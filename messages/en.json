@@ -7455,5 +7455,712 @@
     "admin": "Admin",
     "overview": "Overview",
     "activity": "Activity"
+  },
+  "marketing": {
+    "home": {
+      "seo": {
+        "title": "KolayXport – AI-Powered E-Commerce Command Center | Etsy, eBay & Amazon Tools",
+        "description": "AI listing optimization, market research, order management & shipping — everything for Etsy, eBay, Amazon, Trendyol, Wix and Shopify sellers in one dashboard. Try free for 30 days.",
+        "ogAlt": "KolayXport Overview"
+      },
+      "hero": {
+        "titlePrefix": "AI-Powered",
+        "titleHighlight": "E-Commerce Command Center",
+        "subtitle": "Market research, AI listing optimization, competitor analysis, order management & shipping — everything you need for Etsy, eBay, Amazon, Trendyol, Wix and Shopify, in one dashboard.",
+        "ctaPrimary": "Start 30-Day Free Trial",
+        "ctaSecondary": "Features",
+        "imageAlt": "KolayXport dashboard preview"
+      },
+      "trust": {
+        "heading": "MARKETPLACES YOU CAN MANAGE FROM ONE DASHBOARD"
+      },
+      "features": {
+        "heading": "All Your Selling Tools in One Place",
+        "subheading": "Research, listing, optimization, orders & shipping — KolayXport covers every stage of e-commerce.",
+        "integrationsLinkText": "Explore supported integrations",
+        "items": [
+          {
+            "title": "AI Listing Assistant",
+            "description": "Gemini-powered title, tag and description optimization, AI image generation, alt-text creation and listing SEO scoring. Supercharge your listings with AI."
+          },
+          {
+            "title": "Market Research",
+            "description": "Competitor analysis, niche discovery, keyword intelligence and trend tracking for Etsy, eBay, Amazon and Trendyol. Grow with data-driven decisions."
+          },
+          {
+            "title": "Listing Management",
+            "description": "Create, edit, copy and bulk-manage your Etsy and eBay listings from one dashboard. The draft system saves changes locally first — publish with one click."
+          },
+          {
+            "title": "Photo & Video Studio",
+            "description": "Bulk photo uploads, drag-and-drop reordering, AI image generation and replacement, AI alt text and video management — all in one studio."
+          },
+          {
+            "title": "Automatic Shipping Labels",
+            "description": "Create domestic and international shipping labels in one click with UPS, FedEx, MNG Kargo (DHL eCommerce) and Shippo."
+          },
+          {
+            "title": "Trendyol → eBay Arbitrage",
+            "description": "Auto-scan Trendyol products, compare with eBay prices, and match with AI translation. Instant profit, ROI and fee calculations."
+          },
+          {
+            "title": "Financial Dashboard",
+            "description": "Your Etsy, eBay, Amazon and Trendyol settlement data syncs automatically. P&L, fees, ad spend and exchange rates in one view."
+          },
+          {
+            "title": "Unified Messaging",
+            "description": "View and answer your Wix and Trendyol customer messages from a single inbox, with order context attached."
+          },
+          {
+            "title": "Multi-Channel Sync",
+            "description": "Orders, inventory, and tracking synced in real-time across all marketplaces. Prevent overselling and stock errors."
+          }
+        ]
+      },
+      "powerTools": {
+        "heading": "Powerful Tools for Your Marketplaces",
+        "subheading": "Not just order management — manage the entire journey from research to sale",
+        "fullIntegration": "Full Integration",
+        "etsy": [
+          "Secure connection via the official Etsy Open API v3",
+          "AI title, tag and description optimization",
+          "Draft system: save first, publish with one click",
+          "Photo & Video Studio with AI image generation",
+          "Bulk editing and variation management",
+          "Market research and shop analysis",
+          "Listing SEO grader",
+          "Order sync and tracking management"
+        ],
+        "ebay": [
+          "Trendyol → eBay arbitrage scanner",
+          "AI Optimization Hub: titles and descriptions",
+          "SEO analysis and keyword rank tracking",
+          "Competitor analysis and seller intelligence",
+          "Niche comparison and category explorer",
+          "Keyword intelligence and price analysis",
+          "Listing creation and bulk editing",
+          "Financial intelligence and profit analysis"
+        ],
+        "amazon": [
+          "7 marketplaces: US, TR, DE, UK, FR, IT, ES",
+          "Keyword intelligence and competition analysis",
+          "Competitor listing and seller analysis",
+          "Product tracking and price history",
+          "Saved niche reports",
+          "Order sync via SP-API",
+          "Settlement and finance data"
+        ],
+        "trendyol": [
+          "Product and order sync",
+          "Category explorer and price analysis",
+          "Seller and brand intelligence",
+          "Gemini AI market report",
+          "Q&A and customer messages",
+          "Source scanning for arbitrage",
+          "Settlement and finance data"
+        ]
+      },
+      "arbitrage": {
+        "badge": "Featured",
+        "heading": "Trendyol → eBay Arbitrage Scanner",
+        "description": "Automatically scan thousands of Trendyol products, compare with eBay prices, and find the most profitable opportunities. AI-powered translation matches Turkish products to the right eBay listings.",
+        "items": [
+          "65+ Trendyol categories, one-click scanning",
+          "AI Turkish → English product matching",
+          "Profit, ROI, margin & 28 eBay fee rate calculations",
+          "Background scanning — scan hundreds without timeout",
+          "Price history tracking & product watchlist",
+          "Charts & sortable tables for visual analysis"
+        ],
+        "cta": "Try the Arbitrage Scanner",
+        "trendyolPrice": "Trendyol Price",
+        "ebayMedian": "eBay Median",
+        "profit": "Profit",
+        "roi": "ROI",
+        "score": "Score",
+        "productCost": "Product Cost",
+        "shipping": "Shipping",
+        "ebayFee": "eBay Fees",
+        "netProfit": "Net Profit",
+        "exampleNote": "Real scan example — Turkish Peshtemal category"
+      },
+      "extension": {
+        "badge": "Chrome Extension",
+        "heading": "Instant Research in Your Browser",
+        "description": "The KolayXport Chrome extension shows sales estimates, SEO scores and competition analysis right on the page as you browse Etsy, eBay and Amazon. It also imports your Etsy orders into the dashboard with one click.",
+        "items": [
+          "Instant sales estimates on Etsy, eBay and Amazon product pages",
+          "SEO score and competition badges in search results",
+          "Revenue analysis on shop pages",
+          "One-click order import from Etsy Shop Manager",
+          "Automatic tracking-number push to Etsy"
+        ],
+        "mock": {"salesPerMonth":"Est. Sales/mo","revenue":"Est. Revenue","rating":"Shop Rating"},
+      "cta": "Try It Free"
+      },
+      "included": {
+        "heading": "Included in Every Plan",
+        "subheading": "From research to sales, all tools at your fingertips",
+        "items": [
+          "AI Title, Tag & Description Optimization",
+          "AI Image Generation & Alt Text",
+          "Competitor Analysis & Seller Tracking",
+          "Niche Discovery & Trend Analysis",
+          "Keyword Intelligence",
+          "Bulk Listing & Photo Studio",
+          "Trendyol → eBay Arbitrage Scanner",
+          "Profit Margin & Fee Calculator",
+          "Shipping Labels (UPS, FedEx, MNG, Shippo)",
+          "Multi-Marketplace Sync",
+          "Financial Dashboard & P&L",
+          "Unified Messaging Inbox",
+          "Chrome Research Extension",
+          "Order & Tracking Management",
+          "English & Turkish Interface",
+          "SSL Encrypted Connections"
+        ]
+      },
+      "testimonials": {
+        "heading": "What Our Customers Say",
+        "items": [
+          {
+            "quote": "Thanks to KolayXport I manage my Etsy and eBay orders from a single dashboard. The AI features sped up my listing workflow enormously.",
+            "name": "Etsy Seller"
+          },
+          {
+            "quote": "One-click shipping labels and the market research tools completely changed how I work.",
+            "name": "E-commerce Entrepreneur"
+          },
+          {
+            "quote": "Tracking all my marketplaces in one place and seeing financial reports instantly is amazing.",
+            "name": "Online Store Owner"
+          }
+        ]
+      },
+      "cta": {
+        "heading": "Research, List, Sell — All From One Place.",
+        "subtitle": "Grow your marketplace sales with AI-powered tools.",
+        "pricingLinkText": "See our pricing plans",
+        "button": "Start 30-Day Free Trial",
+        "contactPrompt": "Have questions?",
+        "contactLinkText": "Contact Us"
+      },
+      "faq": {
+        "heading": "Frequently Asked Questions",
+        "items": [
+          {
+            "question": "How long does KolayXport setup take?",
+            "answer": "For the average user, basic integrations and setup can be completed in 30 minutes to 1 hour. Our support team is available to help with detailed configuration."
+          },
+          {
+            "question": "Which marketplaces and carriers are supported?",
+            "answer": "We support the Etsy, eBay, Amazon, Trendyol, Wix and Shopify marketplaces, plus UPS, FedEx, MNG Kargo (DHL eCommerce) and Shippo shipping integrations. You can also import orders from additional channels via Veeqo and Shippo."
+          },
+          {
+            "question": "How do the AI tools work?",
+            "answer": "KolayXport's Gemini-powered AI assistant optimizes titles, tags and descriptions for your Etsy, eBay and Amazon listings, generates product images, writes alt text for your photos, and scores your listings for SEO. It analyzes market data to provide recommendations that increase your sales."
+          },
+          {
+            "question": "What do the market research tools offer?",
+            "answer": "Competitor analysis, seller tracking, niche discovery, keyword intelligence, trend analysis and profit margin calculators for Etsy, eBay, Amazon and Trendyol. It's a built-in alternative to paid tools like eRank and Terapeak."
+          },
+          {
+            "question": "How does the arbitrage scanner work?",
+            "answer": "It automatically pulls products from 65+ Trendyol categories, uses Gemini AI to translate Turkish product names into English eBay search queries, finds matching eBay listings, and calculates profit, ROI, and margin including 28 different eBay fee rates. All data is cached and scanning runs in the background for large scans."
+          },
+          {
+            "question": "What does the Chrome extension do?",
+            "answer": "The extension shows sales estimates, SEO scores and competition analysis right on the page as you browse Etsy, eBay and Amazon. It also imports your orders from Etsy Shop Manager into KolayXport with one click and pushes tracking numbers back to Etsy."
+          },
+          {
+            "question": "How is my data secured?",
+            "answer": "Data security is our top priority. All connections are SSL encrypted, sensitive data (API keys, etc.) is stored encrypted in our database, and we run on enterprise-grade European (Germany) cloud infrastructure."
+          },
+          {
+            "question": "How does the free trial work?",
+            "answer": "A 30-day free trial starts automatically when you create an account. The trial includes 50 order syncs, 10 shipping labels, and all AI and research tools. When it ends, simply pick the Starter or Growth plan to continue."
+          },
+          {
+            "question": "How does KolayXport use the Etsy API?",
+            "answer": "We use Etsy's official Open API v3 with OAuth 2.0 authentication to securely access your shop data, orders, and listings. We only request the permissions necessary for each feature and comply fully with Etsy's API Terms of Use. We do not scrape Etsy — all data is obtained exclusively through the official API."
+          }
+        ]
+      },
+      "disclaimer": "The term \"Etsy\" is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed or certified by Etsy. All other trademarks are the property of their respective owners."
+    },
+    "features": {
+      "seo": {
+        "title": "KolayXport Features | AI-Powered E-Commerce Tools",
+        "description": "AI listing optimization, market research, order sync, shipping labels, arbitrage scanner and more. Discover all KolayXport features.",
+        "ogAlt": "KolayXport Features Page"
+      },
+      "hero": {
+        "titlePrefix": "Discover KolayXport's",
+        "titleHighlight": "Powerful Features",
+        "titleSuffix": "",
+        "subtitle": "Meet the solutions that simplify your e-commerce operations, save you time, and help you grow your business."
+      },
+      "items": [
+        {
+          "title": "Automatic Order Sync",
+          "description": "Automatically pull your orders from Etsy, eBay, Amazon, Trendyol, Wix and Shopify into one central system. Stop manual data entry and save time."
+        },
+        {
+          "title": "Central Order & Stock Management",
+          "description": "Manage orders from all channels in one place. Track products with production statuses, notes and custom order states, and prevent overselling."
+        },
+        {
+          "title": "Shipping Label Creation",
+          "description": "Create domestic and international shipping labels in one click with UPS, FedEx, MNG Kargo (DHL eCommerce) and Shippo. Tracking numbers are pushed to marketplaces automatically."
+        },
+        {
+          "title": "Wide Integration Range",
+          "description": "Seamless integration with Etsy, eBay, Amazon, Trendyol, Wix and Shopify. Consolidate orders from additional channels via Veeqo and Shippo."
+        },
+        {
+          "title": "Easy Setup & Use",
+          "description": "Sign up in minutes with your email or Google account. Our user-friendly interface gets you automating without wrestling with complex settings."
+        },
+        {
+          "title": "AI Listing Optimization",
+          "description": "Optimize your Etsy, eBay and Amazon listings with the Gemini AI assistant. Get title, tag and description suggestions and generate images with AI. Boost sales with research-based, SEO-friendly content."
+        },
+        {
+          "title": "Market Research Tools",
+          "description": "Deep market research for Etsy, eBay, Amazon and Trendyol. Make informed decisions with competitor analysis, trend tracking, keyword research and shop analysis."
+        },
+        {
+          "title": "Arbitrage Scanner",
+          "description": "Auto-scan products from 65+ Trendyol categories, translate to English eBay queries with Gemini AI, and find the most profitable arbitrage opportunities. Full financial analysis including profit, ROI, margin, fees and shipping cost."
+        },
+        {
+          "title": "Financial Analytics Dashboard",
+          "description": "Your Etsy, eBay, Amazon and Trendyol settlement data syncs automatically. Monitor revenue, expenses, fees and ad spend with dynamic exchange rates and a P&L view."
+        },
+        {
+          "title": "Bulk Editing & Draft System",
+          "description": "Bulk-edit your Etsy listings: titles, tags, categories, personalization and more. The draft system saves changes locally first; when you approve, they're pushed to Etsy in one click. Conflict protection prevents accidental overwrites."
+        },
+        {
+          "title": "Photo & Video Studio",
+          "description": "Upload photos individually or in bulk, reorder with drag-and-drop, generate and replace images with AI, create AI alt text and manage your videos."
+        },
+        {
+          "title": "Chrome Research Extension",
+          "description": "See sales estimates, SEO scores and competition analysis right on the page as you browse Etsy, eBay and Amazon. Import Etsy orders into the dashboard with one click."
+        },
+        {
+          "title": "Unified Messaging",
+          "description": "Manage your Wix and Trendyol customer messages from a single inbox with order context. Reply without switching platforms."
+        },
+        {
+          "title": "Secure Data Storage",
+          "description": "Your API keys and sensitive data are protected with advanced encryption. Benefit from the highest security standards on our enterprise European (Germany) server infrastructure."
+        },
+        {
+          "title": "30-Day Free Trial",
+          "description": "All integrations, AI tools and research features free for 30 days. Sign up without a credit card, and pick the plan that fits when you're ready."
+        }
+      ],
+      "cta": {
+        "heading": "Ready to Try KolayXport?",
+        "subtitle": "Take your e-commerce operations to the next level. Try free for 30 days and see the difference.",
+        "button": "Start 30-Day Free Trial"
+      }
+    },
+    "integrations": {
+      "seo": {
+        "title": "Integrations - KolayXport",
+        "description": "Easily integrate with Etsy, eBay, Amazon, Trendyol, Wix and Shopify marketplaces plus UPS, FedEx, MNG Kargo (DHL eCommerce) and Shippo carriers with KolayXport."
+      },
+      "hero": {
+        "title": "From Etsy to Trendyol, UPS to FedEx — Under One Roof",
+        "subtitle": "6 marketplaces, 4 shipping integrations and AI tools. All included in the 30-day free trial."
+      },
+      "categories": {
+        "all": "All",
+        "marketplaces": "Marketplaces",
+        "shipping": "Shipping",
+        "tools": "Tools"
+      },
+      "setupStepsLabel": "Setup Steps:",
+      "detailsLink": "View Details →",
+      "emptyTitle": "No integrations in this category yet.",
+      "emptySubtitle": "Coming soon!",
+      "items": {
+        "etsy": {
+          "description": "Full Etsy integration for handmade and vintage products: order sync, draft-based bulk editing, Photo & Video Studio, AI optimization and research tools.",
+          "steps": [
+            "Connect your Etsy shop",
+            "Sync your listings",
+            "Manage orders"
+          ]
+        },
+        "ebay": {
+          "description": "Sell globally on eBay with order and listing management, a comprehensive research suite, SEO analysis and the arbitrage scanner.",
+          "steps": [
+            "Connect your eBay account",
+            "List products",
+            "Sync orders"
+          ]
+        },
+        "amazon": {
+          "description": "Order sync via SP-API and research tools across 7 marketplaces: US, Turkey, Germany, UK, France, Italy, Spain.",
+          "steps": [
+            "Authorize via SP-API",
+            "Choose your marketplaces",
+            "Pull orders and reports"
+          ]
+        },
+        "trendyol": {
+          "description": "Product and order sync, category-price-brand analysis, seller intelligence and the Gemini AI market report.",
+          "steps": [
+            "Enter your API credentials",
+            "Sync products",
+            "Use the research tools"
+          ]
+        },
+        "wix": {
+          "description": "Product sync, order import and customer messages for your Wix store — with the unified inbox.",
+          "steps": [
+            "Connect your Wix site",
+            "Sync products",
+            "Answer messages from one inbox"
+          ]
+        },
+        "shopify": {
+          "description": "Connect your store with the KolayXport app on the Shopify App Store and sync your orders and products.",
+          "steps": [
+            "Install the KolayXport app",
+            "Connect your store",
+            "Automatic sync"
+          ]
+        },
+        "veeqo": {
+          "description": "Import all channel orders from your Veeqo account into KolayXport and create labels from one dashboard.",
+          "steps": [
+            "Enter your API key",
+            "Sync orders"
+          ]
+        },
+        "ups": {
+          "description": "Create domestic and international shipping labels with UPS, including service type selection and international shipping forms.",
+          "steps": [
+            "Add your UPS account",
+            "Choose service types",
+            "Create labels"
+          ]
+        },
+        "fedex": {
+          "description": "Create and track labels for your global shipments with the FedEx integration.",
+          "steps": [
+            "Add your account number",
+            "Choose service types",
+            "Create labels"
+          ]
+        },
+        "mng": {
+          "description": "Domestic Turkey and international shipments with MNG Kargo (DHL eCommerce), including cash-on-delivery support.",
+          "steps": [
+            "Connect your MNG account",
+            "Verify shipment details",
+            "Create labels"
+          ]
+        },
+        "shippo": {
+          "description": "Multi-carrier support via Shippo with USPS, DHL and more. You can also import your Shippo orders into the dashboard.",
+          "steps": [
+            "Enter your Shippo API key",
+            "Choose carriers",
+            "Create labels"
+          ]
+        },
+        "chrome": {
+          "description": "On-page sales estimates and SEO scores on Etsy, eBay and Amazon, plus one-click Etsy order import.",
+          "steps": [
+            "Install the extension",
+            "Sign in with your KolayXport account",
+            "Browse the marketplaces"
+          ]
+        },
+        "gemini": {
+          "description": "Google Gemini-powered AI: title/tag/description optimization, image generation, alt text and market reports.",
+          "steps": [
+            "Included with your account",
+            "No extra setup needed"
+          ]
+        }
+      }
+    },
+    "corporate": {
+      "seo": {
+        "title": "About Us – KolayXport",
+        "description": "Discover KolayXport's story, mission and vision. Learn how we simplify e-commerce operations.",
+        "ogAlt": "About KolayXport"
+      },
+      "hero": {
+        "title": "About Us",
+        "subtitle": "KolayXport, which accelerates e-commerce sellers' workflows, was born in Istanbul and opened to the world."
+      },
+      "timelineHeading": "Our Journey",
+      "timeline": [
+        {
+          "year": "2019",
+          "title": "Founding & Idea Stage",
+          "description": "The KolayXport idea was born; the first steps toward e-commerce automation were taken."
+        },
+        {
+          "year": "2020",
+          "title": "First Prototype & MVP",
+          "description": "The first prototype with core features was developed and tested with a small user group."
+        },
+        {
+          "year": "2022",
+          "title": "Official Launch & Growth",
+          "description": "KolayXport officially launched and was tested with its first users."
+        },
+        {
+          "year": "2024",
+          "title": "Integrations Expanded",
+          "description": "Etsy, eBay and shipping integrations were completed, laying the foundation for multi-marketplace management."
+        },
+        {
+          "year": "2025",
+          "title": "The AI Transformation",
+          "description": "The first versions of Gemini-powered listing optimization, market research tools and the arbitrage scanner were developed."
+        },
+        {
+          "year": "2026",
+          "title": "Platform Maturity",
+          "description": "Amazon, Trendyol, Wix and Shopify integrations, the Chrome extension, Photo & Video Studio and the financial dashboard went live. Launched on the Shopify App Store."
+        }
+      ],
+      "mvHeading": "Our Mission & Vision",
+      "missionTitle": "Our Mission",
+      "missionText": "To reduce the operational burden on SMEs and e-commerce entrepreneurs so they can focus on their core business. We aim to increase the competitiveness of sellers in Turkey and globally by offering user-friendly, innovative automation solutions that simplify complex processes.",
+      "visionTitle": "Our Vision",
+      "visionText": "To become the first name that comes to mind in e-commerce automation — a trusted, pioneering technology brand. By closely following evolving technology and putting customer feedback at the center, we aim to become a global player offering every tool sellers need on a single platform.",
+      "valuesHeading": "Our Values",
+      "values": [
+        {
+          "title": "Customer Focus",
+          "desc": "Our users' success is our success."
+        },
+        {
+          "title": "Innovation",
+          "desc": "We continuously learn, improve, and integrate the latest technologies."
+        },
+        {
+          "title": "Transparency",
+          "desc": "We build relationships based on open communication and honesty."
+        },
+        {
+          "title": "Teamwork",
+          "desc": "We work together to reach shared goals."
+        },
+        {
+          "title": "Responsibility",
+          "desc": "We take responsibility for our work and its impact on society."
+        },
+        {
+          "title": "Quality",
+          "desc": "We develop solutions with a pursuit of excellence in every detail."
+        }
+      ],
+      "statsHeading": "KolayXport in Numbers",
+      "stats": [
+        {
+          "number": "6+",
+          "label": "Marketplace Integrations",
+          "desc": "Etsy, eBay, Amazon, Trendyol, Wix, Shopify"
+        },
+        {
+          "number": "4",
+          "label": "Shipping Integrations",
+          "desc": "UPS, FedEx, MNG, Shippo"
+        },
+        {
+          "number": "AI",
+          "label": "Powered Tools",
+          "desc": "Listing, research and images"
+        },
+        {
+          "number": "24/7",
+          "label": "Access",
+          "desc": "Reach it from anywhere"
+        }
+      ],
+      "techHeading": "Our Technology Stack",
+      "tech": [
+        {
+          "title": "Security",
+          "description": "We protect your data with SSL encryption, OAuth 2.0 authorization and regular security audits."
+        },
+        {
+          "title": "Scalability",
+          "description": "With our enterprise European (Germany) server infrastructure, we scale capacity as your business grows."
+        },
+        {
+          "title": "Performance",
+          "description": "Optimized APIs and smart caching deliver up-to-date data in seconds."
+        }
+      ],
+      "cta": {
+        "heading": "Join Our Team!",
+        "subtitle": "Want to be part of a dynamic team shaping the future of e-commerce? Check out our open positions.",
+        "button": "Careers"
+      }
+    },
+    "pricing": {
+      "seo": {
+        "title": "KolayXport | Pricing",
+        "description": "Discover KolayXport's transparent and flexible pricing options. Get started with a 30-day free trial.",
+        "ogAlt": "KolayXport Pricing Plans"
+      },
+      "hero": {
+        "titlePrefix": "Try",
+        "titleHighlight": "FREE",
+        "titleSuffix": "for 30 Days",
+        "subtitle": "Try KolayXport free for 30 days. All marketplace integrations, shipping label creation and AI tools are included during the trial.",
+        "ctaStart": "Get Started",
+        "ctaCall": "Call Us"
+      },
+      "plansHeading": "Choose the Plan That Fits You",
+      "plansSubheading": "Transparent, flexible pricing that keeps pace with your business growth. All plans include a 30-day free trial.",
+      "billing": {
+        "monthly": "Monthly",
+        "yearly": "Yearly",
+        "discount": "15% OFF"
+      },
+      "plans": {
+        "starter": {
+          "name": "Starter",
+          "descMonth": "The ideal starting package for small and mid-sized businesses.",
+          "descYear": "Save 15% with annual billing.",
+          "features": [
+            "200 Orders/Month",
+            "100 Shipping Labels/Month",
+            "All Marketplace Integrations",
+            "Standard Support",
+            "1 User"
+          ]
+        },
+        "growth": {
+          "name": "Growth",
+          "descMonth": "Higher limits and priority support for growing businesses.",
+          "descYear": "Save 15% with annual billing.",
+          "features": [
+            "2,000 Orders/Month",
+            "500 Shipping Labels/Month",
+            "Everything in Starter",
+            "Priority Support",
+            "5 Users"
+          ]
+        },
+        "enterprise": {
+          "name": "Enterprise",
+          "price": "Get a Quote",
+          "description": "Tailored solutions for large-scale businesses and custom needs.",
+          "features": [
+            "Unlimited Orders & Labels",
+            "Custom Integration Development",
+            "SLA (Service Level Agreement)",
+            "Priority Phone Support",
+            "Unlimited Users",
+            "Dedicated Account Manager"
+          ],
+          "cta": "Contact Us"
+        }
+      },
+      "trialButton": "Start 30-Day Free Trial",
+      "comparison": {
+        "heading": "Feature Comparison",
+        "subheading": "See the differences between plans.",
+        "headers": [
+          "Feature",
+          "Starter",
+          "Growth",
+          "Enterprise"
+        ],
+        "rows": [
+          [
+            "Order Limit",
+            "200/mo",
+            "2,000/mo",
+            "Unlimited"
+          ],
+          [
+            "Shipping Labels",
+            "100/mo",
+            "500/mo",
+            "Unlimited"
+          ],
+          [
+            "Marketplace Integrations",
+            "All",
+            "All",
+            "All + Custom"
+          ],
+          [
+            "Shipping Integrations",
+            "All",
+            "All",
+            "All + Custom"
+          ],
+          [
+            "Users",
+            "1",
+            "5",
+            "Unlimited"
+          ],
+          [
+            "API Access",
+            "—",
+            "✓",
+            "✓"
+          ],
+          [
+            "Priority Support",
+            "—",
+            "✓",
+            "✓"
+          ],
+          [
+            "Dedicated Account Manager",
+            "—",
+            "—",
+            "✓"
+          ]
+        ]
+      },
+      "faqHeading": "Frequently Asked Questions",
+      "faq": [
+        {
+          "question": "How does the free trial work?",
+          "answer": "A 30-day free trial starts automatically when you create an account. During the trial you can sync 50 orders and create 10 shipping labels. When it ends, simply pick the Starter or Growth plan to continue."
+        },
+        {
+          "question": "Which integrations are available during the trial?",
+          "answer": "All marketplace (Etsy, eBay, Amazon, Trendyol, Wix, Shopify) and shipping (UPS, FedEx, MNG Kargo/DHL eCommerce, Shippo) integrations are included during the trial."
+        },
+        {
+          "question": "What are the order and label limits?",
+          "answer": "Each plan has monthly limits. Trial: 50 order syncs and 10 shipping labels. Starter (₺449/mo): 200 orders and 100 labels. Growth (₺999/mo): 2,000 orders and 500 labels. The Enterprise plan offers unlimited usage."
+        },
+        {
+          "question": "How is my data secured?",
+          "answer": "Your data security is our top priority. All API keys and sensitive data are stored encrypted. Our European (Hetzner) server infrastructure follows the latest security standards."
+        },
+        {
+          "question": "What if I need more users or features?",
+          "answer": "Our Growth plan offers extra users, advanced reporting and API access. For bigger needs, our Enterprise plan provides tailored solutions. Contact us for details."
+        }
+      ],
+      "custom": {
+        "heading": "Need a Custom Plan?",
+        "text": "We can build solutions tailored to your needs. Get in touch with us.",
+        "button": "Contact Us"
+      }
+    }
   }
 }

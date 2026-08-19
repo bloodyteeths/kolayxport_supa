@@ -7455,5 +7455,712 @@
     "admin": "Yönetici",
     "overview": "Genel Bakış",
     "activity": "Aktivite"
+  },
+  "marketing": {
+    "home": {
+      "seo": {
+        "title": "KolayXport – AI Destekli E-Ticaret Komuta Merkezi | Etsy, eBay & Amazon Araçları",
+        "description": "AI listeleme, pazar araştırması, sipariş yönetimi ve kargo — Etsy, eBay, Amazon, Trendyol, Wix ve Shopify satıcıları için hepsi tek panelde. 30 gün ücretsiz deneyin.",
+        "ogAlt": "KolayXport Genel Bakış"
+      },
+      "hero": {
+        "titlePrefix": "AI Destekli",
+        "titleHighlight": "E-Ticaret Komuta Merkezi",
+        "subtitle": "Pazar araştırması, AI listeleme, rakip analizi, sipariş yönetimi ve kargo — Etsy, eBay, Amazon, Trendyol, Wix ve Shopify için ihtiyacınız olan her şey, %100 Türkçe.",
+        "ctaPrimary": "30 Gün Ücretsiz Dene",
+        "ctaSecondary": "Özellikler",
+        "imageAlt": "KolayXport panel önizlemesi"
+      },
+      "trust": {
+        "heading": "TEK PANELDEN YÖNETEBİLECEĞİNİZ PAZARYERLERİ"
+      },
+      "features": {
+        "heading": "Satış Araçlarınızın Tamamı Tek Yerde",
+        "subheading": "Araştırma, listeleme, optimizasyon, sipariş ve kargo — KolayXport, e-ticaretin tüm aşamalarını kapsar.",
+        "integrationsLinkText": "Desteklenen entegrasyonları keşfedin",
+        "items": [
+          {
+            "title": "AI Listeleme Asistanı",
+            "description": "Gemini destekli başlık, etiket ve açıklama optimizasyonu, AI görsel oluşturma, alt metin üretimi ve listeleme SEO puanlama. Listelerinizi yapay zeka ile güçlendirin."
+          },
+          {
+            "title": "Pazar Araştırması",
+            "description": "Etsy, eBay, Amazon ve Trendyol için rakip analizi, niş keşfi, anahtar kelime istihbaratı ve trend takibi. Veri odaklı kararlarla satışlarınızı büyütün."
+          },
+          {
+            "title": "Listeleme Yönetimi",
+            "description": "Etsy ve eBay listelerinizi tek panelden oluşturun, düzenleyin, kopyalayın ve toplu işlem yapın. Taslak sistemi ile değişiklikleri önce kaydedin, tek tıkla yayınlayın."
+          },
+          {
+            "title": "Fotoğraf & Video Stüdyosu",
+            "description": "Toplu fotoğraf yükleme, sürükle-bırak sıralama, AI ile görsel oluşturma ve değiştirme, AI alt metin ve video yönetimi — hepsi tek stüdyoda."
+          },
+          {
+            "title": "Otomatik Kargo Etiketi",
+            "description": "UPS, FedEx, MNG Kargo (DHL eCommerce) ve Shippo ile yurt içi ve uluslararası kargo etiketlerinizi tek tıkla oluşturun."
+          },
+          {
+            "title": "Trendyol → eBay Arbitraj",
+            "description": "Trendyol'daki ürünleri otomatik tarayın, eBay fiyatlarıyla karşılaştırın, AI çeviri ile eşleştirin. Kâr, ROI, komisyon hesabı anında."
+          },
+          {
+            "title": "Finansal Panel",
+            "description": "Etsy, eBay, Amazon ve Trendyol hakediş verileriniz otomatik senkronize edilir. Kar/zarar, komisyon, reklam harcaması ve döviz kuru tek panelde."
+          },
+          {
+            "title": "Birleşik Mesajlaşma",
+            "description": "Wix ve Trendyol müşteri mesajlarınızı sipariş bağlamıyla birlikte tek gelen kutusundan görüntüleyin ve yanıtlayın."
+          },
+          {
+            "title": "Çoklu Kanal Senkronizasyonu",
+            "description": "Sipariş, envanter ve takip bilgilerini tüm pazaryerlerinde anlık senkronize edin. Fazla satış ve stok hatalarını önleyin."
+          }
+        ]
+      },
+      "powerTools": {
+        "heading": "Pazaryerleriniz İçin Güçlü Araçlar",
+        "subheading": "Sadece sipariş yönetimi değil — araştırmadan satışa kadar tüm süreci yönetin",
+        "fullIntegration": "Tam Entegrasyon",
+        "etsy": [
+          "Resmi Etsy Open API v3 ile güvenli bağlantı",
+          "AI başlık, etiket ve açıklama optimizasyonu",
+          "Taslak sistemi: önce kaydet, tek tıkla yayınla",
+          "Fotoğraf & Video Stüdyosu, AI görsel oluşturma",
+          "Toplu düzenleme ve varyant yönetimi",
+          "Pazar araştırması ve mağaza analizi",
+          "Listeleme SEO puanlayıcı",
+          "Sipariş senkronizasyonu ve takip yönetimi"
+        ],
+        "ebay": [
+          "Trendyol → eBay arbitraj tarayıcı",
+          "AI Optimizasyon Merkezi: başlık ve açıklama",
+          "SEO analizi ve anahtar kelime sıralama takibi",
+          "Rakip analizi ve satıcı istihbaratı",
+          "Niş karşılaştırma ve kategori keşfi",
+          "Anahtar kelime istihbaratı ve fiyat analizi",
+          "Listeleme oluşturma ve toplu düzenleme",
+          "Finansal istihbarat ve kar analizi"
+        ],
+        "amazon": [
+          "7 pazar: ABD, TR, DE, UK, FR, IT, ES",
+          "Anahtar kelime istihbaratı ve rekabet analizi",
+          "Rakip listeleme ve satıcı analizi",
+          "Ürün takibi ve fiyat geçmişi",
+          "Kayıtlı niş raporları",
+          "SP-API ile sipariş senkronizasyonu",
+          "Hakediş ve finans verisi"
+        ],
+        "trendyol": [
+          "Ürün ve sipariş senkronizasyonu",
+          "Kategori gezgini ve fiyat analizi",
+          "Satıcı ve marka istihbaratı",
+          "Gemini AI pazar raporu",
+          "Soru-cevap ve müşteri mesajları",
+          "Arbitraj için kaynak tarama",
+          "Hakediş ve finans verisi"
+        ]
+      },
+      "arbitrage": {
+        "badge": "Öne Çıkan",
+        "heading": "Trendyol → eBay Arbitraj Tarayıcı",
+        "description": "Trendyol'daki binlerce ürünü otomatik tarayın, eBay fiyatlarıyla karşılaştırın ve en kârlı fırsatları anında bulun. AI destekli çeviri ile Türkçe ürünleri eBay'de doğru eşleştirin.",
+        "items": [
+          "65+ Trendyol kategorisi, tek tıkla tarama",
+          "AI ile Türkçe → İngilizce ürün eşleştirme",
+          "Kâr, ROI, marj ve 28 eBay komisyon oranı hesabı",
+          "Arka plan tarama — yüzlerce ürünü timeout olmadan tara",
+          "Fiyat geçmişi takibi ve ürün izleme",
+          "Grafik ve tablo ile görsel analiz"
+        ],
+        "cta": "Arbitraj Tarayıcıyı Dene",
+        "trendyolPrice": "Trendyol Fiyat",
+        "ebayMedian": "eBay Medyan",
+        "profit": "Kâr",
+        "roi": "ROI",
+        "score": "Skor",
+        "productCost": "Ürün Maliyeti",
+        "shipping": "Kargo",
+        "ebayFee": "eBay Komisyon",
+        "netProfit": "Net Kâr",
+        "exampleNote": "Gerçek tarama örneği — Türk Peştemal kategorisi"
+      },
+      "extension": {
+        "badge": "Chrome Eklentisi",
+        "heading": "Tarayıcınızda Anlık Araştırma",
+        "description": "KolayXport Chrome eklentisi, Etsy, eBay ve Amazon'da gezinirken satış tahminlerini, SEO skorlarını ve rekabet analizini doğrudan sayfa üzerinde gösterir. Etsy siparişlerinizi tek tıkla panele aktarır.",
+        "items": [
+          "Etsy, eBay ve Amazon ürün sayfalarında anlık satış tahminleri",
+          "Arama sonuçlarında SEO skoru ve rekabet rozetleri",
+          "Mağaza sayfalarında gelir analizi",
+          "Etsy Mağaza Yöneticisi'nden tek tıkla sipariş aktarımı",
+          "Kargo takip numaralarını Etsy'ye otomatik iletme"
+        ],
+        "mock": {"salesPerMonth":"Aylık Satış","revenue":"Tahmini Gelir","rating":"Mağaza Puanı"},
+      "cta": "Ücretsiz Dene"
+      },
+      "included": {
+        "heading": "Her Plana Dahil",
+        "subheading": "Araştırmadan satışa, tüm araçlar elinizin altında",
+        "items": [
+          "AI Başlık, Etiket & Açıklama Optimizasyonu",
+          "AI Görsel Oluşturma & Alt Metin",
+          "Rakip Analizi & Satıcı Takibi",
+          "Niş Keşfi & Trend Analizi",
+          "Anahtar Kelime İstihbaratı",
+          "Toplu Listeleme & Fotoğraf Stüdyosu",
+          "Trendyol → eBay Arbitraj Tarayıcı",
+          "Kar Marjı & Komisyon Hesaplayıcı",
+          "Kargo Etiketi (UPS, FedEx, MNG, Shippo)",
+          "Çoklu Pazaryeri Senkronizasyonu",
+          "Finansal Panel & Kar/Zarar",
+          "Birleşik Mesajlaşma Gelen Kutusu",
+          "Chrome Araştırma Eklentisi",
+          "Sipariş & Takip Yönetimi",
+          "Türkçe Arayüz & Destek",
+          "SSL ile Şifreli Bağlantı"
+        ]
+      },
+      "testimonials": {
+        "heading": "Müşterilerimiz Ne Diyor?",
+        "items": [
+          {
+            "quote": "KolayXport sayesinde Etsy ve eBay siparişlerimi tek panelden yönetiyorum. AI özellikleri listeleme sürecimi çok hızlandırdı.",
+            "name": "Etsy Satıcısı"
+          },
+          {
+            "quote": "Kargo etiketlerini tek tıkla oluşturmak ve pazar araştırma araçları işimi tamamen değiştirdi.",
+            "name": "E-ticaret Girişimcisi"
+          },
+          {
+            "quote": "Tüm pazaryerlerimi tek yerden takip edebilmek, finansal raporları anında görebilmek muhteşem.",
+            "name": "Online Mağaza Sahibi"
+          }
+        ]
+      },
+      "cta": {
+        "heading": "Araştırma, Listeleme, Satış — Hepsini Tek Yerden Yönetin.",
+        "subtitle": "AI destekli araçlarla pazaryeri satışlarınızı büyütün.",
+        "pricingLinkText": "Fiyatlandırma planlarını inceleyin",
+        "button": "30 Gün Ücretsiz Dene",
+        "contactPrompt": "Sorularınız mı var?",
+        "contactLinkText": "Bize Ulaşın"
+      },
+      "faq": {
+        "heading": "Sıkça Sorulan Sorular",
+        "items": [
+          {
+            "question": "KolayXport kurulumu ne kadar sürer?",
+            "answer": "Ortalama bir kullanıcı için temel entegrasyonlar ve kurulum 30 dakika ile 1 saat arasında tamamlanabilir. Detaylı yapılandırmalar için destek ekibimiz yardımcı olmaktadır."
+          },
+          {
+            "question": "Hangi pazaryerleri ve kargo firmaları destekleniyor?",
+            "answer": "Etsy, eBay, Amazon, Trendyol, Wix ve Shopify pazaryerlerini; UPS, FedEx, MNG Kargo (DHL eCommerce) ve Shippo kargo entegrasyonlarını destekliyoruz. Veeqo ve Shippo üzerinden ek kanal siparişlerinizi de aktarabilirsiniz."
+          },
+          {
+            "question": "AI araçları nasıl çalışıyor?",
+            "answer": "KolayXport'un Gemini destekli AI asistanı; Etsy, eBay ve Amazon listeleriniz için başlık, etiket ve açıklama optimizasyonu yapar, ürün görseli oluşturur, fotoğraflarınız için alt metin üretir ve listelerinizi SEO açısından puanlar. Pazar verilerini analiz ederek satışlarınızı artıracak öneriler sunar."
+          },
+          {
+            "question": "Pazar araştırması araçları neler sunuyor?",
+            "answer": "Etsy, eBay, Amazon ve Trendyol için rakip analizi, satıcı takibi, niş keşfi, anahtar kelime istihbaratı, trend analizi ve kar marjı hesaplama araçları sunar. eRank ve Terapeak gibi ücretli araçlara alternatiftir."
+          },
+          {
+            "question": "Arbitraj tarayıcı nasıl çalışıyor?",
+            "answer": "Trendyol'daki 65+ kategoriden ürünleri otomatik çeker, Gemini AI ile Türkçe ürün adlarını İngilizce eBay arama sorgularına çevirir ve eBay'de eşleşen ürünleri bulur. Kâr, ROI, marj ve 28 farklı eBay komisyon oranını hesaplayarak en kârlı fırsatları sıralar. Tüm veriler önbelleğe alınır, arka planda tarama yapılır."
+          },
+          {
+            "question": "Chrome eklentisi ne yapıyor?",
+            "answer": "Eklenti, Etsy, eBay ve Amazon'da gezinirken satış tahminlerini, SEO skorlarını ve rekabet analizini doğrudan sayfa üzerinde gösterir. Ayrıca Etsy Mağaza Yöneticisi'nden siparişlerinizi tek tıkla KolayXport'a aktarır ve kargo takip numaralarınızı Etsy'ye iletir."
+          },
+          {
+            "question": "Veri güvenliğim nasıl sağlanıyor?",
+            "answer": "Veri güvenliğiniz bizim için en üst düzey önceliktir. Tüm bağlantılar SSL ile şifrelenir, hassas verileriniz (API anahtarları vb.) veritabanımızda şifreli olarak saklanır. Avrupa merkezli (Almanya) sunucu altyapısı kullanıyoruz."
+          },
+          {
+            "question": "Ücretsiz deneme nasıl çalışıyor?",
+            "answer": "Hesap oluşturduğunuzda 30 günlük ücretsiz deneme otomatik başlar. Deneme süresince 50 sipariş senkronizasyonu, 10 kargo etiketi ve tüm AI ve araştırma araçları dahildir. Süre dolduğunda devam etmek için Başlangıç veya Büyüme planlarından birini seçebilirsiniz."
+          },
+          {
+            "question": "KolayXport Etsy API'sini nasıl kullanıyor?",
+            "answer": "Mağaza verilerinize, siparişlerinize ve listelerinize güvenli erişim için Etsy'nin resmi Open API v3'ünü OAuth 2.0 ile kullanıyoruz. Her özellik için yalnızca gerekli izinleri talep ediyor ve Etsy API Kullanım Koşulları'na tam uyum sağlıyoruz. Etsy'de veri kazıma (scraping) yapmıyoruz — tüm veriler yalnızca resmi API üzerinden alınır."
+          }
+        ]
+      },
+      "disclaimer": "\"Etsy\" terimi Etsy, Inc. şirketinin ticari markasıdır. Bu uygulama Etsy API'sini kullanır ancak Etsy tarafından desteklenmemekte veya sertifikalandırılmamaktadır. Diğer tüm ticari markalar ilgili sahiplerinin mülkiyetindedir."
+    },
+    "features": {
+      "seo": {
+        "title": "KolayXport Özellikleri | AI Destekli E-Ticaret Araçları",
+        "description": "AI listeleme optimizasyonu, pazar araştırması, sipariş senkronizasyonu, kargo etiketi, arbitraj tarayıcı ve daha fazlası. KolayXport'un tüm özelliklerini keşfedin.",
+        "ogAlt": "KolayXport Özellikler Sayfası"
+      },
+      "hero": {
+        "titlePrefix": "KolayXport'un",
+        "titleHighlight": "Güçlü Özelliklerini",
+        "titleSuffix": "Keşfedin",
+        "subtitle": "E-ticaret operasyonlarınızı basitleştiren, zaman kazandıran ve işinizi büyütmenize yardımcı olan çözümlerimizle tanışın."
+      },
+      "items": [
+        {
+          "title": "Otomatik Sipariş Senkronizasyonu",
+          "description": "Etsy, eBay, Amazon, Trendyol, Wix ve Shopify'dan siparişlerinizi otomatik olarak merkezi bir sisteme aktarın. Manuel veri girişine son verin, zamandan kazanın."
+        },
+        {
+          "title": "Merkezi Sipariş ve Stok Yönetimi",
+          "description": "Tüm kanallardan gelen siparişlerinizi tek bir yerden yönetin. Üretim durumu, notlar ve özel sipariş durumlarıyla ürünlerinizin takibini yapın, fazla satışı engelleyin."
+        },
+        {
+          "title": "Kargo Etiketi Oluşturma",
+          "description": "UPS, FedEx, MNG Kargo (DHL eCommerce) ve Shippo ile yurt içi ve uluslararası kargo etiketlerinizi tek tıkla oluşturun. Takip numaraları pazaryerlerine otomatik iletilir."
+        },
+        {
+          "title": "Geniş Entegrasyon Yelpazesi",
+          "description": "Etsy, eBay, Amazon, Trendyol, Wix ve Shopify ile sorunsuz entegrasyon. Veeqo ve Shippo üzerinden ek kanal siparişlerinizi de tek panele toplayın."
+        },
+        {
+          "title": "Kolay Kurulum ve Kullanım",
+          "description": "E-posta veya Google hesabınızla dakikalar içinde kaydolun. Kullanıcı dostu arayüzümüz sayesinde karmaşık ayarlarla uğraşmadan otomasyona başlayın."
+        },
+        {
+          "title": "AI Liste Optimizasyonu",
+          "description": "Gemini AI destekli akıllı asistan ile Etsy, eBay ve Amazon listelerinizi optimize edin. Başlık, etiket ve açıklama önerileri alın, AI ile görsel oluşturun. Pazar araştırmasına dayalı, SEO uyumlu içeriklerle satışlarınızı artırın."
+        },
+        {
+          "title": "Pazar Araştırma Araçları",
+          "description": "Etsy, eBay, Amazon ve Trendyol için derinlemesine pazar araştırması yapın. Rakip analizi, trend takibi, anahtar kelime araştırması ve mağaza analizi ile bilinçli kararlar verin."
+        },
+        {
+          "title": "Arbitraj Tarayıcı",
+          "description": "65+ Trendyol kategorisinden ürünleri otomatik tarayın, Gemini AI ile İngilizce eBay sorgularına çevirin ve en karlı arbitraj fırsatlarını bulun. Kar, ROI, marj, komisyon oranı ve kargo maliyeti dahil tam finansal analiz."
+        },
+        {
+          "title": "Finansal Analiz Paneli",
+          "description": "Etsy, eBay, Amazon ve Trendyol hakediş verileriniz otomatik senkronize edilir. Gelir, gider, komisyon ve reklam harcamalarınızı dinamik döviz kuru ve kar/zarar tablosuyla tek panelde izleyin."
+        },
+        {
+          "title": "Toplu Düzenleme ve Taslak Sistemi",
+          "description": "Etsy listelerinizi toplu düzenleyin: başlık, etiket, kategori, kişiselleştirme ve daha fazlası. Taslak sistemi değişiklikleri önce yerel kaydeder; siz onaylayınca tek tıkla Etsy'ye gönderilir. Çakışma koruması yanlışlıkla üzerine yazmayı engeller."
+        },
+        {
+          "title": "Fotoğraf & Video Stüdyosu",
+          "description": "Tek veya toplu modda fotoğraf yükleyin, sürükle-bırak ile sıralayın, AI ile görsel oluşturup değiştirin, AI alt metin üretin ve videolarınızı yönetin."
+        },
+        {
+          "title": "Chrome Araştırma Eklentisi",
+          "description": "Etsy, eBay ve Amazon'da gezinirken satış tahminleri, SEO skorları ve rekabet analizini doğrudan sayfa üzerinde görün. Etsy siparişlerinizi tek tıkla panele aktarın."
+        },
+        {
+          "title": "Birleşik Mesajlaşma",
+          "description": "Wix ve Trendyol müşteri mesajlarınızı sipariş bağlamıyla birlikte tek gelen kutusundan yönetin. Platformlar arasında geçiş yapmadan yanıtlayın."
+        },
+        {
+          "title": "Güvenli Veri Saklama",
+          "description": "API anahtarlarınız ve hassas verileriniz gelişmiş şifreleme yöntemleriyle korunur. Avrupa merkezli (Almanya) kurumsal sunucu altyapımızın sunduğu en yüksek güvenlik standartlarından faydalanın."
+        },
+        {
+          "title": "30 Gün Ücretsiz Deneme",
+          "description": "Tüm entegrasyonlar, AI araçları ve araştırma özellikleri 30 gün boyunca ücretsiz. Kredi kartı gerekmeden kaydolun, memnun kalırsanız size uygun planı seçin."
+        }
+      ],
+      "cta": {
+        "heading": "KolayXport'u Denemeye Hazır mısınız?",
+        "subtitle": "E-ticaret operasyonlarınızı bir üst seviyeye taşıyın. 30 gün ücretsiz deneyin ve farkı görün.",
+        "button": "30 Gün Ücretsiz Deneyin"
+      }
+    },
+    "integrations": {
+      "seo": {
+        "title": "Entegrasyonlar - KolayXport",
+        "description": "KolayXport ile Etsy, eBay, Amazon, Trendyol, Wix, Shopify pazaryerlerine ve UPS, FedEx, MNG Kargo (DHL eCommerce), Shippo kargo firmalarına kolayca entegre olun."
+      },
+      "hero": {
+        "title": "Etsy'den Trendyol'a, UPS'ten FedEx'e — Tek Çatı Altında",
+        "subtitle": "6 pazaryeri, 4 kargo entegrasyonu ve AI araçları. 30 gün ücretsiz denemede hepsi dahil."
+      },
+      "categories": {
+        "all": "Tümü",
+        "marketplaces": "Pazaryerleri",
+        "shipping": "Kargo",
+        "tools": "Araçlar"
+      },
+      "setupStepsLabel": "Kurulum Adımları:",
+      "detailsLink": "Detayları Gör →",
+      "emptyTitle": "Bu kategoride henüz entegrasyon bulunmamaktadır.",
+      "emptySubtitle": "Yakında eklenecektir!",
+      "items": {
+        "etsy": {
+          "description": "El yapımı ve vintage ürünler için tam Etsy entegrasyonu: sipariş senkronizasyonu, taslak sistemli toplu düzenleme, Fotoğraf & Video Stüdyosu, AI optimizasyon ve araştırma araçları.",
+          "steps": [
+            "Etsy mağazanızı bağlayın",
+            "Listelerinizi senkronize edin",
+            "Siparişleri yönetin"
+          ]
+        },
+        "ebay": {
+          "description": "Sipariş ve listeleme yönetimi, kapsamlı araştırma paketi, SEO analizi ve arbitraj tarayıcı ile eBay'de global satış yapın.",
+          "steps": [
+            "eBay hesabınızı bağlayın",
+            "Ürünleri listeleyin",
+            "Siparişleri senkronize edin"
+          ]
+        },
+        "amazon": {
+          "description": "SP-API ile sipariş senkronizasyonu ve 7 pazarda araştırma araçları: ABD, Türkiye, Almanya, İngiltere, Fransa, İtalya, İspanya.",
+          "steps": [
+            "SP-API yetkilendirmesi yapın",
+            "Pazarlarınızı seçin",
+            "Siparişleri ve raporları çekin"
+          ]
+        },
+        "trendyol": {
+          "description": "Ürün ve sipariş senkronizasyonu, kategori-fiyat-marka analizi, satıcı istihbaratı ve Gemini AI pazar raporu.",
+          "steps": [
+            "API bilgilerinizi girin",
+            "Ürünleri senkronize edin",
+            "Araştırma araçlarını kullanın"
+          ]
+        },
+        "wix": {
+          "description": "Wix mağazanız için ürün senkronizasyonu, sipariş aktarımı ve müşteri mesajları — birleşik gelen kutusuyla.",
+          "steps": [
+            "Wix sitenizi bağlayın",
+            "Ürünleri senkronize edin",
+            "Mesajları tek kutudan yanıtlayın"
+          ]
+        },
+        "shopify": {
+          "description": "Shopify App Store'daki KolayXport uygulaması ile mağazanızı bağlayın, sipariş ve ürünlerinizi senkronize edin.",
+          "steps": [
+            "KolayXport uygulamasını yükleyin",
+            "Mağazanızı bağlayın",
+            "Otomatik senkronizasyon"
+          ]
+        },
+        "veeqo": {
+          "description": "Veeqo hesabınızdaki tüm kanal siparişlerini KolayXport'a aktarın, etiketleri tek panelden oluşturun.",
+          "steps": [
+            "API anahtarınızı girin",
+            "Siparişleri senkronize edin"
+          ]
+        },
+        "ups": {
+          "description": "UPS ile yurt içi ve uluslararası kargo etiketi oluşturma, servis tipi seçimi ve uluslararası gönderi formları.",
+          "steps": [
+            "UPS hesabınızı ekleyin",
+            "Servis tiplerini seçin",
+            "Etiket oluşturun"
+          ]
+        },
+        "fedex": {
+          "description": "FedEx entegrasyonu ile global gönderileriniz için etiket oluşturun ve takip edin.",
+          "steps": [
+            "Hesap numaranızı ekleyin",
+            "Servis tiplerini seçin",
+            "Etiket oluşturun"
+          ]
+        },
+        "mng": {
+          "description": "MNG Kargo (DHL eCommerce) ile Türkiye içi ve uluslararası gönderiler, kapıda ödeme desteği dahil.",
+          "steps": [
+            "MNG hesabınızı bağlayın",
+            "Gönderi bilgilerini doğrulayın",
+            "Etiket oluşturun"
+          ]
+        },
+        "shippo": {
+          "description": "Shippo üzerinden USPS, DHL ve daha fazla taşıyıcıyla çoklu kargo desteği. Shippo siparişlerinizi de panele aktarabilirsiniz.",
+          "steps": [
+            "Shippo API anahtarınızı girin",
+            "Taşıyıcıları seçin",
+            "Etiket oluşturun"
+          ]
+        },
+        "chrome": {
+          "description": "Etsy, eBay ve Amazon'da sayfa üzerinde satış tahminleri, SEO skorları ve tek tıkla Etsy sipariş aktarımı.",
+          "steps": [
+            "Eklentiyi kurun",
+            "KolayXport hesabınızla giriş yapın",
+            "Pazaryerlerinde gezinin"
+          ]
+        },
+        "gemini": {
+          "description": "Google Gemini destekli AI: başlık/etiket/açıklama optimizasyonu, görsel oluşturma, alt metin ve pazar raporları.",
+          "steps": [
+            "Hesabınızla birlikte gelir",
+            "Ek kurulum gerektirmez"
+          ]
+        }
+      }
+    },
+    "corporate": {
+      "seo": {
+        "title": "Hakkımızda – KolayXport",
+        "description": "KolayXport'un hikayesini, misyonunu ve vizyonunu keşfedin. E-ticaret operasyonlarını nasıl kolaylaştırdığımızı öğrenin.",
+        "ogAlt": "KolayXport Hakkında"
+      },
+      "hero": {
+        "title": "Hakkımızda",
+        "subtitle": "E-ticaret satıcılarının süreçlerini hızlandıran KolayXport, İstanbul'da doğdu, dünyaya açıldı."
+      },
+      "timelineHeading": "Yolculuğumuz",
+      "timeline": [
+        {
+          "year": "2019",
+          "title": "Kuruluş ve Fikir Aşaması",
+          "description": "KolayXport fikri doğdu, e-ticaret otomasyonu için ilk adımlar atıldı."
+        },
+        {
+          "year": "2020",
+          "title": "İlk Prototip ve MVP",
+          "description": "Temel özelliklerle ilk prototip geliştirildi ve küçük bir kullanıcı grubuyla test edildi."
+        },
+        {
+          "year": "2022",
+          "title": "Resmi Lansman ve Büyüme",
+          "description": "KolayXport resmi olarak piyasaya sürüldü, ilk kullanıcılarla test edildi."
+        },
+        {
+          "year": "2024",
+          "title": "Entegrasyonlar Genişledi",
+          "description": "Etsy, eBay ve kargo entegrasyonları tamamlandı, çoklu pazaryeri yönetiminin temelleri atıldı."
+        },
+        {
+          "year": "2025",
+          "title": "AI Dönüşümü",
+          "description": "Gemini destekli listeleme optimizasyonu, pazar araştırma araçları ve arbitraj tarayıcının ilk sürümleri geliştirildi."
+        },
+        {
+          "year": "2026",
+          "title": "Platform Olgunluğu",
+          "description": "Amazon, Trendyol, Wix ve Shopify entegrasyonları, Chrome eklentisi, Fotoğraf & Video Stüdyosu ve finansal panel yayına alındı. Shopify App Store lansmanı gerçekleşti."
+        }
+      ],
+      "mvHeading": "Misyonumuz & Vizyonumuz",
+      "missionTitle": "Misyonumuz",
+      "missionText": "KOBİ'lerin ve e-ticaret girişimcilerinin operasyonel yüklerini azaltarak, onların esas işlerine odaklanmalarını sağlamak. Karmaşık süreçleri basitleştiren, kullanıcı dostu ve yenilikçi otomasyon çözümleri sunarak Türkiye'deki ve globaldeki satıcıların rekabet gücünü artırmayı hedefliyoruz.",
+      "visionTitle": "Vizyonumuz",
+      "visionText": "E-ticaret otomasyonunda akla ilk gelen, güvenilir ve öncü bir teknoloji markası olmak. Sürekli gelişen teknolojiyi yakından takip ederek ve müşteri geri bildirimlerini merkeze alarak, satıcıların ihtiyaç duyduğu tüm araçları tek bir platformda sunan, global bir oyuncu haline gelmek.",
+      "valuesHeading": "Değerlerimiz",
+      "values": [
+        {
+          "title": "Müşteri Odaklılık",
+          "desc": "Kullanıcılarımızın başarısı, bizim başarımızdır."
+        },
+        {
+          "title": "İnovasyon",
+          "desc": "Sürekli öğrenir, gelişir ve en yeni teknolojileri entegre ederiz."
+        },
+        {
+          "title": "Şeffaflık",
+          "desc": "Açık iletişim ve dürüstlük üzerine kurulu ilişkiler inşa ederiz."
+        },
+        {
+          "title": "Takım Çalışması",
+          "desc": "Ortak hedeflere ulaşmak için birlikte çalışırız."
+        },
+        {
+          "title": "Sorumluluk",
+          "desc": "Yaptığımız işin ve topluma olan etkimizin sorumluluğunu alırız."
+        },
+        {
+          "title": "Kalite",
+          "desc": "Her detayda mükemmellik arayışıyla çözümler geliştiririz."
+        }
+      ],
+      "statsHeading": "Sayılarla KolayXport",
+      "stats": [
+        {
+          "number": "6+",
+          "label": "Pazaryeri Entegrasyonu",
+          "desc": "Etsy, eBay, Amazon, Trendyol, Wix, Shopify"
+        },
+        {
+          "number": "4",
+          "label": "Kargo Entegrasyonu",
+          "desc": "UPS, FedEx, MNG, Shippo"
+        },
+        {
+          "number": "AI",
+          "label": "Destekli Araçlar",
+          "desc": "Listeleme, araştırma ve görsel"
+        },
+        {
+          "number": "7/24",
+          "label": "Erişim",
+          "desc": "Her yerden ulaşım"
+        }
+      ],
+      "techHeading": "Teknoloji Altyapımız",
+      "tech": [
+        {
+          "title": "Güvenlik",
+          "description": "SSL şifrelemesi, OAuth 2.0 yetkilendirmesi ve düzenli güvenlik denetimleri ile verilerinizi koruyoruz."
+        },
+        {
+          "title": "Ölçeklenebilirlik",
+          "description": "Avrupa merkezli (Almanya) kurumsal sunucu altyapımız ile işletmenizin büyümesine paralel olarak kapasitemizi artırıyoruz."
+        },
+        {
+          "title": "Performans",
+          "description": "Optimize edilmiş API'ler ve akıllı önbellekleme ile saniyeler içinde güncel veri sağlıyoruz."
+        }
+      ],
+      "cta": {
+        "heading": "Ekibimize Katılın!",
+        "subtitle": "E-ticaretin geleceğini şekillendiren dinamik bir ekibin parçası olmak ister misiniz? Açık pozisyonlarımızı inceleyin.",
+        "button": "Kariyerler"
+      }
+    },
+    "pricing": {
+      "seo": {
+        "title": "KolayXport | Fiyatlandırma",
+        "description": "KolayXport'un şeffaf ve esnek fiyatlandırma seçeneklerini keşfedin. 30 gün ücretsiz deneme ile hemen başlayın.",
+        "ogAlt": "KolayXport Fiyatlandırma Planları"
+      },
+      "hero": {
+        "titlePrefix": "30 Gün",
+        "titleHighlight": "ÜCRETSİZ",
+        "titleSuffix": "Deneyin",
+        "subtitle": "KolayXport'u 30 gün boyunca ücretsiz deneyin. Tüm pazaryeri entegrasyonları, kargo etiketi oluşturma ve AI araçları deneme süresince dahil.",
+        "ctaStart": "Hemen Başla",
+        "ctaCall": "Bizi Arayın"
+      },
+      "plansHeading": "Size Uygun Planı Seçin",
+      "plansSubheading": "Şeffaf, esnek ve işletmenizin büyümesine ayak uyduran fiyatlandırma. Tüm planlar 30 gün ücretsiz deneme içerir.",
+      "billing": {
+        "monthly": "Aylık",
+        "yearly": "Yıllık",
+        "discount": "%15 İNDİRİM"
+      },
+      "plans": {
+        "starter": {
+          "name": "Başlangıç",
+          "descMonth": "Küçük ve orta ölçekli işletmeler için ideal başlangıç paketi.",
+          "descYear": "Yıllık ödemede %15 indirim kazanın.",
+          "features": [
+            "200 Sipariş/Ay",
+            "100 Kargo Etiketi/Ay",
+            "Tüm Pazaryeri Entegrasyonları",
+            "Standart Destek",
+            "1 Kullanıcı"
+          ]
+        },
+        "growth": {
+          "name": "Büyüme",
+          "descMonth": "Büyüyen işletmeler için daha yüksek limitler ve öncelikli destek.",
+          "descYear": "Yıllık ödemede %15 indirim kazanın.",
+          "features": [
+            "2000 Sipariş/Ay",
+            "500 Kargo Etiketi/Ay",
+            "Başlangıç Planındaki Her Şey",
+            "Öncelikli Destek",
+            "5 Kullanıcı"
+          ]
+        },
+        "enterprise": {
+          "name": "Kurumsal",
+          "price": "Teklif Al",
+          "description": "Büyük ölçekli işletmeler ve özel ihtiyaçlar için kişiselleştirilmiş çözümler.",
+          "features": [
+            "Limitsiz Sipariş & Etiket",
+            "Özel Entegrasyon Geliştirme",
+            "SLA (Servis Seviyesi Anlaşması)",
+            "Öncelikli Telefon Desteği",
+            "Sınırsız Kullanıcı",
+            "Özel Hesap Yöneticisi"
+          ],
+          "cta": "Bize Ulaşın"
+        }
+      },
+      "trialButton": "30 Gün Ücretsiz Dene",
+      "comparison": {
+        "heading": "Özellik Karşılaştırması",
+        "subheading": "Planlar arasındaki farkları inceleyin.",
+        "headers": [
+          "Özellik",
+          "Başlangıç",
+          "Büyüme",
+          "Kurumsal"
+        ],
+        "rows": [
+          [
+            "Sipariş Limiti",
+            "200/ay",
+            "2.000/ay",
+            "Sınırsız"
+          ],
+          [
+            "Kargo Etiketi",
+            "100/ay",
+            "500/ay",
+            "Sınırsız"
+          ],
+          [
+            "Pazaryeri Entegrasyonları",
+            "Tümü",
+            "Tümü",
+            "Tümü + Özel"
+          ],
+          [
+            "Kargo Entegrasyonları",
+            "Tümü",
+            "Tümü",
+            "Tümü + Özel"
+          ],
+          [
+            "Kullanıcı Sayısı",
+            "1",
+            "5",
+            "Sınırsız"
+          ],
+          [
+            "API Erişimi",
+            "—",
+            "✓",
+            "✓"
+          ],
+          [
+            "Öncelikli Destek",
+            "—",
+            "✓",
+            "✓"
+          ],
+          [
+            "Özel Hesap Yöneticisi",
+            "—",
+            "—",
+            "✓"
+          ]
+        ]
+      },
+      "faqHeading": "Sıkça Sorulan Sorular",
+      "faq": [
+        {
+          "question": "Ücretsiz deneme nasıl çalışıyor?",
+          "answer": "Hesap oluşturduğunuzda otomatik olarak 30 günlük ücretsiz deneme başlar. Deneme süresince 50 sipariş senkronizasyonu ve 10 kargo etiketi oluşturabilirsiniz. Deneme süresi dolduktan sonra kullanmaya devam etmek için Başlangıç veya Büyüme planlarından birini seçmeniz yeterli."
+        },
+        {
+          "question": "Deneme süresinde hangi entegrasyonlar mevcut?",
+          "answer": "Deneme süresince tüm pazaryeri (Etsy, eBay, Amazon, Trendyol, Wix, Shopify) ve kargo (UPS, FedEx, MNG Kargo/DHL eCommerce, Shippo) entegrasyonları dahildir."
+        },
+        {
+          "question": "Sipariş veya etiket limitleri nelerdir?",
+          "answer": "Her planın aylık limitleri vardır. Deneme: 50 sipariş senkronizasyonu ve 10 kargo etiketi. Başlangıç (₺449/ay): 200 sipariş ve 100 etiket. Büyüme (₺999/ay): 2.000 sipariş ve 500 etiket. Kurumsal plan için limitsiz kullanım mevcuttur."
+        },
+        {
+          "question": "Veri güvenliğim nasıl sağlanıyor?",
+          "answer": "Veri güvenliğiniz en büyük önceliğimizdir. Tüm API anahtarları ve hassas veriler şifrelenerek saklanır. Avrupa merkezli (Hetzner) sunucu altyapımızda en güncel güvenlik standartlarına uyuyoruz."
+        },
+        {
+          "question": "Daha fazla kullanıcıya veya özelliğe ihtiyacım olursa ne yapmalıyım?",
+          "answer": "Büyüme planımız ek kullanıcılar, gelişmiş raporlama ve API erişimi gibi özellikler sunar. Daha büyük ihtiyaçlarınız için Kurumsal planımızla size özel çözümler üretebiliriz. Detaylar için bizimle iletişime geçebilirsiniz."
+        }
+      ],
+      "custom": {
+        "heading": "Size Özel Bir Plan mı Lazım?",
+        "text": "İhtiyaçlarınız doğrultusunda size özel çözümler üretebiliriz. Bizimle iletişime geçin.",
+        "button": "İletişime Geç"
+      }
+    }
   }
 }

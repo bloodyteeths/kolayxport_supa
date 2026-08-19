@@ -6,6 +6,7 @@ import { Menu, X } from 'lucide-react'; // Using lucide-react for icons
 import { signIn as nextAuthSignIn } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { useTranslations } from 'next-intl';
+import useLocaleStore from '@/lib/stores/useLocaleStore';
 
 const getNavLinks = (t) => [
   { name: t('corporate'), href: '/kurumsal' },
@@ -48,6 +49,7 @@ const PublicNav = ({ ctaLabel }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const router = useRouter();
   const t = useTranslations('public');
+  const setLocale = useLocaleStore((s) => s.setLocale);
   const navLinks = getNavLinks(t);
   const resolvedCtaLabel = ctaLabel || t('ctaSignIn');
 
@@ -98,6 +100,7 @@ const PublicNav = ({ ctaLabel }) => {
             <motion.div variants={linkVariants}>
               <Link
                 href={router.asPath === '/en' ? '/' : '/en'}
+                onClick={() => setLocale(router.asPath === '/en' ? 'tr' : 'en')}
                 className="text-xs font-semibold text-gray-500 hover:text-blue-600 border border-gray-300 rounded px-2 py-1 transition-colors">
                   {router.asPath === '/en' ? 'TR' : 'EN'}
               </Link>

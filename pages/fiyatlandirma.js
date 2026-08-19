@@ -5,11 +5,12 @@ import { loadStripe } from '@stripe/stripe-js';
 import PublicLayout from '../components/PublicLayout';
 import { motion } from 'framer-motion';
 import { Disclosure, Transition } from '@headlessui/react';
-import { CheckCircle, ChevronDown, Zap, ShieldCheck, Star, MessageSquare, TrendingUp } from 'lucide-react';
+import { CheckCircle, ChevronDown, ShieldCheck, Star, TrendingUp } from 'lucide-react';
 import { NextSeo } from 'next-seo';
 import { signIn as nextAuthSignIn } from 'next-auth/react';
+import { useTranslations } from 'next-intl';
 
-const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY 
+const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
   : null;
 
@@ -25,141 +26,20 @@ const cardHover = {
   transition: { type: 'spring', stiffness: 300 },
 };
 
-const plansData = {
-  month: [
-    {
-      name: 'Başlangıç',
-      id: 'tier-starter-month',
-      priceMonthly: '₺449',
-      planKey: 'starter',
-      frequency: '/ ay',
-      description: 'Küçük ve orta ölçekli işletmeler için ideal başlangıç paketi.',
-      features: [
-        '200 Sipariş/Ay',
-        '100 Kargo Etiketi/Ay',
-        'Tüm Pazaryeri Entegrasyonları',
-        'Standart Destek',
-        '1 Kullanıcı',
-      ],
-      highlight: false,
-      icon: Star,
-    },
-    {
-      name: 'Büyüme',
-      id: 'tier-growth-month',
-      priceMonthly: '₺999',
-      planKey: 'growth',
-      frequency: '/ ay',
-      description: 'Büyüyen işletmeler için daha yüksek limitler ve öncelikli destek.',
-      features: [
-        '2000 Sipariş/Ay',
-        '500 Kargo Etiketi/Ay',
-        'Starter Planındaki Her Şey',
-        'Öncelikli Destek',
-        '5 Kullanıcı',
-      ],
-      highlight: true,
-      icon: TrendingUp,
-    },
-  ],
-  year: [
-    {
-      name: 'Başlangıç',
-      id: 'tier-starter-year',
-      priceMonthly: '₺4,490',
-      planKey: 'starter',
-      frequency: '/ yıl',
-      description: 'Yıllık ödemede %15 indirim kazanın.',
-      features: [
-        '200 Sipariş/Ay',
-        '100 Kargo Etiketi/Ay',
-        'Tüm Pazaryeri Entegrasyonları',
-        'Standart Destek',
-        '1 Kullanıcı',
-      ],
-      highlight: false,
-      icon: Star,
-    },
-    {
-      name: 'Büyüme',
-      id: 'tier-growth-year',
-      priceMonthly: '₺9,990',
-      planKey: 'growth',
-      frequency: '/ yıl',
-      description: 'Yıllık ödemede %15 indirim kazanın.',
-      features: [
-        '2000 Sipariş/Ay',
-        '500 Kargo Etiketi/Ay',
-        'Starter Planındaki Her Şey',
-        'Öncelikli Destek',
-        '5 Kullanıcı',
-      ],
-      highlight: true,
-      icon: TrendingUp,
-    },
-  ],
+// Prices are data, not copy — they stay here and must match the Stripe price
+// env vars (PRICE_STARTER_MONTH etc.). All human-readable strings come from
+// messages/*.json under marketing.pricing.
+const planPrices = {
+  month: { starter: '₺449', growth: '₺999' },
+  year: { starter: '₺4,490', growth: '₺9,990' },
 };
-
-const enterprisePlan = {
-  name: 'Kurumsal',
-  id: 'tier-enterprise',
-  priceMonthly: 'Teklif Al',
-  frequency: '',
-  description: 'Büyük ölçekli işletmeler ve özel ihtiyaçlar için kişiselleştirilmiş çözümler.',
-  features: [
-    'Limitsiz Sipariş & Etiket',
-    'Özel Entegrasyon Geliştirme',
-    'SLA (Servis Seviyesi Anlaşması)',
-    'Öncelikli Telefon Desteği',
-    'Sınırsız Kullanıcı',
-    'Özel Hesap Yöneticisi',
-  ],
-  href_contact: '/iletisim?subject=Kurumsal%20Teklif%20Talebi',
-  highlight: false,
-  icon: ShieldCheck,
-};
-
-
-const comparisonData = {
-  headers: ['Özellik', 'Başlangıç', 'Büyüme', 'Kurumsal'],
-  rows: [
-    ['Sipariş Limiti', '200/ay', '2.000/ay', 'Sınırsız'],
-    ['Kargo Etiketi', '100/ay', '500/ay', 'Sınırsız'],
-    ['Pazaryeri Entegrasyonları', 'Tümü', 'Tümü', 'Tümü + Özel'],
-    ['Kargo Entegrasyonları', 'Tümü', 'Tümü', 'Tümü + Özel'],
-    ['Kullanıcı Sayısı', '1', '5', 'Sınırsız'],
-    ['API Erişimi', '\u2014', '\u2713', '\u2713'],
-    ['Öncelikli Destek', '\u2014', '\u2713', '\u2713'],
-    ['Özel Hesap Yöneticisi', '\u2014', '\u2014', '\u2713'],
-  ],
-};
-
-const faqItems = [
-  {
-    question: 'Ücretsiz deneme nasıl çalışıyor?',
-    answer: 'Hesap oluşturduğunuzda otomatik olarak 30 günlük ücretsiz deneme başlar. Deneme süresince 50 sipariş senkronizasyonu ve 10 kargo etiketi oluşturabilirsiniz. Deneme süresi dolduktan sonra kullanmaya devam etmek için Başlangıç veya Büyüme planlarından birini seçmeniz yeterli.',
-  },
-  {
-    question: 'Deneme süresinde hangi entegrasyonlar mevcut?',
-    answer: 'Deneme süresince tüm pazaryeri (Etsy, eBay, Trendyol, Hepsiburada vb.) ve kargo (FedEx, UPS, DHL vb.) entegrasyonları dahildir. Entegrasyon listemizi sürekli genişletiyoruz.',
-  },
-  {
-    question: 'Sipariş veya etiket limitleri nelerdir?',
-    answer: 'Her planın aylık limitleri vardır. Deneme: 50 sipariş senkronizasyonu ve 10 kargo etiketi. Başlangıç (₺449/ay): 200 sipariş ve 100 etiket. Büyüme (₺999/ay): 2.000 sipariş ve 500 etiket. Kurumsal plan için limitsiz kullanım mevcuttur.',
-  },
-  {
-    question: 'Veri güvenliğim nasıl sağlanıyor?',
-    answer: 'Veri güvenliğiniz en büyük önceliğimizdir. Tüm API anahtarları ve hassas veriler şifrelenerek saklanır. Avrupa merkezli (Hetzner) sunucu altyapımızda en güncel güvenlik standartlarına uyuyoruz.',
-  },
-  {
-    question: 'Daha fazla kullanıcıya veya özelliğe ihtiyacım olursa ne yapmalıyım?',
-    answer: 'Büyüme planımız ek kullanıcılar, gelişmiş raporlama ve API erişimi gibi özellikler sunar. Daha büyük ihtiyaçlarınız için Kurumsal planımızla size özel çözümler üretebiliriz. Detaylar için bizimle iletişime geçebilirsiniz.',
-  },
-];
 
 export default function FiyatlandirmaPage() {
   const [billingInterval, setBillingInterval] = useState('month');
   const router = useRouter();
+  const t = useTranslations('marketing.pricing');
+  const comparison = t.raw('comparison');
+  const faqItems = t.raw('faq');
 
   // Shopify-installed merchants are on the free Shopify tier — App Store rules
   // forbid showing them Stripe pricing. Redirect to /ayarlar so the reviewer (and
@@ -222,7 +102,7 @@ export default function FiyatlandirmaPage() {
 
       const stripe = await stripePromise;
       const { error: redirectError } = await stripe.redirectToCheckout({ sessionId });
-      
+
       if (redirectError) {
         throw redirectError;
       }
@@ -231,22 +111,57 @@ export default function FiyatlandirmaPage() {
     }
   };
 
-  const plans = [...plansData[billingInterval], enterprisePlan];
-
+  const frequency = billingInterval === 'month' ? '/ ay' : '/ yıl';
+  const descKey = billingInterval === 'month' ? 'descMonth' : 'descYear';
+  const plans = [
+    {
+      planKey: 'starter',
+      id: `tier-starter-${billingInterval}`,
+      name: t('plans.starter.name'),
+      priceMonthly: planPrices[billingInterval].starter,
+      frequency,
+      description: t(`plans.starter.${descKey}`),
+      features: t.raw('plans.starter.features'),
+      highlight: false,
+      icon: Star,
+    },
+    {
+      planKey: 'growth',
+      id: `tier-growth-${billingInterval}`,
+      name: t('plans.growth.name'),
+      priceMonthly: planPrices[billingInterval].growth,
+      frequency,
+      description: t(`plans.growth.${descKey}`),
+      features: t.raw('plans.growth.features'),
+      highlight: true,
+      icon: TrendingUp,
+    },
+    {
+      id: 'tier-enterprise',
+      name: t('plans.enterprise.name'),
+      priceMonthly: t('plans.enterprise.price'),
+      frequency: '',
+      description: t('plans.enterprise.description'),
+      features: t.raw('plans.enterprise.features'),
+      href_contact: '/iletisim?subject=Kurumsal%20Teklif%20Talebi',
+      highlight: false,
+      icon: ShieldCheck,
+    },
+  ];
 
   return (
     <PublicLayout
-      title="KolayXport | Fiyatlandırma"
-      description="KolayXport\'un şeffaf ve esnek fiyatlandırma seçeneklerini keşfedin. 30 gün ücretsiz deneme ile hemen başlayın."
+      title={t('seo.title')}
+      description={t('seo.description')}
     >
       <NextSeo
         openGraph={{
           images: [
             {
-              url: 'https://kolayxport.com/og-pricing.png', // Ensure this image exists in public folder
+              url: 'https://kolayxport.com/og-pricing.png',
               width: 1200,
               height: 630,
-              alt: 'KolayXport Fiyatlandırma Planları',
+              alt: t('seo.ogAlt'),
             },
           ],
         }}
@@ -259,7 +174,7 @@ export default function FiyatlandirmaPage() {
         animate="visible"
       >
         <div className="absolute inset-0 pointer-events-none">
-            <div 
+            <div
                 className="absolute inset-0 animate-slow-spin opacity-30 md:opacity-40"
                 style={{
                     background: `
@@ -276,7 +191,7 @@ export default function FiyatlandirmaPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
           >
-            30 Gün <span className="text-blue-600">ÜCRETSİZ</span> Deneyin
+            {t('hero.titlePrefix')} <span className="text-blue-600">{t('hero.titleHighlight')}</span> {t('hero.titleSuffix')}
           </motion.h1>
           <motion.p
             className="mt-6 max-w-2xl mx-auto text-lg sm:text-xl text-slate-600"
@@ -284,7 +199,7 @@ export default function FiyatlandirmaPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.4 }}
           >
-            KolayXport'u 30 gün boyunca ücretsiz deneyin. Tüm pazaryeri entegrasyonları, kargo etiketi oluşturma ve AI araçları deneme süresince dahil.
+            {t('hero.subtitle')}
           </motion.p>
           <motion.div
             className="mt-10 flex flex-col sm:flex-row justify-center items-center gap-4"
@@ -293,17 +208,17 @@ export default function FiyatlandirmaPage() {
             transition={{ duration: 0.5, delay: 0.6 }}
           >
             <Link href="/api/auth/signin" className="px-8 py-3.5 text-lg font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400">
-                Hemen Başla
+                {t('hero.ctaStart')}
             </Link>
             <Link href="/iletisim?subject=Telefonla%20Bilgi%20Almak%20İstiyorum" className="px-8 py-3.5 text-lg font-semibold text-blue-600 bg-white rounded-lg shadow-lg hover:scale-105 hover:bg-slate-50 transform transition-all duration-200 ease-out border border-slate-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400">
-                Bizi Arayın
+                {t('hero.ctaCall')}
             </Link>
           </motion.div>
         </div>
       </motion.section>
 
       {/* Plans Grid Section */}
-      <motion.section 
+      <motion.section
         className="py-16 md:py-24 bg-slate-50"
         variants={sectionVariants}
         initial="hidden"
@@ -312,14 +227,15 @@ export default function FiyatlandirmaPage() {
       >
         <div className="container max-w-7xl mx-auto px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">Size Uygun Planı Seçin</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">{t('plansHeading')}</h2>
             <p className="max-w-xl mx-auto text-lg text-slate-600">
-              Şeffaf, esnek ve işletmenizin büyümesine ayak uyduran fiyatlandırma. Tüm planlar 30 gün ücretsiz deneme içerir.
+              {t('plansSubheading')}
             </p>
           </div>
 
           {/* English pricing summary — ensures the pricing scheme is clear and
-              transparent to non-Turkish readers (e.g. marketplace app reviewers). */}
+              transparent to non-Turkish readers (e.g. marketplace app reviewers).
+              Intentionally hardcoded English regardless of locale. */}
           <div className="max-w-3xl mx-auto mb-12 rounded-2xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm">
             <h3 className="text-lg font-semibold text-slate-800 mb-3">Pricing (English)</h3>
             <ul className="space-y-2 text-slate-600 text-sm md:text-base">
@@ -337,15 +253,15 @@ export default function FiyatlandirmaPage() {
               onClick={() => setBillingInterval('month')}
               className={`px-6 py-2 text-lg font-semibold rounded-l-full transition-colors duration-300 ${billingInterval === 'month' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border border-r-0 border-slate-300'}`}
             >
-              Aylık
+              {t('billing.monthly')}
             </button>
             <button
               onClick={() => setBillingInterval('year')}
               className={`px-6 py-2 text-lg font-semibold rounded-r-full transition-colors duration-300 relative ${billingInterval === 'year' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-300'}`}
             >
-              Yıllık
+              {t('billing.yearly')}
               <span className="absolute -top-2 -right-3 bg-green-500 text-white text-xs font-bold px-2 py-0.5 rounded-full transform rotate-12">
-                %15 İNDİRİM
+                {t('billing.discount')}
               </span>
             </button>
           </div>
@@ -367,7 +283,7 @@ export default function FiyatlandirmaPage() {
                     <h3 className="text-2xl font-bold text-slate-800">{plan.name}</h3>
                   </div>
                   <p className={`text-4xl font-black text-slate-900 mb-1 ${plan.highlight ? 'text-blue-600' : ''}`}>
-                    {plan.priceMonthly} 
+                    {plan.priceMonthly}
                     {plan.frequency && <span className="text-xl font-semibold text-slate-500">{plan.frequency}</span>}
                   </p>
                   <p className="text-sm text-slate-500 mb-6 h-12">{plan.description}</p>
@@ -382,19 +298,19 @@ export default function FiyatlandirmaPage() {
                 </div>
                 {plan.href_contact ? (
                   <Link href={plan.href_contact} aria-describedby={plan.id} className={`w-full block text-center px-6 py-3.5 text-base font-semibold rounded-lg shadow-md transform transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 cursor-pointer ${plan.highlight ? 'text-white bg-gradient-to-r from-orange-500 to-red-500 hover:scale-[1.03]' : 'text-slate-700 bg-slate-100 hover:bg-slate-200 hover:scale-[1.03]'} ${plan.highlight ? 'focus:ring-orange-400' : 'focus:ring-slate-300'}`}>
-                      Bize Ulaşın
+                      {t('plans.enterprise.cta')}
                   </Link>
                 ) : (
                   <button
                     onClick={() => handleCheckout(plan.planKey, billingInterval)}
-                    aria-describedby={plan.id} 
+                    aria-describedby={plan.id}
                     className={`w-full block text-center px-6 py-3.5 text-base font-semibold rounded-lg shadow-md transform transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 cursor-pointer
-                      ${plan.highlight 
-                        ? 'text-white bg-gradient-to-r from-blue-500 to-indigo-500 hover:scale-[1.03]' 
+                      ${plan.highlight
+                        ? 'text-white bg-gradient-to-r from-blue-500 to-indigo-500 hover:scale-[1.03]'
                         : 'text-blue-600 bg-blue-50 hover:bg-blue-100 hover:scale-[1.03]'
                       } ${plan.highlight ? 'focus:ring-blue-400' : 'focus:ring-blue-300'}
                     `}>
-                    30 Gün Ücretsiz Dene
+                    {t('trialButton')}
                   </button>
                 )}
               </motion.div>
@@ -404,7 +320,7 @@ export default function FiyatlandirmaPage() {
       </motion.section>
 
       {/* Comparison Table Section */}
-      <motion.section 
+      <motion.section
         className="py-16 md:py-24 bg-white"
         variants={sectionVariants}
         initial="hidden"
@@ -413,16 +329,16 @@ export default function FiyatlandirmaPage() {
       >
         <div className="container max-w-6xl mx-auto px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">Özellik Karşılaştırması</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">{comparison.heading}</h2>
             <p className="max-w-xl mx-auto text-lg text-slate-600">
-              Planlar arasındaki farkları inceleyin.
+              {comparison.subheading}
             </p>
           </div>
           <div className="overflow-x-auto lg:overflow-visible rounded-xl shadow-xl shadow-slate-900/[.07] ring-1 ring-slate-200">
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-50">
                 <tr>
-                  {comparisonData.headers.map((header, index) => (
+                  {comparison.headers.map((header, index) => (
                     <th
                       key={header}
                       scope="col"
@@ -435,15 +351,15 @@ export default function FiyatlandirmaPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-slate-200">
-                {comparisonData.rows.map((row, rowIndex) => (
+                {comparison.rows.map((row, rowIndex) => (
                   <tr key={rowIndex} className="hover:bg-slate-50/50 transition-colors">
                     {row.map((cell, cellIndex) => (
                       <td
                         key={cellIndex}
                         className={`px-6 py-4 whitespace-nowrap text-sm
                           ${cellIndex === 0 ? 'font-medium text-slate-800 text-left sticky left-0 bg-white group-hover:bg-slate-50/50 z-10' : 'text-center'}
-                          ${cell === '\u2713' ? 'text-green-600 font-bold text-base' : ''}
-                          ${cell === '\u2014' ? 'text-slate-300' : 'text-slate-600'}`
+                          ${cell === '✓' ? 'text-green-600 font-bold text-base' : ''}
+                          ${cell === '—' ? 'text-slate-300' : 'text-slate-600'}`
                         }
                       >
                         {cell}
@@ -458,7 +374,7 @@ export default function FiyatlandirmaPage() {
       </motion.section>
 
       {/* FAQ Section */}
-      <motion.section 
+      <motion.section
         className="py-16 md:py-24 bg-slate-50"
         variants={sectionVariants}
         initial="hidden"
@@ -467,7 +383,7 @@ export default function FiyatlandirmaPage() {
       >
         <div className="container max-w-3xl mx-auto px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">Sıkça Sorulan Sorular</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">{t('faqHeading')}</h2>
           </div>
           <div className="space-y-4">
             {faqItems.map((item, i) => (
@@ -503,13 +419,13 @@ export default function FiyatlandirmaPage() {
       </motion.section>
 
       <div className="mt-16 text-center">
-        <h3 className="text-2xl font-semibold text-slate-800 mb-4">Size Özel Bir Plan mı Lazım?</h3>
-        <p className="text-slate-600 mb-8">İhtiyaçlarınız doğrultusunda size özel çözümler üretebiliriz. Bizimle iletişime geçin.</p>
+        <h3 className="text-2xl font-semibold text-slate-800 mb-4">{t('custom.heading')}</h3>
+        <p className="text-slate-600 mb-8">{t('custom.text')}</p>
         <Link href="/iletisim" className="inline-block px-8 py-3 text-lg font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
-            İletişime Geç
+            {t('custom.button')}
         </Link>
       </div>
 
     </PublicLayout>
   );
-} 
+}

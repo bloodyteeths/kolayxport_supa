@@ -1,12 +1,12 @@
 /** @type {import('next-seo').NextSeoProps} */
 const defaultSEOConfig = {
-  defaultTitle: 'KolayXport | E-ticaret Entegrasyon SaaS - Marketplace Yönetim Platformu',
+  defaultTitle: 'KolayXport | AI Destekli E-Ticaret Komuta Merkezi - Etsy, eBay & Amazon Araçları',
   description:
-    'Trendyol, Hepsiburada, Amazon entegrasyonu. Otomatik kargo etiketi, envanter senkronizasyonu ve sipariş yönetimi. Ücretsiz deneme!',
+    'Etsy, eBay, Amazon, Trendyol, Wix ve Shopify entegrasyonu. AI listeleme optimizasyonu, pazar araştırması, otomatik kargo etiketi (UPS, FedEx, MNG) ve sipariş yönetimi. 30 gün ücretsiz deneme!',
   additionalMetaTags: [
     {
       name: 'keywords',
-      content: 'e-ticaret entegrasyon, marketplace yönetimi, trendyol entegrasyon, hepsiburada entegrasyon, amazon entegrasyon, otomatik kargo, envanter yönetimi, sipariş yönetimi, e-ticaret otomasyon, satış kanalı yönetimi'
+      content: 'e-ticaret entegrasyon, etsy entegrasyon, ebay entegrasyon, amazon entegrasyon, trendyol entegrasyon, etsy araçları, ai listeleme optimizasyonu, pazar araştırması, etsy seo, otomatik kargo etiketi, sipariş yönetimi, e-ticaret otomasyon, arbitraj tarayıcı'
     },
     {
       name: 'author',

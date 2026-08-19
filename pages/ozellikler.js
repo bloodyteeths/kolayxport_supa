@@ -3,71 +3,17 @@ import Link from 'next/link';
 import PublicLayout from '../components/PublicLayout';
 import Breadcrumb from '../components/Breadcrumb';
 import { motion } from 'framer-motion';
-import { NextSeo } from 'next-seo';
-import { Zap, Shuffle, Edit3, Package, Link2, Settings, ShieldCheck, Gift, ArrowLeftRight, Sparkles, Search, BarChart3, Layers } from 'lucide-react';
-// supabase browser client removed — auth now handled by NextAuth
+import { useTranslations } from 'next-intl';
+import {
+  Zap, Edit3, Package, Link2, Settings, ShieldCheck, Gift, ArrowLeftRight,
+  Sparkles, Search, BarChart3, Layers, Camera, Chrome, MessageSquare,
+} from 'lucide-react';
 
-const featureSections = [
-  {
-    icon: Zap,
-    title: 'Otomatik Sipariş Senkronizasyonu',
-    description: 'Trendyol, Hepsiburada, Amazon, n11, Shopify gibi popüler pazaryerlerinden ve e-ticaret platformlarından siparişlerinizi otomatik olarak merkezi bir sisteme aktarın. Manuel veri girişine son verin, zamandan kazanın.'
-  },
-  {
-    icon: Package,
-    title: 'Merkezi Sipariş ve Stok Yönetimi',
-    description: 'Tüm kanallardan gelen siparişlerinizi tek bir yerden yönetin. Temel stok yönetimi özellikleriyle ürünlerinizin takibini yapın, fazla satışı engelleyin.'
-  },
-  {
-    icon: Edit3,
-    title: 'Kargo Etiketi Oluşturma Asistanı',
-    description: 'Anlaşmalı kargo firmalarınız için kargo etiketi oluşturma süreçlerinizi hızlandırın. Tek tıkla etiket bilgileri hazırlama ve yazdırmaya hazır hale getirme kolaylığı.'
-  },
-  {
-    icon: Link2,
-    title: 'Geniş Entegrasyon Yelpazesi',
-    description: 'Türkiye\'nin önde gelen pazaryerleri ve e-ticaret altyapılarıyla (Trendyol, Hepsiburada, Amazon, n11, PTTAvm, Shopify, WooCommerce vb.) sorunsuz entegrasyon. Kargo firmalarıyla entegre çalışın.'
-  },
-  {
-    icon: Settings,
-    title: 'Kolay Kurulum ve Kullanım',
-    description: 'Google hesabınızla saniyeler içinde kaydolun. Kullanıcı dostu arayüzümüz sayesinde karmaşık ayarlarla uğraşmadan otomasyona başlayın.'
-  },
-  {
-    icon: Sparkles,
-    title: 'AI Liste Optimizasyonu',
-    description: 'Gemini AI destekli akıllı asistan ile Etsy ve eBay listelerinizi optimize edin. Başlık, etiket ve açıklama önerileri alın, AI ile görsel oluşturun. Pazar araştırmasına dayalı, SEO uyumlu içeriklerle satışlarınızı artırın.',
-  },
-  {
-    icon: Search,
-    title: 'Pazar Araştırma Araçları',
-    description: 'Etsy ve eBay için derinlemesine pazar araştırması yapın. Rakip analizi, trend takibi, anahtar kelime araştırması ve mağaza analizi ile bilinçli kararlar verin. Paralel arama ve AI destekli içgörülerle avantaj yakalayın.',
-  },
-  {
-    icon: ArrowLeftRight,
-    title: 'Arbitraj Tarayıcı',
-    description: '65+ Trendyol kategorisinden ürünleri otomatik tarayın, Gemini AI ile İngilizce eBay sorgularına çevirin ve en karlı arbitraj fırsatlarını bulun. Kar, ROI, marj, komisyon oranı ve kargo maliyeti dahil tam finansal analiz.',
-  },
-  {
-    icon: BarChart3,
-    title: 'Finansal Analiz Paneli',
-    description: 'Tüm pazaryerlerinden gelen gelir, gider, komisyon ve reklam harcamalarınızı tek panelde görüntüleyin. Dinamik döviz kuru, kar/zarar tablosu ve detaylı dönemsel raporlarla finansal performansınızı takip edin.',
-  },
-  {
-    icon: Layers,
-    title: 'Toplu Düzenleme',
-    description: 'Etsy listelerinizi toplu olarak düzenleyin: fotoğraf yükleme/silme, başlık ve etiket güncelleme, kategori değiştirme, kişiselleştirme ayarları ve daha fazlası. Taslak sistemi ile değişiklikleri önce kaydedin, sonra tek tıkla yayınlayın.',
-  },
-  {
-    icon: ShieldCheck,
-    title: 'Güvenli Veri Saklama',
-    description: 'API anahtarlarınız ve hassas verileriniz gelişmiş şifreleme yöntemleriyle korunur. Avrupa merkezli (Almanya) kurumsal sunucu altyapımızın sunduğu en yüksek güvenlik standartlarından faydalanın.'
-  },
-  {
-    icon: Gift,
-    title: 'Esnek ve Ücretsiz Başlangıç Planı',
-    description: 'Temel entegrasyon ve sipariş yönetimi özelliklerimiz her zaman ücretsiz. Sınırsız sipariş ve ürün listeleme ile işletmenizi özgürce büyütün.'
-  }
+// Copy lives in messages/*.json under marketing.features; icons are zipped by
+// index with the items array — keep both lists the same length and order.
+const featureIcons = [
+  Zap, Package, Edit3, Link2, Settings, Sparkles, Search, ArrowLeftRight,
+  BarChart3, Layers, Camera, Chrome, MessageSquare, ShieldCheck, Gift,
 ];
 
 const sectionVariants = {
@@ -75,48 +21,33 @@ const sectionVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } },
 };
 
-const CallToActionSection = () => {
-  return (
-    <section className="bg-gradient-to-r from-blue-600 to-indigo-700 py-20">
-      <div className="container mx-auto px-6 text-center">
-        <h2 className="text-3xl font-bold text-white mb-6">KolayXport'u Denemeye Hazır mısınız?</h2>
-        <p className="text-blue-100 text-lg mb-8 max-w-2xl mx-auto">
-          E-ticaret operasyonlarınızı bir üst seviyeye taşıyın. Hemen ücretsiz başlayın ve farkı görün.
-        </p>
-        <Link href="/login" className="bg-white text-blue-600 font-semibold px-8 py-3 rounded-lg shadow-md hover:bg-blue-50 transition-colors text-lg">
-          Hemen Ücretsiz Başla
-        </Link>
-      </div>
-    </section>
-  );
-};
-
 export default function OzelliklerPage() {
+  const t = useTranslations('marketing.features');
+  const tPublic = useTranslations('public');
+  const featureItems = t.raw('items');
+
   return (
     <PublicLayout
-      title="KolayXport | Özellikler"
-      description="KolayXport'un e-ticaret operasyonlarınızı nasıl kolaylaştırabileceğini keşfedin. Otomatik sipariş yönetimi, kargo entegrasyonları ve daha fazlası."
-    >
-      <NextSeo
-        title="KolayXport Özellikleri | E-Ticaret Otomasyon Çözümleri"
-        description="KolayXport ile e-ticaretinizi bir üst seviyeye taşıyın. Sipariş senkronizasyonu, stok yönetimi, kargo etiketi asistanı ve geniş entegrasyon seçenekleri."
-        openGraph={{
+      title={t('seo.title')}
+      description={t('seo.description')}
+      seo={{
+        openGraph: {
           url: 'https://kolayxport.com/ozellikler',
-          title: 'KolayXport E-Ticaret Otomasyon Özellikleri',
-          description: 'Otomatik sipariş çekme, merkezi yönetim, kargo entegrasyonları ve daha birçok özellikle işinizi kolaylaştırın.',
+          title: t('seo.title'),
+          description: t('seo.description'),
           images: [
             {
-              url: 'https://kolayxport.com/og-ozellikler.png', // TODO: Create and place this image in /public
+              url: 'https://kolayxport.com/og-ozellikler.png',
               width: 1200,
               height: 630,
-              alt: 'KolayXport Özellikler Sayfası',
+              alt: t('seo.ogAlt'),
             },
           ],
-        }}
-      />
-
+        },
+      }}
+    >
       <Breadcrumb items={[
-        { name: 'Özellikler', href: '/ozellikler' }
+        { name: tPublic('features'), href: '/ozellikler' },
       ]} />
 
       {/* Hero Section */}
@@ -126,8 +57,6 @@ export default function OzelliklerPage() {
         initial="hidden"
         animate="visible"
       >
-        <div className="absolute inset-0 pointer-events-none">
-        </div>
         <div className="relative z-10">
           <motion.h1
             className="text-4xl sm:text-5xl md:text-6xl font-black text-slate-900 tracking-tight"
@@ -135,7 +64,7 @@ export default function OzelliklerPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
           >
-            KolayXport'un <span className="text-blue-600">Güçlü Özelliklerini</span> Keşfedin
+            {t('hero.titlePrefix')} <span className="text-blue-600">{t('hero.titleHighlight')}</span> {t('hero.titleSuffix')}
           </motion.h1>
           <motion.p
             className="mt-6 max-w-2xl mx-auto text-lg sm:text-xl text-slate-600"
@@ -143,7 +72,7 @@ export default function OzelliklerPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.4 }}
           >
-            E-ticaret operasyonlarınızı basitleştiren, zaman kazandıran ve işinizi büyütmenize yardımcı olan çözümlerimizle tanışın.
+            {t('hero.subtitle')}
           </motion.p>
         </div>
       </motion.section>
@@ -152,31 +81,41 @@ export default function OzelliklerPage() {
       <section className="py-16 md:py-24 bg-white">
         <div className="container max-w-7xl mx-auto px-6 lg:px-8">
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-10">
-            {featureSections.map((feature, index) => (
-              <motion.div
-                key={index}
-                className="bg-slate-50 rounded-xl p-8 shadow-lg hover:shadow-xl transition-shadow duration-300"
-                variants={sectionVariants}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true, amount: 0.2 }}
-              >
-                <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-full mb-6 shadow-md">
-                  <feature.icon size={32} />
-                </div>
-                <h3 className="text-2xl font-bold text-slate-800 mb-3">{feature.title}</h3>
-                <p className="text-slate-600 leading-relaxed text-sm">{feature.description}</p>
-              </motion.div>
-            ))}
+            {featureItems.map((feature, index) => {
+              const Icon = featureIcons[index] || Zap;
+              return (
+                <motion.div
+                  key={index}
+                  className="bg-slate-50 rounded-xl p-8 shadow-lg hover:shadow-xl transition-shadow duration-300"
+                  variants={sectionVariants}
+                  initial="hidden"
+                  whileInView="visible"
+                  viewport={{ once: true, amount: 0.2 }}
+                >
+                  <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-full mb-6 shadow-md">
+                    <Icon size={32} />
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-800 mb-3">{feature.title}</h3>
+                  <p className="text-slate-600 leading-relaxed text-sm">{feature.description}</p>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
       </section>
-      
-      {/* CTA Section */}
-      <CallToActionSection />
 
+      {/* CTA Section */}
+      <section className="bg-gradient-to-r from-blue-600 to-indigo-700 py-20">
+        <div className="container mx-auto px-6 text-center">
+          <h2 className="text-3xl font-bold text-white mb-6">{t('cta.heading')}</h2>
+          <p className="text-blue-100 text-lg mb-8 max-w-2xl mx-auto">
+            {t('cta.subtitle')}
+          </p>
+          <Link href="/login" className="bg-white text-blue-600 font-semibold px-8 py-3 rounded-lg shadow-md hover:bg-blue-50 transition-colors text-lg">
+            {t('cta.button')}
+          </Link>
+        </div>
+      </section>
     </PublicLayout>
   );
 }
-
-OzelliklerPage.getLayout = (page) => page; 

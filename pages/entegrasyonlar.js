@@ -3,7 +3,8 @@ import Image from 'next/image';
 import PublicLayout from '../components/PublicLayout';
 import Breadcrumb from '../components/Breadcrumb';
 import { motion } from 'framer-motion';
-import { Package, Truck, CreditCard, CheckSquare, ShoppingCart, Zap } from 'lucide-react'; // Added more icons
+import { useTranslations } from 'next-intl';
+import { Package, Truck, CheckSquare, ShoppingCart, Zap, Chrome, Sparkles } from 'lucide-react';
 
 const sectionVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -17,44 +18,45 @@ const cardHover = {
   transition: { type: 'spring', stiffness: 300 },
 };
 
+// Every entry here is a LIVE integration — descriptions and setup steps come
+// from messages/*.json under marketing.integrations.items.<key>. Integrations
+// without a logo file fall back to their lucide icon.
 const integrationsData = [
-  // Pazaryerleri
-  { name: 'Trendyol', category: 'Pazaryerleri', logo: '/logos/trendyol.svg', icon: ShoppingCart, setupSteps: ['API Anahtarı Girin', 'Mağaza Bilgilerini Eşleştirin', 'Ürünleri Senkronize Edin'], description: 'Türkiye\'nin lider pazaryerlerinden Trendyol ile ürünlerinizi milyonlara ulaştırın.' },
-  // { name: 'Hepsiburada', category: 'Pazaryerleri', logo: '/logos/hepsiburada.svg', icon: ShoppingCart, setupSteps: ['Satıcı ID ve API Key Alın', 'Kategori Eşleştirmesi Yapın', 'Siparişleri Otomatik Çekin'], description: 'Geniş ürün yelpazesi ve müşteri kitlesiyle Hepsiburada\'da satışlarınızı artırın.' },
-  { name: 'Amazon', category: 'Pazaryerleri', logo: '/logos/amazon.svg', icon: ShoppingCart, setupSteps: ['MWS Yetkilendirmesi Yapın', 'Listingleri Bağlayın', 'FBA Entegrasyonunu Aktif Edin'], description: 'Global e-ticaret devi Amazon pazarında yerinizi alın.' }, // Changed Amazon TR to Amazon
-  // { name: 'n11', category: 'Pazaryerleri', logo: '/logos/n11.svg', icon: ShoppingCart, setupSteps: ['API Şifresi Oluşturun', 'Ürün Bilgilerini Aktarın', 'Stok Takibini Başlatın'], description: 'Türkiye\'nin önde gelen platformlarından n11 ile daha fazla müşteriye ulaşın.' },
-  { name: 'Shopify', category: 'Pazaryerleri', logo: '/logos/shopify.svg', icon: Zap, setupSteps: ['KolayXport App Yükleyin', 'Mağazanızı Bağlayın', 'Otomatik Senkronizasyon'], description: 'Kendi e-ticaret sitenizi Shopify ile yönetin, KolayXport ile entegre edin.' },
-  // { name: 'WooCommerce', category: 'Pazaryerleri', logo: '/logos/woocommerce.svg', icon: Zap, setupSteps: ['Eklentiyi Kurun', 'API İzinlerini Verin', 'Veri Akışını Ayarlayın'], description: 'WordPress tabanlı WooCommerce mağazanızı KolayXport ile güçlendirin.' },
-  { name: 'eBay', category: 'Pazaryerleri', logo: '/logos/ebay.svg', icon: ShoppingCart, setupSteps: ['eBay Hesabınızı Bağlayın', 'Ürünleri Listeleyin', 'Siparişleri Senkronize Edin'], description: 'Dünyanın en büyük online pazaryerlerinden eBay ile global satış yapın. Sipariş, listeleme ve araştırma araçları aktif.' },
-  { name: 'Etsy', category: 'Pazaryerleri', logo: '/logos/etsy.svg', icon: ShoppingCart, setupSteps: ['Etsy Mağazanızı Bağlayın', 'Listeleri Düzenleyin', 'Siparişleri Yönetin'], description: 'El yapımı ve vintage ürünler için Etsy entegrasyonu. Sipariş senkronizasyonu, toplu düzenleme, AI optimizasyon ve araştırma araçları aktif.' },
-  
-  // Kargo
-  { name: 'FedEx', category: 'Kargo', logo: '/logos/fedex.svg', icon: Truck, setupSteps: ['Hesap Numaranızı Ekleyin', 'Servis Tiplerini Seçin', 'Uluslararası Gönderiler'], description: 'FedEx entegrasyonu ile global gönderilerinizi kolayca yönetin.' },
-  { name: 'Yurtiçi Kargo', category: 'Kargo', logo: '/logos/yurticikargo.svg', icon: Truck, setupSteps: ['Entegrasyon Hazırlanıyor'], description: 'Türkiye genelinde yaygın ağa sahip Yurtiçi Kargo entegrasyonu. (Yakında)' },
-  { name: 'Aras Kargo', category: 'Kargo', logo: '/logos/araskargo.svg', icon: Truck, setupSteps: ['Entegrasyon Hazırlanıyor'], description: 'Aras Kargo ile hızlı ve güvenilir teslimat seçenekleri. (Yakında)' },
-  { name: 'UPS', category: 'Kargo', logo: '/logos/ups.svg', icon: Truck, setupSteps: ['Entegrasyon Hazırlanıyor'], description: 'Global lojistik lideri UPS ile gönderi yönetimi. (Yakında)' },
-  { name: 'DHL', category: 'Kargo', logo: '/logos/dhl.svg', icon: Truck, setupSteps: ['Entegrasyon Hazırlanıyor'], description: 'Uluslararası ekspres taşımacılıkta öncü DHL entegrasyonu. (Yakında)' },
-
-  // Ödeme (Örnek)
-  { name: 'iyzico', category: 'Ödeme', logo: '/logos/iyzico.svg', icon: CreditCard, setupSteps: ['API Anahtarı & Gizli Anahtar', 'Ödeme Formu Entegrasyonu', 'İade İşlemleri'], description: 'iyzico ile güvenli ve çeşitli ödeme alma seçenekleri sunun.' },
-  { name: 'PayTR', category: 'Ödeme', logo: '/logos/paytr.svg', icon: CreditCard, setupSteps: ['Mağaza No ve API Bilgileri', 'Webhook Kurulumu', 'Taksit Seçenekleri'], description: 'PayTR\'ın sunduğu esnek ödeme çözümleriyle dönüşümlerinizi artırın.' },
+  // Marketplaces
+  { key: 'etsy', name: 'Etsy', category: 'marketplaces', logo: '/logos/etsy.svg', icon: ShoppingCart },
+  { key: 'ebay', name: 'eBay', category: 'marketplaces', logo: null, icon: ShoppingCart },
+  { key: 'amazon', name: 'Amazon', category: 'marketplaces', logo: '/logos/amazon.svg', icon: ShoppingCart },
+  { key: 'trendyol', name: 'Trendyol', category: 'marketplaces', logo: '/logos/trendyol.png', icon: ShoppingCart },
+  { key: 'wix', name: 'Wix', category: 'marketplaces', logo: null, icon: Zap },
+  { key: 'shopify', name: 'Shopify', category: 'marketplaces', logo: '/logos/shopify.jpg', icon: Zap },
+  { key: 'veeqo', name: 'Veeqo', category: 'marketplaces', logo: null, icon: Package },
+  // Shipping
+  { key: 'ups', name: 'UPS', category: 'shipping', logo: null, icon: Truck },
+  { key: 'fedex', name: 'FedEx', category: 'shipping', logo: null, icon: Truck },
+  { key: 'mng', name: 'MNG Kargo (DHL eCommerce)', category: 'shipping', logo: null, icon: Truck },
+  { key: 'shippo', name: 'Shippo', category: 'shipping', logo: null, icon: Truck },
+  // Tools
+  { key: 'chrome', name: 'Chrome', category: 'tools', logo: null, icon: Chrome },
+  { key: 'gemini', name: 'Gemini AI', category: 'tools', logo: null, icon: Sparkles },
 ];
 
-const categories = ['Tümü', 'Pazaryerleri', 'Kargo', 'Ödeme'];
+const categoryKeys = ['all', 'marketplaces', 'shipping', 'tools'];
 
 export default function EntegrasyonlarPage() {
-  const [activeFilter, setActiveFilter] = useState('Tümü');
+  const [activeFilter, setActiveFilter] = useState('all');
+  const t = useTranslations('marketing.integrations');
+  const tPublic = useTranslations('public');
 
   const filteredIntegrations = useMemo(() => {
-    if (activeFilter === 'Tümü') return integrationsData;
+    if (activeFilter === 'all') return integrationsData;
     return integrationsData.filter(integration => integration.category === activeFilter);
   }, [activeFilter]);
 
   return (
-    <PublicLayout title="Entegrasyonlar - KolayXport" description="KolayXport ile Trendyol, Hepsiburada, Amazon, Yurtiçi Kargo, Aras Kargo ve daha birçok pazaryeri, kargo ve ödeme sistemine kolayca entegre olun.">
-      
+    <PublicLayout title={t('seo.title')} description={t('seo.description')}>
+
       <Breadcrumb items={[
-        { name: 'Entegrasyonlar', href: '/entegrasyonlar' }
+        { name: tPublic('integrations'), href: '/entegrasyonlar' },
       ]} />
 
       {/* Hero Section */}
@@ -71,7 +73,7 @@ export default function EntegrasyonlarPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
           >
-            Yakında 50+ Entegrasyon Tek Çatı Altında
+            {t('hero.title')}
           </motion.h1>
           <motion.p
             className="mt-4 max-w-2xl mx-auto text-lg sm:text-xl text-sky-700 font-semibold"
@@ -79,13 +81,13 @@ export default function EntegrasyonlarPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.4 }}
           >
-            Hem de hepsi ücretsiz temel planımızda!
+            {t('hero.subtitle')}
           </motion.p>
         </div>
       </motion.section>
 
       {/* Filters and Grid Section */}
-      <motion.section 
+      <motion.section
         className="py-16 md:py-24 bg-white"
         initial="hidden"
         whileInView="visible"
@@ -94,16 +96,16 @@ export default function EntegrasyonlarPage() {
       >
         <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-center mb-12 space-x-2 md:space-x-4">
-            {categories.map(category => (
+            {categoryKeys.map(category => (
               <button
                 key={category}
                 onClick={() => setActiveFilter(category)}
                 className={`px-4 py-2 md:px-6 md:py-2.5 text-sm md:text-base font-medium rounded-full transition-all duration-200 ease-out
-                  ${activeFilter === category 
-                    ? 'bg-blue-600 text-white shadow-md' 
+                  ${activeFilter === category
+                    ? 'bg-blue-600 text-white shadow-md'
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
               >
-                {category}
+                {t(`categories.${category}`)}
               </button>
             ))}
           </div>
@@ -111,12 +113,12 @@ export default function EntegrasyonlarPage() {
           {filteredIntegrations.length === 0 && (
             <div className="text-center py-12">
               <Package size={64} className="mx-auto text-slate-300 mb-4" />
-              <p className="text-xl text-slate-500">Bu kategoride henüz entegrasyon bulunmamaktadır.</p>
-              <p className="text-slate-400 mt-2">Yakında eklenecektir!</p>
+              <p className="text-xl text-slate-500">{t('emptyTitle')}</p>
+              <p className="text-slate-400 mt-2">{t('emptySubtitle')}</p>
             </div>
           )}
 
-          <motion.div 
+          <motion.div
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8"
             variants={{ visible: { transition: { staggerChildren: 0.05 } } }}
             initial="hidden"
@@ -124,7 +126,7 @@ export default function EntegrasyonlarPage() {
           >
             {filteredIntegrations.map((integration) => (
               <motion.div
-                key={integration.name}
+                key={integration.key}
                 className="bg-white rounded-xl shadow-lg overflow-hidden border border-slate-100 flex flex-col"
                 variants={sectionVariants}
                 whileHover={cardHover}
@@ -132,18 +134,18 @@ export default function EntegrasyonlarPage() {
                 <div className="p-6 flex-grow">
                   <div className="flex items-center mb-4">
                     {integration.logo ? (
-                      <Image src={integration.logo} alt={`${integration.name} entegrasyon logosu`} width={80} height={40} className="h-10 w-auto mr-4 object-contain" loading="lazy"/>
+                      <Image src={integration.logo} alt={`${integration.name} logo`} width={80} height={40} className="h-10 w-auto mr-4 object-contain" loading="lazy"/>
                     ) : (
                       React.createElement(integration.icon || Package, { className: "h-10 w-10 mr-4 text-blue-500" })
                     )}
                     <h3 className="text-xl font-semibold text-slate-800">{integration.name}</h3>
                   </div>
-                  <p className="text-sm text-slate-500 mb-4 h-16 line-clamp-3">{integration.description}</p>
-                  
+                  <p className="text-sm text-slate-500 mb-4 h-16 line-clamp-3">{t(`items.${integration.key}.description`)}</p>
+
                   <div className="mt-auto">
-                    <h4 className="text-xs font-semibold text-slate-400 uppercase mb-2">Kurulum Adımları:</h4>
+                    <h4 className="text-xs font-semibold text-slate-400 uppercase mb-2">{t('setupStepsLabel')}</h4>
                     <ul className="space-y-1.5">
-                      {integration.setupSteps.map((step, i) => (
+                      {t.raw(`items.${integration.key}.steps`).map((step, i) => (
                         <li key={i} className="flex items-center text-xs text-slate-600">
                           <CheckSquare size={14} className="mr-2 text-green-500 flex-shrink-0" />
                           <span>{step}</span>
@@ -153,11 +155,11 @@ export default function EntegrasyonlarPage() {
                   </div>
                 </div>
                 <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 text-right">
-                    <a
-                        href="/ayarlar"
-                        className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline">
-                        Detayları Gör →
-                    </a>
+                  <a
+                    href="/ayarlar"
+                    className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline">
+                    {t('detailsLink')}
+                  </a>
                 </div>
               </motion.div>
             ))}
@@ -167,5 +169,3 @@ export default function EntegrasyonlarPage() {
     </PublicLayout>
   );
 }
-
-EntegrasyonlarPage.getLayout = (page) => page; 

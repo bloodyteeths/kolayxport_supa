@@ -136,6 +136,10 @@ interface BulkEditorProps {
   shippingProfiles?: ShippingProfile[];
   returnPolicies?: ReturnPolicy[];
   onCompleted: () => void;
+  /** Fired after an incremental change (e.g. a staged photo/video edit) so the
+   *  parent can refresh drafts WITHOUT closing the editor. Falls back to
+   *  onCompleted when not provided. */
+  onChanged?: () => void;
 }
 
 type FieldCategory =
@@ -603,7 +607,10 @@ export default function BulkEditor({
   shippingProfiles = [],
   returnPolicies = [],
   onCompleted,
+  onChanged,
 }: BulkEditorProps) {
+  // Studios stage incremental changes; refresh drafts without closing the editor.
+  const onStudioChanged = onChanged || onCompleted;
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const t = useTranslations('etsy.bulkEditor');
@@ -3294,7 +3301,7 @@ export default function BulkEditor({
               setListingImagesById={setListingImagesById}
               listingImagesLoading={listingImagesLoading}
               refreshListingImages={refreshListingImages}
-              onCompleted={onCompleted}
+              onCompleted={onStudioChanged}
             />
           ) : activeField === 'videos' ? (
             <BulkVideoStudio
@@ -3312,7 +3319,7 @@ export default function BulkEditor({
               someChecked={someChecked}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
-              onCompleted={onCompleted}
+              onCompleted={onStudioChanged}
             />
           ) : (
           <>

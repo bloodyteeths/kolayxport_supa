@@ -2702,6 +2702,10 @@ function EtsyListingsPage() {
           fetchPendingDrafts();
           fetchListings();
         }}
+        onChanged={() => {
+          // Incremental photo/video edit staged — refresh drafts, keep editor open.
+          fetchPendingDrafts();
+        }}
       />
 
       {/* CSV Import Preview Dialog */}

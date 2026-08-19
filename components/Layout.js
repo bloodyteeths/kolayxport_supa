@@ -140,7 +140,7 @@ export default function Layout({ children }) {
               </>
             )}
             <div className="mt-2">
-              &copy; {new Date().getFullYear()} Tamsar Tekstil Dış Tic. Ltd. Şti. {t('allRightsReserved')}
+              &copy; {new Date().getFullYear()} Modsons Yazılım E-Ticaret Ltd. Şti. {t('allRightsReserved')}
             </div>
             <div className="mt-1">
               {t('support')}: <a href="mailto:destek@kolayxport.com" className="hover:underline">destek@kolayxport.com</a>

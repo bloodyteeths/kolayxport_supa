@@ -216,7 +216,7 @@ export default function IletisimPage() {
                     <MapPin size={20} className="mr-3 mt-1 text-blue-500 flex-shrink-0" />
                     <div>
                       <h3 className="font-semibold text-slate-700">Konum</h3>
-                      <p>Tamsar Tekstil Dis Tic. Ltd. Sti.</p>
+                      <p>Modsons Yazılım E-Ticaret Ltd. Şti.</p>
                       <p>Istanbul, Turkiye</p>
                     </div>
                   </div>
@@ -332,7 +332,7 @@ export default function IletisimPage() {
               </div>
               <h3 className="text-xl font-bold text-slate-800 mb-4">Kurumsal Bilgiler</h3>
               <p className="text-slate-600 mb-4">
-                Tamsar Tekstil Dis Tic. Ltd. Sti. Istanbul, Turkiye
+                Modsons Yazılım E-Ticaret Ltd. Şti. Istanbul, Turkiye
               </p>
               <Link href="mailto:destek@kolayxport.com" className="text-purple-600 hover:text-purple-700 font-semibold">
                 destek@kolayxport.com

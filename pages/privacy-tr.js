@@ -3,7 +3,7 @@ import React from "react";
 import PublicLayout from "@/components/PublicLayout"; // New PublicLayout imported
 
 export default function PrivacyPolicyTR() {
-  const companyName = "Tamsar Tekstil Dış Tic. Ltd. Şti.";
+  const companyName = "Modsons Yazılım E-Ticaret Ltd. Şti.";
   const appName = "KolayXport";
   const supportEmail = "destek@kolayxport.com";
   const websiteUrl = "https://kolayxport.com";

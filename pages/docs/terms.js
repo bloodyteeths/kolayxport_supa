@@ -2,7 +2,7 @@ import React from "react";
 import PublicLayout from "@/components/PublicLayout";
 
 export default function TermsOfServiceEN() {
-  const companyName = "Tamsar Tekstil Dış Tic. Ltd. Şti.";
+  const companyName = "Modsons Yazılım E-Ticaret Ltd. Şti.";
   const appName = "KolayXport";
   const supportEmail = "destek@kolayxport.com";
   const websiteUrl = "https://kolayxport.com";

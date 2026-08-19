@@ -2173,6 +2173,8 @@
         "changes": "{count} değişiklik",
         "syncUpdates": "Taslakları Kaydet",
         "sync": "Kaydet",
+        "autoSaved": "Taslağa otomatik kaydedildi",
+        "autoSavedShort": "Kaydedildi",
         "cancel": "İptal",
         "discard": "Vazgeç"
       },

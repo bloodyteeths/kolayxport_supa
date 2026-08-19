@@ -2173,6 +2173,8 @@
         "changes": "{count} changes",
         "syncUpdates": "Save Drafts",
         "sync": "Save",
+        "autoSaved": "Auto-saved to draft",
+        "autoSavedShort": "Saved",
         "cancel": "Cancel",
         "discard": "Discard"
       },

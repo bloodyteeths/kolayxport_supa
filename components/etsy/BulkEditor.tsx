@@ -28,6 +28,7 @@ import {
   IndeterminateCheckBox as IndeterminateIcon,
   Schedule as ScheduleIcon,
   Save as SaveIcon,
+  CloudDone as CloudDoneIcon,
   ArrowBack as BackIcon,
   Palette as PaletteIcon,
   Straighten as SizeIcon,
@@ -3207,22 +3208,36 @@ export default function BulkEditor({
           <CloseIcon />
         </IconButton>
 
-        <Button
-          variant="contained"
-          size="small"
-          onClick={handleSave}
-          disabled={saving || pendingCount === 0}
-          startIcon={saving ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <SaveIcon />}
-          sx={{
-            minHeight: 36, textTransform: 'none', fontWeight: 700, borderRadius: '8px',
-            px: { xs: 2, sm: 3 },
-            background: 'linear-gradient(135deg, #10b981, #059669)',
-            '&:hover': { background: 'linear-gradient(135deg, #059669, #047857)' },
-            '&.Mui-disabled': { bgcolor: '#e0e0e0' },
-          }}
-        >
-          {saving ? `${saveProgress}%` : isMobile ? t('header.sync') : t('header.syncUpdates')}
-        </Button>
+        {(activeField === 'photos' || activeField === 'videos') && pendingCount === 0 ? (
+          // Photo/video edits auto-stage to draft, so there is nothing to "Save
+          // drafts" for here — show an auto-saved indicator instead of a
+          // confusing greyed-out button.
+          <Chip
+            icon={<CloudDoneIcon sx={{ fontSize: 18 }} />}
+            label={isMobile ? t('header.autoSavedShort') : t('header.autoSaved')}
+            color="success"
+            variant="outlined"
+            size="small"
+            sx={{ fontWeight: 600, borderRadius: '8px', height: 36 }}
+          />
+        ) : (
+          <Button
+            variant="contained"
+            size="small"
+            onClick={handleSave}
+            disabled={saving || pendingCount === 0}
+            startIcon={saving ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <SaveIcon />}
+            sx={{
+              minHeight: 36, textTransform: 'none', fontWeight: 700, borderRadius: '8px',
+              px: { xs: 2, sm: 3 },
+              background: 'linear-gradient(135deg, #10b981, #059669)',
+              '&:hover': { background: 'linear-gradient(135deg, #059669, #047857)' },
+              '&.Mui-disabled': { bgcolor: '#e0e0e0' },
+            }}
+          >
+            {saving ? `${saveProgress}%` : isMobile ? t('header.sync') : t('header.syncUpdates')}
+          </Button>
+        )}
       </Box>
 
       {/* Progress bar */}

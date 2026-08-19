@@ -844,6 +844,38 @@
   },
   "settings": {
     "pageTitle": "Ayarlar",
+    "pageSubtitle": "Planınızı, bağlantılarınızı, kimlik bilgilerinizi ve gönderici profilinizi yönetin",
+    "connected": "Bağlı",
+    "notConnected": "Bağlı değil",
+    "tabs": {
+      "billing": "Plan ve Faturalama",
+      "connections": "Bağlantılar",
+      "apiKeys": "API ve Kargo",
+      "senderProfile": "Gönderici Profili",
+      "syncAdvanced": "Senkron ve Gelişmiş"
+    },
+    "saveBar": {
+      "unsaved": "Kaydedilmemiş değişiklikleriniz var",
+      "save": "Değişiklikleri kaydet"
+    },
+    "credential": {
+      "showValue": "Göster",
+      "hideValue": "Gizle",
+      "secureHint": "Şifreli saklanır"
+    },
+    "errorDialog": {
+      "title": "Senkron hataları",
+      "copy": "Kopyala",
+      "copied": "Kopyalandı",
+      "close": "Kapat"
+    },
+    "section": {
+      "ecommerceApis": "E-ticaret ve Kargo API'leri",
+      "carriers": "Kargo Firmaları",
+      "accounting": "Muhasebe — Paraşüt",
+      "companyAddress": "Şirket ve Adres",
+      "customsCurrency": "Gümrük ve Para Birimi"
+    },
     "loadingTitle": "Ayarlar - Yükleniyor",
     "apiIntegrations": "API Entegrasyonları",
     "marketplaceConnections": "Marketplace Bağlantıları",

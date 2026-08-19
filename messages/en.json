@@ -922,6 +922,38 @@
   },
   "settings": {
     "pageTitle": "Settings",
+    "pageSubtitle": "Manage your plan, connections, credentials and shipping profile",
+    "connected": "Connected",
+    "notConnected": "Not connected",
+    "tabs": {
+      "billing": "Plan & Billing",
+      "connections": "Connections",
+      "apiKeys": "API & Carriers",
+      "senderProfile": "Sender Profile",
+      "syncAdvanced": "Sync & Advanced"
+    },
+    "saveBar": {
+      "unsaved": "You have unsaved changes",
+      "save": "Save changes"
+    },
+    "credential": {
+      "showValue": "Show",
+      "hideValue": "Hide",
+      "secureHint": "Encrypted at rest"
+    },
+    "errorDialog": {
+      "title": "Sync errors",
+      "copy": "Copy",
+      "copied": "Copied",
+      "close": "Close"
+    },
+    "section": {
+      "ecommerceApis": "E-commerce & Shipping APIs",
+      "carriers": "Carriers",
+      "accounting": "Accounting — Paraşüt",
+      "companyAddress": "Company & Address",
+      "customsCurrency": "Customs & Currency"
+    },
     "loadingTitle": "Settings - Loading",
     "apiIntegrations": "API Integrations",
     "marketplaceConnections": "Marketplace Connections",

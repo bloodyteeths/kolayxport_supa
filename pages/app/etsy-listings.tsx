@@ -70,6 +70,7 @@ import {
   Sync as SyncIcon,
 } from '@mui/icons-material';
 import { toast, Toaster } from 'react-hot-toast';
+import { useRouter } from 'next/router';
 import AppLayout from '@/components/AppLayout';
 import withAuth from '@/components/withAuth';
 import { useAuth } from '@/lib/auth-context';
@@ -872,6 +873,41 @@ function EtsyListingsPage() {
   const [duplicateDetectorOpen, setDuplicateDetectorOpen] = useState(false);
   const [backupManagerOpen, setBackupManagerOpen] = useState(false);
   const [bulkEditorOpen, setBulkEditorOpen] = useState(false);
+  const router = useRouter();
+
+  // The bulk editor is a fullscreen dialog with no route of its own, so the
+  // browser Back button used to navigate away from this page entirely instead
+  // of closing it. Opening pushes a shallow ?bulkEditor=1 history entry; Back
+  // (or İptal, which consumes that entry) returns to this exact view.
+  const openBulkEditor = useCallback(() => {
+    setBulkEditorOpen(true);
+    router.push(
+      { pathname: router.pathname, query: { ...router.query, bulkEditor: '1' } },
+      undefined,
+      { shallow: true },
+    );
+  }, [router]);
+
+  const closeBulkEditor = useCallback(() => {
+    setBulkEditorOpen(false);
+    if (router.query.bulkEditor === '1') router.back();
+  }, [router]);
+
+  // Browser Back while the editor is open → the query param disappears → close.
+  useEffect(() => {
+    if (router.query.bulkEditor !== '1' && bulkEditorOpen) setBulkEditorOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.query.bulkEditor]);
+
+  // Stale ?bulkEditor=1 after a refresh/direct load: strip it so a later
+  // closeBulkEditor doesn't router.back() out of the app.
+  useEffect(() => {
+    if (router.isReady && router.query.bulkEditor === '1') {
+      const { bulkEditor, ...rest } = router.query;
+      router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady]);
 
   const [shops, setShops] = useState<ShopInfo[]>([]);
   const [selectedShopId, setSelectedShopId] = useState<string>('');
@@ -2245,7 +2281,7 @@ function EtsyListingsPage() {
                 shopSections={shopSections}
                 shopId={selectedShopId}
                 allShops={shops}
-                onOpenBulkEditor={() => setBulkEditorOpen(true)}
+                onOpenBulkEditor={openBulkEditor}
                 onCompleted={() => {
                   fetchPendingDrafts();
                   fetchListings();
@@ -2279,7 +2315,7 @@ function EtsyListingsPage() {
               <Button
                 variant="contained"
                 size="small"
-                onClick={() => setBulkEditorOpen(true)}
+                onClick={openBulkEditor}
                 startIcon={<EditIcon sx={{ fontSize: '16px !important' }} />}
                 sx={{
                   minHeight: 36, textTransform: 'none', fontWeight: 700, borderRadius: '8px', ml: 'auto',
@@ -2690,7 +2726,7 @@ function EtsyListingsPage() {
       {/* Bulk Editor (Vela-style full-page) */}
       <BulkEditor
         open={bulkEditorOpen}
-        onClose={() => setBulkEditorOpen(false)}
+        onClose={closeBulkEditor}
         listings={selectedListings}
         shopId={selectedShopId}
         shopName={shops.find(s => s.shopId === selectedShopId)?.shopName}
@@ -2698,7 +2734,7 @@ function EtsyListingsPage() {
         shippingProfiles={shippingProfiles}
         returnPolicies={returnPolicies}
         onCompleted={() => {
-          setBulkEditorOpen(false);
+          closeBulkEditor();
           fetchPendingDrafts();
           fetchListings();
         }}

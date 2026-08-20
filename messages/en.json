@@ -2097,6 +2097,7 @@
       "deactivate": "Deactivate",
       "noListingSelected": "No listing selected",
       "fields": {
+        "etsyDetails": "Etsy Details",
         "photos": "Photos",
         "videos": "Videos",
         "title": "Title",

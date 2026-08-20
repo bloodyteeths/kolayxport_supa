@@ -320,7 +320,7 @@ const FIELD_DEFS: FieldDef[] = [
     operations: [{ value: 'set_value', label: 'operations.setCategory' }],
   },
   {
-    key: 'etsy_details', label: 'Etsy details', group: 'groups.listings',
+    key: 'etsy_details', label: 'fields.etsyDetails', group: 'groups.listings',
     icon: <TuneIcon fontSize="small" />,
     operations: [{ value: 'set_value', label: 'Edit details' }],
   },

@@ -2097,6 +2097,7 @@
       "deactivate": "Deaktif Et",
       "noListingSelected": "Hicbir listing secili degil",
       "fields": {
+        "etsyDetails": "Etsy Detayları",
         "photos": "Fotoğraflar",
         "videos": "Videolar",
         "title": "Başlık",

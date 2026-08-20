@@ -42,7 +42,10 @@ export async function runFinancialSync(
   endMs: number,
 ): Promise<{ status: number; body: any }> {
   const { res, result } = mockRes();
-  const body = { startDate: startMs, endDate: endMs };
+  // Amazon SP-API rejects end dates less than 2 minutes in the past
+  // ("Date is not valid, should be no later than 2 minutes from now").
+  const clampedEnd = Math.min(endMs, Date.now() - 5 * 60_000);
+  const body = { startDate: startMs, endDate: clampedEnd };
   switch (marketplace) {
     case 'trendyol': await handleTrendyolSync(userId, body, res); break;
     case 'etsy': await handleEtsySync(userId, body, res); break;

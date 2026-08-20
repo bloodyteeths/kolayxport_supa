@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';
+import { refreshFinancialsIfStale } from '@/lib/finance/financialAutoSync';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -553,6 +554,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         })),
       });
     }
+
+    // Staleness fallback: the sync-financials cron keeps ledgers current every
+    // 6h; if it missed (deploy, outage), refresh here so the user never sees
+    // stale numbers. Bounded by a 20s race — a slow marketplace API can't hang
+    // the dashboard; the sync finishes in the background for the next load.
+    await refreshFinancialsIfStale(userId, marketplace).catch(() => undefined);
 
     const dashboard = await buildDashboard(userId, marketplace, startDate, endDate, groupBy);
 

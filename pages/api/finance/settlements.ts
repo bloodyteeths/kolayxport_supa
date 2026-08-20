@@ -337,7 +337,7 @@ async function fetchProductNamesByBarcodes(
 // Sync action — fetch from Trendyol and upsert into DB
 // ---------------------------------------------------------------------------
 
-async function handleSync(userId: string, body: any, res: NextApiResponse) {
+export async function handleSync(userId: string, body: any, res: NextApiResponse) {
   const { startDate, endDate } = body;
   if (!startDate || !endDate) {
     return res.status(400).json({ error: 'startDate and endDate are required (epoch ms)' });
@@ -575,7 +575,7 @@ async function getEtsyCredentials(userId: string): Promise<EtsyShopCredentials> 
   };
 }
 
-async function handleEtsySync(userId: string, body: any, res: NextApiResponse) {
+export async function handleEtsySync(userId: string, body: any, res: NextApiResponse) {
   const { startDate, endDate } = body;
   if (!startDate || !endDate) {
     return res.status(400).json({ error: 'startDate and endDate are required (epoch ms)' });
@@ -1122,7 +1122,7 @@ function ebayAmount(money: { value: string; currency: string } | null | undefine
   return parseFloat(money.value) || 0;
 }
 
-async function handleEbaySync(userId: string, body: any, res: NextApiResponse) {
+export async function handleEbaySync(userId: string, body: any, res: NextApiResponse) {
   const { startDate, endDate } = body;
   if (!startDate || !endDate) {
     return res.status(400).json({ error: 'startDate and endDate are required (epoch ms)' });
@@ -1442,7 +1442,7 @@ async function getAmazonCredentials(userId: string) {
   return cred;
 }
 
-async function handleAmazonSync(userId: string, body: any, res: NextApiResponse) {
+export async function handleAmazonSync(userId: string, body: any, res: NextApiResponse) {
   const { startDate, endDate } = body;
   if (!startDate || !endDate) {
     return res.status(400).json({ error: 'startDate and endDate are required (epoch ms)' });

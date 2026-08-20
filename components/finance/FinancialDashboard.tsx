@@ -7,7 +7,7 @@ import {
 import {
   Banknote, TrendingUp, TrendingDown, Truck, RotateCcw,
   Package, PieChart, ChevronDown, ChevronUp, List, BarChart3,
-  Percent, Edit3, Megaphone,
+  Percent, Edit3, Megaphone, ReceiptText,
 } from 'lucide-react';
 import useFinanceStore, { DashboardData, DashboardSummary } from '@/lib/stores/useFinanceStore';
 import dynamic from 'next/dynamic';
@@ -38,6 +38,7 @@ const CARDS: CardDef[] = [
   { key: 'commissions', tKey: 'commissions', icon: <Percent size={20} />, color: '#f59e0b', gradient: 'linear-gradient(135deg, #fffbeb, #fef3c7)', format: 'currency' },
   { key: 'adSpend', tKey: 'adSpend', icon: <Megaphone size={20} />, color: '#ec4899', gradient: 'linear-gradient(135deg, #fdf2f8, #fce7f3)', format: 'currency' },
   { key: 'shipping', tKey: 'shippingCosts', icon: <Truck size={20} />, color: '#3b82f6', gradient: 'linear-gradient(135deg, #eff6ff, #dbeafe)', format: 'currency' },
+  { key: 'otherFees', tKey: 'otherFees', icon: <ReceiptText size={20} />, color: '#64748b', gradient: 'linear-gradient(135deg, #f8fafc, #e2e8f0)', format: 'currency' },
   { key: 'cogs', tKey: 'productCost', icon: <Package size={20} />, color: '#8b5cf6', gradient: 'linear-gradient(135deg, #f5f3ff, #ede9fe)', format: 'currency' },
   { key: 'netProfit', tKey: 'netProfit', icon: <TrendingUp size={20} />, color: '#10b981', gradient: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', format: 'currency', invertColor: true },
 ];
@@ -183,6 +184,7 @@ function ProfitCharts({ data, marketplace }: { data: DashboardData; marketplace:
   const costItems = [
     { label: t('commissions'), value: summary.commissions, color: '#f59e0b' },
     { label: t('adSpend'), value: summary.adSpend || 0, color: '#ec4899' },
+    { label: t('otherFees'), value: summary.otherFees || 0, color: '#64748b' },
     { label: t('shippingCosts'), value: summary.shipping, color: '#3b82f6' },
     { label: t('returns'), value: summary.returns, color: '#ef4444' },
     { label: t('productCost'), value: summary.cogs, color: '#8b5cf6' },

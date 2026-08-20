@@ -14,6 +14,7 @@ interface DashboardSummary {
   returns: number;
   discounts: number;
   adSpend: number;
+  otherFees: number;
   cogs: number;
   netProfit: number;
   margin: number;
@@ -76,13 +77,26 @@ function getDateTruncExpression(groupBy: string): string {
 /**
  * Classify Trendyol transaction types into financial categories.
  */
-function classifyTransactionType(type: string): 'revenue' | 'commission' | 'shipping' | 'return' | 'discount' | 'adspend' | 'other' {
+function classifyTransactionType(type: string): 'revenue' | 'commission' | 'shipping' | 'return' | 'discount' | 'adspend' | 'fees' | 'commission_invoice' | 'other' {
   // Normalize: strip diacritics so Turkish İ→i, ş→s, etc. work with plain includes()
   const t = (type || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   // Also check original for exact Turkish matches
   const orig = (type || '').trim();
 
   // Order matters — more specific patterns first
+
+  // Trendyol otherfinancials deduction invoices & withholdings (Turkish labels
+  // from the Cari Hesap Ekstresi). Must precede the generic komisyon/kargo
+  // rules below.
+  // Weekly commission invoice — commissions are already counted per-sale;
+  // counting the invoice too would double them.
+  if (t.includes('komisyon') && t.includes('fatura')) return 'commission_invoice';
+  if (t.includes('stopaj') || t.includes('stoppage')) return 'fees'; // E-ticaret Stopajı
+  if (t.includes('reklam')) return 'adspend'; // Reklam Bedeli
+  if (t.includes('hizmet')) return 'fees'; // Platform / Uluslararası Hizmet Bedeli
+  // Kusurlu Ürün / Yanlış Ürün / Tedarik Edememe / Erken Ödeme Kesinti / Fatura Kontör
+  if (t.includes('kusurlu') || t.includes('yanl') || t.includes('tedarik') || t.includes('kesinti') || t.includes('kontor')) return 'fees';
+
   if (t.includes('sale') || orig === 'Satış' || t.includes('satis')) return 'revenue';
   if (t.includes('shipping') || t.includes('cargo') || t.includes('kargo')) return 'shipping';
   if (t.includes('commission') || t.includes('komisyon') || t.includes('service')) return 'commission';
@@ -215,6 +229,9 @@ async function buildDashboard(
   let returns = 0;
   let discounts = 0;
   let adSpend = 0;
+  // Trendyol deduction invoices that fit no other bucket: platform service
+  // fee, stopaj withholding, penalty invoices, early-payment deduction, etc.
+  let otherFees = 0;
   let cogs = 0;
   let orderCount = 0;
   // Distinct orderNumbers with at least one finalized refund event in the
@@ -251,7 +268,10 @@ async function buildDashboard(
       case 'revenue':
         grossRevenue += amount;
         commissions += commissionAmt;
-        shipping += shippingAmt;
+        // Trendyol headline shipping comes from Kargo Fatura invoice rows
+        // (statement-exact); the per-sale shippingAmount is a partial cargo
+        // line-item mapping kept for the product breakdown only.
+        if (tx.marketplace !== 'trendyol') shipping += shippingAmt;
         orderCount++;
         break;
       case 'commission':
@@ -276,10 +296,23 @@ async function buildDashboard(
         }
         break;
       case 'discount':
-        discounts += Math.abs(amount);
+        // Sign-aware: discount/coupon charges are negative (add to the total),
+        // cancellations (Kupon İptal / CouponCancel) come in positive and
+        // reduce it. abs() here used to inflate discounts by every
+        // cancellation.
+        discounts -= amount;
         break;
       case 'adspend':
         adSpend += Math.abs(amount);
+        break;
+      case 'fees':
+        // Cost rows carry negative amounts (credit − debt); credits (e.g.
+        // stopaj corrections) come in positive and reduce the total.
+        otherFees -= amount;
+        break;
+      case 'commission_invoice':
+        // Official commission invoice — already represented by per-sale
+        // commission amounts; kept visible in transactionTypeSummary only.
         break;
       default:
         // Other types — add to revenue if positive, ignore if negative
@@ -304,7 +337,7 @@ async function buildDashboard(
     if (category === 'revenue') {
       bucket.revenue += amount;
       bucket.commissions += commissionAmt;
-      bucket.shipping += shippingAmt;
+      if (tx.marketplace !== 'trendyol') bucket.shipping += shippingAmt;
       if (tx.barcode) {
         const cost = costMap.get(tx.barcode);
         if (cost) bucket.cogs += (cost.costAmount + cost.shippingCost) * quantity;
@@ -346,7 +379,7 @@ async function buildDashboard(
     }
   }
 
-  const netProfit = grossRevenue - commissions - shipping - returns - discounts - adSpend - cogs;
+  const netProfit = grossRevenue - commissions - shipping - returns - discounts - adSpend - otherFees - cogs;
   const margin = grossRevenue > 0 ? (netProfit / grossRevenue) * 100 : 0;
 
   // Build time series array
@@ -382,6 +415,7 @@ async function buildDashboard(
       returns: round2(returns),
       discounts: round2(discounts),
       adSpend: round2(adSpend),
+      otherFees: round2(otherFees),
       cogs: round2(cogs),
       netProfit: round2(netProfit),
       margin: round2(margin),

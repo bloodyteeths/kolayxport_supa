@@ -7,6 +7,9 @@ export interface DashboardSummary {
   returns: number;
   discounts: number;
   adSpend: number;
+  // Trendyol deduction invoices outside the other buckets: platform hizmet
+  // bedeli, stopaj, kusurlu/yanlış ürün, erken ödeme kesintisi, kontör...
+  otherFees?: number;
   cogs: number;
   netProfit: number;
   margin: number;

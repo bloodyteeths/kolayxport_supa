@@ -184,9 +184,13 @@ async function fetchCargoInvoiceItems(
 async function syncCargoInvoices(
   credentials: TrendyolCredentials,
   windows: Array<{ startDate: string; endDate: string }>
-): Promise<{ orderShippingMap: Map<string, number>; totalCargoItems: number }> {
+): Promise<{ orderShippingMap: Map<string, number>; totalCargoItems: number; deductionItems: any[] }> {
   const orderShippingMap = new Map<string, number>();
   let totalCargoItems = 0;
+  // Every deduction invoice (kargo, komisyon, platform hizmet, reklam,
+  // kusurlu/yanlış ürün, kesinti, kontör...) — stored as FinancialTransaction
+  // rows so the dashboard matches the official Cari Hesap Ekstresi.
+  const deductionItems: any[] = [];
 
   for (const window of windows) {
     // Fetch DeductionInvoices from otherfinancials
@@ -204,6 +208,7 @@ async function syncCargoInvoices(
 
       const items = Array.isArray(data.content) ? data.content : [];
       if (items.length === 0) { hasMore = false; break; }
+      deductionItems.push(...items);
 
       // Filter for cargo invoices (Kargo Faturasi / Kargo Fatura)
       const cargoInvoices = items.filter((item: any) => {
@@ -242,7 +247,38 @@ async function syncCargoInvoices(
     }
   }
 
-  return { orderShippingMap, totalCargoItems };
+  return { orderShippingMap, totalCargoItems, deductionItems };
+}
+
+/**
+ * Fetch withholding-tax rows (E-ticaret Stopajı, 7524 sayılı kanun) from
+ * otherfinancials. These are real deductions on every payout and must be in
+ * the dashboard for it to reconcile with the Cari Hesap Ekstresi.
+ */
+async function fetchStoppageItems(
+  credentials: TrendyolCredentials,
+  windows: Array<{ startDate: string; endDate: string }>
+): Promise<any[]> {
+  const items: any[] = [];
+  for (const window of windows) {
+    let page = 0;
+    let hasMore = true;
+    while (hasMore) {
+      const data = await callTrendyolOtherFinancials(credentials, {
+        startDate: window.startDate,
+        endDate: window.endDate,
+        transactionType: 'Stoppage',
+        page,
+        size: 500,
+      });
+      const content = Array.isArray(data.content) ? data.content : [];
+      if (content.length === 0) break;
+      items.push(...content);
+      hasMore = page < (data.totalPages || 0) - 1;
+      page++;
+    }
+  }
+  return items;
 }
 
 // ---------------------------------------------------------------------------
@@ -319,34 +355,42 @@ async function handleSync(userId: string, body: any, res: NextApiResponse) {
   let totalUpserted = 0;
 
   // ---- PHASE 1: Fetch all data in parallel ----
-  // Build all settlement fetch promises across ALL windows × ALL types at once
+  // Build all settlement fetch promises across ALL windows × ALL types at once.
+  // Each window×type is paginated — page 0 alone silently truncates busy
+  // stores at 500 rows.
   const allTypes = [...SETTLEMENT_TYPES_PRIMARY, ...SETTLEMENT_TYPES_SECONDARY];
-  const settlementPromises = windows.flatMap(window =>
-    allTypes.map(txType =>
-      callTrendyolSettlements(credentials, {
+  const fetchAllSettlementPages = async (window: { startDate: string; endDate: string }, txType: string): Promise<any[]> => {
+    const out: any[] = [];
+    for (let page = 0; page < 10; page++) {
+      const data = await callTrendyolSettlements(credentials, {
         startDate: window.startDate,
         endDate: window.endDate,
         transactionType: txType,
-        page: 0,
+        page,
         size: 500,
-      }).catch(() => ({ content: [], totalPages: 0, totalElements: 0 }))
-    )
+      }).catch(() => null);
+      if (!data) break;
+      const items = Array.isArray(data.content) ? data.content : [];
+      out.push(...items);
+      if (page >= (data.totalPages || 0) - 1) break;
+    }
+    return out;
+  };
+  const settlementPromises = windows.flatMap(window =>
+    allTypes.map(txType => fetchAllSettlementPages(window, txType))
   );
 
-  // Fetch settlements + cargo invoices in parallel
-  const [settlementResults, cargoResult] = await Promise.all([
+  // Fetch settlements + deduction invoices + stopaj in parallel
+  const [settlementResults, cargoResult, stoppageItems] = await Promise.all([
     Promise.all(settlementPromises),
     syncCargoInvoices(credentials, windows),
+    fetchStoppageItems(credentials, windows).catch(() => [] as any[]),
   ]);
 
   // Collect all settlement items
-  const allSettlementItems: any[] = [];
-  for (const data of settlementResults) {
-    const items = Array.isArray(data.content) ? data.content : [];
-    allSettlementItems.push(...items);
-  }
+  const allSettlementItems: any[] = settlementResults.flat();
   const totalFetched = allSettlementItems.length;
-  const { orderShippingMap, totalCargoItems } = cargoResult;
+  const { orderShippingMap, totalCargoItems, deductionItems } = cargoResult;
 
   // ---- PHASE 2: Resolve product names (parallel with bigger batches) ----
   const uniqueBarcodes = [...new Set(
@@ -391,6 +435,44 @@ async function handleSync(userId: string, body: any, res: NextApiResponse) {
             marketplace: 'trendyol',
             externalId,
           },
+        },
+        update: { ...txData, syncedAt: new Date() },
+        create: { userId, marketplace: 'trendyol', externalId, ...txData },
+      });
+    }));
+    totalUpserted += batch.length;
+  }
+
+  // ---- PHASE 4: store deduction invoices + stopaj as transactions ----
+  // These are the official cost side of the Cari Hesap Ekstresi (komisyon,
+  // kargo, platform hizmet, reklam, kusurlu/yanlış ürün, kesinti, stopaj...).
+  // Without them the dashboard overstates profit.
+  const invoiceRows = [
+    ...deductionItems.map((it: any) => ({ it, prefix: 'inv' })),
+    ...stoppageItems.map((it: any) => ({ it, prefix: 'stopaj' })),
+  ];
+  for (let i = 0; i < invoiceRows.length; i += UPSERT_BATCH) {
+    const batch = invoiceRows.slice(i, i + UPSERT_BATCH);
+    await Promise.all(batch.map(({ it, prefix }) => {
+      const externalId = `${prefix}_${it.id ?? `${it.transactionType || prefix}_${it.transactionDate || ''}`}`;
+      const credit = Number(it.credit || 0);
+      const debt = Number(it.debt || 0);
+      const txData = {
+        transactionType: it.transactionType || (prefix === 'stopaj' ? 'E-ticaret Stopajı' : 'DeductionInvoice'),
+        orderNumber: it.orderNumber ? String(it.orderNumber) : null,
+        barcode: null,
+        productName: it.description || null,
+        quantity: 1,
+        amount: credit - debt,
+        currency: 'TRY',
+        commission: null,
+        shippingAmount: null,
+        transactionDate: it.transactionDate ? new Date(it.transactionDate) : new Date(),
+        rawData: it,
+      };
+      return prisma.financialTransaction.upsert({
+        where: {
+          userId_marketplace_externalId: { userId, marketplace: 'trendyol', externalId },
         },
         update: { ...txData, syncedAt: new Date() },
         create: { userId, marketplace: 'trendyol', externalId, ...txData },

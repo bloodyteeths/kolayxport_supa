@@ -1074,13 +1074,56 @@ async function refreshListingCache(shopId: string, listingId: bigint, accessToke
   });
 }
 
+// A sync in flight when the process dies (deploys restart kolayxport.service)
+// leaves the draft orphaned in 'syncing' with no code path to recover it.
+// Anything 'syncing' longer than this is treated as interrupted.
+export const STALE_SYNCING_MS = 10 * 60 * 1000;
+
+// Flip a user's orphaned 'syncing' drafts to 'failed' so the UI shows a
+// retryable state instead of a permanent spinner. Called from the drafts list
+// endpoint; syncDraft has its own inline recovery as a second line of defense.
+export async function recoverStaleSyncingDrafts(userId: string, shopId?: string) {
+  const cutoff = new Date(Date.now() - STALE_SYNCING_MS);
+  const stale = await prisma.etsyListingDraft.findMany({
+    where: { userId, ...(shopId ? { etsyShopId: shopId } : {}), status: 'syncing', updatedAt: { lt: cutoff } },
+    select: { id: true },
+  });
+  if (stale.length === 0) return 0;
+  const ids = stale.map((s) => s.id);
+  logger.warn('Recovering drafts stuck in syncing (interrupted sync)', { userId, draftIds: ids });
+  await prisma.etsyDraftSyncAttempt.updateMany({
+    where: { draftId: { in: ids }, status: 'running' },
+    data: { status: 'failed', finishedAt: new Date(), error: 'Interrupted (process restarted mid-sync)' },
+  });
+  await prisma.etsyListingDraft.updateMany({
+    where: { id: { in: ids } },
+    data: { status: 'failed', lastSyncError: 'Sync interrupted by a server restart — retry Sync to Etsy' },
+  });
+  return ids.length;
+}
+
 export async function syncDraft(draftId: string, userId: string) {
   const draft = await prisma.etsyListingDraft.findFirst({
     where: { id: draftId, userId },
     include: { media: { orderBy: { createdAt: 'asc' } } },
   });
   if (!draft) throw new Error('Draft not found');
-  if (!['draft', 'failed', 'conflict'].includes(draft.status)) throw new Error(`Draft is not syncable (${draft.status})`);
+  if (!['draft', 'failed', 'conflict'].includes(draft.status)) {
+    // A draft can be orphaned in 'syncing' when the process dies mid-sync
+    // (deploys restart kolayxport.service). Without recovery it is stuck
+    // forever. Treat a long-stale 'syncing' as interrupted: close the orphaned
+    // attempt and let this sync proceed — media re-sync is idempotent and
+    // conflict protection still guards against partial remote changes.
+    const isStaleSyncing =
+      draft.status === 'syncing' &&
+      Date.now() - new Date(draft.updatedAt).getTime() > STALE_SYNCING_MS;
+    if (!isStaleSyncing) throw new Error(`Draft is not syncable (${draft.status})`);
+    logger.warn('Recovering draft stuck in syncing (interrupted sync)', { draftId: draft.id, stuckSince: draft.updatedAt });
+    await prisma.etsyDraftSyncAttempt.updateMany({
+      where: { draftId: draft.id, status: 'running' },
+      data: { status: 'failed', finishedAt: new Date(), error: 'Interrupted (process restarted mid-sync); recovered as stale' },
+    });
+  }
 
   const accessToken = await getEtsyAccessToken(draft.etsyShopId, userId);
   const queuedActions = ((draft.queuedActions as any[]) || []);

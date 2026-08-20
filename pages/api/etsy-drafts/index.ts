@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { getAuthUser } from '@/lib/auth';
-import { toSerializable, upsertDraftPatch } from '@/lib/etsy/draftService';
+import { toSerializable, upsertDraftPatch, recoverStaleSyncingDrafts } from '@/lib/etsy/draftService';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const user = await getAuthUser(req, res);
@@ -12,6 +12,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const shopId = String(req.query.shop_id || '');
       const listingId = req.query.listing_id ? BigInt(String(req.query.listing_id)) : null;
       if (!shopId) return res.status(400).json({ error: 'shop_id is required' });
+
+      // Surface drafts orphaned in 'syncing' by a mid-sync restart as 'failed'
+      // (retryable) before listing them.
+      await recoverStaleSyncingDrafts(user.id, shopId);
 
       const drafts = await prisma.etsyListingDraft.findMany({
         where: {

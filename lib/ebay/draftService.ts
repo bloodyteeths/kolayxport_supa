@@ -297,8 +297,20 @@ export async function syncDraft(draftId: string, userId: string) {
     include: { media: { orderBy: { createdAt: 'asc' } }, syncAttempts: { orderBy: { startedAt: 'desc' }, take: 1 } },
   });
   if (!draft) throw new Error('Draft not found');
-  if (draft.status === 'syncing') throw new Error('Draft is already syncing');
-  if (!['draft', 'failed', 'conflict'].includes(draft.status)) throw new Error(`Draft is not syncable (${draft.status})`);
+  if (!['draft', 'failed', 'conflict'].includes(draft.status)) {
+    // See etsy/draftService: recover drafts orphaned in 'syncing' by a process
+    // restart mid-sync instead of leaving them stuck forever.
+    const STALE_SYNCING_MS = 10 * 60 * 1000;
+    const isStaleSyncing =
+      draft.status === 'syncing' &&
+      Date.now() - new Date(draft.updatedAt).getTime() > STALE_SYNCING_MS;
+    if (draft.status === 'syncing' && !isStaleSyncing) throw new Error('Draft is already syncing');
+    if (!isStaleSyncing) throw new Error(`Draft is not syncable (${draft.status})`);
+    await prisma.ebayDraftSyncAttempt.updateMany({
+      where: { draftId: draft.id, status: 'running' },
+      data: { status: 'failed', finishedAt: new Date(), error: 'Interrupted (process restarted mid-sync); recovered as stale' },
+    });
+  }
 
   const queuedActions = ((draft.queuedActions as any[]) || []);
   const requestPlan = {

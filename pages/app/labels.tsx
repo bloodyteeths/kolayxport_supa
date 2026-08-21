@@ -1517,11 +1517,11 @@ function LabelsPage(props: { source?: string; channel?: string }) {
   const [hasFedexCredentials, setHasFedexCredentials] = useState(false);
   const [checkingFedexCredentials, setCheckingFedexCredentials] = useState(true);
   const [labelFilter, setLabelFilter] = useState<'all' | 'unlabeled' | 'labeled'>('all');
-  const COMPACT_COLS: Record<string, boolean> = { shipByDate: false, customerNote: false, variantInfo: false, delete: false, lastCarrier: false };
-  const DETAILED_COLS: Record<string, boolean> = { shipByDate: false, customerNote: false, delete: false };
-  const ALL_COLS: Record<string, boolean> = {};
-  const [columnVisibilityModel, setColumnVisibilityModel] = useState<Record<string, boolean>>(COMPACT_COLS);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+  // Kompakt = collapsed cards (click one to expand), Detaylı = all expanded.
+  // Replaces the old DataGrid column presets, which stopped doing anything
+  // when the page moved to the unified card layout.
+  const [cardViewMode, setCardViewMode] = useState<'compact' | 'expanded'>('compact');
   const [deleteConfirmation, setDeleteConfirmation] = useState<string | null>(null);
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const [shipmentDeleteConfirmation, setShipmentDeleteConfirmation] = useState<string | null>(null);
@@ -2919,20 +2919,19 @@ function LabelsPage(props: { source?: string; channel?: string }) {
             <ToggleButton value="unlabeled">{t('unlabeled')}</ToggleButton>
             <ToggleButton value="labeled">{t('received')}</ToggleButton>
           </ToggleButtonGroup>
-          {/* View presets — desktop only */}
+          {/* Card density presets */}
           <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 0.25, borderLeft: '1px solid', borderColor: 'divider', pl: 0.75 }}>
             {([
-              { label: t('viewCompact'), model: COMPACT_COLS },
-              { label: t('viewDetailed'), model: DETAILED_COLS },
-              { label: t('viewAll'), model: ALL_COLS },
-            ] as { label: string; model: Record<string, boolean> }[]).map((preset) => {
-              const isActive = JSON.stringify(columnVisibilityModel) === JSON.stringify(preset.model);
+              { label: t('viewCompact'), mode: 'compact' as const },
+              { label: t('viewDetailed'), mode: 'expanded' as const },
+            ]).map((preset) => {
+              const isActive = cardViewMode === preset.mode;
               return (
                 <Chip
                   key={preset.label}
                   label={preset.label}
                   size="small"
-                  onClick={() => setColumnVisibilityModel(preset.model)}
+                  onClick={() => { setCardViewMode(preset.mode); setExpandedCardId(null); }}
                   sx={{
                     height: 20, fontSize: '0.68rem', fontWeight: isActive ? 700 : 400,
                     bgcolor: isActive ? 'primary.main' : 'transparent',
@@ -2965,7 +2964,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, pb: 0.5 }}>
             {orderGroups.map((group) => {
-              const isExpanded = expandedCardId === group.orderId;
+              const isExpanded = cardViewMode === 'expanded' || expandedCardId === group.orderId;
               const row = group.primaryRow;
               const allLabeled = group.items.every(i => getLabelStatus(i) === 'labeled');
               const someLabeled = group.items.some(i => getLabelStatus(i) === 'labeled');

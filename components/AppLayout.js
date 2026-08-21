@@ -5,7 +5,6 @@ import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Menu,
-  Search,
   Bell,
   Globe,
   UserCircle,
@@ -467,28 +466,6 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
                 </button>
               )}
               <h1 className="text-lg font-bold text-slate-900 truncate" style={{ letterSpacing: '-0.02em' }}>{title}</h1>
-            </div>
-
-            {/* Search */}
-            <div className="hidden sm:flex flex-1 max-w-sm mx-auto px-4">
-              <div className="relative w-full">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-4 w-4 text-slate-400" />
-                </div>
-                <input
-                  type="search"
-                  name="app-search"
-                  id="app-search"
-                  className="block w-full pl-9 pr-3 py-2 text-sm text-slate-700 border-0 rounded-xl placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
-                  style={{ backgroundColor: 'rgba(241, 245, 249, 0.8)' }}
-                  placeholder={t('searchPlaceholder')}
-                />
-                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                  <kbd className="hidden lg:inline-flex items-center gap-0.5 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
-                    ⌘K
-                  </kbd>
-                </div>
-              </div>
             </div>
 
             {/* Right actions */}

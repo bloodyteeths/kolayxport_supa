@@ -3044,6 +3044,11 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                               <FlightTakeoffIcon sx={{ fontSize: 14, color: 'success.main' }} />
                             </Tooltip>
                           ) : null}
+                          <ShippingCostCell
+                            orderId={row.orderId}
+                            cost={(row.originalOrder as any)?.manualShippingCost != null ? Number((row.originalOrder as any).manualShippingCost) : null}
+                            currency={(row.originalOrder as any)?.manualShippingCostCurrency || null}
+                          />
                           <ExpandMoreIcon sx={{ fontSize: 18, color: 'text.disabled', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                         </Box>
                       </Box>

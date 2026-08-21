@@ -68,14 +68,13 @@ export default function ShippingCostCell({ orderId, cost, currency, size = 'smal
     <>
       {value.cost != null ? (
         <Chip
-          label={`${symbol}${Number(value.cost).toFixed(2)}`}
-          size={size}
-          variant="outlined"
+          label={`🚚 ${symbol}${Number(value.cost).toFixed(2)}`}
+          size="small"
           onClick={open}
-          sx={{ fontWeight: 600, cursor: 'pointer' }}
+          sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700, cursor: 'pointer', bgcolor: '#e0f2fe', color: '#0369a1' }}
         />
       ) : (
-        <Button size="small" onClick={open} sx={{ minWidth: 0, textTransform: 'none', fontSize: '0.72rem', color: 'text.secondary', borderBottom: '1px dashed', borderColor: 'divider', borderRadius: 0, px: 0.5, py: 0 }}>
+        <Button size="small" onClick={open} sx={{ minWidth: 0, textTransform: 'none', fontSize: '0.62rem', lineHeight: 1, color: 'text.secondary', border: '1px dashed', borderColor: 'divider', borderRadius: '9px', px: 0.6, py: 0.2 }}>
           {t('addShippingCost')}
         </Button>
       )}

@@ -32,7 +32,9 @@ export default async function handler(
 
   const page = parseInt(req.query.page as string) || 1;
   const pageSize = parseInt(req.query.limit as string) || 15;
-  const search = req.query.search as string;
+  // Trim — pasted tracking numbers often carry trailing whitespace/newlines
+  // that silently break the ILIKE pattern.
+  const search = ((req.query.search as string) || '').trim();
   const searchType = req.query.searchType as string || 'all';
   const source = req.query.source as string;
   const channel = req.query.channel as string;
@@ -105,9 +107,15 @@ export default async function handler(
           break;
           
         case 'tracking':
+          // Tracking numbers live in several places depending on how the label
+          // was made: Order.trackingNumber (current), Shipment (in-app labels
+          // pre-Dec 2025), TrackingSubmission (Chrome-extension pushes),
+          // rawData (marketplace-side cargo numbers).
           whereClause += ` AND (
             o."trackingNumber" ILIKE $${paramIndex} OR
-            o."rawData"::text ILIKE $${paramIndex}
+            o."rawData"::text ILIKE $${paramIndex} OR
+            EXISTS (SELECT 1 FROM "Shipment" s WHERE s."orderId" = o.id AND s."trackingNumber" ILIKE $${paramIndex}) OR
+            EXISTS (SELECT 1 FROM "TrackingSubmission" ts WHERE ts."orderId" = o.id AND ts."trackingNumber" ILIKE $${paramIndex})
           )`;
           params.push(searchPattern);
           paramIndex++;
@@ -174,9 +182,11 @@ export default async function handler(
             o."trackingNumber" ILIKE $${paramIndex} OR
             o."rawData"::text ILIKE $${paramIndex} OR
             o."shippingAddress"::text ILIKE $${paramIndex} OR
+            EXISTS (SELECT 1 FROM "Shipment" s WHERE s."orderId" = o.id AND s."trackingNumber" ILIKE $${paramIndex}) OR
+            EXISTS (SELECT 1 FROM "TrackingSubmission" ts WHERE ts."orderId" = o.id AND ts."trackingNumber" ILIKE $${paramIndex}) OR
             EXISTS (
-              SELECT 1 FROM "OrderItem" oi 
-              WHERE oi."orderId" = o.id 
+              SELECT 1 FROM "OrderItem" oi
+              WHERE oi."orderId" = o.id
               AND (oi."productName" ILIKE $${paramIndex} OR oi."sku" ILIKE $${paramIndex})
             )
           )`;
@@ -332,13 +342,16 @@ export default async function handler(
       }
     }
 
-    if (startDate) {
+    // A search means "find this order wherever it is" — the labels page always
+    // sends its default 7-day window, which silently hid any match older than
+    // a week. Date scoping only applies when NOT searching.
+    if (startDate && !search) {
       whereClause += ` AND COALESCE(o."uiOrderDate", o."createdAt") >= $${paramIndex}::timestamp`;
       params.push(startDate as string);
       paramIndex++;
     }
 
-    if (endDate) {
+    if (endDate && !search) {
       // Create end of day in UTC to properly filter orders.
       // Guard against malformed endDate query values that would otherwise
       // throw RangeError on .toISOString() and 500 the whole endpoint.

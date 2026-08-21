@@ -108,7 +108,13 @@ export function useOrders(page: number = 1, pageSize: number = 15, filters: Reco
       dedupingInterval: context === 'labelsPage' ? 1000 : 5000, // Reduced to 1 second for faster pagination
       revalidateOnFocus: false, // Disable aggressive revalidation for better performance
       revalidateOnReconnect: false, // Don't refetch on reconnect
-      shouldRetryOnError: false, // Don't retry on error to prevent hanging
+      // A transient failure (cold search queries can run ~2s and hit timeouts)
+      // used to silently strand the UI on stale data with no retry — the
+      // "search finds nothing until I retype it" bug. Retry a couple of times
+      // instead of never.
+      shouldRetryOnError: true,
+      errorRetryCount: 2,
+      errorRetryInterval: 1500,
       keepPreviousData: true, // Keep previous data while loading new page
     }
   );

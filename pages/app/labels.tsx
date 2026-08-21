@@ -1549,14 +1549,21 @@ function LabelsPage(props: { source?: string; channel?: string }) {
   // Fetch marketplace options
   const { marketplaceOptions: dbMarketplaceOptions, isLoading: isLoadingMarketplaces } = useMarketplaceOptions();
 
-  const { 
-    orders: fetchedOrders, 
-    total, 
-    isLoading, 
-    isError, 
-    mutate 
+  // When any filter changes, the FIRST fetch must already use page 0 — the old
+  // setTimeout-based reset let a request go out with the stale page number
+  // (an empty page of the new result set) before resetting.
+  const filterSignature = JSON.stringify([debouncedSearch, searchType, statusFilter, labelStatusFilter, labelFilter, filterStartDate, filterEndDate, marketplaceFilter]);
+  const lastFilterSignatureRef = useRef(filterSignature);
+  const effectivePage = lastFilterSignatureRef.current === filterSignature ? paginationModel.page : 0;
+
+  const {
+    orders: fetchedOrders,
+    total,
+    isLoading,
+    isError,
+    mutate
   } = useOrders(
-    paginationModel.page + 1,
+    effectivePage + 1,
     paginationModel.pageSize,
     {
       search: debouncedSearch,
@@ -1648,12 +1655,11 @@ function LabelsPage(props: { source?: string; channel?: string }) {
 
   // Reset pagination when filters change, but use a more stable approach
   useEffect(() => {
-    // Use setTimeout to avoid race conditions with the filtering useMemo
-    const timer = setTimeout(() => {
+    if (lastFilterSignatureRef.current !== filterSignature) {
+      lastFilterSignatureRef.current = filterSignature;
       setPaginationModel(prev => ({ ...prev, page: 0 }));
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [debouncedSearch, searchType, statusFilter, labelStatusFilter, labelFilter, filterStartDate, filterEndDate, marketplaceFilter]);
+    }
+  }, [filterSignature]);
 
   useEffect(() => {
     const fetchUserSettings = async () => {

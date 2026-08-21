@@ -323,24 +323,44 @@ export default async function handler(
         });
       }
     } else if (source === 'wix') {
-      // Submit fulfillment directly to Wix
-      await submitWixFulfillment(userSettings, order, trackingNumber, carrierId, user.id);
+      // Local-first: a failed Wix push must never lose the number the user
+      // typed. Save, then attempt the remote fulfillment.
+      try {
+        await submitWixFulfillment(userSettings, order, trackingNumber, carrierId, user.id);
+      } catch (err: any) {
+        await saveTrackingLocally(orderId as string, trackingNumber, carrierId, notifyCustomer, updateRemoteOrder, user.id, 'failed', err.message?.slice(0, 200));
+        return res.status(200).json({
+          success: true,
+          message: `Tracking saved locally. Wix push failed: ${err.message?.slice(0, 200)}`,
+        });
+      }
     } else {
-      // Submit through Veeqo for other marketplaces
+      // Veeqo (and unknown-marketplace fallback). Local-first: without a Veeqo
+      // key or on API failure the number still persists locally.
       if (!userSettings?.veeqoApiKey) {
-        return res.status(400).json({
-          error: 'Veeqo API key not found. Please configure your integration settings.'
+        await saveTrackingLocally(orderId as string, trackingNumber, carrierId, notifyCustomer, updateRemoteOrder, user.id, 'submitted', null);
+        return res.status(200).json({
+          success: true,
+          message: 'Tracking saved locally (no Veeqo API key configured — nothing pushed to a marketplace).',
         });
       }
 
-      await submitVeeqoTracking(
-        userSettings.veeqoApiKey,
-        order.marketplaceKey,
-        trackingNumber,
-        carrierId,
-        notifyCustomer,
-        updateRemoteOrder
-      );
+      try {
+        await submitVeeqoTracking(
+          userSettings.veeqoApiKey,
+          order.marketplaceKey,
+          trackingNumber,
+          carrierId,
+          notifyCustomer,
+          updateRemoteOrder
+        );
+      } catch (err: any) {
+        await saveTrackingLocally(orderId as string, trackingNumber, carrierId, notifyCustomer, updateRemoteOrder, user.id, 'failed', err.message?.slice(0, 200));
+        return res.status(200).json({
+          success: true,
+          message: `Tracking saved locally. Veeqo push failed: ${err.message?.slice(0, 200)}`,
+        });
+      }
     }
 
     // Create TrackingSubmission record
@@ -389,6 +409,36 @@ export default async function handler(
       details: error.message 
     });
   }
+}
+
+// Persist tracking locally regardless of remote push outcome — the number the
+// user entered must never be lost.
+async function saveTrackingLocally(
+  orderId: string,
+  trackingNumber: string,
+  carrierId: number,
+  notifyCustomer: boolean,
+  updateRemoteOrder: boolean,
+  userId: string,
+  status: string,
+  errorMessage: string | null,
+) {
+  await prisma.trackingSubmission.upsert({
+    where: { orderId_trackingNumber: { orderId, trackingNumber } },
+    update: { status, errorMessage, carrierId, carrierName: getCarrierName(carrierId) },
+    create: {
+      orderId,
+      trackingNumber,
+      carrierId,
+      carrierName: getCarrierName(carrierId),
+      notifyCustomer,
+      updateRemoteOrder,
+      submittedBy: userId,
+      status,
+      ...(errorMessage ? { errorMessage } : {}),
+    },
+  });
+  await prisma.order.update({ where: { id: orderId }, data: { trackingNumber, status: 'shipped' } });
 }
 
 function getCarrierName(carrierId: number): string {

@@ -263,6 +263,15 @@ function mapReceiptToUIOrder(receipt: any, shopId: string, shopName: string, ima
     })(),
     giftMessage: rawGiftMessage || undefined,
     customerNote: customerNote || undefined,
+    // Etsy receipts carry shipments[] once tracking is pushed to Etsy — by the
+    // Chrome extension OR any 3rd-party shipping app. Mapping it here lets
+    // orders self-heal with tracking on every sync even when the label was
+    // never created or logged inside KolayXport. Latest shipment wins.
+    trackingNumber: (() => {
+      const ships = Array.isArray(receipt.shipments) ? receipt.shipments : [];
+      const codes = ships.map((s: any) => s?.tracking_code).filter(Boolean);
+      return codes.length ? String(codes[codes.length - 1]) : undefined;
+    })(),
     rawData: receipt,
     commodityDesc: lineItems[0]?.title || '',
   };

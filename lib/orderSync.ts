@@ -1391,7 +1391,10 @@ export async function syncAllOrders(userId: string, options: {
 
         const missingUiOrderDate = !(existing?.uiOrderDate);
         const hasNewItemData = order.line_items?.some((item: any) => item.image || item.value > 0);
-        if (hasChanged || missingStatus || missingUiOrderDate || hasNewItemData) {
+        // Marketplace now reports tracking we don't have locally (e.g. Etsy
+        // shipments pushed by a 3rd-party app) — must reprocess to capture it.
+        const hasNewTracking = Boolean(order.trackingNumber) && !(existing as any)?.trackingNumber;
+        if (hasChanged || missingStatus || missingUiOrderDate || hasNewItemData || hasNewTracking) {
           ordersToProcess.push(order);
         } else {
           if (existing) {
@@ -1461,6 +1464,13 @@ export async function syncAllOrders(userId: string, options: {
           }
           if (typeof (order as any).customerNote === 'string' && (order as any).customerNote.length > 0) {
             baseOrderData.customerNote = (order as any).customerNote;
+          }
+
+          // Marketplace-reported tracking (e.g. Etsy receipt shipments).
+          // Fill-if-empty only — never clobber a number the user entered
+          // locally with a possibly different marketplace value.
+          if (order.trackingNumber && !(existingOrder as any)?.trackingNumber) {
+            baseOrderData.trackingNumber = order.trackingNumber;
           }
 
           if (existingOrder) {

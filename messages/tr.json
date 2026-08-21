@@ -501,6 +501,14 @@
     "orders": "sipariş"
   },
   "labels": {
+    "columnShippingCost": "Kargo Maliyeti",
+    "addShippingCost": "+ Maliyet",
+    "shippingCostHint": "Kargo faturasındaki gerçek maliyeti girin. Finans paneline gider olarak yansır.",
+    "shippingCostLabel": "Tutar",
+    "shippingCostSave": "Kaydet",
+    "shippingCostClear": "Temizle",
+    "shippingCostSaved": "Kargo maliyeti kaydedildi",
+    "shippingCostInvalid": "Geçerli bir tutar girin",
     "fbaBadgeTooltip": "Fulfilled by Amazon — Amazon, bu siparişi kendi deposundan kargolar. Sizin tarafınızdan etiket veya takip gerekmez.",
     "mcfBadgeTooltip": "Multi-Channel Fulfillment — Amazon, başka bir kanalda gerçekleşen satış için kendi FBA stoğundan kargolar.",
     "fbaRowDisabled": "Amazon bu siparişi kargolar. Etiket oluşturma veya takip iletme gerekmez.",

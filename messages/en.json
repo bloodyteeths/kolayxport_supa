@@ -541,6 +541,14 @@
     "orders": "orders"
   },
   "labels": {
+    "columnShippingCost": "Shipping Cost",
+    "addShippingCost": "+ Cost",
+    "shippingCostHint": "Enter the actual cost from the carrier invoice. It flows into the finance dashboard as an expense.",
+    "shippingCostLabel": "Amount",
+    "shippingCostSave": "Save",
+    "shippingCostClear": "Clear",
+    "shippingCostSaved": "Shipping cost saved",
+    "shippingCostInvalid": "Enter a valid amount",
     "fbaBadgeTooltip": "Fulfilled by Amazon — Amazon ships this from its warehouse. No label or tracking needed from you.",
     "mcfBadgeTooltip": "Multi-Channel Fulfillment — Amazon ships from FBA inventory for a sale that happened on another channel.",
     "fbaRowDisabled": "Amazon ships this order. Label generation and tracking submission aren't needed.",

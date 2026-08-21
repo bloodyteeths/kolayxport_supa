@@ -128,6 +128,11 @@ model Order {
   status                      String?
   currency                    String?
   totalPrice                  Float?
+  // Actual carrier cost for this order's shipment, entered manually from the
+  // carrier invoice (UPS/MNG bill later; label API responses don't carry the
+  // final cost). Feeds the financial dashboard's shipping bucket.
+  manualShippingCost          Decimal?             @db.Decimal(10, 2)
+  manualShippingCostCurrency  String?
   createdAt                   DateTime             @default(now())
   updatedAt                   DateTime             @updatedAt
   orderNumber                 String

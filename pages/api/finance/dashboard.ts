@@ -3,6 +3,7 @@ import { getAuthUser } from '@/lib/auth';
 import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';
 import { refreshFinancialsIfStale } from '@/lib/finance/financialAutoSync';
+import { convertCurrency } from '@/lib/finance/fx';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -189,9 +190,9 @@ async function buildDashboard(
           },
         ],
       },
-      select: { id: true, status: true, totalPrice: true },
+      select: { id: true, status: true, totalPrice: true, manualShippingCost: true, manualShippingCostCurrency: true },
     })
-    .catch(() => [] as Array<{ id: string; status: string | null; totalPrice: number | null }>);
+    .catch(() => [] as Array<{ id: string; status: string | null; totalPrice: number | null; manualShippingCost: any; manualShippingCostCurrency: string | null }>);
   const cancelledStatuses = new Set(['CANCELLED', 'cancelled', 'Cancelled', 'canceled', 'Canceled']);
   const orderRowsActive = orderRows.filter(r => !cancelledStatuses.has(r.status || ''));
   const orderRowsCancelled = orderRows.filter(r => cancelledStatuses.has(r.status || ''));
@@ -378,6 +379,23 @@ async function buildDashboard(
         p.cogs += (cost.costAmount + cost.shippingCost) * quantity;
       }
     }
+  }
+
+  // Manually-logged carrier costs (entered on the labels page from UPS/MNG
+  // invoices) — the only source of real label costs for carriers that bill
+  // after the fact. Converted into this dashboard's display currency;
+  // unconvertible entries are skipped rather than mis-summed. Cancelled
+  // orders included: a purchased label is a real cost either way.
+  const targetCurrency = marketplace === 'trendyol' ? 'TRY' : 'USD';
+  for (const r of orderRows) {
+    const manualCost = r.manualShippingCost != null ? Number(r.manualShippingCost) : null;
+    if (!manualCost) continue;
+    const converted = await convertCurrency(manualCost, r.manualShippingCostCurrency || targetCurrency, targetCurrency);
+    if (converted == null) {
+      logger.warn('Manual shipping cost skipped — FX rate unavailable', { orderId: r.id, currency: r.manualShippingCostCurrency, targetCurrency });
+      continue;
+    }
+    shipping += converted;
   }
 
   const netProfit = grossRevenue - commissions - shipping - returns - discounts - adSpend - otherFees - cogs;

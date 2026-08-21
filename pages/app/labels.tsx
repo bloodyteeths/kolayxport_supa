@@ -21,6 +21,7 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import UPSLabelDrawer from '@/components/UPSLabelDrawer';
 import MngLabelDrawer from '@/components/MngLabelDrawer';
 import ManualOrderButton from '@/components/ManualOrderButton';
+import ShippingCostCell from '@/components/labels/ShippingCostCell';
 import { isEtsyOrderSync } from '@/lib/utils/etsyDetection';
 import { buildTrendyolProductUrl } from '@/lib/utils/trendyolUrl';
 import withAuth from '@/components/withAuth';
@@ -2064,7 +2065,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
       width: 130,
       valueGetter: (_value, row) => `${row.recipientFirstName || ''} ${row.recipientLastName || ''}`.trim() || row.originalOrder?.customerName || '—'
     },
-    { 
+    {
       field: 'orderTotalPrice',
       headerName: t('columnTotal'),
       width: 95,
@@ -2076,6 +2077,21 @@ function LabelsPage(props: { source?: string; channel?: string }) {
           </Typography>
         </Box>
       )
+    },
+    {
+      field: 'manualShippingCost',
+      headerName: t('columnShippingCost'),
+      width: 110,
+      sortable: false,
+      renderCell: (params: GridRenderCellParams<LabelRow>) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }} onClick={(e) => e.stopPropagation()}>
+          <ShippingCostCell
+            orderId={params.row.orderId}
+            cost={(params.row.originalOrder as any)?.manualShippingCost != null ? Number((params.row.originalOrder as any).manualShippingCost) : null}
+            currency={(params.row.originalOrder as any)?.manualShippingCostCurrency || null}
+          />
+        </Box>
+      ),
     },
     {
       field: 'title',

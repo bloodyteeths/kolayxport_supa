@@ -449,6 +449,7 @@
     "bankedInPeriod": "Banked in Period",
     "bankedDepositCount": "{count} payouts",
     "bankedCurrentBalance": "Current Etsy Balance",
+    "bankedCurrentBalanceMp": "Current {marketplace} Balance",
     "bankedBalanceHint": "Earned, not yet paid to bank",
     "bankedDepositList": "Payout Breakdown",
     "bankedReserveNote": "Etsy’s API does not expose reserve (held) amounts or release dates, so they can’t be shown. “Current balance” is the total not yet disbursed to your bank.",

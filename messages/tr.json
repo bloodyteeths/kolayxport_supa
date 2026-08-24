@@ -409,6 +409,7 @@
     "bankedInPeriod": "Dönemde Bankaya Geçen",
     "bankedDepositCount": "{count} ödeme",
     "bankedCurrentBalance": "Güncel Etsy Bakiyesi",
+    "bankedCurrentBalanceMp": "Güncel {marketplace} Bakiyesi",
     "bankedBalanceHint": "Kazanıldı, henüz bankaya aktarılmadı",
     "bankedDepositList": "Ödeme Dökümü",
     "bankedReserveNote": "Etsy API’si tutulan bakiye (reserve) miktarını ve serbest bırakılma tarihlerini paylaşmaz; bu yüzden gösterilemiyor. “Güncel bakiye” henüz bankaya geçmemiş toplam tutardır.",

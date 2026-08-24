@@ -32,6 +32,9 @@ export default function BankedPanel({ data, marketplace }: { data: DashboardData
   const cur = SYMBOL[summary.balanceCurrency || 'USD'] || '$';
   if (!banked && balance == null && held == null && disbursements.length === 0) return null;
 
+  // Marketplace-aware label — the balance card previously hardcoded "Etsy".
+  const mpName = marketplace === 'ebay' ? 'eBay' : marketplace.charAt(0).toUpperCase() + marketplace.slice(1);
+
   return (
     <Paper sx={{ borderRadius: '12px', p: 2, mb: 2, border: '1px solid', borderColor: 'divider' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
@@ -56,7 +59,7 @@ export default function BankedPanel({ data, marketplace }: { data: DashboardData
           <Box sx={{ p: 1.5, borderRadius: '10px', background: 'linear-gradient(135deg, #f5f3ff, #ede9fe)' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5 }}>
               <Wallet size={16} color="#7c3aed" />
-              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>{t('bankedCurrentBalance')}</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>{t('bankedCurrentBalanceMp', { marketplace: mpName })}</Typography>
             </Box>
             {/* Etsy/Amazon: balance is an estimate and reserve/release isn't in
                 the API — explain on hover. eBay: held funds shown separately. */}

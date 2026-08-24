@@ -36,6 +36,11 @@ interface DashboardSummary {
   totalOrderCount: number;
   pendingSettlementCount: number;
   totalOrderRevenue: number;
+  // Banked money paid to bank in the period + current not-yet-disbursed balance.
+  banked?: number;
+  disbursementCount?: number;
+  currentBalance?: number | null;
+  balanceCurrency?: string | null;
 }
 
 interface TimeSeriesPoint {
@@ -79,7 +84,7 @@ function getDateTruncExpression(groupBy: string): string {
 /**
  * Classify Trendyol transaction types into financial categories.
  */
-function classifyTransactionType(type: string): 'revenue' | 'commission' | 'shipping' | 'return' | 'discount' | 'adspend' | 'fees' | 'commission_invoice' | 'other' {
+function classifyTransactionType(type: string): 'revenue' | 'commission' | 'shipping' | 'return' | 'discount' | 'adspend' | 'fees' | 'commission_invoice' | 'disbursement' | 'other' {
   // Normalize: strip diacritics so Turkish İ→i, ş→s, etc. work with plain includes()
   const t = (type || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   // Also check original for exact Turkish matches
@@ -98,6 +103,14 @@ function classifyTransactionType(type: string): 'revenue' | 'commission' | 'ship
   if (t.includes('hizmet')) return 'fees'; // Platform / Uluslararası Hizmet Bedeli
   // Kusurlu Ürün / Yanlış Ürün / Tedarik Edememe / Erken Ödeme Kesinti / Fatura Kontör
   if (t.includes('kusurlu') || t.includes('yanl') || t.includes('tedarik') || t.includes('kesinti') || t.includes('kontor')) return 'fees';
+
+  // Etsy real ledger types (from settlements Phase 4). EtsyFee amounts are
+  // SIGNED (charge<0, refund>0) — the 'commission' switch case handles the
+  // sign. Disbursements are bank transfers (excluded from P&L). SellerCredit
+  // is a positive revenue adjustment handled by the default case.
+  if (t === 'etsyfee') return 'commission';
+  if (t === 'disbursement' || t.includes('disburse')) return 'disbursement';
+  if (t === 'sellercredit') return 'other';
 
   if (t.includes('sale') || orig === 'Satış' || t.includes('satis')) return 'revenue';
   if (t.includes('shipping') || t.includes('cargo') || t.includes('kargo')) return 'shipping';
@@ -138,6 +151,7 @@ async function buildDashboard(
   groupBy: string
 ): Promise<{
   summary: DashboardSummary;
+  disbursements: Array<{ date: string; amount: number }>;
   timeSeries: TimeSeriesPoint[];
   productBreakdown: ProductBreakdownItem[];
   transactionTypeSummary: Record<string, { count: number; total: number }>;
@@ -234,6 +248,10 @@ async function buildDashboard(
   // Trendyol deduction invoices that fit no other bucket: platform service
   // fee, stopaj withholding, penalty invoices, early-payment deduction, etc.
   let otherFees = 0;
+  // Etsy bank disbursements in the period (money actually paid out). NOT a P&L
+  // figure — reported separately in the "banked" panel.
+  let banked = 0;
+  const disbursements: Array<{ date: string; amount: number }> = [];
   let cogs = 0;
   let orderCount = 0;
   // Distinct orderNumbers with at least one finalized refund event in the
@@ -315,6 +333,12 @@ async function buildDashboard(
       case 'commission_invoice':
         // Official commission invoice — already represented by per-sale
         // commission amounts; kept visible in transactionTypeSummary only.
+        break;
+      case 'disbursement':
+        // Bank transfer of already-earned money — NOT a P&L event. Summed for
+        // the "banked" panel only. Stored negative (money out to bank).
+        banked += Math.abs(amount);
+        disbursements.push({ date: tx.transactionDate.toISOString().slice(0, 10), amount: round2(Math.abs(amount)) });
         break;
       default:
         // Other types — add to revenue if positive, ignore if negative
@@ -401,6 +425,13 @@ async function buildDashboard(
   const netProfit = grossRevenue - commissions - shipping - returns - discounts - adSpend - otherFees - cogs;
   const margin = grossRevenue > 0 ? (netProfit / grossRevenue) * 100 : 0;
 
+  // Current marketplace account balance (money earned, not yet paid to bank).
+  const cursor = await prisma.financialSyncCursor.findUnique({
+    where: { userId_marketplace: { userId, marketplace } },
+    select: { currentBalance: true, balanceCurrency: true },
+  }).catch(() => null);
+  disbursements.sort((a, b) => a.date.localeCompare(b.date));
+
   // Build time series array
   const timeSeries: TimeSeriesPoint[] = Array.from(timeMap.entries())
     .sort(([a], [b]) => a.localeCompare(b))
@@ -453,7 +484,14 @@ async function buildDashboard(
       totalOrderCount: orderTableCount,
       pendingSettlementCount: Math.max(0, orderTableCount - orderCount),
       totalOrderRevenue: round2(orderTableRevenue),
+      // Banked = money disbursed to bank in the period; currentBalance = money
+      // earned but not yet paid out (as of last sync). Powers the banked panel.
+      banked: round2(banked),
+      disbursementCount: disbursements.length,
+      currentBalance: cursor?.currentBalance != null ? Number(cursor.currentBalance) : null,
+      balanceCurrency: cursor?.balanceCurrency || null,
     },
+    disbursements,
     timeSeries,
     productBreakdown,
     transactionTypeSummary,

@@ -26,6 +26,12 @@ export interface DashboardSummary {
   totalOrderCount?: number;
   pendingSettlementCount?: number;
   totalOrderRevenue?: number;
+  // Etsy banked money (paid to bank) in the period + current not-yet-disbursed
+  // Etsy balance. Powers the banked/held-funds panel.
+  banked?: number;
+  disbursementCount?: number;
+  currentBalance?: number | null;
+  balanceCurrency?: string | null;
 }
 
 export interface TimeSeriesPoint {
@@ -61,6 +67,7 @@ export interface DashboardData {
   timeSeries: TimeSeriesPoint[];
   productBreakdown: ProductBreakdown[];
   transactionTypeSummary: TransactionTypeSummary[];
+  disbursements?: Array<{ date: string; amount: number }>;
 }
 
 export interface ProductCostEntry {
@@ -234,6 +241,7 @@ const useFinanceStore = create<FinanceState>((set, get) => ({
           timeSeries: Array.isArray(data.timeSeries) ? data.timeSeries : [],
           productBreakdown: Array.isArray(data.productBreakdown) ? data.productBreakdown : [],
           transactionTypeSummary: txSummary,
+          disbursements: Array.isArray(data.disbursements) ? data.disbursements : [],
         },
       });
     } catch (err) {

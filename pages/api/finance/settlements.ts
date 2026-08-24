@@ -644,60 +644,9 @@ export async function handleEtsySync(userId: string, body: any, res: NextApiResp
 
   const totalFetched = allReceipts.length;
 
-  // ---- PHASE 2: Fetch payments in parallel for fee data ----
-  const paymentMap = new Map<string, { amount_gross: number; amount_fees: number; amount_net: number }>();
-
-  try {
-    let paymentOffset = 0;
-    let paymentHasMore = true;
-    const allPayments: any[] = [];
-
-    while (paymentHasMore) {
-      const paymentData = await client.getShopPayments({
-        min_created: minCreated,
-        max_created: maxCreated,
-        limit: PAGE_LIMIT,
-        offset: paymentOffset,
-      });
-
-      const paymentResults = Array.isArray(paymentData.results) ? paymentData.results : [];
-      allPayments.push(...paymentResults);
-
-      if (paymentResults.length < PAGE_LIMIT) {
-        paymentHasMore = false;
-      } else {
-        paymentOffset += PAGE_LIMIT;
-      }
-    }
-
-    for (const payment of allPayments) {
-      const receiptId = String(payment.receipt_id);
-      const existing = paymentMap.get(receiptId);
-      const gross = EtsyClient.etsyMoney(payment.amount_gross || { amount: 0, divisor: 100 });
-      const fees = EtsyClient.etsyMoney(payment.amount_fees || { amount: 0, divisor: 100 });
-      const net = EtsyClient.etsyMoney(payment.amount_net || { amount: 0, divisor: 100 });
-
-      if (existing) {
-        existing.amount_gross += gross;
-        existing.amount_fees += fees;
-        existing.amount_net += net;
-      } else {
-        paymentMap.set(receiptId, { amount_gross: gross, amount_fees: fees, amount_net: net });
-      }
-    }
-  } catch (err) {
-    // Payment data is supplementary — log and continue
-    logger.warn('Failed to fetch Etsy payments (continuing without fee data)', {
-      error: err instanceof Error ? err.message : String(err),
-      shopId: etsyCreds.shopId,
-    });
-  }
-
-  logger.info('Etsy sync phase 2 complete', {
-    receipts: allReceipts.length,
-    paymentsWithFees: paymentMap.size,
-    sampleFee: paymentMap.size > 0 ? Array.from(paymentMap.values())[0] : null,
-  });
+  // Phase 2 (getShopPayments) was removed: that endpoint requires payment_ids
+  // and 400s with a date range, so it never returned fee data. Real fees now
+  // come from the ledger in Phase 4.
 
   // ---- PHASE 3: Map receipts to FinancialTransaction records & upsert ----
   let totalUpserted = 0;
@@ -723,23 +672,22 @@ export async function handleEtsySync(userId: string, body: any, res: NextApiResp
         }
       }
 
-      // Amount from grandtotal (includes buyer-paid shipping)
-      let amount = EtsyClient.etsyMoney(receipt.grandtotal || { amount: 0, divisor: 100 });
+      // Revenue = grandtotal MINUS sales tax. Etsy's grandtotal bundles the
+      // marketplace-facilitator sales tax it collects and remits to tax
+      // authorities — that money is never the seller's, so it must not inflate
+      // revenue. total_tax_cost is the exact tax portion (matches the ledger's
+      // sales_tax entries). Remaining amount = items + buyer-paid shipping.
+      const taxCost = EtsyClient.etsyMoney(receipt.total_tax_cost || { amount: 0, divisor: 100 });
+      let amount = EtsyClient.etsyMoney(receipt.grandtotal || { amount: 0, divisor: 100 }) - taxCost;
       if (isRefund) amount = -Math.abs(amount);
 
-      // Etsy shipping is buyer-paid — NOT a seller expense. Don't store as shippingAmount.
-      // shippingAmount is for seller-paid shipping costs (deductions). Etsy doesn't charge shipping to sellers.
-
-      // Fees from payment map
-      const paymentInfo = paymentMap.get(receiptId);
-      // Etsy fees = listing fee + transaction fee (6.5%) + payment processing (3%+$0.25) + offsite ads (if applicable)
-      let commission: number | null = null;
-      if (paymentInfo && paymentInfo.amount_fees !== 0) {
-        commission = Math.abs(paymentInfo.amount_fees);
-      } else if (!isRefund && amount > 0) {
-        // Fallback: estimate Etsy fees (~13% total: 6.5% transaction + 3%+$0.25 processing + ~1.5% regulatory + listing)
-        commission = Math.round((amount * 0.13 + 0.20) * 100) / 100;
-      }
+      // Etsy shipping is buyer-paid — NOT a seller expense.
+      // Real Etsy fees are NOT estimated here anymore. They come from the
+      // ledger in Phase 4 (transaction/processing/listing fees), which is
+      // authoritative. The old 13% estimate overstated commissions by ~50%
+      // because the payments API (getShopPayments) requires payment_ids and
+      // always 400s — so real fee data never arrived. commission stays null.
+      const commission: number | null = null;
 
       // Currency
       const currency = receipt.grandtotal?.currency_code || 'USD';
@@ -793,6 +741,9 @@ export async function handleEtsySync(userId: string, body: any, res: NextApiResp
   // ad spend by 4-5x. Keying by entry_id makes re-sync idempotent.
   let adSpendTotal = 0;
   let adSpendEntries = 0;
+  let latestBalance = 0;
+  let latestBalanceSeq = -1;
+  let balanceCurrency = 'USD';
   try {
     let ledgerOffset = 0;
     let ledgerHasMore = true;
@@ -830,82 +781,79 @@ export async function handleEtsySync(userId: string, body: any, res: NextApiResp
         const ledgerType = (entry.ledger_type || '').toLowerCase();
         const description = (entry.description || '').toLowerCase();
 
-        // Precise match only. Do NOT match `ledgerType.includes('ad')` —
-        // that picks up `payment_adjustment`, `card_processing`, etc.
-        const isAdSpend = ledgerType === 'prolist'
-          || ledgerType === 'offsite_ads_fee'
-          || ledgerType === 'offsite_ads'
-          || description.includes('offsite ads')
-          || description.includes('etsy ads')
-          || description.includes('promoted listing');
-
-        // Refunds and cancellation losses. Etsy's `refund` ledger type
-        // covers full + partial buyer refunds; `seller_paid_for_return_shipping`
-        // also costs the seller money. Without persisting these the dashboard
-        // counts canceled Sale rows as revenue and net profit is overstated.
-        const isRefund = ledgerType === 'refund'
-          || ledgerType === 'refund_dispute'
-          || ledgerType === 'seller_paid_for_return_shipping'
-          || description.includes('refund');
-
-        if (!isAdSpend && !isRefund) continue;
-
-        // Ledger amounts are integers in cents, not Money objects
+        // Ledger amounts are integers in cents, not Money objects. Sign is
+        // meaningful: negative = money out (fee/refund/ad/disbursement),
+        // positive = money in (fee refund, seller credit).
         const rawAmount = typeof entry.amount === 'object'
           ? EtsyClient.etsyMoney(entry.amount)
           : (Number(entry.amount) || 0) / 100;
 
-        const entryId = entry.entry_id ?? entry.ledger_entry_id ?? entry.id;
-        if (entryId == null) {
-          // Defensive: Etsy should always return an id, but if not we can't
-          // dedup safely — skip rather than risk double-count on re-sync.
-          continue;
-        }
-        const externalId = `etsy_ledger_${entryId}`;
-        const txDate = entry.create_date
-          ? new Date(entry.create_date * 1000)
-          : new Date();
+        // Track running balance (highest sequence_number = current).
+        const seq = Number(entry.sequence_number) || 0;
+        const balAmt = typeof entry.balance === 'object'
+          ? EtsyClient.etsyMoney(entry.balance)
+          : (Number(entry.balance) || 0) / 100;
+        if (seq > latestBalanceSeq) { latestBalanceSeq = seq; latestBalance = balAmt; balanceCurrency = entry.currency_code || balanceCurrency; }
 
-        const txType = isAdSpend ? 'AdSpend' : 'Refund';
-        const txProductName = isAdSpend
-          ? (description || (ledgerType === 'offsite_ads_fee' ? 'Offsite Ads' : 'Etsy Ads'))
-          : (description || 'Refund');
+        // Classify by ledger_type into a dashboard bucket. Revenue and sales
+        // tax come from receipts (Phase 3), so skip those here to avoid
+        // double-counting; PAYMENT_GROSS/DISBURSE2 are balance mechanics.
+        const isAdSpend = ledgerType === 'prolist'
+          || ledgerType === 'offsite_ads_fee' || ledgerType === 'offsite_ads'
+          || description.includes('offsite ads') || description.includes('etsy ads')
+          || description.includes('promoted listing');
+
+        // Real Etsy seller fees (and their refunds, which arrive positive).
+        const isFee = ledgerType === 'transaction' || ledgerType === 'transaction_refund'
+          || ledgerType === 'payment_processing_fee' || ledgerType === 'refund_processing_fee'
+          || ledgerType === 'listing' || ledgerType === 'listing_private'
+          || ledgerType === 'renew' || ledgerType === 'renew_sold' || ledgerType === 'renew_sold_auto'
+          || ledgerType === 'renew_expired' || ledgerType === 'renew_refund'
+          || ledgerType === 'renew_sold_refund' || ledgerType === 'renew_sold_auto_refund'
+          || ledgerType === 'shipping_transaction' || ledgerType === 'shipping_transaction_refund'
+          || ledgerType === 'buyer_fee' || ledgerType === 'gift_wrap_fees';
+
+        // Money refunded to the buyer (the actual return cost to the seller).
+        const isRefund = ledgerType === 'refund_gross' || ledgerType === 'refund'
+          || ledgerType === 'refund_dispute' || ledgerType === 'seller_paid_for_return_shipping';
+
+        // Actual bank disbursements — recorded for the "banked" panel; excluded
+        // from P&L (they move money already earned, they don't earn/spend it).
+        const isDisbursement = ledgerType === 'disburse2' || ledgerType === 'disburse'
+          || description === 'disbursement';
+
+        // Etsy credits to the seller (positive) — a revenue adjustment.
+        const isSellerCredit = ledgerType === 'seller_credit';
+
+        if (!isAdSpend && !isFee && !isRefund && !isDisbursement && !isSellerCredit) continue;
+
+        const entryId = entry.entry_id ?? entry.ledger_entry_id ?? entry.id;
+        if (entryId == null) continue; // can't dedup safely — skip
+        const externalId = `etsy_ledger_${entryId}`;
+        const txDate = entry.create_date ? new Date(entry.create_date * 1000) : new Date();
+
+        let txType: string;
+        let storedAmount: number;
+        if (isAdSpend) { txType = 'AdSpend'; storedAmount = -Math.abs(rawAmount); }
+        else if (isFee) { txType = 'EtsyFee'; storedAmount = rawAmount; } // signed: charge<0, refund>0
+        else if (isRefund) { txType = 'Refund'; storedAmount = -Math.abs(rawAmount); }
+        else if (isDisbursement) { txType = 'Disbursement'; storedAmount = rawAmount; } // negative = to bank
+        else { txType = 'SellerCredit'; storedAmount = Math.abs(rawAmount); } // positive revenue adj
 
         await prisma.financialTransaction.upsert({
-          where: {
-            userId_marketplace_externalId: {
-              userId,
-              marketplace: 'etsy',
-              externalId,
-            },
-          },
-          update: {
-            amount: -Math.abs(rawAmount),
-            transactionDate: txDate,
-            syncedAt: new Date(),
-            transactionType: txType,
-          },
+          where: { userId_marketplace_externalId: { userId, marketplace: 'etsy', externalId } },
+          update: { amount: storedAmount, transactionDate: txDate, syncedAt: new Date(), transactionType: txType },
           create: {
-            userId,
-            marketplace: 'etsy',
-            externalId,
-            transactionType: txType,
-            orderNumber: null,
-            barcode: null,
-            productName: txProductName,
-            quantity: 1,
-            amount: -Math.abs(rawAmount),
+            userId, marketplace: 'etsy', externalId, transactionType: txType,
+            orderNumber: null, barcode: null,
+            productName: description || txType,
+            quantity: 1, amount: storedAmount,
             currency: entry.currency_code || 'USD',
-            commission: null,
-            shippingAmount: null,
-            transactionDate: txDate,
+            commission: null, shippingAmount: null, transactionDate: txDate,
           },
         });
 
-        if (isAdSpend) {
-          adSpendTotal += Math.abs(rawAmount);
-          adSpendEntries++;
-        }
+        if (isAdSpend) { adSpendTotal += Math.abs(rawAmount); adSpendEntries++; }
         totalUpserted++;
       }
 
@@ -922,7 +870,11 @@ export async function handleEtsySync(userId: string, body: any, res: NextApiResp
     });
   }
 
-  // Update sync cursor
+  // Update sync cursor. Persist the latest ledger balance (current Etsy
+  // account balance) so the dashboard can show it without a live API call.
+  const balanceData = latestBalanceSeq >= 0
+    ? { currentBalance: Math.round(latestBalance * 100) / 100, balanceCurrency }
+    : {};
   await prisma.financialSyncCursor.upsert({
     where: {
       userId_marketplace: { userId, marketplace: 'etsy' },
@@ -930,12 +882,14 @@ export async function handleEtsySync(userId: string, body: any, res: NextApiResp
     update: {
       lastSyncedTo: new Date(endMs),
       totalSynced: { increment: totalUpserted },
+      ...balanceData,
     },
     create: {
       userId,
       marketplace: 'etsy',
       lastSyncedTo: new Date(endMs),
       totalSynced: totalUpserted,
+      ...balanceData,
     },
   });
 
@@ -943,9 +897,9 @@ export async function handleEtsySync(userId: string, body: any, res: NextApiResp
     userId,
     totalFetched,
     totalUpserted,
-    paymentsWithFees: paymentMap.size,
     adSpendTotal: Math.round(adSpendTotal * 100) / 100,
     adSpendEntries,
+    currentBalance: latestBalanceSeq >= 0 ? Math.round(latestBalance * 100) / 100 : null,
     shopId: etsyCreds.shopId,
   });
 
@@ -953,8 +907,8 @@ export async function handleEtsySync(userId: string, body: any, res: NextApiResp
     success: true,
     totalFetched,
     totalUpserted,
-    paymentsWithFees: paymentMap.size,
     adSpend: Math.round(adSpendTotal * 100) / 100,
+    currentBalance: latestBalanceSeq >= 0 ? Math.round(latestBalance * 100) / 100 : null,
     syncedTo: new Date(endMs).toISOString(),
   });
 }

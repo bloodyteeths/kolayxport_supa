@@ -44,11 +44,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     else { saleCount++; grandtotal += g; subtotal += money(r.subtotal); shipping += money(r.total_shipping_cost); tax += money(r.total_tax_cost); discount += money(r.discount_amt); }
   }
 
+  // NOTE: getShopPayments (GET /shops/{id}/payments) requires payment_ids and
+  // 400s without them — the finance sync's fee fetch has been silently failing.
+  // Capture the error rather than crash the audit.
+  let paymentsError: string | null = null;
   const payments: any[] = [];
-  for (let offset = 0; ; offset += 100) {
-    const d = await client.getShopPayments({ min_created: minCreated, max_created: maxCreated, limit: 100, offset });
-    const r = d.results || []; payments.push(...r); if (r.length < 100) break;
-  }
+  try {
+    for (let offset = 0; ; offset += 100) {
+      const d = await client.getShopPayments({ min_created: minCreated, max_created: maxCreated, limit: 100, offset });
+      const r = d.results || []; payments.push(...r); if (r.length < 100) break;
+    }
+  } catch (err: any) { paymentsError = err?.message?.slice(0, 200) || 'failed'; }
   let payGross = 0, payFees = 0, payNet = 0;
   for (const p of payments) { payGross += money(p.amount_gross); payFees += money(p.amount_fees); payNet += money(p.amount_net); }
 
@@ -76,7 +82,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   return res.status(200).json({
     shop: shop.shopName, range: [startStr, endStr],
     receipts: { saleCount, grandtotal: round(grandtotal), subtotal: round(subtotal), shipping: round(shipping), salesTax: round(tax), discount: round(discount), refundedReceiptCount, refundedGrand: round(refundedGrand) },
-    payments: { count: payments.length, gross: round(payGross), fees: round(payFees), net: round(payNet) },
+    payments: { count: payments.length, gross: round(payGross), fees: round(payFees), net: round(payNet), error: paymentsError },
     ledger: { byType, net: round(ledgerNet), count: ledger.length },
     db: dbRows,
   });

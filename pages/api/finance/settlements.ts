@@ -1092,6 +1092,77 @@ function ebayAmount(money: { value: string; currency: string } | null | undefine
   return parseFloat(money.value) || 0;
 }
 
+// Fetch eBay bank payouts (banked money) and the seller funds summary (current
+// balance + held funds), store payouts as Disbursement rows, and return the
+// balance/held figures for the sync cursor. Best-effort — a failure here must
+// not fail the whole sync.
+async function syncEbayPayoutsAndFunds(
+  userId: string,
+  accessToken: string,
+  startMs: number,
+  endMs: number,
+): Promise<{ bankedTotal: { count: number; amount: number }; currentBalance: number | null; heldFunds: number | null }> {
+  let count = 0;
+  let amount = 0;
+  try {
+    // Payouts — chunk by 88 days to stay under the 90-day filter cap.
+    const WINDOW = 88 * 24 * 60 * 60 * 1000;
+    for (let ws = startMs; ws < endMs; ws += WINDOW) {
+      const we = Math.min(ws + WINDOW, endMs);
+      const filter = `payoutDate:[${new Date(ws).toISOString()}..${new Date(we).toISOString()}]`;
+      let offset = 0;
+      while (true) {
+        const data = await callEbayFinancesAPI(
+          `/sell/finances/v1/payout?filter=${encodeURIComponent(filter)}&limit=200&offset=${offset}`,
+          accessToken,
+        );
+        const payouts = Array.isArray(data.payouts) ? data.payouts : [];
+        for (const p of payouts) {
+          const val = ebayAmount(p.amount);
+          if (!p.payoutId) continue;
+          amount += val;
+          count++;
+          await prisma.financialTransaction.upsert({
+            where: { userId_marketplace_externalId: { userId, marketplace: 'ebay', externalId: `payout_${p.payoutId}` } },
+            update: { amount: -Math.abs(val), transactionDate: p.payoutDate ? new Date(p.payoutDate) : new Date(), syncedAt: new Date(), transactionType: 'Disbursement' },
+            create: {
+              userId, marketplace: 'ebay', externalId: `payout_${p.payoutId}`,
+              transactionType: 'Disbursement', orderNumber: null, barcode: null,
+              productName: `Payout${p.payoutStatus ? ` (${p.payoutStatus})` : ''}`,
+              quantity: p.transactionCount || 1, amount: -Math.abs(val),
+              currency: p.amount?.currency || 'USD', commission: null, shippingAmount: null,
+              transactionDate: p.payoutDate ? new Date(p.payoutDate) : new Date(),
+            },
+          });
+        }
+        if (payouts.length < 200) break;
+        offset += 200;
+      }
+    }
+  } catch (err) {
+    logger.warn('eBay payout sync failed (continuing)', { error: err instanceof Error ? err.message : String(err) });
+  }
+
+  // Funds summary — current snapshot (available + processing + on-hold). Returns
+  // HTTP 204 (empty) when there are no pending funds.
+  let currentBalance: number | null = null;
+  let heldFunds: number | null = null;
+  try {
+    const url = `${EBAY_FINANCES_BASE}/sell/finances/v1/seller_funds_summary`;
+    const resp = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' } });
+    if (resp.status === 204) { currentBalance = 0; heldFunds = 0; }
+    else if (resp.ok) {
+      const f = await resp.json();
+      currentBalance = Math.round(ebayAmount(f.totalFunds) * 100) / 100;
+      heldFunds = Math.round(ebayAmount(f.fundsOnHold) * 100) / 100;
+    }
+  } catch (err) {
+    logger.warn('eBay funds summary failed (continuing)', { error: err instanceof Error ? err.message : String(err) });
+  }
+
+  return { bankedTotal: { count, amount: Math.round(amount * 100) / 100 }, currentBalance, heldFunds };
+}
+
 export async function handleEbaySync(userId: string, body: any, res: NextApiResponse) {
   const { startDate, endDate } = body;
   if (!startDate || !endDate) {
@@ -1106,28 +1177,27 @@ export async function handleEbaySync(userId: string, body: any, res: NextApiResp
 
   const accessToken = await getEbayAccessToken(userId);
 
-  const startISO = new Date(startMs).toISOString();
-  const endISO = new Date(endMs).toISOString();
-  const filter = `transactionDate:[${startISO}..${endISO}]`;
-
   // ---- PHASE 1: Fetch all transactions with pagination ----
+  // eBay's transaction endpoint caps the date filter at 90 days, so chunk the
+  // range into <=88-day sub-windows (the cron's 35-day window is fine, but the
+  // "Last 90 Days" preset would hit the cap).
   const allTransactions: any[] = [];
-  let offset = 0;
   const PAGE_LIMIT = 1000;
-  let hasMore = true;
-
-  while (hasMore) {
-    const data = await callEbayFinancesAPI(
-      `/sell/finances/v1/transaction?filter=${encodeURIComponent(filter)}&limit=${PAGE_LIMIT}&offset=${offset}`,
-      accessToken
-    );
-    const txs = Array.isArray(data.transactions) ? data.transactions : [];
-    allTransactions.push(...txs);
-
-    if (txs.length < PAGE_LIMIT) {
-      hasMore = false;
-    } else {
-      offset += PAGE_LIMIT;
+  const TX_WINDOW_MS = 88 * 24 * 60 * 60 * 1000;
+  for (let winStart = startMs; winStart < endMs; winStart += TX_WINDOW_MS) {
+    const winEnd = Math.min(winStart + TX_WINDOW_MS, endMs);
+    const filter = `transactionDate:[${new Date(winStart).toISOString()}..${new Date(winEnd).toISOString()}]`;
+    let offset = 0;
+    let hasMore = true;
+    while (hasMore) {
+      const data = await callEbayFinancesAPI(
+        `/sell/finances/v1/transaction?filter=${encodeURIComponent(filter)}&limit=${PAGE_LIMIT}&offset=${offset}`,
+        accessToken
+      );
+      const txs = Array.isArray(data.transactions) ? data.transactions : [];
+      allTransactions.push(...txs);
+      if (txs.length < PAGE_LIMIT) hasMore = false;
+      else offset += PAGE_LIMIT;
     }
   }
 
@@ -1204,7 +1274,11 @@ export async function handleEbaySync(userId: string, body: any, res: NextApiResp
 
     switch (txType) {
       case 'SALE': {
-        const gross = ebayAmount(tx.totalFeeBasisAmount);
+        // totalFeeBasisAmount = item + shipping + sales tax. eBay collects and
+        // remits the tax (marketplace facilitator), so it's never the seller's
+        // money — exclude it from revenue, exactly like Etsy's grandtotal.
+        const salesTax = ebayAmount(tx.salesTax);
+        const gross = ebayAmount(tx.totalFeeBasisAmount) - salesTax;
         const totalFees = ebayAmount(tx.totalFeeAmount);
         const lineItem = Array.isArray(tx.orderLineItems) && tx.orderLineItems[0];
         const lineItemId = lineItem?.lineItemId || null;
@@ -1231,7 +1305,10 @@ export async function handleEbaySync(userId: string, body: any, res: NextApiResp
       }
 
       case 'REFUND': {
-        const refundAmt = ebayAmount(tx.amount);
+        // Exclude the refunded sales tax so returns stay tax-consistent with
+        // revenue (which also excludes tax).
+        const refundTax = ebayAmount(tx.salesTax);
+        const refundAmt = ebayAmount(tx.amount) - refundTax;
         upsertBatch.push({
           externalId: txId,
           transactionType: 'Return',
@@ -1253,10 +1330,28 @@ export async function handleEbaySync(userId: string, body: any, res: NextApiResp
         const chargeAmt = ebayAmount(tx.amount);
         const feeType = tx.feeType || '';
 
-        if (feeType === 'PREMIUM_AD_FEES' || feeType === 'AD_FEE' || memo.toLowerCase().includes('promoted listing')) {
-          // Ad spend — accumulate
+        if (feeType === 'PREMIUM_AD_FEES' || feeType === 'AD_FEE' || feeType === 'DYNAMIC_AD_RATE_FEE'
+            || memo.toLowerCase().includes('promoted') || memo.toLowerCase().includes('ad fee')) {
+          // Promoted Listings ad fee — store PER TRANSACTION (keyed by txId).
+          // The old `adspend_<start>_<end>` summary created overlapping rows for
+          // every date range the user synced, and the dashboard summed them all,
+          // inflating ad spend 4-5x. Per-tx keying makes re-sync idempotent.
           adSpendTotal += Math.abs(chargeAmt);
           adSpendCount++;
+          upsertBatch.push({
+            externalId: txId,
+            transactionType: 'AdSpend',
+            orderNumber: tx.orderId || null,
+            barcode: null,
+            productName: memo || feeType || 'eBay Promoted Listings',
+            quantity: 1,
+            amount: -Math.abs(chargeAmt),
+            currency,
+            commission: null,
+            shippingAmount: null,
+            transactionDate: txDate,
+            rawData: tx,
+          });
         } else {
           // Store subscription, insertion fees, etc.
           upsertBatch.push({
@@ -1343,44 +1438,33 @@ export async function handleEbaySync(userId: string, body: any, res: NextApiResp
     totalUpserted += batch.length;
   }
 
-  // ---- PHASE 4: Upsert ad spend summary ----
-  if (adSpendTotal > 0) {
-    const startSec = Math.floor(startMs / 1000);
-    const endSec = Math.floor(endMs / 1000);
-    const adSpendId = `adspend_${startSec}_${endSec}`;
-    await prisma.financialTransaction.upsert({
-      where: {
-        userId_marketplace_externalId: { userId, marketplace: 'ebay', externalId: adSpendId },
-      },
-      update: {
-        amount: -adSpendTotal,
-        quantity: adSpendCount,
-        syncedAt: new Date(),
-      },
-      create: {
-        userId,
-        marketplace: 'ebay',
-        externalId: adSpendId,
-        transactionType: 'AdSpend',
-        orderNumber: null,
-        barcode: null,
-        productName: 'eBay Promoted Listings',
-        quantity: adSpendCount,
-        amount: -adSpendTotal,
-        currency: 'USD',
-        commission: null,
-        shippingAmount: null,
-        transactionDate: new Date(endMs),
-      },
-    });
-    totalUpserted++;
-  }
+  // Ad spend is now stored per-transaction in Phase 2 (idempotent), replacing
+  // the old overlapping `adspend_<start>_<end>` summary row. A stale summary
+  // row from before this change would double-count — delete any that exist.
+  await prisma.financialTransaction.deleteMany({
+    where: { userId, marketplace: 'ebay', externalId: { startsWith: 'adspend_' } },
+  }).catch(() => undefined);
+
+  // ---- PHASE 4: payouts (banked) + funds summary (balance / held) ----
+  const { bankedTotal, currentBalance, heldFunds } = await syncEbayPayoutsAndFunds(
+    userId, accessToken, startMs, endMs,
+  );
+  totalUpserted += bankedTotal.count;
 
   // Update sync cursor
   await prisma.financialSyncCursor.upsert({
     where: { userId_marketplace: { userId, marketplace: 'ebay' } },
-    update: { lastSyncedTo: new Date(endMs), totalSynced: { increment: totalUpserted } },
-    create: { userId, marketplace: 'ebay', lastSyncedTo: new Date(endMs), totalSynced: totalUpserted },
+    update: {
+      lastSyncedTo: new Date(endMs),
+      totalSynced: { increment: totalUpserted },
+      ...(currentBalance != null ? { currentBalance, balanceCurrency: 'USD' } : {}),
+      ...(heldFunds != null ? { heldFunds } : {}),
+    },
+    create: {
+      userId, marketplace: 'ebay', lastSyncedTo: new Date(endMs), totalSynced: totalUpserted,
+      ...(currentBalance != null ? { currentBalance, balanceCurrency: 'USD' } : {}),
+      ...(heldFunds != null ? { heldFunds } : {}),
+    },
   });
 
   logger.info('eBay settlement sync complete', {

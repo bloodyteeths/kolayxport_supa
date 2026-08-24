@@ -41,6 +41,7 @@ interface DashboardSummary {
   disbursementCount?: number;
   currentBalance?: number | null;
   balanceCurrency?: string | null;
+  heldFunds?: number | null;
 }
 
 interface TimeSeriesPoint {
@@ -128,7 +129,10 @@ function classifyTransactionType(type: string): 'revenue' | 'commission' | 'ship
   // eBay-specific types
   if (t.includes('shippinglabel')) return 'shipping';
   if (t.includes('credit')) return 'revenue'; // eBay credits = revenue adjustment
-  if (t.includes('storefee')) return 'other'; // eBay store subscription — don't mix with commissions
+  // eBay store subscription / insertion / regulatory / dispute fees
+  // (NON_SALE_CHARGE OTHER_FEES). These are real selling costs — count them as
+  // commission so they reduce net profit (they were silently ignored before).
+  if (t.includes('storefee')) return 'commission';
   if (t.includes('sellerrevenue') || t.includes('manualrefund')) return 'other';
   // Amazon-specific types
   if (t.includes('productcharges') || t.includes('productcharge')) return 'revenue';
@@ -437,7 +441,7 @@ async function buildDashboard(
   // Current marketplace account balance (money earned, not yet paid to bank).
   const cursor = await prisma.financialSyncCursor.findUnique({
     where: { userId_marketplace: { userId, marketplace } },
-    select: { currentBalance: true, balanceCurrency: true },
+    select: { currentBalance: true, balanceCurrency: true, heldFunds: true },
   }).catch(() => null);
   disbursements.sort((a, b) => a.date.localeCompare(b.date));
 
@@ -499,6 +503,7 @@ async function buildDashboard(
       disbursementCount: disbursements.length,
       currentBalance: cursor?.currentBalance != null ? Number(cursor.currentBalance) : null,
       balanceCurrency: cursor?.balanceCurrency || null,
+      heldFunds: cursor?.heldFunds != null ? Number(cursor.heldFunds) : null,
     },
     disbursements,
     timeSeries,

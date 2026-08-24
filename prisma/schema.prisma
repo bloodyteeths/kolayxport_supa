@@ -1259,6 +1259,9 @@ model FinancialSyncCursor {
   // earned but not yet disbursed to bank. Powers the "banked" panel.
   currentBalance   Decimal? @db.Decimal(12, 2)
   balanceCurrency  String?
+  // Funds the marketplace is holding (eBay exposes this via seller_funds_summary;
+  // Etsy does not). Money earned but not available for payout yet.
+  heldFunds        Decimal? @db.Decimal(12, 2)
   updatedAt    DateTime @updatedAt
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 

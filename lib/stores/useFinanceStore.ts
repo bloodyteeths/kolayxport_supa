@@ -32,6 +32,7 @@ export interface DashboardSummary {
   disbursementCount?: number;
   currentBalance?: number | null;
   balanceCurrency?: string | null;
+  heldFunds?: number | null;
 }
 
 export interface TimeSeriesPoint {

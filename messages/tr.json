@@ -402,6 +402,8 @@
     "product": "Ürün"
   },
   "financials": {
+    "bankedHeldFunds": "eBay Tarafından Tutulan",
+    "bankedHeldHint": "Henüz ödemeye hazır değil",
     "bankedTitle": "Bankaya Geçen & Bakiye",
     "bankedInPeriod": "Dönemde Bankaya Geçen",
     "bankedDepositCount": "{count} ödeme",

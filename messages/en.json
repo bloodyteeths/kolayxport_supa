@@ -442,6 +442,8 @@
     "product": "Product"
   },
   "financials": {
+    "bankedHeldFunds": "Held by eBay",
+    "bankedHeldHint": "Not yet available for payout",
     "bankedTitle": "Banked & Balance",
     "bankedInPeriod": "Banked in Period",
     "bankedDepositCount": "{count} payouts",

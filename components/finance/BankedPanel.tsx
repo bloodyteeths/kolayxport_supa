@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Paper, Typography, Grid, Collapse, IconButton, Divider, Tooltip } from '@mui/material';
-import { Landmark, Wallet, ChevronDown, ChevronUp } from 'lucide-react';
+import { Landmark, Wallet, ChevronDown, ChevronUp, Lock } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { DashboardData } from '@/lib/stores/useFinanceStore';
 
@@ -24,12 +24,13 @@ export default function BankedPanel({ data, marketplace }: { data: DashboardData
   const { summary } = data;
   const disbursements = data.disbursements || [];
 
-  // Only Etsy currently provides ledger-level banking data.
-  if (marketplace !== 'etsy') return null;
+  // Etsy and eBay provide banking data (ledger disbursements / payouts).
+  if (marketplace !== 'etsy' && marketplace !== 'ebay') return null;
   const banked = summary.banked || 0;
   const balance = summary.currentBalance;
+  const held = summary.heldFunds; // eBay only — Etsy's API doesn't expose it
   const cur = SYMBOL[summary.balanceCurrency || 'USD'] || '$';
-  if (!banked && balance == null && disbursements.length === 0) return null;
+  if (!banked && balance == null && held == null && disbursements.length === 0) return null;
 
   return (
     <Paper sx={{ borderRadius: '12px', p: 2, mb: 2, border: '1px solid', borderColor: 'divider' }}>
@@ -39,7 +40,7 @@ export default function BankedPanel({ data, marketplace }: { data: DashboardData
       </Box>
 
       <Grid container spacing={1.5}>
-        <Grid item xs={12} sm={6}>
+        <Grid item xs={12} sm={held != null ? 4 : 6}>
           <Box sx={{ p: 1.5, borderRadius: '10px', background: 'linear-gradient(135deg, #ecfeff, #cffafe)' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5 }}>
               <Landmark size={16} color="#0369a1" />
@@ -51,20 +52,40 @@ export default function BankedPanel({ data, marketplace }: { data: DashboardData
             </Typography>
           </Box>
         </Grid>
-        <Grid item xs={12} sm={6}>
+        <Grid item xs={12} sm={held != null ? 4 : 6}>
           <Box sx={{ p: 1.5, borderRadius: '10px', background: 'linear-gradient(135deg, #f5f3ff, #ede9fe)' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5 }}>
               <Wallet size={16} color="#7c3aed" />
               <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>{t('bankedCurrentBalance')}</Typography>
             </Box>
-            <Tooltip title={t('bankedReserveNote')} arrow placement="top">
-              <Typography variant="h5" sx={{ fontWeight: 800, color: '#7c3aed', display: 'inline-block', cursor: 'help', borderBottom: '1px dotted', borderColor: 'rgba(124,58,237,0.4)' }}>
+            {/* Etsy: the "reserve not exposed" tooltip applies. eBay: held funds
+                ARE shown separately, so no tooltip needed on the balance. */}
+            {marketplace === 'etsy' ? (
+              <Tooltip title={t('bankedReserveNote')} arrow placement="top">
+                <Typography variant="h5" sx={{ fontWeight: 800, color: '#7c3aed', display: 'inline-block', cursor: 'help', borderBottom: '1px dotted', borderColor: 'rgba(124,58,237,0.4)' }}>
+                  {balance != null ? fmt(balance, cur) : '—'}
+                </Typography>
+              </Tooltip>
+            ) : (
+              <Typography variant="h5" sx={{ fontWeight: 800, color: '#7c3aed' }}>
                 {balance != null ? fmt(balance, cur) : '—'}
               </Typography>
-            </Tooltip>
+            )}
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{t('bankedBalanceHint')}</Typography>
           </Box>
         </Grid>
+        {held != null && (
+          <Grid item xs={12} sm={4}>
+            <Box sx={{ p: 1.5, borderRadius: '10px', background: 'linear-gradient(135deg, #fff7ed, #ffedd5)' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5 }}>
+                <Lock size={16} color="#c2410c" />
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>{t('bankedHeldFunds')}</Typography>
+              </Box>
+              <Typography variant="h5" sx={{ fontWeight: 800, color: '#c2410c' }}>{fmt(held, cur)}</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{t('bankedHeldHint')}</Typography>
+            </Box>
+          </Grid>
+        )}
       </Grid>
 
       {disbursements.length > 0 && (

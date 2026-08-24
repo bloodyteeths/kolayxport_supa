@@ -342,8 +342,12 @@ async function buildDashboard(
         disbursements.push({ date: tx.transactionDate.toISOString().slice(0, 10), amount: round2(Math.abs(amount)) });
         break;
       case 'passthrough':
-        // Sales tax Etsy collects and remits — revenue already excludes it, so
-        // it must not touch any P&L bucket.
+        // Sales tax Etsy collects and remits. The tax CHARGE (negative) offsets
+        // tax already excluded from revenue — ignore it. But a tax REFUND
+        // (positive: sales_tax_refund) returns to the seller the tax portion
+        // that's baked into refund_gross (counted in returns); net it out so
+        // returns reflect the real business loss, tax-consistent with revenue.
+        if (amount > 0) returns -= amount;
         break;
       default:
         // Other types — add to revenue if positive, ignore if negative

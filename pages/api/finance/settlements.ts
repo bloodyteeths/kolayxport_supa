@@ -745,13 +745,21 @@ export async function handleEtsySync(userId: string, body: any, res: NextApiResp
   let latestBalanceSeq = -1;
   let balanceCurrency = 'USD';
   try {
-    let ledgerOffset = 0;
-    let ledgerHasMore = true;
+    // Etsy's ledger endpoint rejects any window wider than 31 days (400 "Time
+    // window between min_created and max_created must be no more than
+    // 2678400"). The 35-day cron window silently failed this every run — so
+    // fees/ads/refunds/balance only updated on manual ≤31-day syncs. Chunk the
+    // range into ≤30-day sub-windows so ANY range works.
+    const LEDGER_WINDOW_SEC = 30 * 24 * 60 * 60;
+    for (let winStart = minCreated; winStart < maxCreated; winStart += LEDGER_WINDOW_SEC) {
+      const winEnd = Math.min(winStart + LEDGER_WINDOW_SEC, maxCreated);
+      let ledgerOffset = 0;
+      let ledgerHasMore = true;
 
     while (ledgerHasMore) {
       const ledgerData = await client.getLedgerEntries({
-        min_created: minCreated,
-        max_created: maxCreated,
+        min_created: winStart,
+        max_created: winEnd,
         limit: PAGE_LIMIT,
         offset: ledgerOffset,
       });
@@ -863,6 +871,7 @@ export async function handleEtsySync(userId: string, body: any, res: NextApiResp
         ledgerOffset += PAGE_LIMIT;
       }
     }
+    } // end per-window loop
   } catch (err) {
     logger.warn('Failed to fetch Etsy ledger entries for ad spend', {
       error: err instanceof Error ? err.message : String(err),

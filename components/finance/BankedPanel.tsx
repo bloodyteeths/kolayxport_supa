@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Paper, Typography, Grid, Collapse, IconButton, Divider, Tooltip } from '@mui/material';
-import { Landmark, Wallet, ChevronDown, ChevronUp, Info } from 'lucide-react';
+import { Landmark, Wallet, ChevronDown, ChevronUp } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { DashboardData } from '@/lib/stores/useFinanceStore';
 
@@ -36,9 +36,6 @@ export default function BankedPanel({ data, marketplace }: { data: DashboardData
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
         <Landmark size={18} color="#0369a1" />
         <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{t('bankedTitle')}</Typography>
-        <Tooltip title={t('bankedReserveNote')}>
-          <Info size={15} color="#94a3b8" style={{ cursor: 'help' }} />
-        </Tooltip>
       </Box>
 
       <Grid container spacing={1.5}>
@@ -60,10 +57,12 @@ export default function BankedPanel({ data, marketplace }: { data: DashboardData
               <Wallet size={16} color="#7c3aed" />
               <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>{t('bankedCurrentBalance')}</Typography>
             </Box>
-            <Typography variant="h5" sx={{ fontWeight: 800, color: '#7c3aed' }}>
-              {balance != null ? fmt(balance, cur) : '—'}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">{t('bankedBalanceHint')}</Typography>
+            <Tooltip title={t('bankedReserveNote')} arrow placement="top">
+              <Typography variant="h5" sx={{ fontWeight: 800, color: '#7c3aed', display: 'inline-block', cursor: 'help', borderBottom: '1px dotted', borderColor: 'rgba(124,58,237,0.4)' }}>
+                {balance != null ? fmt(balance, cur) : '—'}
+              </Typography>
+            </Tooltip>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{t('bankedBalanceHint')}</Typography>
           </Box>
         </Grid>
       </Grid>
@@ -91,9 +90,6 @@ export default function BankedPanel({ data, marketplace }: { data: DashboardData
         </>
       )}
 
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5, fontStyle: 'italic' }}>
-        {t('bankedReserveNote')}
-      </Typography>
     </Paper>
   );
 }

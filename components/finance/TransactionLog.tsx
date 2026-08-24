@@ -9,10 +9,20 @@ import { useTranslations } from 'next-intl';
 import useFinanceStore from '@/lib/stores/useFinanceStore';
 
 const TYPE_COLORS: Record<string, { bg: string; color: string }> = {
+  // Etsy real ledger types
+  EtsyFee: { bg: '#fef3c7', color: '#92400e' },
+  AdSpend: { bg: '#fce7f3', color: '#be185d' },
+  Disbursement: { bg: '#e0f2fe', color: '#0369a1' },
+  SalesTax: { bg: '#f1f5f9', color: '#64748b' },
+  SellerCredit: { bg: '#dcfce7', color: '#15803d' },
+  // Generic / other marketplaces (substring match)
   Sale: { bg: '#dcfce7', color: '#15803d' },
   Commission: { bg: '#fef3c7', color: '#92400e' },
   Return: { bg: '#fecaca', color: '#dc2626' },
+  Refund: { bg: '#fecaca', color: '#dc2626' },
   Cargo: { bg: '#dbeafe', color: '#1d4ed8' },
+  Kargo: { bg: '#dbeafe', color: '#1d4ed8' },
+  Reklam: { bg: '#fce7f3', color: '#be185d' },
   Discount: { bg: '#fce7f3', color: '#be185d' },
   default: { bg: '#f1f5f9', color: '#475569' },
 };
@@ -36,13 +46,33 @@ export default function TransactionLog() {
   const t = useTranslations('financials');
   const {
     transactions, transactionsLoading, transactionsTotal,
-    fetchTransactions, marketplace,
+    fetchTransactions, marketplace, dashboardData,
   } = useFinanceStore();
   const cs = CURRENCY_SYMBOLS[marketplace] || '$';
 
   const [page, setPage] = useState(0);
   const [typeFilter, setTypeFilter] = useState('');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+
+  // Real, exact transaction types present in the current period (the API
+  // filters by exact match). Derived from the dashboard's type summary so the
+  // dropdown always matches what actually exists — Etsy: Sale/EtsyFee/AdSpend/
+  // Refund/Disbursement/SalesTax..., Trendyol: Satış/Komisyon Faturası/... —
+  // instead of hardcoded generic labels that matched nothing.
+  const typeOptions = React.useMemo(() => {
+    const summary = dashboardData?.transactionTypeSummary || [];
+    return [...summary]
+      .filter(s => s.type && s.count > 0)
+      .sort((a, b) => b.count - a.count)
+      .map(s => ({ type: s.type, count: s.count }));
+  }, [dashboardData]);
+
+  // If the current filter no longer exists in this period, reset to All.
+  useEffect(() => {
+    if (typeFilter && typeOptions.length > 0 && !typeOptions.some(o => o.type === typeFilter)) {
+      setTypeFilter('');
+    }
+  }, [typeOptions]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchTransactions(page, typeFilter || undefined);
@@ -62,11 +92,9 @@ export default function TransactionLog() {
           <InputLabel>{t('transactionType')}</InputLabel>
           <Select value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setPage(0); }} label={t('transactionType')}>
             <MenuItem value="">{t('all')}</MenuItem>
-            <MenuItem value="Sale">{t('sale')}</MenuItem>
-            <MenuItem value="Commission">{t('commission')}</MenuItem>
-            <MenuItem value="Return">{t('return')}</MenuItem>
-            <MenuItem value="Cargo">{t('cargo')}</MenuItem>
-            <MenuItem value="Discount">{t('discount')}</MenuItem>
+            {typeOptions.map(o => (
+              <MenuItem key={o.type} value={o.type}>{o.type} ({o.count})</MenuItem>
+            ))}
           </Select>
         </FormControl>
         <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>

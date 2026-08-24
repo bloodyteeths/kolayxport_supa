@@ -1506,10 +1506,12 @@ async function syncAmazonPayouts(
   startMs: number,
   endMs: number,
   callSpApiWithRetry: (path: string, token: string, region: any) => Promise<any>,
-): Promise<{ bankedCount: number; currentBalance: number | null }> {
+): Promise<{ bankedCount: number; currentBalance: number | null; balanceCurrency: string | null }> {
   const money = (m: any): number => (m && (m.CurrencyAmount ?? m.Amount) != null ? parseFloat(String(m.CurrencyAmount ?? m.Amount)) : 0);
   let bankedCount = 0;
-  let openBalance: number | null = null;
+  // Balance must be tracked PER CURRENCY — a seller can have USD/CAD/MXN open
+  // groups, and summing them as one number is meaningless (the old bug).
+  const openByCur: Record<string, number> = {};
   try {
     // Groups filter caps at 180 days; end must be >2 min in the past.
     const gStart = new Date(Math.max(startMs, Date.now() - 175 * 86400_000)).toISOString();
@@ -1525,8 +1527,9 @@ async function syncAmazonPayouts(
       for (const g of groups) {
         const total = money(g.ConvertedTotal || g.OriginalTotal);
         if (g.ProcessingStatus === 'Open') {
-          // Current unpaid balance (money accruing toward the next payout).
-          openBalance = (openBalance || 0) + total;
+          // Open settled balance ("Standard Orders" in Seller Central), per currency.
+          const cc = (g.ConvertedTotal || g.OriginalTotal)?.CurrencyCode || 'USD';
+          openByCur[cc] = (openByCur[cc] || 0) + total;
           continue;
         }
         // Closed = settled/paid out. Record as a bank disbursement.
@@ -1553,7 +1556,48 @@ async function syncAmazonPayouts(
   } catch (err) {
     logger.warn('Amazon payout sync failed (continuing)', { error: err instanceof Error ? err.message : String(err) });
   }
-  return { bankedCount, currentBalance: openBalance != null ? Math.round(openBalance * 100) / 100 : null };
+
+  // Deferred funds — the bulk of the real Seller Central balance, which
+  // financialEventGroups misses. Comes from the 2024-06-19 transactions
+  // endpoint (lowercase currencyAmount, unlike v0). status DEFERRED = held,
+  // not yet available; DEFERRED_RELEASED/RELEASED have already moved into a
+  // group so must NOT be added again.
+  const deferredByCur: Record<string, number> = {};
+  try {
+    const newAmt = (m: any) => (m && (m.currencyAmount ?? m.CurrencyAmount) != null ? parseFloat(String(m.currencyAmount ?? m.CurrencyAmount)) : 0);
+    const after = new Date(Date.now() - 45 * 86400_000).toISOString();
+    let nt: string | null = null;
+    let p = 0;
+    do {
+      const qs = nt ? `nextToken=${encodeURIComponent(nt)}` : `postedAfter=${encodeURIComponent(after)}`;
+      const data: any = await callSpApiWithRetry(`/finances/2024-06-19/transactions?${qs}`, token, region);
+      const txs = data?.transactions || data?.payload?.transactions || [];
+      for (const tx of txs) {
+        if ((tx.transactionStatus || tx.status) !== 'DEFERRED') continue;
+        const m = tx.totalAmount || tx.netAmount;
+        const cc = m?.currencyCode || m?.CurrencyCode || 'USD';
+        deferredByCur[cc] = (deferredByCur[cc] || 0) + newAmt(m);
+      }
+      nt = data?.nextToken || data?.payload?.nextToken || null;
+      p++;
+    } while (nt && p < 30);
+  } catch (err) {
+    logger.warn('Amazon deferred-balance fetch failed (continuing)', { error: err instanceof Error ? err.message : String(err) });
+  }
+
+  // Current balance = open settled + deferred, in the dominant currency
+  // (matches Seller Central "Total Balance"). Pick the currency with the
+  // largest deferred/open magnitude (defaults to USD).
+  const currencies = new Set([...Object.keys(openByCur), ...Object.keys(deferredByCur)]);
+  let balanceCurrency: string | null = null;
+  let currentBalance: number | null = null;
+  if (currencies.size > 0) {
+    balanceCurrency = [...currencies].sort((a, b) =>
+      (Math.abs(deferredByCur[b] || 0) + Math.abs(openByCur[b] || 0)) -
+      (Math.abs(deferredByCur[a] || 0) + Math.abs(openByCur[a] || 0)))[0];
+    currentBalance = Math.round(((openByCur[balanceCurrency] || 0) + (deferredByCur[balanceCurrency] || 0)) * 100) / 100;
+  }
+  return { bankedCount, currentBalance, balanceCurrency };
 }
 
 export async function handleAmazonSync(userId: string, body: any, res: NextApiResponse) {
@@ -1868,8 +1912,8 @@ export async function handleAmazonSync(userId: string, body: any, res: NextApiRe
     where: { userId, marketplace: 'amazon', externalId: { startsWith: 'amz_adspend_' } },
   }).catch(() => undefined);
 
-  // ---- PHASE 4: payouts (settlements) + open-group balance ----
-  const { bankedCount, currentBalance } = await syncAmazonPayouts(userId, token, region, startMs, endMs, callSpApiWithRetry);
+  // ---- PHASE 4: payouts (settlements) + balance (open settled + deferred) ----
+  const { bankedCount, currentBalance, balanceCurrency } = await syncAmazonPayouts(userId, token, region, startMs, endMs, callSpApiWithRetry);
   totalUpserted += bankedCount;
 
   // Update sync cursor
@@ -1877,11 +1921,11 @@ export async function handleAmazonSync(userId: string, body: any, res: NextApiRe
     where: { userId_marketplace: { userId, marketplace: 'amazon' } },
     update: {
       lastSyncedTo: new Date(endMs), totalSynced: { increment: totalUpserted },
-      ...(currentBalance != null ? { currentBalance, balanceCurrency: 'USD' } : {}),
+      ...(currentBalance != null ? { currentBalance, balanceCurrency: balanceCurrency || 'USD' } : {}),
     },
     create: {
       userId, marketplace: 'amazon', lastSyncedTo: new Date(endMs), totalSynced: totalUpserted,
-      ...(currentBalance != null ? { currentBalance, balanceCurrency: 'USD' } : {}),
+      ...(currentBalance != null ? { currentBalance, balanceCurrency: balanceCurrency || 'USD' } : {}),
     },
   });
 

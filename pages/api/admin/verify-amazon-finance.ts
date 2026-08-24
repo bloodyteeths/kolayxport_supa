@@ -90,6 +90,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     };
   } catch (e: any) { groups = { error: e.message?.slice(0, 200) }; }
 
+  // Probe the 2024-06-19 transactions endpoint for DEFERRED funds (the bulk of
+  // the real Seller Central balance, which financialEventGroups misses).
+  let deferred: any = { error: null };
+  try {
+    const byStatus: Record<string, { n: number; amt: number }> = {};
+    let nextToken: string | null = null;
+    let pages = 0;
+    const after = new Date(Date.now() - 45 * 86400_000).toISOString();
+    do {
+      const qs = nextToken ? `nextToken=${encodeURIComponent(nextToken)}` : `postedAfter=${encodeURIComponent(after)}`;
+      const data: any = await callSpApiWithRetry(`/finances/2024-06-19/transactions?${qs}`, token, region);
+      const txs = data?.transactions || data?.payload?.transactions || [];
+      for (const tx of txs) {
+        const st = tx.transactionStatus || tx.status || '?';
+        const a = num(tx.totalAmount || tx.netAmount);
+        (byStatus[st] ||= { n: 0, amt: 0 }); byStatus[st].n++; byStatus[st].amt += a;
+      }
+      nextToken = data?.nextToken || data?.payload?.nextToken || null;
+      pages++;
+    } while (nextToken && pages < 30);
+    deferred = { byStatus: Object.fromEntries(Object.entries(byStatus).map(([k, v]) => [k, { n: v.n, amt: Math.round(v.amt * 100) / 100 }])) };
+  } catch (e: any) { deferred = { error: e.message?.slice(0, 200) }; }
+
   const dbRows: any[] = await prisma.$queryRawUnsafe(
     `SELECT "transactionType" t, COUNT(*)::int n, ROUND(SUM(amount)::numeric,2)::float amt, ROUND(SUM(COALESCE(commission,0))::numeric,2)::float comm
      FROM "FinancialTransaction" WHERE "userId"=$1 AND marketplace='amazon' AND "transactionDate" >= $2 AND "transactionDate" <= $3 GROUP BY 1 ORDER BY 3 DESC`,
@@ -102,6 +125,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     charges: r(chargeByType), fees: r(feeByType), taxWithheld: r(withheldByType), serviceFees: r(svcFeeByReason),
     ads: { total: Math.round(adsTotal * 100) / 100, count: adsCount },
     payoutGroups: groups,
+    deferredProbe: deferred,
     db: dbRows,
   });
 }

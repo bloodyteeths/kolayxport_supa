@@ -833,7 +833,13 @@ export async function handleEtsySync(userId: string, body: any, res: NextApiResp
         // Etsy credits to the seller (positive) — a revenue adjustment.
         const isSellerCredit = ledgerType === 'seller_credit';
 
-        if (!isAdSpend && !isFee && !isRefund && !isDisbursement && !isSellerCredit) continue;
+        // Sales tax collected/refunded — a pass-through (Etsy remits it).
+        // Revenue already excludes tax, so these must NOT hit any P&L bucket.
+        // Captured (not skipped) so stale rows the old sync mislabeled as
+        // 'Refund' get reclassified to the neutral SalesTax type on re-sync.
+        const isSalesTax = ledgerType === 'sales_tax' || ledgerType === 'sales_tax_refund';
+
+        if (!isAdSpend && !isFee && !isRefund && !isDisbursement && !isSellerCredit && !isSalesTax) continue;
 
         const entryId = entry.entry_id ?? entry.ledger_entry_id ?? entry.id;
         if (entryId == null) continue; // can't dedup safely — skip
@@ -846,6 +852,7 @@ export async function handleEtsySync(userId: string, body: any, res: NextApiResp
         else if (isFee) { txType = 'EtsyFee'; storedAmount = rawAmount; } // signed: charge<0, refund>0
         else if (isRefund) { txType = 'Refund'; storedAmount = -Math.abs(rawAmount); }
         else if (isDisbursement) { txType = 'Disbursement'; storedAmount = rawAmount; } // negative = to bank
+        else if (isSalesTax) { txType = 'SalesTax'; storedAmount = rawAmount; } // pass-through, excluded from P&L
         else { txType = 'SellerCredit'; storedAmount = Math.abs(rawAmount); } // positive revenue adj
 
         await prisma.financialTransaction.upsert({

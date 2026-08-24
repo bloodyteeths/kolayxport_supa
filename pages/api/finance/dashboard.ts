@@ -84,7 +84,7 @@ function getDateTruncExpression(groupBy: string): string {
 /**
  * Classify Trendyol transaction types into financial categories.
  */
-function classifyTransactionType(type: string): 'revenue' | 'commission' | 'shipping' | 'return' | 'discount' | 'adspend' | 'fees' | 'commission_invoice' | 'disbursement' | 'other' {
+function classifyTransactionType(type: string): 'revenue' | 'commission' | 'shipping' | 'return' | 'discount' | 'adspend' | 'fees' | 'commission_invoice' | 'disbursement' | 'passthrough' | 'other' {
   // Normalize: strip diacritics so Turkish İ→i, ş→s, etc. work with plain includes()
   const t = (type || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   // Also check original for exact Turkish matches
@@ -110,6 +110,7 @@ function classifyTransactionType(type: string): 'revenue' | 'commission' | 'ship
   // is a positive revenue adjustment handled by the default case.
   if (t === 'etsyfee') return 'commission';
   if (t === 'disbursement' || t.includes('disburse')) return 'disbursement';
+  if (t === 'salestax') return 'passthrough'; // remitted tax — excluded from P&L entirely
   if (t === 'sellercredit') return 'other';
 
   if (t.includes('sale') || orig === 'Satış' || t.includes('satis')) return 'revenue';
@@ -339,6 +340,10 @@ async function buildDashboard(
         // the "banked" panel only. Stored negative (money out to bank).
         banked += Math.abs(amount);
         disbursements.push({ date: tx.transactionDate.toISOString().slice(0, 10), amount: round2(Math.abs(amount)) });
+        break;
+      case 'passthrough':
+        // Sales tax Etsy collects and remits — revenue already excludes it, so
+        // it must not touch any P&L bucket.
         break;
       default:
         // Other types — add to revenue if positive, ignore if negative

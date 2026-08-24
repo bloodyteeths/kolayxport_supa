@@ -442,6 +442,13 @@
     "product": "Product"
   },
   "financials": {
+    "bankedTitle": "Banked & Balance",
+    "bankedInPeriod": "Banked in Period",
+    "bankedDepositCount": "{count} payouts",
+    "bankedCurrentBalance": "Current Etsy Balance",
+    "bankedBalanceHint": "Earned, not yet paid to bank",
+    "bankedDepositList": "Payout Breakdown",
+    "bankedReserveNote": "Etsy’s API does not expose reserve (held) amounts or release dates, so they can’t be shown. “Current balance” is the total not yet disbursed to your bank.",
     "pageTitle": "Financial Dashboard",
     "subtitle": "Revenue, expenses, commissions & profit analysis",
     "grossRevenue": "Gross Revenue",

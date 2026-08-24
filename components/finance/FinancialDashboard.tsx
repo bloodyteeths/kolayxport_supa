@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import useFinanceStore, { DashboardData, DashboardSummary } from '@/lib/stores/useFinanceStore';
 import dynamic from 'next/dynamic';
+import BankedPanel from './BankedPanel';
 
 const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
 const ProductPnLTable = lazy(() => import('./ProductPnLTable'));
@@ -296,6 +297,9 @@ export default function FinancialDashboard() {
     <Box>
       {/* Summary Cards */}
       <SummaryCards summary={summary} marketplace={marketplace} />
+
+      {/* Banked / payouts (Etsy) */}
+      <BankedPanel data={dashboardData} marketplace={marketplace} />
 
       {/* Charts */}
       <ProfitCharts data={dashboardData} marketplace={marketplace} />

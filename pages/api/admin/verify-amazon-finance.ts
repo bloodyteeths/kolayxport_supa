@@ -94,7 +94,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // the real Seller Central balance, which financialEventGroups misses).
   let deferred: any = { error: null };
   try {
-    const byStatus: Record<string, { n: number; amt: number }> = {};
+    // 2024-06-19 uses lowercase currencyAmount (v0 uses CurrencyAmount).
+    const newAmt = (m: any) => (m && (m.currencyAmount ?? m.CurrencyAmount ?? m.Amount) != null ? parseFloat(String(m.currencyAmount ?? m.CurrencyAmount ?? m.Amount)) : 0);
+    const byStatus: Record<string, { n: number; amt: number; byCur: Record<string, number> }> = {};
     let nextToken: string | null = null;
     let pages = 0;
     const after = new Date(Date.now() - 45 * 86400_000).toISOString();
@@ -104,13 +106,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const txs = data?.transactions || data?.payload?.transactions || [];
       for (const tx of txs) {
         const st = tx.transactionStatus || tx.status || '?';
-        const a = num(tx.totalAmount || tx.netAmount);
-        (byStatus[st] ||= { n: 0, amt: 0 }); byStatus[st].n++; byStatus[st].amt += a;
+        const m = tx.totalAmount || tx.netAmount;
+        const a = newAmt(m); const cc = m?.currencyCode || m?.CurrencyCode || '?';
+        (byStatus[st] ||= { n: 0, amt: 0, byCur: {} }); byStatus[st].n++; byStatus[st].amt += a;
+        byStatus[st].byCur[cc] = Math.round(((byStatus[st].byCur[cc] || 0) + a) * 100) / 100;
       }
       nextToken = data?.nextToken || data?.payload?.nextToken || null;
       pages++;
     } while (nextToken && pages < 30);
-    deferred = { byStatus: Object.fromEntries(Object.entries(byStatus).map(([k, v]) => [k, { n: v.n, amt: Math.round(v.amt * 100) / 100 }])) };
+    deferred = { byStatus: Object.fromEntries(Object.entries(byStatus).map(([k, v]) => [k, { n: v.n, amt: Math.round(v.amt * 100) / 100, byCur: v.byCur }])) };
   } catch (e: any) { deferred = { error: e.message?.slice(0, 200) }; }
 
   const dbRows: any[] = await prisma.$queryRawUnsafe(

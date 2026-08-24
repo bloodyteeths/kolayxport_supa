@@ -1496,6 +1496,66 @@ async function getAmazonCredentials(userId: string) {
   return cred;
 }
 
+// Fetch Amazon settlement groups and record CLOSED ones (actual bank payouts)
+// as Disbursement rows; the OPEN group's total is the current unpaid balance
+// (Amazon has no real-time balance/reserve endpoint). Best-effort.
+async function syncAmazonPayouts(
+  userId: string,
+  token: string,
+  region: any,
+  startMs: number,
+  endMs: number,
+  callSpApiWithRetry: (path: string, token: string, region: any) => Promise<any>,
+): Promise<{ bankedCount: number; currentBalance: number | null }> {
+  const money = (m: any): number => (m && (m.CurrencyAmount ?? m.Amount) != null ? parseFloat(String(m.CurrencyAmount ?? m.Amount)) : 0);
+  let bankedCount = 0;
+  let openBalance: number | null = null;
+  try {
+    // Groups filter caps at 180 days; end must be >2 min in the past.
+    const gStart = new Date(Math.max(startMs, Date.now() - 175 * 86400_000)).toISOString();
+    const gEnd = new Date(Date.now() - 3 * 60_000).toISOString();
+    let nextToken: string | null = null;
+    let pages = 0;
+    do {
+      const qs = nextToken
+        ? `NextToken=${encodeURIComponent(nextToken)}`
+        : `FinancialEventGroupStartedAfter=${encodeURIComponent(gStart)}&FinancialEventGroupStartedBefore=${encodeURIComponent(gEnd)}&MaxResultsPerPage=100`;
+      const data: any = await callSpApiWithRetry(`/finances/v0/financialEventGroups?${qs}`, token, region);
+      const groups = data?.payload?.FinancialEventGroupList || [];
+      for (const g of groups) {
+        const total = money(g.ConvertedTotal || g.OriginalTotal);
+        if (g.ProcessingStatus === 'Open') {
+          // Current unpaid balance (money accruing toward the next payout).
+          openBalance = (openBalance || 0) + total;
+          continue;
+        }
+        // Closed = settled/paid out. Record as a bank disbursement.
+        if (!g.FinancialEventGroupId || !total) continue;
+        bankedCount++;
+        const date = g.FundTransferDate || g.FinancialEventGroupEnd || null;
+        await prisma.financialTransaction.upsert({
+          where: { userId_marketplace_externalId: { userId, marketplace: 'amazon', externalId: `amz_payout_${g.FinancialEventGroupId}` } },
+          update: { amount: -Math.abs(total), transactionDate: date ? new Date(date) : new Date(), syncedAt: new Date(), transactionType: 'Disbursement' },
+          create: {
+            userId, marketplace: 'amazon', externalId: `amz_payout_${g.FinancialEventGroupId}`,
+            transactionType: 'Disbursement', orderNumber: null, barcode: null,
+            productName: `Payout${g.FundTransferStatus ? ` (${g.FundTransferStatus})` : ''}`,
+            quantity: 1, amount: -Math.abs(total),
+            currency: (g.ConvertedTotal || g.OriginalTotal)?.CurrencyCode || 'USD',
+            commission: null, shippingAmount: null,
+            transactionDate: date ? new Date(date) : new Date(),
+          },
+        });
+      }
+      nextToken = data?.payload?.NextToken || null;
+      pages++;
+    } while (nextToken && pages < 50);
+  } catch (err) {
+    logger.warn('Amazon payout sync failed (continuing)', { error: err instanceof Error ? err.message : String(err) });
+  }
+  return { bankedCount, currentBalance: openBalance != null ? Math.round(openBalance * 100) / 100 : null };
+}
+
 export async function handleAmazonSync(userId: string, body: any, res: NextApiResponse) {
   const { startDate, endDate } = body;
   if (!startDate || !endDate) {
@@ -1598,11 +1658,18 @@ export async function handleAmazonSync(userId: string, body: any, res: NextApiRe
       const asin = item.SellerSKU || item.OrderItemId || null;
       const charges = item.ItemChargeList || [];
       const fees = item.ItemFeeList || [];
-      // Revenue = sum of all Principal/Promotion charges (positive)
+      // Revenue = item + shipping + giftwrap + promotions, EXCLUDING sales tax.
+      // Amazon collects Tax/ShippingTax/GiftWrapTax from the buyer and remits it
+      // (marketplace facilitator) — it's offset 1:1 by ItemTaxWithheldList, so
+      // it's never seller money. Excluding the tax charge types nets it out
+      // (we don't read the withheld list, so leaving tax out entirely is
+      // correct and self-consistent). Note: the charge type is "ShippingCharge"
+      // (the old "Shipping" never matched, dropping buyer-paid shipping revenue).
+      const REVENUE_CHARGES = ['Principal', 'GiftWrap', 'Giftwrap', 'ShippingCharge', 'Promotion', 'ShippingDiscount', 'PromotionShipping'];
       let revenue = 0;
       let currency = 'USD';
       for (const c of charges) {
-        if (['Principal', 'Tax', 'GiftWrap', 'Shipping', 'ShippingTax', 'GiftWrapTax', 'Promotion', 'ShippingDiscount'].includes(c.ChargeType)) {
+        if (REVENUE_CHARGES.includes(c.ChargeType)) {
           revenue += amt(c.ChargeAmount);
           currency = curr(c.ChargeAmount);
         }
@@ -1660,9 +1727,12 @@ export async function handleAmazonSync(userId: string, body: any, res: NextApiRe
       const item = items[i];
       const asin = item.SellerSKU || item.OrderItemId || null;
       const charges = item.ItemChargeAdjustmentList || item.ItemChargeList || [];
+      // Exclude refunded sales tax so returns stay tax-consistent with revenue.
+      const TAX_TYPES = ['Tax', 'ShippingTax', 'GiftWrapTax', 'GiftwrapTax'];
       let refund = 0;
       let currency = 'USD';
       for (const c of charges) {
+        if (TAX_TYPES.includes(c.ChargeType)) continue;
         refund += amt(c.ChargeAmount);
         currency = curr(c.ChargeAmount);
       }
@@ -1700,10 +1770,13 @@ export async function handleAmazonSync(userId: string, body: any, res: NextApiRe
       let kind: string = 'AmazonOther';
       if (reasonLower.includes('storage')) kind = 'FBAStorage';
       else if (reasonLower.includes('fba') || reasonLower.includes('fulfillment')) kind = 'FBAFee';
-      else if (reasonLower.includes('sponsored') || reasonLower.includes('advertising')) {
+      else if (reasonLower.includes('sponsored') || reasonLower.includes('advertising') || reasonLower.includes('cost of advertising')) {
+        // Ad fee — store PER EVENT (keyed by svcfee id) instead of tallying
+        // into an overlapping adspend_<start>_<end> summary that double-counted
+        // across every synced date range.
+        kind = 'AmazonAdSpend';
         adSpendTotal += Math.abs(feeAmt);
         adSpendCount++;
-        continue;
       }
       upsertBatch.push({
         externalId: `amz_svcfee_${ev.SellerId || ''}_${ev.PostedDate || ''}_${reason}_${i}_${j}`,
@@ -1743,13 +1816,27 @@ export async function handleAmazonSync(userId: string, body: any, res: NextApiRe
     });
   }
 
-  // ---- 2e. Sponsored Ads payments → tally adSpendTotal
-  for (const ev of (allEvents.ProductAdsPaymentEventList || [])) {
+  // ---- 2e. Sponsored Ads payments → per-event AmazonAdSpend rows
+  for (let i = 0; i < (allEvents.ProductAdsPaymentEventList || []).length; i++) {
+    const ev = allEvents.ProductAdsPaymentEventList[i];
     const a = Math.abs(amt(ev.transactionValue || ev.TransactionValue));
-    if (a > 0) {
-      adSpendTotal += a;
-      adSpendCount++;
-    }
+    if (a <= 0) continue;
+    adSpendTotal += a;
+    adSpendCount++;
+    upsertBatch.push({
+      externalId: `amz_ads_${ev.postedDate || ev.PostedDate || ''}_${ev.invoiceId || i}`,
+      transactionType: 'AmazonAdSpend',
+      orderNumber: null,
+      barcode: null,
+      productName: 'Amazon Sponsored Ads',
+      quantity: 1,
+      amount: -a,
+      currency: curr(ev.transactionValue || ev.TransactionValue),
+      commission: null,
+      shippingAmount: null,
+      transactionDate: (ev.postedDate || ev.PostedDate) ? new Date(ev.postedDate || ev.PostedDate) : new Date(endMs),
+      rawData: ev,
+    });
   }
 
   // ---- PHASE 3: Batch upsert to DB ----
@@ -1774,44 +1861,28 @@ export async function handleAmazonSync(userId: string, body: any, res: NextApiRe
     totalUpserted += batch.length;
   }
 
-  // ---- PHASE 4: Upsert ad spend summary ----
-  if (adSpendTotal > 0) {
-    const startSec = Math.floor(startMs / 1000);
-    const endSec = Math.floor(endMs / 1000);
-    const adSpendId = `amz_adspend_${startSec}_${endSec}`;
-    await prisma.financialTransaction.upsert({
-      where: {
-        userId_marketplace_externalId: { userId, marketplace: 'amazon', externalId: adSpendId },
-      },
-      update: {
-        amount: -adSpendTotal,
-        quantity: adSpendCount,
-        syncedAt: new Date(),
-      },
-      create: {
-        userId,
-        marketplace: 'amazon',
-        externalId: adSpendId,
-        transactionType: 'AmazonAdSpend',
-        orderNumber: null,
-        barcode: null,
-        productName: 'Amazon Sponsored Ads',
-        quantity: adSpendCount,
-        amount: -adSpendTotal,
-        currency: 'USD',
-        commission: null,
-        shippingAmount: null,
-        transactionDate: new Date(endMs),
-      },
-    });
-    totalUpserted++;
-  }
+  // Ad spend is now stored per-event (idempotent). Delete the old overlapping
+  // `amz_adspend_<start>_<end>` summary rows, which double-counted across every
+  // synced date range (this seller had ~$2.1k of bogus ad spend from them).
+  await prisma.financialTransaction.deleteMany({
+    where: { userId, marketplace: 'amazon', externalId: { startsWith: 'amz_adspend_' } },
+  }).catch(() => undefined);
+
+  // ---- PHASE 4: payouts (settlements) + open-group balance ----
+  const { bankedCount, currentBalance } = await syncAmazonPayouts(userId, token, region, startMs, endMs, callSpApiWithRetry);
+  totalUpserted += bankedCount;
 
   // Update sync cursor
   await prisma.financialSyncCursor.upsert({
     where: { userId_marketplace: { userId, marketplace: 'amazon' } },
-    update: { lastSyncedTo: new Date(endMs), totalSynced: { increment: totalUpserted } },
-    create: { userId, marketplace: 'amazon', lastSyncedTo: new Date(endMs), totalSynced: totalUpserted },
+    update: {
+      lastSyncedTo: new Date(endMs), totalSynced: { increment: totalUpserted },
+      ...(currentBalance != null ? { currentBalance, balanceCurrency: 'USD' } : {}),
+    },
+    create: {
+      userId, marketplace: 'amazon', lastSyncedTo: new Date(endMs), totalSynced: totalUpserted,
+      ...(currentBalance != null ? { currentBalance, balanceCurrency: 'USD' } : {}),
+    },
   });
 
   logger.info('Amazon settlement sync complete', {

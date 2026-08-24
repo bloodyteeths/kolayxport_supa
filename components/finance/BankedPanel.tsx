@@ -24,8 +24,8 @@ export default function BankedPanel({ data, marketplace }: { data: DashboardData
   const { summary } = data;
   const disbursements = data.disbursements || [];
 
-  // Etsy and eBay provide banking data (ledger disbursements / payouts).
-  if (marketplace !== 'etsy' && marketplace !== 'ebay') return null;
+  // Etsy, eBay and Amazon provide banking data (ledger / payouts / settlements).
+  if (marketplace !== 'etsy' && marketplace !== 'ebay' && marketplace !== 'amazon') return null;
   const banked = summary.banked || 0;
   const balance = summary.currentBalance;
   const held = summary.heldFunds; // eBay only — Etsy's API doesn't expose it
@@ -58,10 +58,10 @@ export default function BankedPanel({ data, marketplace }: { data: DashboardData
               <Wallet size={16} color="#7c3aed" />
               <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>{t('bankedCurrentBalance')}</Typography>
             </Box>
-            {/* Etsy: the "reserve not exposed" tooltip applies. eBay: held funds
-                ARE shown separately, so no tooltip needed on the balance. */}
-            {marketplace === 'etsy' ? (
-              <Tooltip title={t('bankedReserveNote')} arrow placement="top">
+            {/* Etsy/Amazon: balance is an estimate and reserve/release isn't in
+                the API — explain on hover. eBay: held funds shown separately. */}
+            {marketplace === 'etsy' || marketplace === 'amazon' ? (
+              <Tooltip title={marketplace === 'amazon' ? t('bankedBalanceApproxNote') : t('bankedReserveNote')} arrow placement="top">
                 <Typography variant="h5" sx={{ fontWeight: 800, color: '#7c3aed', display: 'inline-block', cursor: 'help', borderBottom: '1px dotted', borderColor: 'rgba(124,58,237,0.4)' }}>
                   {balance != null ? fmt(balance, cur) : '—'}
                 </Typography>

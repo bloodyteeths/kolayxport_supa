@@ -141,6 +141,10 @@ function classifyTransactionType(type: string): 'revenue' | 'commission' | 'ship
   if (t.includes('refundcommission') || t.includes('amazonrefund')) return 'return';
   if (t.includes('sponsoredproduct') || t.includes('sponsoredbrand') || t.includes('sponsoreddisplay') || t.includes('amazonadspend')) return 'adspend';
   if (t.includes('amazoncoupon') || t.includes('amazondiscount')) return 'discount';
+  // Amazon misc events (service fees w/o a reason, adjustments, chargebacks).
+  // Sign-aware via the 'fees' bucket: negative = real cost, positive = credit —
+  // so they affect net profit correctly instead of being silently dropped.
+  if (t.includes('amazonother')) return 'fees';
   return 'other';
 }
 

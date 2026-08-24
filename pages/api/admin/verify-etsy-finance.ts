@@ -65,10 +65,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
   const byType: Record<string, { n: number; amt: number }> = {};
   let ledgerNet = 0;
+  const disbursements: Array<{ date: string; amount: number }> = [];
+  let latestBalance: { amount: number; date: string; seq: number } | null = null;
   for (const e of ledger) {
     const t = e.ledger_type || 'unknown';
     const amt = typeof e.amount === 'object' ? money(e.amount) : (Number(e.amount) || 0) / 100;
     (byType[t] ||= { n: 0, amt: 0 }); byType[t].n++; byType[t].amt += amt; ledgerNet += amt;
+    const dateIso = e.create_date ? new Date(e.create_date * 1000).toISOString().slice(0, 10) : '';
+    if (t === 'DISBURSE2' || (e.description || '').toLowerCase().includes('disbursement')) {
+      disbursements.push({ date: dateIso, amount: Math.round(amt * 100) / 100 });
+    }
+    // Running balance: the entry with the highest sequence_number is "now".
+    const bal = typeof e.balance === 'object' ? money(e.balance) : (Number(e.balance) || 0) / 100;
+    const seq = Number(e.sequence_number) || 0;
+    if (!latestBalance || seq > latestBalance.seq) latestBalance = { amount: Math.round(bal * 100) / 100, date: dateIso, seq };
   }
   for (const t of Object.keys(byType)) byType[t].amt = Math.round(byType[t].amt * 100) / 100;
 
@@ -84,6 +94,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     receipts: { saleCount, grandtotal: round(grandtotal), subtotal: round(subtotal), shipping: round(shipping), salesTax: round(tax), discount: round(discount), refundedReceiptCount, refundedGrand: round(refundedGrand) },
     payments: { count: payments.length, gross: round(payGross), fees: round(payFees), net: round(payNet), error: paymentsError },
     ledger: { byType, net: round(ledgerNet), count: ledger.length },
+    banked: { totalDisbursed: round(disbursements.reduce((s, d) => s + d.amount, 0)), count: disbursements.length, items: disbursements.sort((a, b) => a.date.localeCompare(b.date)) },
+    currentBalance: latestBalance,
     db: dbRows,
   });
 }

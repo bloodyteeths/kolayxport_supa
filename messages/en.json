@@ -442,6 +442,7 @@
     "product": "Product"
   },
   "financials": {
+    "bankedPendingNote": "Trendyol’s API does not expose a live balance. This is the estimated total of matured-but-not-yet-paid earnings (pending payout).",
     "bankedBalanceApproxNote": "This is the total of the open, not-yet-paid settlement period (approximate). Amazon’s API does not expose a real-time balance or reserve amount.",
     "bankedHeldFunds": "Held by eBay",
     "bankedHeldHint": "Not yet available for payout",

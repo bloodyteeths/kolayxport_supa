@@ -402,6 +402,7 @@
     "product": "Ürün"
   },
   "financials": {
+    "bankedPendingNote": "Trendyol API’si güncel bakiye vermez. Bu tutar, vadesi henüz gelmemiş (bankaya aktarılmayı bekleyen) hakedişlerin tahmini toplamıdır.",
     "bankedBalanceApproxNote": "Bu tutar, henüz ödenmemiş açık mutabakat döneminin toplamıdır (yaklaşık). Amazon API’si gerçek zamanlı bakiye veya rezerve tutulan tutarı paylaşmaz.",
     "bankedHeldFunds": "eBay Tarafından Tutulan",
     "bankedHeldHint": "Henüz ödemeye hazır değil",

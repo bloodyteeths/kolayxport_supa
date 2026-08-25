@@ -281,6 +281,35 @@ async function fetchStoppageItems(
   return items;
 }
 
+// Fetch PaymentOrder rows (Ödeme — accrual payments Trendyol made to the
+// seller's bank) from otherfinancials. This is Trendyol's payout data, used
+// for the banked panel.
+async function fetchPaymentOrders(
+  credentials: TrendyolCredentials,
+  windows: Array<{ startDate: string; endDate: string }>
+): Promise<any[]> {
+  const items: any[] = [];
+  for (const window of windows) {
+    let page = 0;
+    let hasMore = true;
+    while (hasMore) {
+      const data = await callTrendyolOtherFinancials(credentials, {
+        startDate: window.startDate,
+        endDate: window.endDate,
+        transactionType: 'PaymentOrder',
+        page,
+        size: 500,
+      });
+      const content = Array.isArray(data.content) ? data.content : [];
+      if (content.length === 0) break;
+      items.push(...content);
+      hasMore = page < (data.totalPages || 0) - 1;
+      page++;
+    }
+  }
+  return items;
+}
+
 // ---------------------------------------------------------------------------
 // Resolve product names from Trendyol Products API by barcode
 // ---------------------------------------------------------------------------
@@ -380,11 +409,12 @@ export async function handleSync(userId: string, body: any, res: NextApiResponse
     allTypes.map(txType => fetchAllSettlementPages(window, txType))
   );
 
-  // Fetch settlements + deduction invoices + stopaj in parallel
-  const [settlementResults, cargoResult, stoppageItems] = await Promise.all([
+  // Fetch settlements + deduction invoices + stopaj + payouts in parallel
+  const [settlementResults, cargoResult, stoppageItems, paymentOrders] = await Promise.all([
     Promise.all(settlementPromises),
     syncCargoInvoices(credentials, windows),
     fetchStoppageItems(credentials, windows).catch(() => [] as any[]),
+    fetchPaymentOrders(credentials, windows).catch(() => [] as any[]),
   ]);
 
   // Collect all settlement items
@@ -402,6 +432,11 @@ export async function handleSync(userId: string, body: any, res: NextApiResponse
   const productNameMap = await fetchProductNamesByBarcodes(credentials, uniqueBarcodes);
 
   // ---- PHASE 3: Bulk upsert (batched for speed) ----
+  // Trendyol has no balance API, so derive "pending payout" = net of settlement
+  // rows whose paymentDate (vade) is still in the future = money earned but not
+  // yet disbursed. Approximate (only within the synced window) and labelled as such.
+  const nowMs = Date.now();
+  let pendingPayout = 0;
   const UPSERT_BATCH = 20;
   for (let i = 0; i < allSettlementItems.length; i += UPSERT_BATCH) {
     const batch = allSettlementItems.slice(i, i + UPSERT_BATCH);
@@ -410,6 +445,8 @@ export async function handleSync(userId: string, body: any, res: NextApiResponse
       const credit = Number(item.credit || 0);
       const debt = Number(item.debt || 0);
       const amount = credit - debt;
+      const payMs = item.paymentDate ? Number(item.paymentDate) : 0;
+      if (payMs > nowMs) pendingPayout += amount;
       const resolvedName = item.barcode ? productNameMap.get(item.barcode) : undefined;
       const orderNum = item.orderNumber ? String(item.orderNumber) : null;
       const shippingFromCargo = orderNum ? (orderShippingMap.get(orderNum) || null) : null;
@@ -481,7 +518,41 @@ export async function handleSync(userId: string, body: any, res: NextApiResponse
     totalUpserted += batch.length;
   }
 
-  // Update sync cursor
+  // ---- PHASE 5: store PaymentOrder rows as bank payouts (Disbursement) ----
+  // Ödeme = money Trendyol paid to the seller's bank. In the cari hesap it's a
+  // debit (reduces balance); store negative like the other marketplaces so the
+  // banked panel shows it and it's excluded from P&L.
+  for (let i = 0; i < paymentOrders.length; i += UPSERT_BATCH) {
+    const batch = paymentOrders.slice(i, i + UPSERT_BATCH);
+    await Promise.all(batch.map((it: any) => {
+      const payout = Math.abs(Number(it.debt || 0) || Number(it.credit || 0));
+      const externalId = `payout_${it.id ?? it.paymentOrderId ?? `${it.transactionDate || ''}_${payout}`}`;
+      const txData = {
+        transactionType: 'Disbursement',
+        orderNumber: it.paymentOrderId ? String(it.paymentOrderId) : null,
+        barcode: null,
+        productName: it.description || 'Ödeme',
+        quantity: 1,
+        amount: -payout,
+        currency: 'TRY',
+        commission: null,
+        shippingAmount: null,
+        transactionDate: it.transactionDate ? new Date(Number(it.transactionDate)) : new Date(),
+        rawData: it,
+      };
+      return prisma.financialTransaction.upsert({
+        where: { userId_marketplace_externalId: { userId, marketplace: 'trendyol', externalId } },
+        update: { ...txData, syncedAt: new Date() },
+        create: { userId, marketplace: 'trendyol', externalId, ...txData },
+      });
+    }));
+    totalUpserted += batch.length;
+  }
+
+  // Update sync cursor (+ derived pending-payout balance)
+  const balanceData = pendingPayout !== 0
+    ? { currentBalance: Math.round(pendingPayout * 100) / 100, balanceCurrency: 'TRY' }
+    : {};
   await prisma.financialSyncCursor.upsert({
     where: {
       userId_marketplace: { userId, marketplace: 'trendyol' },
@@ -489,12 +560,14 @@ export async function handleSync(userId: string, body: any, res: NextApiResponse
     update: {
       lastSyncedTo: new Date(endMs),
       totalSynced: { increment: totalUpserted },
+      ...balanceData,
     },
     create: {
       userId,
       marketplace: 'trendyol',
       lastSyncedTo: new Date(endMs),
       totalSynced: totalUpserted,
+      ...balanceData,
     },
   });
 

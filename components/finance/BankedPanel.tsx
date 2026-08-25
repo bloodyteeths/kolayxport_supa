@@ -24,8 +24,10 @@ export default function BankedPanel({ data, marketplace }: { data: DashboardData
   const { summary } = data;
   const disbursements = data.disbursements || [];
 
-  // Etsy, eBay and Amazon provide banking data (ledger / payouts / settlements).
-  if (marketplace !== 'etsy' && marketplace !== 'ebay' && marketplace !== 'amazon') return null;
+  // Etsy, eBay, Amazon and Trendyol provide banking data
+  // (ledger / payouts / settlements / Ödeme).
+  const SUPPORTED = ['etsy', 'ebay', 'amazon', 'trendyol'];
+  if (!SUPPORTED.includes(marketplace)) return null;
   const banked = summary.banked || 0;
   const balance = summary.currentBalance;
   const held = summary.heldFunds; // eBay only — Etsy's API doesn't expose it
@@ -34,6 +36,11 @@ export default function BankedPanel({ data, marketplace }: { data: DashboardData
 
   // Marketplace-aware label — the balance card previously hardcoded "Etsy".
   const mpName = marketplace === 'ebay' ? 'eBay' : marketplace.charAt(0).toUpperCase() + marketplace.slice(1);
+  // Etsy/Amazon/Trendyol balances are estimates the API doesn't give directly.
+  const balanceTooltip = marketplace === 'amazon' ? t('bankedBalanceApproxNote')
+    : marketplace === 'trendyol' ? t('bankedPendingNote')
+    : t('bankedReserveNote');
+  const showBalanceTooltip = marketplace === 'etsy' || marketplace === 'amazon' || marketplace === 'trendyol';
 
   return (
     <Paper sx={{ borderRadius: '12px', p: 2, mb: 2, border: '1px solid', borderColor: 'divider' }}>
@@ -61,10 +68,10 @@ export default function BankedPanel({ data, marketplace }: { data: DashboardData
               <Wallet size={16} color="#7c3aed" />
               <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>{t('bankedCurrentBalanceMp', { marketplace: mpName })}</Typography>
             </Box>
-            {/* Etsy/Amazon: balance is an estimate and reserve/release isn't in
-                the API — explain on hover. eBay: held funds shown separately. */}
-            {marketplace === 'etsy' || marketplace === 'amazon' ? (
-              <Tooltip title={marketplace === 'amazon' ? t('bankedBalanceApproxNote') : t('bankedReserveNote')} arrow placement="top">
+            {/* Etsy/Amazon/Trendyol: balance is an estimate the API doesn't give
+                directly — explain on hover. eBay: held funds shown separately. */}
+            {showBalanceTooltip ? (
+              <Tooltip title={balanceTooltip} arrow placement="top">
                 <Typography variant="h5" sx={{ fontWeight: 800, color: '#7c3aed', display: 'inline-block', cursor: 'help', borderBottom: '1px dotted', borderColor: 'rgba(124,58,237,0.4)' }}>
                   {balance != null ? fmt(balance, cur) : '—'}
                 </Typography>

@@ -3055,7 +3055,10 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                             const today = new Date(); today.setHours(0, 0, 0, 0);
                             const shipDay = new Date(ship); shipDay.setHours(0, 0, 0, 0);
                             const daysLeft = Math.round((shipDay.getTime() - today.getTime()) / 86400000);
-                            const label = daysLeft < 0 ? t('shipOverdue') : daysLeft === 0 ? t('shipToday') : daysLeft === 1 ? t('shipTomorrow') : fmtDateTr(shipByRaw);
+                            // Day + short month ("12 Eyl" / "Sep 12") — numeric 09/12/26
+                            // reads day-first to Turkish users and month-first in EN,
+                            // so it gets misread as the wrong month at a glance.
+                            const label = daysLeft < 0 ? t('shipOverdue') : daysLeft === 0 ? t('shipToday') : daysLeft === 1 ? t('shipTomorrow') : formatDate(ship, { day: 'numeric', month: 'short' });
                             const palette = daysLeft <= 0 ? { bg: '#fee2e2', color: '#b91c1c' }
                               : daysLeft === 1 ? { bg: '#ffedd5', color: '#c2410c' }
                               : daysLeft <= 3 ? { bg: '#fef3c7', color: '#92400e' }

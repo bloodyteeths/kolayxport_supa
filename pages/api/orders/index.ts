@@ -45,8 +45,26 @@ export default async function handler(
   const sortByRaw = (req.query.sortBy as string) || 'orderDate';
   const orderByClauses: Record<string, string> = {
     orderDate: `COALESCE(o."uiOrderDate", o."createdAt") ${sort}`,
-    // Earliest item deadline per order; orders without a deadline go last.
-    shipBy: `(SELECT MIN(oi2."shipBy") FROM "OrderItem" oi2 WHERE oi2."orderId" = o.id) ${sort} NULLS LAST, COALESCE(o."uiOrderDate", o."createdAt") DESC`,
+    // Ship-by sort is for "what do I need to ship next": orders that still
+    // need a label come first (tier 0), already-shipped/labeled ones sink to
+    // the bottom (tier 1) regardless of deadline. The labeled condition
+    // mirrors the labelFilter=labeled clause above. Within each tier, earliest
+    // item deadline first; orders without a deadline go last.
+    shipBy: `
+      CASE WHEN (
+        (o."trackingNumber" IS NOT NULL AND o."trackingNumber" != '') OR
+        (o."shippingLabelUrl" IS NOT NULL AND o."shippingLabelUrl" != '') OR
+        o."labelStatus" = 'created' OR
+        UPPER(o."status") IN ('SHIPPED', 'PARTIALLY_SHIPPED', 'DELIVERED', 'COMPLETED', 'CANCELLED', 'CANCELED', 'REFUNDED') OR
+        EXISTS (
+          SELECT 1 FROM "Shipment" s
+          WHERE s."orderId" = o.id
+          AND s.status = 'created'
+          AND (s."trackingNumber" IS NOT NULL OR s."pdfUrl" IS NOT NULL)
+        )
+      ) THEN 1 ELSE 0 END ASC,
+      (SELECT MIN(oi2."shipBy") FROM "OrderItem" oi2 WHERE oi2."orderId" = o.id) ${sort} NULLS LAST,
+      COALESCE(o."uiOrderDate", o."createdAt") DESC`,
     price: `o."totalPrice" ${sort} NULLS LAST`,
     customer: `o."customerName" ${sort} NULLS LAST`,
   };

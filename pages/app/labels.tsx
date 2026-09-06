@@ -3041,8 +3041,13 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                         <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
                           {(() => {
                             // Ship-by deadline at a glance: earliest deadline across the
-                            // order's items, hidden once every item has a label.
-                            if (allLabeled) return null;
+                            // order's items, hidden once the order no longer needs shipping.
+                            // Trendyol pre-assigns cargoTrackingNumber before the seller
+                            // ships, so "has tracking" (allLabeled) is not evidence of
+                            // shipped there — only the order status is.
+                            const shippedStatus = /^(SHIPPED|PARTIALLY_SHIPPED|DELIVERED|COMPLETED|CANCELLED|CANCELED|REFUNDED)$/i.test(String(group.status || ''));
+                            const isTrendyolOrder = String(row.marketplace || '').toLowerCase().includes('trendyol');
+                            if (isTrendyolOrder ? shippedStatus : (allLabeled || shippedStatus)) return null;
                             const shipByRaw = group.items.map(i => i.shipByDate).filter(Boolean).sort()[0] || row.shipByDate;
                             if (!shipByRaw) return null;
                             const ship = new Date(shipByRaw);

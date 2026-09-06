@@ -3017,6 +3017,31 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
                           {(() => {
+                            // Ship-by deadline at a glance: earliest deadline across the
+                            // order's items, hidden once every item has a label.
+                            if (allLabeled) return null;
+                            const shipByRaw = group.items.map(i => i.shipByDate).filter(Boolean).sort()[0] || row.shipByDate;
+                            if (!shipByRaw) return null;
+                            const ship = new Date(shipByRaw);
+                            if (isNaN(ship.getTime())) return null;
+                            const today = new Date(); today.setHours(0, 0, 0, 0);
+                            const shipDay = new Date(ship); shipDay.setHours(0, 0, 0, 0);
+                            const daysLeft = Math.round((shipDay.getTime() - today.getTime()) / 86400000);
+                            const label = daysLeft < 0 ? t('shipOverdue') : daysLeft === 0 ? t('shipToday') : daysLeft === 1 ? t('shipTomorrow') : fmtDateTr(shipByRaw);
+                            const palette = daysLeft <= 0 ? { bg: '#fee2e2', color: '#b91c1c' }
+                              : daysLeft === 1 ? { bg: '#ffedd5', color: '#c2410c' }
+                              : daysLeft <= 3 ? { bg: '#fef3c7', color: '#92400e' }
+                              : { bg: '#e0f2fe', color: '#0369a1' };
+                            return (
+                              <Chip
+                                label={`⏱ ${label}`}
+                                size="small"
+                                title={`${t('shipBy')}: ${fmtDateTr(shipByRaw)}`}
+                                sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700, bgcolor: palette.bg, color: palette.color }}
+                              />
+                            );
+                          })()}
+                          {(() => {
                             const up = String(row.shippingUpgrade || '').trim();
                             if (!up) return null;
                             // Show the buyer's shipping upgrade name exactly as Etsy provides

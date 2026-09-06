@@ -642,6 +642,15 @@
     "phone": "Telefon",
     "email": "E-posta",
     "shipBy": "Son Kargo",
+    "sortLabel": "Sırala",
+    "sortOptions": {
+      "newest": "En Yeni",
+      "oldest": "En Eski",
+      "shipBy": "Son Kargo (En Yakın)",
+      "priceHigh": "Fiyat (Yüksek → Düşük)",
+      "priceLow": "Fiyat (Düşük → Yüksek)",
+      "customer": "Müşteri (A → Z)"
+    },
     "shipToday": "Bugün",
     "shipTomorrow": "Yarın",
     "shipOverdue": "Gecikti",

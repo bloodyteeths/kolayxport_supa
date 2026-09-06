@@ -1544,6 +1544,19 @@ function LabelsPage(props: { source?: string; channel?: string }) {
   const [etgbEnabled, setEtgbEnabled] = useState(false);
   const [processingEtgb, setProcessingEtgb] = useState(false);
 
+  // Sort — default newest first (existing behavior); ship-by closest surfaces
+  // urgent orders. Sorting is server-side because pagination is server-side.
+  type SortOption = 'newest' | 'oldest' | 'shipBy' | 'priceHigh' | 'priceLow' | 'customer';
+  const [sortOption, setSortOption] = useState<SortOption>('newest');
+  const SORT_PARAMS: Record<SortOption, { sortBy: string; sort: string }> = {
+    newest: { sortBy: 'orderDate', sort: 'desc' },
+    oldest: { sortBy: 'orderDate', sort: 'asc' },
+    shipBy: { sortBy: 'shipBy', sort: 'asc' },
+    priceHigh: { sortBy: 'price', sort: 'desc' },
+    priceLow: { sortBy: 'price', sort: 'asc' },
+    customer: { sortBy: 'customer', sort: 'asc' },
+  };
+
   const debouncedSearch = useDebouncedValue(searchTerm, 300);
 
   // Fetch marketplace options
@@ -1552,7 +1565,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
   // When any filter changes, the FIRST fetch must already use page 0 — the old
   // setTimeout-based reset let a request go out with the stale page number
   // (an empty page of the new result set) before resetting.
-  const filterSignature = JSON.stringify([debouncedSearch, searchType, statusFilter, labelStatusFilter, labelFilter, filterStartDate, filterEndDate, marketplaceFilter]);
+  const filterSignature = JSON.stringify([debouncedSearch, searchType, statusFilter, labelStatusFilter, labelFilter, filterStartDate, filterEndDate, marketplaceFilter, sortOption]);
   const lastFilterSignatureRef = useRef(filterSignature);
   const effectivePage = lastFilterSignatureRef.current === filterSignature ? paginationModel.page : 0;
 
@@ -1574,6 +1587,8 @@ function LabelsPage(props: { source?: string; channel?: string }) {
       status: statusFilter,
       labelStatus: labelStatusFilter,
       labelFilter: labelFilter,
+      sortBy: SORT_PARAMS[sortOption].sortBy,
+      sort: SORT_PARAMS[sortOption].sort,
     },
     'labelsPage'
   );
@@ -2917,9 +2932,17 @@ function LabelsPage(props: { source?: string; channel?: string }) {
         </FormControl>
         <TextField label={t('startDate')} type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} size="small" InputLabelProps={{ shrink: true }} sx={{ width: 125, display: { xs: 'none', lg: 'inline-flex' }, '& .MuiInputBase-root': { height: 30, fontSize: '0.75rem' } }} />
         <TextField label={t('endDate')} type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} size="small" InputLabelProps={{ shrink: true }} sx={{ width: 125, display: { xs: 'none', lg: 'inline-flex' }, '& .MuiInputBase-root': { height: 30, fontSize: '0.75rem' } }} />
-        <Button onClick={() => { setSearchTerm(''); setSearchType('all'); setStatusFilter(''); setLabelStatusFilter(''); setMarketplaceFilter([]); setLabelFilter('all'); const now = new Date(); const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); setFilterStartDate(sevenDaysAgo.toISOString().slice(0, 10)); setFilterEndDate(now.toISOString().slice(0, 10)); }} variant="text" size="small" sx={{ fontSize: '0.7rem', textTransform: 'none', display: { xs: 'none', md: 'inline-flex' }, minWidth: 0, px: 0.5 }}>{t('reset')}</Button>
+        <Button onClick={() => { setSearchTerm(''); setSearchType('all'); setStatusFilter(''); setLabelStatusFilter(''); setMarketplaceFilter([]); setLabelFilter('all'); setSortOption('newest'); const now = new Date(); const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); setFilterStartDate(sevenDaysAgo.toISOString().slice(0, 10)); setFilterEndDate(now.toISOString().slice(0, 10)); }} variant="text" size="small" sx={{ fontSize: '0.7rem', textTransform: 'none', display: { xs: 'none', md: 'inline-flex' }, minWidth: 0, px: 0.5 }}>{t('reset')}</Button>
         {/* Label toggle + view presets + count — pushed right */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, ml: 'auto' }}>
+          <FormControl size="small" variant="outlined" sx={{ minWidth: 110 }}>
+            <InputLabel shrink>{t('sortLabel')}</InputLabel>
+            <Select value={sortOption} label={t('sortLabel')} onChange={e => setSortOption(e.target.value as typeof sortOption)} sx={{ fontSize: '0.72rem', height: 30 }}>
+              {(['newest', 'oldest', 'shipBy', 'priceHigh', 'priceLow', 'customer'] as const).map(opt => (
+                <MenuItem key={opt} value={opt} sx={{ fontSize: '0.8rem' }}>{t(`sortOptions.${opt}`)}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <ToggleButtonGroup exclusive size="small" value={labelFilter} onChange={handleLabelFilter} aria-label={t('labelFilter')} sx={{ '& .MuiToggleButton-root': { fontSize: '0.68rem', px: { xs: 0.75, sm: 1.25 }, py: 0.15, height: 26 } }}>
             <ToggleButton value="all">{t('all')}</ToggleButton>
             <ToggleButton value="unlabeled">{t('unlabeled')}</ToggleButton>

@@ -682,6 +682,15 @@
     "phone": "Phone",
     "email": "Email",
     "shipBy": "Ship By",
+    "sortLabel": "Sort",
+    "sortOptions": {
+      "newest": "Newest",
+      "oldest": "Oldest",
+      "shipBy": "Ship By (Closest)",
+      "priceHigh": "Price (High → Low)",
+      "priceLow": "Price (Low → High)",
+      "customer": "Customer (A → Z)"
+    },
     "shipToday": "Today",
     "shipTomorrow": "Tomorrow",
     "shipOverdue": "Overdue",

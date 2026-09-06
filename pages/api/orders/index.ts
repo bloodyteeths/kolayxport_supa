@@ -40,6 +40,17 @@ export default async function handler(
   const channel = req.query.channel as string;
   const sortRaw = req.query.sort as string || 'desc';
   const sort = sortRaw.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+  // Whitelisted sort columns — sortBy/sort are interpolated into raw SQL, so
+  // anything outside this map must fall back to the default order-date sort.
+  const sortByRaw = (req.query.sortBy as string) || 'orderDate';
+  const orderByClauses: Record<string, string> = {
+    orderDate: `COALESCE(o."uiOrderDate", o."createdAt") ${sort}`,
+    // Earliest item deadline per order; orders without a deadline go last.
+    shipBy: `(SELECT MIN(oi2."shipBy") FROM "OrderItem" oi2 WHERE oi2."orderId" = o.id) ${sort} NULLS LAST, COALESCE(o."uiOrderDate", o."createdAt") DESC`,
+    price: `o."totalPrice" ${sort} NULLS LAST`,
+    customer: `o."customerName" ${sort} NULLS LAST`,
+  };
+  const orderByClause = orderByClauses[sortByRaw] || orderByClauses.orderDate;
 
   // Filters
   const {
@@ -390,7 +401,7 @@ export default async function handler(
       FROM "Order" o
       LEFT JOIN "SenkronOrderData" sod ON sod."orderId" = o.id
       ${whereClause}
-      ORDER BY COALESCE(o."uiOrderDate", o."createdAt") ${sort}
+      ORDER BY ${orderByClause}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
     params.push(limit, offset);

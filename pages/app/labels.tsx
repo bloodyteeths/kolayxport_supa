@@ -3058,8 +3058,11 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                             const daysLeft = Math.round((shipDay.getTime() - today.getTime()) / 86400000);
                             // Day + short month ("12 Eyl" / "Sep 12") — numeric 09/12/26
                             // reads day-first to Turkish users and month-first in EN,
-                            // so it gets misread as the wrong month at a glance.
-                            const label = daysLeft < 0 ? t('shipOverdue') : daysLeft === 0 ? t('shipToday') : daysLeft === 1 ? t('shipTomorrow') : formatDate(ship, { day: 'numeric', month: 'short' });
+                            // so it gets misread as the wrong month at a glance. The
+                            // deadline hour matters (carrier cutoffs), so append it.
+                            const timeStr = formatDate(ship, { hour: '2-digit', minute: '2-digit' });
+                            const dayLabel = daysLeft < 0 ? t('shipOverdue') : daysLeft === 0 ? t('shipToday') : daysLeft === 1 ? t('shipTomorrow') : formatDate(ship, { day: 'numeric', month: 'short' });
+                            const label = daysLeft < 0 ? dayLabel : `${dayLabel} ${timeStr}`;
                             const palette = daysLeft <= 0 ? { bg: '#fee2e2', color: '#b91c1c' }
                               : daysLeft === 1 ? { bg: '#ffedd5', color: '#c2410c' }
                               : daysLeft <= 3 ? { bg: '#fef3c7', color: '#92400e' }
@@ -3068,7 +3071,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                               <Chip
                                 label={`⏱ ${label}`}
                                 size="small"
-                                title={`${t('shipBy')}: ${fmtDateTr(shipByRaw)}`}
+                                title={`${t('shipBy')}: ${formatDateTime(ship)}`}
                                 sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700, bgcolor: palette.bg, color: palette.color }}
                               />
                             );
@@ -3236,7 +3239,11 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                       {/* Order status & shipping info */}
                       <Box sx={{ py: 0.75, borderTop: '1px dashed', borderColor: 'divider', display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
                         <Chip label={statusLabel} size="small" sx={{ height: 20, fontSize: '0.65rem', bgcolor: statusConfig.bg, color: statusConfig.text }} />
-                        {row.shipByDate && <Typography variant="caption" color="text.secondary">{t('shipBy')}: {fmtDateTr(row.shipByDate)}</Typography>}
+                        {row.shipByDate && <Typography variant="caption" color="text.secondary">{t('shipBy')}: {(() => {
+                          // With time when parseable; extension-scraped raw text ("Ship by tomorrow") falls back to fmtDateTr's dash handling
+                          const d = new Date(row.shipByDate);
+                          return isNaN(d.getTime()) ? fmtDateTr(row.shipByDate) : formatDateTime(d);
+                        })()}</Typography>}
                         {row.trackingNumber && <Typography variant="caption" color="text.secondary">{t('tracking')}: {row.lastCarrier} {row.trackingNumber}</Typography>}
                       </Box>
 

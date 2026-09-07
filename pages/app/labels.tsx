@@ -3035,11 +3035,13 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                       ))}
                     </Box>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography variant="body2" fontWeight={600} noWrap sx={{ fontSize: '0.8rem' }}>
+                      {/* Wrap on mobile: the name keeps a guaranteed width and the
+                          chip group drops to its own line instead of covering it. */}
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: { xs: 'wrap', md: 'nowrap' }, rowGap: 0.25 }}>
+                        <Typography variant="body2" fontWeight={600} noWrap sx={{ fontSize: '0.8rem', flex: '1 1 auto', minWidth: { xs: 130, md: 0 } }}>
                           {group.customerName || '—'}
                         </Typography>
-                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
+                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end', rowGap: 0.25, maxWidth: '100%' }}>
                           {(() => {
                             // Ship-by deadline at a glance: earliest deadline across the
                             // order's items, hidden once the order no longer needs shipping.

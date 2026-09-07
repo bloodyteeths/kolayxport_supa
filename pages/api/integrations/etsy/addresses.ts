@@ -150,7 +150,23 @@ async function handler(
           continue;
         }
 
-        // Upsert Etsy address data
+        // Upsert Etsy address data. Merge with any existing record so partial
+        // pushes (e.g. an email-only update from the detail-panel watcher)
+        // never clobber a previously scraped full address — and vice versa.
+        const existing = await prisma.etsyAddress.findUnique({
+          where: {
+            userId_etsyStoreId_orderNumber: {
+              userId,
+              etsyStoreId: etsyStoreId || '',
+              orderNumber
+            }
+          }
+        });
+        const existingAddr = parseAddr(existing?.shippingAddress);
+        const mergedAddr = { ...existingAddr };
+        for (const [k, v] of Object.entries(shippingAddress)) {
+          if (typeof v === 'string' ? v.trim() : v) mergedAddr[k] = v;
+        }
         await prisma.etsyAddress.upsert({
           where: {
             userId_etsyStoreId_orderNumber: {
@@ -160,11 +176,11 @@ async function handler(
             }
           },
           update: {
-            shippingAddress,
-            notes: notes || null,
-            etsyStoreName: etsyStoreName || null,
-            shipByDate: shipByDate || null,
-            orderDate: orderDate || null,
+            shippingAddress: mergedAddr,
+            notes: notes || existing?.notes || null,
+            etsyStoreName: etsyStoreName || existing?.etsyStoreName || null,
+            shipByDate: shipByDate || existing?.shipByDate || null,
+            orderDate: orderDate || existing?.orderDate || null,
             updatedAt: new Date()
           },
           create: {
@@ -172,7 +188,7 @@ async function handler(
             orderNumber,
             etsyStoreId: etsyStoreId || '',
             etsyStoreName: etsyStoreName || null,
-            shippingAddress,
+            shippingAddress: mergedAddr,
             notes: notes || null,
             shipByDate: shipByDate || null,
             orderDate: orderDate || null
@@ -188,12 +204,14 @@ async function handler(
           hasNotes: !!notes
         });
 
-        // Fill the live Order.shippingAddress right now so the address shows in the
-        // dashboard immediately — Etsy's API never returns it, so the scrape is the
-        // only source. Only when the order's street is empty (never clobber a
-        // manually-corrected/real address).
+        // Fill the live Order.shippingAddress right now so the address/email
+        // shows in the dashboard immediately — Etsy's API never returns buyer
+        // PII to third-party apps, so the scrape is the only source. Address
+        // fields fill only when the order's street is empty (never clobber a
+        // manually-corrected/real address); email fills whenever it's missing.
         const scrapedStreet = (shippingAddress?.line1 || shippingAddress?.street1 || '').trim();
-        if (scrapedStreet) {
+        const scrapedEmail = (shippingAddress?.email || '').trim();
+        if (scrapedStreet || scrapedEmail) {
           const order = await prisma.order.findFirst({
             where: { userId, orderNumber },
             select: { id: true, shippingAddress: true, customerNote: true },
@@ -202,8 +220,10 @@ async function handler(
             results.notFound++;
           } else {
             const cur = parseAddr(order.shippingAddress);
-            if (!(cur.street1 || '').trim()) {
-              const merged = {
+            const fillStreet = scrapedStreet && !(cur.street1 || '').trim();
+            const fillEmail = scrapedEmail && !(cur.email || '').trim();
+            if (fillStreet || fillEmail) {
+              const merged = fillStreet ? {
                 name: shippingAddress.name || cur.name || '',
                 phone: cur.phone || '',
                 street1: scrapedStreet,
@@ -213,8 +233,8 @@ async function handler(
                 postal: (shippingAddress.postalCode || shippingAddress.postal || '').trim(),
                 country: toIso((shippingAddress.country || '').trim()),
                 isResidential: true,
-                email: cur.email || '',
-              };
+                email: scrapedEmail || cur.email || '',
+              } : { ...cur, email: scrapedEmail };
               // Only fill the address. Personalization/notes come from the Etsy API
               // (message_from_buyer / transaction personalization in etsyOrderSync) — the
               // scraped `notes` is the whole order-card text and would overwrite the real

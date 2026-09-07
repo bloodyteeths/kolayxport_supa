@@ -757,6 +757,7 @@ async function extractAddress(order: LocalUIOrder, preFetchedEnrichment?: any): 
           recipientState: isMissingValue(extractedAddress.recipientState) ? (etsyAddr.state || '') : extractedAddress.recipientState,
           recipientPostal: isMissingValue(extractedAddress.recipientPostal) ? (etsyAddr.postalCode || '') : extractedAddress.recipientPostal,
           recipientCountry: isMissingValue(extractedAddress.recipientCountry) ? resolveEtsyCountryCode(etsyAddr) : extractedAddress.recipientCountry,
+          recipientEmail: isMissingValue((extractedAddress as any).recipientEmail) ? (etsyAddr.email || '') : (extractedAddress as any).recipientEmail,
           // Add Etsy-specific data for debugging/display
           _etsyEnriched: true,
           _etsyStoreName: etsyEnrichment.etsyStoreName,

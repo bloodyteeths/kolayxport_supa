@@ -18,6 +18,7 @@ const getKolayxportAPI = () => {
 
 const API = getKolayxportAPI();
 const STORAGE_KEY = 'kx_synced_orders';
+const EMAIL_SYNC_KEY = 'kx_synced_emails';
 const MAX_STORED_IDS = 5000;
 
 // Logging system - since Etsy blocks console, we'll use extension storage and server logs
@@ -618,6 +619,17 @@ async function extract() {
         }
       }
       
+      // Buyer email — Etsy's API returns buyer_email=null for third-party apps
+      // (case-by-case PII approval), so the dashboard is the only source. A
+      // mailto: link only exists in the row when the buyer dropdown/detail has
+      // been rendered; the detail-panel watcher below covers the rest.
+      let buyerEmail = '';
+      const rowMailto = row.querySelector('a[href^="mailto:"]');
+      if (rowMailto) {
+        buyerEmail = decodeURIComponent((rowMailto.getAttribute('href') || '').replace(/^mailto:/i, '').split('?')[0]).trim();
+        if (buyerEmail) log.info(`Order ${orderId}: Found buyer email in row`);
+      }
+
       // Personalization / buyer notes are intentionally NOT scraped here. The old
       // approach grabbed every `.text-body-smaller` in the row — which is the whole
       // order card (SKU, coupon, item title, size, colour, shipping, address) — and
@@ -642,7 +654,8 @@ async function extract() {
           city: shippingAddress.city || '',
           state: shippingAddress.state || '',
           postalCode: shippingAddress.postalCode || '',
-          country: shippingAddress.country || ''
+          country: shippingAddress.country || '',
+          email: buyerEmail || ''
         },
         notes: notes || '',
         shipByDate: shipByDate || '',
@@ -801,6 +814,72 @@ function debouncedExtract() {
     }
   }, 2000); // 2 second delay to allow for DOM settling
 }
+
+// ── Buyer email watcher ──────────────────────────────────────────────────
+// When the seller opens an order (URL gains order_id=), Etsy renders the
+// buyer's email in the detail panel. Scrape it and push an email-only update;
+// the server merges it into the stored address without clobbering anything.
+async function extractDetailEmail() {
+  try {
+    const url = new URL(window.location.href);
+    const orderId = url.searchParams.get('order_id') || url.searchParams.get('receipt_id');
+    if (!orderId) return;
+
+    const store = await chrome.storage.local.get({ [EMAIL_SYNC_KEY]: {} });
+    const syncedEmails = (typeof store[EMAIL_SYNC_KEY] === 'object' && !Array.isArray(store[EMAIL_SYNC_KEY])) ? store[EMAIL_SYNC_KEY] : {};
+    if (syncedEmails[orderId]) return;
+
+    // Prefer an explicit mailto link; fall back to a single unambiguous
+    // email in the page text (excluding Etsy's own addresses).
+    let email = '';
+    const mailto = document.querySelector('a[href^="mailto:"]');
+    if (mailto) {
+      email = decodeURIComponent((mailto.getAttribute('href') || '').replace(/^mailto:/i, '').split('?')[0]).trim();
+    }
+    if (!email) {
+      const matches = (document.body.innerText || '').match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) || [];
+      const candidates = new Set();
+      matches.forEach(function(e) {
+        const low = e.toLowerCase();
+        if (!low.endsWith('@etsy.com') && !low.includes('kolayxport')) candidates.add(e.trim());
+      });
+      if (candidates.size === 1) {
+        email = [...candidates][0];
+      } else if (candidates.size > 1) {
+        log.warn('Multiple candidate emails on detail view, skipping', { orderId, count: candidates.size });
+      }
+    }
+    if (!email || !email.includes('@')) return;
+
+    const storeInfo = getEtsyStoreInfo();
+    log.info(`Order ${orderId}: Found buyer email on detail view, pushing`);
+    const response = await safeSendMessage({
+      action: 'syncOrders',
+      orders: [{
+        orderNumber: orderId,
+        etsyStoreId: storeInfo.shopId,
+        etsyStoreName: storeInfo.storeName,
+        shippingAddress: { email: email },
+        emailOnly: true
+      }],
+      source: 'chrome-extension-v9.4-email',
+      timestamp: new Date().toISOString()
+    });
+    if (response && response.success) {
+      syncedEmails[orderId] = Date.now();
+      // Prune entries older than 7 days
+      const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      Object.keys(syncedEmails).forEach(function(k) { if (syncedEmails[k] < cutoff) delete syncedEmails[k]; });
+      await chrome.storage.local.set({ [EMAIL_SYNC_KEY]: syncedEmails });
+      log.success(`Order ${orderId}: Buyer email synced`);
+    }
+  } catch (e) {
+    log.error('Email watcher failed', { message: e.message });
+  }
+}
+// The detail panel doesn't look like an order row to the MutationObserver, so
+// poll cheaply — no-ops unless the URL carries an order_id.
+setInterval(extractDetailEmail, 3000);
 
 // Initial extraction with delay
 setTimeout(debouncedExtract, 3000);

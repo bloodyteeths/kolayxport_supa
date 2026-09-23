@@ -68,6 +68,8 @@ interface AspectMetadata {
   aspectConstraint: {
     aspectRequired: boolean;
     aspectMode: 'FREE_TEXT' | 'SELECTION_ONLY';
+    /** eBay states per category which aspects may be used as variation axes. */
+    aspectEnabledForVariations?: boolean;
     aspectValues?: { localizedValue: string }[];
   };
 }
@@ -84,10 +86,21 @@ interface VariationRow {
   quantity: string;
 }
 
-type AutofillStepId = 'research' | 'title' | 'category' | 'aspects' | 'price' | 'description';
+/** Photo shown when a buyer picks a value of the image-varying aspect. */
+type VariationImageMap = Record<string, string>;
+
+type AutofillStepId =
+  | 'identify'
+  | 'research'
+  | 'title'
+  | 'category'
+  | 'aspects'
+  | 'price'
+  | 'description';
 type AutofillStatus = 'pending' | 'running' | 'done' | 'error';
 
 const AUTOFILL_STEPS: AutofillStepId[] = [
+  'identify',
   'research',
   'title',
   'category',
@@ -97,6 +110,7 @@ const AUTOFILL_STEPS: AutofillStepId[] = [
 ];
 
 const AUTOFILL_STEP_KEYS: Record<AutofillStepId, string> = {
+  identify: 'aiStepIdentify',
   research: 'aiStepResearch',
   title: 'aiStepTitle',
   category: 'aiStepCategory',
@@ -209,6 +223,9 @@ export default function ListingCreatorDialog({
   const [hasVariations, setHasVariations] = useState(false);
   const [variationAspects, setVariationAspects] = useState<VariationAspect[]>([]);
   const [variationRows, setVariationRows] = useState<VariationRow[]>([]);
+  /** Which aspect (usually Colour) gets its own photo per value. */
+  const [imageVaryingAspect, setImageVaryingAspect] = useState('');
+  const [variationImages, setVariationImages] = useState<VariationImageMap>({});
 
   const [draftRestored, setDraftRestored] = useState(false);
 
@@ -221,6 +238,7 @@ export default function ListingCreatorDialog({
   const categoryRef = useRef<HTMLDivElement>(null);
   const pricingRef = useRef<HTMLDivElement>(null);
   const shippingRef = useRef<HTMLDivElement>(null);
+  const variationsRef = useRef<HTMLDivElement>(null);
 
   // --------------------------------------------------
   // Persistence
@@ -250,6 +268,8 @@ export default function ListingCreatorDialog({
     setHasVariations(false);
     setVariationAspects([]);
     setVariationRows([]);
+    setImageVaryingAspect('');
+    setVariationImages({});
     setMarketResearch(null);
     setAiLoading(null);
     setAiAnalysis(null);
@@ -286,12 +306,15 @@ export default function ListingCreatorDialog({
       hasVariations,
       variationAspects,
       variationRows,
+      imageVaryingAspect,
+      variationImages,
     }),
     [
       title, description, skuInput, condition, conditionDescription, categorySearchQuery,
       selectedCategory, price, currency, quantity, aspects, requiredAspects, recommendedAspects,
       images, fulfillmentPolicyId, returnPolicyId, paymentPolicyId, selectedStoreCategory,
       selectedStoreCategory2, hasVariations, variationAspects, variationRows,
+      imageVaryingAspect, variationImages,
     ]
   );
 
@@ -326,6 +349,8 @@ export default function ListingCreatorDialog({
       setHasVariations(Boolean(saved.hasVariations));
       setVariationAspects(saved.variationAspects || []);
       setVariationRows(saved.variationRows || []);
+      setImageVaryingAspect(saved.imageVaryingAspect || '');
+      setVariationImages(saved.variationImages || {});
       setDraftRestored(true);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -596,14 +621,19 @@ export default function ListingCreatorDialog({
   // One-click: research → title → category → specifics → price → description
   // --------------------------------------------------
   const runAiAutofill = async () => {
-    const seed = (aiSeed.trim() || title.trim()).slice(0, 200);
-    if (!seed) {
+    let seed = (aiSeed.trim() || title.trim()).slice(0, 200);
+    // A seller who only has a photo shouldn't have to describe it — read it off
+    // the image instead.
+    const identifyFromPhotos = !seed && images.length > 0;
+
+    if (!seed && !identifyFromPhotos) {
       setFormError(t('aiStartNeedsSeed'));
       return;
     }
 
     setFormError(null);
     const status: Record<AutofillStepId, AutofillStatus> = {
+      identify: identifyFromPhotos ? 'pending' : 'done',
       research: 'pending', title: 'pending', category: 'pending',
       aspects: 'pending', price: 'pending', description: 'pending',
     };
@@ -613,6 +643,29 @@ export default function ListingCreatorDialog({
       status[id] = s;
       setAutofillStatus({ ...status });
     };
+
+    if (identifyFromPhotos) {
+      mark('identify', 'running');
+      try {
+        const data = await callAI('identify_product', { imageUrls: images.slice(0, 4) });
+        if (data?.seed) {
+          seed = String(data.seed).slice(0, 200);
+          setAiSeed(seed);
+          if (data.suggestedCondition) setCondition(String(data.suggestedCondition));
+          mark('identify', 'done');
+        } else {
+          mark('identify', 'error');
+        }
+      } catch {
+        mark('identify', 'error');
+      }
+
+      if (!seed) {
+        setAutofillStatus(null);
+        setFormError(t('aiIdentifyFailed'));
+        return;
+      }
+    }
 
     // Each step is independently non-fatal: a failure marks that row and the
     // rest still run, so the seller always ends up with a partly filled form.
@@ -768,6 +821,70 @@ export default function ListingCreatorDialog({
   // --------------------------------------------------
   // Variations
   // --------------------------------------------------
+  /**
+   * eBay publishes, per category, which aspects may be used as a variation axis.
+   * Anything else is rejected at publish time, so only offer these.
+   */
+  const variationCapableAspects = useMemo(
+    () =>
+      [...requiredAspects, ...recommendedAspects].filter(
+        (a) => a.aspectConstraint.aspectEnabledForVariations
+      ),
+    [requiredAspects, recommendedAspects]
+  );
+
+  const definedVariationAspects = useMemo(
+    () => variationAspects.filter((a) => a.name && a.values.length > 0),
+    [variationAspects]
+  );
+
+  /** Ask the AI which values of this aspect actually make sense for the product. */
+  const suggestVariationValues = async (idx: number) => {
+    const aspect = variationAspects[idx];
+    if (!aspect?.name || !title.trim()) return;
+
+    const meta = variationCapableAspects.find((a) => a.localizedAspectName === aspect.name);
+    const allowed = meta?.aspectConstraint.aspectValues?.map((v) => v.localizedValue) || [];
+
+    setAiLoading(`varvalues-${idx}`);
+    try {
+      const data = await callAI('suggest_aspects', {
+        title: title.trim(),
+        aspectNames: [aspect.name],
+        categoryName: selectedCategory?.name,
+        marketResearch,
+        // Hint the model toward eBay's own vocabulary where one exists.
+        currentAspects: allowed.length ? { [`${aspect.name} (allowed)`]: allowed.slice(0, 40) } : undefined,
+      });
+      let values: string[] = data?.aspects?.[aspect.name] || [];
+      if (allowed.length) {
+        const lower = new Map(allowed.map((v) => [v.toLowerCase(), v]));
+        values = values.map((v) => lower.get(String(v).toLowerCase()) || v).filter((v) => lower.has(String(v).toLowerCase()));
+      }
+      if (values.length > 0) {
+        const updated = [...variationAspects];
+        updated[idx] = { ...updated[idx], values: Array.from(new Set(values)) };
+        setVariationAspects(updated);
+        generateVariationRows(updated);
+      } else {
+        toast.error(t('variationSuggestEmpty'));
+      }
+    } catch (err: any) {
+      toast.error(err.message || t('aiAspectsFailed'));
+    } finally {
+      setAiLoading(null);
+    }
+  };
+
+  const applyPriceToAllVariations = () => {
+    if (!price) return;
+    setVariationRows((rows) => rows.map((r) => ({ ...r, price })));
+  };
+
+  const applyStockToAllVariations = () => {
+    setVariationRows((rows) => rows.map((r) => ({ ...r, quantity: quantity || '1' })));
+  };
+
   const generateVariationRows = (defs: VariationAspect[]) => {
     const valid = defs.filter((a) => a.name && a.values.length > 0);
     if (valid.length === 0) {
@@ -801,6 +918,20 @@ export default function ListingCreatorDialog({
       })
     );
   };
+
+  /** Competing listings behind the suggested price, most-sold first. */
+  const comparableListings = useMemo(() => {
+    const products = (marketResearch?.topProducts || []) as any[];
+    return [...products]
+      .filter((p) => p && p.price !== undefined)
+      .sort((a, b) => (b.soldQuantity || 0) - (a.soldQuantity || 0))
+      .slice(0, 5)
+      .map((p) => ({
+        title: String(p.title || '').slice(0, 70),
+        price: p.price,
+        soldQuantity: p.soldQuantity || 0,
+      }));
+  }, [marketResearch]);
 
   // --------------------------------------------------
   // Readiness
@@ -836,11 +967,26 @@ export default function ListingCreatorDialog({
         ref: shippingRef,
         blocksDraft: true,
       },
+      ...(hasVariations
+        ? [
+            {
+              id: 'variations',
+              ok:
+                definedVariationAspects.length > 0 &&
+                variationRows.length > 0 &&
+                variationRows.every((r) => r.sku.trim() && (r.price || price)),
+              label: t('checkVariations'),
+              ref: variationsRef,
+              blocksDraft: true,
+            },
+          ]
+        : []),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       images.length, title, description, selectedCategory, price, missingRequiredAspects.length,
       fulfillmentPolicyId, returnPolicyId, paymentPolicyId,
+      hasVariations, definedVariationAspects.length, variationRows,
     ]
   );
 
@@ -895,6 +1041,15 @@ export default function ListingCreatorDialog({
             varAspects[key] = [value];
           }
 
+          // A variant's own photo leads, so eBay shows it when the buyer picks
+          // that value; the rest of the gallery follows.
+          const variantImage = imageVaryingAspect
+            ? variationImages[row.combination[imageVaryingAspect]]
+            : undefined;
+          const variantImages = variantImage
+            ? [variantImage, ...images.filter((i) => i !== variantImage)]
+            : images;
+
           const inventoryRes = await fetch(
             `/api/clawd/ebay?action=create_inventory_item&sku=${encodeURIComponent(row.sku)}&user_id=${userId}`,
             {
@@ -905,7 +1060,7 @@ export default function ListingCreatorDialog({
                   title: title.trim(),
                   description: description.trim(),
                   aspects: varAspects,
-                  imageUrls: images,
+                  imageUrls: variantImages,
                 },
                 condition,
                 conditionDescription: condition !== 'NEW' ? conditionDescription : undefined,
@@ -922,7 +1077,7 @@ export default function ListingCreatorDialog({
           }
         }
 
-        const varAspectNames = variationAspects.filter((a) => a.name && a.values.length).map((a) => a.name);
+        const varAspectNames = definedVariationAspects.map((a) => a.name);
         const groupRes = await fetch(
           `/api/clawd/ebay?action=create_inventory_item_group&sku=${encodeURIComponent(baseSku)}&user_id=${userId}`,
           {
@@ -937,10 +1092,11 @@ export default function ListingCreatorDialog({
               ),
               variantSKUs: variationRows.map((r) => r.sku),
               variesBy: {
-                aspectsImageVariesBy: [],
-                specifications: variationAspects
-                  .filter((a) => a.name && a.values.length)
-                  .map((a) => ({ name: a.name, values: a.values })),
+                aspectsImageVariesBy: imageVaryingAspect ? [imageVaryingAspect] : [],
+                specifications: definedVariationAspects.map((a) => ({
+                  name: a.name,
+                  values: a.values,
+                })),
               },
             }),
           }
@@ -1135,7 +1291,9 @@ export default function ListingCreatorDialog({
         <AutoAwesomeIcon color="primary" fontSize="small" />
         <Typography variant="subtitle1" fontWeight={700}>{t('aiStartTitle')}</Typography>
       </Box>
-      <Typography variant="body2" color="text.secondary">{t('aiStartHint')}</Typography>
+      <Typography variant="body2" color="text.secondary">
+        {images.length > 0 && !aiSeed.trim() ? t('aiStartHintPhoto') : t('aiStartHint')}
+      </Typography>
 
       <Box sx={{ display: 'flex', gap: 1, flexDirection: { xs: 'column', sm: 'row' } }}>
         <TextField
@@ -1152,11 +1310,17 @@ export default function ListingCreatorDialog({
         <Button
           variant="contained"
           onClick={runAiAutofill}
-          disabled={autofilling}
+          disabled={autofilling || (!aiSeed.trim() && !title.trim() && images.length === 0)}
           startIcon={autofilling ? <CircularProgress size={16} color="inherit" /> : <AutoAwesomeIcon />}
           sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}
         >
-          {autofilling ? t('aiStartRunning') : title.trim() ? t('aiStartRegenerate') : t('aiStartButton')}
+          {autofilling
+            ? t('aiStartRunning')
+            : title.trim()
+              ? t('aiStartRegenerate')
+              : !aiSeed.trim() && images.length > 0
+                ? t('aiStartFromPhoto')
+                : t('aiStartButton')}
         </Button>
       </Box>
 
@@ -1594,6 +1758,46 @@ export default function ListingCreatorDialog({
               {t('aiSuggestPriceBtn')}
             </Button>
 
+            {/* What the price is based on — comparable listings and what they sold */}
+            {comparableListings.length > 0 && (
+              <Box>
+                <Typography variant="caption" fontWeight={700} color="text.secondary">
+                  {t('priceComparablesTitle')}
+                </Typography>
+                <Box sx={{ mt: 0.5, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                  {comparableListings.map((p: any, i: number) => (
+                    <Box
+                      key={i}
+                      sx={{ display: 'flex', alignItems: 'baseline', gap: 1, fontSize: '0.8rem' }}
+                    >
+                      <Typography variant="caption" sx={{ flex: 1 }} noWrap>
+                        {p.title}
+                      </Typography>
+                      <Typography variant="caption" fontWeight={700} sx={{ whiteSpace: 'nowrap' }}>
+                        {p.price} {currency}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        color={p.soldQuantity > 0 ? 'success.main' : 'text.disabled'}
+                        sx={{ whiteSpace: 'nowrap', minWidth: 70, textAlign: 'right' }}
+                      >
+                        {t('priceComparableSold', { count: p.soldQuantity || 0 })}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+                {marketResearch?.priceRange && (
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                    {t('priceComparableRange', {
+                      min: Number(marketResearch.priceRange.min ?? 0).toFixed(0),
+                      max: Number(marketResearch.priceRange.max ?? 0).toFixed(0),
+                      currency,
+                    })}
+                  </Typography>
+                )}
+              </Box>
+            )}
+
             <Divider />
 
             <ConditionSelector
@@ -1697,152 +1901,339 @@ export default function ListingCreatorDialog({
           </Box>
 
           {/* Variations */}
-          <Box sx={sectionSx}>
+          <Box ref={variationsRef} sx={sectionSx}>
             {renderSectionHeading(t('sectionVariations'), t('variationsHint'))}
-            <Button
-              variant={hasVariations ? 'contained' : 'outlined'}
-              size="small"
-              sx={{ alignSelf: 'flex-start' }}
-              onClick={() => {
-                setHasVariations(!hasVariations);
-                if (hasVariations) {
-                  setVariationAspects([]);
-                  setVariationRows([]);
-                }
-              }}
-            >
-              {hasVariations ? t('variationsActive') : t('addVariations')}
-            </Button>
 
-            <Collapse in={hasVariations}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {variationAspects.map((aspect, idx) => (
-                  <Box key={idx} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                    <TextField
-                      label={t('variationAspectName')}
-                      value={aspect.name}
-                      onChange={(e) => {
-                        const updated = [...variationAspects];
-                        updated[idx] = { ...updated[idx], name: e.target.value };
-                        setVariationAspects(updated);
-                      }}
-                      size="small"
-                      sx={{ width: 150 }}
-                      placeholder={t('variationAspectNamePlaceholder')}
-                    />
-                    <TextField
-                      label={t('variationAspectValues')}
-                      value={aspect.values.join(', ')}
-                      onChange={(e) => {
-                        const updated = [...variationAspects];
-                        updated[idx] = {
-                          ...updated[idx],
-                          values: e.target.value.split(',').map((v) => v.trim()).filter(Boolean),
-                        };
-                        setVariationAspects(updated);
-                      }}
-                      size="small"
-                      sx={{ flex: 1 }}
-                      placeholder={t('variationAspectValuesPlaceholder')}
-                      onBlur={() => generateVariationRows(variationAspects)}
-                    />
-                    <Button
-                      size="small"
-                      color="error"
-                      onClick={() => {
-                        const updated = variationAspects.filter((_, i) => i !== idx);
-                        setVariationAspects(updated);
-                        generateVariationRows(updated);
-                      }}
-                      sx={{ minWidth: 36 }}
-                    >
-                      ✕
-                    </Button>
-                  </Box>
-                ))}
-
+            {!selectedCategory ? (
+              <Alert severity="info" sx={{ py: 0.5 }}>{t('variationsNeedCategory')}</Alert>
+            ) : variationCapableAspects.length === 0 ? (
+              <Alert severity="info" sx={{ py: 0.5 }}>{t('variationsUnsupportedCategory')}</Alert>
+            ) : (
+              <>
                 <Button
+                  variant={hasVariations ? 'contained' : 'outlined'}
                   size="small"
-                  variant="outlined"
                   sx={{ alignSelf: 'flex-start' }}
-                  onClick={() => setVariationAspects([...variationAspects, { name: '', values: [] }])}
+                  onClick={() => {
+                    const next = !hasVariations;
+                    setHasVariations(next);
+                    if (!next) {
+                      setVariationAspects([]);
+                      setVariationRows([]);
+                      setImageVaryingAspect('');
+                      setVariationImages({});
+                    }
+                  }}
                 >
-                  {t('addAspect')}
+                  {hasVariations ? t('variationsActive') : t('addVariations')}
                 </Button>
 
-                {variationRows.length > 0 && (
-                  <Box
-                    sx={{
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      borderRadius: 1,
-                      overflow: 'auto',
-                      maxHeight: 320,
-                      WebkitOverflowScrolling: 'touch',
-                    }}
-                  >
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                      <thead>
-                        <tr style={{ background: theme.palette.action.hover }}>
-                          {variationAspects.filter((a) => a.name).map((a) => (
-                            <th key={a.name} style={{ padding: '6px 8px', textAlign: 'left' }}>{a.name}</th>
-                          ))}
-                          <th style={{ padding: '6px 8px', textAlign: 'left' }}>SKU</th>
-                          <th style={{ padding: '6px 8px', textAlign: 'left' }}>{t('variationTablePrice')}</th>
-                          <th style={{ padding: '6px 8px', textAlign: 'left' }}>{t('variationTableStock')}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {variationRows.map((row, idx) => (
-                          <tr key={idx}>
-                            {variationAspects.filter((a) => a.name).map((a) => (
-                              <td key={a.name} style={{ padding: '4px 8px' }}>{row.combination[a.name]}</td>
-                            ))}
-                            <td style={{ padding: '4px 8px' }}>
-                              <input
-                                value={row.sku}
-                                onChange={(e) => {
-                                  const updated = [...variationRows];
-                                  updated[idx] = { ...updated[idx], sku: e.target.value };
-                                  setVariationRows(updated);
-                                }}
-                                style={{ width: '100%', padding: '3px 6px', border: '1px solid #ccc', borderRadius: 3, fontSize: '0.8rem' }}
-                              />
-                            </td>
-                            <td style={{ padding: '4px 8px' }}>
-                              <input
-                                type="number"
-                                value={row.price}
-                                onChange={(e) => {
-                                  const updated = [...variationRows];
-                                  updated[idx] = { ...updated[idx], price: e.target.value };
-                                  setVariationRows(updated);
-                                }}
-                                style={{ width: 80, padding: '3px 6px', border: '1px solid #ccc', borderRadius: 3, fontSize: '0.8rem' }}
-                              />
-                            </td>
-                            <td style={{ padding: '4px 8px' }}>
-                              <input
-                                type="number"
-                                value={row.quantity}
-                                onChange={(e) => {
-                                  const updated = [...variationRows];
-                                  updated[idx] = { ...updated[idx], quantity: e.target.value };
-                                  setVariationRows(updated);
-                                }}
-                                style={{ width: 60, padding: '3px 6px', border: '1px solid #ccc', borderRadius: 3, fontSize: '0.8rem' }}
-                              />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </Box>
-                )}
+                <Collapse in={hasVariations}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {variationAspects.map((aspect, idx) => {
+                      const meta = variationCapableAspects.find(
+                        (a) => a.localizedAspectName === aspect.name
+                      );
+                      const allowed =
+                        meta?.aspectConstraint.aspectValues?.map((v) => v.localizedValue) || [];
+                      const selectionOnly = meta?.aspectConstraint.aspectMode === 'SELECTION_ONLY';
 
-                <Typography variant="caption" color="text.secondary">{t('variationNote')}</Typography>
-              </Box>
-            </Collapse>
+                      return (
+                        <Box
+                          key={idx}
+                          sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', flexWrap: 'wrap' }}
+                        >
+                          {/* Only aspects eBay allows as a variation axis for this category */}
+                          <FormControl size="small" sx={{ width: 170 }}>
+                            <InputLabel>{t('variationAspectName')}</InputLabel>
+                            <Select
+                              value={aspect.name}
+                              label={t('variationAspectName')}
+                              onChange={(e: SelectChangeEvent) => {
+                                const updated = [...variationAspects];
+                                updated[idx] = { name: e.target.value, values: [] };
+                                setVariationAspects(updated);
+                                generateVariationRows(updated);
+                              }}
+                              MenuProps={{ sx: { zIndex: 1600 } }}
+                            >
+                              {variationCapableAspects
+                                .filter(
+                                  (a) =>
+                                    a.localizedAspectName === aspect.name ||
+                                    !variationAspects.some(
+                                      (v) => v.name === a.localizedAspectName
+                                    )
+                                )
+                                .map((a) => (
+                                  <MenuItem key={a.localizedAspectName} value={a.localizedAspectName}>
+                                    {a.localizedAspectName}
+                                  </MenuItem>
+                                ))}
+                            </Select>
+                          </FormControl>
+
+                          <Autocomplete
+                            multiple
+                            freeSolo={!selectionOnly}
+                            options={allowed}
+                            value={aspect.values}
+                            onChange={(_, value) => {
+                              const updated = [...variationAspects];
+                              updated[idx] = { ...updated[idx], values: value as string[] };
+                              setVariationAspects(updated);
+                              generateVariationRows(updated);
+                            }}
+                            renderInput={(params) => (
+                              <TextField
+                                {...params}
+                                label={t('variationAspectValues')}
+                                size="small"
+                                placeholder={
+                                  allowed.length
+                                    ? t('variationPickValues')
+                                    : t('variationTypeValues')
+                                }
+                              />
+                            )}
+                            size="small"
+                            sx={{ flex: 1, minWidth: 240 }}
+                            slotProps={{ popper: { style: { zIndex: 1600 } } }}
+                            disabled={!aspect.name}
+                          />
+
+                          <Button
+                            size="small"
+                            onClick={() => suggestVariationValues(idx)}
+                            disabled={!aspect.name || !!aiLoading || !title.trim()}
+                            startIcon={
+                              aiLoading === `varvalues-${idx}` ? (
+                                <CircularProgress size={14} />
+                              ) : (
+                                <AutoFixHighIcon sx={{ fontSize: 16 }} />
+                              )
+                            }
+                            sx={{ whiteSpace: 'nowrap' }}
+                          >
+                            {t('variationSuggestValues')}
+                          </Button>
+
+                          <Button
+                            size="small"
+                            color="error"
+                            onClick={() => {
+                              const updated = variationAspects.filter((_, i) => i !== idx);
+                              setVariationAspects(updated);
+                              if (imageVaryingAspect === aspect.name) {
+                                setImageVaryingAspect('');
+                                setVariationImages({});
+                              }
+                              generateVariationRows(updated);
+                            }}
+                            sx={{ minWidth: 36 }}
+                          >
+                            ✕
+                          </Button>
+                        </Box>
+                      );
+                    })}
+
+                    {variationAspects.length < 2 && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        sx={{ alignSelf: 'flex-start' }}
+                        onClick={() =>
+                          setVariationAspects([...variationAspects, { name: '', values: [] }])
+                        }
+                      >
+                        {t('addAspect')}
+                      </Button>
+                    )}
+
+                    {/* Per-value photos — eBay shows these when a buyer picks a value */}
+                    {definedVariationAspects.length > 0 && (
+                      <>
+                        <Divider />
+                        <FormControl size="small" sx={{ maxWidth: 320 }}>
+                          <InputLabel>{t('variationImageAspect')}</InputLabel>
+                          <Select
+                            value={imageVaryingAspect}
+                            label={t('variationImageAspect')}
+                            onChange={(e: SelectChangeEvent) => {
+                              setImageVaryingAspect(e.target.value);
+                              setVariationImages({});
+                            }}
+                            MenuProps={{ sx: { zIndex: 1600 } }}
+                          >
+                            <MenuItem value="">{t('variationImageAspectNone')}</MenuItem>
+                            {definedVariationAspects.map((a) => (
+                              <MenuItem key={a.name} value={a.name}>{a.name}</MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+
+                        {imageVaryingAspect && (
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            <Typography variant="caption" color="text.secondary">
+                              {t('variationImageHint')}
+                            </Typography>
+                            {(variationAspects.find((a) => a.name === imageVaryingAspect)?.values || []).map(
+                              (value) => (
+                                <Box
+                                  key={value}
+                                  sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}
+                                >
+                                  <Typography variant="body2" sx={{ width: 120 }} noWrap>
+                                    {value}
+                                  </Typography>
+                                  <Select
+                                    size="small"
+                                    displayEmpty
+                                    value={variationImages[value] || ''}
+                                    onChange={(e: SelectChangeEvent) =>
+                                      setVariationImages((prev) => ({
+                                        ...prev,
+                                        [value]: e.target.value,
+                                      }))
+                                    }
+                                    sx={{ flex: 1, maxWidth: 420 }}
+                                    MenuProps={{ sx: { zIndex: 1600 } }}
+                                    renderValue={(v) =>
+                                      v ? (
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                          <Box
+                                            component="img"
+                                            src={v as string}
+                                            alt={value}
+                                            sx={{ width: 24, height: 24, objectFit: 'cover', borderRadius: 0.5 }}
+                                          />
+                                          <Typography variant="caption">
+                                            {t('variationImageSelected', {
+                                              index: images.indexOf(v as string) + 1,
+                                            })}
+                                          </Typography>
+                                        </Box>
+                                      ) : (
+                                        <Typography variant="caption" color="text.secondary">
+                                          {t('variationImagePick')}
+                                        </Typography>
+                                      )
+                                    }
+                                  >
+                                    <MenuItem value="">{t('variationImagePick')}</MenuItem>
+                                    {images.map((img, i) => (
+                                      <MenuItem key={img} value={img}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                          <Box
+                                            component="img"
+                                            src={img}
+                                            alt=""
+                                            sx={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 0.5 }}
+                                          />
+                                          {t('variationImageSelected', { index: i + 1 })}
+                                        </Box>
+                                      </MenuItem>
+                                    ))}
+                                  </Select>
+                                </Box>
+                              )
+                            )}
+                          </Box>
+                        )}
+                      </>
+                    )}
+
+                    {/* Generated combinations */}
+                    {variationRows.length > 0 && (
+                      <>
+                        <Divider />
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+                            {t('variationRowCount', { count: variationRows.length })}
+                          </Typography>
+                          <Button size="small" onClick={applyPriceToAllVariations}>
+                            {t('variationApplyPrice')}
+                          </Button>
+                          <Button size="small" onClick={applyStockToAllVariations}>
+                            {t('variationApplyStock')}
+                          </Button>
+                        </Box>
+                        <Box
+                          sx={{
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            borderRadius: 1,
+                            overflow: 'auto',
+                            maxHeight: 320,
+                            WebkitOverflowScrolling: 'touch',
+                          }}
+                        >
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                            <thead>
+                              <tr style={{ background: theme.palette.action.hover }}>
+                                {definedVariationAspects.map((a) => (
+                                  <th key={a.name} style={{ padding: '6px 8px', textAlign: 'left' }}>{a.name}</th>
+                                ))}
+                                <th style={{ padding: '6px 8px', textAlign: 'left' }}>SKU</th>
+                                <th style={{ padding: '6px 8px', textAlign: 'left' }}>{t('variationTablePrice')}</th>
+                                <th style={{ padding: '6px 8px', textAlign: 'left' }}>{t('variationTableStock')}</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {variationRows.map((row, idx) => (
+                                <tr key={idx}>
+                                  {definedVariationAspects.map((a) => (
+                                    <td key={a.name} style={{ padding: '4px 8px' }}>{row.combination[a.name]}</td>
+                                  ))}
+                                  <td style={{ padding: '4px 8px' }}>
+                                    <input
+                                      value={row.sku}
+                                      onChange={(e) => {
+                                        const updated = [...variationRows];
+                                        updated[idx] = { ...updated[idx], sku: e.target.value };
+                                        setVariationRows(updated);
+                                      }}
+                                      style={{ width: '100%', minWidth: 130, padding: '3px 6px', border: '1px solid #ccc', borderRadius: 3, fontSize: '0.8rem' }}
+                                    />
+                                  </td>
+                                  <td style={{ padding: '4px 8px' }}>
+                                    <input
+                                      type="number"
+                                      value={row.price}
+                                      onChange={(e) => {
+                                        const updated = [...variationRows];
+                                        updated[idx] = { ...updated[idx], price: e.target.value };
+                                        setVariationRows(updated);
+                                      }}
+                                      style={{ width: 80, padding: '3px 6px', border: '1px solid #ccc', borderRadius: 3, fontSize: '0.8rem' }}
+                                    />
+                                  </td>
+                                  <td style={{ padding: '4px 8px' }}>
+                                    <input
+                                      type="number"
+                                      value={row.quantity}
+                                      onChange={(e) => {
+                                        const updated = [...variationRows];
+                                        updated[idx] = { ...updated[idx], quantity: e.target.value };
+                                        setVariationRows(updated);
+                                      }}
+                                      style={{ width: 60, padding: '3px 6px', border: '1px solid #ccc', borderRadius: 3, fontSize: '0.8rem' }}
+                                    />
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </Box>
+                      </>
+                    )}
+
+                    <Typography variant="caption" color="text.secondary">{t('variationNote')}</Typography>
+                  </Box>
+                </Collapse>
+              </>
+            )}
           </Box>
 
           {/* Sidebar content inline on mobile */}

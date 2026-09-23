@@ -131,6 +131,12 @@ const theme = createTheme({
         },
         contained: {
           background: `linear-gradient(135deg, ${brandBlue} 0%, ${brandIndigo} 100%)`,
+          '&.Mui-disabled': {
+            background: '#e2e8f0',
+            color: '#94a3b8',
+            boxShadow: 'none',
+            transform: 'none',
+          },
           '&:hover': {
             background: `linear-gradient(135deg, #1d4ed8 0%, #4338ca 100%)`,
             transform: 'translateY(-1px)',
@@ -139,6 +145,12 @@ const theme = createTheme({
         },
         containedError: {
           background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+          '&.Mui-disabled': {
+            background: '#e2e8f0',
+            color: '#94a3b8',
+            boxShadow: 'none',
+            transform: 'none',
+          },
           '&:hover': {
             background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
             boxShadow: '0 4px 14px rgba(239, 68, 68, 0.3)',
@@ -146,6 +158,12 @@ const theme = createTheme({
         },
         containedSuccess: {
           background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+          '&.Mui-disabled': {
+            background: '#e2e8f0',
+            color: '#94a3b8',
+            boxShadow: 'none',
+            transform: 'none',
+          },
           '&:hover': {
             background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
             boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
@@ -154,6 +172,10 @@ const theme = createTheme({
         outlined: {
           borderColor: '#e2e8f0',
           color: '#334155',
+          '&.Mui-disabled': {
+            borderColor: '#f1f5f9',
+            color: '#cbd5e1',
+          },
           '&:hover': {
             backgroundColor: '#f8fafc',
             borderColor: '#cbd5e1',

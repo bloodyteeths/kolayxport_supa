@@ -473,6 +473,72 @@ ${currentAspects && Object.keys(currentAspects).length > 0 ? `Current values: ${
 }
 
 // ---------------------------------------------------------------------------
+// 8. Suggest values for a variation axis
+// ---------------------------------------------------------------------------
+
+/**
+ * Deliberately separate from `suggest_aspects`: that prompt insists on exactly
+ * ONE value per aspect (right for item specifics), which is the opposite of what
+ * a variation axis needs — there we want the whole set the seller stocks.
+ */
+interface SuggestVariationValuesInput {
+  title: string;
+  aspectName: string;
+  categoryName?: string;
+  /** eBay's own vocabulary for this aspect, when the category defines one. */
+  allowedValues?: string[];
+  marketResearch?: MarketResearch;
+}
+
+interface SuggestVariationValuesOutput {
+  values: string[];
+}
+
+async function handleSuggestVariationValues(
+  body: SuggestVariationValuesInput
+): Promise<SuggestVariationValuesOutput> {
+  const { title, aspectName, categoryName, allowedValues, marketResearch } = body;
+  if (!title) throw new InputError('title is required');
+  if (!aspectName) throw new InputError('aspectName is required');
+
+  const marketContext = marketResearch ? formatMarketContext(marketResearch) : '';
+  const hasVocab = Array.isArray(allowedValues) && allowedValues.length > 0;
+
+  const systemPrompt = `You help an eBay seller set up a multi-variation listing.
+
+Given a product and ONE variation option (for example Size, Color, or Style), list the values a
+seller of this product would realistically offer as separate variations.
+
+Rules:
+- Return MULTIPLE values — this is a variation axis, not a single item specific. 2-12 values.
+- Order them the way a shopper expects: sizes smallest to largest (XS, S, M, L, XL, 2XL),
+  everything else most-popular first.
+- Use the normal retail vocabulary for the category and keep values in English.
+- Values must be distinct, short, and free of explanations.
+${hasVocab ? '- You MUST choose only from the ALLOWED VALUES listed below. Never invent one.' : '- There is no fixed list, so use standard values for this category.'}
+- If the option genuinely cannot vary for this product, return an empty array.
+
+${hasVocab ? `ALLOWED VALUES: ${allowedValues!.slice(0, 120).join(', ')}` : ''}
+
+${marketContext}
+
+Respond with ONLY valid JSON: { "values": ["...", "..."] }`;
+
+  const userMsg = `Product: "${title}"${categoryName ? ` | Category: ${categoryName}` : ''}
+Variation option to fill: ${aspectName}`;
+
+  const result = await askClaude<SuggestVariationValuesOutput>(systemPrompt, userMsg, 512);
+  const values = Array.isArray(result?.values) ? result.values : [];
+  return {
+    values: values
+      .map((v) => String(v).trim())
+      .filter(Boolean)
+      .filter((v, i, arr) => arr.indexOf(v) === i)
+      .slice(0, 12),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Vision helper — reads an image the seller already uploaded to our own storage
 // ---------------------------------------------------------------------------
 
@@ -637,6 +703,7 @@ export default async function handler(
         'bulk_optimize_titles',
         'suggest_aspects',
         'identify_product',
+        'suggest_variation_values',
       ],
     });
   }
@@ -673,6 +740,10 @@ export default async function handler(
         result = await handleIdentifyProduct(req.body);
         break;
 
+      case 'suggest_variation_values':
+        result = await handleSuggestVariationValues(req.body);
+        break;
+
       default:
         return res.status(400).json({
           error: `Unknown action: ${action}`,
@@ -684,6 +755,7 @@ export default async function handler(
             'bulk_optimize_titles',
             'suggest_aspects',
             'identify_product',
+            'suggest_variation_values',
           ],
         });
     }

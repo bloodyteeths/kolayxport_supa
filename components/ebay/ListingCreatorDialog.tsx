@@ -851,18 +851,20 @@ export default function ListingCreatorDialog({
 
     setAiLoading(`varvalues-${idx}`);
     try {
-      const data = await callAI('suggest_aspects', {
+      const data = await callAI('suggest_variation_values', {
         title: title.trim(),
-        aspectNames: [aspect.name],
+        aspectName: aspect.name,
         categoryName: selectedCategory?.name,
+        allowedValues: allowed.length ? allowed : undefined,
         marketResearch,
-        // Hint the model toward eBay's own vocabulary where one exists.
-        currentAspects: allowed.length ? { [`${aspect.name} (allowed)`]: allowed.slice(0, 40) } : undefined,
       });
-      let values: string[] = data?.aspects?.[aspect.name] || [];
+      let values: string[] = Array.isArray(data?.values) ? data.values : [];
       if (allowed.length) {
+        // Snap to eBay's own casing and drop anything it wouldn't accept.
         const lower = new Map(allowed.map((v) => [v.toLowerCase(), v]));
-        values = values.map((v) => lower.get(String(v).toLowerCase()) || v).filter((v) => lower.has(String(v).toLowerCase()));
+        values = values
+          .map((v) => lower.get(String(v).toLowerCase()) || v)
+          .filter((v) => lower.has(String(v).toLowerCase()));
       }
       if (values.length > 0) {
         const updated = [...variationAspects];

@@ -174,7 +174,10 @@ export default function ListingCreatorDialog({
 }: ListingCreatorDialogProps) {
   const t = useTranslations('ebay.listing');
   const theme = useTheme();
+  /** Below md the studio stacks to one column; the app rail is still present. */
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  /** Only on a phone does AppLayout hide its sidebar, so only there go full screen. */
+  const isPhone = useMediaQuery(theme.breakpoints.down('sm'));
 
   const [creating, setCreating] = useState(false);
   /** Errors stay on screen until dismissed — a toast disappears before it can be read. */
@@ -1522,7 +1525,22 @@ export default function ListingCreatorDialog({
   // Render
   // --------------------------------------------------
   return (
-    <Dialog open={open} onClose={handleClose} fullScreen>
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      // Full screen only on mobile. On desktop a full-screen dialog painted over
+      // the fixed app sidebar, so the seller lost the navigation entirely.
+      fullScreen={isPhone}
+      maxWidth="xl"
+      fullWidth
+      PaperProps={{
+        sx: {
+          height: isPhone ? '100%' : 'min(92vh, 1000px)',
+          maxHeight: isPhone ? '100%' : 'min(92vh, 1000px)',
+          m: isPhone ? 0 : 2,
+        },
+      }}
+    >
       {/* Header */}
       <Box
         sx={{

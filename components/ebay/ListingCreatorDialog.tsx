@@ -1531,12 +1531,14 @@ export default function ListingCreatorDialog({
       // Full screen only on mobile. On desktop a full-screen dialog painted over
       // the fixed app sidebar, so the seller lost the navigation entirely.
       fullScreen={isPhone}
-      maxWidth="xl"
+      // Matches the Etsy creator: a focused dialog with the app frame still
+      // visible around it, rather than something that reads as a takeover.
+      maxWidth="lg"
       fullWidth
       PaperProps={{
         sx: {
-          height: isPhone ? '100%' : 'min(92vh, 1000px)',
-          maxHeight: isPhone ? '100%' : 'min(92vh, 1000px)',
+          height: isPhone ? '100%' : 'min(88vh, 900px)',
+          maxHeight: isPhone ? '100%' : 'min(88vh, 900px)',
           m: isPhone ? 0 : 2,
         },
       }}

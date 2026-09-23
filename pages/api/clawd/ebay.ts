@@ -915,7 +915,17 @@ export default async function handler(
         } catch { /* offer already deleted */ }
       }
 
-      // Step 3: Delete the inventory item
+      // Step 3: Note any variation group this SKU belongs to, before it's gone
+      let groupIds: string[] = [];
+      try {
+        const item = await callEbayAPI(
+          `/sell/inventory/v1/inventory_item/${encodedSku}`,
+          accessToken, {}, marketplaceId
+        );
+        groupIds = Array.isArray(item?.groupIds) ? item.groupIds : [];
+      } catch { /* inventory item may not exist */ }
+
+      // Step 4: Delete the inventory item
       try {
         await callEbayAPI(
           `/sell/inventory/v1/inventory_item/${encodedSku}`,
@@ -925,9 +935,45 @@ export default async function handler(
         );
       } catch { /* inventory item may not exist */ }
 
+      // Step 5: Drop the variation group once its last variant is gone. Left
+      // behind it would hold the base SKU hostage and silently accumulate.
+      const removedGroups: string[] = [];
+      for (const groupId of groupIds) {
+        try {
+          const group = await callEbayAPI(
+            `/sell/inventory/v1/inventory_item_group/${encodeURIComponent(groupId)}`,
+            accessToken, {}, marketplaceId
+          );
+          const siblings: string[] = (group?.variantSKUs || []).filter((s: string) => s !== sku);
+
+          let anyAlive = false;
+          for (const sibling of siblings) {
+            try {
+              await callEbayAPI(
+                `/sell/inventory/v1/inventory_item/${encodeURIComponent(sibling)}`,
+                accessToken, {}, marketplaceId
+              );
+              anyAlive = true;
+              break;
+            } catch { /* this sibling is already deleted */ }
+          }
+
+          if (!anyAlive) {
+            await callEbayAPI(
+              `/sell/inventory/v1/inventory_item_group/${encodeURIComponent(groupId)}`,
+              accessToken,
+              { method: 'DELETE' },
+              marketplaceId
+            );
+            removedGroups.push(groupId);
+          }
+        } catch { /* group already gone */ }
+      }
+
       return res.status(200).json({
         success: true,
         sku,
+        removedGroups,
         message: 'Listing deleted.',
       });
     }

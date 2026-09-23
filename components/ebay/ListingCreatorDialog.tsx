@@ -228,6 +228,8 @@ export default function ListingCreatorDialog({
   const [variationImages, setVariationImages] = useState<VariationImageMap>({});
 
   const [draftRestored, setDraftRestored] = useState(false);
+  /** Bumped by resetForm so the policy defaults re-apply after "Start over". */
+  const [formEpoch, setFormEpoch] = useState(0);
 
   const categorySearchTimeout = useRef<NodeJS.Timeout | null>(null);
   const marketResearchFetched = useRef(false);
@@ -278,6 +280,7 @@ export default function ListingCreatorDialog({
     setFormError(null);
     setShowMarketInsights(false);
     setDraftRestored(false);
+    setFormEpoch((n) => n + 1);
     marketResearchFetched.current = false;
   }, []);
 
@@ -386,7 +389,7 @@ export default function ListingCreatorDialog({
     pick(fulfillmentPolicies, last.fulfillment, fulfillmentPolicyId, setFulfillmentPolicyId);
     pick(returnPolicies, last.return, returnPolicyId, setReturnPolicyId);
     pick(paymentPolicies, last.payment, paymentPolicyId, setPaymentPolicyId);
-  }, [open, fulfillmentPolicies, returnPolicies, paymentPolicies]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, formEpoch, fulfillmentPolicies, returnPolicies, paymentPolicies]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch store categories when dialog opens
   useEffect(() => {

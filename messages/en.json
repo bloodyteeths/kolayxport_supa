@@ -4709,7 +4709,7 @@
       "variationsHint": "Add variations like Size, Color",
       "variationAspectName": "Aspect Name",
       "variationAspectNamePlaceholder": "e.g. Size",
-      "variationAspectValues": "Values (comma-separated)",
+      "variationAspectValues": "Values",
       "variationAspectValuesPlaceholder": "e.g. S, M, L, XL",
       "addAspect": "+ Add Aspect",
       "variationTablePrice": "Price",

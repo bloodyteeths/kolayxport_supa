@@ -4850,7 +4850,7 @@
       "variationsHint": "Boyut, Renk gibi varyasyonlar ekleyin",
       "variationAspectName": "Özellik Adı",
       "variationAspectNamePlaceholder": "Örn: Boyut",
-      "variationAspectValues": "Değerler (virgülle ayırın)",
+      "variationAspectValues": "Değerler",
       "variationAspectValuesPlaceholder": "Örn: S, M, L, XL",
       "addAspect": "+ Özellik Ekle",
       "variationTablePrice": "Fiyat",

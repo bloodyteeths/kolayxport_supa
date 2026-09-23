@@ -941,13 +941,16 @@ export default function ListingCreatorDialog({
   // --------------------------------------------------
   // Readiness
   // --------------------------------------------------
-  const missingRequiredAspects = useMemo(
-    () =>
-      requiredAspects
-        .map((a) => a.localizedAspectName)
-        .filter((name) => !aspects[name]?.length),
-    [requiredAspects, aspects]
-  );
+  const missingRequiredAspects = useMemo(() => {
+    // An aspect used as a variation axis is carried by each variant, not by the
+    // group, so requiring it here would block every variation listing.
+    const axisNames = hasVariations
+      ? new Set(variationAspects.filter((a) => a.name).map((a) => a.name))
+      : new Set<string>();
+    return requiredAspects
+      .map((a) => a.localizedAspectName)
+      .filter((name) => !axisNames.has(name) && !aspects[name]?.length);
+  }, [requiredAspects, aspects, hasVariations, variationAspects]);
 
   const checklist = useMemo(
     () => [

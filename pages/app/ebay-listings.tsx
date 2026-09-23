@@ -31,9 +31,11 @@ import {
   ListItemIcon,
   ListSubheader,
   Divider,
+  InputLabel,
   useMediaQuery,
   useTheme,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import {
   DataGrid,
   GridColDef,
@@ -65,6 +67,10 @@ import {
   Psychology as PsychologyIcon,
   Add as AddIcon,
   Sync as SyncIcon,
+  Inventory2 as Inventory2Icon,
+  CheckCircle as CheckCircleIcon,
+  EditNote as EditNoteIcon,
+  RemoveShoppingCart as RemoveShoppingCartIcon,
 } from '@mui/icons-material';
 import { toast, Toaster } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
@@ -1237,6 +1243,70 @@ function EbayListingsPage() {
   }, []);
 
   // --- Paginated listings for mobile ---
+  // Stat cards double as filter shortcuts — clicking one narrows the table.
+  const filtersActive =
+    statusFilter !== 'all' || conditionFilter !== 'all' || healthFilter !== '' || searchTerm !== '';
+
+  const clearFilters = useCallback(() => {
+    setStatusFilter('all');
+    setConditionFilter('all');
+    setHealthFilter('');
+    setSearchTerm('');
+  }, []);
+
+  const statCards = useMemo(
+    () => [
+      {
+        id: 'total',
+        label: t('totalListings'),
+        value: totalCount,
+        color: theme.palette.primary.main,
+        icon: <Inventory2Icon sx={{ fontSize: 16 }} />,
+        isActive: !filtersActive,
+        onClick: clearFilters,
+      },
+      {
+        id: 'published',
+        label: t('published'),
+        value: publishedCount,
+        color: theme.palette.success.main,
+        icon: <CheckCircleIcon sx={{ fontSize: 16 }} />,
+        isActive: statusFilter === 'PUBLISHED',
+        onClick: () => { setHealthFilter(''); setStatusFilter('PUBLISHED'); },
+      },
+      {
+        id: 'draft',
+        label: t('draft'),
+        value: unpublishedCount,
+        color: theme.palette.warning.main,
+        icon: <EditNoteIcon sx={{ fontSize: 16 }} />,
+        isActive: statusFilter === 'UNPUBLISHED',
+        onClick: () => { setHealthFilter(''); setStatusFilter('UNPUBLISHED'); },
+      },
+      {
+        id: 'outOfStock',
+        label: t('outOfStock'),
+        value: outOfStock,
+        color: theme.palette.error.main,
+        icon: <RemoveShoppingCartIcon sx={{ fontSize: 16 }} />,
+        isActive: healthFilter === 'no_stock',
+        onClick: () => { setStatusFilter('all'); setHealthFilter('no_stock'); },
+      },
+      {
+        id: 'needsAttention',
+        label: t('needsAttention'),
+        value: needsAttention,
+        color: theme.palette.warning.dark,
+        icon: <ErrorOutlineIcon sx={{ fontSize: 16 }} />,
+        isActive: healthFilter === 'issues',
+        onClick: () => { setStatusFilter('all'); setHealthFilter('issues'); },
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [totalCount, publishedCount, unpublishedCount, outOfStock, needsAttention,
+     statusFilter, healthFilter, filtersActive, clearFilters, theme]
+  );
+
   const paginatedMobileListings = useMemo(() => {
     const start = paginationModel.page * paginationModel.pageSize;
     return filteredListings.slice(start, start + paginationModel.pageSize);
@@ -1246,63 +1316,136 @@ function EbayListingsPage() {
     <Box sx={{ p: { xs: 0.5, sm: 1, md: 1.5 }, maxWidth: 1600, mx: 'auto', width: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
       <Toaster position="top-right" />
 
-      {/* Statistics Bar */}
-      <Box sx={{ display: 'flex', gap: { xs: 1, sm: 2 }, mb: 2, flexWrap: 'wrap', overflow: 'hidden', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
-        <Paper sx={{ p: 1.5, flex: 1, minWidth: { xs: '45%', sm: 120 } }}>
-          <Typography variant="caption" color="text.secondary">
-            {t('totalListings')}
+      {/* ---------------------------------------------------------------
+          Page header — identity, sync state and the primary action in one row
+         --------------------------------------------------------------- */}
+      <Box
+        sx={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: 1.5,
+          mb: 2.5,
+        }}
+      >
+        <Box sx={{ flex: 1, minWidth: 220 }}>
+          <Typography variant="h4" fontWeight={700} sx={{ letterSpacing: '-0.02em' }}>
+            {t('pageTitle')}
           </Typography>
-          <Typography variant="h6" fontWeight={700}>
-            {totalCount}
+          <Typography variant="body2" color="text.secondary">
+            {t('pageSubtitle', { count: totalCount })}
+            {lastSyncAt
+              ? ` · ${t('lastSync')}: ${new Date(lastSyncAt).toLocaleString()}`
+              : ` · ${t('neverSynced')}`}
           </Typography>
-        </Paper>
-        <Paper sx={{ p: 1.5, flex: 1, minWidth: { xs: '45%', sm: 120 } }}>
-          <Typography variant="caption" color="text.secondary">
-            {t('published')}
-          </Typography>
-          <Typography variant="h6" fontWeight={700} color="success.main">
-            {publishedCount}
-          </Typography>
-        </Paper>
-        <Paper sx={{ p: 1.5, flex: 1, minWidth: { xs: '45%', sm: 120 } }}>
-          <Typography variant="caption" color="text.secondary">
-            {t('draft')}
-          </Typography>
-          <Typography variant="h6" fontWeight={700} color="warning.main">
-            {unpublishedCount}
-          </Typography>
-        </Paper>
-        <Paper sx={{ p: 1.5, flex: 1, minWidth: { xs: '45%', sm: 120 } }}>
-          <Typography variant="caption" color="text.secondary">
-            {t('outOfStock')}
-          </Typography>
-          <Typography variant="h6" fontWeight={700} color="error">
-            {outOfStock}
-          </Typography>
-        </Paper>
-        <Paper sx={{ p: 1.5, flex: 1, minWidth: { xs: '45%', sm: 120 }, borderLeft: '3px solid #ff9800' }}>
-          <Typography variant="caption" color="text.secondary">
-            {t('needsAttention')}
-          </Typography>
-          <Typography variant="h6" fontWeight={700} sx={{ color: '#ff9800' }}>
-            {needsAttention}
-          </Typography>
-        </Paper>
+        </Box>
+
+        <Button
+          variant="outlined"
+          onClick={syncFromEbay}
+          disabled={syncing || loading}
+          startIcon={syncing ? <CircularProgress size={16} /> : <SyncIcon />}
+          sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}
+        >
+          {syncing ? t('syncing') : t('syncFromEbay')}
+        </Button>
+
+        <Button
+          variant="outlined"
+          startIcon={<DownloadIcon />}
+          onClick={handleExportCSV}
+          sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}
+        >
+          {t('csvDownload')}
+        </Button>
+
+        <Button
+          variant="outlined"
+          onClick={(e) => setMoreMenuAnchor(e.currentTarget)}
+          startIcon={<BuildIcon />}
+          endIcon={<ExpandMoreIcon />}
+          sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}
+        >
+          {t('tools')}
+        </Button>
+
+        <Button
+          variant="contained"
+          color="success"
+          onClick={() => setCreatorOpen(true)}
+          startIcon={<AddIcon />}
+          sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}
+        >
+          {t('newListing')}
+        </Button>
       </Box>
 
-      {/* Listings */}
-      <>
+      {/* ---------------------------------------------------------------
+          Stat cards — each one is also a filter shortcut
+         --------------------------------------------------------------- */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', lg: 'repeat(5, 1fr)' },
+          gap: { xs: 1, sm: 1.5 },
+          mb: 2.5,
+        }}
+      >
+        {statCards.map((card) => {
+          const active = card.isActive;
+          return (
+            <Paper
+              key={card.id}
+              elevation={0}
+              onClick={card.onClick}
+              sx={{
+                p: 1.75,
+                cursor: 'pointer',
+                border: '1px solid',
+                borderColor: active ? card.color : 'divider',
+                boxShadow: active ? `0 0 0 3px ${alpha(card.color, 0.12)}` : 'none',
+                transition: 'border-color .15s, box-shadow .15s, transform .15s',
+                '&:hover': { borderColor: card.color, transform: 'translateY(-1px)' },
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                <Box
+                  sx={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: '8px',
+                    display: 'grid',
+                    placeItems: 'center',
+                    bgcolor: alpha(card.color, 0.12),
+                    color: card.color,
+                    flexShrink: 0,
+                  }}
+                >
+                  {card.icon}
+                </Box>
+                <Typography variant="caption" color="text.secondary" noWrap>
+                  {card.label}
+                </Typography>
+              </Box>
+              <Typography variant="h5" fontWeight={700} sx={{ color: card.color }}>
+                {card.value}
+              </Typography>
+            </Paper>
+          );
+        })}
+      </Box>
 
-      {/* Toolbar Row 1: Search & Filters */}
-      <Paper sx={{ p: 1.5, mb: 1, overflow: 'hidden', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center', width: '100%', maxWidth: '100%' }}>
-          {/* Search */}
+      {/* ---------------------------------------------------------------
+          Filters
+         --------------------------------------------------------------- */}
+      <Paper elevation={0} sx={{ p: 1.5, mb: 2, border: '1px solid', borderColor: 'divider' }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.25, alignItems: 'center' }}>
           <TextField
             size="small"
             placeholder={t('searchPlaceholder')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            sx={{ minWidth: { xs: '100%', sm: 200 }, flex: 1 }}
+            sx={{ minWidth: { xs: '100%', sm: 240 }, flex: 1 }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -1312,10 +1455,11 @@ function EbayListingsPage() {
             }}
           />
 
-          {/* Status filter */}
-          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 120 } }}>
+          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 150 } }}>
+            <InputLabel>{t('statusCol')}</InputLabel>
             <Select
               value={statusFilter}
+              label={t('statusCol')}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
               <MenuItem value="all">{t('filterAll')}</MenuItem>
@@ -1324,10 +1468,11 @@ function EbayListingsPage() {
             </Select>
           </FormControl>
 
-          {/* Condition filter */}
-          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 120 } }}>
+          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 150 } }}>
+            <InputLabel>{t('conditionCol')}</InputLabel>
             <Select
               value={conditionFilter}
+              label={t('conditionCol')}
               onChange={(e) => setConditionFilter(e.target.value)}
             >
               <MenuItem value="all">{t('allConditions')}</MenuItem>
@@ -1339,20 +1484,15 @@ function EbayListingsPage() {
             </Select>
           </FormControl>
 
-          {/* Health filter */}
-          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 130 } }}>
+          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 170 } }}>
+            <InputLabel>{t('healthCol')}</InputLabel>
             <Select
               value={healthFilter}
+              label={t('healthCol')}
               onChange={(e) => setHealthFilter(e.target.value)}
-              displayEmpty
             >
               <MenuItem value="">{t('allHealth')}</MenuItem>
-              <MenuItem value="issues">
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <ErrorOutlineIcon sx={{ fontSize: 16, color: '#ff9800' }} />
-                  {t('healthIssues')}
-                </Box>
-              </MenuItem>
+              <MenuItem value="issues">{t('healthIssues')}</MenuItem>
               <MenuItem value="missing_images">{t('healthMissingImages')}</MenuItem>
               <MenuItem value="short_title">{t('healthShortTitle')}</MenuItem>
               <MenuItem value="no_description">{t('healthNoDescription')}</MenuItem>
@@ -1361,165 +1501,79 @@ function EbayListingsPage() {
             </Select>
           </FormControl>
 
-          <Tooltip title={t('syncFromEbay')}>
-            <span>
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={syncFromEbay}
-                disabled={syncing || loading}
-                startIcon={syncing ? <CircularProgress size={16} /> : <SyncIcon />}
-                sx={{ minHeight: 40, textTransform: 'none', fontWeight: 600, borderRadius: '10px', whiteSpace: 'nowrap' }}
-              >
-                {syncing ? t('syncing') : t('syncFromEbay')}
-              </Button>
-            </span>
-          </Tooltip>
-          {lastSyncAt && (
-            <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5, whiteSpace: 'nowrap' }}>
-              {t('lastSync')}: {new Date(lastSyncAt).toLocaleString()}
-            </Typography>
+          {filtersActive && (
+            <Chip
+              label={t('clearFilters')}
+              onDelete={clearFilters}
+              onClick={clearFilters}
+              size="small"
+              variant="outlined"
+            />
           )}
         </Box>
       </Paper>
 
-      {/* Toolbar Row 2: Actions */}
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2, alignItems: 'center', overflow: 'hidden', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
-        {/* Primary action */}
-        <Button
-          variant="contained"
-          size="small"
-          onClick={() => setCreatorOpen(true)}
-          startIcon={<AddIcon />}
-          sx={{
-            whiteSpace: 'nowrap', minWidth: 'auto', flexShrink: 0, minHeight: 40,
-            borderRadius: '10px', textTransform: 'none', fontWeight: 600, px: 2, fontSize: '0.85rem',
-            background: 'linear-gradient(135deg, #10b981, #059669)', boxShadow: '0 2px 8px rgba(5,150,105,0.3)',
-            '&:hover': { background: 'linear-gradient(135deg, #059669, #047857)' },
-          }}
-        >
-          {t('newListing')}
-        </Button>
+      <Menu
+        anchorEl={moreMenuAnchor}
+        open={Boolean(moreMenuAnchor)}
+        onClose={() => setMoreMenuAnchor(null)}
+        slotProps={{ paper: { sx: { minWidth: 320 } } }}
+      >
+        <ListSubheader sx={{ lineHeight: '32px', fontSize: 12, fontWeight: 700, color: 'primary.main' }}>
+          {t('aiAssistant')}
+        </ListSubheader>
+        <MenuItem onClick={() => { setMoreMenuAnchor(null); handleAIBulkOptimize(); }}>
+          <ListItemIcon><AutoFixHighIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary={t('optimizeTitles')} secondary={t('optimizeTitlesDesc')} />
+        </MenuItem>
+        <MenuItem onClick={() => { setMoreMenuAnchor(null); handleAIAnalyze(); }}>
+          <ListItemIcon><PsychologyIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary={t('analyzeListing')} secondary={t('aiAnalysisDesc')} />
+        </MenuItem>
+        <Divider />
+        <ListSubheader sx={{ lineHeight: '32px', fontWeight: 700 }}>{t('editingTools')}</ListSubheader>
+        <MenuItem onClick={() => { setMoreMenuAnchor(null); setFindReplaceOpen(true); }}>
+          <ListItemIcon><FindReplaceIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary={t('findReplace')} secondary={t('findReplaceDesc')} />
+        </MenuItem>
+        <MenuItem onClick={() => { setMoreMenuAnchor(null); setDuplicateDetectorOpen(true); }}>
+          <ListItemIcon><ContentCopyIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary={t('duplicateDetection')} secondary={t('duplicateDetectionDesc')} />
+        </MenuItem>
 
-        {/* CSV Download */}
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<DownloadIcon />}
-          onClick={handleExportCSV}
-          sx={{
-            whiteSpace: 'nowrap', minWidth: 'auto', flexShrink: 0, minHeight: 40,
-            borderRadius: '10px', textTransform: 'none', fontWeight: 600, px: 2, fontSize: '0.85rem',
-            borderColor: '#e2e8f0', color: '#475569',
-            '&:hover': { borderColor: '#cbd5e1', bgcolor: '#f8fafc' },
-          }}
-        >
-          {t('csvDownload')}
-        </Button>
+        <ListSubheader sx={{ lineHeight: '32px', fontWeight: 700 }}>{t('priceTemplates')}</ListSubheader>
+        <MenuItem onClick={() => { setMoreMenuAnchor(null); setSmartPricingOpen(true); }}>
+          <ListItemIcon><AttachMoneyIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary={t('smartPricing')} secondary={t('smartPricingDesc')} />
+        </MenuItem>
+        <MenuItem onClick={() => { setMoreMenuAnchor(null); setTemplatesOpen(true); }}>
+          <ListItemIcon><ViewListIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary={t('templates')} secondary={t('templatesDesc')} />
+        </MenuItem>
 
-        {/* Tools dropdown */}
-        <Button
-          variant="outlined"
-          size="small"
-          onClick={(e) => setMoreMenuAnchor(e.currentTarget)}
-          startIcon={<BuildIcon />}
-          endIcon={<ExpandMoreIcon />}
-          sx={{
-            whiteSpace: 'nowrap', minWidth: 'auto', flexShrink: 0, minHeight: 40,
-            borderRadius: '10px', textTransform: 'none', fontWeight: 600, px: 2, fontSize: '0.85rem',
-            borderColor: '#e2e8f0', color: '#475569',
-            '&:hover': { borderColor: '#cbd5e1', bgcolor: '#f8fafc' },
-          }}
-        >
-          {t('tools')}
-        </Button>
+        <ListSubheader sx={{ lineHeight: '32px', fontWeight: 700 }}>{t('data')}</ListSubheader>
+        <MenuItem onClick={() => { setMoreMenuAnchor(null); handleCSVFileSelect(); }}>
+          <ListItemIcon><UploadFileIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary={t('csvImport')} secondary={t('csvImportDesc')} />
+        </MenuItem>
 
-        <Menu
-          anchorEl={moreMenuAnchor}
-          open={Boolean(moreMenuAnchor)}
-          onClose={() => setMoreMenuAnchor(null)}
-          slotProps={{ paper: { sx: { minWidth: 320 } } }}
-        >
-          <ListSubheader sx={{ lineHeight: '32px', fontSize: 12, fontWeight: 700, color: 'primary.main' }}>
-            {t('aiAssistant')}
-          </ListSubheader>
-          <MenuItem onClick={() => { setMoreMenuAnchor(null); handleAIBulkOptimize(); }}>
-            <ListItemIcon><AutoFixHighIcon fontSize="small" /></ListItemIcon>
-            <ListItemText
-              primary={t('optimizeTitles')}
-              secondary={t('optimizeTitlesDesc')}
-            />
-          </MenuItem>
-          <MenuItem onClick={() => { setMoreMenuAnchor(null); handleAIAnalyze(); }}>
-            <ListItemIcon><PsychologyIcon fontSize="small" /></ListItemIcon>
-            <ListItemText
-              primary={t('analyzeListing')}
-              secondary={t('aiAnalysisDesc')}
-            />
-          </MenuItem>
-          <Divider />
-          <ListSubheader sx={{ lineHeight: '32px', fontWeight: 700 }}>{t('editingTools')}</ListSubheader>
-          <MenuItem onClick={() => { setMoreMenuAnchor(null); setFindReplaceOpen(true); }}>
-            <ListItemIcon><FindReplaceIcon fontSize="small" /></ListItemIcon>
-            <ListItemText
-              primary={t('findReplace')}
-              secondary={t('findReplaceDesc')}
-            />
-          </MenuItem>
-          <MenuItem onClick={() => { setMoreMenuAnchor(null); setDuplicateDetectorOpen(true); }}>
-            <ListItemIcon><ContentCopyIcon fontSize="small" /></ListItemIcon>
-            <ListItemText
-              primary={t('duplicateDetection')}
-              secondary={t('duplicateDetectionDesc')}
-            />
-          </MenuItem>
-
-          <ListSubheader sx={{ lineHeight: '32px', fontWeight: 700 }}>{t('priceTemplates')}</ListSubheader>
-          <MenuItem onClick={() => { setMoreMenuAnchor(null); setSmartPricingOpen(true); }}>
-            <ListItemIcon><AttachMoneyIcon fontSize="small" /></ListItemIcon>
-            <ListItemText
-              primary={t('smartPricing')}
-              secondary={t('smartPricingDesc')}
-            />
-          </MenuItem>
-          <MenuItem onClick={() => { setMoreMenuAnchor(null); setTemplatesOpen(true); }}>
-            <ListItemIcon><ViewListIcon fontSize="small" /></ListItemIcon>
-            <ListItemText
-              primary={t('templates')}
-              secondary={t('templatesDesc')}
-            />
-          </MenuItem>
-
-          <ListSubheader sx={{ lineHeight: '32px', fontWeight: 700 }}>{t('data')}</ListSubheader>
-          <MenuItem onClick={() => { setMoreMenuAnchor(null); handleCSVFileSelect(); }}>
-            <ListItemIcon><UploadFileIcon fontSize="small" /></ListItemIcon>
-            <ListItemText
-              primary={t('csvImport')}
-              secondary={t('csvImportDesc')}
-            />
-          </MenuItem>
-
-          <ListSubheader sx={{ lineHeight: '32px', fontWeight: 700 }}>{t('security')}</ListSubheader>
-          <MenuItem onClick={() => { setMoreMenuAnchor(null); setBackupManagerOpen(true); }}>
-            <ListItemIcon><BackupIcon fontSize="small" /></ListItemIcon>
-            <ListItemText
-              primary={t('backupManager')}
-              secondary={t('backupManagerDesc')}
-            />
-          </MenuItem>
-          <MenuItem onClick={() => { setMoreMenuAnchor(null); setScheduledOpen(true); }}>
-            <ListItemIcon>
-              <Badge badgeContent={scheduledCount} color="primary" sx={{ '& .MuiBadge-badge': { fontSize: '0.8rem' } }}>
-                <ScheduleIcon fontSize="small" />
-              </Badge>
-            </ListItemIcon>
-            <ListItemText
-              primary={`${t('scheduledTasks')}${scheduledCount > 0 ? ` (${scheduledCount})` : ''}`}
-              secondary={t('scheduledUpdatesDesc')}
-            />
-          </MenuItem>
-        </Menu>
-      </Box>
+        <ListSubheader sx={{ lineHeight: '32px', fontWeight: 700 }}>{t('security')}</ListSubheader>
+        <MenuItem onClick={() => { setMoreMenuAnchor(null); setBackupManagerOpen(true); }}>
+          <ListItemIcon><BackupIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary={t('backupManager')} secondary={t('backupManagerDesc')} />
+        </MenuItem>
+        <MenuItem onClick={() => { setMoreMenuAnchor(null); setScheduledOpen(true); }}>
+          <ListItemIcon>
+            <Badge badgeContent={scheduledCount} color="primary" sx={{ '& .MuiBadge-badge': { fontSize: '0.8rem' } }}>
+              <ScheduleIcon fontSize="small" />
+            </Badge>
+          </ListItemIcon>
+          <ListItemText
+            primary={`${t('scheduledTasks')}${scheduledCount > 0 ? ` (${scheduledCount})` : ''}`}
+            secondary={t('scheduledUpdatesDesc')}
+          />
+        </MenuItem>
+      </Menu>
 
       {/* Mobile Card Layout */}
       {isMobile ? (
@@ -1573,14 +1627,14 @@ function EbayListingsPage() {
         </Box>
       ) : (
         /* Desktop DataGrid */
-        <Paper sx={{ width: '100%' }}>
+        <Paper elevation={0} sx={{ width: '100%', border: '1px solid', borderColor: 'divider', overflow: 'hidden' }}>
           <DataGrid
             rows={filteredListings}
             columns={columns}
             loading={loading}
             checkboxSelection
             disableRowSelectionOnClick
-            rowHeight={60}
+            rowHeight={68}
             rowSelectionModel={selectedIds}
             onRowSelectionModelChange={(newSelection) => setSelectedIds(newSelection)}
             paginationModel={paginationModel}
@@ -1592,13 +1646,34 @@ function EbayListingsPage() {
             autoHeight
             sx={{
               border: 'none',
+              '& .MuiDataGrid-columnHeaders': {
+                backgroundColor: 'grey.50',
+                borderBottom: '1px solid',
+                borderColor: 'divider',
+              },
+              '& .MuiDataGrid-columnHeaderTitle': {
+                fontWeight: 700,
+                fontSize: '0.8rem',
+                letterSpacing: '0.02em',
+                color: 'text.secondary',
+              },
               '& .MuiDataGrid-cell': {
                 display: 'flex',
                 alignItems: 'center',
+                borderColor: 'divider',
+              },
+              '& .MuiDataGrid-row': {
+                transition: 'background-color .12s',
               },
               '& .MuiDataGrid-row:hover': {
                 backgroundColor: 'action.hover',
               },
+              '& .MuiDataGrid-footerContainer': {
+                borderTop: '1px solid',
+                borderColor: 'divider',
+              },
+              '& .MuiDataGrid-columnSeparator': { display: 'none' },
+              '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': { outline: 'none' },
             }}
             slots={{
               noRowsOverlay: () => (
@@ -1609,12 +1684,28 @@ function EbayListingsPage() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     height: '100%',
-                    py: 4,
+                    gap: 1.5,
+                    py: 6,
                   }}
                 >
-                  <Typography color="text.secondary">
-                    {t('noListingsFound')}
-                  </Typography>
+                  <Inventory2Icon sx={{ fontSize: 40, color: 'text.disabled' }} />
+                  <Typography color="text.secondary">{t('noListingsFound')}</Typography>
+                  {filtersActive ? (
+                    <Button size="small" variant="outlined" onClick={clearFilters} sx={{ textTransform: 'none' }}>
+                      {t('clearFilters')}
+                    </Button>
+                  ) : (
+                    <Button
+                      size="small"
+                      variant="contained"
+                      color="success"
+                      startIcon={<AddIcon />}
+                      onClick={() => setCreatorOpen(true)}
+                      sx={{ textTransform: 'none' }}
+                    >
+                      {t('newListing')}
+                    </Button>
+                  )}
                 </Box>
               ),
               loadingOverlay: () => (
@@ -1678,7 +1769,6 @@ function EbayListingsPage() {
         </Box>
       )}
 
-      </>
 
       {/* Listing Editor Drawer */}
       <ListingEditorDrawer

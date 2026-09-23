@@ -6729,7 +6729,18 @@
     "pageTitle": "eBay İlanları",
     "pageSubtitle": "{count} ilan",
     "neverSynced": "Henüz senkronize edilmedi",
-    "clearFilters": "Filtreleri temizle"
+    "clearFilters": "Filtreleri temizle",
+    "listingsCountLabel": "{count} ilan",
+    "publishedCountLabel": "{count} yayında",
+    "draftCountLabel": "{count} taslak",
+    "outOfStockCountLabel": "{count} stokta yok",
+    "needsAttentionCountLabel": "{count} ilgi bekliyor",
+    "categoryLabel": "Kategori",
+    "allCategories": "Tüm kategoriler",
+    "viewLabel": "Görünüm:",
+    "viewCompact": "Sıkışık",
+    "viewStandard": "Standart",
+    "viewComfortable": "Geniş"
   },
   "etsyResearch": {
     "pageTitle": "Etsy Araştırma",

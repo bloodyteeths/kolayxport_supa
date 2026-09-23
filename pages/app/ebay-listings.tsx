@@ -35,7 +35,6 @@ import {
   useMediaQuery,
   useTheme,
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
 import {
   DataGrid,
   GridColDef,
@@ -71,6 +70,7 @@ import {
   CheckCircle as CheckCircleIcon,
   EditNote as EditNoteIcon,
   RemoveShoppingCart as RemoveShoppingCartIcon,
+  Circle as CircleIcon,
 } from '@mui/icons-material';
 import { toast, Toaster } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
@@ -395,6 +395,197 @@ function MobileListingCard({
 // Page Component
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Left filter sidebar (desktop only) — mirrors the Etsy listings page
+// ---------------------------------------------------------------------------
+
+function LeftSidebar({
+  statusFilter,
+  onStatusChange,
+  counts,
+  conditionFilter,
+  onConditionChange,
+  healthFilter,
+  onHealthChange,
+  categoryCounts,
+  categoryFilter,
+  onCategoryChange,
+}: {
+  statusFilter: string;
+  onStatusChange: (s: string) => void;
+  counts: { all: number; published: number; draft: number };
+  conditionFilter: string;
+  onConditionChange: (c: string) => void;
+  healthFilter: string;
+  onHealthChange: (h: string) => void;
+  categoryCounts: [string, number][];
+  categoryFilter: string;
+  onCategoryChange: (c: string) => void;
+}) {
+  const t = useTranslations('ebayListings');
+  const [categoriesExpanded, setCategoriesExpanded] = useState(true);
+
+  const rowSx = (selected: boolean) => ({
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    px: 1,
+    py: 0.5,
+    borderRadius: 1,
+    cursor: 'pointer',
+    bgcolor: selected ? 'primary.50' : 'transparent',
+    color: selected ? 'primary.main' : 'text.primary',
+    fontWeight: selected ? 700 : 400,
+    fontSize: '0.82rem',
+    transition: 'all 0.15s ease',
+    '&:hover': { bgcolor: selected ? 'primary.50' : 'action.hover' },
+  });
+
+  const labelSx = {
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
+    fontSize: 10,
+    mb: 0.5,
+    display: 'block',
+  };
+
+  const statuses: { key: string; label: string; count: number; dot: string }[] = [
+    { key: 'all', label: t('filterAll'), count: counts.all, dot: '#64748b' },
+    { key: 'PUBLISHED', label: t('published'), count: counts.published, dot: '#4caf50' },
+    { key: 'UNPUBLISHED', label: t('draft'), count: counts.draft, dot: '#ff9800' },
+  ];
+
+  return (
+    <Box
+      sx={{
+        width: 220,
+        minWidth: 220,
+        flexShrink: 0,
+        position: 'sticky',
+        top: 80,
+        alignSelf: 'flex-start',
+        maxHeight: 'calc(100vh - 100px)',
+        overflowY: 'auto',
+        pr: 1.5,
+        '&::-webkit-scrollbar': { width: 4 },
+        '&::-webkit-scrollbar-thumb': { bgcolor: '#d0d0d0', borderRadius: 2 },
+      }}
+    >
+      {/* Status */}
+      <Paper sx={{ p: 1.5, mb: 1.5, borderRadius: 2 }}>
+        <Typography variant="caption" fontWeight={700} color="text.secondary" sx={labelSx}>
+          eBay
+        </Typography>
+        {statuses.map((s) => (
+          <Box key={s.key} onClick={() => onStatusChange(s.key)} sx={rowSx(statusFilter === s.key)}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+              <CircleIcon sx={{ fontSize: 8, color: s.dot }} />
+              <span>{s.label}</span>
+            </Box>
+            <Typography
+              variant="caption"
+              sx={{ color: statusFilter === s.key ? 'primary.main' : 'text.secondary', fontWeight: 'inherit' }}
+            >
+              {s.count}
+            </Typography>
+          </Box>
+        ))}
+      </Paper>
+
+      {/* Health */}
+      <Paper sx={{ p: 1.5, mb: 1.5, borderRadius: 2 }}>
+        <Typography variant="caption" fontWeight={700} color="text.secondary" sx={labelSx}>
+          {t('healthScore')}
+        </Typography>
+        <FormControl size="small" fullWidth>
+          <Select
+            value={healthFilter}
+            onChange={(e) => onHealthChange(e.target.value)}
+            displayEmpty
+            sx={{ fontSize: '0.82rem', '& .MuiSelect-select': { py: 0.75 } }}
+          >
+            <MenuItem value="">{t('allHealth')}</MenuItem>
+            <MenuItem value="issues">{t('healthIssues')}</MenuItem>
+            <MenuItem value="missing_images">{t('healthMissingImages')}</MenuItem>
+            <MenuItem value="short_title">{t('healthShortTitle')}</MenuItem>
+            <MenuItem value="no_description">{t('healthNoDescription')}</MenuItem>
+            <MenuItem value="few_aspects">{t('healthFewAspects')}</MenuItem>
+            <MenuItem value="no_stock">{t('healthNoStock')}</MenuItem>
+          </Select>
+        </FormControl>
+      </Paper>
+
+      {/* Condition */}
+      <Paper sx={{ p: 1.5, mb: 1.5, borderRadius: 2 }}>
+        <Typography variant="caption" fontWeight={700} color="text.secondary" sx={labelSx}>
+          {t('conditionCol')}
+        </Typography>
+        <FormControl size="small" fullWidth>
+          <Select
+            value={conditionFilter}
+            onChange={(e) => onConditionChange(e.target.value)}
+            sx={{ fontSize: '0.82rem', '& .MuiSelect-select': { py: 0.75 } }}
+          >
+            <MenuItem value="all">{t('allConditions')}</MenuItem>
+            <MenuItem value="NEW">{t('condNew')}</MenuItem>
+            <MenuItem value="LIKE_NEW">{t('condLikeNew')}</MenuItem>
+            <MenuItem value="VERY_GOOD">{t('condVeryGood')}</MenuItem>
+            <MenuItem value="GOOD">{t('condGood')}</MenuItem>
+            <MenuItem value="ACCEPTABLE">{t('condAcceptable')}</MenuItem>
+          </Select>
+        </FormControl>
+      </Paper>
+
+      {/* Categories */}
+      {categoryCounts.length > 0 && (
+        <Paper sx={{ p: 1.5, mb: 1.5, borderRadius: 2 }}>
+          <Box
+            sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', mb: 0.5 }}
+            onClick={() => setCategoriesExpanded((v) => !v)}
+          >
+            <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ ...labelSx, mb: 0 }}>
+              {t('categoryLabel')}
+            </Typography>
+            {categoriesExpanded
+              ? <ExpandLessIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+              : <ExpandMoreIcon sx={{ fontSize: 16, color: 'text.secondary' }} />}
+          </Box>
+          <Collapse in={categoriesExpanded}>
+            <Box onClick={() => onCategoryChange('')} sx={rowSx(!categoryFilter)}>
+              <span>{t('allCategories')}</span>
+            </Box>
+            {categoryCounts.map(([name, count]) => (
+              <Box
+                key={name}
+                onClick={() => onCategoryChange(name)}
+                sx={{ ...rowSx(categoryFilter === name), overflow: 'hidden' }}
+              >
+                <Typography
+                  noWrap
+                  sx={{ fontSize: 'inherit', fontWeight: 'inherit', color: 'inherit', flex: 1, minWidth: 0 }}
+                >
+                  {name}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: categoryFilter === name ? 'primary.main' : 'text.secondary',
+                    fontWeight: 'inherit',
+                    ml: 0.5,
+                    flexShrink: 0,
+                  }}
+                >
+                  {count}
+                </Typography>
+              </Box>
+            ))}
+          </Collapse>
+        </Paper>
+      )}
+    </Box>
+  );
+}
+
 function EbayListingsPage() {
   const { user } = useAuth();
   const userId = (user as any)?.id;
@@ -413,6 +604,9 @@ function EbayListingsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [healthFilter, setHealthFilter] = useState<string>('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('');
+  /** Row density, mirroring the Etsy page's Compact/Detailed toggle. */
+  const [density, setDensity] = useState<'compact' | 'standard' | 'comfortable'>('standard');
   const [conditionFilter, setConditionFilter] = useState<string>('all');
 
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
@@ -618,6 +812,7 @@ function EbayListingsPage() {
       if (searchTerm && !l.title.toLowerCase().includes(searchTerm.toLowerCase())) return false;
       if (statusFilter !== 'all' && l.status !== statusFilter) return false;
       if (conditionFilter !== 'all' && l.condition !== conditionFilter) return false;
+      if (categoryFilter && (l.categoryName || '') !== categoryFilter) return false;
       if (healthFilter) {
         const h = calculateHealth(l);
         switch (healthFilter) {
@@ -632,7 +827,7 @@ function EbayListingsPage() {
       }
       return true;
     });
-  }, [listings, searchTerm, statusFilter, conditionFilter, healthFilter]);
+  }, [listings, searchTerm, statusFilter, conditionFilter, healthFilter, categoryFilter]);
 
   // --- Statistics ---
   const totalCount = listings.length;
@@ -652,6 +847,17 @@ function EbayListingsPage() {
     () => listings.filter((l) => calculateHealth(l).overall < 70).length,
     [listings]
   );
+
+  /** eBay has no shop sections, so the sidebar groups by leaf category instead. */
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const l of listings) {
+      const name = l.categoryName;
+      if (!name) continue;
+      counts.set(name, (counts.get(name) || 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  }, [listings]);
 
   // --- Delete listing (via draft system) ---
   const handleDeleteListing = useCallback(
@@ -1254,58 +1460,6 @@ function EbayListingsPage() {
     setSearchTerm('');
   }, []);
 
-  const statCards = useMemo(
-    () => [
-      {
-        id: 'total',
-        label: t('totalListings'),
-        value: totalCount,
-        color: theme.palette.primary.main,
-        icon: <Inventory2Icon sx={{ fontSize: 16 }} />,
-        isActive: !filtersActive,
-        onClick: clearFilters,
-      },
-      {
-        id: 'published',
-        label: t('published'),
-        value: publishedCount,
-        color: theme.palette.success.main,
-        icon: <CheckCircleIcon sx={{ fontSize: 16 }} />,
-        isActive: statusFilter === 'PUBLISHED',
-        onClick: () => { setHealthFilter(''); setStatusFilter('PUBLISHED'); },
-      },
-      {
-        id: 'draft',
-        label: t('draft'),
-        value: unpublishedCount,
-        color: theme.palette.warning.main,
-        icon: <EditNoteIcon sx={{ fontSize: 16 }} />,
-        isActive: statusFilter === 'UNPUBLISHED',
-        onClick: () => { setHealthFilter(''); setStatusFilter('UNPUBLISHED'); },
-      },
-      {
-        id: 'outOfStock',
-        label: t('outOfStock'),
-        value: outOfStock,
-        color: theme.palette.error.main,
-        icon: <RemoveShoppingCartIcon sx={{ fontSize: 16 }} />,
-        isActive: healthFilter === 'no_stock',
-        onClick: () => { setStatusFilter('all'); setHealthFilter('no_stock'); },
-      },
-      {
-        id: 'needsAttention',
-        label: t('needsAttention'),
-        value: needsAttention,
-        color: theme.palette.warning.dark,
-        icon: <ErrorOutlineIcon sx={{ fontSize: 16 }} />,
-        isActive: healthFilter === 'issues',
-        onClick: () => { setStatusFilter('all'); setHealthFilter('issues'); },
-      },
-    ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [totalCount, publishedCount, unpublishedCount, outOfStock, needsAttention,
-     statusFilter, healthFilter, filtersActive, clearFilters, theme]
-  );
 
   const paginatedMobileListings = useMemo(() => {
     const start = paginationModel.page * paginationModel.pageSize;
@@ -1381,137 +1535,163 @@ function EbayListingsPage() {
       </Box>
 
       {/* ---------------------------------------------------------------
-          Stat cards — each one is also a filter shortcut
-         --------------------------------------------------------------- */}
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', lg: 'repeat(5, 1fr)' },
-          gap: { xs: 1, sm: 1.5 },
-          mb: 2.5,
-        }}
-      >
-        {statCards.map((card) => {
-          const active = card.isActive;
-          return (
-            <Paper
-              key={card.id}
-              elevation={0}
-              onClick={card.onClick}
-              sx={{
-                p: 1.75,
-                cursor: 'pointer',
-                border: '1px solid',
-                borderColor: active ? card.color : 'divider',
-                boxShadow: active ? `0 0 0 3px ${alpha(card.color, 0.12)}` : 'none',
-                transition: 'border-color .15s, box-shadow .15s, transform .15s',
-                '&:hover': { borderColor: card.color, transform: 'translateY(-1px)' },
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                <Box
-                  sx={{
-                    width: 26,
-                    height: 26,
-                    borderRadius: '8px',
-                    display: 'grid',
-                    placeItems: 'center',
-                    bgcolor: alpha(card.color, 0.12),
-                    color: card.color,
-                    flexShrink: 0,
-                  }}
-                >
-                  {card.icon}
-                </Box>
-                <Typography variant="caption" color="text.secondary" noWrap>
-                  {card.label}
-                </Typography>
-              </Box>
-              <Typography variant="h5" fontWeight={700} sx={{ color: card.color }}>
-                {card.value}
-              </Typography>
-            </Paper>
-          );
-        })}
-      </Box>
-
       {/* ---------------------------------------------------------------
-          Filters
+          Sidebar + content, mirroring the Etsy listings layout
          --------------------------------------------------------------- */}
-      <Paper elevation={0} sx={{ p: 1.5, mb: 2, border: '1px solid', borderColor: 'divider' }}>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.25, alignItems: 'center' }}>
-          <TextField
-            size="small"
-            placeholder={t('searchPlaceholder')}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            sx={{ minWidth: { xs: '100%', sm: 240 }, flex: 1 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
-            }}
+      <Box sx={{ display: 'flex', gap: 0 }}>
+        {!isMobile && (
+          <LeftSidebar
+            statusFilter={statusFilter}
+            onStatusChange={setStatusFilter}
+            counts={{ all: totalCount, published: publishedCount, draft: unpublishedCount }}
+            conditionFilter={conditionFilter}
+            onConditionChange={setConditionFilter}
+            healthFilter={healthFilter}
+            onHealthChange={setHealthFilter}
+            categoryCounts={categoryCounts}
+            categoryFilter={categoryFilter}
+            onCategoryChange={setCategoryFilter}
           />
+        )}
 
-          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 150 } }}>
-            <InputLabel>{t('statusCol')}</InputLabel>
-            <Select
-              value={statusFilter}
-              label={t('statusCol')}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <MenuItem value="all">{t('filterAll')}</MenuItem>
-              <MenuItem value="PUBLISHED">{t('published')}</MenuItem>
-              <MenuItem value="UNPUBLISHED">{t('draft')}</MenuItem>
-            </Select>
-          </FormControl>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          {/* Compact stats strip — the problem counts are clickable filters */}
+          <Paper
+            elevation={0}
+            sx={{
+              px: 1.5, py: 0.75, mb: 1,
+              border: '1px solid', borderColor: 'divider',
+              display: 'flex', alignItems: 'center', gap: { xs: 1.5, sm: 2 },
+              flexWrap: 'wrap', minHeight: 36,
+            }}
+          >
+            <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '0.82rem' }}>
+              {t('listingsCountLabel', { count: totalCount })}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem' }}>
+              ·&nbsp;&nbsp;{t('publishedCountLabel', { count: publishedCount })}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem' }}>
+              ·&nbsp;&nbsp;{t('draftCountLabel', { count: unpublishedCount })}
+            </Typography>
+            {outOfStock > 0 && (
+              <Typography
+                variant="body2"
+                onClick={() => setHealthFilter('no_stock')}
+                sx={{
+                  fontSize: '0.85rem', color: 'error.main', fontWeight: 600, cursor: 'pointer',
+                  '&:hover': { textDecoration: 'underline' },
+                }}
+              >
+                ·&nbsp;&nbsp;{t('outOfStockCountLabel', { count: outOfStock })}
+              </Typography>
+            )}
+            {needsAttention > 0 && (
+              <Typography
+                variant="body2"
+                onClick={() => setHealthFilter('issues')}
+                sx={{
+                  fontSize: '0.85rem', color: 'warning.main', fontWeight: 600, cursor: 'pointer',
+                  '&:hover': { textDecoration: 'underline' },
+                }}
+              >
+                ·&nbsp;&nbsp;{t('needsAttentionCountLabel', { count: needsAttention })}
+              </Typography>
+            )}
+          </Paper>
 
-          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 150 } }}>
-            <InputLabel>{t('conditionCol')}</InputLabel>
-            <Select
-              value={conditionFilter}
-              label={t('conditionCol')}
-              onChange={(e) => setConditionFilter(e.target.value)}
-            >
-              <MenuItem value="all">{t('allConditions')}</MenuItem>
-              <MenuItem value="NEW">{t('condNew')}</MenuItem>
-              <MenuItem value="LIKE_NEW">{t('condLikeNew')}</MenuItem>
-              <MenuItem value="VERY_GOOD">{t('condVeryGood')}</MenuItem>
-              <MenuItem value="GOOD">{t('condGood')}</MenuItem>
-              <MenuItem value="ACCEPTABLE">{t('condAcceptable')}</MenuItem>
-            </Select>
-          </FormControl>
+          {/* Toolbar */}
+          <Paper
+            elevation={0}
+            sx={{ px: 1.5, py: 1, mb: 1, border: '1px solid', borderColor: 'divider' }}
+          >
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+              <Typography
+                variant="subtitle1"
+                fontWeight={700}
+                sx={{ display: { xs: 'none', sm: 'block' }, whiteSpace: 'nowrap' }}
+              >
+                {statusFilter === 'PUBLISHED'
+                  ? t('published')
+                  : statusFilter === 'UNPUBLISHED'
+                    ? t('draft')
+                    : t('filterAll')}
+              </Typography>
 
-          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 170 } }}>
-            <InputLabel>{t('healthCol')}</InputLabel>
-            <Select
-              value={healthFilter}
-              label={t('healthCol')}
-              onChange={(e) => setHealthFilter(e.target.value)}
-            >
-              <MenuItem value="">{t('allHealth')}</MenuItem>
-              <MenuItem value="issues">{t('healthIssues')}</MenuItem>
-              <MenuItem value="missing_images">{t('healthMissingImages')}</MenuItem>
-              <MenuItem value="short_title">{t('healthShortTitle')}</MenuItem>
-              <MenuItem value="no_description">{t('healthNoDescription')}</MenuItem>
-              <MenuItem value="few_aspects">{t('healthFewAspects')}</MenuItem>
-              <MenuItem value="no_stock">{t('healthNoStock')}</MenuItem>
-            </Select>
-          </FormControl>
+              <TextField
+                size="small"
+                placeholder={t('searchPlaceholder')}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                sx={{ minWidth: { xs: '100%', sm: 220 }, flex: 1 }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
 
-          {filtersActive && (
-            <Chip
-              label={t('clearFilters')}
-              onDelete={clearFilters}
-              onClick={clearFilters}
-              size="small"
-              variant="outlined"
-            />
-          )}
-        </Box>
-      </Paper>
+              {/* Mobile keeps the filters inline — there's no sidebar there */}
+              {isMobile && (
+                <>
+                  <FormControl size="small" sx={{ minWidth: 110 }}>
+                    <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                      <MenuItem value="all">{t('filterAll')}</MenuItem>
+                      <MenuItem value="PUBLISHED">{t('published')}</MenuItem>
+                      <MenuItem value="UNPUBLISHED">{t('draft')}</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <FormControl size="small" sx={{ minWidth: 120 }}>
+                    <Select
+                      value={healthFilter}
+                      onChange={(e) => setHealthFilter(e.target.value)}
+                      displayEmpty
+                    >
+                      <MenuItem value="">{t('allHealth')}</MenuItem>
+                      <MenuItem value="issues">{t('healthIssues')}</MenuItem>
+                      <MenuItem value="missing_images">{t('healthMissingImages')}</MenuItem>
+                      <MenuItem value="short_title">{t('healthShortTitle')}</MenuItem>
+                      <MenuItem value="no_description">{t('healthNoDescription')}</MenuItem>
+                      <MenuItem value="few_aspects">{t('healthFewAspects')}</MenuItem>
+                      <MenuItem value="no_stock">{t('healthNoStock')}</MenuItem>
+                    </Select>
+                  </FormControl>
+                </>
+              )}
+
+              {filtersActive && (
+                <Chip
+                  label={t('clearFilters')}
+                  onDelete={clearFilters}
+                  onClick={clearFilters}
+                  size="small"
+                  variant="outlined"
+                />
+              )}
+
+              <Box sx={{ flex: { xs: '0 0 100%', sm: '0 0 auto' }, ml: { sm: 'auto' } }} />
+
+              {/* Row density */}
+              {!isMobile && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Typography variant="caption" color="text.secondary">{t('viewLabel')}</Typography>
+                  {(['compact', 'standard', 'comfortable'] as const).map((d) => (
+                    <Chip
+                      key={d}
+                      size="small"
+                      label={t(d === 'compact' ? 'viewCompact' : d === 'standard' ? 'viewStandard' : 'viewComfortable')}
+                      onClick={() => setDensity(d)}
+                      color={density === d ? 'primary' : 'default'}
+                      variant={density === d ? 'filled' : 'outlined'}
+                      sx={{ height: 24, fontSize: '0.72rem' }}
+                    />
+                  ))}
+                </Box>
+              )}
+            </Box>
+          </Paper>
 
       <Menu
         anchorEl={moreMenuAnchor}
@@ -1634,7 +1814,7 @@ function EbayListingsPage() {
             loading={loading}
             checkboxSelection
             disableRowSelectionOnClick
-            rowHeight={68}
+            density={density}
             rowSelectionModel={selectedIds}
             onRowSelectionModelChange={(newSelection) => setSelectedIds(newSelection)}
             paginationModel={paginationModel}
@@ -1724,6 +1904,8 @@ function EbayListingsPage() {
           />
         </Paper>
       )}
+        </Box>
+      </Box>
 
       {/* Delete confirmation dialog */}
       {deleteConfirm !== null && (

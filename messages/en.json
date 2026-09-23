@@ -6729,7 +6729,18 @@
     "pageTitle": "eBay Listings",
     "pageSubtitle": "{count} listings",
     "neverSynced": "Not synced yet",
-    "clearFilters": "Clear filters"
+    "clearFilters": "Clear filters",
+    "listingsCountLabel": "{count} listings",
+    "publishedCountLabel": "{count} published",
+    "draftCountLabel": "{count} drafts",
+    "outOfStockCountLabel": "{count} out of stock",
+    "needsAttentionCountLabel": "{count} need attention",
+    "categoryLabel": "Category",
+    "allCategories": "All categories",
+    "viewLabel": "View:",
+    "viewCompact": "Compact",
+    "viewStandard": "Standard",
+    "viewComfortable": "Roomy"
   },
   "etsyResearch": {
     "pageTitle": "Etsy Research",

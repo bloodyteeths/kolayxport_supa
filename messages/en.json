@@ -4874,7 +4874,8 @@
       "publishQueued": "Publish queued — sync to apply",
       "withdrawQueued": "Withdraw queued — sync to apply",
       "copyQueued": "Copy queued — sync to apply",
-      "deleteQueued": "Delete queued — sync to apply"
+      "deleteQueued": "Delete queued — sync to apply",
+      "imagesRequired": "Add at least one photo — eBay requires a photo to create a listing"
     },
     "financial": {
       "revenueCalculator": "Revenue Calculator",
@@ -7632,8 +7633,12 @@
           "One-click order import from Etsy Shop Manager",
           "Automatic tracking-number push to Etsy"
         ],
-        "mock": {"salesPerMonth":"Est. Sales/mo","revenue":"Est. Revenue","rating":"Shop Rating"},
-      "cta": "Try It Free"
+        "mock": {
+          "salesPerMonth": "Est. Sales/mo",
+          "revenue": "Est. Revenue",
+          "rating": "Shop Rating"
+        },
+        "cta": "Try It Free"
       },
       "included": {
         "heading": "Included in Every Plan",

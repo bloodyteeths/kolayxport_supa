@@ -5015,7 +5015,8 @@
       "publishQueued": "Yayınlama sıraya eklendi — gönder ile uygula",
       "withdrawQueued": "Geri çekme sıraya eklendi — gönder ile uygula",
       "copyQueued": "Kopyalama sıraya eklendi — gönder ile uygula",
-      "deleteQueued": "Silme sıraya eklendi — gönder ile uygula"
+      "deleteQueued": "Silme sıraya eklendi — gönder ile uygula",
+      "imagesRequired": "En az bir fotoğraf ekleyin — eBay ilan oluşturmak için fotoğraf zorunlu tutuyor"
     },
     "financial": {
       "revenueCalculator": "Gelir Hesaplayıcı",
@@ -7632,8 +7633,12 @@
           "Etsy Mağaza Yöneticisi'nden tek tıkla sipariş aktarımı",
           "Kargo takip numaralarını Etsy'ye otomatik iletme"
         ],
-        "mock": {"salesPerMonth":"Aylık Satış","revenue":"Tahmini Gelir","rating":"Mağaza Puanı"},
-      "cta": "Ücretsiz Dene"
+        "mock": {
+          "salesPerMonth": "Aylık Satış",
+          "revenue": "Tahmini Gelir",
+          "rating": "Mağaza Puanı"
+        },
+        "cta": "Ücretsiz Dene"
       },
       "included": {
         "heading": "Her Plana Dahil",

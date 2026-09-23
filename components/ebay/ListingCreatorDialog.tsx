@@ -505,6 +505,12 @@ export default function ListingCreatorDialog({
         }
         return true;
       case 2:
+        // eBay rejects an inventory item with no imageUrls (errorId 25717), so
+        // block here rather than letting the wizard fail on the final step.
+        if (images.length === 0) {
+          toast.error(t('imagesRequired'));
+          return false;
+        }
         return true;
       default:
         return true;
@@ -542,6 +548,11 @@ export default function ListingCreatorDialog({
     // Validate variations
     if (hasVariations && variationRows.length === 0) {
       toast.error(t('variationsRequired'));
+      return;
+    }
+
+    if (images.length === 0) {
+      toast.error(t('imagesRequired'));
       return;
     }
 

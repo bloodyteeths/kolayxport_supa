@@ -27,6 +27,30 @@ interface CallOptions {
   maxRetries?: number;
 }
 
+/**
+ * eBay returns errors as `{"errors":[{errorId, message, longMessage, ...}]}`.
+ * Surface just the human-readable part — the raw JSON ends up in user-facing
+ * toasts otherwise.
+ */
+function summarizeEbayError(body: string): string {
+  try {
+    const parsed = JSON.parse(body);
+    const errors = Array.isArray(parsed?.errors) ? parsed.errors : [];
+    if (errors.length > 0) {
+      return errors
+        .map((e: any) => {
+          const text = e.longMessage || e.message || 'Unknown error';
+          return e.errorId ? `${text} (eBay ${e.errorId})` : text;
+        })
+        .join(' | ')
+        .substring(0, 400);
+    }
+  } catch {
+    // Not JSON — fall through to the raw body.
+  }
+  return body.substring(0, 300);
+}
+
 export async function callEbayRateLimited<T = any>(
   url: string,
   { token, marketplaceId, options = {}, maxRetries = 4 }: CallOptions
@@ -59,7 +83,7 @@ export async function callEbayRateLimited<T = any>(
       }
 
       const text = await response.text();
-      const err = new Error(`eBay API ${response.status}: ${text.substring(0, 300)}`);
+      const err = new Error(`eBay API ${response.status}: ${summarizeEbayError(text)}`);
 
       // Retry 429 / 5xx with exponential backoff
       if (response.status === 429 || response.status >= 500) {

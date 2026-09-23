@@ -5,6 +5,7 @@ import { IncomingForm } from 'formidable';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { signImagePath } from '@/lib/images/signedImageUrl';
 
 export const config = {
   api: {
@@ -81,7 +82,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try { fs.unlinkSync(file.filepath); } catch { /* ignore */ }
 
     const storagePath = `${userId}/${filename}`;
-    const publicUrl = `${getBaseUrl()}/api/clawd/serve-image?path=${encodeURIComponent(storagePath)}`;
+    // The signature lets marketplaces (eBay fetches imageUrls anonymously from
+    // its own servers) read the file without a session — see signedImageUrl.ts.
+    const publicUrl =
+      `${getBaseUrl()}/api/clawd/serve-image` +
+      `?path=${encodeURIComponent(storagePath)}` +
+      `&sig=${signImagePath(storagePath)}`;
 
     logger.info('Image uploaded to local storage', { userId, storagePath });
 

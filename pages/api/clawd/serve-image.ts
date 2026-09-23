@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs';
 import path from 'path';
 import { getAuthUser } from '@/lib/auth';
+import { verifyImagePathSignature } from '@/lib/images/signedImageUrl';
 
 const UPLOAD_ROOT = process.env.EBAY_IMAGE_UPLOAD_DIR || path.join(process.cwd(), 'uploads', 'ebay-images');
 
@@ -22,16 +23,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const user = await getAuthUser(req, res);
-  if (!user) {
-    res.setHeader('Cache-Control', 'no-store');
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
   const imagePath = req.query.path;
   if (!imagePath || typeof imagePath !== 'string') {
     res.setHeader('Cache-Control', 'no-store');
     return res.status(400).json({ error: 'path is required' });
+  }
+
+  // A valid signature stands in for a session. Marketplaces fetch imageUrls
+  // anonymously from their own servers, so a session-only endpoint can never
+  // host listing photos — see lib/images/signedImageUrl.ts.
+  const signed = verifyImagePathSignature(imagePath, req.query.sig);
+
+  const user = signed ? null : await getAuthUser(req, res);
+  if (!signed && !user) {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   const resolvedRoot = path.resolve(UPLOAD_ROOT);
@@ -52,14 +58,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const segments = relativeFromRoot.split(path.sep).filter(Boolean);
   const firstSegment = segments[0];
 
-  let ownedByCaller = false;
-  if (firstSegment === user.id) {
-    ownedByCaller = true;
-  } else {
-    const claimedUserId = req.query.userId;
-    if (typeof claimedUserId === 'string' && claimedUserId === user.id) {
-      // Legacy file directly under root, caller is the only one who can access it.
+  let ownedByCaller = signed;
+  if (!ownedByCaller && user) {
+    if (firstSegment === user.id) {
       ownedByCaller = true;
+    } else {
+      const claimedUserId = req.query.userId;
+      if (typeof claimedUserId === 'string' && claimedUserId === user.id) {
+        // Legacy file directly under root, caller is the only one who can access it.
+        ownedByCaller = true;
+      }
     }
   }
 
@@ -78,7 +86,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const contentType = EXT_TO_MIME[ext] || 'application/octet-stream';
   res.setHeader('Content-Type', contentType);
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  // Private cache only — content is per-user.
-  res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+  // Private cache for session reads; signed capability URLs may be cached by
+  // the marketplace CDNs that fetch them.
+  res.setHeader(
+    'Cache-Control',
+    signed ? 'public, max-age=31536000, immutable' : 'private, max-age=31536000, immutable'
+  );
   fs.createReadStream(absolutePath).pipe(res);
 }

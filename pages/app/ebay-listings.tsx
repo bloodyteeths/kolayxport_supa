@@ -1230,7 +1230,7 @@ function EbayListingsPage() {
         field: 'title',
         headerName: t('titleCol'),
         flex: 1,
-        minWidth: 250,
+        minWidth: 180,
         renderCell: (params: GridRenderCellParams<EbayListingRow>) => (
           <Tooltip title={params.row.title} arrow>
             <Typography
@@ -1252,7 +1252,7 @@ function EbayListingsPage() {
       {
         field: 'sku',
         headerName: 'SKU',
-        width: 120,
+        width: 110,
       },
       {
         field: 'price',
@@ -1400,7 +1400,7 @@ function EbayListingsPage() {
       {
         field: 'actions',
         headerName: '',
-        width: 100,
+        width: 84,
         sortable: false,
         filterable: false,
         renderCell: (params: GridRenderCellParams<EbayListingRow>) => (
@@ -1566,7 +1566,9 @@ function EbayListingsPage() {
             }}
           >
             <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '0.82rem' }}>
-              {t('listingsCountLabel', { count: totalCount })}
+              {filtersActive
+                ? t('listingsCountFiltered', { count: filteredListings.length, total: totalCount })
+                : t('listingsCountLabel', { count: totalCount })}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem' }}>
               ·&nbsp;&nbsp;{t('publishedCountLabel', { count: publishedCount })}

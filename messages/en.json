@@ -6740,7 +6740,8 @@
     "viewLabel": "View:",
     "viewCompact": "Compact",
     "viewStandard": "Standard",
-    "viewComfortable": "Roomy"
+    "viewComfortable": "Roomy",
+    "listingsCountFiltered": "{count} of {total} listings"
   },
   "etsyResearch": {
     "pageTitle": "Etsy Research",

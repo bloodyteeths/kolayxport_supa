@@ -6740,7 +6740,8 @@
     "viewLabel": "Görünüm:",
     "viewCompact": "Sıkışık",
     "viewStandard": "Standart",
-    "viewComfortable": "Geniş"
+    "viewComfortable": "Geniş",
+    "listingsCountFiltered": "{total} ilandan {count} tanesi"
   },
   "etsyResearch": {
     "pageTitle": "Etsy Araştırma",

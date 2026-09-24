@@ -1428,6 +1428,23 @@ function EbayListingsPage() {
   // --- Column visibility for mobile ---
   const [columnVisibilityModel, setColumnVisibilityModel] = useState<Record<string, boolean>>({});
 
+  /** Columns each view hides. "all" hides nothing. */
+  const VIEW_HIDDEN_COLUMNS: Record<string, string[]> = {
+    compact: ['sku', 'condition', 'seo', 'imageCount', 'health'],
+    standard: ['sku', 'seo'],
+    all: [],
+  };
+
+  const effectiveColumnVisibility = useMemo(() => {
+    const hidden = VIEW_HIDDEN_COLUMNS[density] || [];
+    const model: Record<string, boolean> = { ...columnVisibilityModel };
+    for (const field of ['sku', 'condition', 'seo', 'imageCount', 'health']) {
+      model[field] = !hidden.includes(field);
+    }
+    return model;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [density, columnVisibilityModel]);
+
   useEffect(() => {
     const handleResize = () => {
       const isSmall = window.innerWidth < 768;
@@ -1816,13 +1833,13 @@ function EbayListingsPage() {
             loading={loading}
             checkboxSelection
             disableRowSelectionOnClick
-            density={density}
+            density={density === 'compact' ? 'compact' : 'standard'}
             rowSelectionModel={selectedIds}
             onRowSelectionModelChange={(newSelection) => setSelectedIds(newSelection)}
             paginationModel={paginationModel}
             onPaginationModelChange={setPaginationModel}
             pageSizeOptions={[25, 50, 100]}
-            columnVisibilityModel={columnVisibilityModel}
+            columnVisibilityModel={effectiveColumnVisibility}
             onColumnVisibilityModelChange={(model) => setColumnVisibilityModel(model)}
             getRowId={(row) => row.id}
             autoHeight

@@ -1196,7 +1196,7 @@ function EbayListingsPage() {
       {
         field: 'image',
         headerName: '',
-        width: 60,
+        width: 52,
         sortable: false,
         filterable: false,
         renderCell: (params: GridRenderCellParams<EbayListingRow>) => {
@@ -1257,7 +1257,7 @@ function EbayListingsPage() {
       {
         field: 'price',
         headerName: t('priceCol'),
-        width: 100,
+        width: 88,
         renderCell: (params: GridRenderCellParams<EbayListingRow>) => (
           <Typography variant="body2">{formatPrice(params.row.price)}</Typography>
         ),
@@ -1272,7 +1272,7 @@ function EbayListingsPage() {
       {
         field: 'quantity',
         headerName: t('stockCol'),
-        width: 80,
+        width: 66,
         renderCell: (params: GridRenderCellParams<EbayListingRow>) => {
           const qty = params.row.quantity;
           const color = qty === 0 ? 'error' : qty < 5 ? 'warning' : 'success';
@@ -1292,7 +1292,7 @@ function EbayListingsPage() {
       {
         field: 'condition',
         headerName: t('conditionCol'),
-        width: 100,
+        width: 88,
         renderCell: (params: GridRenderCellParams<EbayListingRow>) => (
           <Chip
             label={CONDITION_LABELS[params.row.condition] || params.row.condition}
@@ -1377,14 +1377,14 @@ function EbayListingsPage() {
       {
         field: 'imageCount',
         headerName: t('imageCol'),
-        width: 70,
+        width: 62,
         renderCell: (params: GridRenderCellParams<EbayListingRow>) =>
           `${params.row.imageCount}/24`,
       },
       {
         field: 'status',
         headerName: t('statusCol'),
-        width: 100,
+        width: 92,
         renderCell: (params: GridRenderCellParams<EbayListingRow>) => {
           const isPublished = params.row.status === 'PUBLISHED';
           return (

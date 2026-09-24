@@ -1384,7 +1384,7 @@ function EbayListingsPage() {
       {
         field: 'status',
         headerName: t('statusCol'),
-        width: 92,
+        width: 106,
         renderCell: (params: GridRenderCellParams<EbayListingRow>) => {
           const isPublished = params.row.status === 'PUBLISHED';
           return (

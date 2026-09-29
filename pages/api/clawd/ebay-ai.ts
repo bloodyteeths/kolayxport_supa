@@ -459,6 +459,9 @@ Rules:
 - For "Type", "Style", "Material", "Color", "Size": pick the single best value from the title context
 - Only fill aspects where you can make a reasonable guess — skip ones you're unsure about
 - Values must be in English (eBay standard)
+- HARD LIMIT: each value must be 65 characters or fewer. eBay rejects the whole
+  listing at publish time otherwise. Use the short catalogue term ("Die-cast metal",
+  "Marble"), never a descriptive sentence.
 - If current values already exist, keep them unless you have a better suggestion
 
 ${marketContext}
@@ -469,7 +472,19 @@ Respond with ONLY valid JSON: { "aspects": { "AspectName": ["value"], ... } }`;
 Aspects to fill: ${aspectNames.join(', ')}
 ${currentAspects && Object.keys(currentAspects).length > 0 ? `Current values: ${JSON.stringify(currentAspects)}` : ''}`;
 
-  return askClaude<SuggestAspectsOutput>(systemPrompt, userMsg, 1024);
+  const result = await askClaude<SuggestAspectsOutput>(systemPrompt, userMsg, 1024);
+
+  // eBay rejects an item specific longer than 65 characters, and only says so at
+  // publish time — clamp here so a chatty model can't poison the listing.
+  const aspects: Record<string, string[]> = {};
+  for (const [name, values] of Object.entries(result?.aspects || {})) {
+    const kept = (Array.isArray(values) ? values : [values])
+      .map((v) => String(v ?? '').trim())
+      .filter(Boolean)
+      .filter((v) => v.length <= 65);
+    if (kept.length > 0) aspects[name] = kept;
+  }
+  return { aspects };
 }
 
 // ---------------------------------------------------------------------------

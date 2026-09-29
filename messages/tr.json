@@ -5084,7 +5084,8 @@
       "priceComparableRange": "Piyasa aralığı {min}–{max} {currency}",
       "footerHintSaveFirst": "Önce değişikliklerinizi kaydedin, sonra eBay’e gönderin.",
       "footerHintReadyToSync": "Kaydedildi. Değişiklikleri eBay’e göndermek için senkronize edin.",
-      "footerHintNoChanges": "Kaydetmek için bir alanı düzenleyin."
+      "footerHintNoChanges": "Kaydetmek için bir alanı düzenleyin.",
+      "checkAspectTooLong": "{names} kısaltın — eBay 65 karaktere izin veriyor"
     },
     "financial": {
       "revenueCalculator": "Gelir Hesaplayıcı",

@@ -4943,7 +4943,8 @@
       "priceComparableRange": "Market range {min}–{max} {currency}",
       "footerHintSaveFirst": "Save your changes first, then sync them to eBay.",
       "footerHintReadyToSync": "Saved. Sync to push these changes to eBay.",
-      "footerHintNoChanges": "Edit a field to save changes."
+      "footerHintNoChanges": "Edit a field to save changes.",
+      "checkAspectTooLong": "Shorten {names} — eBay allows 65 characters"
     },
     "financial": {
       "revenueCalculator": "Revenue Calculator",

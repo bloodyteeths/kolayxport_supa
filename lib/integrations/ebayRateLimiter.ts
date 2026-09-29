@@ -35,20 +35,32 @@ interface CallOptions {
 function summarizeEbayError(body: string): string {
   try {
     const parsed = JSON.parse(body);
-    const errors = Array.isArray(parsed?.errors) ? parsed.errors : [];
+    const errors = [
+      ...(Array.isArray(parsed?.errors) ? parsed.errors : []),
+      ...(Array.isArray(parsed?.warnings) ? parsed.warnings : []),
+    ];
     if (errors.length > 0) {
       return errors
         .map((e: any) => {
           const text = e.longMessage || e.message || 'Unknown error';
-          return e.errorId ? `${text} (eBay ${e.errorId})` : text;
+          // Generic errors (notably 2004, "The request has errors") say nothing
+          // on their own — the field at fault is only named in `parameters`.
+          const params = (e.parameters || [])
+            .map((p: any) => (p?.name && p?.value ? `${p.name}: ${p.value}` : p?.value))
+            .filter(Boolean)
+            .join(', ');
+          const parts = [text];
+          if (params) parts.push(`[${params}]`);
+          if (e.errorId) parts.push(`(eBay ${e.errorId})`);
+          return parts.join(' ');
         })
         .join(' | ')
-        .substring(0, 400);
+        .substring(0, 600);
     }
   } catch {
     // Not JSON — fall through to the raw body.
   }
-  return body.substring(0, 300);
+  return body.substring(0, 400);
 }
 
 export async function callEbayRateLimited<T = any>(

@@ -126,6 +126,34 @@ const CURRENCY_OPTIONS = [
   { value: 'TRY', label: 'TRY' },
 ];
 
+/**
+ * eBay caps an item-specific value at 65 characters and rejects empty ones —
+ * but only at publish time, not when the inventory item is created. An AI-written
+ * value like "Premium die-cast metal body with high-quality plastic detailing and
+ * rubber tyres" therefore sails through creation and fails the publish with a
+ * generic error. Clean the map before it is ever sent.
+ */
+const ASPECT_VALUE_MAX = 65;
+
+function sanitizeAspects(aspects: Record<string, string[]>): Record<string, string[]> {
+  const clean: Record<string, string[]> = {};
+  for (const [name, values] of Object.entries(aspects || {})) {
+    const kept = (values || [])
+      .map((v) => String(v ?? '').trim())
+      .filter(Boolean)
+      .map((v) => (v.length > ASPECT_VALUE_MAX ? v.slice(0, ASPECT_VALUE_MAX).trim() : v));
+    if (kept.length > 0) clean[name.trim()] = kept;
+  }
+  return clean;
+}
+
+/** Names whose value the seller must shorten before eBay will accept a publish. */
+function overlongAspectNames(aspects: Record<string, string[]>): string[] {
+  return Object.entries(aspects || {})
+    .filter(([, values]) => (values || []).some((v) => String(v ?? '').trim().length > ASPECT_VALUE_MAX))
+    .map(([name]) => name);
+}
+
 /** Work-in-progress listings survive an accidental close or a page reload. */
 const DRAFT_STORAGE_KEY = 'kx.ebay.listingDraft.v1';
 /** Sellers pick the same three policies every time — remember the last choice. */
@@ -955,6 +983,8 @@ export default function ListingCreatorDialog({
       .filter((name) => !axisNames.has(name) && !aspects[name]?.length);
   }, [requiredAspects, aspects, hasVariations, variationAspects]);
 
+  const tooLongAspects = useMemo(() => overlongAspectNames(aspects), [aspects]);
+
   const checklist = useMemo(
     () => [
       { id: 'photos', ok: images.length > 0, label: t('checkPhotos'), ref: photosRef, blocksDraft: true },
@@ -971,6 +1001,17 @@ export default function ListingCreatorDialog({
         ref: categoryRef,
         blocksDraft: false,
       },
+      ...(tooLongAspects.length > 0
+        ? [
+            {
+              id: 'aspectLength',
+              ok: false,
+              label: t('checkAspectTooLong', { names: tooLongAspects.join(', ') }),
+              ref: categoryRef,
+              blocksDraft: false,
+            },
+          ]
+        : []),
       {
         id: 'policies',
         ok: Boolean(fulfillmentPolicyId && returnPolicyId && paymentPolicyId),
@@ -997,7 +1038,7 @@ export default function ListingCreatorDialog({
     [
       images.length, title, description, selectedCategory, price, missingRequiredAspects.length,
       fulfillmentPolicyId, returnPolicyId, paymentPolicyId,
-      hasVariations, definedVariationAspects.length, variationRows,
+      hasVariations, definedVariationAspects.length, variationRows, tooLongAspects,
     ]
   );
 
@@ -1047,7 +1088,7 @@ export default function ListingCreatorDialog({
       if (hasVariations && variationRows.length > 0) {
         // ---- VARIATION LISTING FLOW ----
         for (const row of variationRows) {
-          const varAspects = { ...aspects };
+          const varAspects = sanitizeAspects({ ...aspects });
           for (const [key, value] of Object.entries(row.combination)) {
             varAspects[key] = [value];
           }
@@ -1098,8 +1139,10 @@ export default function ListingCreatorDialog({
               title: title.trim(),
               description: description.trim(),
               imageUrls: images,
-              aspects: Object.fromEntries(
-                Object.entries(aspects).filter(([key]) => !varAspectNames.includes(key))
+              aspects: sanitizeAspects(
+                Object.fromEntries(
+                  Object.entries(aspects).filter(([key]) => !varAspectNames.includes(key))
+                )
               ),
               variantSKUs: variationRows.map((r) => r.sku),
               variesBy: {
@@ -1176,7 +1219,7 @@ export default function ListingCreatorDialog({
               product: {
                 title: title.trim(),
                 description: description.trim(),
-                aspects,
+                aspects: sanitizeAspects(aspects),
                 imageUrls: images,
               },
               condition,

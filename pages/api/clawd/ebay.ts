@@ -2331,12 +2331,20 @@ export default async function handler(
 
       // Part 2: Legacy listings (Browse API)
       const seenSkus = new Set<string>();
+      // A listing published through the Inventory API also shows up in the
+      // seller's public Browse results. Deduping on the synthetic `legacy-<id>`
+      // SKU alone never matched its real SKU, so every listing created here was
+      // re-imported as a read-only "legacy" twin. Dedupe on listingId too.
+      const seenListingIds = new Set<string>();
       try {
         const existingSkus = await prisma.ebayListing.findMany({
           where: { userId, syncedAt },
-          select: { sku: true },
+          select: { sku: true, listingId: true },
         });
-        for (const e of existingSkus) seenSkus.add(e.sku);
+        for (const e of existingSkus) {
+          seenSkus.add(e.sku);
+          if (e.listingId) seenListingIds.add(String(e.listingId));
+        }
       } catch { /* ok */ }
 
       try {
@@ -2400,7 +2408,7 @@ export default async function handler(
         // Fetch full details for each legacy listing
         const results = await Promise.allSettled(
           listingIds
-            .filter(id => !seenSkus.has(`legacy-${id}`))
+            .filter(id => !seenSkus.has(`legacy-${id}`) && !seenListingIds.has(String(id)))
             .map(async (legacyId) => {
               try {
                 const item = await callEbayAPI(

@@ -51,9 +51,24 @@ export default function ConditionSelector({
     return key ? t(key) : value;
   }
 
-  const DEFAULT_CONDITIONS = Object.entries(CONDITION_KEYS).map(([value, key]) => ({
+  /**
+   * eBay's condition-policy endpoint returns nothing for most categories, yet the
+   * publish still enforces one. Verified against a model-car category: NEW and
+   * USED_EXCELLENT publish, while LIKE_NEW and the graded USED_VERY_GOOD /
+   * USED_GOOD / USED_ACCEPTABLE are rejected — those are media-only grades. So
+   * default to the set that works everywhere and let an explicit category list
+   * widen it.
+   */
+  const UNIVERSAL_CONDITIONS = [
+    'NEW',
+    'NEW_OTHER',
+    'USED_EXCELLENT',
+    'FOR_PARTS_OR_NOT_WORKING',
+  ];
+
+  const DEFAULT_CONDITIONS = UNIVERSAL_CONDITIONS.map((value) => ({
     value,
-    label: t(key),
+    label: t(CONDITION_KEYS[value]),
   }));
 
   // Use category-specific conditions if provided, otherwise defaults

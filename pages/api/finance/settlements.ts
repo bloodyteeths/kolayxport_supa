@@ -474,11 +474,30 @@ export async function handleSync(userId: string, body: any, res: NextApiResponse
             externalId,
           },
         },
-        update: { ...txData, syncedAt: new Date() },
+        // Cargo invoices land 2-3 weeks after the sale, usually in a later
+        // sync window — never wipe a shipping cost an earlier sync attached.
+        update: {
+          ...txData,
+          ...(txData.shippingAmount == null ? { shippingAmount: undefined } : {}),
+          syncedAt: new Date(),
+        },
         create: { userId, marketplace: 'trendyol', externalId, ...txData },
       });
     }));
     totalUpserted += batch.length;
+  }
+
+  // Attach this window's cargo invoice costs to sale rows synced in EARLIER
+  // windows (the invoice arrives weeks after the sale, so the two are rarely
+  // fetched together).
+  const cargoEntries = [...orderShippingMap.entries()];
+  for (let i = 0; i < cargoEntries.length; i += UPSERT_BATCH) {
+    await Promise.all(cargoEntries.slice(i, i + UPSERT_BATCH).map(([orderNumber, shippingAmount]) =>
+      prisma.financialTransaction.updateMany({
+        where: { userId, marketplace: 'trendyol', orderNumber, shippingAmount: null },
+        data: { shippingAmount },
+      })
+    ));
   }
 
   // ---- PHASE 4: store deduction invoices + stopaj as transactions ----

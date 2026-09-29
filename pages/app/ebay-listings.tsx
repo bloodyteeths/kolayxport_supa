@@ -125,9 +125,17 @@ interface EbayListingRow {
 // Helpers
 // ---------------------------------------------------------------------------
 
+// eBay returns the USED_ prefixed grades; the bare ones are kept only so older
+// cached rows still render a label.
 const CONDITION_LABELS: Record<string, string> = {
   NEW: 'New',
   LIKE_NEW: 'Like New',
+  NEW_OTHER: 'New (Other)',
+  USED_EXCELLENT: 'Used — Excellent',
+  USED_VERY_GOOD: 'Used — Very Good',
+  USED_GOOD: 'Used — Good',
+  USED_ACCEPTABLE: 'Used — Acceptable',
+  FOR_PARTS_OR_NOT_WORKING: 'For Parts',
   VERY_GOOD: 'Very Good',
   GOOD: 'Good',
   ACCEPTABLE: 'Acceptable',
@@ -529,9 +537,10 @@ function LeftSidebar({
             <MenuItem value="all">{t('allConditions')}</MenuItem>
             <MenuItem value="NEW">{t('condNew')}</MenuItem>
             <MenuItem value="LIKE_NEW">{t('condLikeNew')}</MenuItem>
-            <MenuItem value="VERY_GOOD">{t('condVeryGood')}</MenuItem>
-            <MenuItem value="GOOD">{t('condGood')}</MenuItem>
-            <MenuItem value="ACCEPTABLE">{t('condAcceptable')}</MenuItem>
+            <MenuItem value="USED_EXCELLENT">{t('condUsedExcellent')}</MenuItem>
+            <MenuItem value="USED_VERY_GOOD">{t('condVeryGood')}</MenuItem>
+            <MenuItem value="USED_GOOD">{t('condGood')}</MenuItem>
+            <MenuItem value="USED_ACCEPTABLE">{t('condAcceptable')}</MenuItem>
           </Select>
         </FormControl>
       </Paper>

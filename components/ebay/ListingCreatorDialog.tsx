@@ -133,6 +133,21 @@ const CURRENCY_OPTIONS = [
  * rubber tyres" therefore sails through creation and fails the publish with a
  * generic error. Clean the map before it is ever sent.
  */
+/**
+ * Older builds offered VERY_GOOD / GOOD / ACCEPTABLE, which are not eBay
+ * ConditionEnum values — eBay answered "Could not serialize field [condition]".
+ * Map them so an autosaved draft written before the fix still publishes.
+ */
+const LEGACY_CONDITION_MAP: Record<string, string> = {
+  VERY_GOOD: 'USED_VERY_GOOD',
+  GOOD: 'USED_GOOD',
+  ACCEPTABLE: 'USED_ACCEPTABLE',
+};
+
+function normalizeCondition(value: string): string {
+  return LEGACY_CONDITION_MAP[value] || value;
+}
+
 const ASPECT_VALUE_MAX = 65;
 
 function sanitizeAspects(aspects: Record<string, string[]>): Record<string, string[]> {
@@ -364,7 +379,7 @@ export default function ListingCreatorDialog({
       setTitle(saved.title || '');
       setDescription(saved.description || '');
       setSkuInput(saved.skuInput || '');
-      setCondition(saved.condition || 'NEW');
+      setCondition(normalizeCondition(saved.condition || 'NEW'));
       setConditionDescription(saved.conditionDescription || '');
       setCategorySearchQuery(saved.categorySearchQuery || '');
       setSelectedCategory(saved.selectedCategory || null);
@@ -1114,7 +1129,7 @@ export default function ListingCreatorDialog({
                   aspects: varAspects,
                   imageUrls: variantImages,
                 },
-                condition,
+                condition: normalizeCondition(condition),
                 conditionDescription: condition !== 'NEW' ? conditionDescription : undefined,
                 availability: {
                   shipToLocationAvailability: { quantity: parseInt(row.quantity) || 1 },
@@ -1222,7 +1237,7 @@ export default function ListingCreatorDialog({
                 aspects: sanitizeAspects(aspects),
                 imageUrls: images,
               },
-              condition,
+              condition: normalizeCondition(condition),
               conditionDescription: condition !== 'NEW' ? conditionDescription : undefined,
               availability: {
                 shipToLocationAvailability: { quantity: parseInt(quantity) || 1 },

@@ -98,12 +98,14 @@ export default function BulkOperationsBar({
 }: BulkOperationsBarProps) {
   const t = useTranslations('ebayListings');
 
+  // eBay's ConditionEnum prefixes the used grades with USED_; the bare forms
+  // are rejected outright.
   const CONDITION_OPTIONS: { value: string; label: string }[] = [
     { value: 'NEW', label: t('bulk.condNew') },
     { value: 'LIKE_NEW', label: t('bulk.condLikeNew') },
-    { value: 'VERY_GOOD', label: t('bulk.condVeryGood') },
-    { value: 'GOOD', label: t('bulk.condGood') },
-    { value: 'ACCEPTABLE', label: t('bulk.condAcceptable') },
+    { value: 'USED_VERY_GOOD', label: t('bulk.condVeryGood') },
+    { value: 'USED_GOOD', label: t('bulk.condGood') },
+    { value: 'USED_ACCEPTABLE', label: t('bulk.condAcceptable') },
   ];
 
   // Dialog states - existing

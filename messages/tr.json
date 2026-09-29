@@ -5085,7 +5085,12 @@
       "footerHintSaveFirst": "Önce değişikliklerinizi kaydedin, sonra eBay’e gönderin.",
       "footerHintReadyToSync": "Kaydedildi. Değişiklikleri eBay’e göndermek için senkronize edin.",
       "footerHintNoChanges": "Kaydetmek için bir alanı düzenleyin.",
-      "checkAspectTooLong": "{names} kısaltın — eBay 65 karaktere izin veriyor"
+      "checkAspectTooLong": "{names} kısaltın — eBay 65 karaktere izin veriyor",
+      "conditionNewOther": "Yeni (Diğer)",
+      "conditionUsedExcellent": "Kullanılmış — Mükemmel",
+      "conditionUsedVeryGood": "Kullanılmış — Çok İyi",
+      "conditionUsedGood": "Kullanılmış — İyi",
+      "conditionUsedAcceptable": "Kullanılmış — Kabul Edilebilir"
     },
     "financial": {
       "revenueCalculator": "Gelir Hesaplayıcı",
@@ -6746,7 +6751,8 @@
     "viewCompact": "Sıkışık",
     "viewStandard": "Standart",
     "viewComfortable": "Tümü",
-    "listingsCountFiltered": "{total} ilandan {count} tanesi"
+    "listingsCountFiltered": "{total} ilandan {count} tanesi",
+    "condUsedExcellent": "Kullanılmış — Mükemmel"
   },
   "etsyResearch": {
     "pageTitle": "Etsy Araştırma",

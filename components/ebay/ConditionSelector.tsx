@@ -22,12 +22,19 @@ interface ConditionSelectorProps {
   onChange: (condition: string, description: string) => void;
 }
 
+/**
+ * eBay's Inventory API ConditionEnum. The used grades are prefixed USED_ — the
+ * bare VERY_GOOD / GOOD / ACCEPTABLE we used to send are not valid values and
+ * eBay rejected the whole request with "Could not serialize field [condition]".
+ */
 const CONDITION_KEYS: Record<string, string> = {
   NEW: 'conditionNew',
   LIKE_NEW: 'conditionLikeNew',
-  VERY_GOOD: 'conditionVeryGood',
-  GOOD: 'conditionGood',
-  ACCEPTABLE: 'conditionAcceptable',
+  NEW_OTHER: 'conditionNewOther',
+  USED_EXCELLENT: 'conditionUsedExcellent',
+  USED_VERY_GOOD: 'conditionUsedVeryGood',
+  USED_GOOD: 'conditionUsedGood',
+  USED_ACCEPTABLE: 'conditionUsedAcceptable',
   FOR_PARTS_OR_NOT_WORKING: 'conditionForParts',
 };
 

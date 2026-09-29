@@ -4944,7 +4944,12 @@
       "footerHintSaveFirst": "Save your changes first, then sync them to eBay.",
       "footerHintReadyToSync": "Saved. Sync to push these changes to eBay.",
       "footerHintNoChanges": "Edit a field to save changes.",
-      "checkAspectTooLong": "Shorten {names} — eBay allows 65 characters"
+      "checkAspectTooLong": "Shorten {names} — eBay allows 65 characters",
+      "conditionNewOther": "New (Other)",
+      "conditionUsedExcellent": "Used — Excellent",
+      "conditionUsedVeryGood": "Used — Very Good",
+      "conditionUsedGood": "Used — Good",
+      "conditionUsedAcceptable": "Used — Acceptable"
     },
     "financial": {
       "revenueCalculator": "Revenue Calculator",
@@ -6746,7 +6751,8 @@
     "viewCompact": "Compact",
     "viewStandard": "Standard",
     "viewComfortable": "All",
-    "listingsCountFiltered": "{count} of {total} listings"
+    "listingsCountFiltered": "{count} of {total} listings",
+    "condUsedExcellent": "Used — Excellent"
   },
   "etsyResearch": {
     "pageTitle": "Etsy Research",

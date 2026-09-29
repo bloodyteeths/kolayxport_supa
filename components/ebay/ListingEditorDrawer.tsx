@@ -1760,6 +1760,15 @@ export default function ListingEditorDrawer({
                 {draftError}
               </Alert>
             )}
+            {/* Two steps: changes are staged locally, then pushed to eBay. Say so,
+                otherwise a disabled Sync button looks like a broken save. */}
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
+              {hasChanges()
+                ? t('footerHintSaveFirst')
+                : draftId
+                  ? t('footerHintReadyToSync')
+                  : t('footerHintNoChanges')}
+            </Typography>
             <Box sx={{ display: 'flex', gap: 1 }}>
               <Button
                 variant="outlined"

@@ -5080,7 +5080,10 @@
       "checkVariations": "Varyasyonlarda SKU ve fiyat var",
       "priceComparablesTitle": "Benzer ilanların fiyatları",
       "priceComparableSold": "{count} satış",
-      "priceComparableRange": "Piyasa aralığı {min}–{max} {currency}"
+      "priceComparableRange": "Piyasa aralığı {min}–{max} {currency}",
+      "footerHintSaveFirst": "Önce değişikliklerinizi kaydedin, sonra eBay’e gönderin.",
+      "footerHintReadyToSync": "Kaydedildi. Değişiklikleri eBay’e göndermek için senkronize edin.",
+      "footerHintNoChanges": "Kaydetmek için bir alanı düzenleyin."
     },
     "financial": {
       "revenueCalculator": "Gelir Hesaplayıcı",

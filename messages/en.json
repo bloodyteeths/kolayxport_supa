@@ -4939,7 +4939,10 @@
       "checkVariations": "Variations have SKU and price",
       "priceComparablesTitle": "What similar listings charge",
       "priceComparableSold": "{count} sold",
-      "priceComparableRange": "Market range {min}–{max} {currency}"
+      "priceComparableRange": "Market range {min}–{max} {currency}",
+      "footerHintSaveFirst": "Save your changes first, then sync them to eBay.",
+      "footerHintReadyToSync": "Saved. Sync to push these changes to eBay.",
+      "footerHintNoChanges": "Edit a field to save changes."
     },
     "financial": {
       "revenueCalculator": "Revenue Calculator",

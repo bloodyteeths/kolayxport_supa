@@ -9,6 +9,7 @@ import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
 
 const TRENDYOL_API_BASE = 'https://apigw.trendyol.com/integration';
 const EBAY_FINANCES_BASE = 'https://apiz.ebay.com';
+const DAY_MS = 86_400_000;
 
 // Allow longer timeout for settlement sync (can take a while with many windows)
 export const config = { maxDuration: 120 };
@@ -1732,6 +1733,32 @@ export async function handleAmazonSync(userId: string, body: any, res: NextApiRe
     if (pages > 100) break; // safety cap
   } while (v0NextToken);
 
+  // ServiceFeeEvents (storage, removal, subscription…) carry NO PostedDate.
+  // Keying them by array index within the whole window gave every sync new
+  // externalIds, so one monthly storage fee was re-inserted on every run (a
+  // single $47.31 long-term storage fee showed up 6×). Re-fetch them one UTC
+  // day at a time instead: the day becomes their date, and (day, index) is a
+  // stable key because a day's events keep their order across syncs.
+  const serviceFeeDays: Array<{ day: string; events: any[] }> = [];
+  if ((allEvents.ServiceFeeEventList || []).length > 0) {
+    for (let dayStart = Math.floor(startMs / DAY_MS) * DAY_MS; dayStart < endMs; dayStart += DAY_MS) {
+      const dayEnd = Math.min(dayStart + DAY_MS, endMs);
+      const events: any[] = [];
+      let token2: string | null = null;
+      let dayPages = 0;
+      do {
+        const qs = token2
+          ? `NextToken=${encodeURIComponent(token2)}`
+          : `PostedAfter=${encodeURIComponent(new Date(dayStart).toISOString())}&PostedBefore=${encodeURIComponent(new Date(dayEnd).toISOString())}&MaxResultsPerPage=100`;
+        const data = await callSpApiWithRetry(`/finances/v0/financialEvents?${qs}`, token, region);
+        events.push(...((data as any)?.payload?.FinancialEvents?.ServiceFeeEventList || []));
+        token2 = (data as any)?.payload?.NextToken || null;
+        dayPages++;
+      } while (token2 && dayPages < 20);
+      if (events.length > 0) serviceFeeDays.push({ day: new Date(dayStart).toISOString().slice(0, 10), events });
+    }
+  }
+
   const eventTotal = Object.values(allEvents).reduce(
     (s: number, a: any) => s + (Array.isArray(a) ? a.length : 0),
     0,
@@ -1869,23 +1896,53 @@ export async function handleAmazonSync(userId: string, body: any, res: NextApiRe
           rawData: item,
         });
       }
+      // Fee adjustments on the refund: Amazon credits back the referral fee
+      // (+Commission) and keeps a refund admin fee (−RefundCommission). Signed
+      // amounts, so the dashboard's commission bucket nets them correctly.
+      const feeAdjs = item.ItemFeeAdjustmentList || [];
+      for (let j = 0; j < feeAdjs.length; j++) {
+        const fee = feeAdjs[j];
+        const feeAmt = amt(fee.FeeAmount);
+        if (feeAmt === 0) continue;
+        const feeType = fee.FeeType || '';
+        const lower = feeType.toLowerCase();
+        const kind = lower.includes('commission') || lower.includes('referral') ? 'AmazonCommission' : 'AmazonOther';
+        upsertBatch.push({
+          externalId: `amz_refundfee_${orderId}_${item.OrderAdjustmentItemId || item.OrderItemId || i}_${feeType}_${j}`,
+          transactionType: kind,
+          orderNumber: orderId,
+          barcode: asin,
+          productName: feeType,
+          quantity: 1,
+          amount: feeAmt,
+          currency: curr(fee.FeeAmount),
+          commission: null,
+          shippingAmount: null,
+          transactionDate: txDate,
+          rawData: fee,
+        });
+      }
     }
   }
 
-  // ---- 2c. Service Fee events → FBAFee / FBAStorage / AmazonOther
-  for (let i = 0; i < (allEvents.ServiceFeeEventList || []).length; i++) {
-    const ev = allEvents.ServiceFeeEventList[i];
+  // ---- 2c. Service Fee events → FBAFee / FBAStorage / FBAInventoryFee / AmazonOther
+  // Storage, removal/disposal and customer-return processing are inventory
+  // costs, not shipping — they go to FBAStorage / FBAInventoryFee (the
+  // dashboard's fees bucket). Only real fulfillment stays FBAFee (shipping).
+  for (const { day, events } of serviceFeeDays) for (let i = 0; i < events.length; i++) {
+    const ev = events[i];
     const orderId = ev.AmazonOrderId || null;
-    const reason = (ev.FeeReason || ev.FeeDescription || '').toString();
-    const reasonLower = reason.toLowerCase();
-    const txDate = ev.PostedDate ? new Date(ev.PostedDate) : new Date();
+    const txDate = new Date(`${day}T12:00:00.000Z`);
     const fees = ev.FeeList || [];
     for (let j = 0; j < fees.length; j++) {
       const fee = fees[j];
+      const reason = (ev.FeeReason || ev.FeeDescription || fee.FeeType || '').toString();
+      const reasonLower = reason.toLowerCase();
       const feeAmt = amt(fee.FeeAmount);
       const feeCur = curr(fee.FeeAmount);
       let kind: string = 'AmazonOther';
       if (reasonLower.includes('storage')) kind = 'FBAStorage';
+      else if (reasonLower.includes('removal') || reasonLower.includes('disposal') || reasonLower.includes('customer return')) kind = 'FBAInventoryFee';
       else if (reasonLower.includes('fba') || reasonLower.includes('fulfillment')) kind = 'FBAFee';
       else if (reasonLower.includes('sponsored') || reasonLower.includes('advertising') || reasonLower.includes('cost of advertising')) {
         // Ad fee — store PER EVENT (keyed by svcfee id) instead of tallying
@@ -1896,7 +1953,7 @@ export async function handleAmazonSync(userId: string, body: any, res: NextApiRe
         adSpendCount++;
       }
       upsertBatch.push({
-        externalId: `amz_svcfee_${ev.SellerId || ''}_${ev.PostedDate || ''}_${reason}_${i}_${j}`,
+        externalId: `amz_svcfee_d${day}_${i}_${j}`,
         transactionType: kind,
         orderNumber: orderId,
         barcode: ev.ASIN || null,

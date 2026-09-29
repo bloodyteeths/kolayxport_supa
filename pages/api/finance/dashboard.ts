@@ -137,7 +137,10 @@ function classifyTransactionType(type: string): 'revenue' | 'commission' | 'ship
   // Amazon-specific types
   if (t.includes('productcharges') || t.includes('productcharge')) return 'revenue';
   if (t.includes('referralfee') || t.includes('amazoncommission')) return 'commission';
-  if (t.includes('fbafee') || t.includes('fulfillmentfee') || t.includes('fbainbound') || t.includes('fbastorage')) return 'shipping';
+  // FBA storage / removal / disposal / return-processing are inventory costs,
+  // not shipping — they land in the fees bucket (Platform Fees card).
+  if (t.includes('fbastorage') || t.includes('fbainventoryfee')) return 'fees';
+  if (t.includes('fbafee') || t.includes('fulfillmentfee') || t.includes('fbainbound')) return 'shipping';
   if (t.includes('refundcommission') || t.includes('amazonrefund')) return 'return';
   if (t.includes('sponsoredproduct') || t.includes('sponsoredbrand') || t.includes('sponsoreddisplay') || t.includes('amazonadspend')) return 'adspend';
   if (t.includes('amazoncoupon') || t.includes('amazondiscount')) return 'discount';

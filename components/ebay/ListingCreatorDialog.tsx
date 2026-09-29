@@ -256,6 +256,10 @@ export default function ListingCreatorDialog({
   const [requiredAspects, setRequiredAspects] = useState<AspectMetadata[]>([]);
   const [recommendedAspects, setRecommendedAspects] = useState<AspectMetadata[]>([]);
   const [aspectsLoading, setAspectsLoading] = useState(false);
+  /** Conditions eBay accepts for the chosen category; empty means no restriction. */
+  const [categoryConditions, setCategoryConditions] = useState<
+    { conditionId: string; conditionDescription: string }[]
+  >([]);
 
   const [images, setImages] = useState<string[]>([]);
 
@@ -307,6 +311,7 @@ export default function ListingCreatorDialog({
     setAspects({});
     setRequiredAspects([]);
     setRecommendedAspects([]);
+    setCategoryConditions([]);
     setImages([]);
     setFulfillmentPolicyId('');
     setReturnPolicyId('');
@@ -770,6 +775,7 @@ export default function ListingCreatorDialog({
     mark('aspects', 'running');
     try {
       if (category) {
+        fetchConditionsForCategory(category.id);
         const { required, recommended } = await fetchAspectsForCategory(category.id);
         const names = [...required, ...recommended]
           .slice(0, 15)
@@ -847,10 +853,31 @@ export default function ListingCreatorDialog({
     }, 400);
   };
 
+  /** eBay accepts a different condition set per category — load it so the
+   *  dropdown can't offer one that will be rejected at publish. */
+  const fetchConditionsForCategory = async (categoryId: string) => {
+    try {
+      const res = await fetch(
+        `/api/clawd/ebay?action=item_conditions&category_id=${categoryId}&user_id=${userId}`
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      const allowed = data.itemConditions || [];
+      setCategoryConditions(allowed);
+      // Drop a now-invalid selection rather than failing at publish.
+      if (allowed.length > 0 && !allowed.some((c: any) => c.conditionId === condition)) {
+        setCondition(allowed[0].conditionId);
+      }
+    } catch {
+      setCategoryConditions([]);
+    }
+  };
+
   /** Picking a category immediately pulls its aspects and has the AI fill the required ones. */
   const handleCategorySelected = async (value: CategoryOption) => {
     setSelectedCategory(value);
     setCategorySearchQuery(value.name);
+    fetchConditionsForCategory(value.id);
     const { required } = await fetchAspectsForCategory(value.id);
     const unfilled = required
       .map((a) => a.localizedAspectName)
@@ -1889,6 +1916,7 @@ export default function ListingCreatorDialog({
             <ConditionSelector
               condition={condition}
               conditionDescription={conditionDescription}
+              categoryConditions={categoryConditions}
               onChange={(c, d) => {
                 setCondition(c);
                 setConditionDescription(d);

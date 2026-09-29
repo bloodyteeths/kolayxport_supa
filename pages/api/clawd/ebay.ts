@@ -39,6 +39,28 @@ async function callEbayAPI(endpoint: string, accessToken: string, options: Reque
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * eBay's Taxonomy API reports conditions as numeric ids; the Inventory API wants
+ * the enum name. Categories differ in which they accept — a model car rejects
+ * USED_VERY_GOOD (4000) but takes USED_EXCELLENT (3000, shown as plain "Used").
+ */
+const CONDITION_ID_TO_ENUM: Record<string, string> = {
+  '1000': 'NEW',
+  '1500': 'NEW_OTHER',
+  '1750': 'NEW_WITH_DEFECTS',
+  '2000': 'CERTIFIED_REFURBISHED',
+  '2010': 'EXCELLENT_REFURBISHED',
+  '2020': 'VERY_GOOD_REFURBISHED',
+  '2030': 'GOOD_REFURBISHED',
+  '2500': 'SELLER_REFURBISHED',
+  '2750': 'LIKE_NEW',
+  '3000': 'USED_EXCELLENT',
+  '4000': 'USED_VERY_GOOD',
+  '5000': 'USED_GOOD',
+  '6000': 'USED_ACCEPTABLE',
+  '7000': 'FOR_PARTS_OR_NOT_WORKING',
+};
+
 /** Fetch the first inventory location key for the user (needed for publishing). */
 async function getDefaultMerchantLocationKey(
   accessToken: string,
@@ -149,6 +171,42 @@ export default async function handler(
       );
 
       return res.status(200).json(data);
+    }
+
+    // GET ?action=item_conditions&category_id=XXX — Conditions eBay allows here
+    if (req.method === 'GET' && action === 'item_conditions') {
+      const categoryId = req.query.category_id as string;
+      if (!categoryId) {
+        return res.status(400).json({ error: 'category_id is required' });
+      }
+      const categoryTreeId = (req.query.category_tree_id as string) || '0';
+      const appToken = await getApplicationToken();
+
+      try {
+        const data = await callEbayAPI(
+          `/commerce/taxonomy/v1/category_tree/${categoryTreeId}/get_item_condition_policies` +
+            `?filter=categoryIds:{${encodeURIComponent(categoryId)}}`,
+          appToken
+        );
+        const policy = (data.itemConditionPolicies || [])[0];
+        const itemConditions = (policy?.itemConditions || [])
+          .map((c: any) => ({
+            conditionId: CONDITION_ID_TO_ENUM[String(c.conditionId)] || null,
+            conditionDescription: c.conditionDescription || '',
+          }))
+          .filter((c: any) => c.conditionId);
+
+        return res.status(200).json({
+          categoryId,
+          // An empty list means eBay does not restrict conditions for this category.
+          itemConditions,
+          conditionRequired: policy?.itemConditionRequired ?? false,
+        });
+      } catch (err: any) {
+        // Never block the editor on this — fall back to "no restriction".
+        logger.warn(`item_conditions lookup failed for ${categoryId}: ${err.message}`);
+        return res.status(200).json({ categoryId, itemConditions: [], conditionRequired: false });
+      }
     }
 
     // GET ?action=item_aspects&category_id=XXX&category_tree_id=0
@@ -2523,6 +2581,7 @@ export default async function handler(
         'category_tree',
         'category_suggestions',
         'item_aspects',
+        'item_conditions',
         // Policies
         'fulfillment_policies',
         'return_policies',

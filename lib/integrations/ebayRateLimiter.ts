@@ -46,8 +46,12 @@ function summarizeEbayError(body: string): string {
           // Generic errors (notably 2004, "The request has errors") say nothing
           // on their own — the field at fault is only named in `parameters`.
           const params = (e.parameters || [])
-            .map((p: any) => (p?.name && p?.value ? `${p.name}: ${p.value}` : p?.value))
+            .map((p: any) => String(p?.value ?? '').trim())
             .filter(Boolean)
+            // eBay often echoes the message back as a positional parameter; only
+            // keep values that actually add something.
+            .filter((v: string) => !text.includes(v) && !v.includes(text))
+            .filter((v: string, i: number, arr: string[]) => arr.indexOf(v) === i)
             .join(', ');
           const parts = [text];
           if (params) parts.push(`[${params}]`);

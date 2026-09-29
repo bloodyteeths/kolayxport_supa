@@ -132,7 +132,10 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
                 <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {p.productName}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">{p.quantity} {t('sales')}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {p.quantity} {t('sales')}
+                  {!!p.returnedQuantity && <Box component="span" sx={{ color: '#dc2626', ml: 0.75 }}>{t('returnedCount', { count: p.returnedQuantity })}</Box>}
+                </Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Typography variant="body2" sx={{ fontWeight: 700, color: p.netProfit >= 0 ? '#15803d' : '#dc2626' }}>
@@ -236,7 +239,12 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
                     {p.barcode}
                   </Typography>
                 </TableCell>
-                <TableCell align="right"><Typography variant="body2" fontSize="0.8rem">{p.quantity}</Typography></TableCell>
+                <TableCell align="right">
+                  <Typography variant="body2" fontSize="0.8rem">{p.quantity}</Typography>
+                  {!!p.returnedQuantity && (
+                    <Typography variant="caption" sx={{ color: '#dc2626', display: 'block', lineHeight: 1.2 }}>{t('returnedCount', { count: p.returnedQuantity })}</Typography>
+                  )}
+                </TableCell>
                 <TableCell align="right"><Typography variant="body2" fontSize="0.8rem" fontWeight={600}>{fmt(p.revenue)}</Typography></TableCell>
                 <TableCell align="right"><Typography variant="body2" fontSize="0.8rem" color="warning.main">{fmt(p.commissions)}</Typography></TableCell>
                 <TableCell align="right"><Typography variant="body2" fontSize="0.8rem" color="info.main">{fmt(p.shipping)}</Typography></TableCell>

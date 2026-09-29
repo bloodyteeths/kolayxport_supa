@@ -59,6 +59,9 @@ interface ProductBreakdownItem {
   productName: string | null;
   revenue: number;
   quantity: number;
+  // Units returned in the period (İade / refunds). Revenue, commission and
+  // COGS above are already net of them.
+  returnedQuantity: number;
   commissions: number;
   shipping: number;
   cogs: number;
@@ -117,8 +120,10 @@ function classifyTransactionType(type: string): 'revenue' | 'commission' | 'ship
   if (t.includes('sale') || orig === 'Satış' || t.includes('satis')) return 'revenue';
   if (t.includes('shipping') || t.includes('cargo') || t.includes('kargo')) return 'shipping';
   if (t.includes('commission') || t.includes('komisyon') || t.includes('service')) return 'commission';
-  // Discount cancel (İndirim İptal / DiscountCancel) — revenue recovery
-  if (orig === 'İndirim İptal' || t.includes('discountcancel') || (t.includes('indirim') && t.includes('iptal'))) return 'revenue';
+  // Discount cancel (İndirim İptal / DiscountCancel) reverses an earlier
+  // discount (it follows a return). It's a discount-bucket credit, NOT a sale —
+  // as 'revenue' it counted as an extra order and picked up full COGS/shipping.
+  if (orig === 'İndirim İptal' || t.includes('discountcancel') || (t.includes('indirim') && t.includes('iptal'))) return 'discount';
   // Returns (İade / Return / Refund)
   if (orig.startsWith('İade') || t.includes('return') || t.includes('iade') || t.includes('refund')) return 'return';
   // Discounts/coupons (İndirim / Kupon)
@@ -281,6 +286,16 @@ async function buildDashboard(
   // Product breakdown
   const productMap = new Map<string, ProductBreakdownItem>();
 
+  // orderNumber → distinct products sold in it, to split an order's cargo
+  // cost across its products instead of charging the full cost to each.
+  const orderBarcodes = new Map<string, Set<string>>();
+  for (const tx of transactions) {
+    if (!tx.orderNumber || !tx.barcode || classifyTransactionType(tx.transactionType) !== 'revenue') continue;
+    if (!orderBarcodes.has(tx.orderNumber)) orderBarcodes.set(tx.orderNumber, new Set());
+    orderBarcodes.get(tx.orderNumber)!.add(tx.barcode);
+  }
+  const shippingCounted = new Set<string>();
+
   for (const tx of transactions) {
     const amount = Number(tx.amount);
     const commissionAmt = Number(tx.commission || 0);
@@ -333,6 +348,11 @@ async function buildDashboard(
         // reduce it. abs() here used to inflate discounts by every
         // cancellation.
         discounts -= amount;
+        // Trendyol charges commission on the pre-discount price in the Satış
+        // row; each İndirim/Kupon row carries the commission share of the
+        // discount (positive) that it gives back, and each İptal takes it
+        // back again.
+        if (commissionAmt) commissions += amount < 0 ? -commissionAmt : commissionAmt;
         break;
       case 'adspend':
         adSpend += Math.abs(amount);
@@ -366,11 +386,13 @@ async function buildDashboard(
         break;
     }
 
-    // COGS for revenue transactions
-    if (category === 'revenue' && tx.barcode) {
+    // COGS for revenue transactions; a return puts the unit back in stock,
+    // so its cost comes back out.
+    if ((category === 'revenue' || category === 'return') && tx.barcode) {
       const cost = costMap.get(tx.barcode);
       if (cost) {
-        cogs += (cost.costAmount + cost.shippingCost) * quantity;
+        const unitCogs = (cost.costAmount + cost.shippingCost) * quantity;
+        cogs += category === 'return' ? -unitCogs : unitCogs;
       }
     }
 
@@ -394,10 +416,16 @@ async function buildDashboard(
       bucket.shipping += Math.abs(amount);
     } else if (category === 'return') {
       bucket.returns += Math.abs(amount);
+      if (tx.barcode) {
+        const cost = costMap.get(tx.barcode);
+        if (cost) bucket.cogs -= (cost.costAmount + cost.shippingCost) * quantity;
+      }
     }
 
-    // Product breakdown (only for transactions with barcode)
-    if (tx.barcode && category === 'revenue') {
+    // Product breakdown (only for transactions with barcode). Net per product:
+    // sales minus returns and discounts, so a sold-then-returned order nets
+    // to zero instead of showing as profit.
+    if (tx.barcode && (category === 'revenue' || category === 'return' || category === 'discount')) {
       const key = tx.barcode;
       if (!productMap.has(key)) {
         productMap.set(key, {
@@ -405,6 +433,7 @@ async function buildDashboard(
           productName: tx.productName,
           revenue: 0,
           quantity: 0,
+          returnedQuantity: 0,
           commissions: 0,
           shipping: 0,
           cogs: 0,
@@ -413,14 +442,27 @@ async function buildDashboard(
         });
       }
       const p = productMap.get(key)!;
-      p.revenue += amount;
-      p.quantity += quantity;
-      p.commissions += commissionAmt;
-      p.shipping += shippingAmt;
       const cost = costMap.get(key);
-      if (cost) {
-        p.unitCost = cost.costAmount;
-        p.cogs += (cost.costAmount + cost.shippingCost) * quantity;
+      if (cost) p.unitCost = cost.costAmount;
+      const unitCogs = cost ? (cost.costAmount + cost.shippingCost) * quantity : 0;
+      p.revenue += amount;
+      if (category === 'revenue') {
+        p.quantity += quantity;
+        p.commissions += commissionAmt;
+        p.cogs += unitCogs;
+        // shippingAmount is the whole order's cargo cost and sits on every row
+        // of the order — count it once per order, split across its products.
+        const orderKey = tx.orderNumber ? `${tx.orderNumber}|${key}` : null;
+        if (shippingAmt && (!orderKey || !shippingCounted.has(orderKey))) {
+          if (orderKey) shippingCounted.add(orderKey);
+          p.shipping += shippingAmt / (tx.orderNumber ? (orderBarcodes.get(tx.orderNumber)?.size || 1) : 1);
+        }
+      } else if (category === 'return') {
+        p.returnedQuantity += quantity;
+        if (commissionAmt > 0) p.commissions -= commissionAmt;
+        p.cogs -= unitCogs;
+      } else if (commissionAmt) {
+        p.commissions += amount < 0 ? -commissionAmt : commissionAmt;
       }
     }
   }

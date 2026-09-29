@@ -50,6 +50,7 @@ export interface ProductBreakdown {
   productName: string | null;
   revenue: number;
   quantity: number;
+  returnedQuantity?: number;
   commissions: number;
   shipping: number;
   cogs: number;

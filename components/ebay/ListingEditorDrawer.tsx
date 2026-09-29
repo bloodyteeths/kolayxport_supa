@@ -929,8 +929,7 @@ export default function ListingEditorDrawer({
           borderBottom: '1px solid',
           borderColor: 'divider',
           bgcolor: 'background.paper',
-          position: 'sticky',
-          top: 0,
+          flexShrink: 0,
           zIndex: 10,
         }}
       >
@@ -1042,6 +1041,10 @@ export default function ListingEditorDrawer({
           sx: {
             width: isMobile ? '100%' : DRAWER_WIDTH,
             maxWidth: '100vw',
+            // Only the middle section scrolls; header and the Save footer stay put.
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
           },
         }}
       >
@@ -1052,7 +1055,7 @@ export default function ListingEditorDrawer({
         ) : fetchError ? (
           renderErrorState()
         ) : fields && listing ? (
-          <Box sx={{ overflow: 'auto', flex: 1, pb: 10 }}>
+          <Box sx={{ overflow: 'auto', flex: 1, minHeight: 0, pb: 2 }}>
             {listing.isLegacy && (
               <Box sx={{ mx: 2, mt: 1, mb: 0, p: 1.5, bgcolor: 'warning.light', borderRadius: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
                 <BlockIcon sx={{ color: 'warning.dark', fontSize: 20 }} />
@@ -1744,8 +1747,7 @@ export default function ListingEditorDrawer({
         {fields && listing && !loading && !fetchError && !listing.isLegacy && (
           <Box
             sx={{
-              position: 'sticky',
-              bottom: 0,
+              flexShrink: 0,
               p: 2,
               borderTop: '1px solid',
               borderColor: 'divider',

@@ -819,7 +819,8 @@ function EbayListingsPage() {
   const filteredListings = useMemo(() => {
     return listings.filter((l) => {
       if (searchTerm && !l.title.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-      if (statusFilter !== 'all' && l.status !== statusFilter) return false;
+      if (statusFilter === 'PUBLISHED' && l.status !== 'PUBLISHED') return false;
+      if (statusFilter === 'UNPUBLISHED' && l.status === 'PUBLISHED') return false;
       if (conditionFilter !== 'all' && l.condition !== conditionFilter) return false;
       if (categoryFilter && (l.categoryName || '') !== categoryFilter) return false;
       if (healthFilter) {
@@ -2000,7 +2001,7 @@ function EbayListingsPage() {
         fulfillmentPolicies={fulfillmentPolicies}
         returnPolicies={returnPolicies}
         paymentPolicies={paymentPolicies}
-        onCreated={() => { setCreatorOpen(false); fetchListings(); }}
+        onCreated={() => { setCreatorOpen(false); syncFromEbay(); }}
       />
 
       {/* Find & Replace Dialog */}

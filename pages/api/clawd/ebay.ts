@@ -2183,6 +2183,10 @@ export default async function handler(
       // Part 1: Inventory API offers + items (non-legacy)
       try {
         let offersArr: any[] = [];
+        // A failed offers call must not look like "this seller has no offers" —
+        // the inventory-only fallback below would then rewrite every row as a
+        // DRAFT with no offerId or listingId, losing the link to live listings.
+        let offersFetchOk = true;
         try {
           const offersData = await callEbayAPI(
             `/sell/inventory/v1/offer?limit=200&offset=0`,
@@ -2190,6 +2194,7 @@ export default async function handler(
           );
           offersArr = offersData.offers || [];
         } catch (err: any) {
+          offersFetchOk = false;
           if (!err.message?.includes('25707') && !err.message?.includes('25710') && !err.message?.includes('25713')) {
             logger.warn('sync_listings: offers fetch failed', { error: err.message?.substring(0, 300) });
           }
@@ -2208,9 +2213,25 @@ export default async function handler(
         } catch { /* no inventory items */ }
 
         // If no offers, build from inventory items only
-        if (offersArr.length === 0) {
+        if (offersFetchOk && offersArr.length === 0) {
           for (const sku of Object.keys(inventoryMap)) {
             const item = inventoryMap[sku];
+
+            // eBay's inventory_item LIST can keep returning a SKU whose GET and
+            // DELETE both answer 404 — a deleted item it has not purged yet.
+            // Caching it resurrects a ghost row on every sync, so confirm it.
+            try {
+              await callEbayAPI(
+                `/sell/inventory/v1/inventory_item/${encodeURIComponent(sku)}`,
+                accessToken, {}, marketplaceId
+              );
+            } catch (err: any) {
+              if (err.message?.includes('404')) {
+                logger.info('sync_listings: skipping inventory item eBay lists but cannot fetch', { sku });
+                continue;
+              }
+            }
+
             const product = item.product || {};
             const images = product.imageUrls || [];
 

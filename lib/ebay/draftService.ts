@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { getUserAccessToken } from '@/lib/integrations/ebayClient';
 import { callEbayRateLimited } from '@/lib/integrations/ebayRateLimiter';
+import { sanitizeInventoryItemPayload } from '@/lib/ebay/payloadRules';
 
 const EBAY_API_BASE = 'https://api.ebay.com';
 const UPLOAD_ROOT = process.env.EBAY_IMAGE_UPLOAD_DIR || path.join(process.cwd(), 'uploads', 'ebay-images');
@@ -441,13 +442,15 @@ export async function syncDraft(draftId: string, userId: string) {
             marketplaceId,
             options: {
               method: 'PUT',
-              body: JSON.stringify({
-                product: currentInventory.product,
-                condition: currentInventory.condition,
-                conditionDescription: currentInventory.conditionDescription,
-                availability: currentInventory.availability,
-                packageWeightAndSize: currentInventory.packageWeightAndSize,
-              }),
+              body: JSON.stringify(
+                sanitizeInventoryItemPayload({
+                  product: currentInventory.product,
+                  condition: currentInventory.condition,
+                  conditionDescription: currentInventory.conditionDescription,
+                  availability: currentInventory.availability,
+                  packageWeightAndSize: currentInventory.packageWeightAndSize,
+                })
+              ),
             },
           }
         );
@@ -469,7 +472,7 @@ export async function syncDraft(draftId: string, userId: string) {
           marketplaceId,
           options: {
             method: 'PUT',
-            body: JSON.stringify(merged),
+            body: JSON.stringify(sanitizeInventoryItemPayload(merged)),
           },
         }
       );
@@ -529,7 +532,7 @@ export async function syncDraft(draftId: string, userId: string) {
             marketplaceId,
             options: {
               method: 'PUT',
-              body: JSON.stringify(updatedInventory),
+              body: JSON.stringify(sanitizeInventoryItemPayload(updatedInventory)),
             },
           }
         );

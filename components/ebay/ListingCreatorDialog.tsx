@@ -37,6 +37,11 @@ import SEOIndicator from './SEOIndicator';
 import ImageManager from './ImageManager';
 import ItemSpecificsEditor from './ItemSpecificsEditor';
 import ConditionSelector from './ConditionSelector';
+import {
+  normalizeCondition,
+  overlongAspectNames,
+  sanitizeAspects,
+} from '@/lib/ebay/payloadRules';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -125,49 +130,6 @@ const CURRENCY_OPTIONS = [
   { value: 'EUR', label: 'EUR' },
   { value: 'TRY', label: 'TRY' },
 ];
-
-/**
- * eBay caps an item-specific value at 65 characters and rejects empty ones —
- * but only at publish time, not when the inventory item is created. An AI-written
- * value like "Premium die-cast metal body with high-quality plastic detailing and
- * rubber tyres" therefore sails through creation and fails the publish with a
- * generic error. Clean the map before it is ever sent.
- */
-/**
- * Older builds offered VERY_GOOD / GOOD / ACCEPTABLE, which are not eBay
- * ConditionEnum values — eBay answered "Could not serialize field [condition]".
- * Map them so an autosaved draft written before the fix still publishes.
- */
-const LEGACY_CONDITION_MAP: Record<string, string> = {
-  VERY_GOOD: 'USED_VERY_GOOD',
-  GOOD: 'USED_GOOD',
-  ACCEPTABLE: 'USED_ACCEPTABLE',
-};
-
-function normalizeCondition(value: string): string {
-  return LEGACY_CONDITION_MAP[value] || value;
-}
-
-const ASPECT_VALUE_MAX = 65;
-
-function sanitizeAspects(aspects: Record<string, string[]>): Record<string, string[]> {
-  const clean: Record<string, string[]> = {};
-  for (const [name, values] of Object.entries(aspects || {})) {
-    const kept = (values || [])
-      .map((v) => String(v ?? '').trim())
-      .filter(Boolean)
-      .map((v) => (v.length > ASPECT_VALUE_MAX ? v.slice(0, ASPECT_VALUE_MAX).trim() : v));
-    if (kept.length > 0) clean[name.trim()] = kept;
-  }
-  return clean;
-}
-
-/** Names whose value the seller must shorten before eBay will accept a publish. */
-function overlongAspectNames(aspects: Record<string, string[]>): string[] {
-  return Object.entries(aspects || {})
-    .filter(([, values]) => (values || []).some((v) => String(v ?? '').trim().length > ASPECT_VALUE_MAX))
-    .map(([name]) => name);
-}
 
 /** Work-in-progress listings survive an accidental close or a page reload. */
 const DRAFT_STORAGE_KEY = 'kx.ebay.listingDraft.v1';
@@ -384,7 +346,7 @@ export default function ListingCreatorDialog({
       setTitle(saved.title || '');
       setDescription(saved.description || '');
       setSkuInput(saved.skuInput || '');
-      setCondition(normalizeCondition(saved.condition || 'NEW'));
+      setCondition(normalizeCondition(saved.condition) || 'NEW');
       setConditionDescription(saved.conditionDescription || '');
       setCategorySearchQuery(saved.categorySearchQuery || '');
       setSelectedCategory(saved.selectedCategory || null);
@@ -1130,7 +1092,7 @@ export default function ListingCreatorDialog({
       if (hasVariations && variationRows.length > 0) {
         // ---- VARIATION LISTING FLOW ----
         for (const row of variationRows) {
-          const varAspects = sanitizeAspects({ ...aspects });
+          const varAspects: Record<string, string[]> = sanitizeAspects({ ...aspects }) || {};
           for (const [key, value] of Object.entries(row.combination)) {
             varAspects[key] = [value];
           }

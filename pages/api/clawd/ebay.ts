@@ -8,6 +8,7 @@ import {
   getUserAccessToken,
 } from '../../../lib/integrations/ebayClient';
 import { callEbayRateLimited } from '../../../lib/integrations/ebayRateLimiter';
+import { sanitizeInventoryItemPayload } from '../../../lib/ebay/payloadRules';
 
 // eBay REST API base URL
 const EBAY_API_BASE = 'https://api.ebay.com';
@@ -1151,7 +1152,7 @@ export default async function handler(
       await callEbayAPI(
         `/sell/inventory/v1/inventory_item/${encodeURIComponent(sku)}`,
         accessToken,
-        { method: 'PUT', body: JSON.stringify(req.body) },
+        { method: 'PUT', body: JSON.stringify(sanitizeInventoryItemPayload(req.body)) },
         marketplaceId
       );
 
@@ -1173,7 +1174,7 @@ export default async function handler(
         );
       } catch { /* item doesn't exist, will create */ }
 
-      const merged = { ...existingItem, ...req.body };
+      const merged = sanitizeInventoryItemPayload({ ...existingItem, ...req.body });
       // Remove read-only fields
       delete merged.sku;
       delete merged.groupIds;

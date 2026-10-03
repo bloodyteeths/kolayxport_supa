@@ -2526,10 +2526,35 @@ export default async function handler(
             .filter(id => !seenSkus.has(`legacy-${id}`) && !seenListingIds.has(String(id)))
             .map(async (legacyId) => {
               try {
-                const item = await callEbayAPI(
-                  `/buy/browse/v1/item/get_item_by_legacy_id?legacy_item_id=${legacyId}`,
-                  appToken
-                );
+                let item: any;
+                try {
+                  item = await callEbayAPI(
+                    `/buy/browse/v1/item/get_item_by_legacy_id?legacy_item_id=${legacyId}`,
+                    appToken
+                  );
+                } catch (err: any) {
+                  // A multi-variation listing is an item GROUP, and Browse refuses
+                  // to return it by legacy id — it answers "The legacy Id is
+                  // invalid. Use get_items_by_item_group". Without this fallback
+                  // every variation listing the seller has is skipped entirely.
+                  if (!String(err?.message || '').includes('get_items_by_item_group')) throw err;
+
+                  const group = await callEbayAPI(
+                    `/buy/browse/v1/item/get_items_by_item_group?item_group_id=${legacyId}`,
+                    appToken
+                  );
+                  const variants = group.items || [];
+                  if (variants.length === 0) throw err;
+
+                  // Represent the group by its first variant, but carry the
+                  // group's own title and gallery so the row reads correctly.
+                  item = {
+                    ...variants[0],
+                    title: group.commonDescriptions?.[0]?.title || variants[0].title,
+                    itemGroupId: legacyId,
+                    variantCount: variants.length,
+                  };
+                }
 
                 const aspects: Record<string, string[]> = {};
                 for (const a of item.localizedAspects || []) {

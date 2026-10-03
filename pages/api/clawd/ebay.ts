@@ -2180,6 +2180,8 @@ export default async function handler(
       const syncedAt = new Date();
       let synced = 0;
       let errors = 0;
+      /** Legacy ids Browse can no longer resolve — ended listings, not errors. */
+      let staleLegacy = 0;
 
       // Part 1: Inventory API offers + items (non-legacy)
       // Tracks whether this phase produced a trustworthy picture; the stale-row
@@ -2588,7 +2590,15 @@ export default async function handler(
                 });
                 synced++;
               } catch (e) {
-                errors++;
+                const msg = String(e);
+                // 11003 / 404: the listing has ended and Browse no longer serves
+                // it. Expected for historical ids pulled from analytics and
+                // orders — not a failure worth reporting.
+                if (msg.includes('11003') || msg.includes('404')) {
+                  staleLegacy++;
+                } else {
+                  errors++;
+                }
               }
             })
         );
@@ -2616,6 +2626,7 @@ export default async function handler(
         success: true,
         synced,
         errors,
+        staleLegacy,
         removed,
         syncedAt: syncedAt.toISOString(),
       });

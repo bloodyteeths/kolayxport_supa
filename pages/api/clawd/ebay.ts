@@ -2181,6 +2181,9 @@ export default async function handler(
       let errors = 0;
 
       // Part 1: Inventory API offers + items (non-legacy)
+      // Tracks whether this phase produced a trustworthy picture; the stale-row
+      // cleanup below must not delete rows a failed phase simply never wrote.
+      let inventoryPhaseOk = true;
       try {
         let offersArr: any[] = [];
         // A failed offers call must not look like "this seller has no offers" —
@@ -2195,9 +2198,13 @@ export default async function handler(
           offersArr = offersData.offers || [];
         } catch (err: any) {
           offersFetchOk = false;
-          if (!err.message?.includes('25707') && !err.message?.includes('25710') && !err.message?.includes('25713')) {
-            logger.warn('sync_listings: offers fetch failed', { error: err.message?.substring(0, 300) });
-          }
+          inventoryPhaseOk = false;
+          // Previously the "expected" codes were swallowed entirely, which hid a
+          // persistently failing offers call for weeks — every sync then fell
+          // back to inventory-only and relabelled live offers as drafts.
+          logger.warn('sync_listings: offers fetch failed', {
+            error: err.message?.substring(0, 300),
+          });
         }
 
         // Bulk fetch all inventory items
@@ -2405,6 +2412,7 @@ export default async function handler(
           }
         }
       } catch (err: any) {
+        inventoryPhaseOk = false;
         logger.error('sync_listings: inventory phase failed', err, { userId });
       }
 
@@ -2562,14 +2570,21 @@ export default async function handler(
         logger.warn('sync_listings: legacy phase failed', { error: err.message?.substring(0, 300) });
       }
 
-      // Delete stale listings (not updated in this sync)
+      // Delete stale listings (not updated in this sync).
+      // Only safe when the inventory phase actually succeeded — otherwise every
+      // offer-backed row it failed to write looks stale and gets deleted, wiping
+      // the seller's drafts out of the cache on a transient eBay error.
       let removed = 0;
-      try {
-        const deleted = await prisma.ebayListing.deleteMany({
-          where: { userId, syncedAt: { lt: syncedAt } },
-        });
-        removed = deleted.count;
-      } catch { /* ok */ }
+      if (inventoryPhaseOk) {
+        try {
+          const deleted = await prisma.ebayListing.deleteMany({
+            where: { userId, syncedAt: { lt: syncedAt } },
+          });
+          removed = deleted.count;
+        } catch { /* ok */ }
+      } else {
+        logger.warn('sync_listings: inventory phase incomplete, skipping stale cleanup', { userId });
+      }
 
       return res.status(200).json({
         success: true,

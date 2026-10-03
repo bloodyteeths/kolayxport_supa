@@ -2219,6 +2219,31 @@ export default async function handler(
           }
         } catch { /* no inventory items */ }
 
+        // One unusable entry in the account makes eBay reject the whole offers
+        // list (25707 "invalid value for a SKU"). Rather than lose every offer,
+        // ask for them one SKU at a time and keep whatever answers.
+        if (!offersFetchOk && Object.keys(inventoryMap).length > 0) {
+          const recovered: any[] = [];
+          for (const sku of Object.keys(inventoryMap)) {
+            try {
+              const perSku = await callEbayAPI(
+                `/sell/inventory/v1/offer?sku=${encodeURIComponent(sku)}&limit=10`,
+                accessToken, {}, marketplaceId
+              );
+              for (const o of perSku.offers || []) recovered.push(o);
+            } catch { /* this SKU is the unusable one — skip it */ }
+          }
+          if (recovered.length > 0) {
+            offersArr = recovered;
+            offersFetchOk = true;
+            inventoryPhaseOk = true;
+            logger.info('sync_listings: recovered offers per-SKU after bulk list failed', {
+              userId,
+              count: recovered.length,
+            });
+          }
+        }
+
         // If no offers, build from inventory items only
         if (offersFetchOk && offersArr.length === 0) {
           for (const sku of Object.keys(inventoryMap)) {

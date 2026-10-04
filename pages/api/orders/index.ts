@@ -112,7 +112,13 @@ export default async function handler(
   // console.log('[ORDERS API] Fetching orders for userId:', user.id, 'Query:', req.query);
 
   try {
-    let whereClause = 'WHERE o."userId" = $1 AND o."status" NOT IN (\'PENDING\', \'AWAITING_PAYMENT\', \'pending\', \'awaiting_payment\', \'pending_payment\')';
+    // Amazon reports a brand-new order as "Pending" while it authorises payment —
+    // a real order the seller sees in Seller Central. Hiding it meant a new order
+    // was invisible in KolayXport for its first hours. Only genuinely unpaid
+    // states (awaiting/pending payment, e.g. an abandoned Shopify checkout) stay
+    // hidden; stats.ts already counted pending as live, so this also removes an
+    // inconsistency between the counters and the list.
+    let whereClause = 'WHERE o."userId" = $1 AND o."status" NOT IN (\'AWAITING_PAYMENT\', \'awaiting_payment\', \'pending_payment\')';
     const params: any[] = [user.id];
     let paramIndex = 2;
 

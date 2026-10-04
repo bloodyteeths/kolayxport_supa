@@ -23,7 +23,8 @@ export default async function handler(
       where: {
         userId: user.id,
         status: {
-          notIn: ['PENDING', 'AWAITING_PAYMENT', 'pending', 'awaiting_payment', 'pending_payment']
+          // Keep in step with /api/orders: pending is a live order, only unpaid is hidden.
+          notIn: ['AWAITING_PAYMENT', 'awaiting_payment', 'pending_payment']
         }
       },
       _count: {

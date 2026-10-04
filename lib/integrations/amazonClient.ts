@@ -829,6 +829,18 @@ function extractWeightKg(item: any): number | undefined {
  * Fetch product details (image, weight, country) for a batch of ASINs.
  * Catalog API supports up to 20 identifiers per request.
  */
+/**
+ * Catalog access is denied by app role, not by request — so once it 403s there
+ * is nothing to retry until the seller changes their SP-API authorisation.
+ * Without a cooldown the order sync re-attempted every ASIN every 15 minutes.
+ */
+let catalogAccessDeniedUntil = 0;
+const CATALOG_DENIED_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+
+export function isCatalogAccessDenied(): boolean {
+  return Date.now() < catalogAccessDeniedUntil;
+}
+
 export async function fetchCatalogItems(
   asins: string[],
   marketplaceId: string,
@@ -838,6 +850,7 @@ export async function fetchCatalogItems(
   const result = new Map<string, CatalogEnrichment>();
   const unique = Array.from(new Set(asins.filter(Boolean)));
   if (unique.length === 0) return result;
+  if (isCatalogAccessDenied()) return result;
 
   for (let i = 0; i < unique.length; i += 20) {
     const batch = unique.slice(i, i + 20);
@@ -863,7 +876,23 @@ export async function fetchCatalogItems(
         });
       }
     } catch (err) {
-      logger.warn('Catalog API batch failed', { asins: batch, err: (err as any)?.message });
+      const msg = String((err as any)?.message || '');
+      // 403 Unauthorized is not transient: the SP-API application is missing the
+      // role that grants Catalog Items access. Retrying the remaining batches —
+      // and every batch again on the next sync — just burns quota and buries the
+      // one line that says what is actually wrong.
+      if (msg.includes('403') || msg.includes('Unauthorized')) {
+        logger.error(
+          'Amazon Catalog Items access denied (403). Product images, weights and ' +
+            'country of origin cannot be fetched until the SP-API app is granted ' +
+            'the Product Listing role in Seller Central.',
+          err instanceof Error ? err : new Error(msg),
+          { marketplaceId, region, remainingAsins: unique.length - i },
+        );
+        catalogAccessDeniedUntil = Date.now() + CATALOG_DENIED_COOLDOWN_MS;
+        return result;
+      }
+      logger.warn('Catalog API batch failed', { asins: batch, err: msg });
     }
   }
   return result;

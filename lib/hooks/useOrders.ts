@@ -104,10 +104,15 @@ export function useOrders(page: number = 1, pageSize: number = 15, filters: Reco
     `/api/orders?${params.toString()}`,
     fetcher,
     {
-      refreshInterval: context === 'labelsPage' ? 120000 : 0, // Refresh every 2 minutes (reduced frequency)
+      // The order cron pulls from the marketplaces every 15 minutes, but with
+      // refreshInterval 0 and revalidateOnFocus off an open page never re-read
+      // the result — new orders only appeared if the user reloaded or forced a
+      // sync by hand. Poll gently and refresh when the tab regains focus, which
+      // is the moment someone actually looks at the list.
+      refreshInterval: context === 'labelsPage' ? 120000 : 60000,
       dedupingInterval: context === 'labelsPage' ? 1000 : 5000, // Reduced to 1 second for faster pagination
-      revalidateOnFocus: false, // Disable aggressive revalidation for better performance
-      revalidateOnReconnect: false, // Don't refetch on reconnect
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
       // A transient failure (cold search queries can run ~2s and hit timeouts)
       // used to silently strand the UI on stale data with no retry — the
       // "search finds nothing until I retype it" bug. Retry a couple of times

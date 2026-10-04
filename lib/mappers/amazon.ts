@@ -3,15 +3,33 @@ import type { UIOrder, NormalizedAddress } from '../types';
 /**
  * Amazon order status mapping to normalized statuses.
  */
+/**
+ * Amazon's documented order-status values plus the ones their reports actually
+ * emit. "Cancelled" (British spelling) and "Shipping" are both absent from the
+ * documented set yet appear in live reports, and anything unmapped was stored
+ * raw — leaving the same logical state under two spellings (`cancelled` and
+ * `Cancelled`) which no status filter could match together.
+ *
+ * "Shipping" comes from multi-channel fulfilment: Amazon is shipping an order
+ * placed off-Amazon, so there is nothing for the seller to label.
+ */
 const STATUS_MAP: Record<string, string> = {
-  Pending: 'pending',
-  Unshipped: 'awaiting_shipment',
-  PartiallyShipped: 'partially_shipped',
-  Shipped: 'shipped',
-  InvoiceUnconfirmed: 'pending',
-  Canceled: 'cancelled',
-  Unfulfillable: 'cancelled',
+  pending: 'pending',
+  unshipped: 'awaiting_shipment',
+  partiallyshipped: 'partially_shipped',
+  shipped: 'shipped',
+  shipping: 'shipped',
+  invoiceunconfirmed: 'pending',
+  canceled: 'cancelled',
+  cancelled: 'cancelled',
+  unfulfillable: 'cancelled',
 };
+
+/** Case- and spelling-insensitive lookup, so new casing variants still land. */
+function normalizeAmazonStatus(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  return STATUS_MAP[raw.trim().toLowerCase().replace(/[\s_-]/g, '')];
+}
 
 /**
  * Normalize an Amazon SP-API order to UIOrder format.
@@ -47,7 +65,7 @@ export function toNormalizedOrder(order: any): UIOrder {
 
   const totalPrice = parseFloat(order.OrderTotal?.Amount || '0');
   const currency = order.OrderTotal?.CurrencyCode || 'USD';
-  const status = STATUS_MAP[order.OrderStatus] || order.OrderStatus || 'unknown';
+  const status = normalizeAmazonStatus(order.OrderStatus) || order.OrderStatus || 'unknown';
 
   const isFba = order.FulfillmentChannel === 'AFN';
 
@@ -205,12 +223,15 @@ export function groupReportRows(tsv: string): Map<string, Record<string, string>
 /** Combine per-row Amazon order statuses into one order-level normalized status. */
 function aggregateStatus(rows: Record<string, string>[]): { normalized: string; external: string } {
   const externals = rows.map((r) => r['order-status'] || '').filter(Boolean);
-  const priority = ['Pending', 'Unshipped', 'PartiallyShipped', 'Shipped', 'Canceled', 'Unfulfillable'];
+  // Least-progressed state wins, so a part-shipped order is not reported done.
+  const priority = ['pending', 'unshipped', 'partiallyshipped', 'shipping', 'shipped', 'cancelled', 'unfulfillable'];
+  const key = (v: string) => v.trim().toLowerCase().replace(/[\s_-]/g, '');
   let pick = externals[0] || 'unknown';
   for (const p of priority) {
-    if (externals.includes(p)) { pick = p; break; }
+    const hit = externals.find((e) => key(e) === p || (p === 'cancelled' && key(e) === 'canceled'));
+    if (hit) { pick = hit; break; }
   }
-  return { normalized: STATUS_MAP[pick] || pick || 'unknown', external: pick };
+  return { normalized: normalizeAmazonStatus(pick) || 'unknown', external: pick };
 }
 
 /**

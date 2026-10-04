@@ -223,6 +223,7 @@ export function groupReportRows(tsv: string): Map<string, Record<string, string>
 /** Combine per-row Amazon order statuses into one order-level normalized status. */
 function aggregateStatus(rows: Record<string, string>[]): { normalized: string; external: string } {
   const externals = rows.map((r) => r['order-status'] || '').filter(Boolean);
+  const itemStatuses = rows.map((r) => r['item-status'] || '').filter(Boolean);
   // Least-progressed state wins, so a part-shipped order is not reported done.
   const priority = ['pending', 'unshipped', 'partiallyshipped', 'shipping', 'shipped', 'cancelled', 'unfulfillable'];
   const key = (v: string) => v.trim().toLowerCase().replace(/[\s_-]/g, '');
@@ -231,6 +232,18 @@ function aggregateStatus(rows: Record<string, string>[]): { normalized: string; 
     const hit = externals.find((e) => key(e) === p || (p === 'cancelled' && key(e) === 'canceled'));
     if (hit) { pick = hit; break; }
   }
+
+  // Amazon's _GENERAL report leaves order-status at "Pending" long after the
+  // payment actually cleared — seen here two days after purchase, on orders the
+  // seller was already fulfilling. The item rows are the live signal: once a
+  // payment is authorised the item moves to Unshipped, so an order whose items
+  // have moved on is confirmed regardless of what the order column still says.
+  // A genuinely pending order carries item-status "Pending" too.
+  if (key(pick) === 'pending') {
+    const confirmed = itemStatuses.find((s) => ['unshipped', 'shipped'].includes(key(s)));
+    if (confirmed) pick = confirmed;
+  }
+
   return { normalized: normalizeAmazonStatus(pick) || 'unknown', external: pick };
 }
 

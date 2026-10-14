@@ -60,8 +60,39 @@ export interface CopySourceData {
   is_supply?: boolean;
   shipping_profile_id?: number;
   return_policy_id?: number;
-  shop_section_id?: number;
+  /** null = the source had no section (kept as "no section", not filled from defaults). */
+  shop_section_id?: number | null;
   taxonomy_id?: number;
+  processing_min?: number;
+  processing_max?: number;
+  item_weight?: number;
+  item_weight_unit?: string;
+  item_length?: number;
+  item_width?: number;
+  item_height?: number;
+  item_dimensions_unit?: string;
+  /**
+   * Public https image URLs to start from (duplicate / cross-list). They are
+   * staged as draft media with a sourceUrl; the server downloads them only when
+   * the draft is synced (the user's explicit publish/sync), never from the browser.
+   */
+  imageUrls?: string[];
+  /** Where the prefill came from, for the info banner. */
+  source?: 'etsy' | 'ebay';
+}
+
+/** Keep only plain https URLs, de-duplicated, capped at Etsy's photo limit. */
+function cleanImageUrls(urls: unknown): string[] {
+  if (!Array.isArray(urls)) return [];
+  const out: string[] = [];
+  for (const u of urls) {
+    if (typeof u !== 'string') continue;
+    const v = u.trim();
+    if (!/^https:\/\//i.test(v) || v.length > 2048 || out.includes(v)) continue;
+    out.push(v);
+    if (out.length >= ETSY_MAX_IMAGES) break;
+  }
+  return out;
 }
 
 interface ListingCreatorDialogProps {
@@ -278,6 +309,9 @@ export default function ListingCreatorDialog({
 
   // Step 3 — Images
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  // Photos imported by URL (duplicate / cross-list); staged as sourceUrl media.
+  const [urlImages, setUrlImages] = useState<string[]>([]);
+  const imageCount = urlImages.length + selectedFiles.length;
   const [previews, setPreviews] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -326,8 +360,30 @@ export default function ListingCreatorDialog({
     if (copySource.shipping_profile_id) setShippingProfileId(copySource.shipping_profile_id);
     if (copySource.return_policy_id) setReturnPolicyId(copySource.return_policy_id);
     if (copySource.shop_section_id) setShopSectionId(copySource.shop_section_id);
+    const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? String(v) : '');
+    if (num(copySource.processing_min)) setProcessingMin(num(copySource.processing_min));
+    if (num(copySource.processing_max)) setProcessingMax(num(copySource.processing_max));
+    if (num(copySource.item_weight)) {
+      setItemWeight(num(copySource.item_weight));
+      if (WEIGHT_UNITS.some((u) => u.value === copySource.item_weight_unit)) setItemWeightUnit(copySource.item_weight_unit as string);
+    }
+    if (num(copySource.item_length) || num(copySource.item_width) || num(copySource.item_height)) {
+      setItemLength(num(copySource.item_length));
+      setItemWidth(num(copySource.item_width));
+      setItemHeight(num(copySource.item_height));
+      if (DIMENSION_UNITS.some((u) => u.value === copySource.item_dimensions_unit)) setItemDimensionsUnit(copySource.item_dimensions_unit as string);
+    }
+    setUrlImages(cleanImageUrls(copySource.imageUrls));
     setActiveStep(0); // Start from step 1 so user can review
   }, [open, copySource]);
+
+  // Pre-select the copied category once the taxonomy list is loaded.
+  const copyTaxonomyId = open ? copySource?.taxonomy_id : undefined;
+  useEffect(() => {
+    if (!copyTaxonomyId || taxonomyOptions.length === 0) return;
+    const match = taxonomyOptions.find((o) => o.id === Number(copyTaxonomyId));
+    if (match) setSelectedTaxonomy((cur) => cur || match);
+  }, [copyTaxonomyId, taxonomyOptions]);
 
   // --------------------------------------------------
   // Autosave to this device + "Restore unsaved listing?" offer
@@ -344,7 +400,7 @@ export default function ListingCreatorDialog({
     itemHeight, itemDimensionsUnit,
   };
   const snapshotJson = JSON.stringify(snapshot);
-  const formHasContent = snapshotHasContent(snapshot) || selectedFiles.length > 0;
+  const formHasContent = snapshotHasContent(snapshot) || imageCount > 0;
   const snapshotRef = useRef(snapshot);
   snapshotRef.current = snapshot;
 
@@ -358,14 +414,17 @@ export default function ListingCreatorDialog({
 
   // Debounced autosave while open. Paused while the restore offer is pending so
   // a stray keystroke can't overwrite the saved listing before the user decides.
+  // A copy/cross-list prefill is never written to this device: it would
+  // overwrite the user's own unsaved new listing under the same per-shop key.
+  const isCopySession = Boolean(copySource);
   useEffect(() => {
     // Also paused while creating, so a late write can't resurrect a listing just staged.
-    if (!open || creating || pendingRestore || !snapshotHasContent(snapshotRef.current)) return;
+    if (!open || creating || isCopySession || pendingRestore || !snapshotHasContent(snapshotRef.current)) return;
     const id = setTimeout(() => {
       writeStorage(draftStorageKey(shopId), { ...snapshotRef.current, savedAt: Date.now() });
     }, 800);
     return () => clearTimeout(id);
-  }, [open, shopId, creating, pendingRestore, snapshotJson]);
+  }, [open, shopId, creating, isCopySession, pendingRestore, snapshotJson]);
 
   // Typing a new listing while the offer is unanswered counts as "Start fresh":
   // drop the offer so autosave resumes and the new work is kept (and the close
@@ -425,8 +484,10 @@ export default function ListingCreatorDialog({
   const returnKey = returnPolicies.map((p) => p.return_policy_id).join(',');
   const sectionKey = shopSections.map((p) => p.shop_section_id).join(',');
 
+  // A copy prefill sets its own ids first; these updaters keep any valid one
+  // and only fill the gaps (e.g. an eBay cross-list carries no Etsy profiles).
   useEffect(() => {
-    if (!open || copySource) return;
+    if (!open) return;
     const last = readStorage<ListingDefaults>(defaultsStorageKey(shopId)) || {};
     const ids = (key: string) => (key ? key.split(',').map(Number) : []);
     const shipIds = ids(shippingKey);
@@ -444,8 +505,11 @@ export default function ListingCreatorDialog({
       return typeof last.returnPolicyId === 'number' && retIds.includes(last.returnPolicyId) ? last.returnPolicyId : cur;
     });
     // The section is optional: a remembered "no section" is respected.
+    const copyHasNoSection = copySource?.shop_section_id === null;
     setShopSectionId((cur) => {
       if (cur !== '') return cur;
+      // A duplicated listing that had no section stays without one.
+      if (copyHasNoSection) return '';
       if ('shopSectionId' in last) {
         return typeof last.shopSectionId === 'number' && secIds.includes(last.shopSectionId) ? last.shopSectionId : '';
       }
@@ -648,6 +712,7 @@ export default function ListingCreatorDialog({
     setItemHeight('');
     setItemDimensionsUnit('cm');
     setSelectedFiles([]);
+    setUrlImages([]);
     setCreating(false);
     setSyncingToEtsy(false);
     setUploadProgress(0);
@@ -669,13 +734,15 @@ export default function ListingCreatorDialog({
     if (formHasContent) {
       const ok = await confirm({
         title: t('closeConfirm.title'),
-        description: selectedFiles.length > 0 ? t('closeConfirm.descriptionWithPhotos') : t('closeConfirm.description'),
+        description: isCopySession
+          ? t('closeConfirm.descriptionCopy')
+          : imageCount > 0 ? t('closeConfirm.descriptionWithPhotos') : t('closeConfirm.description'),
         confirmLabel: tCommon('close'),
         cancelLabel: t('closeConfirm.keepEditing'),
       });
       if (!ok) return;
       // Flush the latest state so the debounce can't drop the last edits.
-      if (!pendingRestore && snapshotHasContent(snapshotRef.current)) {
+      if (!isCopySession && !pendingRestore && snapshotHasContent(snapshotRef.current)) {
         writeStorage(draftStorageKey(shopId), { ...snapshotRef.current, savedAt: Date.now() });
       }
     }
@@ -763,7 +830,7 @@ export default function ListingCreatorDialog({
     if (!validateStep(0) || !validateStep(1)) return false;
     if (!validateTitleRules(true)) return false;
     if (tags.length < 1) { toast.error(t('tagsRequiredForPublish')); return false; }
-    if (selectedFiles.length === 0) { toast.error(t('imageRequiredForPublish')); return false; }
+    if (imageCount === 0) { toast.error(t('imageRequiredForPublish')); return false; }
     return true;
   };
 
@@ -851,7 +918,7 @@ export default function ListingCreatorDialog({
 
   const handleAiImageAccept = () => {
     if (!aiImageResult) return;
-    if (selectedFiles.length >= ETSY_MAX_IMAGES) { toast.error(t('maxImages', { max: ETSY_MAX_IMAGES })); return; }
+    if (imageCount >= ETSY_MAX_IMAGES) { toast.error(t('maxImages', { max: ETSY_MAX_IMAGES })); return; }
 
     // Convert base64 to File
     const byteStr = atob(aiImageResult.base64);
@@ -872,7 +939,7 @@ export default function ListingCreatorDialog({
     if (!files) return;
 
     const newFiles = Array.from(files);
-    const total = selectedFiles.length + newFiles.length;
+    const total = imageCount + newFiles.length;
     if (total > ETSY_MAX_IMAGES) {
       toast.error(t('maxImages', { max: ETSY_MAX_IMAGES }));
       return;
@@ -893,6 +960,10 @@ export default function ListingCreatorDialog({
 
   const removeFile = (index: number) => {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const removeUrlImage = (index: number) => {
+    setUrlImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   // --------------------------------------------------
@@ -941,15 +1012,33 @@ export default function ListingCreatorDialog({
       });
 
       // The listing now lives in a DB draft: drop the device copy, remember the picks.
-      clearStorage(draftStorageKey(shopId));
+      // A copy session never wrote the device copy, so it leaves the user's own one alone.
+      if (!isCopySession) clearStorage(draftStorageKey(shopId));
       writeStorage(defaultsStorageKey(shopId), {
         shippingProfileId,
         returnPolicyId,
         shopSectionId,
       } satisfies ListingDefaults);
 
-      // Upload images
+      // Imported photos first (they keep the source listing's order), staged by
+      // URL only: the server downloads them when this draft is synced.
       let stagedImages = 0;
+      const totalImages = urlImages.length + selectedFiles.length;
+      if (urlImages.length > 0) {
+        try {
+          await stageEtsyDraft({
+            shopId,
+            listingId: localDraftListingId,
+            media: urlImages.map((sourceUrl, i) => ({ kind: 'image', operation: 'upload', sourceUrl, rank: i + 1 })),
+          });
+          stagedImages += urlImages.length;
+        } catch (err: any) {
+          const reason = err?.key && tEtsy.has(err.key) ? tEtsy(err.key, err.params || {}) : '';
+          toast.error(reason ? `${t('importedImagesFailed')} ${reason}` : t('importedImagesFailed'));
+        }
+      }
+
+      // Upload images
       if (selectedFiles.length > 0) {
         setUploadTotal(selectedFiles.length);
         for (let i = 0; i < selectedFiles.length; i++) {
@@ -963,7 +1052,7 @@ export default function ListingCreatorDialog({
               file,
               kind: 'image',
               operation: 'upload',
-              rank: i + 1,
+              rank: urlImages.length + i + 1,
             });
             stagedImages++;
           } catch {
@@ -976,7 +1065,7 @@ export default function ListingCreatorDialog({
       // and goes to Etsy when the user syncs it there. If any picked photo
       // failed to stage, don't go live with fewer photos than chosen: keep it
       // a local draft the user can fix and sync from the pinned row.
-      if (!publish || !draft?.id || stagedImages === 0 || stagedImages < selectedFiles.length) {
+      if (!publish || !draft?.id || stagedImages === 0 || stagedImages < totalImages) {
         toast.success(t(publish ? 'draftSavedPublish' : 'draftSavedCreate'));
         onCreated(localDraftListingId, draft?.id);
         resetForm();
@@ -1575,16 +1664,85 @@ export default function ListingCreatorDialog({
           variant="outlined"
           startIcon={<CloudUploadIcon />}
           onClick={() => fileInputRef.current?.click()}
-          disabled={selectedFiles.length >= ETSY_MAX_IMAGES}
+          disabled={imageCount >= ETSY_MAX_IMAGES}
         >
-          {t('selectImages', { count: selectedFiles.length })}
+          {t('selectImages', { count: imageCount })}
         </Button>
       </Box>
 
-      {selectedFiles.length === 0 && !aiImageResult && (
+      {imageCount === 0 && !aiImageResult && (
         <Alert severity="warning">
           {t('imageRequiredWarning')}
         </Alert>
+      )}
+
+      {/* Photos imported by URL (duplicate / cross-list) */}
+      {urlImages.length > 0 && (
+        <Box>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+            {t('importedImagesHint', { count: urlImages.length })}
+          </Typography>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+              gap: 1.5,
+            }}
+          >
+            {urlImages.map((src, i) => (
+              <Box
+                key={src}
+                sx={{
+                  position: 'relative',
+                  borderRadius: 1,
+                  overflow: 'hidden',
+                  border: i === 0 ? '2px solid' : '1px solid',
+                  borderColor: i === 0 ? 'primary.main' : 'divider',
+                }}
+              >
+                <img
+                  src={src}
+                  alt={`${t('image')} ${i + 1}`}
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                  style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }}
+                />
+                <IconButton
+                  size="small"
+                  aria-label={t('remove')}
+                  onClick={() => removeUrlImage(i)}
+                  sx={{
+                    position: 'absolute',
+                    top: 2,
+                    right: 2,
+                    width: 44,
+                    height: 44,
+                    bgcolor: 'rgba(0,0,0,0.5)',
+                    color: 'white',
+                    '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
+                  }}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    bgcolor: 'rgba(0,0,0,0.5)',
+                    color: 'white',
+                    textAlign: 'center',
+                    py: 0.25,
+                  }}
+                >
+                  {i === 0 ? t('cover') : i + 1}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        </Box>
       )}
 
       {/* Uploaded file previews */}
@@ -1603,13 +1761,13 @@ export default function ListingCreatorDialog({
                 position: 'relative',
                 borderRadius: 1,
                 overflow: 'hidden',
-                border: i === 0 ? '2px solid' : '1px solid',
-                borderColor: i === 0 ? 'primary.main' : 'divider',
+                border: urlImages.length + i === 0 ? '2px solid' : '1px solid',
+                borderColor: urlImages.length + i === 0 ? 'primary.main' : 'divider',
               }}
 >
               <img
                 src={src}
-                alt={`${t('image')} ${i + 1}`}
+                alt={`${t('image')} ${urlImages.length + i + 1}`}
                 style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }}
               />
               <IconButton
@@ -1639,7 +1797,7 @@ export default function ListingCreatorDialog({
                   py: 0.25,
                 }}
   >
-                {i === 0 ? t('cover') : i + 1}
+                {urlImages.length + i === 0 ? t('cover') : urlImages.length + i + 1}
               </Typography>
             </Box>
           ))}
@@ -1725,7 +1883,7 @@ export default function ListingCreatorDialog({
           variant="contained"
           fullWidth
           onClick={() => handleAiImageGenerate()}
-          disabled={aiImageGenerating || !aiImagePrompt.trim() || selectedFiles.length >= ETSY_MAX_IMAGES}
+          disabled={aiImageGenerating || !aiImagePrompt.trim() || imageCount >= ETSY_MAX_IMAGES}
           startIcon={aiImageGenerating ? <CircularProgress size={18} color="inherit" /> : <AutoFixHighIcon />}
           sx={{ bgcolor: '#a855f7', '&:hover': { bgcolor: '#9333ea' } }}
         >
@@ -1778,7 +1936,7 @@ export default function ListingCreatorDialog({
               <Button
                 variant="contained"
                 onClick={handleAiImageAccept}
-                disabled={selectedFiles.length >= ETSY_MAX_IMAGES}
+                disabled={imageCount >= ETSY_MAX_IMAGES}
                 color="success"
                 size="small"
   >
@@ -1818,7 +1976,7 @@ export default function ListingCreatorDialog({
       { label: t('summaryProcessing'), value: processingMin && processingMax ? `${processingMin}-${processingMax} ${t('businessDays')}` : '-' },
       { label: t('summaryWeight'), value: itemWeight ? `${itemWeight} ${itemWeightUnit}` : '-' },
       { label: t('summaryDimensions'), value: itemLength ? `${itemLength}x${itemWidth}x${itemHeight} ${itemDimensionsUnit}` : '-' },
-      { label: t('summaryImages'), value: `${selectedFiles.length} ${t('items')}` },
+      { label: t('summaryImages'), value: `${imageCount} ${t('items')}` },
     ];
 
     return (
@@ -1890,13 +2048,13 @@ export default function ListingCreatorDialog({
             variant="outlined"
             color="success"
             onClick={() => handleCreate(true)}
-            disabled={creating || selectedFiles.length === 0}
+            disabled={creating || imageCount === 0}
             sx={{ flex: 1, minWidth: 180 }}
           >
             {creating ? t('creating') : t('createAndPublish')}
           </Button>
         </Box>
-        {selectedFiles.length === 0 && (
+        {imageCount === 0 && (
           <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center' }}>
             {t('publishRequiresImage')}
           </Typography>
@@ -1951,6 +2109,11 @@ export default function ListingCreatorDialog({
       </Box>
 
       <Box sx={{ px: 3, py: 3, flex: 1, overflow: 'auto' }}>
+        {copySource?.source && activeStep === 0 && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            {t(copySource.source === 'ebay' ? 'prefilledFromEbay' : 'prefilledFromEtsy')}
+          </Alert>
+        )}
         {pendingRestore && (
           <Alert
             severity="info"

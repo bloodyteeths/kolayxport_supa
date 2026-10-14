@@ -4,22 +4,24 @@ import {
   AlertTitle,
   Box,
   Button,
-  Collapse,
   IconButton,
-  Snackbar,
 } from '@mui/material';
 import {
   Close,
   UpgradeOutlined,
   Schedule,
 } from '@mui/icons-material';
-import { differenceInDays, format } from 'date-fns';
-import { tr } from 'date-fns/locale';
-import { enUS } from 'date-fns/locale';
+import { differenceInDays } from 'date-fns';
 import { useRouter } from 'next/router';
-import axios from 'axios';
 import { useTranslations } from 'next-intl';
-import useLocaleStore from '@/lib/stores/useLocaleStore';
+
+// Trial quotas enforced server-side in lib/middleware/withUsageLimiter.ts
+// (checkUsage → trialLimits). Used only when the settings payload doesn't carry
+// explicit limits. Keep in sync with that middleware.
+const TRIAL_LIMITS = { orderSync: 50, label: 10 } as const;
+// Warn once usage reaches this share of the quota (same 80% the
+// SubscriptionDashboard uses for "near limit").
+const NEAR_LIMIT_RATIO = 0.8;
 
 interface TrialNotificationProps {
   userSubscription?: {
@@ -29,16 +31,16 @@ interface TrialNotificationProps {
     trialExpiresAt: string | null;
     orderSyncCount: number;
     labelCount: number;
+    /** Optional server-provided quotas; fall back to TRIAL_LIMITS when absent. */
+    orderSyncLimit?: number | null;
+    labelLimit?: number | null;
   } | null;
 }
 
 export default function TrialNotification({ userSubscription }: TrialNotificationProps) {
   const router = useRouter();
   const [dismissed, setDismissed] = useState(false);
-  const [showSnackbar, setShowSnackbar] = useState(false);
   const t = useTranslations('trial');
-  const locale = useLocaleStore((s) => s.locale);
-  const dateFnsLocale = locale === 'tr' ? tr : enUS;
 
   const trialExpiresAt = userSubscription?.trialExpiresAt ?? null;
   const daysUntilExpiry = trialExpiresAt
@@ -120,17 +122,24 @@ export default function TrialNotification({ userSubscription }: TrialNotificatio
   };
 
   const getUsageWarning = () => {
-    const orderSyncUsed = userSubscription.orderSyncCount;
-    const labelUsed = userSubscription.labelCount;
+    const positiveLimit = (v: unknown, fallback: number) =>
+      typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : fallback;
+    const orderSyncLimit = positiveLimit(userSubscription.orderSyncLimit, TRIAL_LIMITS.orderSync);
+    const labelLimit = positiveLimit(userSubscription.labelLimit, TRIAL_LIMITS.label);
+    const orderSyncUsed = Number(userSubscription.orderSyncCount) || 0;
+    const labelUsed = Number(userSubscription.labelCount) || 0;
 
-    if (orderSyncUsed >= 40 || labelUsed >= 8) {
+    if (orderSyncUsed >= orderSyncLimit * NEAR_LIMIT_RATIO || labelUsed >= labelLimit * NEAR_LIMIT_RATIO) {
       return ` ${t('nearingLimit')}`;
     }
     return '';
   };
 
+  // Rendered in normal flow at the top of the page content (AppLayout puts it
+  // first inside <main>), so it pushes content down instead of covering it or
+  // sitting above dialogs.
   return (
-    <Box sx={{ position: 'fixed', top: 80, left: 0, right: 0, zIndex: 1300, px: 2 }}>
+    <Box sx={{ mb: { xs: 1.5, sm: 2 } }}>
       <Alert
         severity={getAlertSeverity()}
         action={
@@ -141,6 +150,7 @@ export default function TrialNotification({ userSubscription }: TrialNotificatio
               color={hasExpired ? 'error' : 'primary'}
               startIcon={<UpgradeOutlined />}
               onClick={handleUpgrade}
+              sx={{ minHeight: 44, whiteSpace: 'nowrap' }}
             >
               {t('selectPlan')}
             </Button>
@@ -149,6 +159,8 @@ export default function TrialNotification({ userSubscription }: TrialNotificatio
                 size="small"
                 onClick={handleDismiss}
                 color="inherit"
+                aria-label={t('dismiss')}
+                sx={{ width: 44, height: 44 }}
               >
                 <Close fontSize="small" />
               </IconButton>
@@ -157,12 +169,18 @@ export default function TrialNotification({ userSubscription }: TrialNotificatio
         }
         icon={<Schedule />}
         sx={{
-          mb: 2,
-          boxShadow: 3,
+          flexWrap: { xs: 'wrap', sm: 'nowrap' },
           '& .MuiAlert-message': {
             flex: 1,
+            minWidth: 0,
             alignSelf: 'center'
-          }
+          },
+          '& .MuiAlert-action': {
+            ml: { xs: 0, sm: 'auto' },
+            pl: { xs: 0, sm: 2 },
+            width: { xs: '100%', sm: 'auto' },
+            justifyContent: { xs: 'flex-end', sm: 'flex-start' },
+          },
         }}
       >
         <AlertTitle>

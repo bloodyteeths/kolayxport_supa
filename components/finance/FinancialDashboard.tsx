@@ -2,16 +2,18 @@ import React, { useState, lazy, Suspense } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   Box, Typography, Paper, Skeleton, Grid, Chip, Button,
-  CircularProgress, Collapse, IconButton,
+  CircularProgress, Collapse, IconButton, LinearProgress,
 } from '@mui/material';
 import {
   Banknote, TrendingUp, TrendingDown, Truck, RotateCcw,
   Package, PieChart, ChevronDown, ChevronUp, List, BarChart3,
-  Percent, Edit3, Megaphone, ReceiptText,
+  Percent, Edit3, Megaphone, ReceiptText, RefreshCw,
 } from 'lucide-react';
 import useFinanceStore, { DashboardData, DashboardSummary } from '@/lib/stores/useFinanceStore';
 import dynamic from 'next/dynamic';
 import BankedPanel from './BankedPanel';
+import ErrorState from '@/components/ui/ErrorState';
+import { resolveFinanceSymbol } from './currency';
 
 const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
 const ProductPnLTable = lazy(() => import('./ProductPnLTable'));
@@ -44,12 +46,6 @@ const CARDS: CardDef[] = [
   { key: 'netProfit', tKey: 'netProfit', icon: <TrendingUp size={20} />, color: '#10b981', gradient: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', format: 'currency', invertColor: true },
 ];
 
-const CURRENCY_SYMBOLS: Record<string, string> = {
-  trendyol: '₺',
-  etsy: '$',
-  ebay: '$',
-};
-
 function formatCurrency(val: number, currency = '₺'): string {
   const abs = Math.abs(val);
   const formatted = abs >= 1000
@@ -58,9 +54,8 @@ function formatCurrency(val: number, currency = '₺'): string {
   return `${val < 0 ? '-' : ''}${currency}${formatted}`;
 }
 
-function SummaryCards({ summary, marketplace }: { summary: DashboardSummary; marketplace: string }) {
+function SummaryCards({ summary, currencySymbol }: { summary: DashboardSummary; currencySymbol: string }) {
   const t = useTranslations('financials');
-  const currencySymbol = CURRENCY_SYMBOLS[marketplace] || '$';
   return (
     <Grid container spacing={1.5} sx={{ mb: 2 }}>
       {CARDS.map(card => {
@@ -100,11 +95,11 @@ function SummaryCards({ summary, marketplace }: { summary: DashboardSummary; mar
                 return (
                   <Chip
                     label={pending > 0
-                      ? `${displayCount} ${t('orders')} (+${pending} bekliyor)`
+                      ? t('ordersWithPending', { count: displayCount, pending })
                       : `${displayCount} ${t('orders')}`}
                     size="small"
                     title={pending > 0
-                      ? `${summary.orderCount} sipariş Etsy/Trendyol tarafından ödeme olarak işlendi. ${pending} sipariş hâlâ market tarafından kapatılmayı bekliyor — 1-3 gün sürebilir.`
+                      ? t('pendingSettlementTooltip', { settled: summary.orderCount, pending })
                       : undefined}
                     sx={{ mt: 0.5, height: 18, fontSize: '0.65rem', fontWeight: 700, bgcolor: pending > 0 ? '#fef3c7' : '#f3f4f6', color: pending > 0 ? '#92400e' : '#6b7280' }}
                   />
@@ -158,10 +153,9 @@ function SummaryCards({ summary, marketplace }: { summary: DashboardSummary; mar
 
 // ---- Charts ----
 
-function ProfitCharts({ data, marketplace }: { data: DashboardData; marketplace: string }) {
+function ProfitCharts({ data, currencySymbol: cs }: { data: DashboardData; currencySymbol: string }) {
   const t = useTranslations('financials');
-  const { timeSeries, summary, transactionTypeSummary } = data;
-  const cs = CURRENCY_SYMBOLS[marketplace] || '$';
+  const { timeSeries, summary } = data;
 
   const barOptions: ApexCharts.ApexOptions = {
     chart: { type: 'bar', height: 300, toolbar: { show: false }, fontFamily: 'Inter, sans-serif', stacked: true },
@@ -243,11 +237,73 @@ function ProfitCharts({ data, marketplace }: { data: DashboardData; marketplace:
 
 // ---- Main Dashboard ----
 
+/** True when the period has no synced financial data at all (not just a quiet month with orders). */
+function isEmptyPeriod(data: DashboardData): boolean {
+  const { summary } = data;
+  return (
+    data.transactionTypeSummary.length === 0 &&
+    data.timeSeries.length === 0 &&
+    data.productBreakdown.length === 0 &&
+    !summary.grossRevenue &&
+    !(summary.totalOrderCount && summary.totalOrderCount > 0) &&
+    !summary.banked &&
+    summary.currentBalance == null
+  );
+}
+
+function SyncPrompt() {
+  const t = useTranslations('financials');
+  const { syncSettlements, syncStatus } = useFinanceStore();
+  const syncing = syncStatus === 'syncing';
+  return (
+    <Paper sx={{ p: { xs: 3, sm: 4 }, textAlign: 'center', borderRadius: '12px' }}>
+      <Box sx={{
+        width: 64, height: 64, borderRadius: '50%', mx: 'auto', mb: 2,
+        background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Banknote size={28} color="#10b981" />
+      </Box>
+      <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+        {t('syncPrompt')}
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5, maxWidth: 420, mx: 'auto' }}>
+        {t('syncEmptyDescription')}
+      </Typography>
+      <Button
+        variant="contained"
+        disableElevation
+        onClick={() => { void syncSettlements(); }}
+        disabled={syncing}
+        startIcon={syncing ? <CircularProgress size={16} color="inherit" /> : <RefreshCw size={16} />}
+        sx={{
+          minHeight: 44, px: 3, textTransform: 'none', fontWeight: 600, borderRadius: '10px',
+          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+        }}
+      >
+        {syncing ? t('syncing') : t('syncData')}
+      </Button>
+    </Paper>
+  );
+}
+
 export default function FinancialDashboard() {
   const t = useTranslations('financials');
-  const { dashboardData, dashboardLoading, marketplace } = useFinanceStore();
+  const { dashboardData, dashboardLoading, dashboardError, marketplace, fetchDashboard } = useFinanceStore();
   const [costDrawerOpen, setCostDrawerOpen] = useState(false);
   const [txLogOpen, setTxLogOpen] = useState(false);
+
+  if (dashboardError && !dashboardData) {
+    return (
+      <Paper sx={{ borderRadius: '12px' }}>
+        <ErrorState
+          error={dashboardError}
+          onRetry={() => fetchDashboard()}
+          retrying={dashboardLoading}
+        />
+      </Paper>
+    );
+  }
 
   if (dashboardLoading && !dashboardData) {
     return (
@@ -271,38 +327,61 @@ export default function FinancialDashboard() {
     );
   }
 
-  if (!dashboardData) {
+  if (!dashboardData || isEmptyPeriod(dashboardData)) {
     return (
-      <Paper sx={{ p: 4, textAlign: 'center', borderRadius: '12px' }}>
-        <Box sx={{
-          width: 64, height: 64, borderRadius: '50%', mx: 'auto', mb: 2,
-          background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <Banknote size={28} color="#10b981" />
+      <Box>
+        <Box sx={{ height: 3, mb: 1 }}>
+          {dashboardLoading && <LinearProgress sx={{ height: 3, borderRadius: 2 }} />}
         </Box>
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-          {t('syncPrompt')}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          {t('syncDescription')}
-        </Typography>
-      </Paper>
+        {/* A failed refresh must not masquerade as an empty period. */}
+        {dashboardError != null && (
+          <ErrorState
+            compact
+            title={t('refreshFailed')}
+            error={dashboardError}
+            onRetry={() => fetchDashboard()}
+            retrying={dashboardLoading}
+            className="mb-2"
+          />
+        )}
+        <SyncPrompt />
+      </Box>
     );
   }
 
   const { summary } = dashboardData;
+  const currencySymbol = resolveFinanceSymbol(marketplace, dashboardData);
 
   return (
     <Box>
+      {/* Thin progress bar while a new range loads; previous numbers stay visible (dimmed). */}
+      <Box sx={{ height: 3, mb: 1 }}>
+        {dashboardLoading && <LinearProgress sx={{ height: 3, borderRadius: 2 }} />}
+      </Box>
+
+      {dashboardError != null && (
+        <ErrorState
+          compact
+          title={t('refreshFailed')}
+          error={dashboardError}
+          onRetry={() => fetchDashboard()}
+          retrying={dashboardLoading}
+          className="mb-2"
+        />
+      )}
+
+      <Box
+        aria-busy={dashboardLoading}
+        sx={{ opacity: dashboardLoading || dashboardError != null ? 0.55 : 1, transition: 'opacity 0.2s' }}
+      >
       {/* Summary Cards */}
-      <SummaryCards summary={summary} marketplace={marketplace} />
+      <SummaryCards summary={summary} currencySymbol={currencySymbol} />
 
       {/* Banked / payouts (Etsy) */}
       <BankedPanel data={dashboardData} marketplace={marketplace} />
 
       {/* Charts */}
-      <ProfitCharts data={dashboardData} marketplace={marketplace} />
+      <ProfitCharts data={dashboardData} currencySymbol={currencySymbol} />
 
       {/* Product P&L Section */}
       <Paper sx={{ borderRadius: '12px', overflow: 'hidden', mb: 2 }}>
@@ -352,6 +431,7 @@ export default function FinancialDashboard() {
           </Suspense>
         </Collapse>
       </Paper>
+      </Box>
 
       {/* Cost Entry Drawer */}
       <Suspense fallback={null}>

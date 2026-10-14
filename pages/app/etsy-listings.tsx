@@ -68,6 +68,8 @@ import {
   Circle as CircleIcon,
   Store as StoreIcon,
   Sync as SyncIcon,
+  SwapHoriz as SwapHorizIcon,
+  EditNote as EditNoteIcon,
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
 import { useRouter } from 'next/router';
@@ -79,7 +81,11 @@ import { useTranslations } from 'next-intl';
 import SEOIndicator from '@/components/etsy/SEOIndicator';
 import { checkTags, checkTitle, TAG_MAX_COUNT, TITLE_MIN, TITLE_MAX } from '@/lib/etsy/seoRules';
 import ListingEditorDrawer from '@/components/etsy/ListingEditorDrawer';
-import ListingCreatorDialog from '@/components/etsy/ListingCreatorDialog';
+import ListingCreatorDialog, { type CopySourceData } from '@/components/etsy/ListingCreatorDialog';
+import { useConnections } from '@/lib/hooks/useConnections';
+import ConnectEmptyState, { RequireConnection } from '@/components/ui/ConnectEmptyState';
+import { useConfirm } from '@/lib/hooks/useConfirm';
+import { notify } from '@/lib/notify';
 import FindReplaceDialog from '@/components/etsy/FindReplaceDialog';
 import BulkOperationsBar from '@/components/etsy/BulkOperationsBar';
 import BulkEditor from '@/components/etsy/BulkEditor';
@@ -292,6 +298,53 @@ function calculateHealth(listing: EtsyListingRow): HealthBreakdown {
   };
 }
 
+/** eBay descriptions are often HTML; Etsy wants plain text. */
+function htmlToPlainText(html: string): string {
+  if (!html) return '';
+  const withBreaks = html
+    .replace(/<\s*br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|h[1-6]|tr)\s*>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '• ');
+  let text = withBreaks.replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, '').replace(/<[^>]+>/g, '');
+  if (typeof window !== 'undefined' && typeof DOMParser !== 'undefined') {
+    // Decode entities (&amp; etc.) without executing anything: text nodes only.
+    try { text = new DOMParser().parseFromString(text, 'text/html').documentElement.textContent || text; } catch { /* keep raw */ }
+  }
+  return text.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/** Map a cached eBay listing (GET /api/clawd/ebay?action=cached_listings row) to the Etsy creator prefill. */
+function ebayItemToCopySource(item: any, shopCurrency: string | null): CopySourceData {
+  const priceNum = Number.parseFloat(String(item?.priceValue ?? ''));
+  const currency = typeof item?.priceCurrency === 'string' ? item.priceCurrency : '';
+  // Etsy prices in the shop currency: only carry the number over when it matches
+  // (an unknown shop currency never matches — better empty than a wrong price).
+  const priceOk = Number.isFinite(priceNum) && priceNum > 0 && Boolean(shopCurrency) && (!currency || currency === shopCurrency);
+  const qty = Number(item?.quantity);
+  const aspects = item?.aspects && typeof item.aspects === 'object' && !Array.isArray(item.aspects) ? item.aspects : {};
+  const materialKey = Object.keys(aspects).find((k) => /^materials?$/i.test(k));
+  const materialValues: unknown[] = materialKey && Array.isArray(aspects[materialKey]) ? aspects[materialKey] : [];
+  const materials = materialValues
+    .filter((m): m is string => typeof m === 'string' && m.trim().length > 0)
+    .map((m) => m.trim().slice(0, 45))
+    .slice(0, 13);
+  const imageUrls: string[] = [
+    ...(Array.isArray(item?.imageUrls) ? item.imageUrls : []),
+    ...(typeof item?.imageUrl === 'string' ? [item.imageUrl] : []),
+  ].filter((u: unknown): u is string => typeof u === 'string' && /^https:\/\//i.test(u));
+  return {
+    source: 'ebay',
+    title: typeof item?.title === 'string' ? item.title : '',
+    description: htmlToPlainText(typeof item?.description === 'string' ? item.description : ''),
+    // eBay has no tags; the creator's AI fills them from the title/description.
+    tags: [],
+    materials,
+    price: priceOk ? Number(priceNum.toFixed(2)) : undefined,
+    quantity: Number.isInteger(qty) && qty > 0 ? qty : undefined,
+    imageUrls: Array.from(new Set(imageUrls)),
+  };
+}
+
 /** Compute Etsy expiration: created + 4 months */
 function getExpiresDate(createdTs: number): string {
   if (!createdTs) return '\u2014';
@@ -304,6 +357,78 @@ function getExpiresDate(createdTs: number): string {
   } catch {
     return '\u2014';
   }
+}
+
+// ---------------------------------------------------------------------------
+// Staged-draft status (shared by the desktop grid and the mobile cards)
+// ---------------------------------------------------------------------------
+
+type TranslateFn = (key: string, values?: Record<string, any>) => string;
+
+/** True when a staged draft carries a queued delete: never bulk-synced from this page. */
+function draftHasQueuedDelete(draft: any): boolean {
+  const actions: any[] = Array.isArray(draft?.queuedActions) ? draft.queuedActions : [];
+  return actions.some((a) => a?.type === 'delete');
+}
+
+/** True for a staged create_listing draft (has its own pinned panel + sync button). */
+function draftIsNewListing(draft: any): boolean {
+  const actions: any[] = Array.isArray(draft?.queuedActions) ? draft.queuedActions : [];
+  return actions.some((a) => a?.type === 'create_listing');
+}
+
+/** Turn a raw Etsy sync error into a short, actionable sentence. */
+function friendlyDraftError(raw: string | null | undefined, t: TranslateFn): string {
+  if (!raw) return '';
+  if (/who_made|when_made|is_supply/i.test(raw)) return t('draftChip.errWhoMade');
+  if (/shop section not found/i.test(raw)) return t('draftChip.errSection');
+  if (/Invalid access token|not a Bearer token/i.test(raw)) return t('draftChip.errToken');
+  if (/shipping_profile/i.test(raw)) return t('draftChip.errShipping');
+  return raw.replace(/^Etsy API error:\s*\d+\s*-\s*/, '').slice(0, 280);
+}
+
+function draftChipMeta(draft: any, t: TranslateFn) {
+  const status = String(draft?.status || 'draft');
+  const isFailed = status === 'failed';
+  const isConflict = status === 'conflict';
+  const label = isFailed
+    ? t('draftChip.failed')
+    : isConflict
+      ? t('draftChip.conflict')
+      : status === 'syncing'
+        ? t('draftChip.syncing')
+        : t('draftChip.pending');
+  const tip = isFailed
+    ? t('draftChip.tipFailed', { reason: friendlyDraftError(draft?.lastSyncError, t) })
+    : isConflict
+      ? t('draftChip.tipConflict')
+      : status === 'syncing'
+        ? t('draftChip.tipSyncing')
+        : t('draftChip.tipDraft');
+  const color: 'warning' | 'error' | 'primary' = isConflict ? 'warning' : isFailed ? 'error' : 'primary';
+  return { isFailed, isConflict, label, tip, color };
+}
+
+function DraftStatusChip({ draft, onClick, sx }: { draft: any; onClick?: () => void; sx?: any }) {
+  const t = useTranslations('etsyListings');
+  const meta = draftChipMeta(draft, t as unknown as TranslateFn);
+  return (
+    <Tooltip title={<span style={{ whiteSpace: 'pre-line' }}>{meta.tip}</span>} arrow placement="top">
+      <Chip
+        size="small"
+        color={meta.color}
+        variant="outlined"
+        label={meta.label}
+        onClick={onClick ? (e) => { e.stopPropagation(); onClick(); } : undefined}
+        sx={{
+          height: 20, fontSize: 11, cursor: onClick ? 'pointer' : 'default',
+          // Tappable chips get an invisible 44px hit area (visual size unchanged).
+          ...(onClick ? { position: 'relative', overflow: 'visible', '&::after': { content: '""', position: 'absolute', top: -12, bottom: -12, left: -4, right: -4 } } : {}),
+          ...sx,
+        }}
+      />
+    </Tooltip>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -320,20 +445,31 @@ function MobileEtsyListingCard({
   selected,
   onToggleSelect,
   sectionName,
+  pendingDraft,
+  onListOnEbay,
+  duplicating,
 }: {
   listing: EtsyListingRow;
   onEdit: (listingId: number) => void;
-  onCopy: (listingId: number) => void;
+  onCopy: (listingId: number, row?: EtsyListingRow) => void;
   onDelete: (listingId: number) => void;
   onRenew: (listingId: number) => void;
   onDeactivate: (listingId: number) => void;
   selected?: boolean;
   onToggleSelect?: (listingId: number) => void;
   sectionName?: string;
+  /** Staged local draft for this listing (same data the desktop grid uses). */
+  pendingDraft?: any;
+  /** Shown only when eBay is connected. */
+  onListOnEbay?: (listingId: number) => void;
+  /** null = idle; this card's id = loading photos for its duplicate; other id = busy elsewhere. */
+  duplicating?: number | null;
 }) {
   const [expanded, setExpanded] = useState(false);
   const health = calculateHealth(listing);
   const t = useTranslations('etsyListings');
+  const draftMeta = pendingDraft ? draftChipMeta(pendingDraft, t as unknown as TranslateFn) : null;
+  const draftedTitle = pendingDraft?.fieldPatch?.title;
 
   return (
     <Paper sx={{ mb: 1, overflow: 'hidden', borderRadius: 2, maxWidth: '100%', width: '100%', border: selected ? '2px solid' : '1px solid', borderColor: selected ? 'primary.main' : 'divider' }}>
@@ -402,9 +538,10 @@ function MobileEtsyListingCard({
               wordBreak: 'break-word',
               maxWidth: '100%',
               fontSize: '0.82rem',
+              fontStyle: draftedTitle ? 'italic' : 'normal',
             }}
           >
-            {listing.title}
+            {draftedTitle || listing.title}
           </Typography>
           <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center', mt: 0.25, flexWrap: 'wrap' }}>
             <Typography variant="body2" fontWeight={600} fontSize="0.82rem">
@@ -434,6 +571,9 @@ function MobileEtsyListingCard({
                 '& .MuiChip-label': { px: 0.5 },
               }}
             />
+            {pendingDraft && (
+              <DraftStatusChip draft={pendingDraft} onClick={() => onEdit(listing.listing_id)} />
+            )}
           </Box>
         </Box>
 
@@ -446,6 +586,15 @@ function MobileEtsyListingCard({
       {/* Expandable details */}
       <Collapse in={expanded}>
         <Box sx={{ px: 1.5, pb: 1.5, borderTop: '1px solid', borderColor: 'divider', overflow: 'hidden', maxWidth: '100%' }}>
+          {/* Staged draft status — tooltips don't work on touch, so spell it out */}
+          {draftMeta && (
+            <Typography
+              variant="caption"
+              sx={{ display: 'block', mt: 1.5, whiteSpace: 'pre-line', wordBreak: 'break-word', color: draftMeta.isFailed ? 'error.main' : draftMeta.isConflict ? 'warning.main' : 'text.secondary' }}
+            >
+              {draftMeta.tip}
+            </Typography>
+          )}
           {/* Tags */}
           {listing.tags && listing.tags.length > 0 && (
             <Box sx={{ mt: 1.5 }}>
@@ -516,8 +665,13 @@ function MobileEtsyListingCard({
             ))}
           </Box>
 
-          {/* Actions */}
-          <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
+          {/* Actions — wrap to rows of three so every button keeps a 44px target */}
+          <Box
+            sx={{
+              display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap',
+              '& > .MuiButton-root': { flex: '1 1 calc(33.33% - 8px)', minWidth: 0, minHeight: 44 },
+            }}
+          >
             <Button
               size="small"
               variant="contained"
@@ -534,16 +688,30 @@ function MobileEtsyListingCard({
             <Button
               size="small"
               variant="contained"
-              startIcon={<ContentCopyIcon sx={{ fontSize: '16px !important' }} />}
-              onClick={(e) => { e.stopPropagation(); onCopy(listing.listing_id); }}
+              startIcon={duplicating === listing.listing_id
+                ? <CircularProgress size={14} color="inherit" />
+                : <ContentCopyIcon sx={{ fontSize: '16px !important' }} />}
+              disabled={duplicating != null}
+              onClick={(e) => { e.stopPropagation(); onCopy(listing.listing_id, listing); }}
               sx={{
                 flex: 1, minHeight: 42, borderRadius: '10px', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem',
                 background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', boxShadow: '0 2px 8px rgba(124,58,237,0.25)',
                 '&:hover': { background: 'linear-gradient(135deg, #7c3aed, #6d28d9)' },
               }}
             >
-              {t('copy')}
+              {t('duplicate.action')}
             </Button>
+            {onListOnEbay && (
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<SwapHorizIcon sx={{ fontSize: '16px !important' }} />}
+                onClick={(e) => { e.stopPropagation(); onListOnEbay(listing.listing_id); }}
+                sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem' }}
+              >
+                {t('crosslist.listOnEbay')}
+              </Button>
+            )}
             {(listing.state === 'active' || listing.state === 'expired' || listing.state === 'inactive') && (
               <Button
                 size="small"
@@ -1042,12 +1210,19 @@ function EtsyListingsPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerRefreshKey, setDrawerRefreshKey] = useState(0);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  // Prefill for the creator: "Duplicate as new" or an incoming eBay cross-list.
+  const [creatorCopySource, setCreatorCopySource] = useState<CopySourceData | null>(null);
   const [findReplaceOpen, setFindReplaceOpen] = useState(false);
   const [smartPricingOpen, setSmartPricingOpen] = useState(false);
   const [duplicateDetectorOpen, setDuplicateDetectorOpen] = useState(false);
   const [backupManagerOpen, setBackupManagerOpen] = useState(false);
   const [bulkEditorOpen, setBulkEditorOpen] = useState(false);
   const router = useRouter();
+  const confirm = useConfirm();
+  const { has: hasConnection } = useConnections();
+  const ebayConnected = hasConnection('ebay') === true;
+  const [hasDraftFilter, setHasDraftFilter] = useState(false);
+  const [shopsLoaded, setShopsLoaded] = useState(false);
 
   // The bulk editor is a fullscreen dialog with no route of its own, so the
   // browser Back button used to navigate away from this page entirely instead
@@ -1140,6 +1315,7 @@ function EtsyListingsPage() {
         const res = await fetch('/api/integrations/etsy/shops');
         if (!res.ok) {
           console.error('Failed to fetch Etsy shops:', res.status);
+          setShopsLoaded(true);
           return;
         }
         const data = await res.json();
@@ -1154,6 +1330,8 @@ function EtsyListingsPage() {
         }
       } catch (err) {
         console.error('Failed to fetch Etsy shops:', err);
+      } finally {
+        setShopsLoaded(true);
       }
     })();
   }, [(user as any)?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1208,6 +1386,11 @@ function EtsyListingsPage() {
   const [bulkSyncingDrafts, setBulkSyncingDrafts] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
 
+  // Which shop the current `listings` belong to (set once the first page, a
+  // cache hit, or a failure settles). The eBay cross-list waits on it so the
+  // shop currency is known before an eBay price is copied.
+  const [listingsLoadedFor, setListingsLoadedFor] = useState('');
+
   // Load listings from Etsy API (with in-memory cache)
   const fetchListings = useCallback(async () => {
     if (!selectedShopId) return;
@@ -1218,6 +1401,7 @@ function EtsyListingsPage() {
     if (cached && Date.now() - cached.ts < 300_000) {
       setListings(cached.listings);
       setTotalCount(cached.total);
+      setListingsLoadedFor(selectedShopId);
       return;
     }
 
@@ -1241,6 +1425,7 @@ function EtsyListingsPage() {
       // Show first page immediately while fetching rest
       setListings(allRows);
       setTotalCount(totalFromApi);
+      setListingsLoadedFor(selectedShopId);
 
       // Fetch remaining pages if more exist
       if (totalFromApi > LIMIT) {
@@ -1269,6 +1454,7 @@ function EtsyListingsPage() {
     } catch (err: any) {
       console.error('Failed to fetch listings:', err);
       toast.error(t('loadFailed', { error: err.message }));
+      setListingsLoadedFor(selectedShopId);
     }
     setLoading(false);
   }, [selectedShopId, statusFilter]);
@@ -1407,7 +1593,7 @@ function EtsyListingsPage() {
   useEffect(() => {
     setPaginationModel((prev) => (prev.page !== 0 ? { ...prev, page: 0 } : prev));
     setMobileVisibleCount(25);
-  }, [searchTerm, sectionFilter, excludeTerm, healthFilter]);
+  }, [searchTerm, sectionFilter, excludeTerm, healthFilter, hasDraftFilter]);
 
   // Pre-compute health scores to avoid recalculating per filter toggle
   const healthMap = useMemo(() => {
@@ -1466,6 +1652,9 @@ function EtsyListingsPage() {
         return !title.includes(exc) && !desc.includes(exc) && !tags.includes(exc);
       });
     }
+    if (hasDraftFilter) {
+      result = result.filter((l) => Boolean(pendingDraftsByListing[String(l.listing_id)]));
+    }
     if (healthFilter) {
       result = result.filter((l) => {
         const h = healthMap.get(l.listing_id) || calculateHealth(l);
@@ -1482,7 +1671,7 @@ function EtsyListingsPage() {
       });
     }
     return result;
-  }, [listings, searchTerm, sectionFilter, excludeTerm, healthFilter, healthMap]);
+  }, [listings, searchTerm, sectionFilter, excludeTerm, healthFilter, healthMap, hasDraftFilter, pendingDraftsByListing]);
 
   // --- Quick stats ---
   const quickStats = useMemo(() => {
@@ -1502,10 +1691,10 @@ function EtsyListingsPage() {
       try {
         await stageEtsyDraft({ shopId: selectedShopId, listingId, queuedActions: [{ type: 'delete' }] });
         await fetchPendingDrafts();
-        toast.success('Delete queued in draft. Sync to Etsy to apply.');
+        toast.success(t('draftQueued.delete'));
         setDeleteConfirmId(null);
       } catch (err: any) {
-        toast.error(t('deleteFailed', { error: err.message }));
+        notify.error(err, t('deleteFailed', { error: '' }).replace(/[:\s]+$/, ''));
       }
     },
     [selectedShopId, fetchPendingDrafts]
@@ -1517,9 +1706,9 @@ function EtsyListingsPage() {
       try {
         await stageEtsyDraft({ shopId: selectedShopId, listingId, queuedActions: [{ type: 'renew' }] });
         await fetchPendingDrafts();
-        toast.success('Renew queued in draft. Sync to Etsy to apply.');
+        toast.success(t('draftQueued.renew'));
       } catch (err: any) {
-        toast.error(t('renewFailed') + ': ' + err.message);
+        notify.error(err, t('renewFailed'));
       }
     },
     [selectedShopId, fetchPendingDrafts]
@@ -1531,9 +1720,9 @@ function EtsyListingsPage() {
       try {
         await stageEtsyDraft({ shopId: selectedShopId, listingId, queuedActions: [{ type: 'deactivate' }] });
         await fetchPendingDrafts();
-        toast.success('Deactivate queued in draft. Sync to Etsy to apply.');
+        toast.success(t('draftQueued.deactivate'));
       } catch (err: any) {
-        toast.error(t('deactivateFailed') + ': ' + err.message);
+        notify.error(err, t('deactivateFailed'));
       }
     },
     [selectedShopId, fetchPendingDrafts]
@@ -1723,10 +1912,10 @@ function EtsyListingsPage() {
       try {
         await stageEtsyDraft({ shopId: selectedShopId, listingId: newRow.listing_id, fields: body });
         await fetchPendingDrafts();
-        toast.success('Draft saved. Sync to Etsy to apply.');
+        toast.success(t('draftQueued.saved'));
         return oldRow;
       } catch (err: any) {
-        toast.error(t('updateFailed', { error: err.message }));
+        notify.error(err, t('updateFailed', { error: '' }).replace(/[:\s]+$/, ''));
         return oldRow;
       }
     },
@@ -1739,19 +1928,90 @@ function EtsyListingsPage() {
     setDrawerOpen(true);
   };
 
-  // --- Copy listing -> create draft on Etsy, then open Editor Drawer ---
-  const handleCopyListing = async (listingId: number) => {
+  // --- Creator open helpers ---
+  const openCreator = useCallback((source: CopySourceData | null) => {
+    setCreatorCopySource(source);
+    setCreateDialogOpen(true);
+  }, []);
+
+  const closeCreator = useCallback(() => {
+    setCreateDialogOpen(false);
+    setCreatorCopySource(null);
+  }, []);
+
+  // --- Duplicate as new: open the creator prefilled from the row. Nothing is
+  // staged until the user saves in the creator; nothing reaches Etsy until they
+  // press Create & Publish there (or sync the saved draft).
+  const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
+  const duplicatingRef = useRef<number | null>(null);
+  // Always read the latest rows: the DataGrid columns memo keeps an older
+  // closure of this handler, so never rely on `listings` captured at render.
+  const listingsRef = useRef<EtsyListingRow[]>(listings);
+  listingsRef.current = listings;
+  const handleCopyListing = async (listingId: number, rowArg?: EtsyListingRow) => {
     const shopId = selectedShopIdRef.current;
-    if (!shopId) return;
-    const toastId = toast.loading(t('copyCreating'));
-    try {
-      await stageEtsyDraft({ shopId, listingId, queuedActions: [{ type: 'copy' }] });
-      await fetchPendingDrafts();
-      toast.success('Copy queued in draft. Sync to Etsy to apply.', { id: toastId });
-    } catch (err: any) {
-      toast.error(err.message || t('copyFailed'), { id: toastId });
+    if (!shopId || duplicatingRef.current !== null) return;
+    const row = listingsRef.current.find((l) => l.listing_id === listingId) || rowArg;
+    if (!row) {
+      notify.error(null, t('duplicate.notFound'));
+      return;
     }
+    duplicatingRef.current = listingId;
+    setDuplicatingId(listingId);
+    // Read-only: every photo of the source listing (full size), in Etsy order.
+    let imageUrls: string[] = [];
+    try {
+      const res = await fetch(`/api/clawd/etsy?action=get_listing_images&listing_id=${listingId}&shop_id=${shopId}`);
+      if (res.ok) {
+        const data = await res.json();
+        const imgs: any[] = Array.isArray(data?.images) ? data.images : [];
+        imageUrls = imgs
+          .slice()
+          .sort((a, b) => (Number(a?.rank) || 99) - (Number(b?.rank) || 99))
+          .map((img) => img?.url_fullxfull || img?.url_570xN)
+          .filter((u): u is string => typeof u === 'string' && u.length > 0);
+      }
+    } catch {
+      // Fall back to the cover photo below.
+    }
+    if (imageUrls.length === 0 && row.thumbnail?.url_570xN) imageUrls = [row.thumbnail.url_570xN];
+    duplicatingRef.current = null;
+    setDuplicatingId(null);
+
+    const priceValue = row.price && row.price.divisor ? row.price.amount / row.price.divisor : undefined;
+    // Same convention as the creator's copySource: no "COPY - " prefix (dashes
+    // break the commas-only title rule); the user edits the title in the creator.
+    openCreator({
+      source: 'etsy',
+      title: row.title,
+      description: row.description,
+      tags: row.tags || [],
+      materials: row.materials || [],
+      price: priceValue && priceValue > 0 ? Number(priceValue.toFixed(2)) : undefined,
+      quantity: row.quantity || undefined,
+      who_made: row.who_made || undefined,
+      when_made: row.when_made || undefined,
+      is_supply: row.is_supply,
+      shipping_profile_id: row.shipping_profile_id || undefined,
+      return_policy_id: row.return_policy_id || undefined,
+      shop_section_id: row.shop_section_id ? row.shop_section_id : null,
+      taxonomy_id: row.taxonomy_id || undefined,
+      processing_min: row.processing_min,
+      processing_max: row.processing_max,
+      item_weight: row.item_weight,
+      item_weight_unit: row.item_weight_unit,
+      item_length: row.item_length,
+      item_width: row.item_width,
+      item_height: row.item_height,
+      item_dimensions_unit: row.item_dimensions_unit,
+      imageUrls,
+    });
   };
+
+  // --- Cross-list: Etsy -> eBay (the eBay page reads ?crosslist=etsy:<id>) ---
+  const handleListOnEbay = useCallback((listingId: number) => {
+    router.push(`/app/ebay-listings?crosslist=etsy:${listingId}`);
+  }, [router]);
 
   // --- Shop currency: Etsy prices every listing in the shop's currency, so the
   // most common currency among this shop's listings is the shop currency.
@@ -1885,15 +2145,137 @@ function EtsyListingsPage() {
 
   const handleSyncSelectedDrafts = useCallback(async () => {
     if (selectedDraftIds.length === 0 || bulkSyncingDrafts) return;
-    if (!window.confirm(t('draftSync.confirm', { count: selectedDraftIds.length }))) return;
-    await runBulkDraftSync(selectedDraftIds, false);
-  }, [selectedDraftIds, bulkSyncingDrafts, runBulkDraftSync, t]);
+    // Never sync a queued delete from a bulk action — those are applied from the editor.
+    const draftsById = new Map<string, any>(pendingDraftList.map((d) => [String(d?.id), d]));
+    const syncIds = selectedDraftIds.filter((id) => !draftHasQueuedDelete(draftsById.get(id)));
+    const skipped = selectedDraftIds.length - syncIds.length;
+    if (syncIds.length === 0) {
+      notify.info(t('draftBanner.skippedDeletes', { count: skipped }));
+      return;
+    }
+    const ok = await confirm({
+      title: t('draftBanner.confirmTitle', { count: syncIds.length }),
+      description: [
+        t('draftBanner.confirmBody'),
+        skipped > 0 ? t('draftBanner.skippedDeletes', { count: skipped }) : '',
+      ].filter(Boolean).join(' '),
+      items: syncIds.map((id) => draftTitleById[id] || id),
+      confirmLabel: t('draftBanner.syncAll'),
+    });
+    if (!ok) return;
+    await runBulkDraftSync(syncIds, false);
+  }, [selectedDraftIds, bulkSyncingDrafts, pendingDraftList, draftTitleById, confirm, runBulkDraftSync, t]);
 
   const handleForceSyncConflicts = useCallback(async () => {
     const ids = (syncConflicts || []).map((c) => c.draftId);
     setSyncConflicts(null);
     if (ids.length > 0) await runBulkDraftSync(ids, true);
   }, [syncConflicts, runBulkDraftSync]);
+
+  // --- Page-level draft summary ("N unsynced changes · M failed") -----------
+  const draftSummary = useMemo(() => {
+    let pending = 0;
+    let failed = 0;
+    let conflicts = 0;
+    const syncable: Array<{ id: string; title: string }> = [];
+    let skippedDeletes = 0;
+    let skippedNew = 0;
+    for (const draft of pendingDraftList) {
+      const status = String(draft?.status || '');
+      if (status === 'draft') pending++;
+      else if (status === 'failed') failed++;
+      else if (status === 'conflict') conflicts++;
+      else continue; // syncing / synced / cancelled are not "unsynced"
+      if (!draft?.id) continue;
+      // Never bulk-sync a queued delete; new listings sync from their own panel.
+      if (draftHasQueuedDelete(draft)) { skippedDeletes++; continue; }
+      if (draftIsNewListing(draft)) { skippedNew++; continue; }
+      syncable.push({ id: String(draft.id), title: draftTitleById[draft.id] || `#${draft.etsyListingId}` });
+    }
+    return { pending, failed, conflicts, total: pending + failed + conflicts, syncable, skippedDeletes, skippedNew };
+  }, [pendingDraftList, draftTitleById]);
+
+  const handleSyncAllDrafts = useCallback(async () => {
+    if (bulkSyncingDrafts) return;
+    const { syncable, skippedDeletes, skippedNew } = draftSummary;
+    if (syncable.length === 0) {
+      notify.info(t('draftBanner.nothingToSync'));
+      return;
+    }
+    const notes = [
+      skippedDeletes > 0 ? t('draftBanner.skippedDeletes', { count: skippedDeletes }) : '',
+      skippedNew > 0 ? t('draftBanner.skippedNew', { count: skippedNew }) : '',
+    ].filter(Boolean);
+    const ok = await confirm({
+      title: t('draftBanner.confirmTitle', { count: syncable.length }),
+      description: [t('draftBanner.confirmBody'), ...notes].join(' '),
+      items: syncable.map((d) => d.title),
+      confirmLabel: t('draftBanner.syncAll'),
+    });
+    if (!ok) return;
+    await runBulkDraftSync(syncable.map((d) => d.id), false);
+  }, [bulkSyncingDrafts, draftSummary, confirm, runBulkDraftSync, t]);
+
+  // --- Cross-list: eBay -> Etsy (?crosslist=ebay:<sku|itemId>) ---------------
+  // Read-only lookup in the eBay listing cache; opens the creator prefilled.
+  // Waits for the shop so the creator has its shop id / profiles.
+  const crosslistParam = typeof router.query.crosslist === 'string' ? router.query.crosslist : '';
+  const crosslistHandledRef = useRef<string | null>(null);
+  const [crosslistLoading, setCrosslistLoading] = useState(false);
+  const shopCurrencyRef = useRef<string | null>(null);
+  shopCurrencyRef.current = shopCurrency;
+  useEffect(() => {
+    if (!router.isReady || !crosslistParam || !selectedShopId) return;
+    // Wait for this shop's listings so the shop currency is known.
+    if (listingsLoadedFor !== selectedShopId) return;
+    if (crosslistHandledRef.current === crosslistParam) return;
+    crosslistHandledRef.current = crosslistParam;
+
+    // Drop the param first so refresh/back doesn't re-open the creator.
+    const { crosslist: _drop, ...rest } = router.query;
+    router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+
+    const match = /^ebay:(.{1,200})$/.exec(crosslistParam);
+    if (!match) return;
+    // router.query is already decoded; only fall back to a second decode when
+    // the raw value matches nothing (e.g. a double-encoded link).
+    const rawRef = match[1];
+    let decodedRef = rawRef;
+    try { decodedRef = decodeURIComponent(rawRef); } catch { /* keep raw */ }
+
+    setCrosslistLoading(true);
+    (async () => {
+      try {
+        const res = await fetch('/api/clawd/ebay?action=cached_listings');
+        if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
+        const data = await res.json();
+        const items: any[] = Array.isArray(data?.listings) ? data.listings : [];
+        const matches = (ref: string) => (l: any) =>
+          [l?.sku, l?.listingId, l?.offerId, l?.id].some((v) => v != null && String(v) === ref);
+        const item = items.find(matches(rawRef)) || (decodedRef !== rawRef ? items.find(matches(decodedRef)) : undefined);
+        if (!item) {
+          notify.error(null, t('crosslist.notFound'));
+          return;
+        }
+        const currentShopCurrency = shopCurrencyRef.current;
+        const copy = ebayItemToCopySource(item, currentShopCurrency);
+        openCreator(copy);
+        const ebayCurrency = typeof item.priceCurrency === 'string' ? item.priceCurrency : '';
+        const hadPrice = Number.parseFloat(String(item?.priceValue ?? '')) > 0;
+        if (hadPrice && copy.price == null) {
+          if (currentShopCurrency && ebayCurrency && ebayCurrency !== currentShopCurrency) {
+            notify.info(t('crosslist.priceCurrencyMismatch', { from: ebayCurrency, to: currentShopCurrency }));
+          } else if (!currentShopCurrency) {
+            notify.info(t('crosslist.priceCurrencyUnknown'));
+          }
+        }
+      } catch (err) {
+        notify.error(err, t('crosslist.loadFailed'));
+      } finally {
+        setCrosslistLoading(false);
+      }
+    })();
+  }, [router.isReady, crosslistParam, selectedShopId, listingsLoadedFor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Staged new listings (create_listing drafts) ---------------------------
   // They have a negative local id until the first sync creates them on Etsy, so
@@ -1923,8 +2305,14 @@ function EtsyListingsPage() {
     // Never sync a draft carrying a queued delete from here.
     if (actions.some((a) => a?.type === 'delete')) return;
     const willPublish = actions.some((a) => a?.type === 'publish' && !a?.completedAt);
-    if (!window.confirm(t(willPublish ? 'newDrafts.confirmSyncPublish' : 'newDrafts.confirmSync'))) return;
     const title = describeNewListingDraft(draft, null).title || t('newDrafts.untitled');
+    const ok = await confirm({
+      title: t('newDrafts.syncToEtsy'),
+      description: t(willPublish ? 'newDrafts.confirmSyncPublish' : 'newDrafts.confirmSync'),
+      items: [title],
+      confirmLabel: t('newDrafts.syncToEtsy'),
+    });
+    if (!ok) return;
     setNewDraftBusyId(draft.id);
     const toastId = toast.loading(t('draftSync.syncing', { count: 1 }));
     try {
@@ -1948,22 +2336,28 @@ function EtsyListingsPage() {
       // Failure: the row stays, now showing the failed status + error.
       await refreshAfterNewListingSync();
     }
-  }, [newDraftBusyId, t, translateDraftIssue, refreshAfterNewListingSync]);
+  }, [newDraftBusyId, t, translateDraftIssue, refreshAfterNewListingSync, confirm]);
 
   const handleDiscardNewListingDraft = useCallback(async (draft: any) => {
     if (!draft?.id || newDraftBusyId) return;
-    if (!window.confirm(t('newDrafts.confirmDiscard'))) return;
+    const ok = await confirm({
+      title: t('newDrafts.discardTitle'),
+      description: t('newDrafts.confirmDiscard'),
+      items: [describeNewListingDraft(draft, null).title || t('newDrafts.untitled')],
+      destructive: true,
+    });
+    if (!ok) return;
     setNewDraftBusyId(draft.id);
     try {
       await discardEtsyDraft(draft.id);
       toast.success(t('newDrafts.discarded'));
     } catch (err: any) {
-      toast.error(t('newDrafts.discardFailed', { error: translateDraftIssue(err) || err?.message || '' }));
+      notify.error(translateDraftIssue(err) || err, t('newDrafts.discardFailed', { error: '' }).replace(/[:\s]+$/, ''));
     } finally {
       setNewDraftBusyId(null);
       await fetchPendingDrafts();
     }
-  }, [newDraftBusyId, t, translateDraftIssue, fetchPendingDrafts]);
+  }, [newDraftBusyId, t, translateDraftIssue, fetchPendingDrafts, confirm]);
 
   // --- DataGrid Columns (Vela-style: image, title+hover actions, stock, price, expires, section, score) ---
   const columns: GridColDef[] = useMemo(
@@ -2047,7 +2441,7 @@ function EtsyListingsPage() {
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
-                    pr: pendingDraft ? 16 : 8,
+                    pr: pendingDraft ? 18 : 10,
                     fontStyle: draftedTitle ? 'italic' : 'normal',
                     '&:hover': { color: 'primary.main', textDecoration: 'underline' },
                   }}
@@ -2056,52 +2450,15 @@ function EtsyListingsPage() {
                   {draftedTitle || params.row.title}
                 </Typography>
               </Tooltip>
-              {pendingDraft && (() => {
-                const isFailed = pendingDraft.status === 'failed';
-                const isConflict = pendingDraft.status === 'conflict';
-                const friendly = (raw: string | null | undefined): string => {
-                  if (!raw) return '';
-                  if (/who_made|when_made|is_supply/i.test(raw)) {
-                    return "Etsy zorunlu üçlüsü (kim/ne zaman yapıldı, malzeme mi) eksik. Yeniden senkronizasyon dener — çoğu yeni denemede otomatik çözülür.";
-                  }
-                  if (/shop section not found/i.test(raw)) {
-                    return "Seçili Etsy bölümü artık yok. Düzenleyiciden başka bir bölüm seç ve tekrar dene.";
-                  }
-                  if (/Invalid access token|not a Bearer token/i.test(raw)) {
-                    return "Etsy bağlantın geçersiz. Ayarlar → Etsy'den yeniden bağlan.";
-                  }
-                  if (/shipping_profile/i.test(raw)) {
-                    return "Seçili kargo profili artık yok. Düzenleyiciden başka bir profil seç.";
-                  }
-                  return raw.replace(/^Etsy API error:\s*\d+\s*-\s*/, '').slice(0, 280);
-                };
-                const tip = isFailed
-                  ? `Sync başarısız: ${friendly(pendingDraft.lastSyncError)}\n\nTıkla → düzenleyiciden Tekrar Sync ya da Taslağı Sil.`
-                  : isConflict
-                    ? "Etsy üzerinde bu listing değişmiş. Düzenleyiciden incele ve gerekiyorsa yeniden Sync."
-                    : "Local taslak. Sync to Etsy'ye basana kadar Etsy'de bir şey değişmez.";
-                return (
-                  <Tooltip title={tip} arrow placement="top">
-                    <Chip
-                      size="small"
-                      color={isConflict ? 'warning' : isFailed ? 'error' : 'primary'}
-                      variant="outlined"
-                      label={isFailed ? 'Sync başarısız' : isConflict ? 'Etsy değişti' : pendingDraft.status === 'draft' ? 'Pending' : pendingDraft.status}
-                      onClick={() => handleOpenEditor(params.row.listing_id)}
-                      sx={{
-                        ml: 1,
-                        height: 20,
-                        fontSize: 11,
-                        cursor: 'pointer',
-                        // Keep the chip above the absolutely-positioned hover
-                        // action buttons so its tooltip stays reachable.
-                        position: 'relative',
-                        zIndex: 2,
-                      }}
-                    />
-                  </Tooltip>
-                );
-              })()}
+              {pendingDraft && (
+                <DraftStatusChip
+                  draft={pendingDraft}
+                  onClick={() => handleOpenEditor(params.row.listing_id)}
+                  // Keep the chip above the absolutely-positioned hover
+                  // action buttons so its tooltip stays reachable.
+                  sx={{ ml: 1, position: 'relative', zIndex: 2 }}
+                />
+              )}
               {/*
                 When a draft is in failed/conflict state, suppress the on-hover
                 quick-action buttons so they don't cover the status chip — the
@@ -2119,11 +2476,18 @@ function EtsyListingsPage() {
                     <EditIcon sx={{ fontSize: 16 }} />
                   </IconButton>
                 </Tooltip>
-                <Tooltip title={t('copy')} arrow>
-                  <IconButton size="small" onClick={() => handleCopyListing(params.row.listing_id)} sx={{ p: 0.5 }}>
-                    <ContentCopyIcon sx={{ fontSize: 16 }} />
+                <Tooltip title={t('duplicate.tooltip')} arrow>
+                  <IconButton size="small" aria-label={t('duplicate.tooltip')} onClick={() => handleCopyListing(params.row.listing_id, params.row as EtsyListingRow)} disabled={duplicatingId !== null} sx={{ p: 0.5 }}>
+                    {duplicatingId === params.row.listing_id ? <CircularProgress size={14} /> : <ContentCopyIcon sx={{ fontSize: 16 }} />}
                   </IconButton>
                 </Tooltip>
+                {ebayConnected && (
+                  <Tooltip title={t('crosslist.listOnEbay')} arrow>
+                    <IconButton size="small" aria-label={t('crosslist.listOnEbay')} onClick={() => handleListOnEbay(params.row.listing_id)} sx={{ p: 0.5 }}>
+                      <SwapHorizIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
+                )}
                 {(params.row.state === 'active' || params.row.state === 'expired' || params.row.state === 'inactive') && (
                   <Tooltip title={t('renew')} arrow>
                     <IconButton size="small" color="success" onClick={() => handleRenewListing(params.row.listing_id)} sx={{ p: 0.5 }}>
@@ -2284,7 +2648,7 @@ function EtsyListingsPage() {
         },
       },
     ],
-    [pendingDraftsByListing, sectionNameMap, t] // eslint-disable-line react-hooks/exhaustive-deps
+    [pendingDraftsByListing, sectionNameMap, t, ebayConnected, duplicatingId] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   // --- Column visibility for mobile ---
@@ -2312,23 +2676,24 @@ function EtsyListingsPage() {
     if (sectionFilter) count++;
     if (healthFilter) count++;
     if (excludeTerm.trim()) count++;
+    if (hasDraftFilter) count++;
     return count;
-  }, [sectionFilter, healthFilter, excludeTerm]);
+  }, [sectionFilter, healthFilter, excludeTerm, hasDraftFilter]);
 
   return (
-    <Box sx={{ p: { xs: 0.5, sm: 1, md: 1.5 }, maxWidth: 1600, mx: 'auto', overflowX: 'hidden' }}>
-      {/* No shops message */}
-      {shops.length === 0 && !(loading) && (
-        <Paper sx={{ p: 3, mb: 2, textAlign: 'center' }}>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
-            {t('noShopConnected')}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {t('noShopConnectedDesc')}
-          </Typography>
-          <Button variant="contained" size="small" href="/ayarlar?tab=connections">
-            {t('goToSettings')}
-          </Button>
+    // overflowX 'clip' (not 'hidden'): no scroll container, so the sticky draft banner can stick.
+    <Box sx={{ p: { xs: 0.5, sm: 1, md: 1.5 }, maxWidth: 1600, mx: 'auto', overflowX: 'clip' }}>
+      {/* Connected per /api/integrations/status, but no shop row came back */}
+      {shopsLoaded && shops.length === 0 && !loading && (
+        <Paper sx={{ mb: 2 }}>
+          <ConnectEmptyState provider="etsy" description={t('noShopConnectedDesc')} />
+        </Paper>
+      )}
+
+      {crosslistLoading && (
+        <Paper sx={{ px: 1.5, py: 1, mb: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <CircularProgress size={16} />
+          <Typography variant="body2" color="text.secondary">{t('crosslist.loading')}</Typography>
         </Paper>
       )}
 
@@ -2526,7 +2891,7 @@ function EtsyListingsPage() {
               <Button
                 variant="contained"
                 size="small"
-                onClick={() => setCreateDialogOpen(true)}
+                onClick={() => openCreator(null)}
                 sx={{
                   minHeight: 36, whiteSpace: 'nowrap', borderRadius: '8px', textTransform: 'none', fontWeight: 600,
                   background: 'linear-gradient(135deg, #10b981, #059669)', boxShadow: '0 2px 8px rgba(5,150,105,0.3)',
@@ -2574,6 +2939,46 @@ function EtsyListingsPage() {
               <ListItemText>{t('backups')}</ListItemText>
             </MenuItem>
           </Menu>
+
+          {/* Page-level staged-draft summary: nothing here is on Etsy until synced */}
+          {draftSummary.total > 0 && (
+            <Paper
+              role="status"
+              sx={{
+                position: 'sticky', top: 0, zIndex: 6,
+                px: 1.5, py: 0.75, mb: 0.5,
+                display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap',
+                border: '1px solid',
+                borderColor: draftSummary.failed + draftSummary.conflicts > 0 ? 'warning.light' : 'primary.light',
+                bgcolor: 'background.paper',
+              }}
+            >
+              <EditNoteIcon fontSize="small" color={draftSummary.failed + draftSummary.conflicts > 0 ? 'warning' : 'primary'} />
+              <Typography variant="body2" sx={{ fontWeight: 600, flex: '1 1 auto', minWidth: 0 }}>
+                {t('draftBanner.unsynced', { count: draftSummary.pending })}
+                {draftSummary.failed > 0 && <>{' · '}<Box component="span" sx={{ color: 'error.main' }}>{t('draftBanner.failed', { count: draftSummary.failed })}</Box></>}
+                {draftSummary.conflicts > 0 && <>{' · '}<Box component="span" sx={{ color: 'warning.main' }}>{t('draftBanner.conflicts', { count: draftSummary.conflicts })}</Box></>}
+              </Typography>
+              <Chip
+                icon={<FilterListIcon sx={{ fontSize: 16 }} />}
+                label={t('draftBanner.hasDraftFilter')}
+                color={hasDraftFilter ? 'primary' : 'default'}
+                variant={hasDraftFilter ? 'filled' : 'outlined'}
+                onClick={() => setHasDraftFilter((v) => !v)}
+                sx={{ minHeight: { xs: 44, sm: 36 }, cursor: 'pointer' }}
+              />
+              <Button
+                variant="contained"
+                size="small"
+                onClick={handleSyncAllDrafts}
+                disabled={bulkSyncingDrafts || draftSummary.syncable.length === 0}
+                startIcon={bulkSyncingDrafts ? <CircularProgress size={16} color="inherit" /> : <SyncIcon sx={{ fontSize: '16px !important' }} />}
+                sx={{ minHeight: 44, textTransform: 'none', fontWeight: 700, borderRadius: '8px', whiteSpace: 'nowrap' }}
+              >
+                {t('draftBanner.syncAllCount', { count: draftSummary.syncable.length })}
+              </Button>
+            </Paper>
+          )}
 
           {/* Selection toolbar: Vela-style — N selected + Delete, Export, Copy, Edit */}
           {selectedCount > 0 && selectedShopId && (
@@ -2662,6 +3067,15 @@ function EtsyListingsPage() {
                   sx={{ height: 28 }}
                 />
               )}
+              {hasDraftFilter && (
+                <Chip
+                  label={t('draftBanner.hasDraftFilter')}
+                  size="small"
+                  onDelete={() => setHasDraftFilter(false)}
+                  color="primary"
+                  sx={{ height: 28 }}
+                />
+              )}
               {excludeTerm.trim() && (
                 <Chip
                   label={t('excludeChip', { term: excludeTerm })}
@@ -2676,7 +3090,7 @@ function EtsyListingsPage() {
                 label={t('clearAll')}
                 size="small"
                 variant="outlined"
-                onClick={() => { setSectionFilter(''); setHealthFilter(''); setExcludeTerm(''); }}
+                onClick={() => { setSectionFilter(''); setHealthFilter(''); setExcludeTerm(''); setHasDraftFilter(false); }}
                 sx={{ height: 28, cursor: 'pointer' }}
               />
             </Box>
@@ -2710,7 +3124,7 @@ function EtsyListingsPage() {
             ) : filteredListings.length === 0 ? (
               <Paper sx={{ p: 3, textAlign: 'center' }}>
                 <Typography color="text.secondary">
-                  {selectedShopId ? t('noListingsFound') : t('selectShop')}
+                  {!selectedShopId ? t('selectShop') : hasDraftFilter && draftSummary.total > 0 ? t('draftBanner.draftsInOtherTabs') : t('noListingsFound')}
                 </Typography>
               </Paper>
             ) : (
@@ -2730,6 +3144,9 @@ function EtsyListingsPage() {
                     selected={mobileSelectedIds.has(listing.listing_id)}
                     onToggleSelect={handleMobileToggleSelect}
                     sectionName={listing.shop_section_id ? sectionNameMap[listing.shop_section_id] : undefined}
+                    pendingDraft={pendingDraftsByListing[String(listing.listing_id)]}
+                    onListOnEbay={ebayConnected ? handleListOnEbay : undefined}
+                    duplicating={duplicatingId}
                   />
                 ))}
                 {mobileVisibleCount < filteredListings.length && (
@@ -2783,7 +3200,7 @@ function EtsyListingsPage() {
               checkboxSelection
               disableRowSelectionOnClick
               processRowUpdate={handleProcessRowUpdate}
-              onProcessRowUpdateError={(error) => toast.error(t('updateError', { error: error.message }))}
+              onProcessRowUpdateError={(error) => notify.error(error, t('updateError', { error: '' }).replace(/[:\s]+$/, ''))}
               rowHeight={52}
               rowSelectionModel={selectedIds}
               onRowSelectionModelChange={(newSelection) => setSelectedIds(newSelection)}
@@ -2820,7 +3237,7 @@ function EtsyListingsPage() {
                     }}
                   >
                     <Typography color="text.secondary">
-                      {selectedShopId ? t('noListingsFound') : t('selectShop')}
+                      {!selectedShopId ? t('selectShop') : hasDraftFilter && draftSummary.total > 0 ? t('draftBanner.draftsInOtherTabs') : t('noListingsFound')}
                     </Typography>
                   </Box>
                 ),
@@ -2946,8 +3363,16 @@ function EtsyListingsPage() {
               value={excludeTerm}
               onChange={(e) => setExcludeTerm(e.target.value)}
             />
+            <Button
+              variant={hasDraftFilter ? 'contained' : 'outlined'}
+              startIcon={<EditNoteIcon />}
+              onClick={() => setHasDraftFilter((v) => !v)}
+              sx={{ minHeight: 44, textTransform: 'none', justifyContent: 'flex-start' }}
+            >
+              {t('draftBanner.hasDraftFilter')}
+            </Button>
             {activeFilterCount > 0 && (
-              <Button size="small" color="error" onClick={() => { setSectionFilter(''); setHealthFilter(''); setExcludeTerm(''); }}>
+              <Button size="small" color="error" onClick={() => { setSectionFilter(''); setHealthFilter(''); setExcludeTerm(''); setHasDraftFilter(false); }}>
                 {t('clearFilters')}
               </Button>
             )}
@@ -2985,7 +3410,8 @@ function EtsyListingsPage() {
       {/* Creator Dialog */}
       <ListingCreatorDialog
         open={createDialogOpen}
-        onClose={() => setCreateDialogOpen(false)}
+        onClose={closeCreator}
+        copySource={creatorCopySource}
         shopId={selectedShopId}
         shopSections={shopSections}
         shippingProfiles={shippingProfiles}
@@ -2996,7 +3422,7 @@ function EtsyListingsPage() {
           // ListingCreatorDialog already toasted the outcome (local draft save,
           // or the result of its immediate Create & Publish sync). A negative id
           // means nothing reached Etsy yet: the draft shows as a pinned row.
-          setCreateDialogOpen(false);
+          closeCreator();
           if (listingId < 0) {
             fetchPendingDrafts();
             return;
@@ -3178,7 +3604,10 @@ function EtsyListingsPage() {
 function EtsyListingsPageWithLayout(props: any): JSX.Element {
   return (
     <AppLayout title="Etsy Listings - KolayXport">
-      <EtsyListingsPage {...props} />
+      {/* Everything on this page needs a connected Etsy shop (market research lives on its own pages). */}
+      <RequireConnection provider="etsy">
+        <EtsyListingsPage {...props} />
+      </RequireConnection>
     </AppLayout>
   );
 }

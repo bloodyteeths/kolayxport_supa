@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Paper,
   Button,
@@ -52,6 +52,7 @@ import {
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import { notify } from '@/lib/notify';
 
 // --- Types ---
 
@@ -77,6 +78,32 @@ interface TrendyolBulkOpsBarProps {
 }
 
 type PriceMode = 'percent_increase' | 'percent_decrease' | 'fixed_add' | 'fixed_subtract';
+
+type BatchKind = 'price' | 'stock' | 'archive' | 'unarchive';
+
+interface BatchFailure {
+  barcode: string;
+  title: string;
+  reasons: string[];
+}
+
+interface BatchSummary {
+  kind: BatchKind;
+  total: number;
+  succeededBarcodes: string[];
+  failures: BatchFailure[];
+  /** Items Trendyol had not reported on when we stopped polling. */
+  pending: number;
+  timedOut: boolean;
+}
+
+const BATCH_POLL_MS = 3000;
+const BATCH_MAX_POLLS = 100; // ~5 minutes
+const BATCH_MAX_CONSECUTIVE_FAILURES = 5;
+// Bulk AI title/description optimize only fetches suggestions from
+// /api/ai/trendyol and has no review/apply step, so it changes nothing while
+// reporting success. Hidden until a review-and-stage flow exists.
+const BULK_AI_OPTIMIZE_ENABLED = false;
 
 const TRENDYOL_ORANGE = '#F27A1A';
 
@@ -108,6 +135,69 @@ function tokenize(title: string): Set<string> {
       .split(/\s+/)
       .filter((t) => t.length > 1)
   );
+}
+
+/** Turn Trendyol failureReasons (strings or objects) into short safe strings. */
+function reasonToString(r: unknown): string | null {
+  if (r == null) return null;
+  if (typeof r === 'string') return r.trim().slice(0, 300) || null;
+  if (typeof r === 'number') return String(r);
+  if (typeof r === 'object') {
+    const o = r as Record<string, unknown>;
+    for (const k of ['message', 'reason', 'description', 'errorMessage', 'key']) {
+      if (typeof o[k] === 'string' && (o[k] as string).trim()) return (o[k] as string).trim().slice(0, 300);
+    }
+  }
+  return null;
+}
+
+function itemBarcode(item: any): string {
+  const ri = item?.requestItem;
+  const v = ri?.barcode ?? ri?.product?.barcode ?? item?.barcode ?? '';
+  return typeof v === 'string' ? v : String(v || '');
+}
+
+/** Build a per-item summary from a Trendyol batch-request result. */
+function summarizeBatch(
+  data: any,
+  submittedBarcodes: string[],
+  titleByBarcode: Map<string, string>
+): BatchSummary {
+  const resultItems: any[] = Array.isArray(data?.items) ? data.items : [];
+  const succeeded = new Set<string>();
+  const failures: BatchFailure[] = [];
+
+  for (const it of resultItems) {
+    const barcode = itemBarcode(it);
+    const status = String(it?.status || '').toUpperCase();
+    if (status === 'SUCCESS') {
+      if (barcode) succeeded.add(barcode);
+    } else if (status === 'FAILED') {
+      const raw: unknown[] = Array.isArray(it?.failureReasons) ? it.failureReasons : [];
+      const reasons = raw.map(reasonToString).filter((x): x is string => Boolean(x));
+      failures.push({ barcode, title: titleByBarcode.get(barcode) || '', reasons });
+    }
+  }
+
+  // Whole batch failed without per-item detail.
+  const batchStatus = String(data?.status ?? data?.batchRequestStatus ?? '').toUpperCase();
+  if (resultItems.length === 0 && batchStatus === 'FAILED') {
+    for (const b of submittedBarcodes) failures.push({ barcode: b, title: titleByBarcode.get(b) || '', reasons: [] });
+  }
+
+  // Anything submitted that is not yet final (unreported or reported with a
+  // non-final status) is still processing.
+  const failedSet = new Set(failures.map((f) => f.barcode));
+  const pending = submittedBarcodes.filter((b) => !succeeded.has(b) && !failedSet.has(b)).length;
+
+  return {
+    kind: 'price',
+    total: submittedBarcodes.length,
+    succeededBarcodes: Array.from(succeeded),
+    failures,
+    pending,
+    timedOut: false,
+  };
 }
 
 // --- Component ---
@@ -146,6 +236,13 @@ export default function TrendyolBulkOpsBar({
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressLabel, setProgressLabel] = useState('');
+  const [progressIndeterminate, setProgressIndeterminate] = useState(false);
+  const [batchResult, setBatchResult] = useState<BatchSummary | null>(null);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   // --- AI state ---
   const [aiResult, setAiResult] = useState<{ success: number; failed: number } | null>(null);
@@ -188,14 +285,154 @@ export default function TrendyolBulkOpsBar({
 
   // --- Handlers ---
 
+  // --- Batch submit + poll ---
+
+  /**
+   * Submit a Trendyol batch, poll its result (same endpoint the editor drawer
+   * polls), then mirror successful items into the local cache and refresh.
+   * Trendyol is only touched here, after the user confirmed a dialog.
+   */
+  const runBatch = async ({
+    kind,
+    action,
+    items,
+    label,
+    failKey,
+  }: {
+    kind: BatchKind;
+    action: 'update_price_inventory' | 'archive';
+    items: Array<Record<string, any> & { barcode: string }>;
+    label: string;
+    failKey: string;
+  }) => {
+    setProcessing(true);
+    setProgress(0);
+    setProgressIndeterminate(true);
+    setProgressLabel(label);
+    setBatchResult(null);
+
+    const titleByBarcode = new Map(selectedProducts.map((p) => [p.barcode, p.title]));
+    const itemByBarcode = new Map(items.map((it) => [it.barcode, it]));
+
+    let batchRequestId: string | null = null;
+    try {
+      const res = await fetch(`/api/trendyol/products?action=${action}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        notify.error({ status: res.status, data }, `trendyolListings.${failKey}`);
+        return;
+      }
+      batchRequestId = typeof data?.batchRequestId === 'string' && data.batchRequestId ? data.batchRequestId : null;
+      if (!batchRequestId) {
+        notify.error(null, `trendyolListings.${failKey}`);
+        return;
+      }
+    } catch (err) {
+      notify.error(err, `trendyolListings.${failKey}`);
+      return;
+    } finally {
+      if (!batchRequestId && mountedRef.current) {
+        setProcessing(false);
+        setProgressIndeterminate(false);
+      }
+    }
+
+    setProgressLabel(t('batchPolling', { count: items.length }));
+
+    // Poll every 3s for up to ~5 minutes. Polling (and the cache write below)
+    // keeps going if the page unmounts — the batch is already at Trendyol and
+    // the cache should still get the accepted values; only setState is skipped.
+    let finalData: any = null;
+    let timedOut = true;
+    let consecutiveFailures = 0;
+    for (let attempt = 0; attempt < BATCH_MAX_POLLS; attempt++) {
+      await delay(attempt === 0 ? 1500 : BATCH_POLL_MS);
+      try {
+        const res = await fetch(
+          `/api/trendyol/products?action=batch_status&batchRequestId=${encodeURIComponent(batchRequestId)}`
+        );
+        if (!res.ok) {
+          // Permanent client errors (unknown batch, expired session, limit):
+          // stop instead of spinning for 5 minutes. notify skips 402s.
+          if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+            const body = await res.json().catch(() => ({}));
+            if (mountedRef.current) notify.error({ status: res.status, data: body }, `trendyolListings.${failKey}`);
+            break;
+          }
+          if (++consecutiveFailures >= BATCH_MAX_CONSECUTIVE_FAILURES) break;
+          continue;
+        }
+        consecutiveFailures = 0;
+        const data = await res.json();
+        finalData = data;
+        const resultItems: any[] = Array.isArray(data?.items) ? data.items : [];
+        const total = Number(data?.itemCount) || resultItems.length || items.length;
+        const done = resultItems.filter((it) => {
+          const s = String(it?.status || '').toUpperCase();
+          return s === 'SUCCESS' || s === 'FAILED';
+        }).length;
+        if (mountedRef.current && total > 0 && resultItems.length > 0) {
+          setProgressIndeterminate(false);
+          setProgress(Math.min(100, (done / total) * 100));
+          setProgressLabel(t('batchProgress', { done, total }));
+        }
+        const status = String(data?.status ?? data?.batchRequestStatus ?? '').toUpperCase();
+        if (status === 'COMPLETED' || status === 'FAILED' || (resultItems.length > 0 && done >= total)) {
+          timedOut = false;
+          break;
+        }
+      } catch {
+        /* transient network error — keep polling, but not forever */
+        if (++consecutiveFailures >= BATCH_MAX_CONSECUTIVE_FAILURES) break;
+      }
+    }
+
+    const summary = summarizeBatch(finalData, items.map((it) => it.barcode), titleByBarcode);
+    summary.kind = kind;
+    summary.timedOut = timedOut;
+
+    // Mirror successes into the local cache so the refreshed list shows the
+    // values Trendyol accepted (price/stock). Archive state needs a full sync.
+    if (kind === 'price' || kind === 'stock') {
+      const cacheItems = summary.succeededBarcodes
+        .map((b) => itemByBarcode.get(b))
+        .filter(Boolean)
+        .map((it: any) => ({
+          barcode: it.barcode,
+          listPrice: it.listPrice,
+          salePrice: it.salePrice,
+          quantity: it.quantity,
+        }));
+      if (cacheItems.length > 0) {
+        try {
+          await fetch('/api/trendyol/products?action=update_cache', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: cacheItems }),
+          });
+        } catch {
+          /* cache refresh is best-effort; Sync fixes it */
+        }
+      }
+    }
+
+    if (!mountedRef.current) return;
+    setProcessing(false);
+    setProgressIndeterminate(false);
+    setProgress(100);
+    setBatchResult(summary);
+    onRefresh();
+  };
+
   const handlePriceSubmit = async () => {
     const amt = parseFloat(priceAmount);
     if (isNaN(amt) || amt <= 0) { toast.error(t('toastEnterValidAmount')); return; }
 
     setPriceDialogOpen(false);
-    setProcessing(true);
-    setProgress(0);
-    setProgressLabel(t('updatingPrices'));
 
     const items = selectedProducts.map((p) => {
       const currentList = toFloat(p.listPrice);
@@ -218,28 +455,9 @@ export default function TrendyolBulkOpsBar({
       };
     });
 
-    try {
-      const res = await fetch('/api/trendyol/products?action=update_price_inventory', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        toast.success(t('toastBatchSubmitted', { count: items.length, batchId: data.batchRequestId || '' }));
-      } else {
-        const err = await res.json().catch(() => ({}));
-        toast.error(err.error || t('toastUpdateFailed'));
-      }
-    } catch {
-      toast.error(t('toastUpdateFailed'));
-    }
-
-    setProcessing(false);
-    setProgress(100);
     setPriceAmount('');
     setPriceMode('percent_increase');
-    onRefresh();
+    await runBatch({ kind: 'price', action: 'update_price_inventory', items, label: t('updatingPrices'), failKey: 'toastUpdateFailed' });
   };
 
   const handleStockSubmit = async () => {
@@ -247,9 +465,6 @@ export default function TrendyolBulkOpsBar({
     if (isNaN(qty) || qty < 0) { toast.error(t('toastEnterValidQuantity')); return; }
 
     setStockDialogOpen(false);
-    setProcessing(true);
-    setProgress(0);
-    setProgressLabel(t('updatingStock'));
 
     const items = selectedProducts.map((p) => ({
       barcode: p.barcode,
@@ -258,87 +473,22 @@ export default function TrendyolBulkOpsBar({
       quantity: qty,
     }));
 
-    try {
-      const res = await fetch('/api/trendyol/products?action=update_price_inventory', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        toast.success(t('toastBatchSubmitted', { count: items.length, batchId: data.batchRequestId || '' }));
-      } else {
-        const err = await res.json().catch(() => ({}));
-        toast.error(err.error || t('toastUpdateFailed'));
-      }
-    } catch {
-      toast.error(t('toastUpdateFailed'));
-    }
-
-    setProcessing(false);
-    setProgress(100);
     setStockQuantity('');
-    onRefresh();
+    await runBatch({ kind: 'stock', action: 'update_price_inventory', items, label: t('updatingStock'), failKey: 'toastUpdateFailed' });
   };
 
   const handleArchiveSubmit = async () => {
     setArchiveDialogOpen(false);
-    setProcessing(true);
-    setProgress(0);
-    setProgressLabel(t('archiving'));
-
-    const items = selectedProducts.map((p) => ({ barcode: p.barcode }));
-
-    try {
-      const res = await fetch('/api/trendyol/products?action=archive', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        toast.success(t('toastBatchSubmitted', { count: items.length, batchId: data.batchRequestId || '' }));
-      } else {
-        const err = await res.json().catch(() => ({}));
-        toast.error(err.error || t('toastArchiveFailed'));
-      }
-    } catch {
-      toast.error(t('toastArchiveFailed'));
-    }
-
-    setProcessing(false);
-    setProgress(100);
-    onRefresh();
+    const items = selectedProducts.map((p) => ({ barcode: p.barcode, archived: true }));
+    await runBatch({ kind: 'archive', action: 'archive', items, label: t('archiving'), failKey: 'toastArchiveFailed' });
   };
 
   const handleUnarchiveSubmit = async () => {
     setUnarchiveDialogOpen(false);
-    setProcessing(true);
-    setProgress(0);
-    setProgressLabel(t('unarchiving'));
-
-    const items = selectedProducts.map((p) => ({ barcode: p.barcode }));
-
-    try {
-      const res = await fetch('/api/trendyol/products?action=unarchive', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        toast.success(t('toastBatchSubmitted', { count: items.length, batchId: data.batchRequestId || '' }));
-      } else {
-        const err = await res.json().catch(() => ({}));
-        toast.error(err.error || t('toastUnarchiveFailed'));
-      }
-    } catch {
-      toast.error(t('toastUnarchiveFailed'));
-    }
-
-    setProcessing(false);
-    setProgress(100);
-    onRefresh();
+    // The API has no separate "unarchive" action; Trendyol's archive endpoint
+    // takes archived:false per item.
+    const items = selectedProducts.map((p) => ({ barcode: p.barcode, archived: false }));
+    await runBatch({ kind: 'unarchive', action: 'archive', items, label: t('unarchiving'), failKey: 'toastUnarchiveFailed' });
   };
 
   const handleAiOptimizeTitles = async () => {
@@ -536,21 +686,23 @@ export default function TrendyolBulkOpsBar({
     },
   };
 
-  if (!hasSelection && !isProcessing) return null;
+  if (!hasSelection && !isProcessing && !batchResult) return null;
 
   // --- More menu items ---
   const moreMenuItems = [
-    {
-      icon: <TitleOutlined fontSize="small" sx={{ color: TRENDYOL_ORANGE }} />,
-      label: t('aiOptimizeTitles'),
-      onClick: () => { setAiResult(null); setAiTitleDialogOpen(true); },
-    },
-    {
-      icon: <DescriptionOutlined fontSize="small" sx={{ color: TRENDYOL_ORANGE }} />,
-      label: t('aiOptimizeDescriptions'),
-      onClick: () => { setAiResult(null); setAiDescDialogOpen(true); },
-    },
-    { divider: true },
+    ...(BULK_AI_OPTIMIZE_ENABLED ? [
+      {
+        icon: <TitleOutlined fontSize="small" sx={{ color: TRENDYOL_ORANGE }} />,
+        label: t('aiOptimizeTitles'),
+        onClick: () => { setAiResult(null); setAiTitleDialogOpen(true); },
+      },
+      {
+        icon: <DescriptionOutlined fontSize="small" sx={{ color: TRENDYOL_ORANGE }} />,
+        label: t('aiOptimizeDescriptions'),
+        onClick: () => { setAiResult(null); setAiDescDialogOpen(true); },
+      },
+      { divider: true },
+    ] : []),
     {
       icon: <UnarchiveOutlined fontSize="small" />,
       label: t('unarchive'),
@@ -570,7 +722,7 @@ export default function TrendyolBulkOpsBar({
     { divider: true },
     {
       icon: <FindReplaceIcon fontSize="small" />,
-      label: t('findReplace'),
+      label: t('findReplace.title'),
       onClick: () => onOpenFindReplace?.(),
     },
     {
@@ -601,7 +753,7 @@ export default function TrendyolBulkOpsBar({
             {progressLabel}
           </Typography>
           <LinearProgress
-            variant="determinate"
+            variant={progressIndeterminate ? 'indeterminate' : 'determinate'}
             value={currentProgress}
             sx={{
               height: 6,
@@ -609,9 +761,11 @@ export default function TrendyolBulkOpsBar({
               '& .MuiLinearProgress-bar': { bgcolor: TRENDYOL_ORANGE },
             }}
           />
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-            {Math.round(currentProgress)}%
-          </Typography>
+          {!progressIndeterminate && (
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+              {Math.round(currentProgress)}%
+            </Typography>
+          )}
         </Paper>
       )}
 
@@ -849,19 +1003,23 @@ export default function TrendyolBulkOpsBar({
               <ListItemText primary={t('unarchive')} />
             </ListItemButton>
           </ListItem>
-          <Divider sx={{ my: 0.5 }} />
-          <ListItem disablePadding>
-            <ListItemButton onClick={() => { setMobileDrawerOpen(false); setAiResult(null); setAiTitleDialogOpen(true); }}>
-              <ListItemIcon><TitleOutlined sx={{ color: TRENDYOL_ORANGE }} /></ListItemIcon>
-              <ListItemText primary={t('aiOptimizeTitles')} />
-            </ListItemButton>
-          </ListItem>
-          <ListItem disablePadding>
-            <ListItemButton onClick={() => { setMobileDrawerOpen(false); setAiResult(null); setAiDescDialogOpen(true); }}>
-              <ListItemIcon><DescriptionOutlined sx={{ color: TRENDYOL_ORANGE }} /></ListItemIcon>
-              <ListItemText primary={t('aiOptimizeDescriptions')} />
-            </ListItemButton>
-          </ListItem>
+          {BULK_AI_OPTIMIZE_ENABLED && (
+            <>
+              <Divider sx={{ my: 0.5 }} />
+              <ListItem disablePadding>
+                <ListItemButton onClick={() => { setMobileDrawerOpen(false); setAiResult(null); setAiTitleDialogOpen(true); }}>
+                  <ListItemIcon><TitleOutlined sx={{ color: TRENDYOL_ORANGE }} /></ListItemIcon>
+                  <ListItemText primary={t('aiOptimizeTitles')} />
+                </ListItemButton>
+              </ListItem>
+              <ListItem disablePadding>
+                <ListItemButton onClick={() => { setMobileDrawerOpen(false); setAiResult(null); setAiDescDialogOpen(true); }}>
+                  <ListItemIcon><DescriptionOutlined sx={{ color: TRENDYOL_ORANGE }} /></ListItemIcon>
+                  <ListItemText primary={t('aiOptimizeDescriptions')} />
+                </ListItemButton>
+              </ListItem>
+            </>
+          )}
           <Divider sx={{ my: 0.5 }} />
           <ListItem disablePadding>
             <ListItemButton onClick={() => { setMobileDrawerOpen(false); handleExportCSV(); }}>
@@ -879,7 +1037,7 @@ export default function TrendyolBulkOpsBar({
           <ListItem disablePadding>
             <ListItemButton onClick={() => { setMobileDrawerOpen(false); onOpenFindReplace?.(); }}>
               <ListItemIcon><FindReplaceIcon /></ListItemIcon>
-              <ListItemText primary={t('findReplace')} />
+              <ListItemText primary={t('findReplace.title')} />
             </ListItemButton>
           </ListItem>
           <ListItem disablePadding>
@@ -1186,6 +1344,89 @@ export default function TrendyolBulkOpsBar({
         <DialogActions>
           <Button onClick={() => setDuplicateDialogOpen(false)}>{t('close')}</Button>
         </DialogActions>
+      </Dialog>
+
+      {/* Batch result summary */}
+      <Dialog
+        open={Boolean(batchResult)}
+        onClose={() => setBatchResult(null)}
+        maxWidth="sm"
+        fullWidth
+        fullScreen={isMobile}
+        sx={{ zIndex: 1500 }}
+      >
+        {batchResult && (
+          <>
+            <DialogTitle>{t('batchResultTitle')}</DialogTitle>
+            <DialogContent>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+                <Chip
+                  color="success"
+                  variant="outlined"
+                  label={t('batchResultUpdated', { count: batchResult.succeededBarcodes.length })}
+                  sx={{ fontWeight: 600 }}
+                />
+                {batchResult.failures.length > 0 && (
+                  <Chip
+                    color="error"
+                    variant="outlined"
+                    label={t('batchResultFailed', { count: batchResult.failures.length })}
+                    sx={{ fontWeight: 600 }}
+                  />
+                )}
+                {batchResult.pending > 0 && (
+                  <Chip
+                    color="warning"
+                    variant="outlined"
+                    label={t('batchResultPending', { count: batchResult.pending })}
+                    sx={{ fontWeight: 600 }}
+                  />
+                )}
+              </Box>
+              {batchResult.timedOut && (
+                <Alert severity="warning" sx={{ mb: 2 }}>{t('batchResultTimedOut')}</Alert>
+              )}
+              {(batchResult.kind === 'archive' || batchResult.kind === 'unarchive') &&
+                batchResult.succeededBarcodes.length > 0 && (
+                  <Alert severity="info" sx={{ mb: 2 }}>{t('batchResultSyncHint')}</Alert>
+                )}
+              {batchResult.failures.length > 0 && (
+                <Box>
+                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
+                    {t('batchResultFailuresTitle')}
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    {batchResult.failures.slice(0, 100).map((f, idx) => (
+                      <Paper key={`${f.barcode}-${idx}`} variant="outlined" sx={{ p: 1.25, borderRadius: 1.5 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>
+                          {f.title || f.barcode || '\u2014'}
+                        </Typography>
+                        {f.title && f.barcode && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', wordBreak: 'break-all' }}>
+                            {f.barcode}
+                          </Typography>
+                        )}
+                        {(f.reasons.length > 0 ? f.reasons : [t('batchResultNoReason')]).map((r, i) => (
+                          <Typography key={i} variant="caption" color="error" sx={{ display: 'block', wordBreak: 'break-word' }}>
+                            {r}
+                          </Typography>
+                        ))}
+                      </Paper>
+                    ))}
+                  </Box>
+                  {batchResult.failures.length > 100 && (
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                      {t('findReplace.andMore', { count: batchResult.failures.length - 100 })}
+                    </Typography>
+                  )}
+                </Box>
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setBatchResult(null)} sx={{ minHeight: 44 }}>{t('close')}</Button>
+            </DialogActions>
+          </>
+        )}
       </Dialog>
     </>
   );

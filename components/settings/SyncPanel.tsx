@@ -4,6 +4,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import ReplayIcon from '@mui/icons-material/Replay';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useLocale } from '@/lib/i18n/useLocale';
 import SettingsSection from './SettingsSection';
 import SyncHistoryList from './SyncHistoryList';
@@ -11,6 +12,7 @@ import ErrorDetailsDialog from './ErrorDetailsDialog';
 
 export default function SyncPanel() {
   const t = useTranslations('settings');
+  const confirm = useConfirm();
   const { formatDateTime } = useLocale();
 
   const [rows, setRows] = useState<any[]>([]);
@@ -50,7 +52,7 @@ export default function SyncPanel() {
   const handleRefresh = () => { cursorRef.current = null; setEnded(false); fetchHistory(); };
 
   const handleFullSync = async () => {
-    if (!window.confirm(t('fullSyncConfirm'))) return;
+    if (!(await confirm({ title: t('fullSyncConfirm') }))) return;
     setFullSyncLoading(true);
     try {
       const res = await fetch('/api/orders/fullSync', { method: 'POST' });
@@ -66,7 +68,7 @@ export default function SyncPanel() {
   };
 
   const handleRetry = async (syncId: string) => {
-    if (!window.confirm(t('retrySyncConfirm'))) return;
+    if (!(await confirm({ title: t('retrySyncConfirm') }))) return;
     setRetryingId(syncId);
     try {
       const res = await fetch(`/api/sync/retry?id=${encodeURIComponent(syncId)}`, { method: 'POST' });

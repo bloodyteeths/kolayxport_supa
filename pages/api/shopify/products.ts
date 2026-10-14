@@ -99,6 +99,81 @@ async function getProductSeo(
   return { title: seo.title ?? null, description: seo.description ?? null };
 }
 
+/**
+ * Live inventory levels for a set of inventory items (REST; needs only read_inventory).
+ * One request per 50 ids, with a timeout and a bounded retry on 429 throttling.
+ * Returns levels grouped by inventory_item_id.
+ */
+async function getInventoryLevelsForItems(
+  shopDomain: string,
+  accessToken: string,
+  inventoryItemIds: string[]
+): Promise<Map<string, { location_id: number; available: number | null }[]>> {
+  const byItem = new Map<string, { location_id: number; available: number | null }[]>();
+  const unique = Array.from(new Set(inventoryItemIds));
+  for (let i = 0; i < unique.length; i += 50) {
+    const chunk = unique.slice(i, i + 50);
+    const url = `https://${shopDomain}/admin/api/2024-10/inventory_levels.json?limit=250&inventory_item_ids=${encodeURIComponent(chunk.join(','))}`;
+    let res: Response | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      res = await fetch(url, {
+        headers: { 'X-Shopify-Access-Token': accessToken },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (res.status !== 429) break;
+      const retryAfter = Number(res.headers.get('Retry-After'));
+      const waitMs = Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter * 1000, 5_000) : 1_000 * (attempt + 1);
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
+    if (!res || !res.ok) {
+      throw new Error(`Shopify inventory read failed: ${res?.status ?? 'no response'}`);
+    }
+    const json = await res.json();
+    const levels: any[] = Array.isArray(json?.inventory_levels) ? json.inventory_levels : [];
+    for (const lvl of levels) {
+      const key = String(lvl.inventory_item_id);
+      const list = byItem.get(key) || [];
+      list.push({ location_id: lvl.location_id, available: lvl.available ?? null });
+      byItem.set(key, list);
+    }
+  }
+  return byItem;
+}
+
+type VariantEditInput = {
+  id: string;
+  price?: string;
+  inventoryQuantity?: number;
+  /** Quantity the user saw when editing; the write is refused if Shopify differs. */
+  expectedQuantity?: number;
+};
+
+type VariantEditResult = {
+  id: string;
+  ok: boolean;
+  code?: 'NOT_FOUND' | 'INVALID_PRICE' | 'INVALID_QUANTITY' | 'NOT_TRACKED' | 'MULTI_LOCATION' | 'NO_LOCATION' | 'STOCK_CHANGED' | 'FAILED';
+  /** True when the price change reached Shopify (even if the stock step then failed). */
+  priceApplied?: boolean;
+  error?: string;
+};
+
+function parseVariantEdits(body: any): VariantEditInput[] | null {
+  const list = body?.variants;
+  if (!Array.isArray(list) || list.length === 0 || list.length > 100) return null;
+  const out: VariantEditInput[] = [];
+  for (const raw of list) {
+    if (!raw || typeof raw !== 'object') return null;
+    const id = raw.id != null ? String(raw.id) : '';
+    if (!/^\d+$/.test(id)) return null;
+    const edit: VariantEditInput = { id };
+    if (raw.price !== undefined) edit.price = String(raw.price);
+    if (raw.inventoryQuantity !== undefined) edit.inventoryQuantity = Number(raw.inventoryQuantity);
+    if (raw.expectedQuantity !== undefined && raw.expectedQuantity !== null) edit.expectedQuantity = Number(raw.expectedQuantity);
+    out.push(edit);
+  }
+  return out;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const action = req.query.action as string;
 
@@ -297,6 +372,126 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const variant = await client.updateProductVariant(variantId, req.body);
       return res.status(200).json({ variant });
+    }
+
+    // ================================================================
+    // UPDATE VARIANT PRICE / STOCK (explicit Save in the editor)
+    // Body: { variants: [{ id, price?, inventoryQuantity?, expectedQuantity? }] }
+    // Each variant is applied independently; per-variant results are returned.
+    // ================================================================
+    if (action === 'updateVariants' && req.method === 'PUT') {
+      const productId = req.query.id as string;
+      if (!productId || !/^\d+$/.test(productId)) return res.status(400).json({ error: 'Missing product id' });
+      const edits = parseVariantEdits(req.body);
+      if (!edits) return res.status(400).json({ error: 'Invalid variants payload' });
+
+      // Fresh read: confirms each variant belongs to this product (of this shop)
+      // and gives the current inventory_item_id / tracking mode.
+      const live = await client.getProduct(productId);
+      const liveVariants: any[] = Array.isArray(live?.variants) ? live.variants : [];
+      const results: VariantEditResult[] = [];
+
+      // Phase 1: validate every edit and check stock preconditions BEFORE any
+      // write, so a refused stock change never leaves a half-applied price.
+      type Planned = { edit: VariantEditInput; variant: any; price?: string; qty?: number; locationId?: string };
+      const planned: Planned[] = [];
+      const needLevels: string[] = [];
+      for (const edit of edits) {
+        const variant = liveVariants.find((v) => String(v.id) === edit.id);
+        if (!variant) {
+          results.push({ id: edit.id, ok: false, code: 'NOT_FOUND' });
+          continue;
+        }
+        const plan: Planned = { edit, variant };
+        if (edit.price !== undefined) {
+          const n = Number(edit.price);
+          if (edit.price.trim() === '' || !Number.isFinite(n) || n < 0 || n > 1_000_000_000) {
+            results.push({ id: edit.id, ok: false, code: 'INVALID_PRICE' });
+            continue;
+          }
+          const price = n.toFixed(2);
+          if (price !== Number(variant.price).toFixed(2)) plan.price = price;
+        }
+        if (edit.inventoryQuantity !== undefined) {
+          const qty = edit.inventoryQuantity;
+          if (!Number.isInteger(qty) || qty < 0 || qty > 1_000_000_000) {
+            results.push({ id: edit.id, ok: false, code: 'INVALID_QUANTITY' });
+            continue;
+          }
+          if (variant.inventory_management !== 'shopify' || !variant.inventory_item_id) {
+            results.push({ id: edit.id, ok: false, code: 'NOT_TRACKED' });
+            continue;
+          }
+          plan.qty = qty;
+          needLevels.push(String(variant.inventory_item_id));
+        }
+        planned.push(plan);
+      }
+
+      let levelsByItem = new Map<string, { location_id: number; available: number | null }[]>();
+      let levelsFailed = false;
+      if (needLevels.length > 0) {
+        try {
+          levelsByItem = await getInventoryLevelsForItems(shop.shopDomain, accessToken, needLevels);
+        } catch (err: any) {
+          levelsFailed = true;
+          logger.error('Shopify inventory levels read failed', err as Error, { productId });
+        }
+      }
+
+      for (const plan of planned) {
+        const { edit, variant } = plan;
+        if (plan.qty !== undefined) {
+          if (levelsFailed) {
+            results.push({ id: edit.id, ok: false, code: 'FAILED' });
+            continue;
+          }
+          const levels = levelsByItem.get(String(variant.inventory_item_id)) || [];
+          if (levels.length === 0) {
+            results.push({ id: edit.id, ok: false, code: 'NO_LOCATION' });
+            continue;
+          }
+          if (levels.length > 1) {
+            // Which location to change is ambiguous; never guess.
+            results.push({ id: edit.id, ok: false, code: 'MULTI_LOCATION' });
+            continue;
+          }
+          const current = levels[0].available ?? 0;
+          if (edit.expectedQuantity !== undefined && Number.isFinite(edit.expectedQuantity) && current !== edit.expectedQuantity) {
+            results.push({ id: edit.id, ok: false, code: 'STOCK_CHANGED' });
+            continue;
+          }
+          if (current === plan.qty) plan.qty = undefined;
+          else plan.locationId = String(levels[0].location_id);
+        }
+
+        // Phase 2: writes.
+        let priceApplied = false;
+        try {
+          if (plan.price !== undefined) {
+            await client.updateProductVariant(edit.id, { price: plan.price });
+            priceApplied = true;
+          }
+          if (plan.qty !== undefined && plan.locationId) {
+            await client.setInventoryLevel(String(variant.inventory_item_id), plan.locationId, plan.qty);
+          }
+          results.push({ id: edit.id, ok: true, ...(priceApplied ? { priceApplied } : {}) });
+        } catch (err: any) {
+          logger.error('Shopify variant update failed', err as Error, { productId, variantId: edit.id });
+          results.push({ id: edit.id, ok: false, code: 'FAILED', ...(priceApplied ? { priceApplied } : {}) });
+        }
+      }
+
+      // Refresh the cache row so the list shows the new price/stock.
+      let product = live;
+      try {
+        product = await client.getProduct(productId);
+        await upsertProductCache(userId, shop.id, product);
+      } catch (err: any) {
+        logger.error('Shopify cache refresh after variant update failed', err as Error, { productId });
+      }
+
+      return res.status(200).json({ product, results });
     }
 
     if (action === 'createVariant' && req.method === 'POST') {

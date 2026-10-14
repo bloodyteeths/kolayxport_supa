@@ -1,14 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box, Tabs, Tab, Button, TextField, Chip, CircularProgress,
   Typography, Paper, Tooltip,
 } from '@mui/material';
 import { RefreshCw, Calendar, Wallet, Store } from 'lucide-react';
-import { toast } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
 import withAuth from '@/components/withAuth';
 import useFinanceStore from '@/lib/stores/useFinanceStore';
 import { useTranslations } from 'next-intl';
+import { useConnections } from '@/lib/hooks/useConnections';
+import ConnectEmptyState from '@/components/ui/ConnectEmptyState';
+import { notify } from '@/lib/notify';
 import dynamic from 'next/dynamic';
 
 const FinancialDashboard = dynamic(() => import('@/components/finance/FinancialDashboard'), { ssr: false });
@@ -49,31 +51,64 @@ const DATE_PRESETS = [
 ];
 
 const MARKETPLACE_TABS = [
-  { key: 'trendyol' as const, label: 'Trendyol', icon: <Store size={16} />, color: '#F59E0B', enabled: true },
-  { key: 'etsy' as const, label: 'Etsy', icon: <Store size={16} />, color: '#F97316', enabled: true },
-  { key: 'ebay' as const, label: 'eBay', icon: <Store size={16} />, color: '#3B82F6', enabled: true },
-  { key: 'amazon' as const, label: 'Amazon', icon: <Store size={16} />, color: '#FF9900', enabled: true },
+  { key: 'trendyol' as const, label: 'Trendyol', icon: <Store size={16} />, color: '#F59E0B' },
+  { key: 'etsy' as const, label: 'Etsy', icon: <Store size={16} />, color: '#F97316' },
+  { key: 'ebay' as const, label: 'eBay', icon: <Store size={16} />, color: '#3B82F6' },
+  { key: 'amazon' as const, label: 'Amazon', icon: <Store size={16} />, color: '#FF9900' },
 ];
 
 function FinancialsPage() {
   const t = useTranslations('financials');
   const {
-    marketplace, dateRange, syncStatus, syncMessage,
+    marketplace, dateRange, syncStatus, syncMessage, syncError,
     setMarketplace, setDateRange, syncSettlements, fetchDashboard,
   } = useFinanceStore();
+  const { connections, has, isLoading: connectionsLoading } = useConnections();
 
   const [activePreset, setActivePreset] = useState('thisMonth');
   const [customStart, setCustomStart] = useState(dateRange.start);
   const [customEnd, setCustomEnd] = useState(dateRange.end);
+  // Becomes true once the initial tab has been chosen from the user's connections
+  // (or connections failed to load and we fall back to the stored tab).
+  const [tabResolved, setTabResolved] = useState(false);
+
+  // undefined = unknown (loading / status endpoint failed), see useConnections.
+  const currentConnected = has(marketplace);
+  const firstConnected = useMemo(
+    () => (connections ? MARKETPLACE_TABS.find(tab => connections[tab.key]?.connected)?.key : undefined),
+    [connections],
+  );
+
+  // Open on the first connected marketplace instead of always Trendyol. Runs
+  // once per visit, so a user who then clicks an unconnected tab to see the
+  // connect CTA isn't bounced back.
+  useEffect(() => {
+    if (tabResolved) return;
+    if (connections) {
+      if (!connections[marketplace]?.connected && firstConnected) setMarketplace(firstConnected);
+      setTabResolved(true);
+    } else if (!connectionsLoading) {
+      // Status endpoint errored: keep the stored tab and load it.
+      setTabResolved(true);
+    }
+  }, [connections, connectionsLoading, firstConnected, marketplace, setMarketplace, tabResolved]);
 
   useEffect(() => {
+    if (!tabResolved || currentConnected === false) return;
     fetchDashboard();
-  }, [marketplace, dateRange]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [marketplace, dateRange, tabResolved, currentConnected]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Toast only on a status transition — the store outlives this page, so a
+  // finished sync must not re-toast every time the page is reopened.
+  const prevSyncStatus = useRef(syncStatus);
   useEffect(() => {
-    if (syncStatus === 'done' && syncMessage) toast.success(`${syncMessage} ${t('synchronized')}`);
-    if (syncStatus === 'error' && syncMessage) toast.error(`${t('syncError')}: ${syncMessage}`);
-  }, [syncStatus, syncMessage]);
+    if (prevSyncStatus.current === syncStatus) return;
+    prevSyncStatus.current = syncStatus;
+    if (syncStatus === 'done') notify.success(t('syncedCount', { count: Number(syncMessage) || 0 }));
+    if (syncStatus === 'error') notify.error(syncError, 'financials.syncError');
+  }, [syncStatus, syncMessage, syncError]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const activeTab = MARKETPLACE_TABS.find(mt => mt.key === marketplace) ?? MARKETPLACE_TABS[0];
 
   const handlePreset = (key: string) => {
     const preset = DATE_PRESETS.find(p => p.key === key);
@@ -119,28 +154,35 @@ function FinancialsPage() {
             value={MARKETPLACE_TABS.findIndex(mt => mt.key === marketplace)}
             onChange={(_, idx) => {
               const tab = MARKETPLACE_TABS[idx];
-              if (tab.enabled) setMarketplace(tab.key);
+              if (tab && tab.key !== marketplace) setMarketplace(tab.key);
             }}
+            variant="scrollable"
+            scrollButtons="auto"
+            allowScrollButtonsMobile
             sx={{
               '& .MuiTab-root': { minHeight: 48, textTransform: 'none', fontWeight: 600 },
-              '& .Mui-selected': { color: MARKETPLACE_TABS.find(mt => mt.key === marketplace)?.color },
+              '& .Mui-selected': { color: activeTab.color },
             }}
           >
-            {MARKETPLACE_TABS.map(tab => (
-              <Tab
-                key={tab.key}
-                label={
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                    {tab.icon}
-                    <span>{tab.label}</span>
-                    {!tab.enabled && (
-                      <Chip label={t('comingSoon')} size="small" sx={{ height: 20, fontSize: '0.65rem', ml: 0.5 }} />
-                    )}
-                  </Box>
-                }
-                disabled={!tab.enabled}
-              />
-            ))}
+            {MARKETPLACE_TABS.map(tab => {
+              // Only mark as unconnected once we definitely know (never on a loading/errored status).
+              const notConnected = connections ? !connections[tab.key]?.connected : false;
+              return (
+                <Tab
+                  key={tab.key}
+                  sx={notConnected ? { opacity: 0.6 } : undefined}
+                  label={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                      {tab.icon}
+                      <span>{tab.label}</span>
+                      {notConnected && (
+                        <Chip label={t('notConnected')} size="small" sx={{ height: 20, fontSize: '0.65rem', ml: 0.5 }} />
+                      )}
+                    </Box>
+                  }
+                />
+              );
+            })}
           </Tabs>
         </Paper>
 
@@ -169,20 +211,32 @@ function FinancialsPage() {
             </Button>
           </Box>
 
-          <Tooltip title={t('syncTooltip')}>
+          <Tooltip title={t('syncTooltipMarketplace', { marketplace: activeTab.label })}>
+            <span>
             <Button
               size="small" variant="contained"
               onClick={() => syncSettlements()}
-              disabled={syncStatus === 'syncing'}
+              disabled={syncStatus === 'syncing' || currentConnected === false}
               startIcon={syncStatus === 'syncing' ? <CircularProgress size={16} /> : <RefreshCw size={16} />}
               sx={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}
             >
               {syncStatus === 'syncing' ? t('syncing') : t('syncData')}
             </Button>
+            </span>
           </Tooltip>
         </Paper>
 
-        <FinancialDashboard />
+        {currentConnected === false ? (
+          <Paper sx={{ borderRadius: '12px' }}>
+            <ConnectEmptyState provider={marketplace} description={t('connectToSeeFinancials', { marketplace: activeTab.label })} />
+          </Paper>
+        ) : tabResolved ? (
+          <FinancialDashboard />
+        ) : (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+            <CircularProgress size={28} />
+          </Box>
+        )}
       </Box>
     </AppLayout>
   );

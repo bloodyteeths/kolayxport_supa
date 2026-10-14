@@ -35,7 +35,8 @@ function normalizeTrendyolQuestion(q: any): UnifiedConversation {
     id: String(q.id),
     platform: 'trendyol',
     status: isAnswered ? 'answered' : 'unanswered',
-    customerName: q.customerFirstName || q.userName || 'Müşteri',
+    // Empty fallback: the UI renders a localized "Customer" label.
+    customerName: q.customerFirstName || q.userName || '',
     subject: q.productName || '',
     lastMessageText: q.text || '',
     lastMessageDate: q.creationDate ? new Date(q.creationDate).toISOString() : new Date().toISOString(),
@@ -58,7 +59,7 @@ function normalizeWixConversation(conv: any): UnifiedConversation {
   const isUnanswered = lastDirection === 'PARTICIPANT_TO_BUSINESS' || lastDirection === 'CUSTOMER_TO_BUSINESS' || lastDirection === 'VISITOR';
 
   // _contactName is injected by our listConversations workaround
-  const customerName = conv._contactName || conv.participantDisplayData?.name || conv.displayName || 'Customer';
+  const customerName = conv._contactName || conv.participantDisplayData?.name || conv.displayName || '';
 
   return {
     id: conv.id,
@@ -87,6 +88,22 @@ function normalizeWixMessage(msg: any): UnifiedMessage {
     text,
     date: msg.createdDate || msg.date || new Date().toISOString(),
   };
+}
+
+// ─── Platform error classification ──────────────────────
+// The UI maps `code` to user-facing i18n copy; `detail` stays developer-facing (logs/tooltips).
+
+type MessagePlatform = 'wix' | 'trendyol';
+type PlatformErrorCode = 'permission' | 'auth' | 'credentials' | 'rateLimited' | 'unavailable';
+interface PlatformError { platform: MessagePlatform; code: PlatformErrorCode; detail: string }
+
+function classifyPlatformError(e: any): PlatformErrorCode {
+  const status = Number(e?.status || e?.response?.status || 0);
+  const msg = String(e?.message || '');
+  if (status === 403 || /\b403\b/.test(msg)) return 'permission';
+  if (status === 401 || /\b401\b/.test(msg)) return 'auth';
+  if (status === 429 || /\b429\b/.test(msg)) return 'rateLimited';
+  return 'unavailable';
 }
 
 // ─── Handler ────────────────────────────────────────────
@@ -176,6 +193,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       let allConversations: UnifiedConversation[] = [];
       const errors: string[] = [];
+      const platformErrors: PlatformError[] = [];
       const enabledPlatforms: string[] = [];
       const promises: Promise<void>[] = [];
 
@@ -192,7 +210,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             } catch (e: any) {
               const msg = e?.message || (e?.body ? JSON.stringify(e.body) : String(e));
               logger.warn(`[MESSAGES] Trendyol list failed: ${msg}`);
-              errors.push(`Trendyol: ${e?.status || ''} ${e?.body?.errors?.[0]?.message || e?.body?.rawError || msg}`.trim());
+              const detail = `Trendyol: ${e?.status || ''} ${e?.body?.errors?.[0]?.message || e?.body?.rawError || msg}`.trim();
+              errors.push(detail);
+              platformErrors.push({ platform: 'trendyol', code: classifyPlatformError(e), detail });
             }
           })()
         );
@@ -204,17 +224,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           (async () => {
             try {
               const client = buildWixClient();
-              if (!client) { errors.push('Wix: credentials incomplete'); return; }
+              if (!client) {
+                const detail = 'Wix: credentials incomplete';
+                errors.push(detail);
+                platformErrors.push({ platform: 'wix', code: 'credentials', detail });
+                return;
+              }
               const data = await client.listConversations({ limit: size });
               const normalized = (data.conversations || []).map(normalizeWixConversation);
               allConversations.push(...normalized);
             } catch (e: any) {
               const msg = e?.message || String(e);
               logger.warn(`[MESSAGES] Wix list failed: ${msg}`);
-              const is403 = msg.includes('403');
-              errors.push(is403
-                ? 'Wix: Inbox permission missing — update app version in Wix Dev Center and reinstall'
-                : `Wix: ${msg}`);
+              const code = classifyPlatformError(e);
+              // Developer detail only (logs / tooltip); the UI shows i18n copy keyed by `code`.
+              const detail = code === 'permission'
+                ? 'Wix: Inbox permission missing (403) — app version lacks Inbox scope; reinstall required'
+                : `Wix: ${msg}`;
+              errors.push(detail);
+              platformErrors.push({ platform: 'wix', code, detail });
             }
           })()
         );
@@ -232,19 +260,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const unansweredCount = allConversations.filter(c => c.status === 'unanswered').length;
 
-      const response: MessagesListResponse & { errors?: string[]; enabledPlatforms?: string[] } = {
+      // Per-platform errors are always returned (not only when the list is empty), so a
+      // failing platform is visible even while the other one still shows conversations.
+      const response: MessagesListResponse & {
+        errors: string[];
+        platformErrors: PlatformError[];
+        enabledPlatforms: string[];
+      } = {
         conversations: allConversations,
         totalCount: allConversations.length,
         unansweredCount,
         page,
         pageSize: size,
+        enabledPlatforms,
+        errors,
+        platformErrors,
       };
-
-      // Include diagnostic info so frontend can show why it's empty
-      if (allConversations.length === 0) {
-        response.enabledPlatforms = enabledPlatforms;
-        if (errors.length > 0) response.errors = errors;
-      }
 
       return res.status(200).json(response);
     }

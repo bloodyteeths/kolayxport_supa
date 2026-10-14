@@ -225,7 +225,7 @@ export default async function handler(req, res) {
         cancel_url: `${req.headers.origin || 'http://localhost:3000'}/fiyatlandirma`,
       });
 
-      res.status(200).json({ sessionId: checkoutSession.id });
+      res.status(200).json({ sessionId: checkoutSession.id, url: checkoutSession.url });
     } catch (checkoutError: any) {
       logger.error('Failed to create checkout session', checkoutError);
       throw checkoutError;

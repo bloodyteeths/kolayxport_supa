@@ -7,15 +7,10 @@ import {
 import { Search, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import useFinanceStore, { ProductBreakdown } from '@/lib/stores/useFinanceStore';
+import { resolveFinanceSymbol } from './currency';
 
 type SortKey = keyof ProductBreakdown;
 type SortDir = 'asc' | 'desc';
-
-const CURRENCY_SYMBOLS: Record<string, string> = {
-  trendyol: '₺',
-  etsy: '$',
-  ebay: '$',
-};
 
 function formatMoney(val: number, symbol = '₺'): string {
   return `${symbol}${(val ?? 0).toFixed(2)}`;
@@ -40,9 +35,9 @@ function getMargin(p: ProductBreakdown): number {
 export default function ProductPnLTable({ products }: { products: ProductBreakdown[] }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const { upsertCostByBarcode, marketplace } = useFinanceStore();
+  const { upsertCostByBarcode, marketplace, dashboardData } = useFinanceStore();
   const t = useTranslations('financials');
-  const cs = CURRENCY_SYMBOLS[marketplace] || '$';
+  const cs = resolveFinanceSymbol(marketplace, dashboardData);
   const fmt = (val: number) => formatMoney(val, cs);
 
   const [search, setSearch] = useState('');

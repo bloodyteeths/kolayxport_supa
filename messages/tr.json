@@ -64,7 +64,91 @@
     "or": "veya",
     "loginSuccess": "Giriş başarılı!",
     "signupSuccess": "Kayıt başarılı! Hesabınızı onaylamak için e-postanızı kontrol edin.",
-    "passwordPolicy": "En az 12 karakter; büyük ve küçük harf, rakam ve özel karakter içermeli. Adınızı veya e-postanızı içeremez."
+    "passwordPolicy": "En az 12 karakter; büyük ve küçük harf, rakam ve özel karakter içermeli. Adınızı veya e-postanızı içeremez.",
+    "passwordHint": "En az {min} karakter; büyük ve küçük harf, rakam ve özel karakter içermeli. Adınızı veya e-postanızı içeremez.",
+    "errors": {
+      "signupFailed": "Kayıt başarısız oldu. Lütfen tekrar deneyin.",
+      "emailExists": "Bu e-posta ile kayıtlı bir hesap zaten var. Lütfen giriş yapın.",
+      "missingFields": "E-posta ve şifre zorunludur.",
+      "generic": "Bir şeyler ters gitti. Lütfen tekrar deneyin.",
+      "signInFailed": "Giriş başarısız oldu. Lütfen tekrar deneyin.",
+      "password_too_short": "Şifre en az {min} karakter olmalıdır.",
+      "password_too_long": "Şifre en fazla {max} karakter olabilir.",
+      "password_needs_lowercase": "Şifre en az bir küçük harf içermelidir.",
+      "password_needs_uppercase": "Şifre en az bir büyük harf içermelidir.",
+      "password_needs_digit": "Şifre en az bir rakam içermelidir.",
+      "password_needs_special": "Şifre en az bir özel karakter içermelidir.",
+      "password_contains_identity": "Şifre adınızı veya e-posta adresinizi içeremez.",
+      "password_too_common": "Bu şifre çok yaygın. Daha zor tahmin edilecek bir şifre seçin.",
+      "invalid_or_expired": "Bu sıfırlama bağlantısı geçersiz veya süresi dolmuş. Yeni bir bağlantı isteyin.",
+      "invalid_input": "Lütfen her iki alanı da doldurun.",
+      "internal_error": "Bir şeyler ters gitti. Bir dakika sonra tekrar deneyin.",
+      "mismatch": "Şifreler eşleşmiyor."
+    },
+    "unverified": {
+      "title": "Giriş yapmadan önce lütfen e-postanızı doğrulayın.",
+      "body": "Gelen kutunuzda onay bağlantısını kontrol edin. Bulamazsanız yeni bir tane isteyin.",
+      "resend": "Doğrulama e-postasını tekrar gönder",
+      "sending": "Gönderiliyor…",
+      "sent": "Doğrulama e-postası gönderildi.",
+      "resendFailed": "E-posta gönderilemedi. Lütfen tekrar deneyin."
+    },
+    "verify": {
+      "pageTitle": "E-posta doğrulama",
+      "goToSignIn": "Giriş sayfasına git",
+      "titles": {
+        "ok": "E-posta doğrulandı",
+        "failed": "Doğrulama başarısız",
+        "expired": "Bu bağlantının süresi doldu",
+        "alreadyUsed": "Bu bağlantı zaten kullanılmış"
+      },
+      "bodies": {
+        "ok": "E-postanız onaylandı. Artık KolayXport'a giriş yapabilirsiniz.",
+        "invalid": "Bağlantı geçersiz. Giriş sayfasından yeni bir doğrulama e-postası isteyin.",
+        "expired": "Lütfen giriş sayfasından yeni bir doğrulama e-postası isteyin.",
+        "alreadyUsed": "Bu bağlantı zaten kullanıldı. Farklı bir e-postayı doğrulamanız gerekiyorsa tekrar kayıt olun.",
+        "default": "E-postanızdaki bağlantıyı açın veya yeni bir tane isteyin."
+      }
+    },
+    "forgot": {
+      "pageTitle": "Şifre sıfırlama",
+      "heading": "Şifrenizi sıfırlayın",
+      "description": "Hesabınızın e-posta adresini girin. Eşleşen bir hesap bulursak 1 saat geçerli bir sıfırlama bağlantısı göndeririz.",
+      "sentMessage": "Bu e-postaya ait bir hesap varsa sıfırlama bağlantısı gönderildi.",
+      "backToSignIn": "Girişe dön",
+      "emailLabel": "E-posta adresi",
+      "emailPlaceholder": "ornek@eposta.com",
+      "submit": "Sıfırlama bağlantısı gönder",
+      "sending": "Gönderiliyor…"
+    },
+    "reset": {
+      "pageTitle": "Yeni şifre belirle",
+      "heading": "Yeni bir şifre belirleyin",
+      "success": "Şifreniz güncellendi.",
+      "signInWithNew": "Yeni şifrenizle giriş yapın",
+      "missingToken": "Sıfırlama anahtarı eksik. E-postanızdaki bağlantıyı açın.",
+      "newPasswordLabel": "Yeni şifre",
+      "newPasswordPlaceholder": "Yeni şifre (en az {min} karakter)",
+      "confirmPlaceholder": "Yeni şifreyi onaylayın",
+      "submit": "Şifreyi kaydet",
+      "updating": "Güncelleniyor…"
+    },
+    "confirmEmail": {
+      "pageTitle": "E-postanızı onaylayın",
+      "heading": "Gelen kutunuzu kontrol edin!",
+      "body": "E-posta adresinize bir onay bağlantısı gönderdik. Kaydınızı tamamlamak için bağlantıya tıklayın, ardından giriş yapın.",
+      "goToSignIn": "Giriş sayfasına git"
+    },
+    "errorPage": {
+      "pageTitle": "Giriş Hatası",
+      "heading": "Giriş Yapılamadı",
+      "generic": "Bir şeyler ters gitti. Lütfen tekrar deneyin.",
+      "accountNotLinked": "Bu e-posta adresi zaten farklı bir giriş yöntemiyle kullanılıyor. Lütfen diğer yöntemle giriş yapmayı deneyin.",
+      "callback": "Giriş sırasında bir sorun oluştu. Lütfen daha sonra tekrar deneyin veya destek ile iletişime geçin.",
+      "errorCode": "Hata Kodu:",
+      "tryAgain": "Girişe dön",
+      "backHome": "Ana Sayfaya Dön"
+    }
   },
   "nav": {
     "overview": "Genel Bakış",
@@ -406,7 +490,13 @@
     "noStatusData": "Durum verisi yok",
     "noActivityYet": "Henüz aktivite yok",
     "byCarrier": "Kargo Firmasına Göre",
-    "product": "Ürün"
+    "product": "Ürün",
+    "nextDay": "Sonraki gün",
+    "nextMonth": "Sonraki ay",
+    "refreshFailed": "Yenilenemedi. Önceki sonuçlar gösteriliyor.",
+    "fxUnconvertedWarning": "{currencies} için döviz kuru alınamadı, bu tutarlar TL toplamlarına dahil edilmedi. Orijinal para birimindeki tutarlar pazaryeri tablosunda görünmeye devam ediyor.",
+    "fxStaleWarning": "Canlı döviz kurları alınamadı. Toplamlar {date} tarihli son bilinen kurlarla hesaplandı.",
+    "fxStaleWarningNoDate": "Canlı döviz kurları alınamadı. Toplamlar son bilinen kurlarla hesaplandı."
   },
   "financials": {
     "bankedPendingNote": "Trendyol API’si güncel bakiye vermez. Bu tutar, vadesi henüz gelmemiş (bankaya aktarılmayı bekleyen) hakedişlerin tahmini toplamıdır.",
@@ -518,7 +608,15 @@
     "syncError": "Senkronizasyon hatası",
     "csvPlaceholder": "8680001234567, Bebek Battaniye, 45.00, 12.50\n8680009876543, Örgü Çorap, 22.00, 8.00",
     "orders": "sipariş",
-    "returnedCount": "{count} iade"
+    "returnedCount": "{count} iade",
+    "syncedCount": "{count, plural, =0 {Senkronize edilecek yeni işlem yok} other {# işlem senkronize edildi}}",
+    "refreshFailed": "Yenilenemedi. Önceki sonuçlar gösteriliyor.",
+    "syncEmptyDescription": "Bu dönem için henüz finansal veri yok. Hesabınızdan gelir, komisyon ve kargo verilerini çekmek için senkronize edin.",
+    "notConnected": "Bağlı değil",
+    "syncTooltipMarketplace": "{marketplace} verilerini senkronize et",
+    "connectToSeeFinancials": "Gelir, kesinti ve kârınızı burada görmek için {marketplace} hesabınızı bağlayın.",
+    "ordersWithPending": "{count} sipariş (+{pending} bekliyor)",
+    "pendingSettlementTooltip": "{settled} sipariş pazaryeri tarafından ödeme olarak işlendi. {pending} sipariş hâlâ pazaryeri tarafından kapatılmayı bekliyor, bu 1-3 gün sürebilir."
   },
   "labels": {
     "columnShippingCost": "Kargo Maliyeti",
@@ -1334,7 +1432,8 @@
     "expiresTomorrow": "Deneme süreniz yarın sona eriyor. Planınızı şimdi seçin.",
     "expiresInDays": "Deneme süreniz {days} gün sonra sona erecek.",
     "nearingLimit": "Deneme limitinize de yaklaşıyorsunuz.",
-    "selectPlan": "Plan Seç"
+    "selectPlan": "Plan Seç",
+    "dismiss": "Kapat"
   },
   "invoices": {
     "pageTitle": "Fatura Geçmişi",
@@ -2524,8 +2623,8 @@
       "confirm": {
         "unsavedChanges": "{count} kaydedilmemiş değişiklik var. Çıkmak istediğinizden emin misiniz?",
         "deleteAllPhotos": "{count} listeden TÜM fotoğraflar silinecek. Bu işlem geri alınamaz.",
-        "replaceAllPhotos": "{count} listedeki TÜM fotoğraflar seçili dosyalarla değiştirilecek. Bu işlem geri alınamaz.",
-        "deleteAllVideos": "{count} listeden TÜM videolar silinecek. Bu işlem geri alınamaz."
+        "replaceAllPhotos": "{count} listedeki TÜM fotoğraflar seçili dosyalarla değiştirilecek. Senkronize edene kadar Etsy'de hiçbir şey değişmez.",
+        "deleteAllVideos": "{count} listeden TÜM videolar silinecek. Senkronize edene kadar Etsy'de hiçbir şey değişmez."
       },
       "shopLabel": "Etsy",
       "etsyDetails": {
@@ -3288,8 +3387,13 @@
         "title": "Bu ilan kapatılsın mı?",
         "description": "Metinleriniz ve ayarlarınız bu cihazda kalır, bir dahaki sefere geri yükleyebilirsiniz. Etsy'ye hiçbir şey gönderilmez.",
         "descriptionWithPhotos": "Metinleriniz ve ayarlarınız bu cihazda kalır, bir dahaki sefere geri yükleyebilirsiniz. Eklediğiniz fotoğraflar saklanmaz. Etsy'ye hiçbir şey gönderilmez.",
-        "keepEditing": "Düzenlemeye devam et"
-      }
+        "keepEditing": "Düzenlemeye devam et",
+        "descriptionCopy": "Önceden doldurulan bu ilan bu cihazda kaydedilmez. Kapatıp silinsin mi? Etsy'ye hiçbir şey gönderilmez."
+      },
+      "importedImagesHint": "Kaynak ilandan {count} fotoğraf alındı. Sadece bu ilanı yayınladığında veya senkronize ettiğinde indirilir.",
+      "importedImagesFailed": "Alınan fotoğraflar taslağa eklenemedi.",
+      "prefilledFromEbay": "eBay ilanından dolduruldu. Tüm alanları kontrol et, kategori seç ve etiket ekle. Oluştur ve Yayınla'ya basana kadar hiçbir şey yayınlanmaz.",
+      "prefilledFromEtsy": "Mevcut bir ilandan çoğaltıldı. Kaydetmeden önce başlığı değiştir. Yayınlayana veya senkronize edene kadar Etsy'ye hiçbir şey gitmez."
     },
     "video": {
       "add": "Video Ekle",
@@ -5451,7 +5555,8 @@
         "discard": "Değişiklikleri sil",
         "keepEditing": "Düzenlemeye devam et",
         "close": "Kapat"
-      }
+      },
+      "crosslistBanner": "{source} ilanından kopyalandı. Bilgileri kontrol edin, kategori ve ürün özelliklerini yapay zekâya doldurtun. Yayınla'ya basana kadar eBay'e hiçbir şey gönderilmez."
     },
     "financial": {
       "revenueCalculator": "Gelir Hesaplayıcı",
@@ -6908,7 +7013,55 @@
       "syncSuccess": "\"{title}\" Etsy'de oluşturuldu (#{id}).",
       "confirmDiscard": "Bu yeni ilan taslağı silinsin mi? Hazırlanan fotoğrafları silinir. Etsy'de zaten oluşturulmuş bir şey varsa kaldırılmaz.",
       "discarded": "Taslak silindi",
-      "discardFailed": "Taslak silinemedi: {error}"
+      "discardFailed": "Taslak silinemedi: {error}",
+      "discardTitle": "Bu taslak silinsin mi?"
+    },
+    "duplicate": {
+      "notFound": "Bu ilan bulunamadı. Listeyi yenileyip tekrar deneyin.",
+      "action": "Çoğalt",
+      "tooltip": "Yeni ilan olarak çoğalt"
+    },
+    "crosslist": {
+      "priceCurrencyUnknown": "Etsy mağazanızın para birimi henüz bilinmediği için fiyat kopyalanmadı. Fiyatı oluşturucuda girin.",
+      "listOnEbay": "eBay'de listele",
+      "loading": "eBay ilanı yükleniyor…",
+      "notFound": "Bu eBay ilanı bulunamadı. eBay ilanlarını senkronize edip tekrar dene.",
+      "loadFailed": "eBay ilanı yüklenemedi",
+      "priceCurrencyMismatch": "Fiyat kopyalanmadı: eBay fiyatı {from}, Etsy mağazan {to} ile fiyatlandırıyor."
+    },
+    "draftChip": {
+      "tipSyncing": "Bu değişiklikler şu anda Etsy'ye gönderiliyor. Biraz sürebilir.",
+      "pending": "Bekliyor",
+      "failed": "Sync başarısız",
+      "conflict": "Etsy değişti",
+      "syncing": "Senkronize ediliyor",
+      "tipFailed": "Sync başarısız: {reason}\n\nTıkla → düzenleyiciden Tekrar Sync ya da Taslağı Sil.",
+      "tipConflict": "Etsy üzerinde bu listing değişmiş. Düzenleyiciden incele ve gerekiyorsa yeniden Sync.",
+      "tipDraft": "Local taslak. Sync to Etsy'ye basana kadar Etsy'de bir şey değişmez.",
+      "errWhoMade": "Etsy zorunlu üçlüsü (kim/ne zaman yapıldı, malzeme mi) eksik. Yeniden senkronizasyon dener — çoğu yeni denemede otomatik çözülür.",
+      "errSection": "Seçili Etsy bölümü artık yok. Düzenleyiciden başka bir bölüm seç ve tekrar dene.",
+      "errToken": "Etsy bağlantın geçersiz. Ayarlar → Etsy'den yeniden bağlan.",
+      "errShipping": "Seçili kargo profili artık yok. Düzenleyiciden başka bir profil seç."
+    },
+    "draftBanner": {
+      "draftsInOtherTabs": "Bu sekmede taslağı olan ilan yok. Taslaklarınız diğer durum sekmelerindeki ilanlarda.",
+      "unsynced": "{count, plural, =0 {Bekleyen değişiklik yok} one {# senkronize edilmemiş değişiklik} other {# senkronize edilmemiş değişiklik}}",
+      "failed": "{count} başarısız",
+      "conflicts": "{count} çakışma",
+      "hasDraftFilter": "Taslağı olanlar",
+      "syncAll": "Etsy'ye senkronize et",
+      "syncAllCount": "Tümünü senkronize et ({count})",
+      "confirmTitle": "{count} taslak Etsy'ye senkronize edilsin mi?",
+      "confirmBody": "Bu ilanlar için kaydedilen taslak değişiklikleri Etsy'ye yazılacak.",
+      "skippedDeletes": "Sırada silme olan {count} taslak atlandı. Bunları düzenleyiciden inceleyip uygula.",
+      "skippedNew": "{count} yeni ilan atlandı. Onları yeni ilanlar panelinden senkronize et.",
+      "nothingToSync": "Burada senkronize edilecek bir şey yok. Sırada silme olan taslaklar ve yeni ilanlar tek tek senkronize edilir."
+    },
+    "draftQueued": {
+      "delete": "Silme yerel taslağa eklendi. Uygulamak için ilanı açıp düzenleyiciden senkronize et.",
+      "renew": "Yenileme yerel taslağa eklendi. Uygulamak için Etsy'ye senkronize et.",
+      "deactivate": "Deaktif etme yerel taslağa eklendi. Uygulamak için Etsy'ye senkronize et.",
+      "saved": "Taslak kaydedildi. Uygulamak için Etsy'ye senkronize et."
     }
   },
   "ebayListings": {
@@ -7169,7 +7322,13 @@
     "viewStandard": "Standart",
     "viewComfortable": "Tümü",
     "listingsCountFiltered": "{total} ilandan {count} tanesi",
-    "condUsedExcellent": "Kullanılmış — Mükemmel"
+    "condUsedExcellent": "Kullanılmış — Mükemmel",
+    "crosslistReplaceTitle": "Düzenlediğiniz ilan değiştirilsin mi?",
+    "crosslistReplaceDesc": "Etsy ilanı yüklendi. Değiştirirseniz mevcut form Etsy bilgileriyle değiştirilir. Kendi kayıtlı taslağınız korunur.",
+    "crosslistReplaceConfirm": "Etsy ilanını kullan",
+    "listOnEtsy": "Etsy'de listele",
+    "crosslistLoading": "Etsy ilanı yükleniyor…",
+    "crosslistLoadFailed": "Kopyalanacak Etsy ilanı yüklenemedi."
   },
   "etsyResearch": {
     "pageTitle": "Etsy Araştırma",
@@ -7726,7 +7885,27 @@
       "restored": "{count} ürün geri yüklendi",
       "manual": "Manuel yedek",
       "items": "{count} öğe"
-    }
+    },
+    "batchPolling": "Trendyol {count} ürünü işliyor...",
+    "batchProgress": "Trendyol {done}/{total} ürünü işledi",
+    "batchResultTitle": "Toplu güncelleme sonucu",
+    "batchResultUpdated": "{count} güncellendi",
+    "batchResultFailed": "{count} başarısız",
+    "batchResultPending": "{count} hâlâ işleniyor",
+    "batchResultTimedOut": "Trendyol bu toplu işlemi hâlâ işliyor. Sonuçlar değişebilir; birkaç dakika sonra yenileyin veya senkronize edin.",
+    "batchResultSyncHint": "Arşiv durumu bu listede bir sonraki Senkronizasyondan sonra güncellenir.",
+    "batchResultFailuresTitle": "Başarısız ürünler",
+    "batchResultNoReason": "Trendyol bir neden belirtmedi",
+    "showVariants": "{count} varyantı göster",
+    "hideVariants": "Varyantları gizle",
+    "variantCount": "{count} varyant",
+    "showingOf": "{total} üründen {shown} tanesi gösteriliyor",
+    "matchingCount": "{count} eşleşen",
+    "filtersLoadedOnly": "Arama ve filtreler yalnızca yüklenen ürünlere uygulanır",
+    "partialSeedHint": "{total} üründen yalnızca {shown} tanesi yüklendi. Tümünü içe aktarmak için senkronize edin.",
+    "emptySyncHint": "Trendyol ürünlerinizi içe aktarmak için senkronize edin.",
+    "clearFilters": "Filtreleri temizle",
+    "loadMore": "{count} ürün daha yükle"
   },
   "wixListings": {
     "pageTitle": "Wix Ürünler",
@@ -7855,7 +8034,24 @@
     "bulkPersonalization": "Kişiselleştirme",
     "bulkSetPersonalization": "Alanları Ayarla",
     "bulkRemovePersonalization": "Alanları Kaldır",
-    "personalizationHelperText": "Alıcıların dolduracağı metin alanları (ör. isim, mesaj)"
+    "personalizationHelperText": "Alıcıların dolduracağı metin alanları (ör. isim, mesaj)",
+    "stagedUnsavedCount": "{count, plural, one {# üründe kaydedilmemiş değişiklik} other {# üründe kaydedilmemiş değişiklik}}",
+    "stagedSaveSuccess": "{count, plural, one {# ürün Wix'e kaydedildi} other {# ürün Wix'e kaydedildi}}",
+    "stagedLeaveConfirm": "Wix'e kaydedilmemiş değişiklikleriniz var. Bu sayfadan çıkıp değişiklikleri silmek istiyor musunuz?",
+    "stagedStockNotEditable": "Varyantlı veya stok takibi kapalı ürünlerde stok buradan düzenlenemez. Wix panelini kullanın.",
+    "expandCard": "Detayları göster",
+    "collapseCard": "Detayları gizle",
+    "stagedUnsaved": "Kaydedilmedi",
+    "stagedNoPending": "Bekleyen değişiklik yok",
+    "stagedSaveToWix": "Wix'e Kaydet",
+    "stagedDiscard": "Vazgeç",
+    "stagedDiscardTitle": "Kaydedilmemiş değişiklikler silinsin mi?",
+    "stagedDiscardConfirm": "{count} üründeki yerel değişiklikler silinecek. Wix'te hiçbir şey değişmez.",
+    "stagedSavePartial": "{ok} kaydedildi, {failed} başarısız",
+    "stagedFailedCount": "{count} başarısız",
+    "stagedInvalidPrice": "Geçerli bir fiyat girin (0 veya üzeri)",
+    "stagedInvalidStock": "Stok tam sayı olmalı (0 veya üzeri)",
+    "stagedInvalidTitle": "Başlık boş olamaz"
   },
   "shopifyListings": {
     "title": "Shopify Ürünler",
@@ -7892,7 +8088,29 @@
     "updateSuccess": "Ürün başarıyla güncellendi",
     "deleteConfirm": "Bu ürünü silmek istediğinizden emin misiniz?",
     "deleteSuccess": "Ürün başarıyla silindi",
-    "updateFailed": "Ürün güncellenemedi"
+    "updateFailed": "Ürün güncellenemedi",
+    "variantUpdatePartialInline": "Ürün kaydedildi ancak {count} varyant tam olarak güncellenemedi. Aşağıda işaretli varyantları kontrol edin.",
+    "variantPriceSavedStockFailed": "Fiyat kaydedildi; stok güncellenmedi: {reason}",
+    "connectDescription": "Ürünleri, fiyatları ve stokları burada yönetmek için Shopify mağazanızı bağlayın.",
+    "showDetails": "Detayları göster",
+    "hideDetails": "Detayları gizle",
+    "sku": "SKU",
+    "variantFallback": "Varyant {n}",
+    "variantEditHint": "Fiyat ve stok değişiklikleri yalnızca Kaydet'e bastığınızda Shopify'a gönderilir.",
+    "notTracked": "Stok Shopify tarafından takip edilmiyor",
+    "invalidPrice": "Geçerli bir fiyat girin (0 veya üzeri, en fazla 2 ondalık).",
+    "invalidStock": "Stok 0 veya daha büyük bir tam sayı olmalı.",
+    "variantUpdatePartial": "{count} varyant güncellenemedi: {reason}",
+    "variantErrors": {
+      "NOT_FOUND": "Varyant artık Shopify'da yok. Senkronize edip tekrar deneyin.",
+      "INVALID_PRICE": "Geçersiz fiyat.",
+      "INVALID_QUANTITY": "Geçersiz stok miktarı.",
+      "NOT_TRACKED": "Bu varyantın stoğu Shopify tarafından takip edilmiyor.",
+      "MULTI_LOCATION": "Stok birden fazla lokasyonda. Shopify panelinden düzenleyin.",
+      "NO_LOCATION": "Bu varyant hiçbir lokasyonda stoklanmıyor.",
+      "STOCK_CHANGED": "Son senkronizasyondan beri Shopify'da stok değişti. Senkronize edip tekrar deneyin.",
+      "FAILED": "Shopify güncellemeyi reddetti."
+    }
   },
   "messages": {
     "title": "Mesajlar",
@@ -7926,7 +8144,32 @@
     "items": "ürün",
     "loadingOrders": "Siparişler yükleniyor...",
     "showContext": "Detayları göster",
-    "hideContext": "Detayları gizle"
+    "hideContext": "Detayları gizle",
+    "templates": {
+      "tooLong": "Şablonlar en fazla {max} karakter olabilir. Kaydetmek için metni kısaltın.",
+      "label": "Kayıtlı yanıtlar",
+      "saveCurrent": "Şablon olarak kaydet",
+      "saved": "Şablon kaydedildi",
+      "alreadySaved": "Bu şablon zaten kayıtlı",
+      "limitReached": "En fazla {max} şablon kaydedebilirsiniz. Yeni eklemek için birini silin.",
+      "deleteTitle": "Bu kayıtlı yanıt silinsin mi?"
+    },
+    "fetchFailed": "Mesajlar yüklenemedi. Lütfen tekrar deneyin.",
+    "refresh": "Yenile",
+    "connectedPlatforms": "Bağlı: {platforms}",
+    "connectEitherDescription": "Tüm müşteri mesajlarınızı tek bir gelen kutusundan yanıtlamak için Wix veya Trendyol'u bağlayın.",
+    "time": {
+      "minutes": "{n}dk",
+      "hours": "{n}sa",
+      "yesterday": "Dün"
+    },
+    "platformErrors": {
+      "permission": "{name}: gelen kutusu izni eksik. Mesaj erişimi için {name} bağlantısını yenileyin.",
+      "auth": "{name}: bağlantının süresi doldu. Ayarlar'dan yeniden bağlayın.",
+      "credentials": "{name}: bağlantı bilgileri eksik. Ayarlar'ı kontrol edin.",
+      "rateLimited": "{name}: şu anda çok fazla istek var. Birazdan tekrar deneyin.",
+      "unavailable": "{name}: mesajlar şu anda yüklenemedi."
+    }
   },
   "errors": {
     "notFoundTitle": "404 - Sayfa Bulunamadı",
@@ -8581,7 +8824,9 @@
       "billing": {
         "monthly": "Aylık",
         "yearly": "Yıllık",
-        "discount": "%15 İNDİRİM"
+        "discount": "%15 İNDİRİM",
+        "perMonth": "/ ay",
+        "perYear": "/ yıl"
       },
       "plans": {
         "starter": {
@@ -8711,6 +8956,12 @@
         "heading": "Size Özel Bir Plan mı Lazım?",
         "text": "İhtiyaçlarınız doğrultusunda size özel çözümler üretebiliriz. Bizimle iletişime geçin.",
         "button": "İletişime Geç"
+      },
+      "checkout": {
+        "shopifyFree": "Shopify üzerinden yüklenen hesaplar ücretsiz Shopify katmanını kullanır ve buradan plan satın alamaz.",
+        "failed": "Ödeme başlatılamadı. Lütfen tekrar deneyin.",
+        "notConfigured": "Ödemeler geçici olarak kullanılamıyor. Lütfen destek ile iletişime geçin.",
+        "redirecting": "Ödemeye yönlendiriliyor…"
       }
     }
   },
@@ -8749,6 +9000,11 @@
       "usage": "{used} / {limit}",
       "resetsOn": "Kullanım {date} tarihinde sıfırlanır",
       "contactSupport": "Destekle iletişime geç"
+    },
+    "connectEmpty": {
+      "title": "Bu sayfa için {name} bağlayın",
+      "description": "{name} hesabınızı bağlayın, verileriniz burada otomatik olarak görünsün.",
+      "cta": "{name} bağla"
     }
   }
 }

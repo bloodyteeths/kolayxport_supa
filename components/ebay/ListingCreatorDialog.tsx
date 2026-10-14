@@ -61,6 +61,33 @@ interface ListingCreatorDialogProps {
   returnPolicies: Policy[];
   paymentPolicies: Policy[];
   onCreated: (sku: string) => void;
+  /**
+   * Seed the form from another marketplace's listing (cross-listing). When set
+   * on open, it wins over the autosaved draft: the restore is skipped and this
+   * session never writes to (or clears) the autosave slot, so an unrelated
+   * in-progress draft survives. Nothing is sent to eBay until the user presses
+   * create/publish. Change `key` to apply a different source.
+   */
+  prefill?: EbayListingPrefill | null;
+}
+
+export interface EbayListingPrefill {
+  /** Stable identity of the source, e.g. "etsy:123456". */
+  key: string;
+  /** Marketplace name shown in the banner, e.g. "Etsy". */
+  sourceLabel: string;
+  title?: string;
+  /** Longer seed for AI autofill (e.g. the full source title). */
+  aiSeed?: string;
+  description?: string;
+  /** Decimal string, e.g. "24.99". */
+  price?: string;
+  currency?: string;
+  quantity?: number;
+  sku?: string;
+  /** Public image URLs; eBay fetches them itself at publish time. */
+  images?: string[];
+  aspects?: Record<string, string[]>;
 }
 
 interface CategoryOption {
@@ -133,6 +160,8 @@ const CURRENCY_OPTIONS = [
 
 /** Work-in-progress listings survive an accidental close or a page reload. */
 const DRAFT_STORAGE_KEY = 'kx.ebay.listingDraft.v1';
+/** A cross-list session autosaves to its own slot so the seller's own draft is never overwritten. */
+const crosslistDraftKey = (source: string) => `${DRAFT_STORAGE_KEY}:${source}`;
 /** Sellers pick the same three policies every time — remember the last choice. */
 const POLICY_STORAGE_KEY = 'kx.ebay.lastPolicies.v1';
 
@@ -176,6 +205,7 @@ export default function ListingCreatorDialog({
   returnPolicies,
   paymentPolicies,
   onCreated,
+  prefill = null,
 }: ListingCreatorDialogProps) {
   const t = useTranslations('ebay.listing');
   const theme = useTheme();
@@ -240,6 +270,9 @@ export default function ListingCreatorDialog({
   const [variationImages, setVariationImages] = useState<VariationImageMap>({});
 
   const [draftRestored, setDraftRestored] = useState(false);
+  /** Key of the prefill this session came from; while set, autosave uses that source's own slot. */
+  const [prefillSource, setPrefillSource] = useState<string | null>(null);
+  const [prefillBanner, setPrefillBanner] = useState<string | null>(null);
   /** Bumped by resetForm so the policy defaults re-apply after "Start over". */
   const [formEpoch, setFormEpoch] = useState(0);
 
@@ -293,6 +326,7 @@ export default function ListingCreatorDialog({
     setFormError(null);
     setShowMarketInsights(false);
     setDraftRestored(false);
+    setPrefillBanner(null);
     setFormEpoch((n) => n + 1);
     marketResearchFetched.current = false;
   }, []);
@@ -338,11 +372,64 @@ export default function ListingCreatorDialog({
     title.trim() || description.trim() || images.length > 0 || selectedCategory || price
   );
 
-  // Restore an interrupted listing when the dialog opens.
+  /** Replace the form with a cross-list source. Values are validated, never trusted. */
+  const applyPrefill = (p: EbayListingPrefill) => {
+    resetForm();
+    const str = (v: unknown) => (typeof v === 'string' ? v : '');
+    setTitle(str(p.title).slice(0, 80));
+    setAiSeed(str(p.aiSeed).slice(0, 200));
+    setDescription(str(p.description));
+    setSkuInput(str(p.sku).slice(0, 50));
+    const cur = str(p.currency).toUpperCase();
+    const priceNum = parseFloat(str(p.price));
+    // Only carry the price over in a currency this form can list in.
+    if (CURRENCY_OPTIONS.some((c) => c.value === cur) && Number.isFinite(priceNum) && priceNum > 0) {
+      setCurrency(cur);
+      setPrice(priceNum.toFixed(2));
+    }
+    const qty = typeof p.quantity === 'number' && Number.isFinite(p.quantity) ? Math.floor(p.quantity) : 0;
+    setQuantity(String(qty > 0 ? qty : 1));
+    const imgs = Array.isArray(p.images)
+      ? p.images.filter((u): u is string => typeof u === 'string' && /^https?:\/\//i.test(u))
+      : [];
+    setImages(Array.from(new Set(imgs)).slice(0, 24));
+    const cleanAspects = sanitizeAspects(p.aspects);
+    if (cleanAspects && Object.keys(cleanAspects).length > 0) setAspects(cleanAspects);
+    setPrefillSource(p.key);
+    setPrefillBanner(p.sourceLabel || null);
+  };
+
+  // Restore an interrupted listing when the dialog opens (or seed it from a cross-list source).
   useEffect(() => {
     if (!open) return;
-    const saved = readStorage<typeof snapshot>(DRAFT_STORAGE_KEY);
-    if (saved && (saved.title || saved.images?.length || saved.description)) {
+    if (prefill) {
+      // Prefill wins over the seller's own draft (left untouched). If this same
+      // source was cross-listed before and closed, resume that session instead.
+      const key = typeof prefill.key === 'string' ? prefill.key : '';
+      if (key) {
+        const resumed = readStorage<typeof snapshot>(crosslistDraftKey(key));
+        resetForm();
+        if (restoreSnapshot(resumed)) {
+          setAiSeed(typeof prefill.aiSeed === 'string' ? prefill.aiSeed.slice(0, 200) : '');
+          setPrefillSource(key);
+          setPrefillBanner(prefill.sourceLabel || null);
+          return;
+        }
+      }
+      applyPrefill(prefill);
+      return;
+    }
+    if (prefillSource) {
+      // Last session was a cross-list; don't show its leftovers in a fresh "New listing".
+      resetForm();
+      setPrefillSource(null);
+    }
+    restoreSnapshot(readStorage<typeof snapshot>(DRAFT_STORAGE_KEY));
+  }, [open, prefill?.key]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Load a saved snapshot into the form; returns false when there is nothing worth restoring. */
+  function restoreSnapshot(saved: Partial<typeof snapshot> | null): boolean {
+    if (saved && typeof saved === 'object' && (saved.title || saved.images?.length || saved.description)) {
       setTitle(saved.title || '');
       setDescription(saved.description || '');
       setSkuInput(saved.skuInput || '');
@@ -368,15 +455,19 @@ export default function ListingCreatorDialog({
       setImageVaryingAspect(saved.imageVaryingAspect || '');
       setVariationImages(saved.variationImages || {});
       setDraftRestored(true);
+      return true;
     }
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+    return false;
+  }
 
-  // Autosave while the dialog is open.
+  // Autosave while the dialog is open. A cross-list session saves to its own
+  // slot, so closing it loses nothing and the seller's own draft is untouched.
+  const draftStorageKey = prefillSource ? crosslistDraftKey(prefillSource) : DRAFT_STORAGE_KEY;
   useEffect(() => {
     if (!open || !hasContent) return;
-    const id = setTimeout(() => writeStorage(DRAFT_STORAGE_KEY, snapshot), 600);
+    const id = setTimeout(() => writeStorage(draftStorageKey, snapshot), 600);
     return () => clearTimeout(id);
-  }, [open, hasContent, snapshot]);
+  }, [open, hasContent, snapshot, draftStorageKey]);
 
   // --------------------------------------------------
   // Policy defaults — no seller wants to pick these three every single time.
@@ -753,8 +844,15 @@ export default function ListingCreatorDialog({
       mark('aspects', 'error');
     }
 
+    // A cross-listed item keeps the seller's own price and description; AI
+    // only fills what the source didn't have.
+    const keepSourcePrice = Boolean(prefillSource && price);
+    const keepSourceDescription = Boolean(prefillSource && description.trim());
+
     mark('price', 'running');
-    try {
+    if (keepSourcePrice) {
+      mark('price', 'done');
+    } else try {
       const data = await callAI('suggest_price', {
         title: workingTitle,
         condition,
@@ -772,7 +870,9 @@ export default function ListingCreatorDialog({
     }
 
     mark('description', 'running');
-    try {
+    if (keepSourceDescription) {
+      mark('description', 'done');
+    } else try {
       const data = await callAI('generate_description', {
         title: workingTitle,
         aspects: Object.keys(workingAspects).length > 0 ? workingAspects : undefined,
@@ -1064,8 +1164,11 @@ export default function ListingCreatorDialog({
   };
 
   const handleStartOver = () => {
-    clearStorage(DRAFT_STORAGE_KEY);
+    // Clears this session's slot (the cross-list slot in a cross-list session).
+    // The fresh form is no longer cross-list data, so it autosaves normally again.
+    clearStorage(draftStorageKey);
     resetForm();
+    setPrefillSource(null);
   };
 
   const handleCreate = async (publish: boolean) => {
@@ -1280,7 +1383,7 @@ export default function ListingCreatorDialog({
             // The listing exists as a draft — say so instead of implying total failure.
             setFormError(err.error || t('listingCreatedButNotPublished'));
             toast.error(t('listingCreatedButNotPublished'));
-            clearStorage(DRAFT_STORAGE_KEY);
+            clearStorage(draftStorageKey);
             onCreated(baseSku);
             setCreating(false);
             return;
@@ -1296,9 +1399,10 @@ export default function ListingCreatorDialog({
         return: returnPolicyId,
         payment: paymentPolicyId,
       });
-      clearStorage(DRAFT_STORAGE_KEY);
+      clearStorage(draftStorageKey);
       onCreated(baseSku);
       resetForm();
+      setPrefillSource(null);
       onClose();
     } catch (err: any) {
       setFormError(err.message || t('createFailed'));
@@ -1635,6 +1739,12 @@ export default function ListingCreatorDialog({
           <Collapse in={draftRestored}>
             <Alert severity="info" onClose={() => setDraftRestored(false)}>
               {t('draftRestoredBanner')}
+            </Alert>
+          </Collapse>
+
+          <Collapse in={Boolean(prefillBanner)}>
+            <Alert severity="info" onClose={() => setPrefillBanner(null)}>
+              {t('crosslistBanner', { source: prefillBanner || '' })}
             </Alert>
           </Collapse>
 

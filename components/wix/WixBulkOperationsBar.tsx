@@ -13,6 +13,7 @@ import DownloadIcon from '@mui/icons-material/Download';
 import TextFieldsIcon from '@mui/icons-material/TextFields';
 import AddIcon from '@mui/icons-material/Add';
 import { toast } from 'react-hot-toast';
+import { notify } from '@/lib/notify';
 import { useTranslations } from 'next-intl';
 
 interface WixBulkOperationsBarProps {
@@ -46,7 +47,7 @@ export default function WixBulkOperationsBar({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ productIds, updates }),
       });
-      if (!res.ok) throw new Error('Bulk update failed');
+      if (!res.ok) throw Object.assign(new Error(''), { status: res.status, data: await res.json().catch(() => null) });
       const data = await res.json();
       if (data.failed > 0) {
         toast.error(t('bulkFailed'));
@@ -56,7 +57,7 @@ export default function WixBulkOperationsBar({
       onCompleted();
       onClearSelection();
     } catch (err: any) {
-      toast.error(err.message || t('bulkFailed'));
+      notify.error(err, t('bulkFailed'));
     } finally {
       setProcessing(false);
     }
@@ -70,14 +71,14 @@ export default function WixBulkOperationsBar({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ productIds }),
       });
-      if (!res.ok) throw new Error('Bulk delete failed');
+      if (!res.ok) throw Object.assign(new Error(''), { status: res.status, data: await res.json().catch(() => null) });
       const data = await res.json();
       toast.success(t('bulkDeleteSuccess', { count: data.succeeded }));
       setDeleteDialogOpen(false);
       onCompleted();
       onClearSelection();
     } catch (err: any) {
-      toast.error(err.message || t('bulkFailed'));
+      notify.error(err, t('bulkFailed'));
     } finally {
       setProcessing(false);
     }

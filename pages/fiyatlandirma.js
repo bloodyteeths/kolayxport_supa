@@ -7,8 +7,8 @@ import { motion } from 'framer-motion';
 import { Disclosure, Transition } from '@headlessui/react';
 import { CheckCircle, ChevronDown, ShieldCheck, Star, TrendingUp } from 'lucide-react';
 import { NextSeo } from 'next-seo';
-import { signIn as nextAuthSignIn } from 'next-auth/react';
 import { useTranslations } from 'next-intl';
+import { notify } from '../lib/notify';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
@@ -36,6 +36,10 @@ const planPrices = {
 
 export default function FiyatlandirmaPage() {
   const [billingInterval, setBillingInterval] = useState('month');
+  const [checkoutPlan, setCheckoutPlan] = useState(null);
+  // Plan the visitor picked before being sent to /login (restored from
+  // ?plan=&interval= on return). Only highlighted — checkout still needs a tap.
+  const [selectedPlan, setSelectedPlan] = useState(null);
   const router = useRouter();
   const t = useTranslations('marketing.pricing');
   const comparison = t.raw('comparison');
@@ -59,59 +63,91 @@ export default function FiyatlandirmaPage() {
     return () => { cancelled = true; };
   }, [router]);
 
-  const handleCheckout = async (plan, interval) => {
-    try {
-      if (!stripePromise) {
-        throw new Error('Stripe publishable key is not configured. Please check NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY environment variable.');
-      }
+  // Restore the plan/interval chosen before login. Primitive deps only.
+  const queryPlan = typeof router.query.plan === 'string' ? router.query.plan : '';
+  const queryInterval = typeof router.query.interval === 'string' ? router.query.interval : '';
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (queryInterval === 'month' || queryInterval === 'year') setBillingInterval(queryInterval);
+    if (queryPlan === 'starter' || queryPlan === 'growth') {
+      setSelectedPlan(queryPlan);
+      const timer = setTimeout(() => {
+        const el = typeof document !== 'undefined' ? document.getElementById(`plan-card-${queryPlan}`) : null;
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [router.isReady, queryPlan, queryInterval]);
 
+  const handleCheckout = async (plan, interval) => {
+    if (checkoutPlan) return; // ignore double taps while a session is being created
+    setCheckoutPlan(plan);
+    let leavingPage = false;
+    try {
       const res = await fetch('/api/stripe/create-checkout-session', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ plan, interval }),
       });
 
       if (res.status === 401) {
-        // Not authenticated, redirect to sign in
-        await nextAuthSignIn('google', { callbackUrl: '/fiyatlandirma' });
+        // Not signed in: send to the login page (email/password and Google both
+        // live there) and come back here afterwards.
+        leavingPage = true;
+        const back = `/fiyatlandirma?plan=${encodeURIComponent(plan)}&interval=${encodeURIComponent(interval)}`;
+        router.push(`/login?callbackUrl=${encodeURIComponent(back)}`);
         return;
       }
 
       // Shopify-installed merchants are on the free tier and can't checkout via Stripe.
       if (res.status === 403) {
-        const data = await res.json().catch(() => ({}));
-        alert(data.error || 'Shopify üzerinden yüklenen hesaplar ücretsiz Shopify katmanını kullanır.');
+        notify.error(null, 'marketing.pricing.checkout.shopifyFree');
         return;
       }
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`API error: ${res.status} - ${errorText}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.error) {
+        // Server messages are English/technical; show the localised fallback.
+        notify.error(null, 'marketing.pricing.checkout.failed');
+        return;
       }
 
-      const data = await res.json();
-      const { sessionId, error } = data;
-      if (error) {
-        throw new Error(error);
+      // Prefer the hosted Checkout URL when the API returns one; fall back to the
+      // legacy Stripe.js redirect (deprecated by Stripe) for sessionId-only responses.
+      if (typeof data.url === 'string' && data.url.startsWith('https://')) {
+        leavingPage = true;
+        window.location.assign(data.url);
+        return;
       }
-      if (!sessionId) {
-        throw new Error('Could not create checkout session');
+      if (!data.sessionId) {
+        notify.error(null, 'marketing.pricing.checkout.failed');
+        return;
       }
-
+      if (!stripePromise) {
+        notify.error(null, 'marketing.pricing.checkout.notConfigured');
+        return;
+      }
       const stripe = await stripePromise;
-      const { error: redirectError } = await stripe.redirectToCheckout({ sessionId });
-
+      if (!stripe) {
+        notify.error(null, 'marketing.pricing.checkout.notConfigured');
+        return;
+      }
+      leavingPage = true;
+      const { error: redirectError } = await stripe.redirectToCheckout({ sessionId: data.sessionId });
       if (redirectError) {
-        throw redirectError;
+        leavingPage = false;
+        notify.error(redirectError, 'marketing.pricing.checkout.failed');
       }
     } catch (error) {
-      alert(`Bir hata oluştu: ${error.message}`);
+      notify.error(error, 'marketing.pricing.checkout.failed');
+    } finally {
+      if (!leavingPage) setCheckoutPlan(null);
     }
   };
 
-  const frequency = billingInterval === 'month' ? '/ ay' : '/ yıl';
+  const frequency = billingInterval === 'month' ? t('billing.perMonth') : t('billing.perYear');
   const descKey = billingInterval === 'month' ? 'descMonth' : 'descYear';
   const plans = [
     {
@@ -269,7 +305,8 @@ export default function FiyatlandirmaPage() {
             {plans.map((plan, index) => (
               <motion.div
                 key={plan.name}
-                className={`flex flex-col bg-white rounded-3xl shadow-xl ${plan.highlight ? 'border-2 border-blue-500 shadow-blue-500/30' : 'border border-slate-100'} p-8 transition-all duration-300 ease-out`}
+                id={plan.planKey ? `plan-card-${plan.planKey}` : undefined}
+                className={`flex flex-col bg-white rounded-3xl shadow-xl ${plan.highlight ? 'border-2 border-blue-500 shadow-blue-500/30' : 'border border-slate-100'} ${plan.planKey && selectedPlan === plan.planKey ? 'ring-4 ring-blue-400 ring-offset-2' : ''} p-8 transition-all duration-300 ease-out`}
                 variants={{ hidden: { opacity: 0, y: 50 }, visible: { opacity: 1, y: 0 } }}
                 initial="hidden"
                 whileInView="visible"
@@ -302,15 +339,18 @@ export default function FiyatlandirmaPage() {
                   </Link>
                 ) : (
                   <button
+                    type="button"
                     onClick={() => handleCheckout(plan.planKey, billingInterval)}
+                    disabled={checkoutPlan !== null}
+                    aria-busy={checkoutPlan === plan.planKey}
                     aria-describedby={plan.id}
-                    className={`w-full block text-center px-6 py-3.5 text-base font-semibold rounded-lg shadow-md transform transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 cursor-pointer
+                    className={`w-full block text-center px-6 py-3.5 text-base font-semibold rounded-lg shadow-md transform transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 cursor-pointer disabled:opacity-60 disabled:cursor-wait
                       ${plan.highlight
                         ? 'text-white bg-gradient-to-r from-blue-500 to-indigo-500 hover:scale-[1.03]'
                         : 'text-blue-600 bg-blue-50 hover:bg-blue-100 hover:scale-[1.03]'
                       } ${plan.highlight ? 'focus:ring-blue-400' : 'focus:ring-blue-300'}
                     `}>
-                    {t('trialButton')}
+                    {checkoutPlan === plan.planKey ? t('checkout.redirecting') : t('trialButton')}
                   </button>
                 )}
               </motion.div>

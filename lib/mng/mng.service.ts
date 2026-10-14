@@ -2,6 +2,7 @@
 // MNG Kargo (DHL eCommerce Turkey) — Service Layer
 // ---------------------------------------------------------------------------
 
+import { createHash } from 'crypto';
 import { logger } from '../logger';
 import { getMngEndpoints } from './mng.config';
 import type {
@@ -24,15 +25,40 @@ interface TokenCacheEntry {
 const tokenCache = new Map<string, TokenCacheEntry>();
 const TOKEN_BUFFER_MS = 5 * 60 * 1000; // refresh 5 min before expiry
 
+/**
+ * Cache key for an MNG JWT. appId:customerNumber alone let a sandbox token be
+ * served for production calls (same ids, different environment) and kept
+ * serving a stale token after the user changed their password/secret. The key
+ * includes the environment and a sha256 of the secrets — never the raw
+ * secrets themselves, so they never sit in a Map key or a heap dump.
+ */
+export function mngTokenCacheKey(credentials: MngCredentials): string {
+  const secretHash = createHash('sha256')
+    .update(`${credentials.appSecret ?? ''}\u0000${credentials.customerPassword ?? ''}`)
+    .digest('hex');
+  return [
+    credentials.environment || 'test', // same default as getMngEndpoints
+    credentials.appId,
+    credentials.customerNumber,
+    secretHash,
+  ].join(':');
+}
+
+/** Test hook: drop all cached MNG tokens. */
+export function clearMngTokenCache(): void {
+  tokenCache.clear();
+}
+
 // ─── Authentication ──────────────────────────────────────────────────────────
 
 /**
  * Get a JWT token from MNG Identity API.
  * Uses appId + appSecret (DHL eCommerce portal credentials).
- * Tokens are cached per appId and refreshed before expiry.
+ * Tokens are cached per environment + account + secret hash (see
+ * mngTokenCacheKey) and refreshed before expiry.
  */
 export async function getMngToken(credentials: MngCredentials): Promise<string> {
-  const cacheKey = `${credentials.appId}:${credentials.customerNumber}`;
+  const cacheKey = mngTokenCacheKey(credentials);
   const cached = tokenCache.get(cacheKey);
 
   if (cached && cached.expiresAt > Date.now()) {

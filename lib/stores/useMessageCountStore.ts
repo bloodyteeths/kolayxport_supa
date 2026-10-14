@@ -1,29 +1,49 @@
 import { create } from 'zustand';
 import type { MessageCountsResponse } from '@/types/messages';
 
+interface MessageCountFetchOptions {
+  /** Bypass the in-flight guard (e.g. right after a reply) so the badge reflects the latest state. */
+  force?: boolean;
+}
+
 interface MessageCountState {
   counts: MessageCountsResponse;
   loading: boolean;
-  fetch: () => Promise<void>;
+  fetch: (opts?: MessageCountFetchOptions) => Promise<void>;
+  /** Optimistically decrement one platform's unread count (e.g. after answering). */
+  decrement: (platform: 'wix' | 'trendyol') => void;
 }
+
+// Monotonic request id: only the latest response may write counts, so a slow
+// pre-reply request can't overwrite a fresher post-reply one.
+let latestRequestId = 0;
 
 const useMessageCountStore = create<MessageCountState>((set, get) => ({
   counts: { wix: 0, trendyol: 0, total: 0 },
   loading: false,
-  fetch: async () => {
-    if (get().loading) return;
+  fetch: async (opts) => {
+    // setInterval may pass a non-object arg in some runtimes; only honour a real options object.
+    const force = !!(opts && typeof opts === 'object' && opts.force);
+    if (get().loading && !force) return;
+    const requestId = ++latestRequestId;
     set({ loading: true });
     try {
       const res = await fetch('/api/messages?action=counts');
-      if (res.ok) {
+      if (res.ok && requestId === latestRequestId) {
         const data = await res.json();
-        set({ counts: data });
+        if (data && typeof data.total === 'number') set({ counts: data });
       }
     } catch {
       // silently fail — badge just won't update
     } finally {
-      set({ loading: false });
+      if (requestId === latestRequestId) set({ loading: false });
     }
+  },
+  decrement: (platform) => {
+    const { counts } = get();
+    const next = { ...counts, [platform]: Math.max(0, (counts[platform] || 0) - 1) };
+    next.total = next.wix + next.trendyol;
+    set({ counts: next });
   },
 }));
 

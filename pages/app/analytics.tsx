@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import LinearProgress from '@mui/material/LinearProgress';
+import ErrorState from '@/components/ui/ErrorState';
 import { useAuth } from '@/lib/auth-context';
 // supabase browser client removed — auth now handled by NextAuth cookies
 import { useRouter } from 'next/router';
@@ -19,6 +21,7 @@ import {
   Calendar,
   ArrowUpRight,
   ArrowDownRight,
+  AlertTriangle,
 } from 'lucide-react';
 
 const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
@@ -46,6 +49,10 @@ interface AnalyticsData {
   revenueTrend: number;
   previousPeriod?: { orders: number; revenue: number };
   exchangeRates?: { USD: number; EUR: number; lastUpdated?: string };
+  /** Live FX fetch failed; totals use last-known rates (or none). */
+  ratesStale?: boolean;
+  /** Currencies left out of the TRY totals because no rate was available. */
+  unconvertedCurrencies?: string[];
   topMarketplaces: {
     name: string;
     orders: number;
@@ -221,6 +228,9 @@ export default function DashboardPage() {
 
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<unknown>(null);
+  // Ignore responses from superseded requests (fast date-range switching).
+  const requestSeq = useRef(0);
   const [dateRange, setDateRange] = useState('30days');
   const [selectedMonth, setSelectedMonth] = useState('');
   const [selectedDay, setSelectedDay] = useState('');
@@ -272,6 +282,7 @@ export default function DashboardPage() {
   }, [authLoading, user, router, dateRange, selectedMonth, selectedDay]);
 
   const fetchData = async () => {
+    const seq = ++requestSeq.current;
     setLoading(true);
     try {
       const params = new URLSearchParams({ dateRange });
@@ -280,17 +291,26 @@ export default function DashboardPage() {
       const res = await fetch(`/api/analytics?${params}`, {
         headers: { 'Content-Type': 'application/json' },
       });
-      if (!res.ok) throw new Error('Fetch failed');
-      setData(await res.json());
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        // `status` + `data` let ErrorState pick a safe message.
+        throw Object.assign(new Error(''), { status: res.status, data: body });
+      }
+      const json = await res.json();
+      if (seq !== requestSeq.current) return;
+      // Guard against a malformed payload rendering as fake zeros / crashing charts.
+      if (!json || typeof json !== 'object' || !Array.isArray(json.dailyStats)) {
+        throw new Error('');
+      }
+      setData(json as AnalyticsData);
+      setError(null);
     } catch (e) {
       console.error('Dashboard fetch error:', e);
-      setData({
-        totalOrders: 0, totalRevenue: 0, totalCustomers: 0, averageOrderValue: 0,
-        orderTrend: 0, revenueTrend: 0, topMarketplaces: [], dailyStats: [],
-        topProducts: [], orderStatusBreakdown: [],
-      });
+      // Keep the last good data (shown dimmed + an error banner) instead of
+      // replacing it with an all-zero dataset that looks real.
+      if (seq === requestSeq.current) setError(e ?? new Error(''));
     } finally {
-      setLoading(false);
+      if (seq === requestSeq.current) setLoading(false);
     }
   };
 
@@ -406,9 +426,18 @@ export default function DashboardPage() {
   // Render
   // ---------------------------------------------------------------------------
 
-  if (authLoading || loading) {
+  // Full skeleton only for the very first load; later range changes keep the
+  // previous data on screen (dimmed) under a thin progress bar.
+  if (authLoading || (loading && !data && !error)) {
     return <AppLayout title={t('pageTitle')}><Skeleton /></AppLayout>;
   }
+
+  const unconverted = data?.unconvertedCurrencies ?? [];
+  const showStaleRates = !!data?.ratesStale && unconverted.length === 0 && !!data?.exchangeRates;
+  const ratesAsOf = data?.exchangeRates?.lastUpdated
+    ? formatDateTime(new Date(data.exchangeRates.lastUpdated))
+    : '';
+  const isStale = loading || !!error;
 
   return (
     <AppLayout title={t('pageTitle')}>
@@ -458,14 +487,14 @@ export default function DashboardPage() {
 
             {dateRange === 'day' && (
               <div className="flex items-center bg-white border border-slate-200 rounded-xl">
-                <button onClick={() => navigateDay(-1)} className="p-2 hover:bg-slate-50 rounded-l-xl transition-colors">
+                <button type="button" aria-label={t('previousDay')} onClick={() => navigateDay(-1)} className="min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-slate-50 rounded-l-xl transition-colors">
                   <ChevronLeft className="h-4 w-4 text-slate-500" />
                 </button>
                 <div className="flex items-center gap-1.5 px-3 py-1.5">
                   <Calendar className="h-4 w-4 text-blue-600 flex-shrink-0" />
                   <span className="text-xs sm:text-sm font-medium text-slate-800 whitespace-nowrap">{selectedDayLabel}</span>
                 </div>
-                <button onClick={() => navigateDay(1)} className="p-2 hover:bg-slate-50 rounded-r-xl transition-colors">
+                <button type="button" aria-label={t('nextDay')} onClick={() => navigateDay(1)} className="min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-slate-50 rounded-r-xl transition-colors">
                   <ChevronRight className="h-4 w-4 text-slate-500" />
                 </button>
               </div>
@@ -473,22 +502,22 @@ export default function DashboardPage() {
 
             {dateRange === 'month' && (
               <div className="flex items-center bg-white border border-slate-200 rounded-xl">
-                <button onClick={() => navigateMonth(-1)} className="p-2 hover:bg-slate-50 rounded-l-xl transition-colors">
+                <button type="button" aria-label={t('previousMonth')} onClick={() => navigateMonth(-1)} className="min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-slate-50 rounded-l-xl transition-colors">
                   <ChevronLeft className="h-4 w-4 text-slate-500" />
                 </button>
                 <div className="flex items-center gap-1.5 px-3 py-1.5">
                   <Calendar className="h-4 w-4 text-blue-600 flex-shrink-0" />
                   <span className="text-xs sm:text-sm font-medium text-slate-800 whitespace-nowrap">{selectedMonthLabel}</span>
                 </div>
-                <button onClick={() => navigateMonth(1)} className="p-2 hover:bg-slate-50 rounded-r-xl transition-colors">
+                <button type="button" aria-label={t('nextMonth')} onClick={() => navigateMonth(1)} className="min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-slate-50 rounded-r-xl transition-colors">
                   <ChevronRight className="h-4 w-4 text-slate-500" />
                 </button>
               </div>
             )}
 
             {/* Exchange rates inline */}
-            {data?.exchangeRates && (
-              <div className="ml-auto flex items-center gap-3 text-xs text-slate-500">
+            {data?.exchangeRates && data.exchangeRates.USD > 0 && data.exchangeRates.EUR > 0 && (
+              <div className={`ml-auto flex items-center gap-3 text-xs ${data.ratesStale ? 'text-amber-700' : 'text-slate-500'}`}>
                 <span>1 USD = <strong className="text-blue-600">₺{data.exchangeRates.USD.toFixed(2)}</strong></span>
                 <span>1 EUR = <strong className="text-emerald-600">₺{data.exchangeRates.EUR.toFixed(2)}</strong></span>
               </div>
@@ -496,6 +525,40 @@ export default function DashboardPage() {
           </div>
         </Card>
 
+        {/* ── Loading bar (keeps layout stable) ───────────────────── */}
+        <div className="h-0.5 -mt-1" aria-hidden={!loading}>
+          {loading && data && <LinearProgress sx={{ height: 2, borderRadius: 1 }} />}
+        </div>
+
+        {/* ── Fetch error ────────────────────────────────────────── */}
+        {error != null && !data && (
+          <Card>
+            <ErrorState error={error} onRetry={fetchData} retrying={loading} />
+          </Card>
+        )}
+        {error != null && data && (
+          <ErrorState compact title={t('refreshFailed')} error={error} onRetry={fetchData} retrying={loading} />
+        )}
+
+        {/* ── FX warnings ────────────────────────────────────────── */}
+        {data && unconverted.length > 0 && (
+          <div role="status" className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs sm:text-sm text-amber-900">
+            <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5 text-amber-600" />
+            <span>{t('fxUnconvertedWarning', { currencies: unconverted.join(', ') })}</span>
+          </div>
+        )}
+        {data && showStaleRates && (
+          <div role="status" className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs sm:text-sm text-amber-900">
+            <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5 text-amber-600" />
+            <span>{ratesAsOf ? t('fxStaleWarning', { date: ratesAsOf }) : t('fxStaleWarningNoDate')}</span>
+          </div>
+        )}
+
+        {data && (
+        <div
+          aria-busy={loading}
+          className={`space-y-3 transition-opacity duration-200 ${isStale ? 'opacity-50' : 'opacity-100'}`}
+        >
         {/* ── KPI Cards ──��───────────────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <KPICard
@@ -533,7 +596,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Currency notice ────────────────────────────────────── */}
-        {data?.exchangeRates && (
+        {data?.exchangeRates && unconverted.length === 0 && (
           <p className="text-[11px] text-slate-400 -mt-2 px-1">{t('allCurrenciesConverted')}</p>
         )}
 
@@ -780,6 +843,9 @@ export default function DashboardPage() {
               </table>
             </div>
           </Card>
+        )}
+
+        </div>
         )}
 
       </div>

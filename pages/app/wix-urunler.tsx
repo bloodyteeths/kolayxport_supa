@@ -16,15 +16,20 @@ import {
   Close as CloseIcon, FileDownload as FileDownloadIcon,
   MoreVert as MoreVertIcon, Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon, TextFields as TextFieldsIcon,
+  CloudUpload as CloudUploadIcon, Undo as UndoIcon, ErrorOutline as ErrorOutlineIcon,
 } from '@mui/icons-material';
-import { toast } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
 import withAuth from '@/components/withAuth';
 import { useTranslations } from 'next-intl';
+import { useRouter } from 'next/router';
 
 import WixProductEditorDrawer from '@/components/wix/WixProductEditorDrawer';
 import WixProductCreatorDialog from '@/components/wix/WixProductCreatorDialog';
 import WixBulkOperationsBar from '@/components/wix/WixBulkOperationsBar';
+import { RequireConnection } from '@/components/ui/ConnectEmptyState';
+import ErrorState from '@/components/ui/ErrorState';
+import { notify, getErrorMessage, isUsageLimitError } from '@/lib/notify';
+import { useConfirm } from '@/lib/hooks/useConfirm';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -52,6 +57,50 @@ interface WixProductRow {
   customTextFields: Array<{ title: string; mandatory: boolean; maxLength: number }> | null;
   wixUpdatedDate: string | null;
   syncedAt: string;
+  trackInventory?: boolean;
+  variants?: unknown;
+}
+
+/**
+ * Inline stock edits are only safe for single-variant products with inventory tracking on:
+ * the inventory route only adjusts the first variant, and untracked products have no real count.
+ */
+function canEditStock(p: Pick<WixProductRow, 'trackInventory' | 'variants'>): boolean {
+  if (p.trackInventory === false) return false;
+  return !Array.isArray(p.variants) || p.variants.length <= 1;
+}
+
+/** Locally staged inline edits for one product. Nothing reaches Wix until "Save to Wix". */
+interface StagedEdit {
+  title?: string;
+  price?: number;
+  quantity?: number;
+}
+type StagedField = keyof StagedEdit;
+const STAGED_FIELDS: StagedField[] = ['title', 'price', 'quantity'];
+
+/** Error carrying HTTP status + parsed body so notify/getErrorMessage can read them. */
+async function putJson(url: string, body: unknown): Promise<any> {
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    const err: any = new Error(`Request failed with status code ${res.status}`);
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
+  return data;
+}
+
+function isValidPrice(n: unknown): n is number {
+  return typeof n === 'number' && Number.isFinite(n) && n >= 0;
+}
+function isValidQuantity(n: unknown): n is number {
+  return typeof n === 'number' && Number.isInteger(n) && n >= 0;
 }
 
 interface WixCollection {
@@ -110,8 +159,59 @@ function formatTimeSince(dateStr: string | null, t: any): string {
 // Mobile Card
 // ---------------------------------------------------------------------------
 
+/** Number input that keeps a local string while typing and commits on blur/Enter. */
+function StagedNumberField({
+  label, value, integer, dirty, onCommit, onInvalid, disabled, helperText,
+}: {
+  label: string;
+  value: number | null;
+  integer?: boolean;
+  dirty: boolean;
+  disabled?: boolean;
+  helperText?: string;
+  onCommit: (n: number) => void;
+  onInvalid: () => void;
+}) {
+  const [text, setText] = useState(value != null ? String(value) : '');
+  useEffect(() => { setText(value != null ? String(value) : ''); }, [value]);
+
+  const commit = () => {
+    const trimmed = text.trim().replace(',', '.');
+    if (trimmed === '' && value == null) return;
+    const n = Number(trimmed);
+    const ok = trimmed !== '' && (integer ? isValidQuantity(n) : isValidPrice(n));
+    if (!ok) {
+      onInvalid();
+      setText(value != null ? String(value) : '');
+      return;
+    }
+    if (n !== value) onCommit(n);
+  };
+
+  return (
+    <TextField
+      label={label}
+      size="small"
+      type="text"
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+      inputProps={{ inputMode: integer ? 'numeric' : 'decimal' }}
+      disabled={disabled}
+      helperText={helperText}
+      fullWidth
+      sx={{
+        '& .MuiInputBase-root': { minHeight: 44 },
+        ...(dirty ? { '& .MuiOutlinedInput-notchedOutline': { borderColor: 'warning.main', borderWidth: 2 } } : {}),
+      }}
+    />
+  );
+}
+
 function MobileWixProductCard({
   product, selected, onToggleSelect, onEdit, onDelete, collections, t,
+  dirtyFields, saveError, onStage, onInvalid, editLocked,
 }: {
   product: WixProductRow;
   selected: boolean;
@@ -120,17 +220,27 @@ function MobileWixProductCard({
   onDelete: () => void;
   collections: WixCollection[];
   t: any;
+  dirtyFields: StagedField[];
+  saveError?: string;
+  onStage: (patch: StagedEdit) => void;
+  onInvalid: (field: StagedField) => void;
+  editLocked: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const stockEditable = canEditStock(product);
+  const isDirty = dirtyFields.length > 0;
   const health = calculateHealth(product);
   const colNames = (product.collectionIds || [])
     .map(id => collections.find(c => c.id === id)?.name)
     .filter(Boolean);
 
   return (
-    <Paper sx={{ mb: 1, overflow: 'hidden' }}>
+    <Paper sx={{
+      mb: 1, overflow: 'hidden',
+      ...(saveError ? { borderLeft: 4, borderColor: 'error.main' } : isDirty ? { borderLeft: 4, borderColor: 'warning.main' } : {}),
+    }}>
       <Box sx={{ display: 'flex', alignItems: 'center', p: 1, gap: 1 }}>
-        <Checkbox size="small" checked={selected} onChange={onToggleSelect} sx={{ p: 0.5 }} />
+        <Checkbox checked={selected} onChange={onToggleSelect} sx={{ p: 1.25 }} />
         <Box sx={{ width: 48, height: 48, borderRadius: 1, overflow: 'hidden', flexShrink: 0 }}>
           <img
             src={product.thumbnailUrl || '/placeholder.png'}
@@ -148,8 +258,8 @@ function MobileWixProductCard({
             <Typography variant="caption" color="text.secondary">
               {product.price != null ? `${Number(product.price).toFixed(2)} ${product.currency}` : '—'}
             </Typography>
-            <Typography variant="caption" color={product.quantity === 0 ? 'error.main' : 'text.secondary'}>
-              &middot; {product.quantity} {t('stockCol')}
+            <Typography variant="caption" color={product.trackInventory !== false && product.quantity === 0 ? 'error.main' : 'text.secondary'}>
+              &middot; {product.trackInventory === false ? '—' : product.quantity} {t('stockCol')}
             </Typography>
             <Chip
               label={product.visible ? t('statusVisible') : t('statusHidden')}
@@ -158,6 +268,14 @@ function MobileWixProductCard({
               variant="outlined"
               sx={{ height: 18, fontSize: '0.65rem', ml: 0.5 }}
             />
+            {isDirty && (
+              <Chip
+                label={t('stagedUnsaved')}
+                size="small"
+                color="warning"
+                sx={{ height: 18, fontSize: '0.65rem' }}
+              />
+            )}
           </Box>
         </Box>
         <Chip
@@ -165,12 +283,43 @@ function MobileWixProductCard({
           size="small"
           sx={{ bgcolor: gradeColor(health.total), color: '#fff', fontWeight: 600, minWidth: 32, height: 22 }}
         />
-        <IconButton size="small" onClick={() => setExpanded(!expanded)}>
+        <IconButton
+          onClick={() => setExpanded(!expanded)}
+          aria-label={expanded ? t('collapseCard') : t('expandCard')}
+          aria-expanded={expanded}
+          sx={{ width: 44, height: 44 }}
+        >
           {expanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
         </IconButton>
       </Box>
       <Collapse in={expanded}>
         <Box sx={{ px: 1, pb: 1, pt: 0 }}>
+          {saveError && (
+            <Typography variant="caption" color="error" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+              <ErrorOutlineIcon sx={{ fontSize: 14 }} /> {saveError}
+            </Typography>
+          )}
+          {/* Staged quick edits — kept locally until "Save to Wix" */}
+          <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+            <StagedNumberField
+              label={`${t('priceCol')} (${product.currency || 'TRY'})`}
+              value={product.price != null ? Number(product.price) : null}
+              dirty={dirtyFields.includes('price')}
+              disabled={editLocked}
+              onCommit={(n) => onStage({ price: n })}
+              onInvalid={() => onInvalid('price')}
+            />
+            <StagedNumberField
+              label={t('stockCol')}
+              value={product.trackInventory === false ? null : (product.quantity ?? 0)}
+              integer
+              dirty={dirtyFields.includes('quantity')}
+              disabled={editLocked || !stockEditable}
+              helperText={stockEditable ? undefined : t('stagedStockNotEditable')}
+              onCommit={(n) => onStage({ quantity: n })}
+              onInvalid={() => onInvalid('quantity')}
+            />
+          </Box>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
             {colNames.map((name, i) => (
               <Chip key={i} label={name} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
@@ -194,10 +343,10 @@ function MobileWixProductCard({
             {health.collections === 0 && <Chip label={t('healthMissingCollections')} size="small" color="warning" sx={{ height: 20, fontSize: '0.6rem' }} />}
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button size="small" variant="outlined" startIcon={<EditIcon />} onClick={onEdit} fullWidth>
+            <Button variant="outlined" startIcon={<EditIcon />} onClick={onEdit} fullWidth sx={{ minHeight: 44 }}>
               {t('edit')}
             </Button>
-            <Button size="small" variant="outlined" color="error" startIcon={<DeleteIcon />} onClick={onDelete} fullWidth>
+            <Button variant="outlined" color="error" startIcon={<DeleteIcon />} onClick={onDelete} fullWidth sx={{ minHeight: 44 }}>
               {t('delete')}
             </Button>
           </Box>
@@ -369,6 +518,20 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 function WixProductsPage() {
   const t = useTranslations('wixListings');
+  return (
+    <AppLayout title={t('pageTitle')}>
+      <RequireConnection provider="wix" description={t('noSiteConnectedDesc')}>
+        <WixProductsContent />
+      </RequireConnection>
+    </AppLayout>
+  );
+}
+
+function WixProductsContent() {
+  const t = useTranslations('wixListings');
+  const tc = useTranslations('common');
+  const router = useRouter();
+  const confirm = useConfirm();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const isTablet = useMediaQuery(theme.breakpoints.down('lg'));
@@ -380,6 +543,13 @@ function WixProductsPage() {
   const [collectionCounts, setCollectionCounts] = useState<Record<string, number>>({});
   const [collections, setCollections] = useState<WixCollection[]>([]);
   const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<unknown>(null);
+
+  // Staged inline edits (local only, keyed by row id) + per-item failures from the last save
+  const [edits, setEdits] = useState<Record<string, StagedEdit>>({});
+  const [saveErrors, setSaveErrors] = useState<Record<string, string>>({});
+  const [savingEdits, setSavingEdits] = useState(false);
+  const [failuresOpen, setFailuresOpen] = useState(false);
 
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -405,6 +575,8 @@ function WixProductsPage() {
 
   // Cache
   const cacheRef = useRef<Record<string, { data: WixProductRow[]; count: number; statusCounts: StatusCounts; collectionCounts: Record<string, number>; ts: number }>>({});
+  // Status filter the current `products` list was loaded with (used to tell "filtered out" from "deleted").
+  const productsFilterRef = useRef<string>('all');
 
   // ---------------------------------------------------------------------------
   // Fetch
@@ -414,6 +586,8 @@ function WixProductsPage() {
     const cacheKey = `${statusFilter}`;
     const cached = cacheRef.current[cacheKey];
     if (!force && cached && Date.now() - cached.ts < CACHE_TTL) {
+      setFetchError(null);
+      productsFilterRef.current = cacheKey;
       setProducts(cached.data);
       setTotalCount(cached.count);
       setStatusCounts(cached.statusCounts);
@@ -422,12 +596,17 @@ function WixProductsPage() {
     }
 
     setLoading(true);
+    setFetchError(null);
     try {
       const visibleParam = statusFilter === 'all' ? '' : statusFilter === 'visible' ? '&visible=true' : '&visible=false';
       const res = await fetch(`/api/wix/products?action=cached_products&page=${paginationModel.page}&size=500${visibleParam}`);
-      if (!res.ok) throw new Error('Fetch failed');
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw Object.assign(new Error(t('fetchFailed')), { status: res.status, data: body });
+      }
       const data = await res.json();
       const prods = data.products || [];
+      productsFilterRef.current = cacheKey;
       setProducts(prods);
       setTotalCount(data.count || prods.length);
       if (data.statusCounts) setStatusCounts(data.statusCounts);
@@ -439,8 +618,8 @@ function WixProductsPage() {
         collectionCounts: data.collectionCounts || collectionCounts,
         ts: Date.now(),
       };
-    } catch (err: any) {
-      toast.error(err.message || t('fetchFailed'));
+    } catch (err: unknown) {
+      setFetchError(err);
     } finally {
       setLoading(false);
     }
@@ -466,14 +645,17 @@ function WixProductsPage() {
     setSyncing(true);
     try {
       const res = await fetch('/api/wix/products?action=sync', { method: 'POST' });
-      if (!res.ok) throw new Error('Sync failed');
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw Object.assign(new Error(t('syncFailed')), { status: res.status, data: body });
+      }
       const data = await res.json();
-      toast.success(`${t('syncSuccess')} (${data.synced})`);
+      notify.success(`${t('syncSuccess')} (${data.synced})`);
       setLastSyncAt(new Date().toISOString());
       cacheRef.current = {};
       fetchProducts(true);
-    } catch (err: any) {
-      toast.error(err.message || t('syncFailed'));
+    } catch (err: unknown) {
+      notify.error(err, t('syncFailed'));
     } finally {
       setSyncing(false);
     }
@@ -487,13 +669,22 @@ function WixProductsPage() {
     try {
       const productId = product.wixProductId || product.id;
       const res = await fetch(`/api/wix/products?action=delete&productId=${productId}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Delete failed');
-      toast.success(t('deleteSuccess'));
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw Object.assign(new Error(t('deleteFailed')), { status: res.status, data: body });
+      }
+      notify.success(t('deleteSuccess'));
       setDeleteConfirmProduct(null);
+      setEdits(prev => {
+        if (!(product.id in prev)) return prev;
+        const next = { ...prev };
+        delete next[product.id];
+        return next;
+      });
       cacheRef.current = {};
       fetchProducts(true);
-    } catch (err: any) {
-      toast.error(err.message || t('deleteFailed'));
+    } catch (err: unknown) {
+      notify.error(err, t('deleteFailed'));
     }
   };
 
@@ -501,28 +692,225 @@ function WixProductsPage() {
   // Inline editing
   // ---------------------------------------------------------------------------
 
-  const processRowUpdate = useCallback(async (newRow: any, oldRow: any) => {
-    const changes: any = {};
-    if (newRow.title !== oldRow.title) changes.name = newRow.title;
-    if (newRow.price !== oldRow.price) changes.priceData = { price: parseFloat(newRow.price) };
-    if (Object.keys(changes).length === 0) return oldRow;
+  const productsById = useMemo(() => {
+    const m = new Map<string, WixProductRow>();
+    for (const p of products) m.set(p.id, p);
+    return m;
+  }, [products]);
 
-    try {
-      const res = await fetch('/api/wix/products?action=update', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId: newRow.wixProductId || newRow.id, ...changes }),
-      });
-      if (!res.ok) throw new Error('Update failed');
-      toast.success(t('updateSuccess'));
-      // Update cache
-      setProducts(prev => prev.map(p => p.id === newRow.id ? { ...p, ...newRow } : p));
-      return newRow;
-    } catch (err: any) {
-      toast.error(err.message || t('updateFailed'));
-      return oldRow;
-    }
+  /** Merge a patch into the staged edits for a row; fields equal to the synced value are dropped. */
+  // Synced snapshot of every staged product, so edits survive a status-filter refetch
+  // that no longer includes the product.
+  const stagedOrigRef = useRef<Record<string, WixProductRow>>({});
+
+  const stageEdit = useCallback((rowId: string, patch: StagedEdit) => {
+    const orig = productsById.get(rowId) || stagedOrigRef.current[rowId];
+    if (!orig) return;
+    stagedOrigRef.current[rowId] = orig;
+    setEdits(prev => {
+      const merged: StagedEdit = { ...(prev[rowId] || {}), ...patch };
+      if (merged.title !== undefined && merged.title === (orig.title || '')) delete merged.title;
+      if (merged.price !== undefined && orig.price != null && merged.price === Number(orig.price)) delete merged.price;
+      if (merged.quantity !== undefined && merged.quantity === (orig.quantity ?? 0)) delete merged.quantity;
+      const next = { ...prev };
+      if (Object.keys(merged).length === 0) delete next[rowId];
+      else next[rowId] = merged;
+      return next;
+    });
+    setSaveErrors(prev => {
+      if (!(rowId in prev)) return prev;
+      const next = { ...prev };
+      delete next[rowId];
+      return next;
+    });
+  }, [productsById]);
+
+  // After a refetch, drop staged fields that already match Wix (e.g. saved via the drawer).
+  useEffect(() => {
+    setEdits(prev => {
+      let changed = false;
+      const next: Record<string, StagedEdit> = {};
+      for (const [id, e] of Object.entries(prev)) {
+        const orig = productsById.get(id);
+        if (!orig) {
+          // Keep it only if the current status filter merely hides it; otherwise it was deleted.
+          const snap = stagedOrigRef.current[id];
+          const f = productsFilterRef.current;
+          const filteredOut = !!snap && f !== 'all' && (f === 'visible' ? !snap.visible : !!snap.visible);
+          if (filteredOut) next[id] = e;
+          else { delete stagedOrigRef.current[id]; changed = true; }
+          continue;
+        }
+        stagedOrigRef.current[id] = orig;
+        const kept: StagedEdit = { ...e };
+        if (kept.title !== undefined && kept.title === (orig.title || '')) delete kept.title;
+        if (kept.price !== undefined && orig.price != null && kept.price === Number(orig.price)) delete kept.price;
+        if (kept.quantity !== undefined && kept.quantity === (orig.quantity ?? 0)) delete kept.quantity;
+        if (Object.keys(kept).length !== Object.keys(e).length) changed = true;
+        if (Object.keys(kept).length > 0) next[id] = kept;
+      }
+      return changed ? next : prev;
+    });
+  }, [productsById]);
+
+  /** The drawer always edits the synced product, never the locally staged overlay. */
+  const openDrawer = useCallback((row: WixProductRow) => {
+    setDrawerProduct(productsById.get(row.id) || row);
+    setDrawerOpen(true);
+  }, [productsById]);
+
+  const notifyInvalid = useCallback((field: StagedField) => {
+    notify.error(field === 'quantity' ? t('stagedInvalidStock') : field === 'price' ? t('stagedInvalidPrice') : t('stagedInvalidTitle'));
   }, [t]);
+
+  // DataGrid inline edit: validate, stage locally, never call Wix here.
+  const processRowUpdate = useCallback((newRow: any, oldRow: any) => {
+    const patch: StagedEdit = {};
+    if (newRow.title !== oldRow.title) {
+      const title = typeof newRow.title === 'string' ? newRow.title.trim() : '';
+      if (!title) { notifyInvalid('title'); return oldRow; }
+      patch.title = title;
+    }
+    if (newRow.price !== oldRow.price) {
+      const price = Number(newRow.price);
+      if (newRow.price === null || newRow.price === '' || !isValidPrice(price)) { notifyInvalid('price'); return oldRow; }
+      patch.price = price;
+    }
+    if (newRow.quantity !== oldRow.quantity) {
+      if (!canEditStock(oldRow)) return oldRow;
+      const qty = Number(newRow.quantity);
+      if (newRow.quantity === null || newRow.quantity === '' || !isValidQuantity(qty)) { notifyInvalid('quantity'); return oldRow; }
+      patch.quantity = qty;
+    }
+    if (Object.keys(patch).length === 0) return oldRow;
+    stageEdit(newRow.id, patch);
+    return { ...newRow, ...patch };
+  }, [stageEdit, notifyInvalid]);
+
+  const dirtyCount = Object.keys(edits).length;
+
+  // Warn before leaving the page with unsaved local edits.
+  useEffect(() => {
+    if (dirtyCount === 0) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [dirtyCount]);
+
+  // Client-side navigation (sidebar / Next links) never fires beforeunload — guard it too.
+  useEffect(() => {
+    if (dirtyCount === 0) return;
+    const onRouteChangeStart = (url: string) => {
+      if (url.split('?')[0] === router.asPath.split('?')[0]) return;
+      if (window.confirm(t('stagedLeaveConfirm'))) return;
+      router.events.emit('routeChangeError', new Error('Route change aborted'), url, { shallow: false });
+      // Throwing is the only way to cancel a Pages Router navigation.
+      throw 'Route change aborted: unsaved Wix edits';
+    };
+    router.events.on('routeChangeStart', onRouteChangeStart);
+    return () => router.events.off('routeChangeStart', onRouteChangeStart);
+  }, [dirtyCount, router, t]);
+
+  const handleDiscardEdits = async () => {
+    const ok = await confirm({
+      title: t('stagedDiscardTitle'),
+      description: t('stagedDiscardConfirm', { count: dirtyCount }),
+      items: Object.keys(edits).map(id => (productsById.get(id) || stagedOrigRef.current[id])?.title || id),
+      confirmLabel: t('stagedDiscard'),
+      destructive: true,
+    });
+    if (!ok) return;
+    setEdits({});
+    setSaveErrors({});
+    setFailuresOpen(false);
+    stagedOrigRef.current = {};
+  };
+
+  /**
+   * Explicit push: one update request (+ one inventory request when stock changed) per product.
+   * Results are merged into the latest state per product, so edits staged while the save runs
+   * are never overwritten (only fields still equal to the value that was sent are cleared).
+   */
+  const handleSaveEdits = async () => {
+    if (savingEdits || dirtyCount === 0) return;
+    setSavingEdits(true);
+    const entries = Object.entries(edits);
+    let okCount = 0;
+    let failCount = 0;
+    let stopped = false;
+
+    for (const [rowId, edit] of entries) {
+      if (stopped) break;
+      const orig = productsById.get(rowId) || stagedOrigRef.current[rowId];
+      if (!orig) continue;
+      const productId = orig.wixProductId || orig.id;
+      const done: StagedEdit = {};
+      let error: string | null = null;
+      try {
+        if (edit.title !== undefined || edit.price !== undefined) {
+          const body: Record<string, unknown> = { productId };
+          if (edit.title !== undefined) body.name = edit.title;
+          if (edit.price !== undefined) body.priceData = { price: edit.price };
+          await putJson('/api/wix/products?action=update', body);
+          if (edit.title !== undefined) done.title = edit.title;
+          if (edit.price !== undefined) done.price = edit.price;
+        }
+        if (edit.quantity !== undefined) {
+          await putJson('/api/wix/products?action=inventory', { productId, quantity: edit.quantity });
+          done.quantity = edit.quantity;
+        }
+        okCount++;
+      } catch (err: unknown) {
+        if (isUsageLimitError(err)) {
+          notify.error(err); // handled by LimitReachedDialog; stop pushing the rest
+          stopped = true;
+        }
+        error = getErrorMessage(err, t('updateFailed'));
+        failCount++;
+      }
+
+      const doneFields = (Object.keys(done) as StagedField[]);
+      if (doneFields.length > 0) {
+        setProducts(prev => prev.map(p => (p.id === rowId ? { ...p, ...done } : p)));
+        if (stagedOrigRef.current[rowId]) stagedOrigRef.current[rowId] = { ...stagedOrigRef.current[rowId], ...done };
+        setEdits(prev => {
+          const cur = prev[rowId];
+          if (!cur) return prev;
+          const kept: StagedEdit = { ...cur };
+          for (const f of doneFields) {
+            if (kept[f] === done[f]) delete kept[f];
+          }
+          const next = { ...prev };
+          if (Object.keys(kept).length === 0) delete next[rowId];
+          else next[rowId] = kept;
+          return next;
+        });
+      }
+      setSaveErrors(prev => {
+        if (error) return { ...prev, [rowId]: error };
+        if (!(rowId in prev)) return prev;
+        const next = { ...prev };
+        delete next[rowId];
+        return next;
+      });
+    }
+
+    if (okCount > 0) cacheRef.current = {};
+    setSavingEdits(false);
+
+    if (failCount === 0 && !stopped) {
+      notify.success(t('stagedSaveSuccess', { count: okCount }));
+    } else if (failCount > 0) {
+      setFailuresOpen(true);
+      notify.error(t('stagedSavePartial', { ok: okCount, failed: failCount }));
+    }
+  };
+
+  /** Staged fields on a row, for dirty-cell styling. */
+  const dirtyFieldsOf = (rowId: string): StagedField[] => {
+    const e = edits[rowId];
+    return e ? STAGED_FIELDS.filter(f => e[f] !== undefined) : [];
+  };
 
   // ---------------------------------------------------------------------------
   // Filtering (client-side)
@@ -571,6 +959,12 @@ function WixProductsPage() {
 
     return result;
   }, [products, searchTerm, collectionFilter, healthFilter, excludeTerm]);
+
+  // What the grid/cards show: synced values overlaid with local staged edits.
+  const displayProducts = useMemo(
+    () => filteredProducts.map(p => (edits[p.id] ? { ...p, ...edits[p.id] } : p)),
+    [filteredProducts, edits],
+  );
 
   // ---------------------------------------------------------------------------
   // CSV Export
@@ -635,7 +1029,7 @@ function WixProductsPage() {
           }}>
             <Typography
               variant="body2" noWrap sx={{ flex: 1, cursor: 'pointer' }}
-              onClick={() => { setDrawerProduct(params.row); setDrawerOpen(true); }}
+              onClick={() => openDrawer(params.row)}
             >
               {params.value}
             </Typography>
@@ -646,7 +1040,7 @@ function WixProductsPage() {
             )}
             <Box className="row-actions" sx={{ opacity: 0, transition: '0.15s', display: 'flex', gap: 0.25 }}>
               <Tooltip title={t('edit')}>
-                <IconButton size="small" onClick={() => { setDrawerProduct(params.row); setDrawerOpen(true); }}>
+                <IconButton size="small" onClick={() => openDrawer(params.row)}>
                   <EditIcon sx={{ fontSize: 16 }} />
                 </IconButton>
               </Tooltip>
@@ -666,11 +1060,19 @@ function WixProductsPage() {
         ),
       },
       {
-        field: 'quantity', headerName: t('stockCol'), width: 80, type: 'number',
+        field: 'quantity', headerName: t('stockCol'), width: 90, type: 'number', editable: true,
         renderCell: (params: GridRenderCellParams) => {
+          if (params.row.trackInventory === false) {
+            return (
+              <Tooltip title={t('stagedStockNotEditable')}>
+                <Typography variant="body2" color="text.secondary">—</Typography>
+              </Tooltip>
+            );
+          }
           const val = params.value ?? 0;
           const color = val === 0 ? 'error.main' : val < 5 ? 'warning.main' : 'text.primary';
-          return <Typography variant="body2" color={color} fontWeight={val === 0 ? 600 : 400}>{val}</Typography>;
+          const label = <Typography variant="body2" color={color} fontWeight={val === 0 ? 600 : 400}>{val}</Typography>;
+          return canEditStock(params.row) ? label : <Tooltip title={t('stagedStockNotEditable')}>{label}</Tooltip>;
         },
       },
       {
@@ -717,14 +1119,14 @@ function WixProductsPage() {
     }
 
     return cols;
-  }, [t, collections, isTablet]);
+  }, [t, collections, isTablet, openDrawer]);
 
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
 
   return (
-    <AppLayout title={t('pageTitle')}>
+    <>
       <Box sx={{ display: 'flex', maxWidth: 1500, mx: 'auto', width: '100%', p: { xs: 0.5, sm: 1, md: 1.5 } }}>
         {/* Left Sidebar (desktop only) */}
         {!isMobile && (
@@ -826,12 +1228,29 @@ function WixProductsPage() {
             </Box>
           )}
 
-          {/* Desktop DataGrid */}
-          {!isMobile ? (
+          {/* Fetch error with stale data still on screen */}
+          {fetchError != null && products.length > 0 && (
+            <Box sx={{ mb: 1 }}>
+              <ErrorState compact error={fetchError} message={t('fetchFailed')} onRetry={() => fetchProducts(true)} />
+            </Box>
+          )}
+
+          {/* Fetch error */}
+          {fetchError != null && products.length === 0 && !loading ? (
+            <Paper sx={{ width: '100%' }}>
+              <ErrorState error={fetchError} message={t('fetchFailed')} onRetry={() => fetchProducts(true)} />
+            </Paper>
+          ) : !isMobile ? (
             <Paper sx={{ width: '100%' }}>
               <DataGrid
-                rows={filteredProducts}
+                rows={displayProducts}
                 columns={columns}
+                getCellClassName={(params) => {
+                  const e = edits[String(params.id)];
+                  return e && (e as any)[params.field] !== undefined ? 'kx-staged-cell' : '';
+                }}
+                getRowClassName={(params) => (saveErrors[String(params.id)] ? 'kx-failed-row' : '')}
+                onProcessRowUpdateError={(err) => notify.error(err, t('updateFailed'))}
                 loading={loading}
                 pageSizeOptions={[25, 50, 100]}
                 paginationModel={paginationModel}
@@ -843,6 +1262,7 @@ function WixProductsPage() {
                 rowSelectionModel={selectedIds}
                 onRowSelectionModelChange={setSelectedIds}
                 processRowUpdate={processRowUpdate}
+                isCellEditable={(params) => !savingEdits && (params.field !== 'quantity' || canEditStock(params.row))}
                 autoHeight
                 sx={{
                   border: 0,
@@ -850,6 +1270,11 @@ function WixProductsPage() {
                   '& .MuiDataGrid-columnHeaders': { backgroundColor: '#f5f5f5' },
                   '& .MuiDataGrid-cell:focus': { outline: 'none' },
                   '& .MuiDataGrid-row:hover': { bgcolor: 'action.hover' },
+                  '& .kx-staged-cell': {
+                    bgcolor: 'rgba(255, 152, 0, 0.12)',
+                    boxShadow: 'inset 3px 0 0 #ff9800',
+                  },
+                  '& .kx-failed-row': { boxShadow: 'inset 4px 0 0 #f44336' },
                 }}
               />
             </Paper>
@@ -862,7 +1287,7 @@ function WixProductsPage() {
                   {t('noProductsFound')}
                 </Typography>
               )}
-              {filteredProducts.slice(0, mobileVisibleCount).map(product => (
+              {displayProducts.slice(0, mobileVisibleCount).map(product => (
                 <MobileWixProductCard
                   key={product.id}
                   product={product}
@@ -874,10 +1299,15 @@ function WixProductsPage() {
                       return { type: 'include' as const, ids };
                     });
                   }}
-                  onEdit={() => { setDrawerProduct(product); setDrawerOpen(true); }}
+                  onEdit={() => openDrawer(product)}
                   onDelete={() => setDeleteConfirmProduct(product)}
                   collections={collections}
                   t={t}
+                  dirtyFields={dirtyFieldsOf(product.id)}
+                  saveError={saveErrors[product.id]}
+                  onStage={(patch) => stageEdit(product.id, patch)}
+                  onInvalid={notifyInvalid}
+                  editLocked={savingEdits}
                 />
               ))}
               {mobileVisibleCount < filteredProducts.length && (
@@ -889,6 +1319,72 @@ function WixProductsPage() {
                 </Button>
               )}
             </Box>
+          )}
+
+          {/* Staged edits bar — the only path that pushes inline edits to Wix */}
+          {(dirtyCount > 0 || Object.keys(saveErrors).length > 0) && (
+            <Paper
+              elevation={6}
+              sx={{
+                position: 'sticky', bottom: { xs: 8, md: 12 }, zIndex: 10, mt: 1.5,
+                p: { xs: 1, sm: 1.25 }, borderRadius: 2,
+                border: 1, borderColor: Object.keys(saveErrors).length > 0 ? 'error.light' : 'warning.light',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                <Typography variant="body2" fontWeight={600} sx={{ flex: 1, minWidth: 140 }}>
+                  {dirtyCount > 0 ? t('stagedUnsavedCount', { count: dirtyCount }) : t('stagedNoPending')}
+                </Typography>
+                {Object.keys(saveErrors).length > 0 && (
+                  <Button
+                    color="error" size="small"
+                    startIcon={<ErrorOutlineIcon />}
+                    endIcon={failuresOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                    onClick={() => setFailuresOpen(o => !o)}
+                    sx={{ minHeight: 44 }}
+                  >
+                    {t('stagedFailedCount', { count: Object.keys(saveErrors).length })}
+                  </Button>
+                )}
+                {dirtyCount > 0 && (
+                  <Box sx={{ display: 'flex', gap: 1, width: { xs: '100%', sm: 'auto' } }}>
+                    <Button
+                      variant="outlined" color="inherit" startIcon={<UndoIcon />}
+                      onClick={handleDiscardEdits} disabled={savingEdits}
+                      sx={{ minHeight: 44, flex: { xs: 1, sm: 'none' } }}
+                    >
+                      {t('stagedDiscard')}
+                    </Button>
+                    <Button
+                      variant="contained" disableElevation
+                      startIcon={savingEdits ? <CircularProgress size={16} color="inherit" /> : <CloudUploadIcon />}
+                      onClick={handleSaveEdits} disabled={savingEdits}
+                      sx={{ minHeight: 44, flex: { xs: 1, sm: 'none' } }}
+                    >
+                      {savingEdits ? t('saving') : t('stagedSaveToWix')}
+                    </Button>
+                  </Box>
+                )}
+                {dirtyCount === 0 && (
+                  <IconButton
+                    onClick={() => { setSaveErrors({}); setFailuresOpen(false); }}
+                    aria-label={tc('close')}
+                    sx={{ width: 44, height: 44 }}
+                  >
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                )}
+              </Box>
+              <Collapse in={failuresOpen && Object.keys(saveErrors).length > 0}>
+                <Box sx={{ mt: 1, maxHeight: 200, overflowY: 'auto' }}>
+                  {Object.entries(saveErrors).map(([rowId, msg]) => (
+                    <Typography key={rowId} variant="caption" component="div" sx={{ py: 0.25 }}>
+                      <strong>{(productsById.get(rowId) || stagedOrigRef.current[rowId])?.title || rowId}</strong>: {msg}
+                    </Typography>
+                  ))}
+                </Box>
+              </Collapse>
+            </Paper>
           )}
         </Box>
       </Box>
@@ -953,7 +1449,7 @@ function WixProductsPage() {
           </Button>
         </SwipeableDrawer>
       )}
-    </AppLayout>
+    </>
   );
 }
 

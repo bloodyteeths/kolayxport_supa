@@ -81,6 +81,27 @@ const fetcher = (url: string) => {
   });
 };
 
+/**
+ * Serialise order filters into query params. Multi-select values (arrays) are
+ * sent as REPEATED params (`marketplace=Etsy&marketplace=Trendyol`) — the old
+ * `String(value)` turned them into one comma-joined value ("Etsy,Trendyol")
+ * that matched no marketplace, so picking two stores showed zero orders.
+ * Marketplace/shop names can themselves contain commas, so repeated params
+ * are the only unambiguous encoding. /api/orders accepts both shapes.
+ */
+export function appendOrderFilters(params: URLSearchParams, filters: Record<string, any>) {
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') return;
+    if (Array.isArray(value)) {
+      value.forEach(v => {
+        if (v !== undefined && v !== null && v !== '') params.append(key, String(v));
+      });
+      return;
+    }
+    params.append(key, String(value));
+  });
+}
+
 export function useOrders(page: number = 1, pageSize: number = 15, filters: Record<string, any> = {}, context?: string) {
   const params = new URLSearchParams();
   if (typeof page !== 'undefined' && typeof pageSize !== 'undefined') {
@@ -88,19 +109,14 @@ export function useOrders(page: number = 1, pageSize: number = 15, filters: Reco
     params.append('limit', String(pageSize));
   }
 
-  // Add filters with proper handling for undefined/null values
-  Object.entries(filters).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      params.append(key, String(value));
-    }
-  });
+  appendOrderFilters(params, filters);
   
   // Add context parameter if provided
   if (context) {
     params.append('context', context);
   }
   
-  const { data, error, isLoading, mutate } = useSWR<OrdersApiResponse>(
+  const { data, error, isLoading, isValidating, mutate } = useSWR<OrdersApiResponse>(
     `/api/orders?${params.toString()}`,
     fetcher,
     {
@@ -188,6 +204,8 @@ export function useOrders(page: number = 1, pageSize: number = 15, filters: Reco
     pageSize: data?.pageSize || pageSize,
     isLoading,
     isError: !!error,
+    error: error as Error | undefined,
+    isValidating,
     mutate,
   };
 }

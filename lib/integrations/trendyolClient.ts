@@ -57,7 +57,12 @@ export function fetchShipmentUpdates(params: FetchTrendyolOrdersParams) {
   return fetchTrendyolOrders({ ...params, status: undefined });
 }
 
-// Image caching for product images
+// Image caching for product images. Keyed by supplierId+barcode: barcodes are
+// seller-assigned and two sellers can reuse the same one, so a barcode-only
+// key served one seller's product photo on another seller's orders.
+export function imageCacheKey(supplierId: string | number, barcode: string): string {
+  return `${String(supplierId)}:${barcode}`;
+}
 export const imageCache = new Map<string, { url: string; timestamp: number }>();
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -94,7 +99,7 @@ export async function getProductImages(
   // Check cache first
   const now = Date.now();
   for (const barcode of barcodes) {
-    const cached = imageCache.get(barcode);
+    const cached = imageCache.get(imageCacheKey(credentials.supplierId, barcode));
     if (cached && (now - cached.timestamp) < CACHE_DURATION) {
       imageMap[barcode] = cached.url;
     } else {
@@ -154,7 +159,7 @@ export async function getProductImages(
       foundImages++;
       
       // Cache the result
-      imageCache.set(barcode, {
+      imageCache.set(imageCacheKey(credentials.supplierId, barcode), {
         url: imageUrl,
         timestamp: now
       });

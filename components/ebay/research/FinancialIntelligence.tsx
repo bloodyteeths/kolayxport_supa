@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import { useConfirm } from '@/lib/hooks/useConfirm';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -979,6 +980,7 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
 
 function ROITracker({ userListings }: { userListings?: any[] }) {
   const t = useTranslations('ebay.research.financial');
+  const confirmDialog = useConfirm();
   const [entries, setEntries] = useState<ROIEntry[]>([]);
   const [productName, setProductName] = useState('');
   const [sellingPrice, setSellingPrice] = useState('');
@@ -1064,12 +1066,12 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
     toast.success(t('entryDeleted'));
   }, []);
 
-  const handleClearAll = useCallback(() => {
-    if (window.confirm(t('confirmDeleteAll'))) {
+  const handleClearAll = useCallback(async () => {
+    if (await confirmDialog({ title: t('confirmDeleteAll'), destructive: true })) {
       setEntries([]);
       toast.success(t('allEntriesDeleted'));
     }
-  }, []);
+  }, [confirmDialog, t]);
 
   const handleExportCSV = useCallback(() => {
     if (entries.length === 0) {

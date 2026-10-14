@@ -33,6 +33,8 @@ export interface DashboardSummary {
   currentBalance?: number | null;
   balanceCurrency?: string | null;
   heldFunds?: number | null;
+  // Display currency of the summary amounts, when the API reports it.
+  currency?: string | null;
 }
 
 export interface TimeSeriesPoint {
@@ -117,10 +119,14 @@ interface FinanceState {
   // Sync
   syncStatus: 'idle' | 'syncing' | 'done' | 'error';
   syncMessage: string;
+  /** Raw error from the last failed sync (for notify.error); null otherwise. */
+  syncError: unknown;
 
   // Dashboard data
   dashboardData: DashboardData | null;
   dashboardLoading: boolean;
+  /** Error from the last dashboard fetch; cleared on the next success. */
+  dashboardError: unknown;
 
   // Product costs
   productCosts: ProductCostEntry[];
@@ -150,6 +156,22 @@ interface FinanceState {
   fetchSoldProducts: () => Promise<void>;
 }
 
+/** Thrown for non-2xx finance API responses; `status`/`data` feed notify/ErrorState. */
+class FinanceFetchError extends Error {
+  status: number;
+  data: unknown;
+  constructor(status: number, data: unknown) {
+    const body = data && typeof data === 'object' ? (data as Record<string, unknown>) : null;
+    super(typeof body?.error === 'string' ? body.error : '');
+    this.status = status;
+    this.data = data;
+  }
+}
+
+// Monotonic id so a slow response for an old marketplace/date range can't
+// overwrite the one the user is now looking at.
+let dashboardRequestSeq = 0;
+
 function getDefaultDateRange() {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -166,9 +188,11 @@ const useFinanceStore = create<FinanceState>((set, get) => ({
 
   syncStatus: 'idle',
   syncMessage: '',
+  syncError: null,
 
   dashboardData: null,
   dashboardLoading: false,
+  dashboardError: null,
 
   productCosts: [],
   costsLoading: false,
@@ -181,14 +205,16 @@ const useFinanceStore = create<FinanceState>((set, get) => ({
   transactionsTotal: 0,
 
   setMarketplace: (m) => {
-    set({ marketplace: m, dashboardData: null, productCosts: [], soldProducts: [], transactions: [] });
+    // Invalidate any in-flight dashboard request for the previous marketplace.
+    dashboardRequestSeq++;
+    set({ marketplace: m, dashboardData: null, dashboardError: null, dashboardLoading: false, productCosts: [], soldProducts: [], transactions: [] });
   },
   setDateRange: (range) => set({ dateRange: range }),
   setGroupBy: (g) => set({ groupBy: g }),
 
   syncSettlements: async (startDate, endDate) => {
     const { marketplace, dateRange } = get();
-    set({ syncStatus: 'syncing', syncMessage: '' });
+    set({ syncStatus: 'syncing', syncMessage: '', syncError: null });
     try {
       const res = await fetch('/api/finance/settlements', {
         method: 'POST',
@@ -201,20 +227,21 @@ const useFinanceStore = create<FinanceState>((set, get) => ({
         }),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Sync failed');
+        const body = await res.json().catch(() => null);
+        throw new FinanceFetchError(res.status, body);
       }
       const data = await res.json();
       set({ syncStatus: 'done', syncMessage: String(data.totalUpserted || 0) });
       // Auto-refresh dashboard after sync
       get().fetchDashboard();
     } catch (err: any) {
-      set({ syncStatus: 'error', syncMessage: err.message || 'Sync error' });
+      set({ syncStatus: 'error', syncMessage: err?.message || '', syncError: err });
     }
   },
 
   fetchDashboard: async () => {
     const { marketplace, dateRange, groupBy } = get();
+    const seq = ++dashboardRequestSeq;
     set({ dashboardLoading: true });
     try {
       const params = new URLSearchParams({
@@ -224,8 +251,12 @@ const useFinanceStore = create<FinanceState>((set, get) => ({
         groupBy,
       });
       const res = await fetch(`/api/finance/dashboard?${params}`);
-      if (!res.ok) throw new Error('Dashboard fetch failed');
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new FinanceFetchError(res.status, body);
+      }
       const data = await res.json();
+      if (seq !== dashboardRequestSeq) return;
       // Normalize transactionTypeSummary from object to array
       let txSummary: TransactionTypeSummary[] = [];
       if (data.transactionTypeSummary) {
@@ -245,11 +276,13 @@ const useFinanceStore = create<FinanceState>((set, get) => ({
           transactionTypeSummary: txSummary,
           disbursements: Array.isArray(data.disbursements) ? data.disbursements : [],
         },
+        dashboardError: null,
       });
     } catch (err) {
       console.error('[Finance Dashboard]', err);
+      if (seq === dashboardRequestSeq) set({ dashboardError: err ?? new Error('') });
     } finally {
-      set({ dashboardLoading: false });
+      if (seq === dashboardRequestSeq) set({ dashboardLoading: false });
     }
   },
 

@@ -15,6 +15,7 @@ import AddIcon from '@mui/icons-material/Add';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import { toast } from 'react-hot-toast';
+import { notify } from '@/lib/notify';
 import { useTranslations } from 'next-intl';
 
 // ---------------------------------------------------------------------------
@@ -141,13 +142,13 @@ export default function WixProductEditorDrawer({
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Update failed');
+        throw Object.assign(new Error(typeof errData.error === 'string' ? errData.error : ''), { status: res.status });
       }
       toast.success(t('updateSuccess'));
       setHasChanges(false);
       onSaved();
     } catch (err: any) {
-      toast.error(err.message || t('updateFailed'));
+      notify.error(err, t('updateFailed'));
     } finally {
       setSaving(false);
     }
@@ -168,12 +169,12 @@ export default function WixProductEditorDrawer({
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Inventory update failed');
+        throw Object.assign(new Error(typeof errData.error === 'string' ? errData.error : ''), { status: res.status });
       }
       toast.success(t('updateSuccess'));
       onSaved();
     } catch (err: any) {
-      toast.error(err.message || t('updateFailed'));
+      notify.error(err, t('updateFailed'));
     } finally {
       setSavingStock(false);
     }
@@ -186,13 +187,13 @@ export default function WixProductEditorDrawer({
     try {
       const productId = product.wixProductId || product.id;
       const res = await fetch(`/api/wix/products?action=delete&productId=${productId}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Delete failed');
+      if (!res.ok) throw Object.assign(new Error(''), { status: res.status, data: await res.json().catch(() => null) });
       toast.success(t('deleteSuccess'));
       setDeleteConfirmOpen(false);
       onClose();
       onDeleted?.();
     } catch (err: any) {
-      toast.error(err.message || t('deleteFailed'));
+      notify.error(err, t('deleteFailed'));
     } finally {
       setDeleting(false);
     }

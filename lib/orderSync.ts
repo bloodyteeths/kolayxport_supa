@@ -1151,7 +1151,7 @@ export async function syncAllOrders(userId: string, options: {
 
                     if (missing.length > 0) {
                       logger.info(`[AmazonSync] Catalog enrichment: ${missing.length} ASIN(s) need fetch (${wantedAsins.size - missing.length} fresh in cache)`);
-                      const enrichments = await fetchCatalogItems(missing, marketplaceIds[0], token, region);
+                      const enrichments = await fetchCatalogItems(missing, marketplaceIds[0], token, region, userId);
                       for (const [asin, e] of enrichments.entries()) {
                         await prisma.amazonProductCache.upsert({
                           where: { asin_marketplaceId: { asin, marketplaceId: marketplaceIds[0] } },

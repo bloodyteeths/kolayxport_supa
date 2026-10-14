@@ -9,6 +9,7 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { toast } from 'react-hot-toast';
+import { notify } from '@/lib/notify';
 import { useTranslations } from 'next-intl';
 
 interface WixCollection {
@@ -72,13 +73,13 @@ export default function WixProductCreatorDialog({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error('Create failed');
+      if (!res.ok) throw Object.assign(new Error(''), { status: res.status, data: await res.json().catch(() => null) });
       toast.success(t('createSuccess'));
       resetForm();
       onClose();
       onCreated();
     } catch (err: any) {
-      toast.error(err.message || t('createFailed'));
+      notify.error(err, t('createFailed'));
     } finally {
       setCreating(false);
     }

@@ -48,8 +48,10 @@ import {
   UnfoldMore as UnfoldMoreIcon,
   UnfoldLess as UnfoldLessIcon,
 } from '@mui/icons-material';
-import { toast } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
+import { RequireConnection } from '@/components/ui/ConnectEmptyState';
+import ErrorState from '@/components/ui/ErrorState';
+import { notify } from '@/lib/notify';
 import withAuth from '@/components/withAuth';
 import { useAuth } from '@/lib/auth-context';
 import { useTranslations } from 'next-intl';
@@ -110,6 +112,29 @@ type StatusFilter = 'all' | 'approved' | 'onSale' | 'rejected' | 'archived' | 'p
 // ---------------------------------------------------------------------------
 
 const TRENDYOL_ORANGE = '#F27A1A';
+/** Cached products are read in pages of this size ("load more" appends the next page). */
+const CACHE_PAGE_SIZE = 500;
+/** First-run seed from the Trendyol API when the cache is empty. */
+const API_SEED_SIZE = 200;
+
+class FetchError extends Error {
+  status: number;
+  data: unknown;
+  constructor(status: number, data: unknown) {
+    // Matches notify's technical-message filter so the i18n fallback is used
+    // when the body carries no user-facing error.
+    super(`Request failed with status code ${status}`);
+    this.status = status;
+    this.data = data;
+  }
+}
+
+async function getJson(url: string, init?: RequestInit): Promise<any> {
+  const res = await fetch(url, init);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new FetchError(res.status, data);
+  return data;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -149,6 +174,7 @@ interface HealthResult {
   overall: number;
   grade: string;
   color: string;
+  /** label is an i18n key under trendyolListings. */
   factors: { label: string; score: number; max: number }[];
 }
 
@@ -188,16 +214,16 @@ function calculateTrendyolHealth(product: TrendyolProductRow): HealthResult {
   return {
     overall, grade, color,
     factors: [
-      { label: 'Title', score: titleLength, max: 15 },
-      { label: 'Brand in title', score: titleBrand, max: 5 },
-      { label: 'Category words', score: titleCategory, max: 5 },
-      { label: 'Images', score: images, max: 20 },
-      { label: 'Description', score: description, max: 15 },
-      { label: 'Attributes', score: attributes, max: 15 },
-      { label: 'Discount', score: priceSanity, max: 10 },
-      { label: 'Stock', score: stock, max: 5 },
-      { label: 'Approved', score: notRejected, max: 5 },
-      { label: 'Weight', score: dimWeight, max: 5 },
+      { label: 'editor.titleLength', score: titleLength, max: 15 },
+      { label: 'editor.titleBrand', score: titleBrand, max: 5 },
+      { label: 'editor.titleCategory', score: titleCategory, max: 5 },
+      { label: 'images', score: images, max: 20 },
+      { label: 'description', score: description, max: 15 },
+      { label: 'attributes', score: attributes, max: 15 },
+      { label: 'editor.priceSanity', score: priceSanity, max: 10 },
+      { label: 'quantity', score: stock, max: 5 },
+      { label: 'editor.notRejected', score: notRejected, max: 5 },
+      { label: 'dimensionalWeight', score: dimWeight, max: 5 },
     ],
   };
 }
@@ -247,12 +273,14 @@ function groupByVariations(products: TrendyolProductRow[], expandedGroups: Set<s
 // ---------------------------------------------------------------------------
 
 function MobileTrendyolCard({
-  product, onEdit, selected, onToggleSelect, t,
+  product, onEdit, selected, onToggleSelect, groupExpanded, onToggleGroup, t,
 }: {
   product: TrendyolProductRow;
   onEdit: (id: string) => void;
   selected: boolean;
   onToggleSelect: (id: string) => void;
+  groupExpanded: boolean;
+  onToggleGroup: (mainId: string) => void;
   t: (key: string, values?: Record<string, any>) => string;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -268,6 +296,7 @@ function MobileTrendyolCard({
         mb: 1, overflow: 'hidden', borderRadius: 2, maxWidth: '100%', width: '100%',
         border: selected ? '2px solid' : '1px solid',
         borderColor: selected ? TRENDYOL_ORANGE : 'divider',
+        ...(product._expanded ? { ml: 2, width: 'calc(100% - 16px)' } : {}),
       }}
     >
       <Box sx={{ display: 'flex', gap: 1, p: 1.5, cursor: 'pointer', alignItems: 'center', minHeight: 44 }}
@@ -276,7 +305,8 @@ function MobileTrendyolCard({
         <Checkbox checked={selected}
           onChange={(e) => { e.stopPropagation(); onToggleSelect(product.id); }}
           onClick={e => e.stopPropagation()}
-          size="small" sx={{ p: 0.5, flexShrink: 0, '&.Mui-checked': { color: TRENDYOL_ORANGE } }}
+          inputProps={{ 'aria-label': product.title }}
+          sx={{ p: 1.25, m: -0.75, flexShrink: 0, '&.Mui-checked': { color: TRENDYOL_ORANGE } }}
         />
         {product.thumbnailUrl ? (
           <Box component="img" src={product.thumbnailUrl} alt=""
@@ -284,7 +314,7 @@ function MobileTrendyolCard({
           />
         ) : (
           <Box sx={{ width: 52, height: 52, borderRadius: 1, bgcolor: '#e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Typography variant="caption" color="text.disabled">N/A</Typography>
+            <Typography variant="caption" color="text.disabled">{'\u2014'}</Typography>
           </Box>
         )}
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -305,7 +335,7 @@ function MobileTrendyolCard({
             />
           </Box>
         </Box>
-        <IconButton size="small" sx={{ flexShrink: 0, minWidth: 40, minHeight: 40 }}>
+        <IconButton size="small" aria-expanded={expanded} sx={{ flexShrink: 0, minWidth: 44, minHeight: 44 }}>
           {expanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
         </IconButton>
       </Box>
@@ -352,11 +382,20 @@ function MobileTrendyolCard({
               ))}
             </Box>
           )}
-          <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
+          <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
+            {product._isGroupParent && (product._variantCount || 0) > 1 && (
+              <Button size="small" variant="outlined"
+                startIcon={groupExpanded ? <UnfoldLessIcon sx={{ fontSize: '16px !important' }} /> : <UnfoldMoreIcon sx={{ fontSize: '16px !important' }} />}
+                onClick={e => { e.stopPropagation(); onToggleGroup(product.productMainId); }}
+                sx={{ flex: '1 1 140px', minHeight: 44, borderRadius: '10px', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem', borderColor: TRENDYOL_ORANGE, color: TRENDYOL_ORANGE }}
+              >
+                {groupExpanded ? t('hideVariants') : t('showVariants', { count: product._variantCount || 0 })}
+              </Button>
+            )}
             <Button size="small" variant="contained"
               startIcon={<EditIcon sx={{ fontSize: '16px !important' }} />}
               onClick={e => { e.stopPropagation(); onEdit(product.id); }}
-              sx={{ flex: 1, minHeight: 42, borderRadius: '10px', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem', background: `linear-gradient(135deg, ${TRENDYOL_ORANGE}, #e06a10)` }}
+              sx={{ flex: '1 1 140px', minHeight: 44, borderRadius: '10px', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem', background: `linear-gradient(135deg, ${TRENDYOL_ORANGE}, #e06a10)` }}
             >
               {t('editProduct')}
             </Button>
@@ -391,40 +430,115 @@ function TrendyolListingsPage() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [findReplaceOpen, setFindReplaceOpen] = useState(false);
   const [backupOpen, setBackupOpen] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
+  const [remoteTotal, setRemoteTotal] = useState<number | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  // Set when a load-more page added no new rows (or the server says there is
+  // nothing past what we requested) so the button can't loop on empty pages.
+  const [noMorePages, setNoMorePages] = useState(false);
+  // Keep the (lazy) bulk bar mounted once used, so a running batch keeps
+  // polling and its result dialog survives the selection being cleared.
+  const [bulkBarMounted, setBulkBarMounted] = useState(false);
+  useEffect(() => { if (selectedIds.size > 0) setBulkBarMounted(true); }, [selectedIds.size]);
 
   // ---------------------------------------------------------------------------
   // Fetch Products
   // ---------------------------------------------------------------------------
 
+  // Products are read from the local DB cache in pages of CACHE_PAGE_SIZE.
+  // A refresh re-reads every page already loaded so "load more" progress
+  // survives edits/bulk ops. Ref (not state) so fetchProducts stays stable.
+  const pagesLoadedRef = React.useRef(1);
+  const productCountRef = React.useRef(0);
+  productCountRef.current = products.length;
+
+  const loadCache = useCallback(async (page: number, size: number) => {
+    const data = await getJson(`/api/trendyol/products?action=list&fromCache=true&page=${page}&size=${size}`);
+    const content: TrendyolProductRow[] = Array.isArray(data?.content) ? data.content : [];
+    const total = typeof data?.totalElements === 'number' ? data.totalElements : null;
+    return { content, total };
+  }, []);
+
+  // Serialises refresh vs load-more: a refresh waits for an in-flight
+  // load-more (so it re-reads the new page count), and only the latest
+  // refresh may write results.
+  const loadMorePromiseRef = React.useRef<Promise<void> | null>(null);
+  const refreshSeqRef = React.useRef(0);
+
   const fetchProducts = useCallback(async () => {
+    const seq = ++refreshSeqRef.current;
+    setRefreshing(true);
     try {
-      setLoading(true);
-      const cacheRes = await fetch('/api/trendyol/products?action=list&fromCache=true&size=500');
-      if (cacheRes.ok) {
-        const cacheData = await cacheRes.json();
-        const cached = Array.isArray(cacheData?.content) ? cacheData.content : [];
-        if (cached.length > 0) {
-          setProducts(cached);
-          setLoading(false);
-          return;
+      setLoadError(null);
+      if (loadMorePromiseRef.current) await loadMorePromiseRef.current.catch(() => {});
+      const size = CACHE_PAGE_SIZE * Math.max(1, pagesLoadedRef.current);
+      let { content, total } = await loadCache(0, size);
+      if (content.length === 0) {
+        // Empty cache (first visit): seed the first page from Trendyol (the API
+        // upserts what it returns into the cache), then read the cache back so
+        // rows always have the cache shape/ids the editor drawer expects.
+        const apiData = await getJson(`/api/trendyol/products?action=list&size=${API_SEED_SIZE}`);
+        const remote = typeof apiData?.totalElements === 'number' ? apiData.totalElements : null;
+        setRemoteTotal(remote);
+        if (Array.isArray(apiData?.content) && apiData.content.length > 0) {
+          ({ content, total } = await loadCache(0, CACHE_PAGE_SIZE));
         }
+        pagesLoadedRef.current = 1;
       }
-      const apiRes = await fetch('/api/trendyol/products?action=list&size=200');
-      if (!apiRes.ok) {
-        const errData = await apiRes.json().catch(() => ({}));
-        throw new Error(errData.error || `HTTP ${apiRes.status}`);
-      }
-      const apiData = await apiRes.json();
-      setProducts(Array.isArray(apiData?.content) ? apiData.content : []);
-    } catch (err: any) {
+      if (seq !== refreshSeqRef.current) return;
+      setProducts(content);
+      setTotalCount(total);
+      setNoMorePages(false);
+    } catch (err) {
+      if (seq !== refreshSeqRef.current) return;
       console.error('Failed to fetch Trendyol products:', err);
-      if (err.message?.includes('credentials')) toast.error(t('connectTrendyol'));
+      setLoadError(err);
+      // Keep already-loaded rows visible; only toast when there is something on screen.
+      if (productCountRef.current > 0) notify.error(err, 'ui.errorState.message');
     } finally {
-      setLoading(false);
+      if (seq === refreshSeqRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  }, [t]);
+  }, [loadCache]);
 
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
+
+  const handleLoadMore = async () => {
+    if (refreshing || loadMorePromiseRef.current) return;
+    setLoadingMore(true);
+    const run = (async () => {
+      const nextPage = pagesLoadedRef.current;
+      const { content, total } = await loadCache(nextPage, CACHE_PAGE_SIZE);
+      pagesLoadedRef.current = nextPage + 1;
+      const seen = new Set(products.map(p => p.id));
+      const fresh = content.filter(p => !seen.has(p.id));
+      setProducts(prev => {
+        const prevSeen = new Set(prev.map(p => p.id));
+        return [...prev, ...content.filter(p => !prevSeen.has(p.id))];
+      });
+      if (total != null) setTotalCount(total);
+      // Stop offering "load more" when a page brings nothing new or we have
+      // already requested every row the server counts.
+      if (fresh.length === 0 || (total != null && (nextPage + 1) * CACHE_PAGE_SIZE >= total)) {
+        setNoMorePages(true);
+      }
+    })();
+    loadMorePromiseRef.current = run;
+    try {
+      await run;
+    } catch (err) {
+      notify.error(err, 'ui.errorState.message');
+    } finally {
+      loadMorePromiseRef.current = null;
+      setLoadingMore(false);
+    }
+  };
+
+  const hasMore = totalCount != null && products.length < totalCount && !noMorePages;
 
   // ---------------------------------------------------------------------------
   // Sync
@@ -433,20 +547,13 @@ function TrendyolListingsPage() {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const res = await fetch('/api/trendyol/products?action=sync', { method: 'POST' });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `HTTP ${res.status}`);
-      }
-      const data = await res.json();
-      toast.success(`${t('syncComplete')} (${data.totalSynced || 0})`);
-      const cacheRes = await fetch('/api/trendyol/products?action=list&fromCache=true&size=500');
-      if (cacheRes.ok) {
-        const cacheData = await cacheRes.json();
-        setProducts(Array.isArray(cacheData?.content) ? cacheData.content : []);
-      }
-    } catch (err: any) {
-      toast.error(`${t('syncFailed')}: ${err.message || 'Unknown error'}`);
+      const data = await getJson('/api/trendyol/products?action=sync', { method: 'POST' });
+      const synced = typeof data?.totalSynced === 'number' ? data.totalSynced : 0;
+      notify.success(`${t('syncComplete')} (${synced})`);
+      setRemoteTotal(null);
+      await fetchProducts();
+    } catch (err) {
+      notify.error(err, 'trendyolListings.syncFailed');
     } finally {
       setSyncing(false);
     }
@@ -550,18 +657,20 @@ function TrendyolListingsPage() {
               />
             ) : (
               <Box sx={{ width: 42, height: 42, borderRadius: 1, bgcolor: '#e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Typography variant="caption" color="text.disabled">N/A</Typography>
+                <Typography variant="caption" color="text.disabled">{'\u2014'}</Typography>
               </Box>
             )}
           </Box>
         ),
       },
       {
-        field: 'title', headerName: 'Title', flex: 1, minWidth: 200,
+        field: 'title', headerName: t('tableProduct'), flex: 1, minWidth: 200,
         renderCell: (params: GridRenderCellParams<TrendyolProductRow>) => (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, width: '100%' }}>
             {params.row._isGroupParent && (
               <IconButton size="small" onClick={e => { e.stopPropagation(); toggleGroup(params.row.productMainId); }}
+                aria-expanded={expandedGroups.has(params.row.productMainId)}
+                aria-label={expandedGroups.has(params.row.productMainId) ? t('hideVariants') : t('showVariants', { count: params.row._variantCount || 0 })}
                 sx={{ p: 0.25 }}
               >
                 {expandedGroups.has(params.row.productMainId) ? <UnfoldLessIcon sx={{ fontSize: 16 }} /> : <UnfoldMoreIcon sx={{ fontSize: 16 }} />}
@@ -577,7 +686,7 @@ function TrendyolListingsPage() {
               </Typography>
             </Tooltip>
             {params.row._isGroupParent && params.row._variantCount && params.row._variantCount > 1 && (
-              <Chip label={`${params.row._variantCount} var`} size="small"
+              <Chip label={t('variantCount', { count: params.row._variantCount })} size="small"
                 sx={{ height: 18, fontSize: 9, fontWeight: 700, bgcolor: '#e3f2fd', color: '#1976d2' }}
               />
             )}
@@ -641,9 +750,9 @@ function TrendyolListingsPage() {
             <Tooltip arrow title={
               <Box sx={{ fontSize: '0.7rem' }}>
                 {health.factors.map((f, i) => (
-                  <Box key={i}>{f.label}: {f.score}/{f.max}</Box>
+                  <Box key={i}>{t(f.label)}: {f.score}/{f.max}</Box>
                 ))}
-                <Box sx={{ mt: 0.5, fontWeight: 700 }}>Total: {health.overall}/100</Box>
+                <Box sx={{ mt: 0.5, fontWeight: 700 }}>{t('healthScore')}: {health.overall}/100</Box>
               </Box>
             }>
               <Chip label={health.grade} size="small"
@@ -673,6 +782,7 @@ function TrendyolListingsPage() {
 
   return (
     <AppLayout title={t('title')}>
+      <RequireConnection provider="trendyol">
       <Box sx={{ p: { xs: 0.5, sm: 1, md: 1.5 }, maxWidth: 1400, mx: 'auto' }}>
         {/* Toolbar */}
         <Paper sx={{ p: { xs: 1.5, md: 2 }, mb: 2, borderRadius: 2, display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center' }}>
@@ -695,20 +805,21 @@ function TrendyolListingsPage() {
           <Button variant="contained"
             startIcon={syncing ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
             onClick={handleSync} disabled={syncing}
-            sx={{ textTransform: 'none', fontWeight: 600, bgcolor: TRENDYOL_ORANGE, '&:hover': { bgcolor: '#e06a10' }, minWidth: 100 }}
+            sx={{ textTransform: 'none', fontWeight: 600, bgcolor: TRENDYOL_ORANGE, '&:hover': { bgcolor: '#e06a10' }, minWidth: 100, minHeight: 40 }}
           >
             {syncing ? t('syncing') : t('sync')}
           </Button>
           {/* Tools Menu */}
           <IconButton onClick={e => setToolsMenuAnchor(e.currentTarget)}
-            sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5 }}
+            aria-label={t('moreActions')}
+            sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5, minWidth: 44, minHeight: 44 }}
           >
             <MoreVertIcon />
           </IconButton>
           <Menu anchorEl={toolsMenuAnchor} open={Boolean(toolsMenuAnchor)} onClose={() => setToolsMenuAnchor(null)}>
             <MenuItem onClick={() => { setToolsMenuAnchor(null); setFindReplaceOpen(true); }}>
               <ListItemIcon><FindReplaceIcon fontSize="small" /></ListItemIcon>
-              <ListItemText>{t('findReplace')}</ListItemText>
+              <ListItemText>{t('findReplace.title')}</ListItemText>
             </MenuItem>
             <MenuItem onClick={() => { setToolsMenuAnchor(null); setBackupOpen(true); }}>
               <ListItemIcon><FileDownloadIcon fontSize="small" /></ListItemIcon>
@@ -718,27 +829,67 @@ function TrendyolListingsPage() {
         </Paper>
 
         {/* Summary bar */}
-        <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-          <Chip label={`${filteredProducts.length} ${t('title').toLowerCase()}`} size="small" sx={{ fontWeight: 600 }} />
+        <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Chip
+            label={
+              totalCount != null && totalCount > products.length
+                ? t('showingOf', { shown: products.length, total: totalCount })
+                : `${filteredProducts.length} ${t('title').toLowerCase()}`
+            }
+            size="small" sx={{ fontWeight: 600 }}
+          />
+          {(statusFilter !== 'all' || searchTerm.trim()) && products.length > 0 && (
+            <Chip label={t('matchingCount', { count: filteredProducts.length })} size="small" variant="outlined" sx={{ fontWeight: 600 }} />
+          )}
           {statusFilter !== 'all' && (
             <Chip label={t(statusFilter)} size="small" color="primary" onDelete={() => setStatusFilter('all')} sx={{ fontWeight: 600 }} />
           )}
+          {hasMore && (
+            <Typography variant="caption" color="text.secondary">{t('filtersLoadedOnly')}</Typography>
+          )}
         </Box>
+        {remoteTotal != null && totalCount != null && remoteTotal > totalCount && (
+          <Paper variant="outlined" sx={{ p: 1.5, mb: 2, borderRadius: 2, display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Typography variant="body2" sx={{ flex: '1 1 220px' }}>
+              {t('partialSeedHint', { shown: totalCount, total: remoteTotal })}
+            </Typography>
+            <Button size="small" variant="outlined" onClick={handleSync} disabled={syncing}
+              sx={{ minHeight: 44, textTransform: 'none', fontWeight: 600, borderColor: TRENDYOL_ORANGE, color: TRENDYOL_ORANGE }}
+            >
+              {syncing ? t('syncing') : t('sync')}
+            </Button>
+          </Paper>
+        )}
 
         {/* Content */}
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
             <CircularProgress sx={{ color: TRENDYOL_ORANGE }} />
           </Box>
-        ) : filteredProducts.length === 0 ? (
-          <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 2 }}>
+        ) : loadError != null && products.length === 0 ? (
+          <Paper sx={{ borderRadius: 2 }}>
+            <ErrorState error={loadError} onRetry={() => { setLoading(true); return fetchProducts(); }} />
+          </Paper>
+        ) : products.length === 0 ? (
+          <Paper sx={{ p: { xs: 3, sm: 6 }, textAlign: 'center', borderRadius: 2 }}>
             <InventoryIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
             <Typography variant="h6" color="text.secondary" gutterBottom>{t('noProducts')}</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>{t('connectTrendyol')}</Typography>
-            <Button variant="contained" startIcon={<RefreshIcon />} onClick={handleSync}
-              sx={{ bgcolor: TRENDYOL_ORANGE, '&:hover': { bgcolor: '#e06a10' } }}
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>{t('emptySyncHint')}</Typography>
+            <Button variant="contained" startIcon={syncing ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
+              onClick={handleSync} disabled={syncing}
+              sx={{ minHeight: 44, bgcolor: TRENDYOL_ORANGE, '&:hover': { bgcolor: '#e06a10' } }}
             >
-              {t('sync')}
+              {syncing ? t('syncing') : t('sync')}
+            </Button>
+          </Paper>
+        ) : filteredProducts.length === 0 ? (
+          <Paper sx={{ p: { xs: 3, sm: 6 }, textAlign: 'center', borderRadius: 2 }}>
+            <SearchIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>{t('findReplace.noMatches')}</Typography>
+            <Button variant="outlined" onClick={() => { setSearchTerm(''); setStatusFilter('all'); }}
+              sx={{ minHeight: 44, textTransform: 'none' }}
+            >
+              {t('clearFilters')}
             </Button>
           </Paper>
         ) : isMobile ? (
@@ -746,7 +897,10 @@ function TrendyolListingsPage() {
             {displayProducts.map(product => (
               <MobileTrendyolCard key={product.id + (product._expanded ? '_exp' : '')}
                 product={product} onEdit={handleEdit} selected={selectedIds.has(product.id)}
-                onToggleSelect={handleToggleSelect} t={t}
+                onToggleSelect={handleToggleSelect}
+                groupExpanded={expandedGroups.has(product.productMainId)}
+                onToggleGroup={toggleGroup}
+                t={t}
               />
             ))}
           </Box>
@@ -776,18 +930,35 @@ function TrendyolListingsPage() {
           </Paper>
         )}
 
+        {/* Load more (cache pages) */}
+        {!loading && hasMore && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75, mt: 2, mb: selectedIds.size > 0 ? 10 : 2 }}>
+            <Typography variant="caption" color="text.secondary">
+              {t('showingOf', { shown: products.length, total: totalCount ?? products.length })}
+            </Typography>
+            <Button variant="outlined" onClick={handleLoadMore} disabled={loadingMore || refreshing}
+              startIcon={loadingMore ? <CircularProgress size={16} color="inherit" /> : <ExpandMoreIcon />}
+              sx={{ minHeight: 44, textTransform: 'none', fontWeight: 600, borderColor: TRENDYOL_ORANGE, color: TRENDYOL_ORANGE }}
+            >
+              {t('loadMore', { count: Math.min(CACHE_PAGE_SIZE, (totalCount ?? 0) - products.length) })}
+            </Button>
+          </Box>
+        )}
+
         {/* Bulk Operations Bar */}
-        {selectedIds.size > 0 && (
+        {(bulkBarMounted || selectedIds.size > 0) && (
           <Suspense fallback={null}>
             <TrendyolBulkOpsBar
               selectedProducts={selectedProducts}
               onClearSelection={clearSelection}
               onRefresh={fetchProducts}
               allProducts={products}
+              onOpenFindReplace={() => setFindReplaceOpen(true)}
             />
           </Suspense>
         )}
       </Box>
+      </RequireConnection>
 
       {/* Editor Drawer */}
       <TrendyolListingEditorDrawer

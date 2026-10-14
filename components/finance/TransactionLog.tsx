@@ -7,6 +7,7 @@ import {
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import useFinanceStore from '@/lib/stores/useFinanceStore';
+import { currencySymbol, resolveFinanceSymbol } from './currency';
 
 const TYPE_COLORS: Record<string, { bg: string; color: string }> = {
   // Etsy real ledger types
@@ -34,11 +35,6 @@ function getTypeColor(type: string) {
   return TYPE_COLORS.default;
 }
 
-const CURRENCY_SYMBOLS: Record<string, string> = {
-  trendyol: '₺',
-  etsy: '$',
-  ebay: '$',
-};
 
 export default function TransactionLog() {
   const theme = useTheme();
@@ -48,7 +44,9 @@ export default function TransactionLog() {
     transactions, transactionsLoading, transactionsTotal,
     fetchTransactions, marketplace, dashboardData,
   } = useFinanceStore();
-  const cs = CURRENCY_SYMBOLS[marketplace] || '$';
+  const fallbackSymbol = resolveFinanceSymbol(marketplace, dashboardData);
+  // Each row carries its own currency; the dashboard currency is only a fallback.
+  const symbolFor = (cur: string | null | undefined) => (cur ? currencySymbol(cur) : fallbackSymbol);
 
   const [page, setPage] = useState(0);
   const [typeFilter, setTypeFilter] = useState('');
@@ -138,7 +136,7 @@ export default function TransactionLog() {
                   </Box>
                   <Box sx={{ textAlign: 'right' }}>
                     <Typography variant="body2" sx={{ fontWeight: 700, color: Number(tx.amount) >= 0 ? '#15803d' : '#dc2626' }}>
-                      {Number(tx.amount) >= 0 ? '+' : ''}{cs}{Number(tx.amount).toFixed(2)}
+                      {Number(tx.amount) >= 0 ? '+' : ''}{symbolFor(tx.currency)}{Number(tx.amount).toFixed(2)}
                     </Typography>
                     {expandedRow === tx.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   </Box>
@@ -148,7 +146,7 @@ export default function TransactionLog() {
                     {tx.productName && <Typography variant="caption" display="block">{t('product')}: {tx.productName}</Typography>}
                     {tx.orderNumber && <Typography variant="caption" display="block">{t('order')}: {tx.orderNumber}</Typography>}
                     {tx.barcode && <Typography variant="caption" display="block">{t('barcode')}: {tx.barcode}</Typography>}
-                    {tx.commission != null && <Typography variant="caption" display="block">{t('commission')}: {cs}{Number(tx.commission).toFixed(2)}</Typography>}
+                    {tx.commission != null && <Typography variant="caption" display="block">{t('commission')}: {symbolFor(tx.currency)}{Number(tx.commission).toFixed(2)}</Typography>}
                   </Box>
                 </Collapse>
               </Paper>
@@ -192,11 +190,11 @@ export default function TransactionLog() {
                     <TableCell sx={{ fontSize: '0.75rem' }}>{tx.orderNumber || '—'}</TableCell>
                     <TableCell align="right">
                       <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 600, color: Number(tx.amount) >= 0 ? '#15803d' : '#dc2626' }}>
-                        {Number(tx.amount) >= 0 ? '+' : ''}{cs}{Number(tx.amount).toFixed(2)}
+                        {Number(tx.amount) >= 0 ? '+' : ''}{symbolFor(tx.currency)}{Number(tx.amount).toFixed(2)}
                       </Typography>
                     </TableCell>
                     <TableCell align="right" sx={{ fontSize: '0.75rem' }}>
-                      {tx.commission != null ? `${cs}${Number(tx.commission).toFixed(2)}` : '—'}
+                      {tx.commission != null ? `${symbolFor(tx.currency)}${Number(tx.commission).toFixed(2)}` : '—'}
                     </TableCell>
                   </TableRow>
                 );

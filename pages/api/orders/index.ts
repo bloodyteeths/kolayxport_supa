@@ -3,6 +3,66 @@ import { getAuthUser } from '@/lib/auth';
 import prisma from '../../../lib/prisma';
 import { safeIsoDate, safeDate } from '../../../lib/utils/safeDate';
 
+/**
+ * Normalise a query param that may arrive once, repeated (string[]), or — for
+ * status only — comma-joined, into a clean list of non-empty values.
+ * useOrders sends multi-select filters as repeated params; the senkron page
+ * still joins statuses with commas. Marketplace names are NOT comma-split:
+ * shop names can contain commas, and repeated params are unambiguous.
+ */
+export function queryValues(value: string | string[] | undefined, splitComma = false): string[] {
+  if (value === undefined || value === null) return [];
+  const raw = Array.isArray(value) ? value : [value];
+  const parts = splitComma ? raw.flatMap(v => String(v).split(',')) : raw.map(v => String(v));
+  return Array.from(new Set(parts.map(v => v.trim()).filter(Boolean)));
+}
+
+/**
+ * Unified status-filter groups, matched against LOWER(o."status"). Statuses
+ * are stored in whatever casing each mapper emits (Trendyol AWAITING_FULFILLMENT,
+ * Amazon awaiting_shipment / pending, Shopify awaiting_shipment, Wix PAID,
+ * eBay PAID, Etsy PAID …), so matching is case-insensitive.
+ *
+ * 'onaylandi' = live orders that still need fulfilment. Amazon 'pending' is a
+ * live order (payment authorising; see commit a4acab0) and belongs here.
+ * Genuinely unpaid states (awaiting_payment / pending_payment) are excluded
+ * from /api/orders entirely and are deliberately NOT listed.
+ */
+export const STATUS_FILTER_GROUPS: Record<string, string[]> = {
+  onaylandi: [
+    'paid', 'created', 'approved', 'pending', 'new', 'open', 'processing',
+    'awaiting_fulfillment', 'awaiting_shipment', 'unshipped', 'unfulfilled',
+    'not_fulfilled', 'not_started', 'in_progress', 'picking', 'invoiced',
+    'ready_to_ship',
+    // Shopify financial_status values the mapper stores verbatim: an
+    // authorized payment (captured later) or a partial refund is still a live
+    // order that needs a label.
+    'authorized', 'partially_refunded',
+  ],
+  kargolandi: ['shipped', 'partially_shipped', 'shipping', 'in_transit', 'fulfilled'],
+  iptal: ['cancelled', 'canceled', 'refunded', 'returned', 'unfulfillable', 'voided'],
+  delivered: ['delivered', 'completed'],
+};
+
+/** Expand UI status filter values to the lowercase DB statuses they cover. */
+export function expandStatusFilter(values: string[]): string[] {
+  const out = new Set<string>();
+  for (const v of values) {
+    const key = v.trim().toLowerCase();
+    if (!key) continue;
+    const group = STATUS_FILTER_GROUPS[key];
+    if (group) group.forEach(s => out.add(s));
+    else out.add(key);
+  }
+  return Array.from(out);
+}
+
+/** First value of a scalar query param (guards against `?x=a&x=b` arrays). */
+function firstQueryValue(value: string | string[] | undefined): string | undefined {
+  const v = Array.isArray(value) ? value[0] : value;
+  return v === undefined || v === '' ? undefined : String(v);
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -30,19 +90,19 @@ export default async function handler(
   const user = await getAuthUser(req, res);
   if (!user) return res.status(401).json({ error: 'Not authenticated' });
 
-  const page = parseInt(req.query.page as string) || 1;
-  const pageSize = parseInt(req.query.limit as string) || 15;
+  const page = parseInt(firstQueryValue(req.query.page) || '') || 1;
+  const pageSize = parseInt(firstQueryValue(req.query.limit) || '') || 15;
   // Trim — pasted tracking numbers often carry trailing whitespace/newlines
   // that silently break the ILIKE pattern.
-  const search = ((req.query.search as string) || '').trim();
-  const searchType = req.query.searchType as string || 'all';
+  const search = (firstQueryValue(req.query.search) || '').trim();
+  const searchType = firstQueryValue(req.query.searchType) || 'all';
   const source = req.query.source as string;
   const channel = req.query.channel as string;
-  const sortRaw = req.query.sort as string || 'desc';
+  const sortRaw = firstQueryValue(req.query.sort) || 'desc';
   const sort = sortRaw.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
   // Whitelisted sort columns — sortBy/sort are interpolated into raw SQL, so
   // anything outside this map must fall back to the default order-date sort.
-  const sortByRaw = (req.query.sortBy as string) || 'orderDate';
+  const sortByRaw = firstQueryValue(req.query.sortBy) || 'orderDate';
   const orderByClauses: Record<string, string> = {
     orderDate: `COALESCE(o."uiOrderDate", o."createdAt") ${sort}`,
     // Ship-by sort is for "what do I need to ship next": orders that still
@@ -70,43 +130,20 @@ export default async function handler(
   };
   const orderByClause = orderByClauses[sortByRaw] || orderByClauses.orderDate;
 
-  // Filters
-  const {
-    startDate,
-    endDate,
-    status,
-    marketplace,
-    labelStatus,
-    labelFilter,
-    serviceType,
-    packagingType,
-    pickupType,
-    dutiesPaymentType,
-    signatureType,
-    labelStockType,
-  } = req.query;
-
-  // Only apply createdAt filter if at least one date is provided
-  let createdAtFilter: any = {};
-  if (startDate || endDate) {
-    const gte = safeDate(startDate);
-    const lte = safeDate(endDate);
-    if (gte) createdAtFilter.gte = gte;
-    if (lte) createdAtFilter.lte = lte;
-  }
-
-  // Build where clause
-  const where: any = { userId: user.id };
-  if (Object.keys(createdAtFilter).length > 0) where.createdAt = createdAtFilter;
-  if (status) where.status = status;
-  if (marketplace) where.marketplace = marketplace;
-  if (labelStatus) where.labelStatus = labelStatus;
-  if (serviceType) where.fedexServiceType = serviceType;
-  if (packagingType) where.fedexPackagingType = packagingType;
-  if (pickupType) where.fedexPickupType = pickupType;
-  if (dutiesPaymentType) where.fedexDutiesPaymentType = dutiesPaymentType;
-  if (signatureType) where.signatureType = signatureType;
-  if (labelStockType) where.labelStockType = labelStockType;
+  // Filters. Scalar filters take the first value if a param is repeated;
+  // status and marketplace are multi-value (see queryValues).
+  const startDate = firstQueryValue(req.query.startDate);
+  const endDate = firstQueryValue(req.query.endDate);
+  const statusValues = queryValues(req.query.status, true);
+  const marketplaceValues = queryValues(req.query.marketplace);
+  const labelStatus = firstQueryValue(req.query.labelStatus);
+  const labelFilter = firstQueryValue(req.query.labelFilter);
+  const serviceType = firstQueryValue(req.query.serviceType);
+  const packagingType = firstQueryValue(req.query.packagingType);
+  const pickupType = firstQueryValue(req.query.pickupType);
+  const dutiesPaymentType = firstQueryValue(req.query.dutiesPaymentType);
+  const signatureType = firstQueryValue(req.query.signatureType);
+  const labelStockType = firstQueryValue(req.query.labelStockType);
 
   // Add debug log for userId and query
   // console.log('[ORDERS API] Fetching orders for userId:', user.id, 'Query:', req.query);
@@ -118,7 +155,9 @@ export default async function handler(
     // states (awaiting/pending payment, e.g. an abandoned Shopify checkout) stay
     // hidden; stats.ts already counted pending as live, so this also removes an
     // inconsistency between the counters and the list.
-    let whereClause = 'WHERE o."userId" = $1 AND o."status" NOT IN (\'AWAITING_PAYMENT\', \'awaiting_payment\', \'pending_payment\')';
+    // Case-insensitive so a new casing variant (e.g. Pending_Payment) is still
+    // hidden. NULL status stays excluded exactly as before (NOT IN on NULL).
+    let whereClause = 'WHERE o."userId" = $1 AND LOWER(o."status") NOT IN (\'awaiting_payment\', \'pending_payment\')';
     const params: any[] = [user.id];
     let paramIndex = 2;
 
@@ -231,52 +270,32 @@ export default async function handler(
       }
     }
 
-    if (status) {
-      // Handle multiple status filtering (comma-separated)
-      const statusValues = (status as string).split(',').filter(s => s.trim());
-      
-      if (statusValues.length > 0) {
-        // For senkron page, we need to filter by customStatus in SenkronOrderData
-        if (req.query.context === 'senkronPage') {
-          const placeholders = statusValues.map((_, index) => `$${paramIndex + index}`).join(', ');
-          whereClause += ` AND sod."customStatus" IN (${placeholders})`;
-          statusValues.forEach(statusValue => {
-            params.push(statusValue.trim());
+    if (statusValues.length > 0) {
+      // For senkron page, we need to filter by customStatus in SenkronOrderData
+      // (exact keys chosen by the user, e.g. inProduction).
+      if (req.query.context === 'senkronPage') {
+        const placeholders = statusValues.map((_, index) => `$${paramIndex + index}`).join(', ');
+        whereClause += ` AND sod."customStatus" IN (${placeholders})`;
+        statusValues.forEach(statusValue => {
+          params.push(statusValue);
+          paramIndex++;
+        });
+      } else {
+        // Unified status filters (onaylandi / kargolandi / iptal / Delivered),
+        // matched case-insensitively against the stored marketplace status.
+        const mappedStatuses = expandStatusFilter(statusValues);
+        if (mappedStatuses.length > 0) {
+          const placeholders = mappedStatuses.map((_, index) => `$${paramIndex + index}`).join(', ');
+          whereClause += ` AND LOWER(o."status") IN (${placeholders})`;
+          mappedStatuses.forEach(mappedStatus => {
+            params.push(mappedStatus);
             paramIndex++;
           });
-        } else {
-          // Handle unified status filters for other pages
-          const statusMappings: Record<string, string[]> = {
-            'onaylandi': ['PAID', 'CREATED', 'Created', 'awaiting_fulfillment', 'AWAITING_FULFILLMENT', 'UNSHIPPED', 'awaiting_payment'],
-            'kargolandi': ['SHIPPED', 'shipped', 'Shipped', 'PARTIALLY_SHIPPED'],
-            'iptal': ['CANCELLED', 'cancelled', 'Cancelled', 'REFUNDED', 'refunded', 'returned'],
-            'Delivered': ['DELIVERED', 'delivered', 'Delivered', 'COMPLETED']
-          };
-
-          // Collect all mapped statuses
-          const allMappedStatuses: string[] = [];
-          statusValues.forEach(statusValue => {
-            if (statusMappings[statusValue as keyof typeof statusMappings]) {
-              allMappedStatuses.push(...statusMappings[statusValue as keyof typeof statusMappings]);
-            } else {
-              allMappedStatuses.push(statusValue);
-            }
-          });
-
-          if (allMappedStatuses.length > 0) {
-            const placeholders = allMappedStatuses.map((_, index) => `$${paramIndex + index}`).join(', ');
-            whereClause += ` AND o."status" IN (${placeholders})`;
-            allMappedStatuses.forEach(mappedStatus => {
-              params.push(mappedStatus);
-              paramIndex++;
-            });
-          }
         }
       }
     }
-    if (marketplace) {
-      // Handle multiple marketplace filtering
-      const marketplaceValues = Array.isArray(marketplace) ? marketplace : [marketplace];
+    if (marketplaceValues.length > 0) {
+      // Multi-select: useOrders sends one repeated `marketplace` param per store.
       const placeholders = marketplaceValues.map((_, index) => `$${paramIndex + index}`).join(', ');
       whereClause += ` AND o."marketplace" IN (${placeholders})`;
       marketplaceValues.forEach(value => {
@@ -380,9 +399,11 @@ export default async function handler(
     // A search means "find this order wherever it is" — the labels page always
     // sends its default 7-day window, which silently hid any match older than
     // a week. Date scoping only applies when NOT searching.
-    if (startDate && !search) {
+    // safeDate guard: a malformed startDate would make the ::timestamp cast
+    // throw and 500 the endpoint.
+    if (startDate && !search && safeDate(startDate)) {
       whereClause += ` AND COALESCE(o."uiOrderDate", o."createdAt") >= $${paramIndex}::timestamp`;
-      params.push(startDate as string);
+      params.push(startDate);
       paramIndex++;
     }
 
@@ -390,7 +411,7 @@ export default async function handler(
       // Create end of day in UTC to properly filter orders.
       // Guard against malformed endDate query values that would otherwise
       // throw RangeError on .toISOString() and 500 the whole endpoint.
-      const endOfDayIso = safeIsoDate((endDate as string) + 'T23:59:59.999Z');
+      const endOfDayIso = safeIsoDate(endDate + 'T23:59:59.999Z');
       if (endOfDayIso) {
         whereClause += ` AND COALESCE(o."uiOrderDate", o."createdAt") <= $${paramIndex}::timestamp`;
         params.push(endOfDayIso);

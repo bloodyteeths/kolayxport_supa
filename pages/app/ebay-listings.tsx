@@ -71,8 +71,15 @@ import {
   EditNote as EditNoteIcon,
   RemoveShoppingCart as RemoveShoppingCartIcon,
   Circle as CircleIcon,
+  Storefront as StorefrontIcon,
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
+import { useRouter } from 'next/router';
+import { useConnections } from '@/lib/hooks/useConnections';
+import { RequireConnection } from '@/components/ui/ConnectEmptyState';
+import ErrorState from '@/components/ui/ErrorState';
+import { useConfirm } from '@/lib/hooks/useConfirm';
+import { notify } from '@/lib/notify';
 import AppLayout from '@/components/AppLayout';
 import withAuth from '@/components/withAuth';
 import { useAuth } from '@/lib/auth-context';
@@ -82,7 +89,7 @@ import { useLocale } from '@/lib/i18n/useLocale';
 import { Tabs, Tab } from '@mui/material';
 import SEOIndicator from '@/components/ebay/SEOIndicator';
 import ListingEditorDrawer from '@/components/ebay/ListingEditorDrawer';
-import ListingCreatorDialog from '@/components/ebay/ListingCreatorDialog';
+import ListingCreatorDialog, { type EbayListingPrefill } from '@/components/ebay/ListingCreatorDialog';
 import FindReplaceDialog from '@/components/ebay/FindReplaceDialog';
 import BulkOperationsBar from '@/components/ebay/BulkOperationsBar';
 // MarketResearch removed — now lives at /app/ebay-research
@@ -149,6 +156,160 @@ function formatPrice(price: EbayListingRow['price']): string {
 }
 
 // ---------------------------------------------------------------------------
+// Cross-listing (Etsy -> eBay). Read-only: loads the source listing from the
+// existing Etsy read endpoints; nothing is created on eBay until the user
+// presses create/publish in the creator.
+// ---------------------------------------------------------------------------
+
+/** Cuts at a word boundary so the eBay title (80 max) doesn't end mid-word. */
+function clampTitle(title: string, max = 80): string {
+  const clean = title.replace(/\s+/g, ' ').trim();
+  if (clean.length <= max) return clean;
+  const cut = clean.slice(0, max);
+  const lastSpace = cut.lastIndexOf(' ');
+  return (lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[\s,|\-–—]+$/, '');
+}
+
+/** Etsy's API returns titles/descriptions with HTML entities (&#39;, &quot;, &amp;). */
+function decodeEntities(text: string): string {
+  return text
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
+/**
+ * Etsy descriptions are plain text; eBay renders the description as HTML, so
+ * line breaks would collapse. Escape and keep the paragraph structure.
+ */
+function plainTextToHtml(text: string): string {
+  const esc = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return esc
+    .split(/\n{2,}/)
+    .map((para) => para.trim())
+    .filter(Boolean)
+    .map((para) => `<p>${para.replace(/\n/g, '<br>')}</p>`)
+    .join('\n');
+}
+
+/**
+ * Live, read-only check that no eBay inventory item already uses this SKU —
+ * create_inventory_item with an existing SKU would overwrite that item. The DB
+ * cache can be empty (first visit) or stale, so it is only a fast reject.
+ * Returns false unless every inventory item was actually checked.
+ */
+async function ebaySkuIsFree(sku: string, userId: string): Promise<boolean> {
+  const LIMIT = 200;
+  const MAX_PAGES = 10;
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const offset = page * LIMIT;
+    const res = await fetch(
+      `/api/clawd/ebay?action=inventory_items&user_id=${encodeURIComponent(userId)}&limit=${LIMIT}&offset=${offset}`,
+      { credentials: 'same-origin' }
+    );
+    if (!res.ok) return false;
+    const data = await res.json().catch(() => null);
+    const items: any[] = Array.isArray(data?.inventoryItems) ? data.inventoryItems : [];
+    if (items.some((it) => typeof it?.sku === 'string' && it.sku.trim().toLowerCase() === sku.toLowerCase())) return false;
+    const total = Number(data?.total);
+    if (!Number.isFinite(total)) return false;
+    if (offset + items.length >= total) return true;
+    if (items.length === 0) return false;
+  }
+  // Too many items to check exhaustively — don't risk it.
+  return false;
+}
+
+async function loadEtsyListingForCrosslist(
+  etsyListingId: string,
+  /** null when the eBay listings couldn't be read — then no SKU is carried over. */
+  existingEbaySkus: Set<string> | null,
+  userId: string
+): Promise<EbayListingPrefill | null> {
+  const shopsRes = await fetch('/api/integrations/etsy/shops', { credentials: 'same-origin' });
+  if (!shopsRes.ok) throw Object.assign(new Error(`HTTP ${shopsRes.status}`), { status: shopsRes.status });
+  const shopsData = await shopsRes.json().catch(() => ({}));
+  const shopIds: string[] = (Array.isArray(shopsData?.shops) ? shopsData.shops : [])
+    .map((s: any) => (s?.shopId != null ? String(s.shopId) : ''))
+    .filter(Boolean);
+
+  // The listing id alone doesn't say which shop owns it. Any shop's token can
+  // read an active listing, so the first readable one is only used for the
+  // public fields; the owner comes from the listing's own shop_id.
+  for (const shopId of shopIds) {
+    const qs = `shop_id=${encodeURIComponent(shopId)}&listing_id=${encodeURIComponent(etsyListingId)}`;
+    const res = await fetch(`/api/clawd/etsy?action=listing&${qs}`, { credentials: 'same-origin' });
+    if (!res.ok) continue;
+    const l = await res.json().catch(() => null);
+    if (!l || typeof l !== 'object' || !l.listing_id) continue;
+
+    // SKU lives on the inventory; only carry it over for a single-product listing
+    // and never when that SKU already exists on eBay (it would overwrite that item).
+    let sku = '';
+    if (existingEbaySkus) try {
+      // Inventory only reads with the owning shop's token: try the owner first,
+      // then the rest, so a multi-shop seller doesn't silently lose the SKU.
+      const owner = l.shop_id != null ? String(l.shop_id) : '';
+      const order = Array.from(new Set([owner, shopId, ...shopIds].filter((id) => id && shopIds.includes(id))));
+      let candidate = '';
+      for (const invShopId of order) {
+        const invQs = `shop_id=${encodeURIComponent(invShopId)}&listing_id=${encodeURIComponent(etsyListingId)}`;
+        const invRes = await fetch(`/api/clawd/etsy?action=get_listing_inventory&${invQs}`, { credentials: 'same-origin' });
+        if (!invRes.ok) continue;
+        const inv = await invRes.json().catch(() => null);
+        const products = Array.isArray(inv?.products) ? inv.products : [];
+        candidate = products.length === 1 && typeof products[0]?.sku === 'string' ? products[0].sku.trim() : '';
+        break;
+      }
+      if (
+        candidate &&
+        candidate.length <= 50 &&
+        !existingEbaySkus.has(candidate) &&
+        (await ebaySkuIsFree(candidate, userId))
+      ) {
+        sku = candidate;
+      }
+    } catch {
+      // SKU is optional — the creator generates one.
+    }
+
+    const images: string[] = (Array.isArray(l.images) ? l.images : [])
+      .slice()
+      .sort((a: any, b: any) => (Number(a?.rank) || 0) - (Number(b?.rank) || 0))
+      .map((img: any) => img?.url_fullxfull || img?.url_570xN)
+      .filter((u: unknown): u is string => typeof u === 'string' && /^https?:\/\//i.test(u));
+
+    const amount = Number(l.price?.amount);
+    const divisor = Number(l.price?.divisor) || 100;
+    const price = Number.isFinite(amount) && amount > 0 ? (amount / divisor).toFixed(2) : '';
+
+    const materials: string[] = (Array.isArray(l.materials) ? l.materials : [])
+      .filter((m: unknown): m is string => typeof m === 'string' && m.trim().length > 0)
+      .slice(0, 5);
+
+    const sourceTitle = typeof l.title === 'string' ? decodeEntities(l.title) : '';
+    return {
+      key: `etsy:${etsyListingId}`,
+      sourceLabel: 'Etsy',
+      title: clampTitle(sourceTitle),
+      aiSeed: sourceTitle.slice(0, 200),
+      description: typeof l.description === 'string' ? plainTextToHtml(decodeEntities(l.description)) : '',
+      price,
+      currency: typeof l.price?.currency_code === 'string' ? l.price.currency_code : undefined,
+      quantity: typeof l.quantity === 'number' ? l.quantity : undefined,
+      sku: sku || undefined,
+      images: images.slice(0, 24),
+      aspects: materials.length > 0 ? { Material: materials } : undefined,
+    };
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Health Score
 // ---------------------------------------------------------------------------
 
@@ -207,10 +368,13 @@ function MobileListingCard({
   listing,
   onEdit,
   onDelete,
+  onListOnEtsy,
 }: {
   listing: EbayListingRow;
   onEdit: (sku: string) => void;
   onDelete: (listing: EbayListingRow) => void;
+  /** Only passed when Etsy is connected. */
+  onListOnEtsy?: (listing: EbayListingRow) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const health = calculateHealth(listing);
@@ -287,7 +451,7 @@ function MobileListingCard({
         </Box>
 
         {/* Expand icon */}
-        <IconButton size="small" sx={{ flexShrink: 0 }}>
+        <IconButton size="small" sx={{ flexShrink: 0, width: 44, height: 44 }}>
           {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
         </IconButton>
       </Box>
@@ -359,7 +523,7 @@ function MobileListingCard({
               startIcon={<EditIcon sx={{ fontSize: '16px !important' }} />}
               onClick={(e) => { e.stopPropagation(); onEdit(listing.sku); }}
               sx={{
-                flex: 1, minHeight: 42, borderRadius: '10px', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem',
+                flex: 1, minHeight: 44, borderRadius: '10px', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem',
                 background: 'linear-gradient(135deg, #3b82f6, #2563eb)', boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
                 '&:hover': { background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' },
               }}
@@ -372,7 +536,7 @@ function MobileListingCard({
               startIcon={<DeleteIcon sx={{ fontSize: '16px !important' }} />}
               onClick={(e) => { e.stopPropagation(); onDelete(listing); }}
               sx={{
-                flex: 1, minHeight: 42, borderRadius: '10px', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem',
+                flex: 1, minHeight: 44, borderRadius: '10px', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem',
                 background: 'linear-gradient(135deg, #ef4444, #dc2626)', boxShadow: '0 2px 8px rgba(220,38,38,0.25)',
                 '&:hover': { background: 'linear-gradient(135deg, #dc2626, #b91c1c)' },
               }}
@@ -381,6 +545,19 @@ function MobileListingCard({
             </Button>
           </Box>
 
+          {onListOnEtsy && (
+            <Button
+              fullWidth
+              size="small"
+              variant="outlined"
+              startIcon={<StorefrontIcon sx={{ fontSize: '16px !important' }} />}
+              onClick={(e) => { e.stopPropagation(); onListOnEtsy(listing); }}
+              sx={{ mt: 1, minHeight: 44, borderRadius: '10px', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem' }}
+            >
+              {t('listOnEtsy')}
+            </Button>
+          )}
+
           {listing.listingUrl && (
             <Button
               size="small"
@@ -388,7 +565,7 @@ function MobileListingCard({
               href={listing.listingUrl}
               target="_blank"
               rel="noopener noreferrer"
-              sx={{ mt: 0.5, fontSize: 11 }}
+              sx={{ mt: 0.5, fontSize: 11, minHeight: 44 }}
             >
               {t('viewOnEbay')}
             </Button>
@@ -599,12 +776,24 @@ function EbayListingsPage() {
   const { user } = useAuth();
   const userId = (user as any)?.id;
   const t = useTranslations('ebayListings');
+  const router = useRouter();
+  const { has } = useConnections();
+  /** Only offer cross-listing once Etsy is definitely connected. */
+  const canListOnEtsy = has('etsy') === true;
+  const confirm = useConfirm();
 
   // --- State ---
   const [listings, setListings] = useState<EbayListingRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  /** Set when the cached-listings fetch fails, so an empty grid isn't mistaken for "no listings". */
+  const [loadError, setLoadError] = useState<unknown>(null);
+  /** First cached-listings read finished (ok or not) — cross-list waits for it to check SKUs. */
+  const [listingsReady, setListingsReady] = useState(false);
+  /** Current row count for callbacks that must not read state through an updater. */
+  const listingsCountRef = React.useRef(0);
+  listingsCountRef.current = listings.length;
 
   const [selectedIds, setSelectedIds] = useState<GridRowSelectionModel>({
     type: 'include' as const,
@@ -632,6 +821,8 @@ function EbayListingsPage() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorSku, setEditorSku] = useState('');
   const [creatorOpen, setCreatorOpen] = useState(false);
+  const [creatorPrefill, setCreatorPrefill] = useState<EbayListingPrefill | null>(null);
+  const [crosslistLoading, setCrosslistLoading] = useState(false);
   const [findReplaceOpen, setFindReplaceOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<EbayListingRow | null>(null);
   const [smartPricingOpen, setSmartPricingOpen] = useState(false);
@@ -664,8 +855,8 @@ function EbayListingsPage() {
   const [moreMenuAnchor, setMoreMenuAnchor] = useState<null | HTMLElement>(null);
 
   // --- Fetch listings from DB cache (instant) ---
-  const fetchListings = useCallback(async () => {
-    if (!userId) return;
+  const fetchListings = useCallback(async (): Promise<boolean> => {
+    if (!userId) return false;
     setLoading(true);
     try {
       const res = await fetch(`/api/clawd/ebay?action=cached_listings&user_id=${userId}`);
@@ -697,14 +888,21 @@ function EbayListingsPage() {
         createdAt: l.ebayCreatedAt,
       }));
       setListings(rows);
+      listingsCountRef.current = rows.length; // callers read it before the next render
       setLastSyncAt(data.lastSyncAt || null);
+      setLoadError(null);
+      return true;
     } catch (err: any) {
       console.error('Failed to fetch eBay listings:', err);
-      toast.error(`${t('loadFailed')}: ${err.message}`);
+      setLoadError(err);
+      // With rows already on screen, keep them and just say the refresh failed.
+      if (listingsCountRef.current > 0) notify.error(err, 'ebayListings.loadFailed');
+      return false;
     } finally {
       setLoading(false);
+      setListingsReady(true);
     }
-  }, [userId]);
+  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Sync from eBay (fetches all listings from API → saves to DB) ---
   const syncFromEbay = useCallback(async () => {
@@ -723,7 +921,7 @@ function EbayListingsPage() {
       toast.success(t('syncComplete', { count: data.synced }));
       await fetchListings();
     } catch (err: any) {
-      toast.error(`${t('syncFailed')}: ${err.message}`);
+      notify.error(err, 'ebayListings.syncFailed');
     } finally {
       setSyncing(false);
     }
@@ -746,7 +944,7 @@ function EbayListingsPage() {
       toast.success(t('titleUpdated'));
       fetchListings();
     } catch (err: any) {
-      toast.error(err.message);
+      notify.error(err, 'ebayListings.updateFailed');
     }
   };
 
@@ -769,7 +967,7 @@ function EbayListingsPage() {
       toast.success(t('titleReverted'));
       fetchListings();
     } catch (err: any) {
-      toast.error(err.message);
+      notify.error(err, 'ebayListings.revertFailed');
     }
   };
 
@@ -800,20 +998,81 @@ function EbayListingsPage() {
     }
   }, [userId]);
 
+  /** Read the cache; on first visit (empty cache, read succeeded) pull from eBay. */
+  const syncingRef = React.useRef(false);
+  syncingRef.current = syncing;
+  const loadListingsWithAutoSync = useCallback(async () => {
+    const ok = await fetchListings();
+    // Not when the read failed — an empty grid then doesn't mean "no listings".
+    if (ok && listingsCountRef.current === 0 && !syncingRef.current) syncFromEbay();
+  }, [fetchListings, syncFromEbay]);
+
   useEffect(() => {
     if (userId) {
-      fetchListings().then(() => {
-        // Auto-sync on first visit when DB cache is empty
-        setListings(prev => {
-          if (prev.length === 0 && !syncing) {
-            syncFromEbay();
-          }
-          return prev;
-        });
-      });
+      loadListingsWithAutoSync();
       fetchPolicies();
     }
   }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // --- Cross-listing ---
+  /** eBay -> Etsy: the Etsy page reads ?crosslist=ebay:<sku|itemId> and opens its creator. */
+  const handleListOnEtsy = useCallback(
+    (row: EbayListingRow) => {
+      const ref = row.sku || row.listingId || row.id;
+      if (!ref) return;
+      router.push(`/app/etsy-listings?crosslist=ebay:${encodeURIComponent(ref)}`);
+    },
+    [router]
+  );
+
+  /** Etsy -> eBay: handle ?crosslist=etsy:<listingId> once, then drop the param. */
+  const crosslistHandled = React.useRef<string | null>(null);
+  const crosslistParam = typeof router.query.crosslist === 'string' ? router.query.crosslist : '';
+  useEffect(() => {
+    if (!router.isReady || !crosslistParam || !userId || !listingsReady) return;
+    if (crosslistHandled.current === crosslistParam) return;
+    crosslistHandled.current = crosslistParam;
+
+    // Remove the param first so a refresh/back doesn't re-open the creator.
+    const { crosslist: _drop, ...rest } = router.query;
+    router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+
+    const match = /^etsy:(\d{1,20})$/.exec(crosslistParam);
+    if (!match) return;
+    const etsyListingId = match[1];
+
+    setCrosslistLoading(true);
+    const existingSkus = loadError ? null : new Set(listings.map((l) => l.sku).filter(Boolean));
+    loadEtsyListingForCrosslist(etsyListingId, existingSkus, userId)
+      .then(async (prefill) => {
+        if (!prefill) {
+          notify.error(null, 'ebayListings.crosslistLoadFailed');
+          return;
+        }
+        // The seller may have opened "New listing" before the load finished;
+        // don't replace what they typed without asking.
+        if (creatorOpenRef.current) {
+          const replace = await confirm({
+            title: t('crosslistReplaceTitle'),
+            description: t('crosslistReplaceDesc'),
+            confirmLabel: t('crosslistReplaceConfirm'),
+          });
+          if (!replace) return;
+        }
+        setCreatorPrefill(prefill);
+        setCreatorOpen(true);
+      })
+      .catch((err) => notify.error(err, 'ebayListings.crosslistLoadFailed'))
+      .finally(() => setCrosslistLoading(false));
+  }, [router.isReady, crosslistParam, userId, listingsReady]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const creatorOpenRef = React.useRef(false);
+  creatorOpenRef.current = creatorOpen;
+
+  const closeCreator = useCallback(() => {
+    setCreatorOpen(false);
+    setCreatorPrefill(null);
+  }, []);
 
   // --- Client-side filtering ---
   const filteredListings = useMemo(() => {
@@ -885,7 +1144,7 @@ function EbayListingsPage() {
         setDeleteConfirm(null);
         setListings(prev => prev.filter(l => l.id !== row.id));
       } catch (err: any) {
-        toast.error(`${t('deleteFailed')}: ${err.message}`);
+        notify.error(err, 'ebayListings.deleteFailed');
       }
     },
     [userId]
@@ -1410,7 +1669,7 @@ function EbayListingsPage() {
       {
         field: 'actions',
         headerName: '',
-        width: 84,
+        width: canListOnEtsy ? 120 : 84,
         sortable: false,
         filterable: false,
         renderCell: (params: GridRenderCellParams<EbayListingRow>) => (
@@ -1421,6 +1680,17 @@ function EbayListingsPage() {
             >
               <EditIcon fontSize="small" />
             </IconButton>
+            {canListOnEtsy && (
+              <Tooltip title={t('listOnEtsy')} arrow>
+                <IconButton
+                  size="small"
+                  aria-label={t('listOnEtsy')}
+                  onClick={() => handleListOnEtsy(params.row)}
+                >
+                  <StorefrontIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
             <IconButton
               size="small"
               color="error"
@@ -1432,7 +1702,7 @@ function EbayListingsPage() {
         ),
       },
     ],
-    [] // eslint-disable-line react-hooks/exhaustive-deps
+    [canListOnEtsy, handleListOnEtsy] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   // --- Column visibility for mobile ---
@@ -1553,6 +1823,7 @@ function EbayListingsPage() {
           variant="contained"
           color="success"
           onClick={() => setCreatorOpen(true)}
+          disabled={crosslistLoading}
           startIcon={<AddIcon />}
           sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}
         >
@@ -1783,8 +2054,22 @@ function EbayListingsPage() {
         </MenuItem>
       </Menu>
 
-      {/* Mobile Card Layout */}
-      {isMobile ? (
+      {crosslistLoading && (
+        <Paper
+          elevation={0}
+          sx={{ px: 1.5, py: 1, mb: 1, border: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}
+        >
+          <CircularProgress size={16} />
+          <Typography variant="body2" color="text.secondary">{t('crosslistLoading')}</Typography>
+        </Paper>
+      )}
+
+      {/* Failed read with nothing cached on screen: say so instead of an empty grid */}
+      {loadError && listings.length === 0 ? (
+        <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
+          <ErrorState title={t('loadFailed')} error={loadError} onRetry={loadListingsWithAutoSync} retrying={loading} />
+        </Paper>
+      ) : isMobile ? (
         <Box sx={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -1802,6 +2087,7 @@ function EbayListingsPage() {
                   listing={listing}
                   onEdit={handleOpenEditor}
                   onDelete={setDeleteConfirm}
+                  onListOnEtsy={canListOnEtsy ? handleListOnEtsy : undefined}
                 />
               ))}
 
@@ -1909,6 +2195,7 @@ function EbayListingsPage() {
                       color="success"
                       startIcon={<AddIcon />}
                       onClick={() => setCreatorOpen(true)}
+                      disabled={crosslistLoading}
                       sx={{ textTransform: 'none' }}
                     >
                       {t('newListing')}
@@ -1995,12 +2282,13 @@ function EbayListingsPage() {
       {/* Listing Creator Dialog */}
       <ListingCreatorDialog
         open={creatorOpen}
-        onClose={() => setCreatorOpen(false)}
+        onClose={closeCreator}
         userId={userId}
         fulfillmentPolicies={fulfillmentPolicies}
         returnPolicies={returnPolicies}
         paymentPolicies={paymentPolicies}
-        onCreated={() => { setCreatorOpen(false); syncFromEbay(); }}
+        prefill={creatorPrefill}
+        onCreated={() => { closeCreator(); syncFromEbay(); }}
       />
 
       {/* Find & Replace Dialog */}
@@ -2376,7 +2664,9 @@ function EbayListingsPage() {
 function EbayListingsPageWithLayout(props: any): JSX.Element {
   return (
     <AppLayout title="eBay Listings — KolayXport">
-      <EbayListingsPage {...props} />
+      <RequireConnection provider="ebay">
+        <EbayListingsPage {...props} />
+      </RequireConnection>
     </AppLayout>
   );
 }

@@ -25,6 +25,7 @@ import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { stageEtsyDraft } from '@/lib/etsy/draftClient';
+import { useConfirm } from '@/lib/hooks/useConfirm';
 
 type PersonalizationQuestionType = 'text_input' | 'dropdown' | 'unlabeled_upload' | 'labeled_upload';
 
@@ -245,6 +246,7 @@ function AdvancedModeEditor({
   onFallbackToLegacy: () => void;
 }) {
   const t = useTranslations('etsy.personalization');
+  const confirmDialog = useConfirm();
   const [questions, setQuestions] = useState<PersonalizationQuestion[]>(
     initialQuestions.length > 0 ? initialQuestions : []
   );
@@ -479,7 +481,7 @@ function AdvancedModeEditor({
   };
 
   const handleRemoveAll = async () => {
-    if (!confirm(t('confirmRemoveAll'))) {
+    if (!(await confirmDialog({ title: t('confirmRemoveAll'), destructive: true }))) {
       return;
     }
 

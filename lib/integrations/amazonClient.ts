@@ -1,3 +1,4 @@
+import { createHash as nodeCreateHash } from 'crypto';
 import { logger } from '../logger';
 import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
 
@@ -834,11 +835,45 @@ function extractWeightKg(item: any): number | undefined {
  * is nothing to retry until the seller changes their SP-API authorisation.
  * Without a cooldown the order sync re-attempted every ASIN every 15 minutes.
  */
-let catalogAccessDeniedUntil = 0;
+//
+// The cooldown is per seller/credential: one seller's missing role must not
+// switch catalog enrichment off for every other seller in the process.
+const catalogAccessDeniedUntil = new Map<string, number>();
 const CATALOG_DENIED_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 
-export function isCatalogAccessDenied(): boolean {
-  return Date.now() < catalogAccessDeniedUntil;
+/**
+ * Cooldown key for a seller. Callers should pass a stable id (userId or
+ * selling-partner id). Without one we fall back to a sha256 of the access
+ * token — never the raw token — which is still per-credential but resets when
+ * the token is refreshed (~hourly), so pass `sellerKey` where available.
+ */
+export function catalogCooldownKey(token: string, sellerKey?: string): string {
+  if (sellerKey) return `seller:${sellerKey}`;
+  return `token:${nodeCreateHash('sha256').update(token || '').digest('hex').slice(0, 32)}`;
+}
+
+export function isCatalogAccessDenied(key: string): boolean {
+  const until = catalogAccessDeniedUntil.get(key);
+  if (until === undefined) return false;
+  if (Date.now() < until) return true;
+  catalogAccessDeniedUntil.delete(key);
+  return false;
+}
+
+/**
+ * Drop expired entries. Token-hash keys go stale on every token refresh and are
+ * never looked up again, so prune on write to keep the Map bounded.
+ */
+function pruneExpiredCatalogCooldowns(): void {
+  const now = Date.now();
+  catalogAccessDeniedUntil.forEach((until, key) => {
+    if (until <= now) catalogAccessDeniedUntil.delete(key);
+  });
+}
+
+/** Test hook: clear every seller's catalog cooldown. */
+export function resetCatalogAccessDenied(): void {
+  catalogAccessDeniedUntil.clear();
 }
 
 export async function fetchCatalogItems(
@@ -846,11 +881,13 @@ export async function fetchCatalogItems(
   marketplaceId: string,
   token: string,
   region: AmazonRegion,
+  sellerKey?: string,
 ): Promise<Map<string, CatalogEnrichment>> {
   const result = new Map<string, CatalogEnrichment>();
   const unique = Array.from(new Set(asins.filter(Boolean)));
   if (unique.length === 0) return result;
-  if (isCatalogAccessDenied()) return result;
+  const cooldownKey = catalogCooldownKey(token, sellerKey);
+  if (isCatalogAccessDenied(cooldownKey)) return result;
 
   for (let i = 0; i < unique.length; i += 20) {
     const batch = unique.slice(i, i + 20);
@@ -889,7 +926,8 @@ export async function fetchCatalogItems(
           err instanceof Error ? err : new Error(msg),
           { marketplaceId, region, remainingAsins: unique.length - i },
         );
-        catalogAccessDeniedUntil = Date.now() + CATALOG_DENIED_COOLDOWN_MS;
+        pruneExpiredCatalogCooldowns();
+        catalogAccessDeniedUntil.set(cooldownKey, Date.now() + CATALOG_DENIED_COOLDOWN_MS);
         return result;
       }
       logger.warn('Catalog API batch failed', { asins: batch, err: msg });

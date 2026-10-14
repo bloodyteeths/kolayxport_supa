@@ -17,6 +17,7 @@ import {
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import { useConfirm } from '@/lib/hooks/useConfirm';
 import { stageEtsyDraft, stageEtsyDraftFile } from '@/lib/etsy/draftClient';
 
 interface StudioListing {
@@ -55,6 +56,7 @@ export default function BulkVideoStudio(props: BulkVideoStudioProps) {
     allChecked, someChecked, searchTerm, onSearchChange, onCompleted,
   } = props;
   const t = useTranslations('etsy.bulkEditor');
+  const confirm = useConfirm();
 
   const [op, setOp] = useState<VideoOp>('add');
   const [source, setSource] = useState<VideoSource>('upload');
@@ -160,7 +162,12 @@ export default function BulkVideoStudio(props: BulkVideoStudioProps) {
 
   const applyDelete = useCallback(async () => {
     if (checkedListings.length === 0) { toast.error(t('photoStudio.selectListings')); return; }
-    if (!confirm(t('videoStudio.confirmDelete', { count: checkedListings.length }))) return;
+    if (!(await confirm({
+      title: t('videoStudio.confirmDelete', { count: checkedListings.length }),
+      items: checkedListings.filter(l => videosFor(l.listing_id).length > 0).map(l => l.title),
+      destructive: true,
+      typeToConfirm: checkedListings.length > 10 ? String(checkedListings.length) : undefined,
+    }))) return;
 
     setApplying(true); setProgress(0);
     let success = 0, failed = 0, skipped = 0;
@@ -185,12 +192,12 @@ export default function BulkVideoStudio(props: BulkVideoStudioProps) {
     if (failed === 0 && skipped === 0) toast.success(t('videoStudio.videoDeleteStaged'));
     else toast(t('photoStudio.stagedPartial', { success, failed, skipped }), { icon: failed ? '⚠️' : 'ℹ️' });
     onCompleted();
-  }, [checkedListings, shopId, videosFor, onCompleted, t]);
+  }, [checkedListings, shopId, videosFor, onCompleted, t, confirm]);
 
   const deleteSingle = useCallback(async (listingId: number) => {
     const vids = videosFor(listingId);
     if (vids.length === 0) return;
-    if (!confirm(t('videoStudio.confirmDeleteOne'))) return;
+    if (!(await confirm({ title: t('videoStudio.confirmDeleteOne'), destructive: true }))) return;
     try {
       for (const v of vids) {
         await stageEtsyDraft({ shopId, listingId, media: [{ kind: 'video', operation: 'delete', etsyMediaId: v.video_id }] });
@@ -199,7 +206,7 @@ export default function BulkVideoStudio(props: BulkVideoStudioProps) {
       toast.success(t('videoStudio.videoDeleteStaged'));
       onCompleted();
     } catch { toast.error(t('photoStudio.reorderFailed')); }
-  }, [videosFor, shopId, onCompleted, t]);
+  }, [videosFor, shopId, onCompleted, t, confirm]);
 
   return (
     <Box>

@@ -3,8 +3,8 @@ import { Box, Paper, Typography, Grid, Collapse, IconButton, Divider, Tooltip } 
 import { Landmark, Wallet, ChevronDown, ChevronUp, Lock } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { DashboardData } from '@/lib/stores/useFinanceStore';
+import { resolveFinanceSymbol } from './currency';
 
-const SYMBOL: Record<string, string> = { TRY: '₺', USD: '$', EUR: '€', GBP: '£', TL: '₺' };
 
 function fmt(val: number, cur = '$'): string {
   const abs = Math.abs(val);
@@ -31,7 +31,7 @@ export default function BankedPanel({ data, marketplace }: { data: DashboardData
   const banked = summary.banked || 0;
   const balance = summary.currentBalance;
   const held = summary.heldFunds; // eBay only — Etsy's API doesn't expose it
-  const cur = SYMBOL[summary.balanceCurrency || 'USD'] || '$';
+  const cur = resolveFinanceSymbol(marketplace, data);
   if (!banked && balance == null && held == null && disbursements.length === 0) return null;
 
   // Marketplace-aware label — the balance card previously hardcoded "Etsy".

@@ -27,6 +27,7 @@ import {
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import { useConfirm } from '@/lib/hooks/useConfirm';
 import { stageEtsyDraft, stageEtsyDraftFile } from '@/lib/etsy/draftClient';
 import { ETSY_MAX_IMAGES } from '@/lib/etsy/seoRules';
 
@@ -148,6 +149,7 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
     listingImagesLoading, refreshListingImages, onCompleted,
   } = props;
   const t = useTranslations('etsy.bulkEditor');
+  const confirm = useConfirm();
 
   const [op, setOp] = useState<StudioOp>('add');
   const [source, setSource] = useState<MediaSource>('upload');
@@ -329,7 +331,7 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
       return;
     }
     if (imgs.length <= 1) { toast.error(t('photoStudio.cantDeleteLast')); return; }
-    if (!confirm(t('photoStudio.confirmDeleteOne', { position: slot }))) return;
+    if (!(await confirm({ title: t('photoStudio.confirmDeleteOne', { position: slot }), destructive: true }))) return;
     try {
       await stageEtsyDraft({ shopId, listingId,
         media: [{ kind: 'image', operation: 'delete', etsyMediaId: target.listing_image_id }] });
@@ -339,7 +341,7 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
     } catch {
       toast.error(t('photoStudio.reorderFailed'));
     }
-  }, [imagesFor, shopId, removeImageAtRank, onCompleted, t]);
+  }, [imagesFor, shopId, removeImageAtRank, onCompleted, t, confirm]);
 
   const setAsMain = useCallback((listingId: number, slot: number) => {
     if (slot === 1) return;
@@ -544,7 +546,12 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
   const applyDelete = useCallback(async () => {
     if (checkedListings.length === 0) { toast.error(t('photoStudio.selectListings')); return; }
     const pos = typeof position === 'number' ? position : MAX_IMAGES;
-    if (!confirm(t('photoStudio.confirmDelete', { position: pos, count: checkedListings.length }))) return;
+    if (!(await confirm({
+      title: t('photoStudio.confirmDelete', { position: pos, count: checkedListings.length }),
+      items: checkedListings.map(l => `${l.title} — ${t('photos.imageCount', { count: imagesFor(l.listing_id).length })}`),
+      destructive: true,
+      typeToConfirm: checkedListings.length > 10 ? String(checkedListings.length) : undefined,
+    }))) return;
 
     setApplying(true); setProgress(0);
     let success = 0, failed = 0, skipped = 0;
@@ -568,7 +575,7 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
     setApplying(false);
     reportResult(success, failed, skipped);
     onCompleted();
-  }, [checkedListings, position, shopId, imagesFor, removeImageAtRank, onCompleted, t]);
+  }, [checkedListings, position, shopId, imagesFor, removeImageAtRank, onCompleted, t, confirm]);
 
   // -------------------------------------------------------------------------
   // Apply: Reorder position X -> Y

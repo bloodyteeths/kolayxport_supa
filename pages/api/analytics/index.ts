@@ -8,9 +8,72 @@ interface AnalyticsQuery {
   marketplace?: string;
 }
 
-// Simple module-level cache for exchange rates
+// Module-level cache for exchange rates (amount_in_currency * rate = TRY).
+// `cachedRatesAt` is when the cached rates were actually fetched, so a stale
+// fallback can say how old it is.
 let cachedRates: Record<string, number> = {};
+let cachedRatesAt = 0;
 let cacheExpiry = 0;
+const RATES_TTL_MS = 60 * 60 * 1000;
+// After a failed fetch, retry sooner than the normal TTL.
+const RATES_RETRY_MS = 5 * 60 * 1000;
+
+interface RatesSnapshot {
+  rates: Record<string, number>;
+  /** True when live rates could not be fetched (last-known or none used). */
+  stale: boolean;
+  /** When the rates in use were fetched; null when there are none. */
+  asOf: number | null;
+}
+
+async function fetchLiveRates(): Promise<Record<string, number> | null> {
+  try {
+    // exchangerate-api.com, USD base
+    const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+    if (!response.ok) throw new Error(`Exchange rate API ${response.status}`);
+    const data = await response.json();
+    const usdToTry = Number(data?.rates?.TRY);
+    if (!data?.rates || typeof data.rates !== 'object' || !Number.isFinite(usdToTry) || usdToTry <= 0) {
+      throw new Error('Exchange rate API returned no TRY rate');
+    }
+    const rates: Record<string, number> = {};
+    for (const [currency, perUsd] of Object.entries(data.rates as Record<string, unknown>)) {
+      const n = Number(perUsd);
+      // amount_in_currency * (TRY_per_USD / currency_per_USD)
+      if (Number.isFinite(n) && n > 0) rates[currency.toUpperCase()] = usdToTry / n;
+    }
+    rates.TRY = 1;
+    rates.TL = 1;
+    return rates;
+  } catch (error) {
+    console.error('[Analytics] Exchange rate API failed:', error);
+    return null;
+  }
+}
+
+async function getExchangeRates(): Promise<RatesSnapshot> {
+  const now = Date.now();
+  const haveCache = Object.keys(cachedRates).length > 0;
+  if (haveCache && now < cacheExpiry) {
+    // Inside a post-failure retry window the cache can be older than the TTL.
+    return { rates: cachedRates, stale: now - cachedRatesAt > RATES_TTL_MS, asOf: cachedRatesAt };
+  }
+  if (!haveCache && now < cacheExpiry) {
+    // A fetch failed recently and there is nothing cached — don't hammer the API.
+    return { rates: {}, stale: true, asOf: null };
+  }
+  const live = await fetchLiveRates();
+  if (live) {
+    cachedRates = live;
+    cachedRatesAt = now;
+    cacheExpiry = now + RATES_TTL_MS;
+    return { rates: live, stale: false, asOf: now };
+  }
+  cacheExpiry = now + RATES_RETRY_MS;
+  // Last-known rates (even if expired) beat summing USD as if it were TRY.
+  if (haveCache) return { rates: cachedRates, stale: true, asOf: cachedRatesAt };
+  return { rates: {}, stale: true, asOf: null };
+}
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -122,84 +185,25 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       whereClause.marketplace = marketplace;
     }
 
-    // Fetch real-time exchange rates
-    const fetchExchangeRates = async (): Promise<Record<string, number>> => {
-      try {
-        // Using exchangerate-api.com - get rates with USD as base
-        const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-        if (!response.ok) {
-          throw new Error('Failed to fetch exchange rates');
-        }
-        const data = await response.json();
-        
-        // Get USD to TRY rate
-        const usdToTry = data.rates.TRY;
-        
-        // Calculate conversion rates to TRY
-        const rates: Record<string, number> = {};
-        Object.keys(data.rates).forEach(currency => {
-          // To convert any currency to TRY:
-          // amount_in_currency * (TRY_per_USD / currency_per_USD)
-          rates[currency] = usdToTry / data.rates[currency];
-        });
-        
-        rates['TRY'] = 1; // TRY to TRY is always 1
-        rates['TL'] = 1;  // Alternative TRY notation
-        
-        console.log('[Analytics] Exchange rates loaded:', { usdToTry, sampleRates: { USD: rates.USD, EUR: rates.EUR } });
-        
-        return rates;
-      } catch (error) {
-        console.error('[Analytics] Exchange rate API failed, using last cached rates:', error);
-        // If we have previously cached rates, reuse them even if expired
-        if (Object.keys(cachedRates).length > 0) {
-          return cachedRates;
-        }
-        // Absolute last resort — return empty so convertToTRY returns raw amounts
-        // This should never happen in practice since the cache persists in-memory
-        return {};
-      }
+    const ratesSnapshot = await getExchangeRates();
+    const exchangeRates = ratesSnapshot.rates;
+
+    // Convert to TRY; null when no rate is available for the currency.
+    const tryConvertToTRY = (amount: number, currency: string | null | undefined): number | null => {
+      if (!amount) return 0;
+      // No currency recorded: orders are stored in TRY unless they say otherwise.
+      if (!currency) return amount;
+      const code = currency.toUpperCase();
+      if (code === 'TRY' || code === 'TL') return amount;
+      const rate = exchangeRates[code];
+      // No rate: leave the amount OUT of TRY totals instead of summing it as TRY.
+      if (!rate) return null;
+      return amount * rate;
     };
 
-    // Get current exchange rates (with 1-hour cache)
-    async function getCachedExchangeRates() {
-      const now = Date.now();
-      if (now < cacheExpiry && Object.keys(cachedRates).length > 0) {
-        return cachedRates;
-      }
-      cachedRates = await fetchExchangeRates();
-      cacheExpiry = now + 3600000; // 1 hour
-      return cachedRates;
-    }
-    const exchangeRates = await getCachedExchangeRates();
-    
-    // Currency symbols
-    const currencySymbols: Record<string, string> = {
-      'USD': '$',
-      'EUR': '€',
-      'GBP': '£',
-      'TRY': '₺',
-      'TL': '₺'
-    };
-
-    // Helper function to convert currency to TRY
-    const convertToTRY = (amount: number, currency: string | null): number => {
-      if (!amount || !currency) return amount || 0;
-      
-      // If currency is already TRY or TL, no conversion needed
-      if (currency.toUpperCase() === 'TRY' || currency.toUpperCase() === 'TL') {
-        return amount;
-      }
-      
-      const rate = exchangeRates[currency.toUpperCase()];
-      if (!rate) {
-        console.log(`[Analytics] Currency rate not found for ${currency}. Available rates:`, Object.keys(exchangeRates));
-        return amount; // If currency not found, return original amount
-      }
-      const converted = amount * rate;
-      console.log(`[Analytics] Converting ${amount} ${currency} to ${converted.toFixed(2)} TRY (rate: ${rate})`);
-      return converted;
-    };
+    // Same, but excluded amounts count as 0 (for sums).
+    const convertToTRY = (amount: number, currency: string | null | undefined): number =>
+      tryConvertToTRY(amount, currency) ?? 0;
 
     // Get comprehensive order data in fewer queries to reduce connection pool usage
     const twelveMonthsAgo = new Date();
@@ -347,9 +351,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       currency: order.currency
     }));
 
-    // Calculate total revenue with currency conversion
+    // Calculate total revenue with currency conversion. Orders whose currency
+    // can't be converted are excluded from the revenue AND from the AOV divisor.
+    // The warning only reports currencies excluded from the SELECTED period's
+    // totals; misses in the previous period / 12-month chart don't count.
+    const currentPeriodUnconverted = new Set<string>();
+    let convertedOrderCount = 0;
     const currentRevenue = ordersWithCurrency.reduce((total, order) => {
-      const convertedAmount = convertToTRY(order.totalPrice || 0, order.currency);
+      const convertedAmount = tryConvertToTRY(order.totalPrice || 0, order.currency);
+      if (convertedAmount == null) {
+        if (order.currency) currentPeriodUnconverted.add(order.currency.toUpperCase());
+        return total;
+      }
+      convertedOrderCount += 1;
       return total + convertedAmount;
     }, 0);
 
@@ -558,22 +572,25 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const rawRevenue = Number(row.revenue) || 0;
       const currency = (row.currency || 'TRY').toUpperCase();
       const convertedRevenue = convertToTRY(rawRevenue, row.currency);
-      const convertedAvg = convertToTRY(Number(row.avg_order_value) || 0, row.currency);
+      const convertedAvgOrNull = tryConvertToTRY(Number(row.avg_order_value) || 0, row.currency);
+      // Unconvertible rows don't count toward the TRY average.
+      const avgWeight = convertedAvgOrNull == null ? 0 : Number(row.orders);
+      const convertedAvg = convertedAvgOrNull ?? 0;
       const existing = mpBreakdownMap.get(mp);
       if (existing) {
         existing.orders += Number(row.orders);
         existing.revenue += convertedRevenue;
         existing.customers += Number(row.customers);
-        existing.avgOrderValueSum += convertedAvg * Number(row.orders);
-        existing.avgOrderValueCount += Number(row.orders);
+        existing.avgOrderValueSum += convertedAvg * avgWeight;
+        existing.avgOrderValueCount += avgWeight;
         existing.byCurrency[currency] = (existing.byCurrency[currency] || 0) + rawRevenue;
       } else {
         mpBreakdownMap.set(mp, {
           orders: Number(row.orders),
           revenue: convertedRevenue,
           customers: Number(row.customers),
-          avgOrderValueSum: convertedAvg * Number(row.orders),
-          avgOrderValueCount: Number(row.orders),
+          avgOrderValueSum: convertedAvg * avgWeight,
+          avgOrderValueCount: avgWeight,
           byCurrency: { [currency]: rawRevenue }
         });
       }
@@ -662,7 +679,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       totalOrders,
       totalRevenue: currentRevenue,
       totalCustomers: uniqueCustomers.length,
-      averageOrderValue: totalOrders > 0 ? currentRevenue / totalOrders : 0,
+      averageOrderValue: convertedOrderCount > 0 ? currentRevenue / convertedOrderCount : 0,
       orderTrend: Math.round(orderTrend * 100) / 100,
       revenueTrend: Math.round(revenueTrend * 100) / 100,
       previousPeriod: {
@@ -672,8 +689,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       exchangeRates: Object.keys(exchangeRates).length > 0 ? {
         USD: exchangeRates['USD'] || 0,
         EUR: exchangeRates['EUR'] || 0,
-        lastUpdated: new Date().toISOString()
+        lastUpdated: ratesSnapshot.asOf ? new Date(ratesSnapshot.asOf).toISOString() : undefined,
       } : undefined,
+      // Live FX fetch failed; totals use last-known rates (exchangeRates.lastUpdated) or none.
+      ratesStale: ratesSnapshot.stale,
+      // Currencies left out of the selected period's TRY totals (no rate available).
+      unconvertedCurrencies: Array.from(currentPeriodUnconverted).sort(),
       topMarketplaces,
       dailyStats: formattedDailyStats,
       topProducts: formattedTopProducts,

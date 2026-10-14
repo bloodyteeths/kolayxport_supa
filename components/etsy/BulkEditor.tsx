@@ -56,6 +56,7 @@ import {
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import { useConfirm } from '@/lib/hooks/useConfirm';
 import {
   aiErrorCode, AiRequestError, checkTitle, normalizeTags, normalizeTitle, splitCommaList, tagTitleOverlap,
   ETSY_WHEN_MADE_OPTIONS, whenMadeLabelKey,
@@ -718,6 +719,7 @@ export default function BulkEditor({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const t = useTranslations('etsy.bulkEditor');
+  const confirm = useConfirm();
   const tEtsy = useTranslations('etsy');
   const tAiErr = useTranslations('etsy.aiErrors');
 
@@ -1512,7 +1514,13 @@ export default function BulkEditor({
     if (photoFiles.length === 0) return;
     const checked = filteredListings.filter(l => checkedIds.has(l.listing_id));
     if (checked.length === 0) return;
-    if (photoMode === 'replace_all' && !confirm(t('confirm.replaceAllPhotos', { count: checked.length }))) return;
+    if (photoMode === 'replace_all' && !(await confirm({
+      title: t('confirm.replaceAllPhotos', { count: checked.length }),
+      items: checked.map(l => l.title),
+      destructive: true,
+      confirmLabel: t('photos.replaceAll'),
+      typeToConfirm: checked.length > 10 ? String(checked.length) : undefined,
+    }))) return;
 
     setPhotoUploading(true);
     setPhotoProgress(0);
@@ -1578,7 +1586,7 @@ export default function BulkEditor({
     if (failed === 0) toast.success(t('toast.photoUploadSuccess', { count: success, listings: checked.length }));
     else toast.error(t('toast.photoUploadPartial', { success, failed }));
     onCompleted();
-  }, [photoFiles, photoMode, filteredListings, checkedIds, shopId, onCompleted, t, deleteListingImages]);
+  }, [photoFiles, photoMode, filteredListings, checkedIds, shopId, onCompleted, t, deleteListingImages, confirm]);
 
   const handleBulkImageDrop = useCallback(async (listing: SelectedListing, targetImageId: number) => {
     if (!draggingBulkImage || draggingBulkImage.listingId !== listing.listing_id || draggingBulkImage.imageId === targetImageId) {
@@ -1699,7 +1707,12 @@ export default function BulkEditor({
   const handleBulkVideoDelete = useCallback(async () => {
     const checked = filteredListings.filter(l => checkedIds.has(l.listing_id));
     if (checked.length === 0) return;
-    if (!confirm(t('confirm.deleteAllVideos', { count: checked.length }))) return;
+    if (!(await confirm({
+      title: t('confirm.deleteAllVideos', { count: checked.length }),
+      items: checked.map(l => l.title),
+      destructive: true,
+      typeToConfirm: checked.length > 10 ? String(checked.length) : undefined,
+    }))) return;
 
     setVideoUploading(true);
     setVideoProgress(0);
@@ -1735,7 +1748,7 @@ export default function BulkEditor({
     if (failed === 0) toast.success(t('toast.videoDeleteSuccess', { count: success }));
     else toast.error(t('toast.videoDeletePartial', { success, failed }));
     onCompleted();
-  }, [filteredListings, checkedIds, shopId, onCompleted]);
+  }, [filteredListings, checkedIds, shopId, onCompleted, confirm, t]);
 
   // Create a new shop section
   const handleCreateSection = useCallback(async () => {
@@ -1896,13 +1909,13 @@ export default function BulkEditor({
   const someChecked = filteredListings.some(l => checkedIds.has(l.listing_id)) && !allChecked;
 
   // Close handler with unsaved warning
-  const handleClose = useCallback(() => {
+  const handleClose = useCallback(async () => {
     if (pendingChanges.size > 0) {
-      if (!confirm(t('confirm.unsavedChanges', { count: pendingChanges.size }))) return;
+      if (!(await confirm({ title: t('confirm.unsavedChanges', { count: pendingChanges.size }), confirmLabel: t('header.discard'), destructive: true }))) return;
     }
     setPendingChanges(new Map());
     onClose();
-  }, [pendingChanges, onClose]);
+  }, [pendingChanges, onClose, confirm, t]);
 
   // Discard all pending changes
   const handleDiscard = useCallback(() => {

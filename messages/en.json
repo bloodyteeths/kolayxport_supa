@@ -64,7 +64,91 @@
     "or": "or",
     "loginSuccess": "Login successful!",
     "signupSuccess": "Signup successful! Please check your email to confirm your account.",
-    "passwordPolicy": "At least 12 characters, with upper- and lower-case letters, a number, and a special character. Cannot contain your name or email."
+    "passwordPolicy": "At least 12 characters, with upper- and lower-case letters, a number, and a special character. Cannot contain your name or email.",
+    "passwordHint": "At least {min} characters, with upper- and lower-case letters, a number, and a special character. Cannot contain your name or email.",
+    "errors": {
+      "signupFailed": "Sign-up failed. Please try again.",
+      "emailExists": "An account with this email already exists. Sign in instead.",
+      "missingFields": "Email and password are required.",
+      "generic": "Something went wrong. Please try again.",
+      "signInFailed": "Sign-in failed. Please try again.",
+      "password_too_short": "Password must be at least {min} characters.",
+      "password_too_long": "Password must be at most {max} characters.",
+      "password_needs_lowercase": "Password must include a lower-case letter.",
+      "password_needs_uppercase": "Password must include an upper-case letter.",
+      "password_needs_digit": "Password must include a number.",
+      "password_needs_special": "Password must include a special character.",
+      "password_contains_identity": "Password must not contain your name or email address.",
+      "password_too_common": "This password is too common. Choose a less predictable one.",
+      "invalid_or_expired": "This reset link is invalid or expired. Request a new one.",
+      "invalid_input": "Please fill in both fields.",
+      "internal_error": "Something went wrong. Try again in a minute.",
+      "mismatch": "Passwords don't match."
+    },
+    "unverified": {
+      "title": "Please verify your email before signing in.",
+      "body": "Check your inbox for a confirmation link. If you can't find it, request a new one.",
+      "resend": "Resend verification email",
+      "sending": "Sending…",
+      "sent": "Verification email sent.",
+      "resendFailed": "Couldn't send the email. Please try again."
+    },
+    "verify": {
+      "pageTitle": "Email verification",
+      "goToSignIn": "Go to sign in",
+      "titles": {
+        "ok": "Email verified",
+        "failed": "Verification failed",
+        "expired": "This link has expired",
+        "alreadyUsed": "This link has already been used"
+      },
+      "bodies": {
+        "ok": "Your email is confirmed. You can now sign in to KolayXport.",
+        "invalid": "The link is invalid. Request a new verification email from the sign-in page.",
+        "expired": "Please request a new verification email from the sign-in page.",
+        "alreadyUsed": "This link was already used. If you need to verify a different email, sign up again.",
+        "default": "Open the link from your email, or request a new one."
+      }
+    },
+    "forgot": {
+      "pageTitle": "Reset password",
+      "heading": "Reset your password",
+      "description": "Enter your account email. If we find a match, we'll send a reset link that expires in 1 hour.",
+      "sentMessage": "If an account exists for that email, a reset link has been sent.",
+      "backToSignIn": "Back to sign in",
+      "emailLabel": "Email address",
+      "emailPlaceholder": "you@example.com",
+      "submit": "Send reset link",
+      "sending": "Sending…"
+    },
+    "reset": {
+      "pageTitle": "Set new password",
+      "heading": "Set a new password",
+      "success": "Your password has been updated.",
+      "signInWithNew": "Sign in with your new password",
+      "missingToken": "Missing reset token. Open the link from your email.",
+      "newPasswordLabel": "New password",
+      "newPasswordPlaceholder": "New password (min {min} chars)",
+      "confirmPlaceholder": "Confirm new password",
+      "submit": "Set password",
+      "updating": "Updating…"
+    },
+    "confirmEmail": {
+      "pageTitle": "Confirm your email",
+      "heading": "Check your inbox!",
+      "body": "We've sent a confirmation link to your email address. Click it to complete your registration, then sign in.",
+      "goToSignIn": "Go to sign in"
+    },
+    "errorPage": {
+      "pageTitle": "Sign-in error",
+      "heading": "Couldn't sign you in",
+      "generic": "Something went wrong. Please try again.",
+      "accountNotLinked": "This email is already used with a different sign-in method. Please sign in with that method.",
+      "callback": "There was a problem during sign-in. Please try again later or contact support.",
+      "errorCode": "Error code:",
+      "tryAgain": "Back to sign in",
+      "backHome": "Back to home"
+    }
   },
   "nav": {
     "overview": "Overview",
@@ -446,7 +530,13 @@
     "noStatusData": "No status data",
     "noActivityYet": "No activity yet",
     "byCarrier": "By Carrier",
-    "product": "Product"
+    "product": "Product",
+    "nextDay": "Next day",
+    "nextMonth": "Next month",
+    "refreshFailed": "Couldn't refresh. Showing the previous results.",
+    "fxUnconvertedWarning": "Exchange rates for {currencies} are unavailable, so those amounts are left out of the TRY totals. Original-currency amounts are still shown in the marketplace table.",
+    "fxStaleWarning": "Live exchange rates are unavailable. Totals use the last known rates from {date}.",
+    "fxStaleWarningNoDate": "Live exchange rates are unavailable. Totals use the last known rates."
   },
   "financials": {
     "bankedPendingNote": "Trendyol’s API does not expose a live balance. This is the estimated total of matured-but-not-yet-paid earnings (pending payout).",
@@ -558,7 +648,15 @@
     "syncError": "Sync error",
     "csvPlaceholder": "8680001234567, Baby Blanket, 45.00, 12.50\n8680009876543, Knit Socks, 22.00, 8.00",
     "orders": "orders",
-    "returnedCount": "{count} returned"
+    "returnedCount": "{count} returned",
+    "syncedCount": "{count, plural, =0 {No new transactions to sync} one {# transaction synchronized} other {# transactions synchronized}}",
+    "refreshFailed": "Couldn't refresh. Showing the previous results.",
+    "syncEmptyDescription": "No financial data for this period yet. Sync to pull revenue, commission and shipping data from your account.",
+    "notConnected": "Not connected",
+    "syncTooltipMarketplace": "Sync data from {marketplace}",
+    "connectToSeeFinancials": "Connect your {marketplace} account to see revenue, fees and profit here.",
+    "ordersWithPending": "{count} orders (+{pending} pending)",
+    "pendingSettlementTooltip": "{settled} orders have been settled by the marketplace. {pending} orders are still waiting for the marketplace to close them, which can take 1-3 days."
   },
   "labels": {
     "columnShippingCost": "Shipping Cost",
@@ -1334,7 +1432,8 @@
     "expiresTomorrow": "Your trial expires tomorrow. Select your plan now.",
     "expiresInDays": "Your trial expires in {days} days.",
     "nearingLimit": "You are also approaching your trial limit.",
-    "selectPlan": "Select Plan"
+    "selectPlan": "Select Plan",
+    "dismiss": "Dismiss"
   },
   "invoices": {
     "pageTitle": "Billing History",
@@ -2524,8 +2623,8 @@
       "confirm": {
         "unsavedChanges": "{count} unsaved changes. Are you sure you want to exit?",
         "deleteAllPhotos": "Delete ALL photos from {count} listings? This cannot be undone.",
-        "replaceAllPhotos": "Replace ALL photos on {count} listings with the selected files? This cannot be undone.",
-        "deleteAllVideos": "Delete ALL videos from {count} listings? This cannot be undone."
+        "replaceAllPhotos": "Replace ALL photos on {count} listings with the selected files? Nothing changes on Etsy until you sync.",
+        "deleteAllVideos": "Delete ALL videos from {count} listings? Nothing changes on Etsy until you sync."
       },
       "shopLabel": "Etsy",
       "etsyDetails": {
@@ -3288,8 +3387,13 @@
         "title": "Close this listing?",
         "description": "Your text and settings stay on this device, and you can restore them next time. Nothing is sent to Etsy.",
         "descriptionWithPhotos": "Your text and settings stay on this device, and you can restore them next time. The photos you added are not kept. Nothing is sent to Etsy.",
-        "keepEditing": "Keep editing"
-      }
+        "keepEditing": "Keep editing",
+        "descriptionCopy": "This prefilled listing isn't saved on this device. Close and discard it? Nothing is sent to Etsy."
+      },
+      "importedImagesHint": "{count, plural, one {# photo} other {# photos}} imported from the source listing. They are downloaded only when you publish or sync this listing.",
+      "importedImagesFailed": "Imported photos couldn't be added to the draft.",
+      "prefilledFromEbay": "Prefilled from your eBay listing. Review every field, choose a category and add tags. Nothing is published until you press Create & Publish.",
+      "prefilledFromEtsy": "Duplicated from an existing listing. Change the title before saving. Nothing reaches Etsy until you publish or sync."
     },
     "seo": {
       "seoScore": "SEO Score",
@@ -5310,7 +5414,8 @@
         "discard": "Discard changes",
         "keepEditing": "Keep editing",
         "close": "Close"
-      }
+      },
+      "crosslistBanner": "Copied from {source}. Review the details and let AI fill the category and item specifics. Nothing goes to eBay until you press publish."
     },
     "financial": {
       "revenueCalculator": "Revenue Calculator",
@@ -6908,7 +7013,55 @@
       "syncSuccess": "\"{title}\" created on Etsy (#{id}).",
       "confirmDiscard": "Discard this new listing draft? Its staged photos are deleted. Anything already created on Etsy is not removed.",
       "discarded": "Draft discarded",
-      "discardFailed": "Could not discard draft: {error}"
+      "discardFailed": "Could not discard draft: {error}",
+      "discardTitle": "Discard this draft?"
+    },
+    "duplicate": {
+      "notFound": "Couldn't find this listing. Refresh the list and try again.",
+      "action": "Duplicate",
+      "tooltip": "Duplicate as new listing"
+    },
+    "crosslist": {
+      "priceCurrencyUnknown": "The price wasn't copied because your Etsy shop currency isn't known yet. Enter the price in the creator.",
+      "listOnEbay": "List on eBay",
+      "loading": "Loading the eBay listing…",
+      "notFound": "That eBay listing wasn't found. Sync your eBay listings and try again.",
+      "loadFailed": "Couldn't load the eBay listing",
+      "priceCurrencyMismatch": "Price not copied: the eBay price is in {from}, your Etsy shop prices in {to}."
+    },
+    "draftChip": {
+      "tipSyncing": "Sending these changes to Etsy now. This can take a moment.",
+      "pending": "Pending",
+      "failed": "Sync failed",
+      "conflict": "Changed on Etsy",
+      "syncing": "Syncing",
+      "tipFailed": "Sync failed: {reason}\n\nOpen the editor to retry the sync or discard the draft.",
+      "tipConflict": "This listing was changed on Etsy. Review it in the editor and sync again if needed.",
+      "tipDraft": "Local draft. Nothing changes on Etsy until you press Sync to Etsy.",
+      "errWhoMade": "Etsy's required trio (who made it, when it was made, is it a supply) is missing. Syncing again usually fixes this automatically.",
+      "errSection": "The selected Etsy shop section no longer exists. Pick another section in the editor and try again.",
+      "errToken": "Your Etsy connection is no longer valid. Reconnect Etsy in Settings.",
+      "errShipping": "The selected shipping profile no longer exists. Pick another profile in the editor."
+    },
+    "draftBanner": {
+      "draftsInOtherTabs": "No listings with drafts in this tab. Your drafts are on listings in other status tabs.",
+      "unsynced": "{count, plural, =0 {No pending changes} one {# unsynced change} other {# unsynced changes}}",
+      "failed": "{count} failed",
+      "conflicts": "{count, plural, one {# conflict} other {# conflicts}}",
+      "hasDraftFilter": "Has draft",
+      "syncAll": "Sync to Etsy",
+      "syncAllCount": "Sync all ({count})",
+      "confirmTitle": "Sync {count, plural, one {# draft} other {# drafts}} to Etsy?",
+      "confirmBody": "Your saved draft changes for these listings will be written to Etsy.",
+      "skippedDeletes": "{count, plural, one {# draft with a queued delete is} other {# drafts with a queued delete are}} skipped. Review and apply those from the editor.",
+      "skippedNew": "{count, plural, one {# new listing is} other {# new listings are}} skipped. Sync them from the new listings panel.",
+      "nothingToSync": "Nothing to sync here. Drafts with a queued delete and new listings are synced individually."
+    },
+    "draftQueued": {
+      "delete": "Delete queued in a local draft. Open the listing and sync it from the editor to apply.",
+      "renew": "Renew queued in a local draft. Sync to Etsy to apply.",
+      "deactivate": "Deactivate queued in a local draft. Sync to Etsy to apply.",
+      "saved": "Draft saved. Sync to Etsy to apply."
     }
   },
   "ebayListings": {
@@ -7169,7 +7322,13 @@
     "viewStandard": "Standard",
     "viewComfortable": "All",
     "listingsCountFiltered": "{count} of {total} listings",
-    "condUsedExcellent": "Used — Excellent"
+    "condUsedExcellent": "Used — Excellent",
+    "crosslistReplaceTitle": "Replace the listing you're editing?",
+    "crosslistReplaceDesc": "The Etsy listing finished loading. Replacing will swap your current form for the Etsy details. Your own saved draft is kept.",
+    "crosslistReplaceConfirm": "Use Etsy listing",
+    "listOnEtsy": "List on Etsy",
+    "crosslistLoading": "Loading the Etsy listing…",
+    "crosslistLoadFailed": "Couldn't load the Etsy listing to copy."
   },
   "etsyResearch": {
     "pageTitle": "Etsy Research",
@@ -7726,7 +7885,27 @@
       "restored": "Restored {count} products",
       "manual": "Manual backup",
       "items": "{count} items"
-    }
+    },
+    "batchPolling": "Trendyol is processing {count} products...",
+    "batchProgress": "{done}/{total} processed by Trendyol",
+    "batchResultTitle": "Bulk update result",
+    "batchResultUpdated": "{count} updated",
+    "batchResultFailed": "{count} failed",
+    "batchResultPending": "{count} still processing",
+    "batchResultTimedOut": "Trendyol is still processing this batch. Results may change; refresh or sync in a few minutes.",
+    "batchResultSyncHint": "Archive status updates in this list after the next Sync.",
+    "batchResultFailuresTitle": "Failed products",
+    "batchResultNoReason": "Trendyol did not return a reason",
+    "showVariants": "Show {count} variants",
+    "hideVariants": "Hide variants",
+    "variantCount": "{count} variants",
+    "showingOf": "Showing {shown} of {total}",
+    "matchingCount": "{count} matching",
+    "filtersLoadedOnly": "Search and filters apply to loaded products only",
+    "partialSeedHint": "Only {shown} of {total} products are loaded. Sync to import all of them.",
+    "emptySyncHint": "Sync to import your Trendyol products.",
+    "clearFilters": "Clear filters",
+    "loadMore": "Load {count} more"
   },
   "wixListings": {
     "pageTitle": "Wix Products",
@@ -7855,7 +8034,24 @@
     "bulkPersonalization": "Personalization",
     "bulkSetPersonalization": "Set Fields",
     "bulkRemovePersonalization": "Remove Fields",
-    "personalizationHelperText": "Text fields buyers fill in (e.g. name, message)"
+    "personalizationHelperText": "Text fields buyers fill in (e.g. name, message)",
+    "stagedUnsavedCount": "{count, plural, one {# product with unsaved changes} other {# products with unsaved changes}}",
+    "stagedSaveSuccess": "{count, plural, one {# product saved to Wix} other {# products saved to Wix}}",
+    "stagedLeaveConfirm": "You have unsaved changes that haven't been saved to Wix. Leave this page and discard them?",
+    "stagedStockNotEditable": "Stock can't be edited here for products with variants or with inventory tracking off. Use the Wix dashboard.",
+    "expandCard": "Show details",
+    "collapseCard": "Hide details",
+    "stagedUnsaved": "Unsaved",
+    "stagedNoPending": "No pending changes",
+    "stagedSaveToWix": "Save to Wix",
+    "stagedDiscard": "Discard",
+    "stagedDiscardTitle": "Discard unsaved changes?",
+    "stagedDiscardConfirm": "Local changes to {count} products will be lost. Nothing on Wix will change.",
+    "stagedSavePartial": "{ok} saved, {failed} failed",
+    "stagedFailedCount": "{count} failed",
+    "stagedInvalidPrice": "Enter a valid price (0 or more)",
+    "stagedInvalidStock": "Stock must be a whole number (0 or more)",
+    "stagedInvalidTitle": "Title cannot be empty"
   },
   "shopifyListings": {
     "title": "Shopify Products",
@@ -7892,7 +8088,29 @@
     "updateSuccess": "Product updated successfully",
     "deleteConfirm": "Are you sure you want to delete this product?",
     "deleteSuccess": "Product deleted successfully",
-    "updateFailed": "Failed to update product"
+    "updateFailed": "Failed to update product",
+    "variantUpdatePartialInline": "Product saved, but {count} variant(s) were not fully updated. Check the highlighted variants below.",
+    "variantPriceSavedStockFailed": "Price saved; stock not updated: {reason}",
+    "connectDescription": "Connect your Shopify store to manage products, prices and stock here.",
+    "showDetails": "Show details",
+    "hideDetails": "Hide details",
+    "sku": "SKU",
+    "variantFallback": "Variant {n}",
+    "variantEditHint": "Price and stock changes are sent to Shopify only when you press Save.",
+    "notTracked": "Stock not tracked by Shopify",
+    "invalidPrice": "Enter a valid price (0 or more, up to 2 decimals).",
+    "invalidStock": "Stock must be a whole number (0 or more).",
+    "variantUpdatePartial": "{count} variant(s) could not be updated: {reason}",
+    "variantErrors": {
+      "NOT_FOUND": "Variant no longer exists on Shopify. Sync and try again.",
+      "INVALID_PRICE": "Invalid price.",
+      "INVALID_QUANTITY": "Invalid stock quantity.",
+      "NOT_TRACKED": "Stock is not tracked by Shopify for this variant.",
+      "MULTI_LOCATION": "Stock is split across several locations. Edit it in Shopify admin.",
+      "NO_LOCATION": "This variant is not stocked at any location.",
+      "STOCK_CHANGED": "Stock changed on Shopify since your last sync. Sync and try again.",
+      "FAILED": "Shopify rejected the update."
+    }
   },
   "messages": {
     "title": "Messages",
@@ -7926,7 +8144,32 @@
     "items": "items",
     "loadingOrders": "Loading orders...",
     "showContext": "Show details",
-    "hideContext": "Hide details"
+    "hideContext": "Hide details",
+    "templates": {
+      "tooLong": "Templates can be at most {max} characters. Shorten the text to save it.",
+      "label": "Saved replies",
+      "saveCurrent": "Save as template",
+      "saved": "Template saved",
+      "alreadySaved": "This template is already saved",
+      "limitReached": "You can save up to {max} templates. Delete one to add another.",
+      "deleteTitle": "Delete this saved reply?"
+    },
+    "fetchFailed": "Couldn't load messages. Please try again.",
+    "refresh": "Refresh",
+    "connectedPlatforms": "Connected: {platforms}",
+    "connectEitherDescription": "Connect Wix or Trendyol to answer all your customer messages from one inbox.",
+    "time": {
+      "minutes": "{n}m",
+      "hours": "{n}h",
+      "yesterday": "Yesterday"
+    },
+    "platformErrors": {
+      "permission": "{name}: inbox access is missing. Reconnect {name} to allow message access.",
+      "auth": "{name}: connection expired. Reconnect it in Settings.",
+      "credentials": "{name}: connection details are incomplete. Check Settings.",
+      "rateLimited": "{name}: too many requests right now. Try again in a moment.",
+      "unavailable": "{name}: messages couldn't be loaded right now."
+    }
   },
   "errors": {
     "notFoundTitle": "404 - Page Not Found",
@@ -8581,7 +8824,9 @@
       "billing": {
         "monthly": "Monthly",
         "yearly": "Yearly",
-        "discount": "15% OFF"
+        "discount": "15% OFF",
+        "perMonth": "/ mo",
+        "perYear": "/ yr"
       },
       "plans": {
         "starter": {
@@ -8711,6 +8956,12 @@
         "heading": "Need a Custom Plan?",
         "text": "We can build solutions tailored to your needs. Get in touch with us.",
         "button": "Contact Us"
+      },
+      "checkout": {
+        "shopifyFree": "Accounts installed via Shopify use the free Shopify tier and can't purchase a plan here.",
+        "failed": "Couldn't start checkout. Please try again.",
+        "notConfigured": "Payments are temporarily unavailable. Please contact support.",
+        "redirecting": "Redirecting to checkout…"
       }
     }
   },
@@ -8749,6 +9000,11 @@
       "usage": "{used} / {limit}",
       "resetsOn": "Usage resets on {date}",
       "contactSupport": "Contact support"
+    },
+    "connectEmpty": {
+      "title": "Connect {name} to use this page",
+      "description": "Link your {name} account and your data will show up here automatically.",
+      "cta": "Connect {name}"
     }
   }
 }

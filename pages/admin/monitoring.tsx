@@ -21,6 +21,7 @@ import {
   Users,
   Mail,
 } from 'lucide-react';
+import EtsyBackboneCard from '@/components/etsy-ops/EtsyBackboneCard';
 
 const fetcher = (url: string) =>
   fetch(url).then(r => {
@@ -565,6 +566,9 @@ export default function AdminMonitoringDashboard() {
             <AuthSection />
             <UsersAtRiskSection />
           </div>
+
+          {/* Etsy event backbone: webhook queue, worker, rate budget, scheduler */}
+          <EtsyBackboneCard />
 
           {/* Row 3: feeds */}
           <ErrorsFeed />

@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { onEtsyShopOwnershipChanged } from '@/lib/stock/hooks';
 
 export default async function handler(
   req: NextApiRequest,
@@ -106,6 +107,8 @@ export default async function handler(
             }
           });
           if (cleared.count === 0) return res.status(404).json({ error: 'Shop not found' });
+          // Stock sync: links to a disconnected shop must never be pushed again.
+          await onEtsyShopOwnershipChanged(actualShopId, null);
         } else {
           // The settings UI sends the EtsyShop row id (what GET returns as `id`);
           // older callers may send Etsy's numeric shop id. Accept either, always
@@ -134,6 +137,15 @@ export default async function handler(
               etsyTokenExpiresAt: null
             }
           });
+        }
+
+        if (!(typeof shopId === 'string' && shopId.startsWith('legacy-'))) {
+          const disconnected = await prisma.etsyShop.findFirst({
+            where: { userId: authUserId, OR: [{ id: String(shopId) }, { shopId: String(shopId) }] },
+            select: { shopId: true },
+          });
+          // Stock sync: links to a disconnected shop are paused ('account_changed'), never pushed.
+          if (disconnected) await onEtsyShopOwnershipChanged(disconnected.shopId, null);
         }
 
         return res.status(200).json({ message: 'Shop disconnected successfully' });

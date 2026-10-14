@@ -3927,7 +3927,8 @@
       "queuedDeleteRemoved": "Queued delete cancelled.",
       "remoteChanged": "This listing was changed on Etsy after you staged these edits.",
       "deletedOnEtsy": "This listing was deleted on Etsy. Your staged edits can no longer be synced — discard the draft.",
-      "deleteQueuedNotice": "A listing delete is queued. It will run on the next Sync to Etsy."
+      "deleteQueuedNotice": "A listing delete is queued. It will run on the next Sync to Etsy.",
+      "stockOverrideFailed": "Stock sync manages this listing and its quantities could not be applied. Your draft was kept — try syncing again."
     },
     "webhooks": {
       "outOfStockSubject": "Out of stock on Etsy: {title}",
@@ -9121,7 +9122,24 @@
       "reauthRequired": "Your {provider} connection expired. Reconnect it in Settings",
       "orderSyncFailed": "Order sync from {provider} failed",
       "usageNearLimit": "You have used {used} of {limit} {kind, select, orderSync {order syncs} label {labels} other {credits}} this period",
-      "usageLimitReached": "You have reached your {kind, select, orderSync {order sync} label {label} other {usage}} limit. Upgrade your plan to continue"
+      "usageLimitReached": "You have reached your {kind, select, orderSync {order sync} label {label} other {usage}} limit. Upgrade your plan to continue",
+      "orderNew": "New order {orderNumber}",
+      "orderCanceled": "Order {orderNumber} was cancelled",
+      "orderCanceledAfterLabel": "Order {orderNumber} was cancelled after its label was created. Void the label",
+      "orderShippedExternal": "Order {orderNumber} was marked as shipped outside KolayXport",
+      "dispatchOverdue": "{count, plural, one {# order is} other {# orders are}} past the ship-by date",
+      "dispatchDueToday": "{count, plural, one {# order} other {# orders}} must ship today",
+      "dispatchDueTomorrow": "{count, plural, one {# order} other {# orders}} must ship tomorrow",
+      "listingDeactivated": "Etsy listing \"{title}\" was deactivated",
+      "listingExpired": "Etsy listing \"{title}\" expired",
+      "listingDeleted": "Etsy listing \"{title}\" was deleted",
+      "listingChangedExternally": "\"{title}\" was changed outside KolayXport",
+      "stockOutOfStock": "{sku} is out of stock",
+      "stockPushFailed": "Stock update for {sku} on {channel} failed",
+      "stockDrift": "{count, plural, one {# stock mismatch} other {# stock mismatches}} found today",
+      "stockUnmatchedSale": "{count, plural, one {# sale} other {# sales}} could not be matched to a stock item",
+      "seoExperimentReady": "SEO test results are ready for \"{title}\"",
+      "webhookBacklog": "The Etsy event queue is backing up"
     }
   },
   "commandPalette": {
@@ -9176,5 +9194,790 @@
     "neededFor": "Orders",
     "popupBlocked": "Your browser blocked the new tab. Allow pop-ups for this site and try again.",
     "truncated": "Only the first {max} selected orders were opened."
+  },
+  "etsyOps": {
+    "common": {
+      "never": "never",
+      "none": "—",
+      "justNow": "just now",
+      "minutesAgo": "{count, plural, one {# min ago} other {# min ago}}",
+      "hoursAgo": "{count, plural, one {# hour ago} other {# hours ago}}",
+      "daysAgo": "{count, plural, one {# day ago} other {# days ago}}",
+      "refresh": "Refresh",
+      "loading": "Loading…",
+      "loadFailed": "Could not load"
+    },
+    "backbone": {
+      "title": "Etsy event backbone",
+      "worker": "Worker",
+      "loop": "In-process loop",
+      "running": "running",
+      "stopped": "not running",
+      "lastPass": "Last pass",
+      "inFlight": "Events in progress",
+      "lastReceived": "Last webhook received",
+      "oldestDue": "Oldest waiting event",
+      "failed24h": "Failed (24h)",
+      "queue": "Queue by status",
+      "budget": "Etsy API budget (today)",
+      "usedToday": "Daily quota used",
+      "remote": "Etsy says",
+      "remoteValue": "{remaining} of {limit} left",
+      "localCalls": "Calls counted here",
+      "perShopCap": "Per-shop background cap",
+      "throttled": "Throttled / deferred",
+      "jobs": "Scheduled jobs",
+      "lastSuccess": "Last success",
+      "runningSince": "Running since",
+      "lastFailure": "Last failure",
+      "backlogByShop": "Backlog by shop",
+      "recentFailed": "Recent failed events",
+      "replay": "Replay",
+      "replayShop": "Replay all failed for this shop",
+      "replayShown": "Replay all shown",
+      "replayed": "{count, plural, =0 {Nothing to replay} one {# event re-queued} other {# events re-queued}}",
+      "replayFailed": "Replay failed",
+      "shop": "Shop",
+      "attempts": "Attempts"
+    },
+    "status": {
+      "received": "waiting",
+      "processing": "processing",
+      "blocked_reauth": "needs reconnect",
+      "failed": "failed",
+      "coalesced": "merged",
+      "done": "done",
+      "ignored": "ignored"
+    },
+    "draftSync": {
+      "stockOverrideFailed": "Stock sync manages this listing and its quantities could not be applied. Your draft was kept — try syncing again."
+    }
+  },
+  "listingHistory": {
+    "navLabel": "Etsy activity",
+    "editorTab": "History",
+    "pageTitle": "Etsy activity",
+    "pageSubtitle": "Every change to your Etsy listings, who made it, and whether SEO edits paid off.",
+    "tabs": {
+      "changes": "Changes",
+      "seo": "SEO experiments"
+    },
+    "shopLabel": "Shop",
+    "allShops": "All shops",
+    "connectDescription": "Connect your Etsy shop to see listing changes and SEO results.",
+    "filters": {
+      "all": "All",
+      "external": "Changed on Etsy",
+      "kolayxport_draft": "Synced from KolayXport",
+      "kolayxport_stock": "Stock sync",
+      "unknown": "Found in a check"
+    },
+    "attribution": {
+      "external": "Changed on Etsy",
+      "kolayxport_draft": "Synced from KolayXport",
+      "kolayxport_stock": "Stock sync",
+      "unknown": "Found in a check"
+    },
+    "freshness": {
+      "live": "Etsy live · last change {time}",
+      "liveNoChange": "Etsy live · no changes yet",
+      "delayed": "Delayed · checked once a day · last check {time}",
+      "delayedNever": "Delayed · not checked yet",
+      "needsReauth": "Reconnect Etsy to keep listings up to date",
+      "tooltipLive": "Etsy tells KolayXport about every change within seconds.",
+      "tooltipDelayed": "Etsy has not sent change notifications recently, so listings are re-checked every night. Use Sync listings to refresh now."
+    },
+    "keys": {
+      "created": "Listing created",
+      "deleted": "Listing deleted",
+      "title": "Title",
+      "description": "Description",
+      "tags": "Tags",
+      "materials": "Materials",
+      "price": "Price",
+      "currency": "Currency",
+      "state": "Status",
+      "taxonomyId": "Category",
+      "shopSectionId": "Shop section",
+      "whoMade": "Who made it",
+      "whenMade": "When made",
+      "isSupply": "Supply",
+      "processingMin": "Processing (min)",
+      "processingMax": "Processing (max)",
+      "shippingProfileId": "Shipping profile",
+      "returnPolicyId": "Return policy",
+      "itemWeight": "Weight",
+      "itemWeightUnit": "Weight unit",
+      "itemLength": "Length",
+      "itemWidth": "Width",
+      "itemHeight": "Height",
+      "itemDimensionsUnit": "Dimension unit",
+      "isPersonalizable": "Personalization",
+      "personalizationIsRequired": "Personalization required",
+      "personalizationInstructions": "Personalization instructions",
+      "personalizationCharCountMax": "Personalization max characters",
+      "hasVariations": "Variations",
+      "images": "Photos",
+      "offerings": "Variations",
+      "videos": "Video"
+    },
+    "states": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "draft": "Draft",
+      "expired": "Expired",
+      "sold_out": "Sold out",
+      "removed": "Deleted",
+      "edit": "Editing"
+    },
+    "diff": {
+      "from": "Before",
+      "to": "After",
+      "empty": "(empty)",
+      "yes": "Yes",
+      "no": "No",
+      "tagsAdded": "Added",
+      "tagsRemoved": "Removed",
+      "imagesAdded": "{count, plural, one {# photo added} other {# photos added}}",
+      "imagesRemoved": "{count, plural, one {# photo removed} other {# photos removed}}",
+      "imagesReordered": "Photo order changed",
+      "imagesAlt": "{count, plural, one {Alt text changed on # photo} other {Alt text changed on # photos}}",
+      "offeringsAdded": "{count, plural, one {# variation added} other {# variations added}}",
+      "offeringsRemoved": "{count, plural, one {# variation removed} other {# variations removed}}",
+      "offeringChanged": "{label}: {fields}",
+      "offeringFieldSku": "SKU",
+      "offeringFieldPrice": "price",
+      "offeringFieldIsEnabled": "on/off",
+      "noDetails": "No visible details for this change."
+    },
+    "history": {
+      "title": "History",
+      "empty": "No changes recorded yet. Changes made on Etsy or from KolayXport will appear here.",
+      "loadMore": "Show older",
+      "restore": "Restore as draft",
+      "restoreTitle": "Restore this version as a draft?",
+      "restoreBody": "KolayXport stages these values as a draft. Nothing changes on Etsy until you review the draft and press Sync to Etsy.",
+      "restoreConfirm": "Create draft",
+      "restoreCancel": "Cancel",
+      "restored": "Draft created. Review it, then sync to Etsy.",
+      "restoredPartial": "Draft created. Some parts can't be restored: {parts}.",
+      "nothingToRestore": "This version matches the listing already — nothing to restore.",
+      "restoreFailed": "Couldn't create the draft.",
+      "unrestorable": {
+        "images_deleted": "deleted photos",
+        "inventory": "variations and stock",
+        "state": "listing status",
+        "personalization": "personalization questions",
+        "videos": "video",
+        "variations": "price (set per variation)",
+        "cleared_value": "cleared fields"
+      },
+      "tombstone": "This listing was deleted on Etsy."
+    },
+    "activity": {
+      "empty": "No listing changes yet. Edits on Etsy and syncs from KolayXport show up here within seconds.",
+      "loadMore": "Show more",
+      "viewListing": "Open on Etsy",
+      "changedFields": "{count, plural, one {# change} other {# changes}}",
+      "deletedListing": "Deleted listing",
+      "newItems": "{count, plural, one {# new change} other {# new changes}} — show"
+    },
+    "errors": {
+      "loadFailed": "Couldn't load listing activity.",
+      "versionNotFound": "That version no longer exists.",
+      "versionNotRestorable": "That version can't be restored.",
+      "listingGone": "This listing no longer exists on Etsy.",
+      "stockSyncManaged": "Stock sync manages this listing's quantities. Change them in Stock sync or through a draft."
+    }
+  },
+  "liveOrders": {
+    "toast": {
+      "newOrder": "New order",
+      "newOrderFrom": "New {marketplace} order",
+      "newOrders": "{count, plural, one {# new order} other {# new orders}}",
+      "items": "{count, plural, one {# item} other {# items}}",
+      "cancelled": "Order {orderNumber} was cancelled",
+      "cancelledHint": "Check before you ship it",
+      "open": "Open",
+      "close": "Close"
+    },
+    "sound": {
+      "on": "Order sound is on",
+      "muted": "Order sound is muted",
+      "needsClick": "Order sound is waiting for one click",
+      "clickToMute": "Click to mute",
+      "clickToEnable": "Click to turn it on and hear a test sound"
+    },
+    "status": {
+      "live": "Live: new orders appear instantly",
+      "connecting": "Connecting to live updates…",
+      "offline": "Live updates paused, reconnecting",
+      "polling": "Live connection lost, checking every minute"
+    },
+    "badge": {
+      "new": "New"
+    }
+  },
+  "notificationCenter": {
+    "typeLabels": {
+      "orderNew": "New orders",
+      "orderCanceled": "Cancelled orders",
+      "orderCanceledAfterLabel": "Cancelled after label",
+      "orderShippedExternal": "Shipped outside KolayXport",
+      "orderSyncFailed": "Order sync failed",
+      "dispatchOverdue": "Late shipments",
+      "dispatchDueToday": "Ship today",
+      "dispatchDueTomorrow": "Ship tomorrow",
+      "listingDeactivated": "Listing deactivated",
+      "listingDeleted": "Listing deleted",
+      "listingExpired": "Listing expired",
+      "listingChangedExternally": "Listing changed outside KolayXport",
+      "draftSyncFailed": "Sync to Etsy failed",
+      "draftConflict": "Listing edit conflict",
+      "seoExperimentReady": "SEO test results",
+      "stockOutOfStock": "Out of stock",
+      "stockPushFailed": "Stock update failed",
+      "stockDrift": "Stock mismatch",
+      "stockUnmatchedSale": "Unmatched sale",
+      "reauthRequired": "Connection expired",
+      "usageNearLimit": "Usage near limit",
+      "usageLimitReached": "Usage limit reached",
+      "webhookBacklog": "Webhook backlog (admin)"
+    },
+    "groups": {
+      "all": "All",
+      "orders": "Orders",
+      "dispatch": "Shipping deadlines",
+      "listings": "Listings",
+      "stock": "Stock",
+      "account": "Account",
+      "system": "System"
+    },
+    "severity": {
+      "info": "Info",
+      "warning": "Warning",
+      "error": "Critical"
+    },
+    "page": {
+      "title": "Notifications",
+      "subtitle": "Orders, shipping deadlines, listings and stock alerts in one place",
+      "tabs": {
+        "unread": "Unread",
+        "all": "All",
+        "activity": "Activity",
+        "preferences": "Preferences"
+      },
+      "markAllRead": "Mark all read",
+      "markRead": "Mark as read",
+      "open": "Open",
+      "today": "Today",
+      "earlier": "Earlier",
+      "loadMore": "Load more",
+      "loading": "Loading…",
+      "resolved": "Resolved",
+      "unread": "Unread",
+      "receivedAt": "Received {date}",
+      "filterLabel": "Filter by category",
+      "empty": {
+        "unread": "You're all caught up",
+        "unreadHint": "Alerts that need your attention will appear here as they happen.",
+        "all": "No notifications yet",
+        "activity": "No activity yet",
+        "activityHint": "Events that don't need your attention (for example new orders, or orders shipped outside KolayXport) are listed here."
+      },
+      "loadError": "Couldn't load notifications"
+    },
+    "panel": {
+      "seeAll": "See all",
+      "empty": "No notifications",
+      "settings": "Notification settings"
+    },
+    "prefs": {
+      "title": "Notification preferences",
+      "subtitle": "Choose what reaches you in the app and by email",
+      "levelTitle": "Notification level",
+      "presets": {
+        "critical": "Critical only",
+        "recommended": "Recommended",
+        "all": "Everything"
+      },
+      "presetHints": {
+        "critical": "Only problems that need action now: cancelled after label, deleted or deactivated listings, failed stock updates, expired connections.",
+        "recommended": "New orders in the activity feed; instant email for labels cancelled after printing, shipping deadlines, listing problems and expired connections; a daily summary for stock-outs and expiring listings.",
+        "all": "Every notification in the app and by email."
+      },
+      "custom": "Custom",
+      "customHint": "You changed some notification types. Picking a level resets them.",
+      "emailTitle": "Email",
+      "emailEnabled": "Send email notifications",
+      "emailHint": "Sent to your account email address.",
+      "quietTitle": "Quiet hours",
+      "quietEnabled": "Hold non-critical emails during quiet hours",
+      "quietHint": "Critical alerts are always sent immediately.",
+      "quietFrom": "From",
+      "quietTo": "To",
+      "digestTitle": "Daily summary",
+      "digestHour": "Send the daily summary at",
+      "digestHint": "Items set to \"Daily summary\" are collected into one email.",
+      "timezone": "Time zone",
+      "advanced": "Advanced: per notification type",
+      "columns": {
+        "inApp": "In app",
+        "email": "Email",
+        "digest": "Daily summary"
+      },
+      "activityOnly": "Activity feed only",
+      "telegram": "Telegram",
+      "comingSoon": "Coming soon",
+      "telegramHint": "Get instant alerts in Telegram.",
+      "saved": "Preferences saved",
+      "saveFailed": "Couldn't save preferences",
+      "loadFailed": "Couldn't load preferences",
+      "hour": "{hour}:00"
+    },
+    "email": {
+      "open": "Open in KolayXport",
+      "footer": "Manage notification emails",
+      "digestSubject": "{count, plural, one {# notification} other {# notifications}} today",
+      "digestIntro": "Your daily KolayXport summary ({count, plural, one {# item} other {# items}}):",
+      "digestMore": "…and {count} more in KolayXport."
+    }
+  },
+  "orderPipeline": {
+    "labelGuard": {
+      "cancelledTitle": "This order was cancelled",
+      "shippedTitle": "This order was already shipped",
+      "orderNumber": "Order {orderNumber}",
+      "cancelled": "The marketplace reports this order as cancelled or refunded. A new label would be charged by the carrier.",
+      "shippedExternally": "The marketplace shows this order as shipped, but no label or tracking number was created in KolayXport. It was probably shipped another way.",
+      "overrideHint": "Create the label only if you are sure you still need to ship it.",
+      "keepSafe": "Don't create",
+      "createAnyway": "Create label anyway"
+    },
+    "badges": {
+      "cancelledAfterLabel": "Cancelled after label",
+      "labelCost": "label {cost} {currency}",
+      "labelTracking": "{carrier} label: {tracking}",
+      "cancelled": "Cancelled",
+      "voidRequested": "Void requested",
+      "shippedExternally": "Shipped outside KolayXport",
+      "late": "Late",
+      "shippedLate": "Shipped late",
+      "labelNotPushed": "Tracking not on Etsy",
+      "labelNotPushedHint": "The label is ready but the tracking number is not on Etsy yet. Push it with the Chrome extension.",
+      "delivered": "Delivered",
+      "returnWindow": "{days, plural, =0 {Return window ends today} one {# day left to return} other {# days left to return}}"
+    },
+    "void": {
+      "voidLabel": "Void label",
+      "confirmManual": "I cancelled it manually",
+      "openCarrierPortal": "Open carrier site",
+      "manualRequired": "This carrier can't be voided automatically. Cancel the label on the carrier's site, then tap \"I cancelled it manually\".",
+      "done": "Label voided",
+      "confirmed": "Marked as cancelled",
+      "failed": "The label could not be voided"
+    },
+    "dispatchState": {
+      "no_label": "No label",
+      "label_not_pushed": "Tracking not on Etsy",
+      "shipped_on_etsy": "Shipped on Etsy"
+    },
+    "dispatchHealth": {
+      "title": "On-time dispatch (Star Seller criterion 1/3)",
+      "empty": "No shipped Etsy orders in the last {days} days yet.",
+      "onTimeWithTracking": "shipped on time with tracking",
+      "target": "Star Seller requires 95% or more.",
+      "onTime": "On time",
+      "shipped": "Shipped",
+      "late": "Late",
+      "avgHandling": "Avg. handling",
+      "hours": "{hours} h",
+      "openNoLabel": "{count} open without label",
+      "openLabelNotPushed": "{count} label ready, tracking not on Etsy",
+      "deliveryDays": "Delivery time (days)",
+      "p50p90": "median {p50} · p90 {p90} ({n})"
+    }
+  },
+  "seoExperiments": {
+    "title": "SEO experiments",
+    "intro": "When you change titles, tags or photos, KolayXport compares views and orders 14 days before and after, against your listings that did not change.",
+    "empty": "No experiments yet. Change a title, tags or photos on an active listing and the result appears here about 15 days later.",
+    "filters": {
+      "all": "All",
+      "collecting": "Measuring",
+      "ready": "Results"
+    },
+    "kind": {
+      "kolayxport": "Edit from KolayXport",
+      "external": "Edit on Etsy"
+    },
+    "listingsCount": "{count, plural, one {# listing} other {# listings}}",
+    "andMore": "+{count} more",
+    "changeKinds": {
+      "title": "Title",
+      "tags": "Tags",
+      "images": "Photos"
+    },
+    "status": {
+      "collecting": "Measuring",
+      "low_traffic": "Low traffic",
+      "ready": "Result ready",
+      "insufficient_data": "Not enough data",
+      "confounded": "Overlapping edits",
+      "cancelled": "Cancelled"
+    },
+    "statusHelp": {
+      "collecting": "Result on {date}.",
+      "low_traffic": "Fewer than 30 views in the 14 days before the change, so the result may not be reliable. Still measuring — result on {date}.",
+      "insufficient_data": "Too few views or orders to say anything reliable.",
+      "confounded": "Another change to the same listing happened during the measurement, so the effect can't be separated.",
+      "cancelled": "This experiment was cancelled."
+    },
+    "verdict": {
+      "improved": "Views went up",
+      "worse": "Views went down",
+      "inconclusive": "No clear effect"
+    },
+    "confidence": {
+      "label": "Confidence",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "control": {
+      "shop": "Compared with your other listings",
+      "category": "Compared with your listings in the same category",
+      "none": "No comparison listings — treat with caution"
+    },
+    "metrics": {
+      "viewsBefore": "Views before",
+      "viewsAfter": "Views after",
+      "ordersBefore": "Orders before",
+      "ordersAfter": "Orders after",
+      "lift": "Change vs. comparison",
+      "liftValue": "{value}%",
+      "rank": "Search rank",
+      "rankDelta": "{count, plural, one {# keyword} other {# keywords}} · average {delta, number} places",
+      "rankNone": "No tracked keywords"
+    },
+    "seasonal": "Holiday season: Nov 15 – Jan 5 traffic swings can distort this result.",
+    "changedAt": "Changed {date}",
+    "loadFailed": "Couldn't load SEO experiments."
+  },
+  "stockSync": {
+    "pageTitle": "Stock Sync",
+    "pageSubtitle": "When an item sells on one channel, it goes down everywhere else, so you never oversell.",
+    "status": {
+      "disabled": "Off",
+      "dryRun": "Dry run",
+      "live": "Live",
+      "globallyDisabled": "Temporarily paused"
+    },
+    "statusHelp": {
+      "disabled": "Stock sync is off. No marketplace stock is changed.",
+      "dryRun": "Dry run: sales are counted and we work out what would be sent, but nothing is written to any marketplace.",
+      "live": "Live: stock changes are sent to every linked channel.",
+      "globallyDisabled": "Stock sync is temporarily paused for maintenance. Nothing is written to any marketplace."
+    },
+    "channels": {
+      "etsy": "Etsy",
+      "trendyol": "Trendyol",
+      "shopify": "Shopify",
+      "ebay": "eBay",
+      "wix": "Wix",
+      "amazon": "Amazon",
+      "hepsiburada": "Hepsiburada"
+    },
+    "common": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "close": "Close",
+      "retry": "Try again",
+      "back": "Back",
+      "next": "Next",
+      "skip": "Skip",
+      "loading": "Loading…",
+      "search": "Search",
+      "refresh": "Refresh",
+      "none": "—",
+      "units": "{count} units"
+    },
+    "settings": {
+      "title": "Status and settings",
+      "restockOnCancel": "Put stock back when an order is cancelled",
+      "restockOnCancelHelp": "Items of a cancelled order go back into stock. Returns are not added automatically.",
+      "autoFixDrift": "Fix mismatches automatically (lowers only)",
+      "autoFixDriftHelp": "If a marketplace shows more than you have, the hourly check lowers it. Stock is never raised automatically.",
+      "zeroAction": "When Etsy stock runs out",
+      "zeroDisable": "Turn off the variation (single-item listings are deactivated)",
+      "zeroDeactivate": "Deactivate the listing",
+      "seedReserved": "Subtract sold-but-unshipped items from the starting stock",
+      "seedReservedHelp": "Items that are sold but not shipped yet are taken off the starting count.",
+      "openWizard": "Setup wizard",
+      "goLive": "Go live",
+      "backToDryRun": "Back to dry run",
+      "disable": "Turn off stock sync",
+      "disableConfirmTitle": "Turn off stock sync?",
+      "disableConfirmBody": "Matches and history are kept. While off, no marketplace stock changes.",
+      "restore": "Undo go-live",
+      "saved": "Settings saved",
+      "channelsTitle": "Synced channels",
+      "counts": {
+        "items": "Products",
+        "activeLinks": "Linked listings",
+        "needsReview": "Need a count",
+        "suggested": "Suggestions",
+        "failed": "Errors in last 24 h"
+      }
+    },
+    "dryRunReport": {
+      "title": "Dry-run report",
+      "wouldHaveSent": "{count} stock updates would have been sent",
+      "risksPrevented": "{count} oversell risks would have been prevented",
+      "riskExample": "{sku}: after a {soldOn} sale, {exposedOn} still showed {shown} while you had {available}",
+      "empty": "Nothing yet. As sales come in you will see here what would be sent."
+    },
+    "wizard": {
+      "title": "Stock sync setup",
+      "steps": {
+        "channels": "Channels",
+        "matches": "Matches",
+        "unmatched": "Unmatched",
+        "seed": "Starting stock",
+        "preview": "Preview",
+        "enable": "Dry run"
+      },
+      "channelsIntro": "Choose the channels whose stock you want to manage together. Each shows how long a sale there takes to reach us; during that time an oversell is possible.",
+      "oversellWindow": "Sales seen within ~{minutes} min",
+      "notConnected": "Not connected",
+      "comingSoon": "Coming soon",
+      "writeUnsupported": "Read only (stock cannot be written)",
+      "matchesIntro": "Listings with the same SKU are grouped into one product. Check and confirm them.",
+      "selectAll": "Select all",
+      "confirmSelected": "Confirm {count} products",
+      "confirmed": "{count} products confirmed",
+      "needsReview": "Needs a check",
+      "reviewReasons": {
+        "zero": "A channel shows 0",
+        "high": "A channel shows 100 or more",
+        "ratio": "Big difference between channels",
+        "shared_pool_conflict": "Same-SKU listings show different numbers"
+      },
+      "seedQtyLabel": "Real stock",
+      "sharedPool": "{count} listings on {channel} share this stock",
+      "noMatches": "No listings with the same SKU on more than one channel.",
+      "singleChannel": "On one channel only ({count})",
+      "unmatchedIntro": "These listings have no SKU or no twin on another channel. Link them by hand if you like.",
+      "unmatchedCount": "{count} unmatched listings",
+      "linkToItem": "Link",
+      "generateSkus": "Generate SKUs for Etsy",
+      "generateSkusHelp": "SKUs are proposed for the selected Etsy listings and saved as drafts. They reach Etsy only when you press \"Sync to Etsy\".",
+      "generateStaged": "SKU drafts created for {count} listings",
+      "looseTitle": "Similar SKUs (never linked automatically)",
+      "titleTitle": "Similar titles (never linked automatically)",
+      "seedIntro": "How should the starting stock be set?",
+      "policy": {
+        "min": "Lowest number across channels",
+        "minHelp": "Recommended. You enter the number for products that need a check.",
+        "etsy_master": "Use the Etsy number",
+        "etsy_masterHelp": "The Etsy quantity becomes the starting stock.",
+        "manual": "I will enter every number",
+        "manualHelp": "You type the real count for each product."
+      },
+      "coverage": "{percent}% of the last 30 days' sales belong to matched products",
+      "previewIntro": "What each listing will be set to when you go live. Nothing is sent in this step.",
+      "enableIntro": "In dry run, sales are counted and we work out what would be sent, but nothing is written to any marketplace. Review the report and press \"Go live\" when you are ready.",
+      "enableButton": "Start dry run",
+      "enabled": "Dry run started",
+      "needsReviewLeft": "Enter a count for {count} products; they are not synced until you do."
+    },
+    "preview": {
+      "title": "Preview",
+      "liveRead": "Reading current numbers from the marketplaces…",
+      "totals": {
+        "pushes": "{count} updates",
+        "deactivations": "{count} listings will be deactivated",
+        "disabledVariations": "{count} variations will be turned off",
+        "bigDrops": "{count} listings drop by more than 50%",
+        "needsReview": "{count} products need a count",
+        "capped": "{count} listings shown with the last seen number"
+      },
+      "remote": "On marketplace",
+      "target": "Will be",
+      "effect": {
+        "none": "No change",
+        "set": "{from} → {to}",
+        "deactivate": "Listing deactivated",
+        "disable_variation": "Variation turned off",
+        "unsupported": "Not supported"
+      },
+      "remoteSource": {
+        "live": "current",
+        "last_seen": "last seen",
+        "none": "unknown"
+      },
+      "noChanges": "Nothing to send."
+    },
+    "goLive": {
+      "title": "Go live",
+      "intro": "When live, stock changes are written to the marketplaces. The numbers before going live are kept for 7 days so you can undo.",
+      "typeToConfirm": "Some listings will be deactivated or variations turned off. Type {word} to confirm.",
+      "word": "LIVE",
+      "confirm": "Go live",
+      "success": "Stock sync is live",
+      "refreshPreview": "Refresh preview"
+    },
+    "restore": {
+      "title": "Undo go-live",
+      "body": "Every listing is set back to its number before go-live (minus what sold since) and stock sync is turned off.",
+      "word": "RESTORE",
+      "typeToConfirm": "Type {word} to confirm",
+      "confirm": "Restore",
+      "success": "{applied} listings restored, {failed} failed",
+      "none": "Nothing to restore"
+    },
+    "items": {
+      "title": "Products",
+      "empty": "No synced products yet. Start with the setup wizard.",
+      "search": "Search SKU or title",
+      "filter": {
+        "all": "All",
+        "active": "Active",
+        "needs_review": "Need a count",
+        "paused": "Paused"
+      },
+      "onHand": "Stock",
+      "safetyBuffer": "Safety buffer",
+      "tracking": "Tracking",
+      "tracked": "Tracked",
+      "untracked": "Not tracked",
+      "links": "Channels",
+      "adjust": "Fix stock",
+      "why": "Why this number?",
+      "enterCount": "Enter count",
+      "pause": "Pause",
+      "resume": "Resume",
+      "statusLabels": {
+        "active": "Active",
+        "paused": "Paused",
+        "needs_review": "Needs a count"
+      },
+      "openPushes": "{count} updates pending",
+      "lastError": "Last error: {error}",
+      "sku": "SKU",
+      "product": "Product"
+    },
+    "link": {
+      "statusLabels": {
+        "active": "Active",
+        "paused": "Paused",
+        "suggested": "Suggestion",
+        "error": "Error",
+        "unsupported": "Not supported"
+      },
+      "reasons": {
+        "account_changed": "Shop connection changed",
+        "user": "Paused by you",
+        "structure": "Listing variations changed",
+        "variant_missing": "Variation not found",
+        "coming_soon": "Coming soon",
+        "catalog_v3_or_unverified": "Wix stock writing not verified yet",
+        "untracked": "Stock tracking is off on the marketplace",
+        "untracked_or_location": "Stock tracking or location not found",
+        "legacy_listing": "Legacy eBay listing",
+        "no_offer": "No eBay offer",
+        "no_inventory_item": "No eBay inventory item",
+        "listing_removed": "Listing removed",
+        "listing_inactive": "Listing inactive",
+        "listing_expired": "Listing expired",
+        "listing_sold_out": "Listing sold out",
+        "listing_draft": "Listing is a draft",
+        "variation_disabled": "Variation disabled on Etsy",
+        "unsupported": "Not supported"
+      },
+      "remote": "On marketplace",
+      "target": "Target",
+      "remoteUnknown": "unknown",
+      "unlink": "Unlink",
+      "unlinkConfirm": "Remove the stock link for this listing?",
+      "accept": "Confirm",
+      "pause": "Pause",
+      "resume": "Resume",
+      "unitsPerSale": "Units per sale",
+      "buffer": "Listing buffer",
+      "maxListed": "Show at most",
+      "deactivatedByStock": "Deactivated because stock ran out",
+      "settings": "Listing settings"
+    },
+    "adjust": {
+      "title": "Fix stock",
+      "modeSet": "New number",
+      "modeDelta": "Add / remove",
+      "setTo": "Real stock",
+      "delta": "Change (e.g. 5 or -2)",
+      "note": "Note (optional)",
+      "save": "Save",
+      "success": "Stock updated: {onHand}"
+    },
+    "mapping": {
+      "title": "Link listing to a product",
+      "searchItems": "Search products",
+      "newSku": "New product SKU",
+      "existing": "Link to an existing product",
+      "create": "Create a new product",
+      "link": "Link",
+      "success": "Listing linked",
+      "candidate": "Listing to link"
+    },
+    "timeline": {
+      "title": "Stock history",
+      "empty": "No movements yet.",
+      "adopt": "Accept this increase",
+      "adopted": "Increase added to stock",
+      "entries": {
+        "sale": "{channel} #{order} sold: −{units} → {after}",
+        "saleAdjust": "{channel} #{order} quantity changed: {delta} → {after}",
+        "cancel": "{channel} #{order} cancelled: +{units} → {after}",
+        "manual": "Fixed by hand: {delta} → {after}",
+        "manualEditor": "Changed in the Etsy editor: {delta} → {after}",
+        "adopt": "{channel} increase accepted: +{delta} → {after}",
+        "seed": "Starting stock: {after}",
+        "remoteDrop": "{channel} stock dropped without an order: −{units} → {after}",
+        "remoteDropMatched": "{channel} #{order} sale (seen first as a stock drop): −{units}",
+        "driftFix": "Mismatch fixed: {delta} → {after}",
+        "other": "Stock changed: {delta} → {after}",
+        "pushApplied": "{channel} {from}→{to} sent ✓",
+        "pushDraft": "{channel} set to {to} by the draft sync ✓",
+        "pushDeactivated": "{channel} listing deactivated because stock ran out",
+        "pushReactivated": "{channel} listing reactivated ({to})",
+        "pushSkipped": "{channel} already correct ({qty})",
+        "pushDryRun": "Dry run: {channel} would be {to}",
+        "pushFailed": "{channel} could not be updated ({to}): {error}",
+        "pushPending": "Sending {to} to {channel}…",
+        "remoteIncrease": "{channel} stock was raised outside KolayXport: {from} → {to}"
+      }
+    },
+    "managed": {
+      "chip": "Managed by stock sync ({qty})",
+      "tooltip": "This variation's quantity comes from stock sync. If you change it here, the new number is saved as a stock correction.",
+      "dryRunTooltip": "Stock sync is in dry run: this quantity is not changed automatically yet."
+    },
+    "errors": {
+      "generic": "Something went wrong. Please try again.",
+      "account_not_owned": "No access to this shop account.",
+      "token_missing": "Open the current preview first.",
+      "token_invalid": "The preview is not valid. Refresh and try again.",
+      "token_expired": "The preview expired (15 min). Refresh and try again.",
+      "typed_confirm_required": "Type the confirmation word correctly.",
+      "plan_changed": "Something changed since the preview (a sale, a link or a setting). Refresh the preview and confirm again.",
+      "not_enabled": "Start the dry run first.",
+      "already_live": "Stock sync is already live.",
+      "needs_seed": "Enter this product's stock count first.",
+      "snapshot_not_found": "Nothing found to restore.",
+      "snapshot_expired": "The saved numbers expired (7 days).",
+      "already_restored": "This was already restored.",
+      "invalid_quantity": "Enter a valid number.",
+      "invalid_value": "Enter a valid value."
+    }
   }
 }

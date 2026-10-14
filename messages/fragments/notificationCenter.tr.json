@@ -1,0 +1,146 @@
+{
+  "notificationCenter": {
+    "types": {
+      "orderNew": "Yeni sipariş: {orderNumber}",
+      "orderCanceled": "{orderNumber} numaralı sipariş iptal edildi",
+      "orderCanceledAfterLabel": "{orderNumber} numaralı sipariş etiketi oluşturulduktan sonra iptal edildi. Etiketi iptal edin",
+      "orderShippedExternal": "{orderNumber} numaralı sipariş KolayXport dışında kargolandı olarak işaretlendi",
+      "dispatchOverdue": "{count} siparişin kargolama tarihi geçti",
+      "dispatchDueToday": "{count} sipariş bugün kargolanmalı",
+      "dispatchDueTomorrow": "{count} sipariş yarın kargolanmalı",
+      "listingDeactivated": "\"{title}\" Etsy ilanı devre dışı bırakıldı",
+      "listingExpired": "\"{title}\" Etsy ilanının süresi doldu",
+      "listingDeleted": "\"{title}\" Etsy ilanı silindi",
+      "listingChangedExternally": "\"{title}\" KolayXport dışında değiştirildi",
+      "stockOutOfStock": "{sku} stokta kalmadı",
+      "stockPushFailed": "{sku} için {channel} stok güncellemesi başarısız oldu",
+      "stockDrift": "Bugün {count} stok uyuşmazlığı bulundu",
+      "stockUnmatchedSale": "{count} satış bir stok kalemiyle eşleştirilemedi",
+      "seoExperimentReady": "\"{title}\" için SEO testi sonuçları hazır",
+      "webhookBacklog": "Etsy olay kuyruğu birikiyor"
+    },
+    "typeLabels": {
+      "orderNew": "Yeni siparişler",
+      "orderCanceled": "İptal edilen siparişler",
+      "orderCanceledAfterLabel": "Etiketten sonra iptal",
+      "orderShippedExternal": "KolayXport dışında kargolanan",
+      "orderSyncFailed": "Sipariş senkronu başarısız",
+      "dispatchOverdue": "Geciken kargolar",
+      "dispatchDueToday": "Bugün kargolanacaklar",
+      "dispatchDueTomorrow": "Yarın kargolanacaklar",
+      "listingDeactivated": "İlan devre dışı",
+      "listingDeleted": "İlan silindi",
+      "listingExpired": "İlan süresi doldu",
+      "listingChangedExternally": "İlan KolayXport dışında değişti",
+      "draftSyncFailed": "Etsy senkronu başarısız",
+      "draftConflict": "İlan düzenleme çakışması",
+      "seoExperimentReady": "SEO testi sonuçları",
+      "stockOutOfStock": "Stok tükendi",
+      "stockPushFailed": "Stok güncellemesi başarısız",
+      "stockDrift": "Stok uyuşmazlığı",
+      "stockUnmatchedSale": "Eşleşmeyen satış",
+      "reauthRequired": "Bağlantı süresi doldu",
+      "usageNearLimit": "Kullanım limite yakın",
+      "usageLimitReached": "Kullanım limiti doldu",
+      "webhookBacklog": "Webhook birikmesi (yönetici)"
+    },
+    "groups": {
+      "all": "Tümü",
+      "orders": "Siparişler",
+      "dispatch": "Kargo süreleri",
+      "listings": "İlanlar",
+      "stock": "Stok",
+      "account": "Hesap",
+      "system": "Sistem"
+    },
+    "severity": {
+      "info": "Bilgi",
+      "warning": "Uyarı",
+      "error": "Kritik"
+    },
+    "page": {
+      "title": "Bildirimler",
+      "subtitle": "Siparişler, kargo süreleri, ilanlar ve stok uyarıları tek yerde",
+      "tabs": {
+        "unread": "Okunmamış",
+        "all": "Tümü",
+        "activity": "Etkinlik",
+        "preferences": "Tercihler"
+      },
+      "markAllRead": "Tümünü okundu işaretle",
+      "markRead": "Okundu işaretle",
+      "open": "Aç",
+      "today": "Bugün",
+      "earlier": "Daha önce",
+      "loadMore": "Daha fazla yükle",
+      "loading": "Yükleniyor…",
+      "resolved": "Çözüldü",
+      "unread": "Okunmadı",
+      "receivedAt": "Alındı: {date}",
+      "filterLabel": "Kategoriye göre filtrele",
+      "empty": {
+        "unread": "Okunmamış bildiriminiz yok",
+        "unreadHint": "İlgilenmeniz gereken uyarılar geldiği anda burada görünür.",
+        "all": "Henüz bildirim yok",
+        "activity": "Henüz etkinlik yok",
+        "activityHint": "İlgilenmeniz gerekmeyen olaylar (örneğin yeni siparişler veya KolayXport dışında kargolanan siparişler) burada listelenir."
+      },
+      "loadError": "Bildirimler yüklenemedi"
+    },
+    "panel": {
+      "seeAll": "Tümünü gör",
+      "empty": "Bildirim yok",
+      "settings": "Bildirim ayarları"
+    },
+    "prefs": {
+      "title": "Bildirim tercihleri",
+      "subtitle": "Uygulamada ve e-postayla nelerin size ulaşacağını seçin",
+      "levelTitle": "Bildirim düzeyi",
+      "presets": {
+        "critical": "Sadece kritik",
+        "recommended": "Önerilen",
+        "all": "Hepsi"
+      },
+      "presetHints": {
+        "critical": "Yalnızca hemen müdahale gerektiren sorunlar: etiketten sonra iptal, silinen veya devre dışı ilanlar, başarısız stok güncellemeleri, süresi dolan bağlantılar.",
+        "recommended": "Yeni siparişler etkinlik akışında; etiket sonrası iptaller, kargo süreleri, ilan sorunları ve süresi dolan bağlantılar için anında e-posta; tükenen stoklar ve süresi dolan ilanlar için günlük özet.",
+        "all": "Tüm bildirimler uygulamada ve e-postayla."
+      },
+      "custom": "Özel",
+      "customHint": "Bazı bildirim türlerini değiştirdiniz. Bir düzey seçmek bunları sıfırlar.",
+      "emailTitle": "E-posta",
+      "emailEnabled": "E-posta bildirimleri gönder",
+      "emailHint": "Hesabınızın e-posta adresine gönderilir.",
+      "quietTitle": "Sessiz saatler",
+      "quietEnabled": "Kritik olmayan e-postaları sessiz saatlerde beklet",
+      "quietHint": "Kritik uyarılar her zaman hemen gönderilir.",
+      "quietFrom": "Başlangıç",
+      "quietTo": "Bitiş",
+      "digestTitle": "Günlük özet",
+      "digestHour": "Günlük özetin gönderileceği saat",
+      "digestHint": "\"Günlük özet\" olarak ayarlanan bildirimler tek bir e-postada toplanır.",
+      "timezone": "Saat dilimi",
+      "advanced": "Gelişmiş: bildirim türüne göre",
+      "columns": {
+        "inApp": "Uygulamada",
+        "email": "E-posta",
+        "digest": "Günlük özet"
+      },
+      "activityOnly": "Yalnızca etkinlik akışı",
+      "telegram": "Telegram",
+      "comingSoon": "Yakında",
+      "telegramHint": "Anlık uyarıları Telegram'dan alın.",
+      "saved": "Tercihler kaydedildi",
+      "saveFailed": "Tercihler kaydedilemedi",
+      "loadFailed": "Tercihler yüklenemedi",
+      "hour": "{hour}:00"
+    },
+    "email": {
+      "open": "KolayXport'ta aç",
+      "footer": "Bildirim e-postalarını yönet",
+      "digestSubject": "Bugün {count} bildirim",
+      "digestIntro": "KolayXport günlük özetiniz ({count} öğe):",
+      "digestMore": "…ve KolayXport'ta {count} öğe daha."
+    }
+  }
+}

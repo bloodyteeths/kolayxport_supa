@@ -7,6 +7,8 @@ import { OrderRow, ShipperProfileData, FedexShipmentResult, OrderRowItem } from 
 import { fedexOptionsData } from '../../../../lib/fedex/fedex.config';
 import { logger } from '../../../../lib/logger';
 import { withUsageLimiter } from '../../../../lib/middleware/withUsageLimiter';
+import { assertOrderLabelable, labelGuardOverride } from '@/lib/orders/labelGuard';
+import { labelGuardBody, publishLabelCreated } from '@/lib/orders/labelEvents';
 
 // Utility to parse phone number and extension - handles Amazon format like "+1 415-851-9136 ext. 96793"
 // Same logic as UPS but adapted for FedEx (max 6 chars extension vs UPS 4 chars)
@@ -99,6 +101,17 @@ async function handler(
   const { orderId } = req.query;
   if (typeof orderId !== 'string' || !orderId) {
     return res.status(400).json({ error: 'Order ID is required.' });
+  }
+
+  // Label safety guard: refuse cancelled / externally shipped orders before
+  // any carrier call (409, client opens CancelledOrderLabelDialog and may
+  // retry with forceCancelled: true).
+  try {
+    const guard = await assertOrderLabelable(orderId, authUser.id, { override: labelGuardOverride(req.body) });
+    if (!guard.ok) return res.status(guard.httpStatus).json(labelGuardBody(guard) as any);
+  } catch (error) {
+    logger.error('[API generate-label] Label guard failed:', error);
+    return res.status(500).json({ error: 'Failed to validate order state.' });
   }
 
   // Check for existing shipments to prevent multiple labels
@@ -577,6 +590,8 @@ async function handler(
     if (res.incrementUsage) {
       await res.incrementUsage();
     }
+
+    publishLabelCreated(authUser.id, orderId, { carrier: 'FEDEX', trackingNumber: fedexResult.trackingNumber });
 
     // Keep only essential success logging
     logger.info(`[API generate-label] Label generated successfully for order ${orderId}. Tracking: ${fedexResult.trackingNumber}`);

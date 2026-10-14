@@ -2,15 +2,21 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { verifyCronAuth } from '@/lib/cron/idempotency';
 import { logCronEvent, logSecurityEvent } from '@/lib/admin/events';
 import { processEtsyWebhookQueue } from '@/lib/etsy/webhooks/processor';
+import { isEtsyWorkerHealthy } from '@/lib/etsy/webhooks/worker';
+import { getLastSuccessfulRun } from '@/lib/scheduler/runs';
 
 export const config = { runtime: 'nodejs' };
 
+const HEALTHY_WITHIN_MS = 2 * 60_000;
+
 /**
- * Sweeper for the Etsy webhook queue (retries with backoff, events whose
- * in-process kick was lost to a restart). Auth: Authorization: Bearer <CRON_SECRET>.
+ * Safety-net sweeper for the Etsy webhook queue (GitHub Actions, every 2 min).
+ * Auth: Authorization: Bearer <CRON_SECRET>.
  *
- * No CronLock bucket: this runs every couple of minutes and the processor
- * claims rows atomically, so overlapping triggers are already safe.
+ * Self-skips while the in-process worker is healthy (its 5 s loop ran within
+ * 2 min, or the 'etsy-webhook-sweep' scheduler job succeeded within 2 min);
+ * otherwise runs one worker pass and waits for the events it started.
+ * Rows are claimed atomically, so overlapping triggers are safe.
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!verifyCronAuth(req)) {
@@ -23,8 +29,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const result = await processEtsyWebhookQueue({ maxEvents: 200, maxApiEvents: 40 });
-    if (!('skipped' in result) && (result.failed > 0 || result.retried > 0)) {
+    const force = req.query.force === '1';
+    if (!force) {
+      if (isEtsyWorkerHealthy()) return res.status(200).json({ ok: true, skipped: 'worker_healthy' });
+      const lastSweep = await getLastSuccessfulRun('etsy-webhook-sweep').catch(() => null);
+      if (lastSweep && Date.now() - lastSweep.getTime() < HEALTHY_WITHIN_MS) {
+        return res.status(200).json({ ok: true, skipped: 'worker_healthy' });
+      }
+    }
+
+    const result = await processEtsyWebhookQueue({ waitTimeoutMs: 90_000 });
+    const outcomes = result.outcomes || {};
+    if ((outcomes.failed || 0) > 0 || (outcomes.retried || 0) > 0) {
       logCronEvent('warn', {
         message: 'Etsy webhook sweep had failures',
         operation: 'cron.etsy_webhooks',

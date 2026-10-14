@@ -5,6 +5,74 @@ import { encryptIfNeeded } from '@/lib/crypto/credentials';
 import { verifyOAuthState } from '@/lib/auth/oauthState';
 import { resolveNotification, notificationKeys } from '@/lib/notifications';
 
+/**
+ * After a successful (re)connect: requeue webhook events parked while the shop
+ * needed reauth, then catch up orders and listings in the background. Every
+ * step is caught and logged — the OAuth redirect never waits on or fails
+ * because of these.
+ */
+async function afterEtsyConnect(userId: string, shopId: string, previousOwnerId: string | null) {
+  if (previousOwnerId && previousOwnerId !== userId) {
+    try {
+      const { onEtsyShopOwnershipChanged } = await import('@/lib/stock/hooks');
+      await onEtsyShopOwnershipChanged(shopId, userId);
+    } catch (err) {
+      logger.error('onEtsyShopOwnershipChanged failed', err instanceof Error ? err : new Error(String(err)), { userId, shopId });
+    }
+  }
+  // Decide the listing pass mode BEFORE anything else touches the shop: only a
+  // shop that was never imported (or just changed owner) gets the silent
+  // 'initial' import. A reconnect after a reauth gap runs with reconcile
+  // semantics so transitions missed during the gap (deactivated / expired)
+  // still alert.
+  let listingMode: 'initial' | 'nightly' = 'initial';
+  try {
+    const ownerChanged = !!previousOwnerId && previousOwnerId !== userId;
+    const shop = await prisma.etsyShop.findUnique({ where: { shopId }, select: { lastListingSyncAt: true } });
+    const cachedCount = shop?.lastListingSyncAt ? 1 : await prisma.etsyListing.count({ where: { etsyShopId: shopId } });
+    const { postConnectListingMode } = await import('@/lib/etsy/listingReconcile');
+    listingMode = postConnectListingMode({ ownerChanged, lastListingSyncAt: shop?.lastListingSyncAt ?? null, cachedCount });
+  } catch (err) {
+    logger.warn('Post-connect listing mode lookup failed; using initial', { userId, shopId, error: err instanceof Error ? err.message : String(err) });
+  }
+  let requeued = 0;
+  try {
+    const { requeueBlockedEtsyEvents } = await import('@/lib/etsy/webhooks/queueOps');
+    requeued = await requeueBlockedEtsyEvents(shopId);
+    if (requeued) logger.info('Requeued Etsy webhook events after reconnect', { userId, shopId, count: requeued });
+  } catch (err) {
+    logger.error('requeueBlockedEtsyEvents failed', err instanceof Error ? err : new Error(String(err)), { userId, shopId });
+  }
+  void import('@/lib/orders/etsyLifecycle')
+    .then((m) => m.runEtsyOrderIncremental(shopId, { reason: 'reconnect' }))
+    .catch((err) => logger.warn('Post-connect Etsy order catch-up failed', { userId, shopId, error: err instanceof Error ? err.message : String(err) }));
+  // Let the requeued listing.* webhooks drain first so they keep their
+  // 'external' attribution and alert context; the reconcile then only picks up
+  // what no webhook covered.
+  void (requeued > 0 ? waitForParkedListingEvents(shopId) : Promise.resolve())
+    .then(() => import('@/lib/etsy/listingReconcile'))
+    .then((m) => m.reconcileShopListings(shopId, { mode: listingMode }))
+    .then((r) =>
+      logger.info('Post-connect Etsy listing import finished', { userId, shopId, mode: listingMode, success: r.success, fetched: r.fetched, synced: r.synced }),
+    )
+    .catch((err) => logger.warn('Post-connect Etsy listing import failed', { userId, shopId, error: err instanceof Error ? err.message : String(err) }));
+}
+
+const PARKED_DRAIN_MAX_MS = 3 * 60_000;
+const PARKED_DRAIN_POLL_MS = 5_000;
+
+/** Waits (bounded) until no listing:* webhook event of the shop is queued or processing. */
+async function waitForParkedListingEvents(shopId: string): Promise<void> {
+  const deadline = Date.now() + PARKED_DRAIN_MAX_MS;
+  for (;;) {
+    const pending = await prisma.webhookEvent
+      .count({ where: { shopId, resourceKey: { startsWith: 'listing:' }, status: { in: ['received', 'processing'] } } })
+      .catch(() => 0);
+    if (pending === 0 || Date.now() >= deadline) return;
+    await new Promise((r) => setTimeout(r, PARKED_DRAIN_POLL_MS));
+  }
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -182,6 +250,12 @@ export default async function handler(
       throw new Error('No shop data available');
     }
 
+    // Who owned this Etsy shop before (EtsyShop.shopId is unique across users).
+    const previousOwner = await prisma.etsyShop.findUnique({
+      where: { shopId: shopData.shop_id.toString() },
+      select: { userId: true },
+    }).catch(() => null);
+
     // Check if user already has this shop
     const existingShop = await prisma.etsyShop.findUnique({
       where: {
@@ -226,6 +300,9 @@ export default async function handler(
           refreshToken: encryptIfNeeded(tokens.refresh_token),
           tokenExpiresAt: tokenExpiresAt,
           isActive: true,
+          // A fresh grant clears the reauth flag set on invalid_grant.
+          needsReauth: false,
+          needsReauthAt: null,
           updatedAt: new Date()
         },
         create: {
@@ -243,6 +320,7 @@ export default async function handler(
       etsyShopSaved = true;
       // A successful (re)connect clears any open "reconnect Etsy" alert for this shop.
       void resolveNotification(userId, notificationKeys.reauth('etsy', shopData.shop_id.toString()));
+      void afterEtsyConnect(userId, shopData.shop_id.toString(), previousOwner?.userId ?? null).catch(() => undefined);
       logger.info('Successfully stored shop in EtsyShop model', {
         userId,
         shopId: shopData.shop_id,

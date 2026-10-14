@@ -4,6 +4,12 @@ import { logger } from '@/lib/logger';
 import { getAuthUser } from '@/lib/auth';
 import { applyExtensionCors } from '@/lib/security/internalApiKey';
 
+const CANCELLED_STATUS_VARIANTS = ['CANCELLED', 'CANCELED', 'cancelled', 'canceled', 'Cancelled', 'Canceled', 'REFUNDED', 'refunded', 'Refunded'];
+
+function normTracking(v: unknown): string {
+  return String(v || '').replace(/\s+/g, '').toUpperCase();
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // CORS: kolayxport.com + configured official extension origin only (fail closed).
   applyExtensionCors(req, res, 'GET, OPTIONS');
@@ -27,19 +33,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
     const etsyShopNames = etsyShops.map((s) => s.shopName).filter((n): n is string => !!n);
 
+    // Optional keyset cursor: the last submissionId of the previous page.
+    const cursor = typeof req.query.cursor === 'string' && req.query.cursor.length <= 64 ? req.query.cursor : null;
+
     // Find tracking submissions for Etsy orders that haven't been pushed via extension yet
-    // Orders may have shop name (e.g. "BelleCoutureGifts") as marketplace, not "etsy"
-    const pending = await prisma.trackingSubmission.findMany({
+    // Orders may have shop name (e.g. "BelleCoutureGifts") as marketplace, not "etsy".
+    // Cancelled orders are excluded. SHIPPED is deliberately NOT filtered:
+    // submit-tracking sets status 'shipped' on submit, before the push.
+    const rows = await prisma.trackingSubmission.findMany({
       where: {
         submittedBy: user.id,
         // needs_manual = typed by the extension but saving wasn't confirmed; keep offering it.
         etsySubmitStatus: { in: ['pending', 'needs_manual'] },
         order: {
-          OR: [
-            { marketplace: { contains: 'etsy', mode: 'insensitive' } },
-            ...(etsyShopNames.length > 0
-              ? etsyShopNames.map((name) => ({ marketplace: name }))
-              : []),
+          cancelledAt: null,
+          AND: [
+            {
+              OR: [
+                { marketplace: { contains: 'etsy', mode: 'insensitive' } },
+                ...(etsyShopNames.length > 0
+                  ? etsyShopNames.map((name) => ({ marketplace: name }))
+                  : []),
+              ],
+            },
+            { OR: [{ status: null }, { status: { notIn: CANCELLED_STATUS_VARIANTS } }] },
           ],
         },
       },
@@ -54,11 +71,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             orderNumber: true,
             marketplaceKey: true,
             customerName: true,
+            rawData: true,
           },
         },
       },
-      orderBy: { submittedAt: 'desc' },
+      orderBy: [{ submittedAt: 'desc' }, { id: 'desc' }],
       take: 50,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    });
+
+    // A number Etsy already shows on the receipt is done (pushed by the
+    // extension, another app or by hand) — don't offer it again.
+    const pending = rows.filter((ts) => {
+      const ships = Array.isArray((ts.order.rawData as any)?.shipments) ? (ts.order.rawData as any).shipments : [];
+      const remote = new Set(ships.map((x: any) => normTracking(x?.tracking_code)).filter(Boolean));
+      return !remote.has(normTracking(ts.trackingNumber));
     });
 
     console.log('[tracking-pending] Query result', { userId: user.id, pendingCount: pending.length, shopNames: etsyShopNames });

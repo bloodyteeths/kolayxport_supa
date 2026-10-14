@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { EtsyClient, EtsyTrackingData, EtsyCredentials } from '@/lib/integrations/etsyClient';
+import { EtsyClient, EtsyPriority, EtsyTrackingData, EtsyCredentials } from '@/lib/integrations/etsyClient';
 import { logger } from '@/lib/logger';
 import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
 
@@ -59,7 +59,9 @@ export default async function handler(
       accessToken: accessTokenPlain,
       refreshToken: refreshTokenPlain || undefined,
       shopId: shopId || credential.etsyShopId, // Use provided shopId or default to user's shop
-      tokenExpiresAt: credential.etsyTokenExpiresAt || undefined
+      tokenExpiresAt: credential.etsyTokenExpiresAt || undefined,
+      userId: user.id,
+      priority: EtsyPriority.Critical,
     };
 
     // Create token refresh callback to update database (re-encrypt on write).

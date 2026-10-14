@@ -26,6 +26,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const users = await prisma.user.findMany({ include: { integrationSettings: true } });
     const results: any[] = [];
 
+    // Etsy is polled by the in-process `etsy-orders-incremental` job (plus
+    // webhooks). The cron keeps polling Etsy itself whenever that job has not
+    // succeeded within 30 minutes, so a dead scheduler can never stop orders.
+    let etsyJobHealthy = false;
+    try {
+      const { getLastSuccessfulRun } = await import('@/lib/scheduler/runs');
+      const last = await getLastSuccessfulRun('etsy-orders-incremental');
+      etsyJobHealthy = !!last && Date.now() - last.getTime() < 30 * 60 * 1000;
+    } catch {
+      etsyJobHealthy = false;
+    }
+
     for (const user of users) {
       const settings = user.integrationSettings;
       if (!settings) continue;
@@ -33,7 +45,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Always attempt generic sync for other marketplaces (veeqo/shippo) using central logic
       // It internally skips missing credentials
       try {
-        await syncAllOrders(user.id, { syncType: 'recent' });
+        await syncAllOrders(user.id, { syncType: 'recent', ...(etsyJobHealthy ? { excludeSources: ['etsy-api'] } : {}) });
       } catch (e: any) {
         results.push({ userId: user.id, source: 'generic', error: e?.message || String(e) });
       }
@@ -64,9 +76,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           results.push({ userId: user.id, source: 'shopify', error: e?.message || String(e) });
         }
       }
+
+      // Stock: apply newly synced orders (no-op unless the user's stock sync is live).
+      try {
+        const { scanOrdersForStock } = await import('@/lib/stock/hooks');
+        await scanOrdersForStock({ userId: user.id });
+      } catch (e: any) {
+        results.push({ userId: user.id, source: 'stock_scan', error: e?.message || String(e) });
+      }
     }
 
-    return res.status(200).json({ ok: true, results });
+    return res.status(200).json({ ok: true, etsyPolledByCron: !etsyJobHealthy, results });
   } catch (err: any) {
     return res.status(500).json({ error: err?.message || String(err) });
   }

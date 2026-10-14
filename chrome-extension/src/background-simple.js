@@ -222,6 +222,12 @@ async function handleMessage(request, sender, sendResponse) {
         break;
       }
 
+      case 'fetchAddressPending': {
+        const r = await refreshAddressPending();
+        sendResponse(r);
+        break;
+      }
+
       case 'confirmTrackingSubmission': {
         const r = await apiFetch('/api/integrations/etsy/tracking-confirm', {
           method: 'POST',
@@ -243,6 +249,8 @@ async function handleMessage(request, sender, sendResponse) {
           body: { orders, source, timestamp }
         });
         if (r.ok) {
+          // An address was just scraped: refresh the missing-address queue count.
+          refreshAddressPending().catch(() => {});
           sendResponse({ success: true, result: r.data });
         } else {
           sendResponse({ success: false, error: `Server error ${r.status}: ${errorOf(r)}` });
@@ -329,6 +337,37 @@ async function checkAuthentication({ force = false } = {}) {
     _authInFlight = null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Missing-address queue (v9.6.0). Etsy's API withholds buyer addresses, so
+// orders without one are listed by the server; the popup shows the count and
+// opens the next order page, where the existing scrape-on-visit fills it.
+// Polled with the same request/response pattern as tracking-pending, on an
+// alarm (15 min), on startup and after every address sync.
+// ---------------------------------------------------------------------------
+const ADDRESS_PENDING_ALARM = 'kx-address-pending';
+
+async function refreshAddressPending() {
+  const r = await apiFetch('/api/integrations/etsy/address-pending');
+  if (!r.ok) return { success: false, error: errorOf(r) };
+  const pending = Array.isArray(r.data && r.data.pending) ? r.data.pending : [];
+  const state = {
+    count: pending.length,
+    next: pending.length ? { receiptId: pending[0].receiptId, orderUrl: pending[0].orderUrl } : null,
+    at: Date.now()
+  };
+  await chrome.storage.local.set({ kx_address_pending: state });
+  return { success: true, ...state };
+}
+
+try {
+  if (chrome.alarms) {
+    chrome.alarms.create(ADDRESS_PENDING_ALARM, { periodInMinutes: 15, delayInMinutes: 1 });
+    chrome.alarms.onAlarm.addListener((alarm) => {
+      if (alarm && alarm.name === ADDRESS_PENDING_ALARM && authToken) refreshAddressPending().catch(() => {});
+    });
+  }
+} catch (_) { /* alarms unavailable: popup still fetches on open */ }
 
 function handleSyncComplete(data) {
   syncStats.totalSynced += Number(data.count) || 0;

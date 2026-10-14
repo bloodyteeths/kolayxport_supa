@@ -20,6 +20,10 @@ const wixFindMany = vi.fn(async () => []);
 const shopifyFindMany = vi.fn(async () => []);
 const syncOpGroupBy = vi.fn(async () => []);
 const webhookFindMany = vi.fn(async () => []);
+const webhookGroupBy = vi.fn(async (_args?: any) => [] as any[]);
+const webhookFindFirst = vi.fn(async (_args?: any) => null as any);
+const jobRunFindMany = vi.fn(async (_args?: any) => [] as any[]);
+const replayFailedEtsyEvents = vi.fn(async (_a?: any) => 0);
 const cronLockFindMany = vi.fn(async () => []);
 const queryRaw = vi.fn(async () => [{ '1': 1 }]);
 
@@ -56,15 +60,28 @@ vi.mock('@/lib/prisma', () => ({
     syncOperation: { groupBy: (...a: any[]) => syncOpGroupBy(...a) },
     webhookEvent: {
       findMany: (...a: any[]) => webhookFindMany(...a),
-      groupBy: async () => [],
-      findFirst: async () => null,
+      groupBy: (a: any) => webhookGroupBy(a),
+      findFirst: (a: any) => webhookFindFirst(a),
     },
+    jobRun: { findMany: (a: any) => jobRunFindMany(a) },
     cronLock: { findMany: (...a: any[]) => cronLockFindMany(...a) },
     $queryRaw: (...a: any[]) => queryRaw(...a),
   },
 }));
 
+vi.mock('@/lib/etsy/webhooks/queueOps', () => ({
+  replayFailedEtsyEvents: (a: any) => replayFailedEtsyEvents(a),
+}));
+vi.mock('@/lib/scheduler/jobs', () => ({
+  allJobs: [
+    { name: 'etsy-webhook-sweep', intervalMinutes: 1, run: async () => undefined },
+    { name: 'webhook-purge', dailyAtUtc: '03:40', run: async () => undefined },
+  ],
+}));
+
 import {
+  getEtsyWebhookHealth,
+  replayFailedEtsyWebhooks,
   getCronHealth,
   getSecurityEvents,
   getRecentErrors,
@@ -93,9 +110,17 @@ beforeEach(() => {
     shopifyFindMany,
     syncOpGroupBy,
     webhookFindMany,
+    webhookGroupBy,
+    webhookFindFirst,
+    jobRunFindMany,
+    replayFailedEtsyEvents,
     cronLockFindMany,
     queryRaw,
   ].forEach(m => m.mockReset());
+  webhookGroupBy.mockResolvedValue([]);
+  webhookFindFirst.mockResolvedValue(null);
+  jobRunFindMany.mockResolvedValue([]);
+  replayFailedEtsyEvents.mockResolvedValue(0);
   syncLogFindMany.mockResolvedValue([]);
   syncLogCount.mockResolvedValue(0);
   syncLogGroupBy.mockResolvedValue([]);
@@ -231,5 +256,85 @@ describe('getOverview & needs-attention', () => {
     expect(out.totals).toEqual({ users: 10, orders: 123, shipments: 45 });
     expect(out.growth).toEqual({ newUsers7d: 2, newUsers30d: 3 });
     expect(Array.isArray(out.needsAttention.items)).toBe(true);
+  });
+});
+
+describe('getEtsyWebhookHealth — event backbone fields', () => {
+  it('reports depth (incl. coalesced/blocked_reauth), oldest due, backlog by shop and jobs', async () => {
+    const now = Date.now();
+    webhookGroupBy.mockImplementation(async (args: any) => {
+      if (args.by?.[0] === 'shopId') {
+        return [
+          { shopId: 'A', _count: 5000 },
+          { shopId: 'B', _count: 1 },
+          { shopId: null, _count: 2 },
+        ];
+      }
+      if (args.where?.createdAt) return [{ status: 'failed', _count: 3 }];
+      return [
+        { status: 'received', _count: 5001 },
+        { status: 'coalesced', _count: 7 },
+        { status: 'blocked_reauth', _count: 2 },
+      ];
+    });
+    webhookFindFirst.mockImplementation(async (args: any) => {
+      if (args.where?.nextAttemptAt) return { createdAt: new Date(now - 12 * 60_000) };
+      if (args.where?.status) return { createdAt: new Date(now - 20 * 60_000) };
+      return { createdAt: new Date(now - 60_000) };
+    });
+    jobRunFindMany.mockResolvedValue([
+      { jobName: 'etsy-webhook-sweep', status: 'succeeded', startedAt: new Date(now - 60_000), finishedAt: new Date(now - 59_000), heartbeatAt: new Date(now - 59_000), error: null },
+      { jobName: 'webhook-purge', status: 'failed', startedAt: new Date(now - HOUR_MS), finishedAt: new Date(now - HOUR_MS), heartbeatAt: new Date(now - HOUR_MS), error: 'boom' },
+    ]);
+
+    const out = await getEtsyWebhookHealth();
+    expect(out.depthByStatus).toMatchObject({ received: 5001, coalesced: 7, blocked_reauth: 2, processing: 0, failed: 0 });
+    expect(out.failed24h).toBe(3);
+    expect(out.oldestDueAgeMs).toBeGreaterThanOrEqual(12 * 60_000);
+    expect(out.oldestPendingAgeMs).toBeGreaterThanOrEqual(20 * 60_000);
+    expect(out.lastReceivedAt).not.toBeNull();
+    expect(out.backlogByShop.map((b: any) => b.shopId)).toEqual(['A', 'unknown', 'B']);
+    const jobs = out.jobs as any[];
+    expect(jobs.find(j => j.name === 'etsy-webhook-sweep')?.lastSuccessAt).not.toBeNull();
+    expect(jobs.find(j => j.name === 'webhook-purge')?.lastError).toBe('boom');
+    expect(out.budget).toMatchObject({ localCalls: expect.any(Number) });
+  });
+
+  it('needs-attention flags a stale due event and parked (blocked_reauth) events', async () => {
+    cronLockFindMany.mockResolvedValueOnce([
+      { jobName: 'sync-orders', bucket: 'b', createdAt: new Date() },
+      { jobName: 'reset-usage', bucket: 'b', createdAt: new Date() },
+      { jobName: 'track-ranks', bucket: 'b', createdAt: new Date() },
+    ]);
+    webhookGroupBy.mockImplementation(async (args: any) =>
+      args.by?.[0] === 'status' && !args.where?.createdAt ? [{ status: 'blocked_reauth', _count: 4 }] : []);
+    webhookFindFirst.mockImplementation(async (args: any) =>
+      args.where?.nextAttemptAt ? { createdAt: new Date(Date.now() - 15 * 60_000) } : null);
+    const out = await buildNeedsAttentionQueue();
+    const kinds = out.items.filter(i => i.kind === 'etsy-webhook').map(i => i.message);
+    expect(kinds.some(m => /older than 10 minutes/.test(m))).toBe(true);
+    expect(kinds.some(m => /parked/.test(m))).toBe(true);
+  });
+});
+
+describe('replayFailedEtsyWebhooks', () => {
+  it('passes only valid ids / numeric shop ids to the queue', async () => {
+    replayFailedEtsyEvents.mockResolvedValueOnce(2);
+    const out = await replayFailedEtsyWebhooks({ ids: ['etsy:a', 5, '', 'etsy:b'], shopId: 'x; drop' });
+    expect(out.replayed).toBe(2);
+    expect(replayFailedEtsyEvents).toHaveBeenCalledWith({ ids: ['etsy:a', 'etsy:b'], shopId: undefined });
+  });
+
+  it('replays all failed rows of a shop', async () => {
+    replayFailedEtsyEvents.mockResolvedValueOnce(9);
+    const out = await replayFailedEtsyWebhooks({ shopId: '12345' });
+    expect(out.replayed).toBe(9);
+    expect(replayFailedEtsyEvents).toHaveBeenCalledWith({ ids: [], shopId: '12345' });
+  });
+
+  it('does nothing without ids or shop', async () => {
+    const out = await replayFailedEtsyWebhooks({});
+    expect(out.replayed).toBe(0);
+    expect(replayFailedEtsyEvents).not.toHaveBeenCalled();
   });
 });

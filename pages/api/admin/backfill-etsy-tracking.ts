@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { runCronGuard } from '@/lib/cron/idempotency';
-import { EtsyClient, EtsyCredentials } from '@/lib/integrations/etsyClient';
+import { EtsyClient, EtsyPriority, EtsyCredentials } from '@/lib/integrations/etsyClient';
 import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
 
 // One-time / maintenance backfill: walk Etsy receipts further back than the
@@ -48,6 +48,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           refreshToken: (decryptIfNeeded(shop.refreshToken) as string | null) || undefined,
           shopId: shop.shopId,
           tokenExpiresAt: shop.tokenExpiresAt || undefined,
+          userId: shop.userId,
+          priority: EtsyPriority.Reconcile,
         },
         onTokenRefresh,
       );

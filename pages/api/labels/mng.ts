@@ -4,6 +4,8 @@ import { getAuthUser } from '@/lib/auth';
 import { getMngCredentialsForUser } from '@/lib/mng/mng.credentials';
 import { createMngShipment, trackMngShipment } from '@/lib/mng/mng.service';
 import { withUsageLimiter } from '@/lib/middleware/withUsageLimiter';
+import { assertOrderLabelable, labelGuardOverride } from '@/lib/orders/labelGuard';
+import { labelGuardBody, publishLabelCreated } from '@/lib/orders/labelEvents';
 import type { MngOrderRequest, MngRecipient, MngPackage } from '@/lib/mng/mng.types';
 // Default values for MNG options (value=1 is standard/sender/address/package)
 
@@ -59,6 +61,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
+    // Tenant isolation + label safety guard before any carrier call.
+    const ownedOrder = await prisma.order.findFirst({ where: { id: orderId, userId }, select: { id: true } });
+    if (!ownedOrder) {
+      return res.status(404).json({ success: false, error: 'Order not found' });
+    }
+    const guard = await assertOrderLabelable(orderId, userId, { override: labelGuardOverride(req.body) });
+    if (!guard.ok) return res.status(guard.httpStatus).json(labelGuardBody(guard));
+
     // Load MNG credentials
     let mngCreds;
     try {
@@ -83,7 +93,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Load order details for reference ID
-    const order = await prisma.order.findUnique({ where: { id: orderId } });
+    const order = await prisma.order.findFirst({ where: { id: orderId, userId } });
     if (!order) {
       return res.status(404).json({ success: false, error: 'Order not found' });
     }
@@ -134,7 +144,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const result = await createMngShipment(mngCreds, mngOrder);
 
     // Save to Shipment table
-    await prisma.shipment.create({
+    const createdShipment = await prisma.shipment.create({
       data: {
         order: { connect: { id: orderId } },
         carrier: 'MNG',
@@ -144,6 +154,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         serviceType: String(serviceType),
       },
     });
+
+    publishLabelCreated(userId, orderId, { carrier: 'MNG', trackingNumber: result.trackingNumber, shipmentId: createdShipment.id });
 
     // Increment usage counter
     if ((res as any).incrementUsage) {

@@ -3,6 +3,8 @@ import { getAuthUser } from '@/lib/auth';
 import prisma from '../../../lib/prisma';
 import { getIntegrationCreds } from '../../../lib/config';
 import { createShipment, FedexPayload } from '@integrations/fedex';
+import { assertOrderLabelable, labelGuardOverride } from '@/lib/orders/labelGuard';
+import { labelGuardBody, publishLabelCreated } from '@/lib/orders/labelEvents';
 
 /**
  * POST { orderId } → creates a FedEx shipment and
@@ -35,6 +37,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const profile = await prisma.shipperProfile.findUnique({ where: { userId } });
     if (!order || !profile) return res.status(404).json({ error: 'Order or Shipper profile not found' });
 
+    // Label safety guard (cancelled / shipped elsewhere) before the carrier call.
+    const guard = await assertOrderLabelable(orderId, userId, { override: labelGuardOverride(req.body) });
+    if (!guard.ok) return res.status(guard.httpStatus).json(labelGuardBody(guard));
+
     // 3️⃣  Build *very* minimal payload (TODO: map recipient etc.)
     const payload: FedexPayload = {
       labelResponseOptions: 'URL_ONLY',
@@ -61,6 +67,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         errorMessage: fx.errors?.join('; '),
       },
     });
+
+    if (fx.success) publishLabelCreated(userId, orderId, { carrier: 'FEDEX', trackingNumber: fx.trackingNumber, shipmentId: shipment.id });
 
     return res.status(fx.success ? 200 : 400).json({ shipment, fx });
   } catch (err: any) {

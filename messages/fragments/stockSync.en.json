@@ -1,0 +1,318 @@
+{
+  "stockSync": {
+    "pageTitle": "Stock Sync",
+    "pageSubtitle": "When an item sells on one channel, it goes down everywhere else, so you never oversell.",
+    "status": {
+      "disabled": "Off",
+      "dryRun": "Dry run",
+      "live": "Live",
+      "globallyDisabled": "Temporarily paused"
+    },
+    "statusHelp": {
+      "disabled": "Stock sync is off. No marketplace stock is changed.",
+      "dryRun": "Dry run: sales are counted and we work out what would be sent, but nothing is written to any marketplace.",
+      "live": "Live: stock changes are sent to every linked channel.",
+      "globallyDisabled": "Stock sync is temporarily paused for maintenance. Nothing is written to any marketplace."
+    },
+    "channels": {
+      "etsy": "Etsy",
+      "trendyol": "Trendyol",
+      "shopify": "Shopify",
+      "ebay": "eBay",
+      "wix": "Wix",
+      "amazon": "Amazon",
+      "hepsiburada": "Hepsiburada"
+    },
+    "common": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "close": "Close",
+      "retry": "Try again",
+      "back": "Back",
+      "next": "Next",
+      "skip": "Skip",
+      "loading": "Loading…",
+      "search": "Search",
+      "refresh": "Refresh",
+      "none": "—",
+      "units": "{count} units"
+    },
+    "settings": {
+      "title": "Status and settings",
+      "restockOnCancel": "Put stock back when an order is cancelled",
+      "restockOnCancelHelp": "Items of a cancelled order go back into stock. Returns are not added automatically.",
+      "autoFixDrift": "Fix mismatches automatically (lowers only)",
+      "autoFixDriftHelp": "If a marketplace shows more than you have, the hourly check lowers it. Stock is never raised automatically.",
+      "zeroAction": "When Etsy stock runs out",
+      "zeroDisable": "Turn off the variation (single-item listings are deactivated)",
+      "zeroDeactivate": "Deactivate the listing",
+      "seedReserved": "Subtract sold-but-unshipped items from the starting stock",
+      "seedReservedHelp": "Items that are sold but not shipped yet are taken off the starting count.",
+      "openWizard": "Setup wizard",
+      "goLive": "Go live",
+      "backToDryRun": "Back to dry run",
+      "disable": "Turn off stock sync",
+      "disableConfirmTitle": "Turn off stock sync?",
+      "disableConfirmBody": "Matches and history are kept. While off, no marketplace stock changes.",
+      "restore": "Undo go-live",
+      "saved": "Settings saved",
+      "channelsTitle": "Synced channels",
+      "counts": {
+        "items": "Products",
+        "activeLinks": "Linked listings",
+        "needsReview": "Need a count",
+        "suggested": "Suggestions",
+        "failed": "Errors in last 24 h"
+      }
+    },
+    "dryRunReport": {
+      "title": "Dry-run report",
+      "wouldHaveSent": "{count} stock updates would have been sent",
+      "risksPrevented": "{count} oversell risks would have been prevented",
+      "riskExample": "{sku}: after a {soldOn} sale, {exposedOn} still showed {shown} while you had {available}",
+      "empty": "Nothing yet. As sales come in you will see here what would be sent."
+    },
+    "wizard": {
+      "title": "Stock sync setup",
+      "steps": {
+        "channels": "Channels",
+        "matches": "Matches",
+        "unmatched": "Unmatched",
+        "seed": "Starting stock",
+        "preview": "Preview",
+        "enable": "Dry run"
+      },
+      "channelsIntro": "Choose the channels whose stock you want to manage together. Each shows how long a sale there takes to reach us; during that time an oversell is possible.",
+      "oversellWindow": "Sales seen within ~{minutes} min",
+      "notConnected": "Not connected",
+      "comingSoon": "Coming soon",
+      "writeUnsupported": "Read only (stock cannot be written)",
+      "matchesIntro": "Listings with the same SKU are grouped into one product. Check and confirm them.",
+      "selectAll": "Select all",
+      "confirmSelected": "Confirm {count} products",
+      "confirmed": "{count} products confirmed",
+      "needsReview": "Needs a check",
+      "reviewReasons": {
+        "zero": "A channel shows 0",
+        "high": "A channel shows 100 or more",
+        "ratio": "Big difference between channels",
+        "shared_pool_conflict": "Same-SKU listings show different numbers"
+      },
+      "seedQtyLabel": "Real stock",
+      "sharedPool": "{count} listings on {channel} share this stock",
+      "noMatches": "No listings with the same SKU on more than one channel.",
+      "singleChannel": "On one channel only ({count})",
+      "unmatchedIntro": "These listings have no SKU or no twin on another channel. Link them by hand if you like.",
+      "unmatchedCount": "{count} unmatched listings",
+      "linkToItem": "Link",
+      "generateSkus": "Generate SKUs for Etsy",
+      "generateSkusHelp": "SKUs are proposed for the selected Etsy listings and saved as drafts. They reach Etsy only when you press \"Sync to Etsy\".",
+      "generateStaged": "SKU drafts created for {count} listings",
+      "looseTitle": "Similar SKUs (never linked automatically)",
+      "titleTitle": "Similar titles (never linked automatically)",
+      "seedIntro": "How should the starting stock be set?",
+      "policy": {
+        "min": "Lowest number across channels",
+        "minHelp": "Recommended. You enter the number for products that need a check.",
+        "etsy_master": "Use the Etsy number",
+        "etsy_masterHelp": "The Etsy quantity becomes the starting stock.",
+        "manual": "I will enter every number",
+        "manualHelp": "You type the real count for each product."
+      },
+      "coverage": "{percent}% of the last 30 days' sales belong to matched products",
+      "previewIntro": "What each listing will be set to when you go live. Nothing is sent in this step.",
+      "enableIntro": "In dry run, sales are counted and we work out what would be sent, but nothing is written to any marketplace. Review the report and press \"Go live\" when you are ready.",
+      "enableButton": "Start dry run",
+      "enabled": "Dry run started",
+      "needsReviewLeft": "Enter a count for {count} products; they are not synced until you do."
+    },
+    "preview": {
+      "title": "Preview",
+      "liveRead": "Reading current numbers from the marketplaces…",
+      "totals": {
+        "pushes": "{count} updates",
+        "deactivations": "{count} listings will be deactivated",
+        "disabledVariations": "{count} variations will be turned off",
+        "bigDrops": "{count} listings drop by more than 50%",
+        "needsReview": "{count} products need a count",
+        "capped": "{count} listings shown with the last seen number"
+      },
+      "remote": "On marketplace",
+      "target": "Will be",
+      "effect": {
+        "none": "No change",
+        "set": "{from} → {to}",
+        "deactivate": "Listing deactivated",
+        "disable_variation": "Variation turned off",
+        "unsupported": "Not supported"
+      },
+      "remoteSource": {
+        "live": "current",
+        "last_seen": "last seen",
+        "none": "unknown"
+      },
+      "noChanges": "Nothing to send."
+    },
+    "goLive": {
+      "title": "Go live",
+      "intro": "When live, stock changes are written to the marketplaces. The numbers before going live are kept for 7 days so you can undo.",
+      "typeToConfirm": "Some listings will be deactivated or variations turned off. Type {word} to confirm.",
+      "word": "LIVE",
+      "confirm": "Go live",
+      "success": "Stock sync is live",
+      "refreshPreview": "Refresh preview"
+    },
+    "restore": {
+      "title": "Undo go-live",
+      "body": "Every listing is set back to its number before go-live (minus what sold since) and stock sync is turned off.",
+      "word": "RESTORE",
+      "typeToConfirm": "Type {word} to confirm",
+      "confirm": "Restore",
+      "success": "{applied} listings restored, {failed} failed",
+      "none": "Nothing to restore"
+    },
+    "items": {
+      "title": "Products",
+      "empty": "No synced products yet. Start with the setup wizard.",
+      "search": "Search SKU or title",
+      "filter": {
+        "all": "All",
+        "active": "Active",
+        "needs_review": "Need a count",
+        "paused": "Paused"
+      },
+      "onHand": "Stock",
+      "safetyBuffer": "Safety buffer",
+      "tracking": "Tracking",
+      "tracked": "Tracked",
+      "untracked": "Not tracked",
+      "links": "Channels",
+      "adjust": "Fix stock",
+      "why": "Why this number?",
+      "enterCount": "Enter count",
+      "pause": "Pause",
+      "resume": "Resume",
+      "statusLabels": {
+        "active": "Active",
+        "paused": "Paused",
+        "needs_review": "Needs a count"
+      },
+      "openPushes": "{count} updates pending",
+      "lastError": "Last error: {error}",
+      "sku": "SKU",
+      "product": "Product"
+    },
+    "link": {
+      "statusLabels": {
+        "active": "Active",
+        "paused": "Paused",
+        "suggested": "Suggestion",
+        "error": "Error",
+        "unsupported": "Not supported"
+      },
+      "reasons": {
+        "account_changed": "Shop connection changed",
+        "user": "Paused by you",
+        "structure": "Listing variations changed",
+        "variant_missing": "Variation not found",
+        "coming_soon": "Coming soon",
+        "catalog_v3_or_unverified": "Wix stock writing not verified yet",
+        "untracked": "Stock tracking is off on the marketplace",
+        "untracked_or_location": "Stock tracking or location not found",
+        "legacy_listing": "Legacy eBay listing",
+        "no_offer": "No eBay offer",
+        "no_inventory_item": "No eBay inventory item",
+        "listing_removed": "Listing removed",
+        "listing_inactive": "Listing inactive",
+        "listing_expired": "Listing expired",
+        "listing_sold_out": "Listing sold out",
+        "listing_draft": "Listing is a draft",
+        "variation_disabled": "Variation disabled on Etsy",
+        "unsupported": "Not supported"
+      },
+      "remote": "On marketplace",
+      "target": "Target",
+      "remoteUnknown": "unknown",
+      "unlink": "Unlink",
+      "unlinkConfirm": "Remove the stock link for this listing?",
+      "accept": "Confirm",
+      "pause": "Pause",
+      "resume": "Resume",
+      "unitsPerSale": "Units per sale",
+      "buffer": "Listing buffer",
+      "maxListed": "Show at most",
+      "deactivatedByStock": "Deactivated because stock ran out",
+      "settings": "Listing settings"
+    },
+    "adjust": {
+      "title": "Fix stock",
+      "modeSet": "New number",
+      "modeDelta": "Add / remove",
+      "setTo": "Real stock",
+      "delta": "Change (e.g. 5 or -2)",
+      "note": "Note (optional)",
+      "save": "Save",
+      "success": "Stock updated: {onHand}"
+    },
+    "mapping": {
+      "title": "Link listing to a product",
+      "searchItems": "Search products",
+      "newSku": "New product SKU",
+      "existing": "Link to an existing product",
+      "create": "Create a new product",
+      "link": "Link",
+      "success": "Listing linked",
+      "candidate": "Listing to link"
+    },
+    "timeline": {
+      "title": "Stock history",
+      "empty": "No movements yet.",
+      "adopt": "Accept this increase",
+      "adopted": "Increase added to stock",
+      "entries": {
+        "sale": "{channel} #{order} sold: −{units} → {after}",
+        "saleAdjust": "{channel} #{order} quantity changed: {delta} → {after}",
+        "cancel": "{channel} #{order} cancelled: +{units} → {after}",
+        "manual": "Fixed by hand: {delta} → {after}",
+        "manualEditor": "Changed in the Etsy editor: {delta} → {after}",
+        "adopt": "{channel} increase accepted: +{delta} → {after}",
+        "seed": "Starting stock: {after}",
+        "remoteDrop": "{channel} stock dropped without an order: −{units} → {after}",
+        "remoteDropMatched": "{channel} #{order} sale (seen first as a stock drop): −{units}",
+        "driftFix": "Mismatch fixed: {delta} → {after}",
+        "other": "Stock changed: {delta} → {after}",
+        "pushApplied": "{channel} {from}→{to} sent ✓",
+        "pushDraft": "{channel} set to {to} by the draft sync ✓",
+        "pushDeactivated": "{channel} listing deactivated because stock ran out",
+        "pushReactivated": "{channel} listing reactivated ({to})",
+        "pushSkipped": "{channel} already correct ({qty})",
+        "pushDryRun": "Dry run: {channel} would be {to}",
+        "pushFailed": "{channel} could not be updated ({to}): {error}",
+        "pushPending": "Sending {to} to {channel}…",
+        "remoteIncrease": "{channel} stock was raised outside KolayXport: {from} → {to}"
+      }
+    },
+    "managed": {
+      "chip": "Managed by stock sync ({qty})",
+      "tooltip": "This variation's quantity comes from stock sync. If you change it here, the new number is saved as a stock correction.",
+      "dryRunTooltip": "Stock sync is in dry run: this quantity is not changed automatically yet."
+    },
+    "errors": {
+      "generic": "Something went wrong. Please try again.",
+      "account_not_owned": "No access to this shop account.",
+      "token_missing": "Open the current preview first.",
+      "token_invalid": "The preview is not valid. Refresh and try again.",
+      "token_expired": "The preview expired (15 min). Refresh and try again.",
+      "typed_confirm_required": "Type the confirmation word correctly.",
+      "plan_changed": "Something changed since the preview (a sale, a link or a setting). Refresh the preview and confirm again.",
+      "not_enabled": "Start the dry run first.",
+      "already_live": "Stock sync is already live.",
+      "needs_seed": "Enter this product's stock count first.",
+      "snapshot_not_found": "Nothing found to restore.",
+      "snapshot_expired": "The saved numbers expired (7 days).",
+      "already_restored": "This was already restored.",
+      "invalid_quantity": "Enter a valid number.",
+      "invalid_value": "Enter a valid value."
+    }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "seoExperiments": {
+    "title": "SEO deneyleri",
+    "intro": "Başlık, etiket veya fotoğraf değiştirdiğinizde KolayXport, değişiklikten 14 gün önce ve sonraki görüntülenme ve siparişleri, değişmeyen ilanlarınızla karşılaştırır.",
+    "empty": "Henüz deney yok. Aktif bir ilanın başlığını, etiketlerini veya fotoğraflarını değiştirin; sonuç yaklaşık 15 gün sonra burada görünür.",
+    "filters": {
+      "all": "Tümü",
+      "collecting": "Ölçülüyor",
+      "ready": "Sonuçlar"
+    },
+    "kind": {
+      "kolayxport": "KolayXport'tan düzenleme",
+      "external": "Etsy'de düzenleme"
+    },
+    "listingsCount": "{count, plural, one {# ilan} other {# ilan}}",
+    "andMore": "+{count} daha",
+    "changeKinds": {
+      "title": "Başlık",
+      "tags": "Etiketler",
+      "images": "Fotoğraflar"
+    },
+    "status": {
+      "collecting": "Ölçülüyor",
+      "low_traffic": "Düşük trafik",
+      "ready": "Sonuç hazır",
+      "insufficient_data": "Yetersiz veri",
+      "confounded": "Çakışan düzenlemeler",
+      "cancelled": "İptal edildi"
+    },
+    "statusHelp": {
+      "collecting": "Sonuç {date} tarihinde.",
+      "low_traffic": "Değişiklikten önceki 14 günde 30'dan az görüntülenme var; sonuç güvenilir olmayabilir. Ölçüm sürüyor — sonuç {date} tarihinde.",
+      "insufficient_data": "Güvenilir bir şey söylemek için görüntülenme veya sipariş çok az.",
+      "confounded": "Ölçüm sırasında aynı ilanda başka bir değişiklik yapıldı; etki ayrıştırılamıyor.",
+      "cancelled": "Bu deney iptal edildi."
+    },
+    "verdict": {
+      "improved": "Görüntülenme arttı",
+      "worse": "Görüntülenme azaldı",
+      "inconclusive": "Belirgin bir etki yok"
+    },
+    "confidence": {
+      "label": "Güven",
+      "high": "Yüksek",
+      "medium": "Orta",
+      "low": "Düşük"
+    },
+    "control": {
+      "shop": "Diğer ilanlarınızla karşılaştırıldı",
+      "category": "Aynı kategorideki ilanlarınızla karşılaştırıldı",
+      "none": "Karşılaştırılacak ilan yok — dikkatli yorumlayın"
+    },
+    "metrics": {
+      "viewsBefore": "Önceki görüntülenme",
+      "viewsAfter": "Sonraki görüntülenme",
+      "ordersBefore": "Önceki sipariş",
+      "ordersAfter": "Sonraki sipariş",
+      "lift": "Karşılaştırmaya göre değişim",
+      "liftValue": "%{value}",
+      "rank": "Arama sırası",
+      "rankDelta": "{count, plural, one {# anahtar kelime} other {# anahtar kelime}} · ortalama {delta, number} sıra",
+      "rankNone": "Takip edilen anahtar kelime yok"
+    },
+    "seasonal": "Tatil sezonu: 15 Kasım – 5 Ocak arasındaki trafik dalgalanmaları bu sonucu bozabilir.",
+    "changedAt": "{date} tarihinde değişti",
+    "loadFailed": "SEO deneyleri yüklenemedi."
+  }
+}

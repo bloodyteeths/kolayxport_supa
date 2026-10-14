@@ -1,0 +1,139 @@
+{
+  "listingHistory": {
+    "navLabel": "Etsy aktivite",
+    "editorTab": "Geçmiş",
+    "pageTitle": "Etsy aktivite",
+    "pageSubtitle": "Etsy ilanlarınızdaki her değişiklik, kimin yaptığı ve SEO düzenlemelerinin işe yarayıp yaramadığı.",
+    "tabs": {
+      "changes": "Değişiklikler",
+      "seo": "SEO deneyleri"
+    },
+    "shopLabel": "Mağaza",
+    "allShops": "Tüm mağazalar",
+    "connectDescription": "İlan değişikliklerini ve SEO sonuçlarını görmek için Etsy mağazanızı bağlayın.",
+    "filters": {
+      "all": "Tümü",
+      "external": "Etsy'de değişti",
+      "kolayxport_draft": "KolayXport'tan gönderildi",
+      "kolayxport_stock": "Stok senkronu",
+      "unknown": "Kontrolde bulundu"
+    },
+    "attribution": {
+      "external": "Etsy'de değişti",
+      "kolayxport_draft": "KolayXport'tan gönderildi",
+      "kolayxport_stock": "Stok senkronu",
+      "unknown": "Kontrolde bulundu"
+    },
+    "freshness": {
+      "live": "Etsy canlı bağlı · son değişiklik {time}",
+      "liveNoChange": "Etsy canlı bağlı · henüz değişiklik yok",
+      "delayed": "Gecikmeli · günde bir kontrol · son kontrol {time}",
+      "delayedNever": "Gecikmeli · henüz kontrol edilmedi",
+      "needsReauth": "İlanların güncel kalması için Etsy'yi yeniden bağlayın",
+      "tooltipLive": "Etsy her değişikliği saniyeler içinde KolayXport'a bildiriyor.",
+      "tooltipDelayed": "Etsy son zamanlarda değişiklik bildirimi göndermedi; ilanlar her gece yeniden kontrol ediliyor. Hemen yenilemek için İlanları senkronize et'e basın."
+    },
+    "keys": {
+      "created": "İlan oluşturuldu",
+      "deleted": "İlan silindi",
+      "title": "Başlık",
+      "description": "Açıklama",
+      "tags": "Etiketler",
+      "materials": "Malzemeler",
+      "price": "Fiyat",
+      "currency": "Para birimi",
+      "state": "Durum",
+      "taxonomyId": "Kategori",
+      "shopSectionId": "Mağaza bölümü",
+      "whoMade": "Kim yaptı",
+      "whenMade": "Ne zaman yapıldı",
+      "isSupply": "Malzeme ürünü",
+      "processingMin": "Hazırlık (min)",
+      "processingMax": "Hazırlık (maks)",
+      "shippingProfileId": "Kargo profili",
+      "returnPolicyId": "İade politikası",
+      "itemWeight": "Ağırlık",
+      "itemWeightUnit": "Ağırlık birimi",
+      "itemLength": "Uzunluk",
+      "itemWidth": "Genişlik",
+      "itemHeight": "Yükseklik",
+      "itemDimensionsUnit": "Ölçü birimi",
+      "isPersonalizable": "Kişiselleştirme",
+      "personalizationIsRequired": "Kişiselleştirme zorunlu",
+      "personalizationInstructions": "Kişiselleştirme talimatı",
+      "personalizationCharCountMax": "Kişiselleştirme maks. karakter",
+      "hasVariations": "Varyasyonlar",
+      "images": "Fotoğraflar",
+      "offerings": "Varyasyonlar",
+      "videos": "Video"
+    },
+    "states": {
+      "active": "Aktif",
+      "inactive": "Pasif",
+      "draft": "Taslak",
+      "expired": "Süresi doldu",
+      "sold_out": "Tükendi",
+      "removed": "Silindi",
+      "edit": "Düzenleniyor"
+    },
+    "diff": {
+      "from": "Önce",
+      "to": "Sonra",
+      "empty": "(boş)",
+      "yes": "Evet",
+      "no": "Hayır",
+      "tagsAdded": "Eklenen",
+      "tagsRemoved": "Çıkarılan",
+      "imagesAdded": "{count, plural, one {# fotoğraf eklendi} other {# fotoğraf eklendi}}",
+      "imagesRemoved": "{count, plural, one {# fotoğraf kaldırıldı} other {# fotoğraf kaldırıldı}}",
+      "imagesReordered": "Fotoğraf sırası değişti",
+      "imagesAlt": "{count, plural, one {# fotoğrafın alt metni değişti} other {# fotoğrafın alt metni değişti}}",
+      "offeringsAdded": "{count, plural, one {# varyasyon eklendi} other {# varyasyon eklendi}}",
+      "offeringsRemoved": "{count, plural, one {# varyasyon kaldırıldı} other {# varyasyon kaldırıldı}}",
+      "offeringChanged": "{label}: {fields}",
+      "offeringFieldSku": "SKU",
+      "offeringFieldPrice": "fiyat",
+      "offeringFieldIsEnabled": "açık/kapalı",
+      "noDetails": "Bu değişiklik için gösterilecek ayrıntı yok."
+    },
+    "history": {
+      "title": "Geçmiş",
+      "empty": "Henüz kayıtlı değişiklik yok. Etsy'de veya KolayXport'tan yapılan değişiklikler burada görünür.",
+      "loadMore": "Daha eskileri göster",
+      "restore": "Taslak olarak geri yükle",
+      "restoreTitle": "Bu sürüm taslak olarak geri yüklensin mi?",
+      "restoreBody": "KolayXport bu değerleri bir taslağa yazar. Taslağı inceleyip Etsy'ye Gönder'e basana kadar Etsy'de hiçbir şey değişmez.",
+      "restoreConfirm": "Taslak oluştur",
+      "restoreCancel": "Vazgeç",
+      "restored": "Taslak oluşturuldu. İnceleyip Etsy'ye gönderin.",
+      "restoredPartial": "Taslak oluşturuldu. Bazı kısımlar geri yüklenemiyor: {parts}.",
+      "nothingToRestore": "Bu sürüm ilanla zaten aynı — geri yüklenecek bir şey yok.",
+      "restoreFailed": "Taslak oluşturulamadı.",
+      "unrestorable": {
+        "images_deleted": "silinmiş fotoğraflar",
+        "inventory": "varyasyonlar ve stok",
+        "state": "ilan durumu",
+        "personalization": "kişiselleştirme soruları",
+        "videos": "video",
+        "variations": "fiyat (varyasyon bazında)",
+        "cleared_value": "temizlenmiş alanlar"
+      },
+      "tombstone": "Bu ilan Etsy'de silindi."
+    },
+    "activity": {
+      "empty": "Henüz ilan değişikliği yok. Etsy'deki düzenlemeler ve KolayXport'tan gönderimler saniyeler içinde burada görünür.",
+      "loadMore": "Daha fazla göster",
+      "viewListing": "Etsy'de aç",
+      "changedFields": "{count, plural, one {# değişiklik} other {# değişiklik}}",
+      "deletedListing": "Silinmiş ilan",
+      "newItems": "{count, plural, one {# yeni değişiklik} other {# yeni değişiklik}} — göster"
+    },
+    "errors": {
+      "loadFailed": "İlan aktivitesi yüklenemedi.",
+      "versionNotFound": "Bu sürüm artık yok.",
+      "versionNotRestorable": "Bu sürüm geri yüklenemez.",
+      "listingGone": "Bu ilan artık Etsy'de yok.",
+      "stockSyncManaged": "Bu ilanın stok adetlerini stok senkronu yönetiyor. Adetleri Stok senkronu'ndan veya bir taslakla değiştirin."
+    }
+  }
+}

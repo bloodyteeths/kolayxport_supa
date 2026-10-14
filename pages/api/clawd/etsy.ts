@@ -6,6 +6,12 @@ import { hasValidInternalApiKeyHeader } from '../../../lib/security/internalApiK
 import { getEtsyAccessToken as getSharedEtsyAccessToken } from '@/lib/etsy/etsyToken';
 import { checkTitle, checkTags, computeSeoScore } from '@/lib/etsy/seoRules';
 import { getListingStats } from '@/lib/etsy/listingStats';
+import { etsyFetch, recordEtsyResponse } from '@/lib/etsy/http';
+import { currentEtsyPriority } from '@/lib/etsy/rateBudget';
+import { withListingInventoryLock } from '@/lib/etsy/inventoryLock';
+import { isListingStockManaged } from '@/lib/stock/hooks';
+import { reconcileShopListings, syncListingsFailure } from '@/lib/etsy/listingReconcile';
+import { markKolayxportDelete } from '@/lib/etsy/listingAlerts';
 
 // Raise body size limit for image uploads (base64 encoding inflates by ~33%,
 // so a 10MB Etsy image arrives as ~14MB JSON body)
@@ -164,8 +170,11 @@ function validatePersonalizationQuestions(questions: PersonalizationQuestion[]):
 
 async function callEtsyAPI(endpoint: string, accessToken: string, options: RequestInit = {}) {
     const url = `${ETSY_API_BASE}${endpoint}`;
+    const method = String(options.method || 'GET').toUpperCase();
 
-    const response = await fetch(url, {
+    // Through the shared Etsy entry point so quota headers feed the rate budget.
+    // Writes are never retried here (a 5xx create/copy may already have landed).
+    const response = await etsyFetch(url, {
         ...options,
         headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -173,7 +182,7 @@ async function callEtsyAPI(endpoint: string, accessToken: string, options: Reque
             'Content-Type': 'application/json',
             ...options.headers,
         },
-    });
+    }, { retries: method === 'GET' ? undefined : 0, timeoutMs: method === 'GET' ? undefined : 120_000 });
 
     if (!response.ok) {
         const errorText = await response.text();
@@ -198,7 +207,7 @@ async function callEtsyPublicAPI(endpoint: string) {
     const url = `${ETSY_API_BASE}${endpoint}`;
     const apiKey = (process.env.ETSY_API_KEY || '').trim().replace(/^"|"$/g, '');
     const apiSecret = (process.env.ETSY_API_SECRET || '').trim().replace(/^"|"$/g, '');
-    const response = await fetch(url, {
+    const response = await etsyFetch(url, {
         headers: {
             'x-api-key': `${apiKey}:${apiSecret}`,
         },
@@ -1923,14 +1932,14 @@ export default async function handler(
                         sample_product_property_values: productsForCopy[0]?.property_values,
                     });
 
-                    const inventoryCopyResult = await callEtsyAPI(
+                    const inventoryCopyResult = await withListingInventoryLock(String(newListing.listing_id), () => callEtsyAPI(
                         `/listings/${newListing.listing_id}/inventory`,
                         accessToken,
                         {
                             method: 'PUT',
                             body: JSON.stringify(inventoryPayload),
                         }
-                    );
+                    ));
                     inventoryCopied = true;
                     logger.info('Inventory copy result', {
                         new_listing_id: newListing.listing_id,
@@ -2108,6 +2117,7 @@ export default async function handler(
                 },
                 body: bodyParts,
             });
+            recordEtsyResponse(uploadResponse, currentEtsyPriority(), shopId);
 
             if (!uploadResponse.ok) {
                 const errorText = await uploadResponse.text();
@@ -2390,6 +2400,7 @@ export default async function handler(
                     },
                     body: new URLSearchParams({ video_id: String(video_id) }),
                 });
+                recordEtsyResponse(response, currentEtsyPriority(), shopId);
 
                 if (!response.ok) {
                     const errorText = await response.text();
@@ -2496,6 +2507,7 @@ export default async function handler(
                 },
                 body: bodyParts,
             });
+            recordEtsyResponse(uploadResponse, currentEtsyPriority(), shopId);
 
             if (!uploadResponse.ok) {
                 const errorText = await uploadResponse.text();
@@ -2638,6 +2650,16 @@ export default async function handler(
                 });
             }
 
+            // Stock sync owns quantities for managed listings: direct inventory
+            // writes would fight it. (Disabled no-op until the seller goes live.)
+            if (await isListingStockManaged(userId, shopId, String(listing_id))) {
+                return res.status(409).json({
+                    error: 'Stock sync manages this listing\'s quantities. Edit it through a draft (Sync to Etsy) instead.',
+                    code: 'STOCK_SYNC_MANAGED',
+                    key: 'listingHistory.errors.stockSyncManaged',
+                });
+            }
+
             logger.info('Updating inventory for listing', {
                 listing_id,
                 product_count: products.length,
@@ -2678,14 +2700,14 @@ export default async function handler(
             if (Array.isArray(quantity_on_property)) payload.quantity_on_property = quantity_on_property;
             if (Array.isArray(sku_on_property)) payload.sku_on_property = sku_on_property;
 
-            const result = await callEtsyAPI(
+            const result = await withListingInventoryLock(String(listing_id), () => callEtsyAPI(
                 `/listings/${listing_id}/inventory?max_variations_supported=3`,
                 accessToken,
                 {
                     method: 'PUT',
                     body: JSON.stringify(payload),
                 }
-            );
+            ));
 
             return res.status(200).json({
                 success: true,
@@ -2827,6 +2849,8 @@ export default async function handler(
         // DELETE /api/clawd/etsy?action=delete_listing&listing_id=XXXXX
         if (req.method === 'DELETE' && action === 'delete_listing' && listing_id) {
             logger.info('Deleting Etsy listing', { listing_id, shopId });
+            // Our own delete: the listing.deleted webhook must not alert the seller.
+            markKolayxportDelete(shopId, String(listing_id));
             // Etsy v3: DELETE /application/listings/{listing_id} (not shop-scoped)
             await callEtsyAPI(
                 `/listings/${listing_id}`,
@@ -2903,6 +2927,18 @@ export default async function handler(
         // GET /api/clawd/etsy?action=listing_count — Lightweight count only (no images/data)
         if (req.method === 'GET' && action === 'listing_count') {
             const state = (req.query.state as string) || 'active';
+            // Served from the webhook-fresh DB cache (zero Etsy calls). Only a shop
+            // that was never imported falls back to one live count call.
+            const grouped = await prisma.etsyListing.groupBy({
+                by: ['state'],
+                where: { etsyShopId: shopId },
+                _count: { _all: true },
+            });
+            const cacheShop = await prisma.etsyShop.findFirst({ where: { shopId }, select: { lastListingSyncAt: true } });
+            if (grouped.length > 0 || cacheShop?.lastListingSyncAt) {
+                const row = grouped.find((g) => g.state === state);
+                return res.status(200).json({ count: row?._count?._all || 0, state });
+            }
             const endpoint = `/shops/${shopId}/listings?state=${state}&limit=1&offset=0`;
             const data = await callEtsyAPI(endpoint, accessToken);
             return res.status(200).json({ count: data.count || 0, state });
@@ -3090,6 +3126,7 @@ export default async function handler(
                     body: formData,
                 }
             );
+            recordEtsyResponse(uploadResp, currentEtsyPriority(), shopId);
             if (!uploadResp.ok) {
                 const errText = await uploadResp.text();
                 throw new Error(`Etsy API error: ${uploadResp.status} - ${errText}`);
@@ -3698,140 +3735,40 @@ Return JSON in Turkish (but keep all keywords/tags/titles in English):
         }
 
         // POST /api/clawd/etsy?action=sync_listings — Fetch from Etsy API → upsert to DB
+        // Delegates to the shared reconcile (timestamp-guarded upserts, offering
+        // cache, versions, safe deletion check). Response shape is unchanged:
+        // {success, partial, synced, fetched, errors (count), removed, lastSyncAt}.
         if (req.method === 'POST' && action === 'sync_listings') {
-            // Etsy getListingsByShop accepts: active, inactive, sold_out, draft, expired.
-            // All must be fetched, otherwise sold-out/expired listings look "stale" and get deleted.
-            const states = ['active', 'draft', 'inactive', 'sold_out', 'expired'];
-            let totalUpserted = 0;
-            let totalFetched = 0;
-            let totalErrors = 0;
-            let fetchFailed = false;
-            const syncedAt = new Date();
-
-            for (const state of states) {
-                let offset = 0;
-                const limit = 100;
-
-                while (true) {
-                    const endpoint = `/shops/${shopId}/listings?state=${state}&limit=${limit}&offset=${offset}&includes=images`;
-                    let data: any;
-                    try {
-                        data = await callEtsyAPI(endpoint, accessToken);
-                    } catch (err: any) {
-                        logger.error(`Sync listings fetch failed for state=${state} offset=${offset}`, err);
-                        fetchFailed = true;
-                        break;
-                    }
-
-                    const rawResults: any[] = Array.isArray(data?.results) ? data.results : [];
-                    const results = rawResults.filter((l: any) => l.state === state);
-                    logger.info(`Sync: state=${state} offset=${offset} raw=${rawResults.length} filtered=${results.length}`);
-                    if (rawResults.length === 0) break;
-                    totalFetched += results.length;
-
-                    // Build upsert data for each listing
-                    const upsertData = results.map((listing: any) => {
-                        const firstImage = listing.images?.[0] || null;
-                        return {
-                            etsyShopId: shopId,
-                            etsyListingId: listing.listing_id,
-                            title: listing.title || '',
-                            description: listing.description || '',
-                            tags: listing.tags || [],
-                            materials: listing.materials || [],
-                            priceAmount: listing.price?.amount || 0,
-                            priceDivisor: listing.price?.divisor || 100,
-                            priceCurrencyCode: listing.price?.currency_code || 'USD',
-                            views: listing.views || 0,
-                            numFavorers: listing.num_favorers || 0,
-                            quantity: listing.quantity || 0,
-                            state: listing.state || 'draft',
-                            url: listing.url || null,
-                            taxonomyId: listing.taxonomy_id || null,
-                            shopSectionId: listing.shop_section_id || null,
-                            whoMade: listing.who_made || null,
-                            whenMade: listing.when_made || null,
-                            isSupply: listing.is_supply ?? false,
-                            processingMin: listing.processing_min || null,
-                            processingMax: listing.processing_max || null,
-                            shippingProfileId: listing.shipping_profile_id || null,
-                            returnPolicyId: listing.return_policy_id || null,
-                            itemWeight: listing.item_weight != null ? listing.item_weight : null,
-                            itemWeightUnit: listing.item_weight_unit || null,
-                            itemLength: listing.item_length != null ? listing.item_length : null,
-                            itemWidth: listing.item_width != null ? listing.item_width : null,
-                            itemHeight: listing.item_height != null ? listing.item_height : null,
-                            itemDimensionsUnit: listing.item_dimensions_unit || null,
-                            isPersonalizable: listing.is_personalizable ?? false,
-                            personalizationIsRequired: listing.personalization_is_required ?? false,
-                            personalizationInstructions: listing.personalization_instructions || null,
-                            personalizationCharCountMax: listing.personalization_char_count_max || null,
-                            thumbnailUrl75x75: firstImage?.url_75x75 || null,
-                            thumbnailUrl170x135: firstImage?.url_170x135 || null,
-                            thumbnailUrl570xN: firstImage?.url_570xN || null,
-                            imageCount: listing.images?.length || 0,
-                            hasVideo: listing.has_videos ?? false,
-                            etsyCreatedTimestamp: listing.created_timestamp || 0,
-                            etsyUpdatedTimestamp: listing.updated_timestamp || 0,
-                            syncedAt,
-                        };
-                    });
-
-                    // Upsert each listing
-                    for (const d of upsertData) {
-                        try {
-                            await prisma.etsyListing.upsert({
-                                where: {
-                                    etsyShopId_etsyListingId: {
-                                        etsyShopId: d.etsyShopId,
-                                        etsyListingId: d.etsyListingId,
-                                    },
-                                },
-                                create: d,
-                                update: { ...d },
-                            });
-                            totalUpserted++;
-                        } catch (err: any) {
-                            totalErrors++;
-                            logger.error(`Upsert failed for listing ${d.etsyListingId}: ${err.message}`);
-                        }
-                    }
-
-                    offset += limit;
-                    // Paginate on the raw page size, not the filtered count.
-                    if (rawResults.length < limit) break;
-                }
-            }
-
-            logger.info(`Sync complete: fetched=${totalFetched} upserted=${totalUpserted} errors=${totalErrors}`);
-
-            // Only remove stale listings after a COMPLETE, error-free sync. A failed page
-            // fetch or failed upsert would otherwise delete live listings from the cache.
-            let deletedCount = 0;
-            if (totalUpserted > 0 && !fetchFailed && totalErrors === 0) {
-                const deleted = await prisma.etsyListing.deleteMany({
-                    where: {
-                        etsyShopId: shopId,
-                        syncedAt: { lt: syncedAt },
-                    },
+            const result = await reconcileShopListings(shopId, { mode: 'full' });
+            logger.info(`Sync complete: fetched=${result.fetched} changed=${result.synced} errors=${result.errors.length} removed=${result.removed}`);
+            // Hard failures are non-2xx so the page's `!res.ok` branch shows an error
+            // toast instead of "0 listings synced".
+            const failure = syncListingsFailure(result);
+            if (failure) {
+                return res.status(failure.status).json({
+                    error: failure.error,
+                    code: failure.code,
+                    success: false,
+                    partial: result.partial,
+                    synced: result.fetched,
+                    changed: result.synced,
+                    fetched: result.fetched,
+                    errors: result.errors.length,
+                    removed: result.removed,
+                    lastSyncAt: result.lastSyncAt,
                 });
-                deletedCount = deleted.count;
             }
-
-            // Update shop's last sync timestamp
-            await prisma.etsyShop.updateMany({
-                where: { shopId, userId },
-                data: { lastListingSyncAt: syncedAt },
-            });
-
             return res.status(200).json({
-                success: !fetchFailed,
-                partial: fetchFailed,
-                synced: totalUpserted,
-                fetched: totalFetched,
-                errors: totalErrors,
-                removed: deletedCount,
-                lastSyncAt: syncedAt.toISOString(),
+                success: result.success,
+                partial: result.partial,
+                // `synced` keeps its old meaning: listings fetched from Etsy and
+                // confirmed in the DB (changed + unchanged). `changed` = rows written.
+                synced: result.fetched,
+                changed: result.synced,
+                fetched: result.fetched,
+                errors: result.errors.length,
+                removed: result.removed,
+                lastSyncAt: result.lastSyncAt,
             });
         }
 

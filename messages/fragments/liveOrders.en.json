@@ -1,0 +1,30 @@
+{
+  "liveOrders": {
+    "toast": {
+      "newOrder": "New order",
+      "newOrderFrom": "New {marketplace} order",
+      "newOrders": "{count, plural, one {# new order} other {# new orders}}",
+      "items": "{count, plural, one {# item} other {# items}}",
+      "cancelled": "Order {orderNumber} was cancelled",
+      "cancelledHint": "Check before you ship it",
+      "open": "Open",
+      "close": "Close"
+    },
+    "sound": {
+      "on": "Order sound is on",
+      "muted": "Order sound is muted",
+      "needsClick": "Order sound is waiting for one click",
+      "clickToMute": "Click to mute",
+      "clickToEnable": "Click to turn it on and hear a test sound"
+    },
+    "status": {
+      "live": "Live: new orders appear instantly",
+      "connecting": "Connecting to live updates…",
+      "offline": "Live updates paused, reconnecting",
+      "polling": "Live connection lost, checking every minute"
+    },
+    "badge": {
+      "new": "New"
+    }
+  }
+}

@@ -182,8 +182,9 @@ export async function getIntegrationHealth() {
 // --------------------------------------------------------------------------
 /** Counts only — never returns webhook payloads. */
 export async function getEtsyWebhookHealth() {
-  const since24h = new Date(Date.now() - DAY);
-  const [byStatusAll, byStatus24h, oldestPending, recentFailed] = await Promise.all([
+  const now = Date.now();
+  const since24h = new Date(now - DAY);
+  const [byStatusAll, byStatus24h, oldestPending, recentFailed, oldestDue, lastReceived, backlog] = await Promise.all([
     prisma.webhookEvent.groupBy({ by: ['status'], where: { provider: 'etsy' }, _count: true }),
     prisma.webhookEvent.groupBy({
       by: ['status'],
@@ -199,20 +200,77 @@ export async function getEtsyWebhookHealth() {
       where: { provider: 'etsy', status: 'failed' },
       orderBy: { createdAt: 'desc' },
       take: 10,
-      select: { id: true, eventType: true, errorMessage: true, attempts: true, createdAt: true },
+      select: { id: true, eventType: true, shopId: true, errorMessage: true, attempts: true, createdAt: true },
+    }),
+    prisma.webhookEvent.findFirst({
+      where: { provider: 'etsy', status: 'received', nextAttemptAt: { lte: new Date(now) } },
+      orderBy: { createdAt: 'asc' },
+      select: { createdAt: true },
+    }),
+    prisma.webhookEvent.findFirst({
+      where: { provider: 'etsy' },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    }),
+    prisma.webhookEvent.groupBy({
+      by: ['shopId'],
+      where: { provider: 'etsy', status: { in: ['received', 'processing', 'blocked_reauth'] } },
+      _count: true,
     }),
   ]);
   const toMap = (rows: Array<{ status: string | null; _count: number }>) =>
-    Object.fromEntries(rows.map(r => [r.status || 'unknown', r._count]));
+    Object.fromEntries((rows || []).map(r => [r.status || 'unknown', r._count]));
   const counts24h = toMap(byStatus24h as any);
+  const countsAll = toMap(byStatusAll as any);
+  const depthByStatus: Record<string, number> = {
+    received: 0, processing: 0, blocked_reauth: 0, coalesced: 0, failed: 0, done: 0, ignored: 0,
+    ...countsAll,
+  };
+  const backlogByShop = ((backlog || []) as Array<{ shopId: string | null; _count: number }>)
+    .map(r => ({ shopId: r.shopId || 'unknown', count: r._count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 20);
+
+  let budget: unknown = null;
+  let worker: unknown = null;
+  let jobs: unknown[] = [];
+  try {
+    const { getBudgetSnapshot } = await import('@/lib/etsy/rateBudget');
+    budget = getBudgetSnapshot();
+  } catch { /* optional */ }
+  try {
+    const { getEtsyWorkerStatus } = await import('@/lib/etsy/webhooks/worker');
+    worker = getEtsyWorkerStatus();
+  } catch { /* optional */ }
+  try {
+    const { getJobStatuses } = await import('@/lib/scheduler/runs');
+    jobs = await getJobStatuses();
+  } catch { /* optional */ }
+
   return {
-    byStatus: toMap(byStatusAll as any),
+    byStatus: countsAll,
     byStatus24h: counts24h,
+    depthByStatus,
     failed24h: counts24h.failed ?? 0,
     pending: oldestPending ? true : false,
-    oldestPendingAgeMs: oldestPending ? Date.now() - new Date(oldestPending.createdAt).getTime() : null,
+    oldestPendingAgeMs: oldestPending ? now - new Date(oldestPending.createdAt).getTime() : null,
+    oldestDueAgeMs: oldestDue ? now - new Date(oldestDue.createdAt).getTime() : null,
+    lastReceivedAt: lastReceived ? new Date(lastReceived.createdAt).toISOString() : null,
+    backlogByShop,
     recentFailed,
+    budget,
+    worker,
+    jobs,
   };
+}
+
+/** Admin replay: failed Etsy events (by ids, or all for a shop) back to the queue with attempts 0. */
+export async function replayFailedEtsyWebhooks(input: { ids?: unknown; shopId?: unknown }): Promise<{ replayed: number }> {
+  const ids = Array.isArray(input.ids) ? input.ids.filter((x): x is string => typeof x === 'string' && x.length > 0 && x.length <= 191) : [];
+  const shopId = typeof input.shopId === 'string' && /^\d{1,20}$/.test(input.shopId) ? input.shopId : undefined;
+  if (ids.length === 0 && !shopId) return { replayed: 0 };
+  const { replayFailedEtsyEvents } = await import('@/lib/etsy/webhooks/queueOps');
+  return { replayed: await replayFailedEtsyEvents({ ids, shopId }) };
 }
 
 // --------------------------------------------------------------------------
@@ -652,12 +710,20 @@ export async function buildNeedsAttentionQueue() {
       meta: { failed24h: etsyWh.failed24h },
     });
   }
-  if (etsyWh.oldestPendingAgeMs !== null && etsyWh.oldestPendingAgeMs > 30 * 60 * 1000) {
+  if (etsyWh.oldestDueAgeMs !== null && etsyWh.oldestDueAgeMs > 10 * 60 * 1000) {
     items.push({
       kind: 'etsy-webhook',
       severity: 'warn',
-      message: 'Etsy webhook queue has events pending for over 30 minutes (is the process-etsy-webhooks cron running?)',
-      meta: { oldestPendingAgeMs: etsyWh.oldestPendingAgeMs },
+      message: 'Etsy webhook queue has due events older than 10 minutes (is the in-process worker running? see the Etsy event backbone card)',
+      meta: { oldestDueAgeMs: etsyWh.oldestDueAgeMs },
+    });
+  }
+  if ((etsyWh.depthByStatus?.blocked_reauth ?? 0) > 0) {
+    items.push({
+      kind: 'etsy-webhook',
+      severity: 'warn',
+      message: `${etsyWh.depthByStatus.blocked_reauth} Etsy webhook event(s) parked until a shop reconnects`,
+      meta: { blockedReauth: etsyWh.depthByStatus.blocked_reauth },
     });
   }
 

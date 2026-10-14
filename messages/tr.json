@@ -3927,7 +3927,8 @@
       "queuedDeleteRemoved": "Sıradaki silme işlemi iptal edildi.",
       "remoteChanged": "Bu ilan, sen değişiklikleri hazırladıktan sonra Etsy'de değiştirildi.",
       "deletedOnEtsy": "Bu ilan Etsy'de silinmiş. Hazırlanan değişiklikler artık gönderilemez — taslağı sil.",
-      "deleteQueuedNotice": "Bu listing için silme işlemi sırada. Bir sonraki Etsy senkronunda çalışacak."
+      "deleteQueuedNotice": "Bu listing için silme işlemi sırada. Bir sonraki Etsy senkronunda çalışacak.",
+      "stockOverrideFailed": "Bu ilan stok senkronu tarafından yönetiliyor ve miktarlar uygulanamadı. Taslağınız korundu — senkronu tekrar deneyin."
     },
     "webhooks": {
       "outOfStockSubject": "Etsy'de stok bitti: {title}",
@@ -9121,7 +9122,24 @@
       "reauthRequired": "{provider} bağlantınızın süresi doldu. Ayarlar'dan yeniden bağlanın",
       "orderSyncFailed": "{provider} sipariş senkronizasyonu başarısız oldu",
       "usageNearLimit": "Bu dönemde {limit} {kind, select, orderSync {sipariş senkronizasyonu} label {etiket} other {kullanım}} hakkınızın {used} tanesini kullandınız",
-      "usageLimitReached": "{kind, select, orderSync {Sipariş senkronizasyonu} label {Etiket} other {Kullanım}} limitinize ulaştınız. Devam etmek için planınızı yükseltin"
+      "usageLimitReached": "{kind, select, orderSync {Sipariş senkronizasyonu} label {Etiket} other {Kullanım}} limitinize ulaştınız. Devam etmek için planınızı yükseltin",
+      "orderNew": "Yeni sipariş: {orderNumber}",
+      "orderCanceled": "{orderNumber} numaralı sipariş iptal edildi",
+      "orderCanceledAfterLabel": "{orderNumber} numaralı sipariş etiketi oluşturulduktan sonra iptal edildi. Etiketi iptal edin",
+      "orderShippedExternal": "{orderNumber} numaralı sipariş KolayXport dışında kargolandı olarak işaretlendi",
+      "dispatchOverdue": "{count} siparişin kargolama tarihi geçti",
+      "dispatchDueToday": "{count} sipariş bugün kargolanmalı",
+      "dispatchDueTomorrow": "{count} sipariş yarın kargolanmalı",
+      "listingDeactivated": "\"{title}\" Etsy ilanı devre dışı bırakıldı",
+      "listingExpired": "\"{title}\" Etsy ilanının süresi doldu",
+      "listingDeleted": "\"{title}\" Etsy ilanı silindi",
+      "listingChangedExternally": "\"{title}\" KolayXport dışında değiştirildi",
+      "stockOutOfStock": "{sku} stokta kalmadı",
+      "stockPushFailed": "{sku} için {channel} stok güncellemesi başarısız oldu",
+      "stockDrift": "Bugün {count} stok uyuşmazlığı bulundu",
+      "stockUnmatchedSale": "{count} satış bir stok kalemiyle eşleştirilemedi",
+      "seoExperimentReady": "\"{title}\" için SEO testi sonuçları hazır",
+      "webhookBacklog": "Etsy olay kuyruğu birikiyor"
     }
   },
   "commandPalette": {
@@ -9176,5 +9194,790 @@
     "neededFor": "Siparişler",
     "popupBlocked": "Tarayıcınız yeni sekmeyi engelledi. Bu site için açılır pencerelere izin verip tekrar deneyin.",
     "truncated": "Seçilen siparişlerden yalnızca ilk {max} tanesi açıldı."
+  },
+  "etsyOps": {
+    "common": {
+      "never": "hiç",
+      "none": "—",
+      "justNow": "az önce",
+      "minutesAgo": "{count, plural, one {# dk önce} other {# dk önce}}",
+      "hoursAgo": "{count, plural, one {# saat önce} other {# saat önce}}",
+      "daysAgo": "{count, plural, one {# gün önce} other {# gün önce}}",
+      "refresh": "Yenile",
+      "loading": "Yükleniyor…",
+      "loadFailed": "Yüklenemedi"
+    },
+    "backbone": {
+      "title": "Etsy olay altyapısı",
+      "worker": "İşleyici",
+      "loop": "Uygulama içi döngü",
+      "running": "çalışıyor",
+      "stopped": "çalışmıyor",
+      "lastPass": "Son tur",
+      "inFlight": "İşlenen olaylar",
+      "lastReceived": "Son gelen webhook",
+      "oldestDue": "En eski bekleyen olay",
+      "failed24h": "Başarısız (24 sa)",
+      "queue": "Duruma göre kuyruk",
+      "budget": "Etsy API bütçesi (bugün)",
+      "usedToday": "Kullanılan günlük kota",
+      "remote": "Etsy'ye göre",
+      "remoteValue": "{limit} kotadan {remaining} kaldı",
+      "localCalls": "Burada sayılan çağrılar",
+      "perShopCap": "Mağaza başı arka plan limiti",
+      "throttled": "Yavaşlatılan / ertelenen",
+      "jobs": "Zamanlanmış görevler",
+      "lastSuccess": "Son başarılı",
+      "runningSince": "Çalışma başlangıcı",
+      "lastFailure": "Son hata",
+      "backlogByShop": "Mağazaya göre birikme",
+      "recentFailed": "Son başarısız olaylar",
+      "replay": "Yeniden dene",
+      "replayShop": "Bu mağazanın tüm başarısızlarını yeniden dene",
+      "replayShown": "Gösterilenlerin hepsini yeniden dene",
+      "replayed": "{count, plural, =0 {Yeniden denenecek olay yok} one {# olay yeniden kuyruğa alındı} other {# olay yeniden kuyruğa alındı}}",
+      "replayFailed": "Yeniden deneme başarısız",
+      "shop": "Mağaza",
+      "attempts": "Deneme"
+    },
+    "status": {
+      "received": "bekliyor",
+      "processing": "işleniyor",
+      "blocked_reauth": "yeniden bağlanma gerekli",
+      "failed": "başarısız",
+      "coalesced": "birleştirildi",
+      "done": "tamamlandı",
+      "ignored": "yok sayıldı"
+    },
+    "draftSync": {
+      "stockOverrideFailed": "Bu ilan stok senkronu tarafından yönetiliyor ve miktarlar uygulanamadı. Taslağınız korundu — senkronu tekrar deneyin."
+    }
+  },
+  "listingHistory": {
+    "navLabel": "Etsy aktivite",
+    "editorTab": "Geçmiş",
+    "pageTitle": "Etsy aktivite",
+    "pageSubtitle": "Etsy ilanlarınızdaki her değişiklik, kimin yaptığı ve SEO düzenlemelerinin işe yarayıp yaramadığı.",
+    "tabs": {
+      "changes": "Değişiklikler",
+      "seo": "SEO deneyleri"
+    },
+    "shopLabel": "Mağaza",
+    "allShops": "Tüm mağazalar",
+    "connectDescription": "İlan değişikliklerini ve SEO sonuçlarını görmek için Etsy mağazanızı bağlayın.",
+    "filters": {
+      "all": "Tümü",
+      "external": "Etsy'de değişti",
+      "kolayxport_draft": "KolayXport'tan gönderildi",
+      "kolayxport_stock": "Stok senkronu",
+      "unknown": "Kontrolde bulundu"
+    },
+    "attribution": {
+      "external": "Etsy'de değişti",
+      "kolayxport_draft": "KolayXport'tan gönderildi",
+      "kolayxport_stock": "Stok senkronu",
+      "unknown": "Kontrolde bulundu"
+    },
+    "freshness": {
+      "live": "Etsy canlı bağlı · son değişiklik {time}",
+      "liveNoChange": "Etsy canlı bağlı · henüz değişiklik yok",
+      "delayed": "Gecikmeli · günde bir kontrol · son kontrol {time}",
+      "delayedNever": "Gecikmeli · henüz kontrol edilmedi",
+      "needsReauth": "İlanların güncel kalması için Etsy'yi yeniden bağlayın",
+      "tooltipLive": "Etsy her değişikliği saniyeler içinde KolayXport'a bildiriyor.",
+      "tooltipDelayed": "Etsy son zamanlarda değişiklik bildirimi göndermedi; ilanlar her gece yeniden kontrol ediliyor. Hemen yenilemek için İlanları senkronize et'e basın."
+    },
+    "keys": {
+      "created": "İlan oluşturuldu",
+      "deleted": "İlan silindi",
+      "title": "Başlık",
+      "description": "Açıklama",
+      "tags": "Etiketler",
+      "materials": "Malzemeler",
+      "price": "Fiyat",
+      "currency": "Para birimi",
+      "state": "Durum",
+      "taxonomyId": "Kategori",
+      "shopSectionId": "Mağaza bölümü",
+      "whoMade": "Kim yaptı",
+      "whenMade": "Ne zaman yapıldı",
+      "isSupply": "Malzeme ürünü",
+      "processingMin": "Hazırlık (min)",
+      "processingMax": "Hazırlık (maks)",
+      "shippingProfileId": "Kargo profili",
+      "returnPolicyId": "İade politikası",
+      "itemWeight": "Ağırlık",
+      "itemWeightUnit": "Ağırlık birimi",
+      "itemLength": "Uzunluk",
+      "itemWidth": "Genişlik",
+      "itemHeight": "Yükseklik",
+      "itemDimensionsUnit": "Ölçü birimi",
+      "isPersonalizable": "Kişiselleştirme",
+      "personalizationIsRequired": "Kişiselleştirme zorunlu",
+      "personalizationInstructions": "Kişiselleştirme talimatı",
+      "personalizationCharCountMax": "Kişiselleştirme maks. karakter",
+      "hasVariations": "Varyasyonlar",
+      "images": "Fotoğraflar",
+      "offerings": "Varyasyonlar",
+      "videos": "Video"
+    },
+    "states": {
+      "active": "Aktif",
+      "inactive": "Pasif",
+      "draft": "Taslak",
+      "expired": "Süresi doldu",
+      "sold_out": "Tükendi",
+      "removed": "Silindi",
+      "edit": "Düzenleniyor"
+    },
+    "diff": {
+      "from": "Önce",
+      "to": "Sonra",
+      "empty": "(boş)",
+      "yes": "Evet",
+      "no": "Hayır",
+      "tagsAdded": "Eklenen",
+      "tagsRemoved": "Çıkarılan",
+      "imagesAdded": "{count, plural, one {# fotoğraf eklendi} other {# fotoğraf eklendi}}",
+      "imagesRemoved": "{count, plural, one {# fotoğraf kaldırıldı} other {# fotoğraf kaldırıldı}}",
+      "imagesReordered": "Fotoğraf sırası değişti",
+      "imagesAlt": "{count, plural, one {# fotoğrafın alt metni değişti} other {# fotoğrafın alt metni değişti}}",
+      "offeringsAdded": "{count, plural, one {# varyasyon eklendi} other {# varyasyon eklendi}}",
+      "offeringsRemoved": "{count, plural, one {# varyasyon kaldırıldı} other {# varyasyon kaldırıldı}}",
+      "offeringChanged": "{label}: {fields}",
+      "offeringFieldSku": "SKU",
+      "offeringFieldPrice": "fiyat",
+      "offeringFieldIsEnabled": "açık/kapalı",
+      "noDetails": "Bu değişiklik için gösterilecek ayrıntı yok."
+    },
+    "history": {
+      "title": "Geçmiş",
+      "empty": "Henüz kayıtlı değişiklik yok. Etsy'de veya KolayXport'tan yapılan değişiklikler burada görünür.",
+      "loadMore": "Daha eskileri göster",
+      "restore": "Taslak olarak geri yükle",
+      "restoreTitle": "Bu sürüm taslak olarak geri yüklensin mi?",
+      "restoreBody": "KolayXport bu değerleri bir taslağa yazar. Taslağı inceleyip Etsy'ye Gönder'e basana kadar Etsy'de hiçbir şey değişmez.",
+      "restoreConfirm": "Taslak oluştur",
+      "restoreCancel": "Vazgeç",
+      "restored": "Taslak oluşturuldu. İnceleyip Etsy'ye gönderin.",
+      "restoredPartial": "Taslak oluşturuldu. Bazı kısımlar geri yüklenemiyor: {parts}.",
+      "nothingToRestore": "Bu sürüm ilanla zaten aynı — geri yüklenecek bir şey yok.",
+      "restoreFailed": "Taslak oluşturulamadı.",
+      "unrestorable": {
+        "images_deleted": "silinmiş fotoğraflar",
+        "inventory": "varyasyonlar ve stok",
+        "state": "ilan durumu",
+        "personalization": "kişiselleştirme soruları",
+        "videos": "video",
+        "variations": "fiyat (varyasyon bazında)",
+        "cleared_value": "temizlenmiş alanlar"
+      },
+      "tombstone": "Bu ilan Etsy'de silindi."
+    },
+    "activity": {
+      "empty": "Henüz ilan değişikliği yok. Etsy'deki düzenlemeler ve KolayXport'tan gönderimler saniyeler içinde burada görünür.",
+      "loadMore": "Daha fazla göster",
+      "viewListing": "Etsy'de aç",
+      "changedFields": "{count, plural, one {# değişiklik} other {# değişiklik}}",
+      "deletedListing": "Silinmiş ilan",
+      "newItems": "{count, plural, one {# yeni değişiklik} other {# yeni değişiklik}} — göster"
+    },
+    "errors": {
+      "loadFailed": "İlan aktivitesi yüklenemedi.",
+      "versionNotFound": "Bu sürüm artık yok.",
+      "versionNotRestorable": "Bu sürüm geri yüklenemez.",
+      "listingGone": "Bu ilan artık Etsy'de yok.",
+      "stockSyncManaged": "Bu ilanın stok adetlerini stok senkronu yönetiyor. Adetleri Stok senkronu'ndan veya bir taslakla değiştirin."
+    }
+  },
+  "liveOrders": {
+    "toast": {
+      "newOrder": "Yeni sipariş",
+      "newOrderFrom": "Yeni {marketplace} siparişi",
+      "newOrders": "{count, plural, one {# yeni sipariş} other {# yeni sipariş}}",
+      "items": "{count, plural, one {# ürün} other {# ürün}}",
+      "cancelled": "{orderNumber} numaralı sipariş iptal edildi",
+      "cancelledHint": "Kargolamadan önce kontrol edin",
+      "open": "Aç",
+      "close": "Kapat"
+    },
+    "sound": {
+      "on": "Sipariş sesi açık",
+      "muted": "Sipariş sesi kapalı",
+      "needsClick": "Sipariş sesi için bir kez tıklamanız gerekiyor",
+      "clickToMute": "Kapatmak için tıklayın",
+      "clickToEnable": "Açmak ve deneme sesini duymak için tıklayın"
+    },
+    "status": {
+      "live": "Canlı: yeni siparişler anında görünür",
+      "connecting": "Canlı güncellemelere bağlanılıyor…",
+      "offline": "Canlı güncellemeler durdu, yeniden bağlanılıyor",
+      "polling": "Canlı bağlantı koptu, her dakika kontrol ediliyor"
+    },
+    "badge": {
+      "new": "Yeni"
+    }
+  },
+  "notificationCenter": {
+    "typeLabels": {
+      "orderNew": "Yeni siparişler",
+      "orderCanceled": "İptal edilen siparişler",
+      "orderCanceledAfterLabel": "Etiketten sonra iptal",
+      "orderShippedExternal": "KolayXport dışında kargolanan",
+      "orderSyncFailed": "Sipariş senkronu başarısız",
+      "dispatchOverdue": "Geciken kargolar",
+      "dispatchDueToday": "Bugün kargolanacaklar",
+      "dispatchDueTomorrow": "Yarın kargolanacaklar",
+      "listingDeactivated": "İlan devre dışı",
+      "listingDeleted": "İlan silindi",
+      "listingExpired": "İlan süresi doldu",
+      "listingChangedExternally": "İlan KolayXport dışında değişti",
+      "draftSyncFailed": "Etsy senkronu başarısız",
+      "draftConflict": "İlan düzenleme çakışması",
+      "seoExperimentReady": "SEO testi sonuçları",
+      "stockOutOfStock": "Stok tükendi",
+      "stockPushFailed": "Stok güncellemesi başarısız",
+      "stockDrift": "Stok uyuşmazlığı",
+      "stockUnmatchedSale": "Eşleşmeyen satış",
+      "reauthRequired": "Bağlantı süresi doldu",
+      "usageNearLimit": "Kullanım limite yakın",
+      "usageLimitReached": "Kullanım limiti doldu",
+      "webhookBacklog": "Webhook birikmesi (yönetici)"
+    },
+    "groups": {
+      "all": "Tümü",
+      "orders": "Siparişler",
+      "dispatch": "Kargo süreleri",
+      "listings": "İlanlar",
+      "stock": "Stok",
+      "account": "Hesap",
+      "system": "Sistem"
+    },
+    "severity": {
+      "info": "Bilgi",
+      "warning": "Uyarı",
+      "error": "Kritik"
+    },
+    "page": {
+      "title": "Bildirimler",
+      "subtitle": "Siparişler, kargo süreleri, ilanlar ve stok uyarıları tek yerde",
+      "tabs": {
+        "unread": "Okunmamış",
+        "all": "Tümü",
+        "activity": "Etkinlik",
+        "preferences": "Tercihler"
+      },
+      "markAllRead": "Tümünü okundu işaretle",
+      "markRead": "Okundu işaretle",
+      "open": "Aç",
+      "today": "Bugün",
+      "earlier": "Daha önce",
+      "loadMore": "Daha fazla yükle",
+      "loading": "Yükleniyor…",
+      "resolved": "Çözüldü",
+      "unread": "Okunmadı",
+      "receivedAt": "Alındı: {date}",
+      "filterLabel": "Kategoriye göre filtrele",
+      "empty": {
+        "unread": "Okunmamış bildiriminiz yok",
+        "unreadHint": "İlgilenmeniz gereken uyarılar geldiği anda burada görünür.",
+        "all": "Henüz bildirim yok",
+        "activity": "Henüz etkinlik yok",
+        "activityHint": "İlgilenmeniz gerekmeyen olaylar (örneğin yeni siparişler veya KolayXport dışında kargolanan siparişler) burada listelenir."
+      },
+      "loadError": "Bildirimler yüklenemedi"
+    },
+    "panel": {
+      "seeAll": "Tümünü gör",
+      "empty": "Bildirim yok",
+      "settings": "Bildirim ayarları"
+    },
+    "prefs": {
+      "title": "Bildirim tercihleri",
+      "subtitle": "Uygulamada ve e-postayla nelerin size ulaşacağını seçin",
+      "levelTitle": "Bildirim düzeyi",
+      "presets": {
+        "critical": "Sadece kritik",
+        "recommended": "Önerilen",
+        "all": "Hepsi"
+      },
+      "presetHints": {
+        "critical": "Yalnızca hemen müdahale gerektiren sorunlar: etiketten sonra iptal, silinen veya devre dışı ilanlar, başarısız stok güncellemeleri, süresi dolan bağlantılar.",
+        "recommended": "Yeni siparişler etkinlik akışında; etiket sonrası iptaller, kargo süreleri, ilan sorunları ve süresi dolan bağlantılar için anında e-posta; tükenen stoklar ve süresi dolan ilanlar için günlük özet.",
+        "all": "Tüm bildirimler uygulamada ve e-postayla."
+      },
+      "custom": "Özel",
+      "customHint": "Bazı bildirim türlerini değiştirdiniz. Bir düzey seçmek bunları sıfırlar.",
+      "emailTitle": "E-posta",
+      "emailEnabled": "E-posta bildirimleri gönder",
+      "emailHint": "Hesabınızın e-posta adresine gönderilir.",
+      "quietTitle": "Sessiz saatler",
+      "quietEnabled": "Kritik olmayan e-postaları sessiz saatlerde beklet",
+      "quietHint": "Kritik uyarılar her zaman hemen gönderilir.",
+      "quietFrom": "Başlangıç",
+      "quietTo": "Bitiş",
+      "digestTitle": "Günlük özet",
+      "digestHour": "Günlük özetin gönderileceği saat",
+      "digestHint": "\"Günlük özet\" olarak ayarlanan bildirimler tek bir e-postada toplanır.",
+      "timezone": "Saat dilimi",
+      "advanced": "Gelişmiş: bildirim türüne göre",
+      "columns": {
+        "inApp": "Uygulamada",
+        "email": "E-posta",
+        "digest": "Günlük özet"
+      },
+      "activityOnly": "Yalnızca etkinlik akışı",
+      "telegram": "Telegram",
+      "comingSoon": "Yakında",
+      "telegramHint": "Anlık uyarıları Telegram'dan alın.",
+      "saved": "Tercihler kaydedildi",
+      "saveFailed": "Tercihler kaydedilemedi",
+      "loadFailed": "Tercihler yüklenemedi",
+      "hour": "{hour}:00"
+    },
+    "email": {
+      "open": "KolayXport'ta aç",
+      "footer": "Bildirim e-postalarını yönet",
+      "digestSubject": "Bugün {count} bildirim",
+      "digestIntro": "KolayXport günlük özetiniz ({count} öğe):",
+      "digestMore": "…ve KolayXport'ta {count} öğe daha."
+    }
+  },
+  "orderPipeline": {
+    "labelGuard": {
+      "cancelledTitle": "Bu sipariş iptal edildi",
+      "shippedTitle": "Bu sipariş zaten kargolanmış",
+      "orderNumber": "Sipariş {orderNumber}",
+      "cancelled": "Pazaryeri bu siparişi iptal edilmiş veya iade edilmiş olarak gösteriyor. Yeni bir etiket kargo firması tarafından ücretlendirilir.",
+      "shippedExternally": "Pazaryeri bu siparişi kargolandı olarak gösteriyor, ancak KolayXport'ta etiket veya takip numarası oluşturulmadı. Muhtemelen başka bir yolla gönderildi.",
+      "overrideHint": "Etiketi yalnızca bu siparişi hâlâ göndermeniz gerektiğinden eminseniz oluşturun.",
+      "keepSafe": "Oluşturma",
+      "createAnyway": "Yine de etiket oluştur"
+    },
+    "badges": {
+      "cancelledAfterLabel": "Etiketten sonra iptal",
+      "labelCost": "etiket {cost} {currency}",
+      "labelTracking": "{carrier} etiketi: {tracking}",
+      "cancelled": "İptal edildi",
+      "voidRequested": "İptal talep edildi",
+      "shippedExternally": "KolayXport dışında kargolandı",
+      "late": "Gecikti",
+      "shippedLate": "Geç kargolandı",
+      "labelNotPushed": "Takip no Etsy'de değil",
+      "labelNotPushedHint": "Etiket hazır, takip numarası Etsy'de değil. Chrome eklentisiyle Etsy'ye gönderin.",
+      "delivered": "Teslim edildi",
+      "returnWindow": "{days, plural, =0 {İade süresi bugün bitiyor} other {İade için # gün kaldı}}"
+    },
+    "void": {
+      "voidLabel": "Etiketi iptal et",
+      "confirmManual": "Manuel iptal ettim",
+      "openCarrierPortal": "Kargo sitesini aç",
+      "manualRequired": "Bu kargo firmasında etiket otomatik iptal edilemiyor. Etiketi kargo firmasının sitesinden iptal edin, ardından \"Manuel iptal ettim\"e dokunun.",
+      "done": "Etiket iptal edildi",
+      "confirmed": "İptal edildi olarak işaretlendi",
+      "failed": "Etiket iptal edilemedi"
+    },
+    "dispatchState": {
+      "no_label": "Etiket yok",
+      "label_not_pushed": "Takip no Etsy'de değil",
+      "shipped_on_etsy": "Etsy'de kargolandı"
+    },
+    "dispatchHealth": {
+      "title": "Zamanında kargo (Star Seller kriteri 1/3)",
+      "empty": "Son {days} günde kargolanmış Etsy siparişi yok.",
+      "onTimeWithTracking": "takip numarasıyla zamanında kargolandı",
+      "target": "Star Seller için %95 veya üzeri gerekir.",
+      "onTime": "Zamanında",
+      "shipped": "Kargolanan",
+      "late": "Geciken",
+      "avgHandling": "Ort. hazırlama",
+      "hours": "{hours} sa",
+      "openNoLabel": "{count} açık sipariş etiketsiz",
+      "openLabelNotPushed": "{count} etiket hazır, takip no Etsy'de değil",
+      "deliveryDays": "Teslim süresi (gün)",
+      "p50p90": "medyan {p50} · p90 {p90} ({n})"
+    }
+  },
+  "seoExperiments": {
+    "title": "SEO deneyleri",
+    "intro": "Başlık, etiket veya fotoğraf değiştirdiğinizde KolayXport, değişiklikten 14 gün önce ve sonraki görüntülenme ve siparişleri, değişmeyen ilanlarınızla karşılaştırır.",
+    "empty": "Henüz deney yok. Aktif bir ilanın başlığını, etiketlerini veya fotoğraflarını değiştirin; sonuç yaklaşık 15 gün sonra burada görünür.",
+    "filters": {
+      "all": "Tümü",
+      "collecting": "Ölçülüyor",
+      "ready": "Sonuçlar"
+    },
+    "kind": {
+      "kolayxport": "KolayXport'tan düzenleme",
+      "external": "Etsy'de düzenleme"
+    },
+    "listingsCount": "{count, plural, one {# ilan} other {# ilan}}",
+    "andMore": "+{count} daha",
+    "changeKinds": {
+      "title": "Başlık",
+      "tags": "Etiketler",
+      "images": "Fotoğraflar"
+    },
+    "status": {
+      "collecting": "Ölçülüyor",
+      "low_traffic": "Düşük trafik",
+      "ready": "Sonuç hazır",
+      "insufficient_data": "Yetersiz veri",
+      "confounded": "Çakışan düzenlemeler",
+      "cancelled": "İptal edildi"
+    },
+    "statusHelp": {
+      "collecting": "Sonuç {date} tarihinde.",
+      "low_traffic": "Değişiklikten önceki 14 günde 30'dan az görüntülenme var; sonuç güvenilir olmayabilir. Ölçüm sürüyor — sonuç {date} tarihinde.",
+      "insufficient_data": "Güvenilir bir şey söylemek için görüntülenme veya sipariş çok az.",
+      "confounded": "Ölçüm sırasında aynı ilanda başka bir değişiklik yapıldı; etki ayrıştırılamıyor.",
+      "cancelled": "Bu deney iptal edildi."
+    },
+    "verdict": {
+      "improved": "Görüntülenme arttı",
+      "worse": "Görüntülenme azaldı",
+      "inconclusive": "Belirgin bir etki yok"
+    },
+    "confidence": {
+      "label": "Güven",
+      "high": "Yüksek",
+      "medium": "Orta",
+      "low": "Düşük"
+    },
+    "control": {
+      "shop": "Diğer ilanlarınızla karşılaştırıldı",
+      "category": "Aynı kategorideki ilanlarınızla karşılaştırıldı",
+      "none": "Karşılaştırılacak ilan yok — dikkatli yorumlayın"
+    },
+    "metrics": {
+      "viewsBefore": "Önceki görüntülenme",
+      "viewsAfter": "Sonraki görüntülenme",
+      "ordersBefore": "Önceki sipariş",
+      "ordersAfter": "Sonraki sipariş",
+      "lift": "Karşılaştırmaya göre değişim",
+      "liftValue": "%{value}",
+      "rank": "Arama sırası",
+      "rankDelta": "{count, plural, one {# anahtar kelime} other {# anahtar kelime}} · ortalama {delta, number} sıra",
+      "rankNone": "Takip edilen anahtar kelime yok"
+    },
+    "seasonal": "Tatil sezonu: 15 Kasım – 5 Ocak arasındaki trafik dalgalanmaları bu sonucu bozabilir.",
+    "changedAt": "{date} tarihinde değişti",
+    "loadFailed": "SEO deneyleri yüklenemedi."
+  },
+  "stockSync": {
+    "pageTitle": "Stok Senkronu",
+    "pageSubtitle": "Bir kanalda satılan ürün diğer kanallarda otomatik düşsün, fazla satış olmasın.",
+    "status": {
+      "disabled": "Kapalı",
+      "dryRun": "Deneme modu",
+      "live": "Canlı",
+      "globallyDisabled": "Geçici olarak durduruldu"
+    },
+    "statusHelp": {
+      "disabled": "Stok senkronu kapalı. Hiçbir pazaryerinde stok değiştirilmiyor.",
+      "dryRun": "Deneme modu: satışlar sayılıyor ve neyin gönderileceği hesaplanıyor, ama hiçbir pazaryerine yazılmıyor.",
+      "live": "Canlı: stok değişiklikleri bağlı tüm kanallara gönderiliyor.",
+      "globallyDisabled": "Stok senkronu bakım nedeniyle geçici olarak durduruldu. Hiçbir pazaryerine yazılmıyor."
+    },
+    "channels": {
+      "etsy": "Etsy",
+      "trendyol": "Trendyol",
+      "shopify": "Shopify",
+      "ebay": "eBay",
+      "wix": "Wix",
+      "amazon": "Amazon",
+      "hepsiburada": "Hepsiburada"
+    },
+    "common": {
+      "save": "Kaydet",
+      "cancel": "Vazgeç",
+      "close": "Kapat",
+      "retry": "Tekrar dene",
+      "back": "Geri",
+      "next": "İleri",
+      "skip": "Atla",
+      "loading": "Yükleniyor…",
+      "search": "Ara",
+      "refresh": "Yenile",
+      "none": "—",
+      "units": "{count} adet"
+    },
+    "settings": {
+      "title": "Durum ve ayarlar",
+      "restockOnCancel": "İptal edilen siparişte stoğu geri ekle",
+      "restockOnCancelHelp": "İptal edilen siparişin ürünleri stoğa geri döner. İadeler otomatik eklenmez.",
+      "autoFixDrift": "Uyumsuzlukları otomatik düzelt (sadece azaltır)",
+      "autoFixDriftHelp": "Bir pazaryeri elimizdekinden fazla gösteriyorsa saatlik kontrolde düşürülür. Artırma asla otomatik yapılmaz.",
+      "zeroAction": "Etsy'de stok bitince",
+      "zeroDisable": "Varyasyonu kapat (tek ürünlü ilan pasife alınır)",
+      "zeroDeactivate": "İlanı pasife al",
+      "seedReserved": "Kargolanmamış satışları başlangıç stoğundan düş",
+      "seedReservedHelp": "Satılmış ama henüz gönderilmemiş ürünler başlangıç sayısından çıkarılır.",
+      "openWizard": "Kurulum sihirbazı",
+      "goLive": "Canlıya geç",
+      "backToDryRun": "Deneme moduna dön",
+      "disable": "Stok senkronunu kapat",
+      "disableConfirmTitle": "Stok senkronu kapatılsın mı?",
+      "disableConfirmBody": "Eşleşmeler ve geçmiş saklanır. Kapalıyken hiçbir pazaryerinde stok değişmez.",
+      "restore": "Canlıya geçiş öncesine dön",
+      "saved": "Ayarlar kaydedildi",
+      "channelsTitle": "Senkronlanan kanallar",
+      "counts": {
+        "items": "Ürün",
+        "activeLinks": "Bağlı ilan",
+        "needsReview": "Sayı bekleyen",
+        "suggested": "Öneri",
+        "failed": "Son 24 saatte hata"
+      }
+    },
+    "dryRunReport": {
+      "title": "Deneme modu raporu",
+      "wouldHaveSent": "{count} stok güncellemesi gönderilecekti",
+      "risksPrevented": "{count} fazla satış riski önlenecekti",
+      "riskExample": "{sku}: {soldOn} satışından sonra {exposedOn} {shown} gösteriyordu, elde {available} vardı",
+      "empty": "Henüz bir şey yok. Satış geldikçe burada neyin gönderileceğini göreceksin."
+    },
+    "wizard": {
+      "title": "Stok senkronu kurulumu",
+      "steps": {
+        "channels": "Kanallar",
+        "matches": "Eşleşmeler",
+        "unmatched": "Eşleşmeyenler",
+        "seed": "Başlangıç stoğu",
+        "preview": "Önizleme",
+        "enable": "Deneme modu"
+      },
+      "channelsIntro": "Stoğunu birlikte yönetmek istediğin kanalları seç. Her kanalda bir satışın bize ne kadar sürede ulaştığı yazıyor; bu süre içinde fazla satış riski vardır.",
+      "oversellWindow": "Satış ~{minutes} dk içinde görülür",
+      "notConnected": "Bağlı değil",
+      "comingSoon": "Yakında",
+      "writeUnsupported": "Sadece okunur (stok yazılamaz)",
+      "matchesIntro": "Aynı SKU'ya sahip ilanları tek üründe topladık. Kontrol et ve onayla.",
+      "selectAll": "Tümünü seç",
+      "confirmSelected": "{count} ürünü onayla",
+      "confirmed": "{count} ürün onaylandı",
+      "needsReview": "Kontrol gerekli",
+      "reviewReasons": {
+        "zero": "Bir kanalda stok 0",
+        "high": "Bir kanalda 100 veya fazla",
+        "ratio": "Kanallar arasında büyük fark",
+        "shared_pool_conflict": "Aynı SKU'lu ilanlarda farklı sayılar"
+      },
+      "seedQtyLabel": "Gerçek stok",
+      "sharedPool": "{channel} içinde {count} ilan aynı stoğu paylaşır",
+      "noMatches": "Birden fazla kanalda aynı SKU'ya sahip ilan bulunamadı.",
+      "singleChannel": "Tek kanalda olanlar ({count})",
+      "unmatchedIntro": "Bu ilanların SKU'su yok veya başka kanalda eşi yok. İstersen elle bağla.",
+      "unmatchedCount": "{count} eşleşmeyen ilan",
+      "linkToItem": "Bağla",
+      "generateSkus": "Etsy için SKU üret",
+      "generateSkusHelp": "Seçili Etsy ilanları için SKU önerilir ve taslak olarak kaydedilir. Etsy'ye sen \"Etsy'ye gönder\" deyince yazılır.",
+      "generateStaged": "{count} ilan için SKU taslağı oluşturuldu",
+      "looseTitle": "Benzer SKU'lar (otomatik bağlanmaz)",
+      "titleTitle": "Benzer başlıklar (otomatik bağlanmaz)",
+      "seedIntro": "Başlangıç stoğu nasıl belirlensin?",
+      "policy": {
+        "min": "Kanallardaki en düşük sayı",
+        "minHelp": "Önerilen. Kontrol gerektiren ürünler için sayıyı sen girersin.",
+        "etsy_master": "Etsy'deki sayı esas",
+        "etsy_masterHelp": "Etsy'deki adet başlangıç stoğu olur.",
+        "manual": "Hepsini elle gireceğim",
+        "manualHelp": "Her ürün için gerçek sayıyı sen girersin."
+      },
+      "coverage": "Son 30 günün satışlarının %{percent} kadarı eşleşen ürünlere ait",
+      "previewIntro": "Canlıya geçince her ilana ne gönderileceği. Bu adımda hiçbir şey gönderilmez.",
+      "enableIntro": "Deneme modunda satışlar sayılır ve neyin gönderileceği hesaplanır, ama hiçbir pazaryerine yazılmaz. Raporu inceleyip hazır olduğunda \"Canlıya geç\" dersin.",
+      "enableButton": "Deneme modunu başlat",
+      "enabled": "Deneme modu başladı",
+      "needsReviewLeft": "{count} ürün için sayı girmen gerekiyor; bunlar sayı girilene kadar senkronlanmaz."
+    },
+    "preview": {
+      "title": "Önizleme",
+      "liveRead": "Pazaryerlerinden güncel sayılar okunuyor…",
+      "totals": {
+        "pushes": "{count} güncelleme",
+        "deactivations": "{count} ilan pasife alınacak",
+        "disabledVariations": "{count} varyasyon kapatılacak",
+        "bigDrops": "{count} ilanda %50'den fazla düşüş",
+        "needsReview": "{count} ürün sayı bekliyor",
+        "capped": "{count} ilan son görülen sayıyla gösteriliyor"
+      },
+      "remote": "Pazaryerinde",
+      "target": "Olacak",
+      "effect": {
+        "none": "Değişiklik yok",
+        "set": "{from} → {to}",
+        "deactivate": "İlan pasife alınır",
+        "disable_variation": "Varyasyon kapatılır",
+        "unsupported": "Desteklenmiyor"
+      },
+      "remoteSource": {
+        "live": "güncel",
+        "last_seen": "son görülen",
+        "none": "bilinmiyor"
+      },
+      "noChanges": "Gönderilecek değişiklik yok."
+    },
+    "goLive": {
+      "title": "Canlıya geç",
+      "intro": "Canlıya geçince stok değişiklikleri pazaryerlerine yazılır. Geçişten önceki sayılar 7 gün saklanır; istersen geri dönebilirsin.",
+      "typeToConfirm": "Bazı ilanlar pasife alınacak veya varyasyonlar kapatılacak. Onaylamak için {word} yaz.",
+      "word": "CANLI",
+      "confirm": "Canlıya geç",
+      "success": "Stok senkronu canlı",
+      "refreshPreview": "Önizlemeyi yenile"
+    },
+    "restore": {
+      "title": "Canlıya geçiş öncesine dön",
+      "body": "Her ilan geçişten önceki sayıya (o zamandan beri satılanlar düşülerek) geri ayarlanır ve stok senkronu kapanır.",
+      "word": "GERİ AL",
+      "typeToConfirm": "Onaylamak için {word} yaz",
+      "confirm": "Geri yükle",
+      "success": "{applied} ilan geri yüklendi, {failed} başarısız",
+      "none": "Geri yüklenebilecek bir kayıt yok"
+    },
+    "items": {
+      "title": "Ürünler",
+      "empty": "Henüz senkronlanan ürün yok. Kurulum sihirbazıyla başla.",
+      "search": "SKU veya başlık ara",
+      "filter": {
+        "all": "Tümü",
+        "active": "Aktif",
+        "needs_review": "Sayı bekleyen",
+        "paused": "Durdurulan"
+      },
+      "onHand": "Stok",
+      "safetyBuffer": "Güvenlik payı",
+      "tracking": "Takip",
+      "tracked": "Takip ediliyor",
+      "untracked": "Takip edilmiyor",
+      "links": "Kanallar",
+      "adjust": "Stoğu düzelt",
+      "why": "Bu sayı neden?",
+      "enterCount": "Sayıyı gir",
+      "pause": "Durdur",
+      "resume": "Devam ettir",
+      "statusLabels": {
+        "active": "Aktif",
+        "paused": "Durduruldu",
+        "needs_review": "Sayı bekliyor"
+      },
+      "openPushes": "{count} gönderim bekliyor",
+      "lastError": "Son hata: {error}",
+      "sku": "SKU",
+      "product": "Ürün"
+    },
+    "link": {
+      "statusLabels": {
+        "active": "Aktif",
+        "paused": "Durduruldu",
+        "suggested": "Öneri",
+        "error": "Hata",
+        "unsupported": "Desteklenmiyor"
+      },
+      "reasons": {
+        "account_changed": "Mağaza bağlantısı değişti",
+        "user": "Sen durdurdun",
+        "structure": "İlan varyasyon yapısı değişti",
+        "variant_missing": "Varyasyon bulunamadı",
+        "coming_soon": "Yakında",
+        "catalog_v3_or_unverified": "Wix stok yazımı henüz doğrulanmadı",
+        "untracked": "Pazaryerinde stok takibi kapalı",
+        "untracked_or_location": "Stok takibi veya konum bulunamadı",
+        "legacy_listing": "Eski tip eBay ilanı",
+        "no_offer": "eBay teklifi yok",
+        "no_inventory_item": "eBay stok kaydı yok",
+        "listing_removed": "İlan kaldırılmış",
+        "listing_inactive": "İlan pasif",
+        "listing_expired": "İlan süresi dolmuş",
+        "listing_sold_out": "İlan tükendi",
+        "listing_draft": "İlan taslakta",
+        "variation_disabled": "Varyasyon Etsy'de kapatıldı",
+        "unsupported": "Desteklenmiyor"
+      },
+      "remote": "Pazaryerinde",
+      "target": "Hedef",
+      "remoteUnknown": "bilinmiyor",
+      "unlink": "Bağlantıyı kaldır",
+      "unlinkConfirm": "Bu ilanın stok bağlantısı kaldırılsın mı?",
+      "accept": "Onayla",
+      "pause": "Durdur",
+      "resume": "Devam ettir",
+      "unitsPerSale": "Satış başına adet",
+      "buffer": "İlan payı",
+      "maxListed": "En fazla gösterilecek",
+      "deactivatedByStock": "Stok bittiği için pasife alındı",
+      "settings": "İlan ayarları"
+    },
+    "adjust": {
+      "title": "Stoğu düzelt",
+      "modeSet": "Yeni sayı",
+      "modeDelta": "Ekle / çıkar",
+      "setTo": "Gerçek stok",
+      "delta": "Değişim (örn. 5 veya -2)",
+      "note": "Not (isteğe bağlı)",
+      "save": "Kaydet",
+      "success": "Stok güncellendi: {onHand}"
+    },
+    "mapping": {
+      "title": "İlanı bir ürüne bağla",
+      "searchItems": "Ürün ara",
+      "newSku": "Yeni ürün SKU'su",
+      "existing": "Mevcut ürüne bağla",
+      "create": "Yeni ürün oluştur",
+      "link": "Bağla",
+      "success": "İlan bağlandı",
+      "candidate": "Bağlanacak ilan"
+    },
+    "timeline": {
+      "title": "Stok geçmişi",
+      "empty": "Henüz hareket yok.",
+      "adopt": "Bu artışı kabul et",
+      "adopted": "Artış stoğa eklendi",
+      "entries": {
+        "sale": "{channel} #{order} satıldı: −{units} → {after}",
+        "saleAdjust": "{channel} #{order} adedi değişti: {delta} → {after}",
+        "cancel": "{channel} #{order} iptal edildi: +{units} → {after}",
+        "manual": "Elle düzeltildi: {delta} → {after}",
+        "manualEditor": "Etsy düzenleyicisinden değiştirildi: {delta} → {after}",
+        "adopt": "{channel} artışı kabul edildi: +{delta} → {after}",
+        "seed": "Başlangıç stoğu: {after}",
+        "remoteDrop": "{channel} stoğu siparişsiz düştü: −{units} → {after}",
+        "remoteDropMatched": "{channel} #{order} satışı (önce stok düşüşü olarak görüldü): −{units}",
+        "driftFix": "Uyumsuzluk düzeltildi: {delta} → {after}",
+        "other": "Stok değişti: {delta} → {after}",
+        "pushApplied": "{channel} {from}→{to} gönderildi ✓",
+        "pushDraft": "{channel} taslak senkronuyla {to} yazıldı ✓",
+        "pushDeactivated": "{channel} ilanı stok bittiği için pasife alındı",
+        "pushReactivated": "{channel} ilanı yeniden aktif edildi ({to})",
+        "pushSkipped": "{channel} zaten doğru ({qty})",
+        "pushDryRun": "Deneme: {channel} {to} olacaktı",
+        "pushFailed": "{channel} güncellenemedi ({to}): {error}",
+        "pushPending": "{channel} {to} gönderiliyor…",
+        "remoteIncrease": "{channel} stoğu dışarıdan arttı: {from} → {to}"
+      }
+    },
+    "managed": {
+      "chip": "Stok senkronu yönetiyor ({qty})",
+      "tooltip": "Bu varyasyonun adedi stok senkronundan gelir. Burada değiştirirsen yeni sayı stok düzeltmesi olarak kaydedilir.",
+      "dryRunTooltip": "Stok senkronu deneme modunda: bu adet henüz otomatik değiştirilmiyor."
+    },
+    "errors": {
+      "generic": "Bir sorun oluştu. Tekrar dene.",
+      "account_not_owned": "Bu mağaza hesabına erişim yok.",
+      "token_missing": "Önce güncel önizlemeyi aç.",
+      "token_invalid": "Önizleme geçersiz. Yenile ve tekrar dene.",
+      "token_expired": "Önizlemenin süresi doldu (15 dk). Yenile ve tekrar dene.",
+      "typed_confirm_required": "Onay kelimesini doğru yaz.",
+      "plan_changed": "Önizlemeden sonra bir şey değişti (satış, bağlantı veya ayar). Önizlemeyi yenile ve tekrar onayla.",
+      "not_enabled": "Önce deneme modunu başlat.",
+      "already_live": "Stok senkronu zaten canlı.",
+      "needs_seed": "Önce bu ürünün stok sayısını gir.",
+      "snapshot_not_found": "Geri yüklenecek kayıt bulunamadı.",
+      "snapshot_expired": "Kaydın süresi dolmuş (7 gün).",
+      "already_restored": "Bu kayıt zaten geri yüklendi.",
+      "invalid_quantity": "Geçerli bir sayı gir.",
+      "invalid_value": "Geçerli bir değer gir."
+    }
   }
 }

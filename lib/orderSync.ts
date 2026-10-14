@@ -9,11 +9,16 @@ import { getIntegrationCreds } from './config';
 import { decryptIfNeeded } from './crypto/credentials';
 import { fetchVeeqoOrders, processOrdersInBatches } from './integrations/veeqo';
 import { fetchShippoOrders } from './integrations/shippo';
-import { fetchEtsyOrders } from './integrations/etsyOrderSync';
 import { fetchEbayOrders } from './integrations/ebayOrderSync';
 import type { VeeqoOrder } from './types';
-import { batchExecuteStatusUpdateHook } from './hooks/statusUpdateHook';
 import { notify, resolveNotification, notificationKeys, NOTIFICATION_LINKS } from './notifications';
+import { publishOrderWrites } from './orders/marketplaceOrderWrite';
+import type { LiveOrderKind } from './live/types';
+import { computeItemsHash, computeOrderHash, itemsHashFromDbRows } from './orders/orderHash';
+import { linesFromUIOrder, upsertOrderItems, type UpsertLine } from './orders/itemUpsert';
+import { hasStreet, mergeAddressPreferNonEmpty, mergeNamePreferNonEmpty, parseStoredAddress, sameAddress } from './orders/addressMerge';
+import { classifyOrderStatus, isRecentOrderDate, liveKindForOrderWrite } from './orders/orderStatus';
+import { deriveOrderEffects, hasOrderEffects, insertOrderEffects, kickOrderEffects, quietForExistingWrite } from './orders/orderEffects';
 
 const ORDER_SYNC_PROVIDER_LABELS: Record<string, string> = {
   veeqo: 'Veeqo',
@@ -32,6 +37,8 @@ function notifyOrderSyncFailed(userId: string, provider: string) {
     params: { provider: ORDER_SYNC_PROVIDER_LABELS[provider] || provider },
     link: NOTIFICATION_LINKS.labels,
     dedupeKey: notificationKeys.orderSync(provider),
+    // Fires on every failed fetch (cron every 15 min); resolve() on success re-arms it.
+    onlyIfNew: true,
   });
 }
 
@@ -880,6 +887,10 @@ export async function syncAllOrders(userId: string, options: {
   endDate?: Date;
   source?: OrderSource;
   channel?: OrderChannel;
+  /** Only sync these sources (e.g. ['trendyol'] is a no-op here; ['etsy-api'], ['veeqo', 'shippo']). */
+  onlySources?: string[];
+  /** Skip these sources (cron passes ['etsy-api'] while the etsy-orders-incremental job is healthy). */
+  excludeSources?: string[];
 } = {}): Promise<{
   newOrders: number;
   updatedOrders: number;
@@ -907,6 +918,10 @@ export async function syncAllOrders(userId: string, options: {
 
   try {
     const { veeqoApiKey, shippoToken, startDate, endDate, source, channel } = options;
+    const wants = (src: string) =>
+      (typeof source === 'undefined' || source === src) &&
+      (!options.onlySources || options.onlySources.includes(src)) &&
+      !(options.excludeSources || []).includes(src);
     
     const lastSyncEntry = await prisma.syncOperation.findFirst({
       where: { 
@@ -937,7 +952,7 @@ export async function syncAllOrders(userId: string, options: {
       fetchPromises.push(trackOrderSource(userId, provider, p));
 
     // CRITICAL FIX: Use separate if statements instead of else-if to fetch from BOTH sources
-    if ((typeof source === 'undefined' || source === 'veeqo') && veeqoApiKey) {
+    if (wants('veeqo') && veeqoApiKey) {
       if (options.syncType === 'fast') {
         logger.info(`[FastSync] Triggering Veeqo fetch (first page only). Options:`, { userId, source, veeqoApiKey: !!veeqoApiKey, lastSyncTime });
         const veeqoClient = createVeeqoClient(veeqoApiKey);
@@ -982,7 +997,7 @@ export async function syncAllOrders(userId: string, options: {
     }
 
     // CRITICAL FIX: Changed from 'else if' to 'if' to fetch from BOTH sources
-    if ((typeof source === 'undefined' || source === 'shippo') && shippoToken) {
+    if (wants('shippo') && shippoToken) {
       if (options.syncType === 'fast') {
         logger.info(`[FastSync] Triggering Shippo fetch (first page only). Options:`, { userId, source, shippoToken: !!shippoToken });
         const etdDefaults = await getEtdDefaults(userId);
@@ -1139,7 +1154,7 @@ export async function syncAllOrders(userId: string, options: {
     }
 
     // Amazon SP-API order sync (uses Reports API for bulk, Orders API for incremental)
-    if (typeof source === 'undefined' || source === 'amazon') {
+    if (wants('amazon')) {
       try {
         const cred = await prisma.credential.findUnique({ where: { userId } }) as any;
         if (cred?.amazonAccessToken && cred?.amazonRefreshToken) {
@@ -1257,29 +1272,47 @@ export async function syncAllOrders(userId: string, options: {
       }
     }
 
-    // Direct Etsy API sync (has real per-item prices, unlike Shippo)
-    if (typeof source === 'undefined' || source === 'etsy-api') {
-      try {
-        const etsyShops = await prisma.etsyShop.findMany({ where: { userId, isActive: true } });
-        console.log(`[OrderSync] Etsy shops found: ${etsyShops.length}`);
-        if (etsyShops.length > 0) {
-          fetchPromises.push(
-            // Not wrapped in trackOrderSource: fetchEtsyOrders swallows per-shop
-            // errors and resolves with partial/empty results, so "resolved" does
-            // not mean "succeeded" and would wrongly clear orderSyncFailed.
-            fetchEtsyOrders(userId, { lastSync: lastSyncTime }).catch(err => {
-              logger.error('[EtsyOrderSync] Failed', err instanceof Error ? err : new Error(String(err)));
-              return [] as UIOrder[];
-            })
-          );
+    // Direct Etsy receipts are written ONLY by upsertEtsyReceipt
+    // (lib/orders/etsyLifecycle): keyset incremental poll per shop for normal
+    // syncs, a 30-day hash-gated pass for the manual full sync. They never go
+    // through the batch writer below. Per-shop failures are returned in errors.
+    let etsyRun: Promise<{ created: number; updated: number }> | null = null;
+    if (wants('etsy-api')) {
+      etsyRun = (async () => {
+        const totals = { created: 0, updated: 0 };
+        const etsyShops = await prisma.etsyShop.findMany({ where: { userId, isActive: true }, select: { shopId: true } });
+        if (etsyShops.length === 0) return totals;
+        const { runEtsyOrderIncremental } = await import('./orders/etsyLifecycle');
+        const { EtsyPriority } = await import('./etsy/rateBudget');
+        for (const shop of etsyShops) {
+          try {
+            const r = options.syncType === 'full'
+              ? await runEtsyOrderIncremental(shop.shopId, {
+                  reason: 'manual_full',
+                  maxPages: 50,
+                  priority: EtsyPriority.Interactive,
+                  sinceSeconds: Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60,
+                  source: 'manual',
+                  persistCursor: false,
+                })
+              : await runEtsyOrderIncremental(shop.shopId, { reason: 'sync', maxPages: 10 });
+            totals.created += r.created;
+            totals.updated += r.updated;
+            // Receipts that failed individually (the rest of the shop was still synced).
+            for (const receiptId of (r.failedReceiptIds || []).slice(0, 20)) {
+              errors.push({ orderId: `etsy:${shop.shopId}:${receiptId}`, error: 'Etsy receipt could not be saved (will be retried)' });
+            }
+          } catch (err: any) {
+            logger.error('[EtsyOrderSync] Shop sync failed', err instanceof Error ? err : new Error(String(err)), { shopId: shop.shopId });
+            errors.push({ orderId: `etsy:${shop.shopId}`, error: String(err?.message || err).slice(0, 300) });
+          }
         }
-      } catch (err) {
-        logger.error('[EtsyOrderSync] Init failed', err instanceof Error ? err : new Error(String(err)));
-      }
+        return totals;
+      })();
     }
 
     // Direct eBay API sync (has real per-item prices)
-    if (typeof source === 'undefined' || source === 'ebay-api') {
+    if (wants('ebay-api')) {
       try {
         const cred = await prisma.credential.findUnique({ where: { userId } });
         console.log(`[OrderSync] eBay credentials found: ${!!(cred as any)?.ebayAccessToken}`);
@@ -1300,6 +1333,7 @@ export async function syncAllOrders(userId: string, options: {
 
     // Wait for all fetch promises to resolve
     const allOrders = await Promise.all(fetchPromises);
+    const etsyTotals = etsyRun ? await etsyRun : { created: 0, updated: 0 };
     logger.info(`[FullSync] All sources fetched. Arrays: ${allOrders.map(arr => arr.length).join(', ')}`);
 
     const ordersByNumber = new Map<string, UIOrder>();
@@ -1374,263 +1408,167 @@ export async function syncAllOrders(userId: string, options: {
       logger.info(`[FullSync] No orders to process after filtering.`, { userId });
     }
 
-    // Bulk prefetch all relevant existing orders
-    const existingOrders = await prisma.order.findMany({
-      where: {
-        userId,
-        marketplace: { in: filteredOrders.map(o => o.marketplace) },
-        marketplaceKey: { in: filteredOrders.map(o => o.marketplaceKey) },
-      },
+    // ---------------------------------------------------------------------
+    // Batch writer (non-Etsy-direct sources). Etsy receipts are rejected here:
+    // upsertEtsyReceipt owns them.
+    // ---------------------------------------------------------------------
+    const batchOrders = filteredOrders.filter((o) => {
+      if (o.source === 'etsy-api') {
+        logger.warn('[Order Sync] Batch writer rejected an etsy-api order (owned by upsertEtsyReceipt)', { marketplaceKey: o.marketplaceKey });
+        return false;
+      }
+      return Boolean(o.marketplace && o.marketplaceKey);
     });
-    const existingOrderMap = new Map(existingOrders.map(o => [o.marketplaceKey, o]));
+    const keyOf = (marketplace: string, marketplaceKey: string) => `${marketplace}|${marketplaceKey}`;
+    const uniq = (xs: string[]) => Array.from(new Set(xs.filter(Boolean)));
 
-    // Filter to only orders that are new or changed
-    const ordersToProcess: UIOrder[] = [];
-    const skippedOrderIds: string[] = [];
-    const skippedOrderMarketplaceKeys: string[] = [];
+    const existingOrders = batchOrders.length
+      ? await prisma.order.findMany({
+          where: {
+            userId,
+            marketplace: { in: uniq(batchOrders.map((o) => o.marketplace)) },
+            marketplaceKey: { in: uniq(batchOrders.map((o) => String(o.marketplaceKey))) },
+          },
+        })
+      : [];
+    const existingOrderMap = new Map(existingOrders.map((o) => [keyOf(o.marketplace, o.marketplaceKey), o]));
 
-    // Helper: Retry async function with exponential backoff
-    async function retry<T>(fn: () => Promise<T>, retries = 3, baseDelay = 300): Promise<T> {
-      let attempt = 0;
-      while (true) {
-        try {
-          return await fn();
-        } catch (err: any) {
-          attempt++;
-          // Only retry for Prisma transaction timeout (P2028)
-          if (attempt > retries || err?.code !== 'P2028') throw err;
-          const delay = baseDelay * Math.pow(2, attempt - 1);
-          logger.warn(`[Order Sync] Transaction failed with P2028. Retrying attempt ${attempt}/${retries} after ${delay}ms...`, { error: err.message });
+    // Aggregator (Veeqo/Shippo) copies of a receipt we already hold from the
+    // direct Etsy API: fill-if-empty onto the direct row, never a duplicate row
+    // and never overwrite its status/items.
+    const aggregatorNumbers = uniq(
+      batchOrders
+        .filter((o) => AGGREGATOR_SOURCES.has(String(o.source)) && !existingOrderMap.has(keyOf(o.marketplace, String(o.marketplaceKey))))
+        .map((o) => String(o.orderNumber || '')),
+    ).filter((n) => /^\d+$/.test(n));
+    const directEtsyByNumber = new Map<string, (typeof existingOrders)[number]>();
+    if (aggregatorNumbers.length > 0) {
+      const directRows = await prisma.order.findMany({ where: { userId, marketplaceKey: { in: aggregatorNumbers } } });
+      for (const r of directRows) {
+        const raw = r.rawData && typeof r.rawData === 'object' ? (r.rawData as any) : null;
+        if (raw?.receipt_id && String(raw.receipt_id) === r.marketplaceKey) directEtsyByNumber.set(r.marketplaceKey, r);
+      }
+    }
+
+    // Rows written before W4 have no stored itemsHash: hash their stored items
+    // once so unchanged orders are not rewritten on the first sync after deploy.
+    const nullHashIds = existingOrders.filter((o) => !o.itemsHash).map((o) => o.id);
+    const storedItemsByOrder = new Map<string, any[]>();
+    if (nullHashIds.length > 0) {
+      for (let i = 0; i < nullHashIds.length; i += 500) {
+        const rows = await prisma.orderItem.findMany({
+          where: { orderId: { in: nullHashIds.slice(i, i + 500) } },
+          select: { id: true, orderId: true, uniqueLineKey: true, remoteLineId: true, marketplaceKey: true, quantity: true, unitPrice: true, sku: true, image: true },
+        });
+        for (const r of rows) {
+          if (!storedItemsByOrder.has(r.orderId)) storedItemsByOrder.set(r.orderId, []);
+          storedItemsByOrder.get(r.orderId)!.push(r);
         }
       }
     }
 
-    for (const order of filteredOrders) {
-      // For Veeqo orders, ensure commodityDesc is mapped from first line item title
-      if (order.source === 'veeqo' && (!order.commodityDesc || order.commodityDesc === '')) {
-        if (order.line_items && order.line_items.length > 0) {
-          order.commodityDesc = order.line_items[0].title || '';
-        }
+    type PlannedWrite = {
+      order: UIOrder;
+      existing: (typeof existingOrders)[number] | null;
+      direct: (typeof existingOrders)[number] | null;
+      lines: UpsertLine[];
+      orderHash: string;
+      itemsHash: string;
+      itemsChanged: boolean;
+      shipByAt: Date | null;
+    };
+    const ordersToProcess: PlannedWrite[] = [];
+    const skippedOrderIds: string[] = [];
+
+    for (const order of batchOrders) {
+      if ((order.source === 'veeqo' || order.source === 'shippo') && !order.commodityDesc && order.line_items?.length) {
+        order.commodityDesc = order.line_items[0].title || '';
       }
-      // For Shippo orders, ensure commodityDesc is mapped from first line item title
-      if (order.source === 'shippo' && (!order.commodityDesc || order.commodityDesc === '')) {
-        if (order.line_items && order.line_items.length > 0) {
-          order.commodityDesc = order.line_items[0].title || '';
-        }
-      }
-      const existing = existingOrderMap.get(order.marketplaceKey) as UIOrder | undefined;
-      const prismaOrderData: { [key: string]: any } = {
-        userId,
-        marketplace: order.marketplace,
-        marketplaceKey: order.marketplaceKey,
-        orderNumber: order.orderNumber,
-        customerName: order.customerName,
+      const key = keyOf(order.marketplace, String(order.marketplaceKey));
+      const existing = existingOrderMap.get(key) || null;
+      const direct = !existing && AGGREGATOR_SOURCES.has(String(order.source)) ? directEtsyByNumber.get(String(order.orderNumber)) || null : null;
+      const lines = linesFromUIOrder(order as any);
+      const itemsHash = computeItemsHash(lines.map((l) => ({ lineKey: l.lineKey, quantity: l.quantity, unitPrice: l.unitPrice, sku: l.sku, image: l.image })));
+      const shipByAt = toDateOrNull(order.shipByDate);
+      const target = existing || direct;
+      const orderHash = computeOrderHash({
         status: order.status,
         externalStatus: order.externalStatus,
-        currency: order.currency,
         totalPrice: order.totalPrice,
-        shippingAddress: order.to_address ? JSON.stringify(order.to_address) : Prisma.JsonNull,
-        rawData: order.rawData ? (typeof order.rawData === 'string' ? JSON.parse(order.rawData) : order.rawData) : Prisma.JsonNull,
-        createdAt: order.createdAt ? new Date(order.createdAt) : new Date(),
-        updatedAt: new Date(),
-        uiOrderDate: getUiOrderDate(order),
-        commodityDesc: order.commodityDesc || '',
-      };  
+        trackingNumber: target?.trackingNumber || order.trackingNumber || null,
+        shipByAt,
+      });
+
       if (!existing) {
-        ordersToProcess.push(order);
-      } else {
-        const hasChanged = (
-          ((existing?.externalStatus ?? undefined) !== (prismaOrderData.externalStatus ?? undefined)) ||
-          (existing?.totalPrice !== prismaOrderData.totalPrice) ||
-          (existing?.customerName !== prismaOrderData.customerName) ||
-          ((existing?.shippingAddress ?? '') !== (prismaOrderData.shippingAddress ?? ''))
-        );
-        const missingStatus = ((existing?.externalStatus ?? null) === null && prismaOrderData.externalStatus);
-
-        const missingUiOrderDate = !(existing?.uiOrderDate);
-        const hasNewItemData = order.line_items?.some((item: any) => item.image || item.value > 0);
-        // Marketplace now reports tracking we don't have locally (e.g. Etsy
-        // shipments pushed by a 3rd-party app) — must reprocess to capture it.
-        const hasNewTracking = Boolean(order.trackingNumber) && !(existing as any)?.trackingNumber;
-        if (hasChanged || missingStatus || missingUiOrderDate || hasNewItemData || hasNewTracking) {
-          ordersToProcess.push(order);
-        } else {
-          if (existing) {
-          skippedOrderIds.push(existing.id);
-          skippedOrderMarketplaceKeys.push(existing.marketplaceKey);
-        }
-        }
+        ordersToProcess.push({ order, existing: null, direct, lines, orderHash, itemsHash, itemsChanged: true, shipByAt });
+        continue;
       }
+      const storedOrderHash =
+        existing.orderHash ??
+        computeOrderHash({ status: existing.status, externalStatus: existing.externalStatus, totalPrice: existing.totalPrice, trackingNumber: existing.trackingNumber, shipByAt: existing.shipByAt });
+      const storedItemsHash = existing.itemsHash ?? itemsHashFromDbRows(storedItemsByOrder.get(existing.id) || []);
+      const itemsChanged = storedItemsHash !== itemsHash;
+      // Address/name are not in orderHash: compare the merged result with the stored row
+      // (same rule as writeBatchOrder / marketplaceOrderWrite), so a corrected address
+      // is never skipped as "unchanged".
+      const incomingAddress = parseStoredAddress(order.to_address) || parseStoredAddress(order.shippingAddress);
+      const mergedAddress = mergeAddressPreferNonEmpty(existing.shippingAddress, incomingAddress);
+      const addressChanged = !!mergedAddress && !sameAddress(existing.shippingAddress, mergedAddress);
+      const mergedName = mergeNamePreferNonEmpty(existing.customerName, order.customerName);
+      const nameChanged = mergedName !== null && mergedName !== existing.customerName;
+      const unchanged =
+        storedOrderHash === orderHash && !itemsChanged && !!existing.uiOrderDate && !addressChanged && !nameChanged;
+      if (unchanged && existing.orderHash && existing.itemsHash) {
+        skippedOrderIds.push(existing.id);
+        continue;
+      }
+      ordersToProcess.push({ order, existing, direct: null, lines, orderHash, itemsHash, itemsChanged, shipByAt });
     }
 
-    // Batch summary logs for skipped orders and line items
     if (skippedOrderIds.length > 0) {
-      logger.info(`[Order Sync] Skipped ${skippedOrderIds.length} unchanged orders. Sample IDs: ${skippedOrderIds.slice(0, 10).join(', ')}${skippedOrderIds.length > 10 ? ', ...' : ''}`);
-      logger.info(`[Order Sync] Skipped line items for ${skippedOrderIds.length} unchanged orders. Sample marketplaceKeys: ${skippedOrderMarketplaceKeys.slice(0, 10).join(', ')}${skippedOrderMarketplaceKeys.length > 10 ? ', ...' : ''}`);
+      logger.info(`[Order Sync] Skipped ${skippedOrderIds.length} unchanged orders (hash match).`);
     }
 
-    // Process all new orders, and only update existing orders if status is cancelled/canceled or tracked fields have changed
-    const BATCH_SIZE = 25; // Reduced batch size to prevent statement timeouts
-    const batches: UIOrder[][] = [];
+    const liveWrites: Array<{ row: any; kind: LiveOrderKind; itemCount: number }> = [];
+    const statusChangedIds: string[] = [];
+    const effectOrderIds: string[] = [];
+
     for (let i = 0; i < ordersToProcess.length; i += BATCH_SIZE) {
-      batches.push(ordersToProcess.slice(i, i + BATCH_SIZE));
-    }
-
-    for (const batch of batches) {
-      // Process each order in the batch
-      try {
-        const orderMarketplaceKeys = batch.map(o => o.marketplaceKey);
-        
-        // Bulk fetch existing orders for the current batch (smaller query)
-        const existingOrdersInDb = await prisma.order.findMany({
-          where: { 
-            userId, 
-            marketplaceKey: { in: orderMarketplaceKeys }
-          }
-        });
-        const existingOrdersMap = new Map(existingOrdersInDb.map(o => [o.marketplaceKey, o]));
-        
-        const ordersToCreate: Prisma.OrderCreateManyInput[] = [];
-        const ordersToUpdate: { where: Prisma.OrderWhereUniqueInput; data: Prisma.OrderUpdateInput }[] = [];
-
-        for (const order of batch) {
-          const existingOrder = existingOrdersMap.get(order.marketplaceKey);
-          
-          // Create the base order data (without userId for updates)
-          const baseOrderData: any = {
-            marketplace: order.marketplace,
-            marketplaceKey: order.marketplaceKey,
-            orderNumber: order.orderNumber,
-            customerName: order.customerName,
-            status: order.status,
-            externalStatus: order.externalStatus,
-            currency: order.currency,
-            totalPrice: order.totalPrice,
-            shippingAddress: order.to_address ? JSON.stringify(order.to_address) : (order.shippingAddress ? order.shippingAddress : Prisma.JsonNull),
-            rawData: order.rawData ? (typeof order.rawData === 'string' ? JSON.parse(order.rawData) : order.rawData) : Prisma.JsonNull,
-            uiOrderDate: order.uiOrderDate || getUiOrderDate(order),
-            commodityDesc: order.commodityDesc,
-            // shipByDate, channel, and source are UI-only fields, not stored in database
-          };
-
-          // Persist Etsy gift_message / message_from_buyer (and any other source's
-          // equivalent) when the mapper supplied them. Only overwrite when we
-          // actually have new content so we don't blank out a previously-saved
-          // note on a later resync where the field is missing.
-          if (typeof (order as any).giftMessage === 'string' && (order as any).giftMessage.length > 0) {
-            baseOrderData.giftMessage = (order as any).giftMessage;
-          }
-          if (typeof (order as any).customerNote === 'string' && (order as any).customerNote.length > 0) {
-            baseOrderData.customerNote = (order as any).customerNote;
-          }
-
-          // Marketplace-reported tracking (e.g. Etsy receipt shipments).
-          // Fill-if-empty only — never clobber a number the user entered
-          // locally with a possibly different marketplace value.
-          if (order.trackingNumber && !(existingOrder as any)?.trackingNumber) {
-            baseOrderData.trackingNumber = order.trackingNumber;
-          }
-
-          if (existingOrder) {
-            // Bug 1 guard: if the user manually edited order-level weight /
-            // dimensions (weightEditedAt is set), do NOT clobber those fields
-            // from rawData on the next sync. We don't currently write
-            // Order.weightKg from sync (line item weights live on OrderItem),
-            // but keep the guard here in case future code starts pushing
-            // weight/dimensions into baseOrderData.
-            if ((existingOrder as any).weightEditedAt) {
-              delete baseOrderData.weightKg;
-              delete baseOrderData.packageLength;
-              delete baseOrderData.packageWidth;
-              delete baseOrderData.packageHeight;
-              delete baseOrderData.dimensionUnits;
-            }
-
-            // Add to update list
-            ordersToUpdate.push({
-              where: { id: existingOrder.id },
-              data: baseOrderData,
-            });
-          } else {
-            // Add to create list (include userId for new orders)
-            ordersToCreate.push({
-              ...baseOrderData,
-              userId, // Only include userId for new orders
-            });
-          }
+      const batch = ordersToProcess.slice(i, i + BATCH_SIZE);
+      for (const plan of batch) {
+        try {
+          const outcome = await writeBatchOrder(userId, plan);
+          if (outcome.created) ordersCreated++;
+          else if (outcome.wrote) ordersUpdated++;
+          if (outcome.statusChanged && !outcome.created) statusChangedIds.push(outcome.orderId);
+          if (outcome.effectsQueued > 0) effectOrderIds.push(outcome.orderId);
+          if (outcome.liveKind) liveWrites.push({ row: outcome.row, kind: outcome.liveKind, itemCount: plan.lines.reduce((n, l) => n + l.quantity, 0) });
+          successful++;
+        } catch (error: any) {
+          failed++;
+          logger.error('[Order Sync] Order write failed', error instanceof Error ? error : new Error(String(error)), { marketplaceKey: plan.order.marketplaceKey });
+          errors.push({ orderId: String(plan.order.marketplaceKey), error: error instanceof Error ? error.message : 'Unknown error' });
+        } finally {
+          processed++;
         }
-
-        // Bulk create new orders and their items in a transaction
-        if (ordersToCreate.length > 0) {
-          logger.info(`[Order Sync] Creating ${ordersToCreate.length} new orders in the database.`);
-          await prisma.$transaction(async (tx) => {
-            await tx.order.createMany({
-              data: ordersToCreate,
-              skipDuplicates: true,
-            });
-            await createOrderItemsForBatch(batch, existingOrdersMap, userId, tx as typeof prisma);
-          });
-          ordersCreated += ordersToCreate.length;
-        } else {
-          // No new orders to create, but still need to create items for updated orders
-          await createOrderItemsForBatch(batch, existingOrdersMap, userId);
-        }
-
-        // Process orders to update in smaller chunks to avoid overwhelming the connection pool
-        if (ordersToUpdate.length > 0) {
-          logger.info(`[Order Sync] Updating ${ordersToUpdate.length} orders in the database.`);
-
-          const updateChunkSize = 5; // Even smaller chunks for updates
-          for (let i = 0; i < ordersToUpdate.length; i += updateChunkSize) {
-            const chunk = ordersToUpdate.slice(i, i + updateChunkSize);
-            await prisma.$transaction(
-              chunk.map(({ where, data }) => prisma.order.update({ where, data }))
-            );
-          }
-          ordersUpdated += ordersToUpdate.length;
-        }
-
-        // Execute status update hook for all orders in this batch
-        // This will check if any orders have "SHIPPED" status and update custom status to "shipped"
-        const batchOrderIds = batch.map(order => {
-          const existingOrder = existingOrdersMap.get(order.marketplaceKey);
-          return existingOrder?.id || '';
-        }).filter(Boolean);
-        
-        if (batchOrderIds.length > 0) {
-          try {
-            await batchExecuteStatusUpdateHook(batchOrderIds, userId);
-          } catch (hookError) {
-            logger.warn(`[Status Update Hook] Failed for batch:`, hookError);
-            // Don't fail the entire sync if hook fails
-          }
-        }
-
-        processed += batch.length;
-        successful += batch.length;
-        logger.info(`[Order Sync] Processed batch: ${batch.length} orders (${processed}/${ordersToProcess.length} total)`);
-
-      } catch (error) {
-        logger.error(`[Order Sync] Batch failed:`, error);
-        failed += batch.length;
-        processed += batch.length;
-        errors.push({ 
-          orderId: `batch_${batches.indexOf(batch)}`, 
-          error: error instanceof Error ? error.message : 'Unknown error' 
-        });
       }
 
-      // Update sync progress after each batch
       await updateSyncStatus(syncId!, {
         processedOrders: processed,
         successfulOrders: successful,
         failedOrders: failed,
         totalOrders: ordersToProcess.length,
       });
-
-      // Small delay between batches to prevent overwhelming the database
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Small delay between batches to keep the pool free for requests.
+      if (i + BATCH_SIZE < ordersToProcess.length) await new Promise((resolve) => setTimeout(resolve, 50));
     }
+
+    for (const id of effectOrderIds.slice(0, 20)) kickOrderEffects(id);
+    if (effectOrderIds.length > 20) kickOrderEffects();
+    publishOrderWrites(userId, liveWrites);
+
+    ordersCreated += etsyTotals.created;
+    ordersUpdated += etsyTotals.updated;
 
     logger.info(`[Order Sync] Completed processing ${ordersToProcess.length} orders`);
     logger.info(`[Order Sync] Summary: ${ordersCreated} created, ${ordersUpdated} updated, ${failed} failed`);
@@ -1658,7 +1596,7 @@ export async function syncAllOrders(userId: string, options: {
     return {
       newOrders: ordersCreated,
       updatedOrders: ordersUpdated,
-      skippedOrders: filteredOrders.length - ordersToProcess.length,
+      skippedOrders: skippedOrderIds.length,
       failedOrders: failed,
       errors
     };
@@ -1692,182 +1630,192 @@ export async function syncAllOrders(userId: string, options: {
   }
 }
 
-// Helper function to create OrderItems for a batch of orders
-async function createOrderItemsForBatch(
-  orders: UIOrder[],
-  existingOrdersMap: Map<string, any>,
+const AGGREGATOR_SOURCES = new Set(['veeqo', 'shippo', 'merged']);
+const BATCH_SIZE = 25;
+
+function toDateOrNull(v: unknown): Date | null {
+  if (!v) return null;
+  const d = v instanceof Date ? v : new Date(String(v));
+  return Number.isFinite(d.getTime()) ? d : null;
+}
+
+type BatchWriteOutcome = {
+  orderId: string;
+  created: boolean;
+  wrote: boolean;
+  statusChanged: boolean;
+  effectsQueued: number;
+  liveKind: LiveOrderKind | null;
+  row: any;
+};
+
+/**
+ * Write one planned order (create / hash-gated update / aggregator fill-if-empty).
+ * Order row, items and effect outbox rows commit in one transaction.
+ */
+async function writeBatchOrder(
   userId: string,
-  db: typeof prisma = prisma
-): Promise<void> {
-  try {
-    const orderItemsToCreate: any[] = [];
+  plan: {
+    order: UIOrder;
+    existing: any | null;
+    direct: any | null;
+    lines: UpsertLine[];
+    orderHash: string;
+    itemsHash: string;
+    itemsChanged: boolean;
+    shipByAt: Date | null;
+  },
+): Promise<BatchWriteOutcome> {
+  const { order, existing, direct, lines, orderHash, itemsHash, itemsChanged, shipByAt } = plan;
+  const now = new Date();
+  const anyOrder = order as any;
+  const nextClass = classifyOrderStatus(order.status, order.externalStatus);
+  const incomingAddress = parseStoredAddress(order.to_address) || parseStoredAddress(order.shippingAddress);
 
-    // Get the order IDs after they've been created/updated
-    const orderMarketplaceKeys = orders.map(o => o.marketplaceKey);
-    const currentOrdersInDb = await db.order.findMany({
-      where: {
-        userId,
-        marketplaceKey: { in: orderMarketplaceKeys }
-      },
-      select: { id: true, marketplaceKey: true }
-    });
-    const orderIdMap = new Map(currentOrdersInDb.map(o => [o.marketplaceKey, o.id]));
+  // Aggregator copy of a direct Etsy receipt: fill-if-empty only.
+  if (direct) {
+    const data: Prisma.OrderUpdateInput = {};
+    if (!hasStreet(parseStoredAddress(direct.shippingAddress)) && hasStreet(incomingAddress)) {
+      data.shippingAddress = JSON.stringify(mergeAddressPreferNonEmpty(direct.shippingAddress, incomingAddress));
+    }
+    if (!direct.customerName && order.customerName) data.customerName = order.customerName;
+    if (!direct.trackingNumber && order.trackingNumber) data.trackingNumber = order.trackingNumber;
+    if (!direct.giftMessage && typeof anyOrder.giftMessage === 'string' && anyOrder.giftMessage) data.giftMessage = anyOrder.giftMessage;
+    if (!direct.customerNote && typeof anyOrder.customerNote === 'string' && anyOrder.customerNote) data.customerNote = anyOrder.customerNote;
+    if (Object.keys(data).length === 0) {
+      return { orderId: direct.id, created: false, wrote: false, statusChanged: false, effectsQueued: 0, liveKind: null, row: direct };
+    }
+    const row = await prisma.order.update({ where: { id: direct.id }, data });
+    return { orderId: direct.id, created: false, wrote: true, statusChanged: false, effectsQueued: 0, liveKind: 'updated', row };
+  }
 
-    for (const order of orders) {
-      const orderId = orderIdMap.get(order.marketplaceKey);
-      if (!orderId) {
-        logger.warn(`[OrderItems] Could not find order ID for marketplaceKey: ${order.marketplaceKey}`);
-        continue;
-      }
+  const rawData = order.rawData ? (typeof order.rawData === 'string' ? JSON.parse(order.rawData) : order.rawData) : Prisma.JsonNull;
+  const base: Record<string, any> = {
+    marketplace: order.marketplace,
+    marketplaceKey: String(order.marketplaceKey),
+    orderNumber: order.orderNumber,
+    status: order.status,
+    externalStatus: order.externalStatus,
+    currency: order.currency,
+    totalPrice: order.totalPrice,
+    rawData,
+    uiOrderDate: order.uiOrderDate || getUiOrderDate(order),
+    commodityDesc: order.commodityDesc || '',
+    source: order.source || null,
+    orderHash,
+    itemsHash,
+    lastRemoteCheckAt: now,
+  };
+  // Only overwrite buyer notes when the mapper actually supplied content.
+  if (typeof anyOrder.giftMessage === 'string' && anyOrder.giftMessage.length > 0) base.giftMessage = anyOrder.giftMessage;
+  if (typeof anyOrder.customerNote === 'string' && anyOrder.customerNote.length > 0) base.customerNote = anyOrder.customerNote;
+  if (shipByAt) base.shipByAt = shipByAt;
 
-      // For existing orders, only recreate OrderItems if they don't exist or line items have changed
-      const existingOrder = existingOrdersMap.get(order.marketplaceKey);
-      if (existingOrder) {
-        // Bug 1 guard: before we delete+recreate items, snapshot per-line
-        // manual weight edits so the next sync doesn't clobber what the user
-        // typed on the labels page. We key by remoteLineId first (stable
-        // marketplace line id), then fall back to uniqueLineKey for legacy
-        // rows that may not have had remoteLineId populated.
-        const existingItems = await db.orderItem.findMany({
-          where: { orderId: existingOrder.id },
-          select: {
-            id: true,
-            marketplaceKey: true,
-            remoteLineId: true,
-            uniqueLineKey: true,
-            weightKg: true,
-            weightEditedAt: true,
-          },
-        });
-        const editedWeightByLineKey = new Map<
-          string,
-          { weightKg: number | null; weightEditedAt: Date | null }
-        >();
-        for (const ex of existingItems) {
-          if (!ex.weightEditedAt) continue;
-          const keys = [ex.remoteLineId, ex.uniqueLineKey].filter(
-            (k): k is string => typeof k === 'string' && k.length > 0,
-          );
-          for (const k of keys) {
-            editedWeightByLineKey.set(k, {
-              weightKg: ex.weightKg ?? null,
-              weightEditedAt: ex.weightEditedAt,
-            });
-          }
-        }
-
-        // Always update OrderItems to reflect latest marketplace data (title, weight, hs_code, etc.)
-        if (existingItems.length > 0) {
-          await db.$transaction(async (tx) => {
-            // Update items in place. Deleting and re-creating them cascaded to
-            // Shipment/LabelJob rows that reference OrderItem (onDelete:
-            // Cascade), wiping label records on every re-sync.
-            const lineItems = order.line_items || [];
-            console.log(`[OrderItems] Refreshing ${lineItems.length} items for order ${order.orderNumber} (marketplace=${order.marketplace}, source=${order.source}), images: ${lineItems.map((i: any) => i.image ? 'YES' : 'NO').join(',')}`);
-            const freshItems = lineItems.map((item, i) => {
-              const lineKeyCandidates = [
-                String(item.id || ''),
-                String(item.id || `${order.marketplaceKey}-${i}`),
-              ].filter(Boolean);
-              let preservedEdit:
-                | { weightKg: number | null; weightEditedAt: Date | null }
-                | undefined;
-              for (const k of lineKeyCandidates) {
-                const hit = editedWeightByLineKey.get(k);
-                if (hit) {
-                  preservedEdit = hit;
-                  break;
-                }
-              }
-              return {
-                orderId,
-                productName: item.title || 'Unknown Product',
-                quantity: item.quantity || 1,
-                unitPrice: item.value || 0,
-                totalPrice: (item.value || 0) * (item.quantity || 1),
-                weightKg: preservedEdit
-                  ? preservedEdit.weightKg ?? 0.5
-                  : item.weight || 0.5,
-                weightEditedAt: preservedEdit?.weightEditedAt ?? null,
-                harmonizedCode: item.hs_code || '',
-                countryOfMfg: item.country_of_origin || '',
-                sku: item.sku || '',
-                image: item.image || '',
-                variantInfo: item.variantInfo || '',
-                notes: (item as any).notes || (item as any).description || (order as any).notes || (order as any).customerNote || '',
-                marketplaceKey: String(item.id || `${order.marketplaceKey}-${i}`),
-                orderNumber: order.orderNumber || '',
-                uniqueLineKey: String(item.id || `${order.marketplaceKey}-${i}`),
-                productId: null,
-                remoteLineId: String(item.id || ''),
-                shipBy: item.shipBy || order.shipByDate || null,
-              };
-            });
-            const byLineKey = new Map(existingItems.map((ex) => [ex.uniqueLineKey || ex.marketplaceKey || ex.id, ex]));
-            const keptIds = new Set<string>();
-            for (const item of freshItems) {
-              const match = byLineKey.get(item.uniqueLineKey);
-              if (match && !keptIds.has(match.id)) {
-                keptIds.add(match.id);
-                const { orderId: _o, ...data } = item;
-                await tx.orderItem.update({ where: { id: match.id }, data });
-              } else {
-                const created = await tx.orderItem.create({ data: item });
-                keptIds.add(created.id);
-              }
-            }
-            // Drop items the marketplace no longer lists — but never one a
-            // label or shipment points at.
-            const stale = existingItems.filter((ex) => !keptIds.has(ex.id)).map((ex) => ex.id);
-            if (stale.length > 0) {
-              await tx.orderItem.deleteMany({
-                where: { id: { in: stale }, shipments: { none: {} }, labelJobs: { none: {} } },
-              });
-            }
+  if (!existing) {
+    const recent = isRecentOrderDate(order.marketplaceOrderDate || base.uiOrderDate, now.getTime());
+    try {
+      const out = await prisma.$transaction(
+        async (tx) => {
+          const row = await tx.order.create({
+            data: {
+              ...base,
+              userId,
+              customerName: order.customerName || '',
+              shippingAddress: incomingAddress ? JSON.stringify(incomingAddress) : Prisma.JsonNull,
+              trackingNumber: order.trackingNumber || null,
+              cancelledAt: nextClass === 'cancelled' ? now : null,
+              lastEventAt: nextClass === 'open' ? null : now,
+            } as Prisma.OrderUncheckedCreateInput,
           });
-          continue; // Items already refreshed via transaction above
-        }
-      }
-
-      // Create OrderItems from line_items
-      const lineItems = order.line_items || [];
-      for (let i = 0; i < lineItems.length; i++) {
-        const item = lineItems[i];
-        orderItemsToCreate.push({
-          orderId,
-          productName: item.title || 'Unknown Product',
-          quantity: item.quantity || 1,
-          unitPrice: item.value || 0,
-          totalPrice: (item.value || 0) * (item.quantity || 1),
-          weightKg: item.weight || 0.5,
-          harmonizedCode: item.hs_code || '',
-          countryOfMfg: item.country_of_origin || '',
-          sku: item.sku || '',
-          image: item.image || '',
-          variantInfo: item.variantInfo || '',
-          notes: (item as any).notes || (item as any).description || (order as any).notes || (order as any).customerNote || '', // Extract notes from item or order level (falls back to Etsy customerNote / message_from_buyer)
-          marketplaceKey: String(item.id || `${order.marketplaceKey}-${i}`),
-          orderNumber: order.orderNumber || '',
-          uniqueLineKey: String(item.id || `${order.marketplaceKey}-${i}`),
-          productId: null, // line_items don't have productId
-          remoteLineId: String(item.id || ''),
-          shipBy: item.shipBy || order.shipByDate || null,
-        });
-      }
+          await upsertOrderItems(tx, row.id, lines);
+          const queued = await insertOrderEffects(
+            tx,
+            row.id,
+            deriveOrderEffects({ statusClass: nextClass, itemsHash, quiet: !recent, includeStock: false, includeShipped: false }),
+            { source: 'sync' },
+          );
+          return { row, queued };
+        },
+        { timeout: 15_000, maxWait: 10_000 },
+      );
+      return {
+        orderId: out.row.id,
+        created: true,
+        wrote: true,
+        statusChanged: true,
+        effectsQueued: out.queued.length,
+        liveKind: liveKindForOrderWrite({ created: true, next: nextClass, changed: true, recent }),
+        row: out.row,
+      };
+    } catch (err: any) {
+      if (err?.code !== 'P2002') throw err;
+      // Created concurrently by another writer: nothing more to do in this pass.
+      const row = await prisma.order.findFirst({ where: { userId, marketplace: order.marketplace, marketplaceKey: String(order.marketplaceKey) } });
+      return { orderId: row?.id || '', created: false, wrote: false, statusChanged: false, effectsQueued: 0, liveKind: null, row };
     }
+  }
 
-    // Bulk create OrderItems
-    if (orderItemsToCreate.length > 0) {
-      logger.info(`[OrderItems] Creating ${orderItemsToCreate.length} OrderItems for ${orders.length} orders`);
-      await db.orderItem.createMany({
-        data: orderItemsToCreate,
-        skipDuplicates: true,
-      });
-    }
+  const prevClass = classifyOrderStatus(existing.status, existing.externalStatus, existing.deliveredAt);
+  const statusChanged = (existing.status || '') !== (order.status || '');
+  const data: Record<string, any> = { ...base };
+  const mergedAddress = mergeAddressPreferNonEmpty(existing.shippingAddress, incomingAddress);
+  if (mergedAddress && !sameAddress(existing.shippingAddress, mergedAddress)) data.shippingAddress = JSON.stringify(mergedAddress);
+  const name = mergeNamePreferNonEmpty(existing.customerName, order.customerName);
+  if (name !== null && name !== existing.customerName) data.customerName = name;
+  // Marketplace tracking is fill-if-empty: never clobber a number entered locally.
+  if (order.trackingNumber && !existing.trackingNumber) data.trackingNumber = order.trackingNumber;
+  if (nextClass === 'cancelled' && !existing.cancelledAt) data.cancelledAt = now;
+  if (statusChanged) data.lastEventAt = now;
+  if (existing.weightEditedAt) {
+    // Manual weight/dimension edits on the order are never overwritten by sync.
+    for (const k of ['weightKg', 'packageLength', 'packageWidth', 'packageHeight', 'dimensionUnits']) delete data[k];
+  }
 
+  const out = await prisma.$transaction(
+    async (tx) => {
+      const row = await tx.order.update({ where: { id: existing.id }, data });
+      if (itemsChanged) await upsertOrderItems(tx, existing.id, lines);
+      // Pre-W4 rows (no OrderEffect yet) are quiet only when the stored state already matches;
+      // a real open -> cancelled transition still raises cancel_label_alert.
+      const quiet = quietForExistingWrite({ seeded: await hasOrderEffects(tx, existing.id), prevClass, nextClass });
+      const queued = await insertOrderEffects(
+        tx,
+        existing.id,
+        deriveOrderEffects({ statusClass: nextClass, itemsHash, quiet, includeStock: false, includeShipped: false }),
+        { source: 'sync' },
+      );
+      return { row, queued };
+    },
+    { timeout: 15_000, maxWait: 10_000 },
+  );
+  const changed = existing.orderHash !== orderHash || itemsChanged || data.shippingAddress !== undefined || data.customerName !== undefined;
+  return {
+    orderId: existing.id,
+    created: false,
+    wrote: true,
+    statusChanged,
+    effectsQueued: out.queued.length,
+    liveKind: liveKindForOrderWrite({ created: false, prev: prevClass, next: nextClass, changed, recent: false }),
+    row: out.row,
+  };
+}
+
+/**
+ * Extension-scraped Etsy address (EtsyAddress) for one receipt, normalised to
+ * the Order.shippingAddress shape. Unlike extractAddressEnriched this does not
+ * depend on the marketplace string (direct Etsy orders use the shop name).
+ */
+export async function getEtsyExtensionAddress(userId: string, orderNumber: string, etsyStoreId?: string | null): Promise<NormalizedAddress | undefined> {
+  try {
+    const row =
+      (etsyStoreId
+        ? await prisma.etsyAddress.findFirst({ where: { userId, orderNumber, etsyStoreId }, select: { shippingAddress: true } })
+        : null) || (await prisma.etsyAddress.findFirst({ where: { userId, orderNumber }, orderBy: { updatedAt: 'desc' }, select: { shippingAddress: true } }));
+    if (!row) return undefined;
+    return normalizeEtsyAddress(row);
   } catch (error) {
-    logger.error(`[OrderItems] Error creating OrderItems:`, error);
-    // Don't throw - this shouldn't fail the entire sync
+    logger.warn('[OrderSync] EtsyAddress lookup failed', { error: error instanceof Error ? error.message : String(error) });
+    return undefined;
   }
 }
 

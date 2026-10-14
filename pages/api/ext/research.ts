@@ -1,5 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
+import { etsyFetch, etsyPublicHeaders } from '@/lib/etsy/http';
+import { EtsyPriority } from '@/lib/etsy/rateBudget';
 import { getBatchListingStats, getListingStats, getShopStats, EtsyPublicApiError } from '@/lib/etsy/listingStats';
 
 // Rate limiting per IP for anonymous users
@@ -23,11 +25,8 @@ function checkAnonLimit(ip: string): boolean {
 const ETSY_BASE = 'https://openapi.etsy.com/v3/application';
 
 async function etsyGet(path: string) {
-  const apiKey = (process.env.ETSY_API_KEY || '').trim().replace(/^"|"$/g, '');
-  const apiSecret = (process.env.ETSY_API_SECRET || '').trim().replace(/^"|"$/g, '');
-  const res = await fetch(`${ETSY_BASE}${path}`, {
-    headers: { 'x-api-key': `${apiKey}:${apiSecret}` },
-  });
+  // Through etsyFetch for the shared rate budget; no retries (unchanged behaviour).
+  const res = await etsyFetch(`${ETSY_BASE}${path}`, { headers: etsyPublicHeaders() }, { priority: EtsyPriority.Interactive, retries: 0 });
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
     throw new Error(`Etsy API error: ${res.status} — ${errText.slice(0, 200)}`);

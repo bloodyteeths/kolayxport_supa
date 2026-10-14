@@ -5,6 +5,8 @@ import { getAuthUser } from '../../../lib/auth';
 import { decryptIfNeeded } from '@/lib/crypto/credentials';
 // Locked (per-shop advisory lock) refresh — Etsy refresh tokens are single-use.
 import { getEtsyAccessToken } from '@/lib/etsy/etsyToken';
+import { etsyFetch, etsyAuthHeaders } from '@/lib/etsy/http';
+import { EtsyPriority } from '@/lib/etsy/rateBudget';
 import formidable from 'formidable';
 import fs from 'fs';
 
@@ -187,15 +189,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Upload to Etsy
     const uploadUrl = `${ETSY_API_BASE}/shops/${canonicalShopId}/listings/${listing_id}/videos`;
-    const uploadResponse = await fetch(uploadUrl, {
+    // Through etsyFetch for the shared rate budget. No retries and a long timeout
+    // (large upload; a timed-out POST may have landed, so it is never re-sent).
+    const uploadResponse = await etsyFetch(uploadUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_API_SECRET || '').trim()}`,
+        ...etsyAuthHeaders(accessToken),
         'Content-Type': `multipart/form-data; boundary=${boundary}`,
       },
       body: bodyParts,
-    });
+    }, { priority: EtsyPriority.Interactive, retries: 0, timeoutMs: 300_000, shopId: String(canonicalShopId) });
 
     // Clean up temp file
     try {

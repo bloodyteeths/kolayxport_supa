@@ -1,0 +1,57 @@
+{
+  "orderPipeline": {
+    "labelGuard": {
+      "cancelledTitle": "Bu sipariş iptal edildi",
+      "shippedTitle": "Bu sipariş zaten kargolanmış",
+      "orderNumber": "Sipariş {orderNumber}",
+      "cancelled": "Pazaryeri bu siparişi iptal edilmiş veya iade edilmiş olarak gösteriyor. Yeni bir etiket kargo firması tarafından ücretlendirilir.",
+      "shippedExternally": "Pazaryeri bu siparişi kargolandı olarak gösteriyor, ancak KolayXport'ta etiket veya takip numarası oluşturulmadı. Muhtemelen başka bir yolla gönderildi.",
+      "overrideHint": "Etiketi yalnızca bu siparişi hâlâ göndermeniz gerektiğinden eminseniz oluşturun.",
+      "keepSafe": "Oluşturma",
+      "createAnyway": "Yine de etiket oluştur"
+    },
+    "badges": {
+      "cancelledAfterLabel": "Etiketten sonra iptal",
+      "labelCost": "etiket {cost} {currency}",
+      "labelTracking": "{carrier} etiketi: {tracking}",
+      "cancelled": "İptal edildi",
+      "voidRequested": "İptal talep edildi",
+      "shippedExternally": "KolayXport dışında kargolandı",
+      "late": "Gecikti",
+      "shippedLate": "Geç kargolandı",
+      "labelNotPushed": "Takip no Etsy'de değil",
+      "labelNotPushedHint": "Etiket hazır, takip numarası Etsy'de değil. Chrome eklentisiyle Etsy'ye gönderin.",
+      "delivered": "Teslim edildi",
+      "returnWindow": "{days, plural, =0 {İade süresi bugün bitiyor} other {İade için # gün kaldı}}"
+    },
+    "void": {
+      "voidLabel": "Etiketi iptal et",
+      "confirmManual": "Manuel iptal ettim",
+      "openCarrierPortal": "Kargo sitesini aç",
+      "manualRequired": "Bu kargo firmasında etiket otomatik iptal edilemiyor. Etiketi kargo firmasının sitesinden iptal edin, ardından \"Manuel iptal ettim\"e dokunun.",
+      "done": "Etiket iptal edildi",
+      "confirmed": "İptal edildi olarak işaretlendi",
+      "failed": "Etiket iptal edilemedi"
+    },
+    "dispatchState": {
+      "no_label": "Etiket yok",
+      "label_not_pushed": "Takip no Etsy'de değil",
+      "shipped_on_etsy": "Etsy'de kargolandı"
+    },
+    "dispatchHealth": {
+      "title": "Zamanında kargo (Star Seller kriteri 1/3)",
+      "empty": "Son {days} günde kargolanmış Etsy siparişi yok.",
+      "onTimeWithTracking": "takip numarasıyla zamanında kargolandı",
+      "target": "Star Seller için %95 veya üzeri gerekir.",
+      "onTime": "Zamanında",
+      "shipped": "Kargolanan",
+      "late": "Geciken",
+      "avgHandling": "Ort. hazırlama",
+      "hours": "{hours} sa",
+      "openNoLabel": "{count} açık sipariş etiketsiz",
+      "openLabelNotPushed": "{count} etiket hazır, takip no Etsy'de değil",
+      "deliveryDays": "Teslim süresi (gün)",
+      "p50p90": "medyan {p50} · p90 {p90} ({n})"
+    }
+  }
+}

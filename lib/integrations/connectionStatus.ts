@@ -15,6 +15,7 @@
  */
 import prisma from '@/lib/prisma';
 import { getOpenReauthFlags, resolveNotification, type OpenReauthFlag } from '@/lib/notifications';
+import { isShopReauthBlocked } from '@/lib/etsy/etsyToken';
 
 export const CONNECTION_PROVIDERS = [
   'etsy',
@@ -275,6 +276,8 @@ export async function getConnectionStatus(userId: string): Promise<ConnectionSta
           refreshToken: true,
           tokenExpiresAt: true,
           lastListingSyncAt: true,
+          needsReauth: true,
+          needsReauthAt: true,
         },
         orderBy: { createdAt: 'asc' },
       },
@@ -315,9 +318,11 @@ export async function getConnectionStatus(userId: string): Promise<ConnectionSta
 
   // ---- Etsy: EtsyShop rows (primary) + legacy Credential mirror ----------
   const etsyAccounts: ConnectionAccount[] = (user?.etsyShops ?? []).map((s) => {
+    // EtsyShop.needsReauth (set on invalid_grant by lib/etsy/etsyToken) is the source of
+    // truth for a parked shop; don't depend on a reauthRequired notification row existing.
     const reason = oauthReauth(has(s.refreshToken), s.tokenExpiresAt, now, {
       refreshLifetimeMs: ETSY_REFRESH_LIFETIME_MS,
-    });
+    }) || (isShopReauthBlocked(s) ? ('reauth_required' as const) : undefined);
     return {
       id: s.id,
       name: s.shopName || `Shop ${s.shopId}`,

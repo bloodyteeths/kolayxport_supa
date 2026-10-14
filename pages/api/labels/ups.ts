@@ -5,6 +5,8 @@ import { getUpsCredentialsForUser } from '@/lib/ups/ups.credentials';
 import { createUpsShipment, CreateShipmentInput, getUpsAccessToken } from '@/lib/ups/createUpsShipment';
 import { saveUpsLabelToCache } from '@/lib/ups/cache';
 import { withUsageLimiter } from '@/lib/middleware/withUsageLimiter';
+import { assertOrderLabelable, labelGuardOverride } from '@/lib/orders/labelGuard';
+import { labelGuardBody, publishLabelCreated } from '@/lib/orders/labelEvents';
 
 // Utility to parse phone number and extension - handles Amazon format like "+1 415-851-9136 ext. 96793"
 function parsePhoneNumberWithExt(raw: string): { phone: string, ext?: string } {
@@ -56,6 +58,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
+    // Tenant isolation: the order must belong to the caller (the address
+    // overwrite below writes by id).
+    const ownedOrder = await prisma.order.findFirst({ where: { id: orderId, userId }, select: { id: true } });
+    if (!ownedOrder) {
+      return res.status(404).json({ success: false, error: 'Order not found' });
+    }
+
+    // Label safety guard (cancelled / shipped elsewhere) before any carrier call.
+    const guard = await assertOrderLabelable(orderId, userId, { override: labelGuardOverride(req.body) });
+    if (!guard.ok) return res.status(guard.httpStatus).json(labelGuardBody(guard));
+
     // Load UPS credentials
     let upsCreds;
     try {
@@ -194,6 +207,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         await res.incrementUsage();
       }
 
+      publishLabelCreated(userId, orderId, { carrier: 'UPS', trackingNumber: shipmentResult.trackingNumber });
+
       // No Step 2 needed – EDI label already generated
       return res.status(200).json(shipmentResult);
     } else {
@@ -222,6 +237,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         await res.incrementUsage();
       }
       
+      publishLabelCreated(userId, orderId, { carrier: 'UPS', trackingNumber: result.trackingNumber });
+
       return res.status(200).json({ success: true, trackingNumber: result.trackingNumber, labelUrl: result.labelUrl });
     }
   } catch (error: any) {

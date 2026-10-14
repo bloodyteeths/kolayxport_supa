@@ -1,139 +1,129 @@
-import { EtsyClient, EtsyCredentials } from './etsyClient';
+/**
+ * Etsy receipts -> UIOrder mapping and raw receipt fetches (W4 T5).
+ *
+ * Writers: this module never writes orders. lib/orders/etsyLifecycle.ts
+ * (upsertEtsyReceipt) is the only Etsy order writer; the orderSync batch
+ * writer rejects source 'etsy-api'.
+ *
+ * HTTP goes through lib/etsy/http.ts (callEtsyAPI) with the shared lease-based
+ * token helper, so every call is visible to the W1 rate budget. Errors
+ * propagate (no silent []), there is no 500-receipt cap, and listing images
+ * come from the EtsyListing cache only — missing listing ids are returned so
+ * the caller can hand them to ensureListingsCached (W3) instead of spending
+ * one live Etsy call per listing on every run.
+ */
 import { UIOrder } from '../types';
 import { logger } from '../logger';
 import prisma from '../prisma';
-import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
+import { etsyVariantKeys, type EtsyVariantPair } from '@/lib/etsy/variantKey';
+import { EtsyPriority, withEtsyBudget } from '@/lib/etsy/rateBudget';
+import { mapEtsyReceiptStatus } from '@/lib/orders/orderStatus';
 
-export async function fetchEtsyOrders(
-  userId: string,
-  options?: { lastSync?: Date }
-): Promise<UIOrder[]> {
-  const shops = await prisma.etsyShop.findMany({
-    where: { userId, isActive: true },
+// ---------------------------------------------------------------------------
+// HTTP
+// ---------------------------------------------------------------------------
+
+async function etsyGet(userId: string, shopId: string, endpoint: string, priority: EtsyPriority): Promise<any> {
+  return withEtsyBudget({ shopId, userId, priority }, async () => {
+    const { getEtsyAccessToken } = await import('@/lib/etsy/etsyToken');
+    const { callEtsyAPI } = await import('@/lib/etsy/http');
+    const accessToken = await getEtsyAccessToken(shopId, userId);
+    return callEtsyAPI(endpoint, accessToken);
   });
-
-  if (shops.length === 0) return [];
-
-  const allOrders: UIOrder[] = [];
-
-  console.log(`[EtsyOrderSync] Found ${shops.length} active Etsy shops for user ${userId}`);
-
-  for (const shop of shops) {
-    if (!shop.accessToken || !shop.shopId) continue;
-    console.log(`[EtsyOrderSync] Processing shop ${shop.shopName || shop.shopId}`);
-
-    const onTokenRefresh = async (newCreds: EtsyCredentials) => {
-      await prisma.etsyShop.update({
-        where: { id: shop.id },
-        data: {
-          accessToken: encryptIfNeeded(newCreds.accessToken) as string,
-          refreshToken: encryptIfNeeded(newCreds.refreshToken) as string | undefined,
-          tokenExpiresAt: newCreds.tokenExpiresAt || undefined,
-        },
-      });
-    };
-
-    // Decrypt once before handing off to the client; the client treats them as plain bytes.
-    const client = new EtsyClient(
-      {
-        accessToken: decryptIfNeeded(shop.accessToken) as string,
-        refreshToken: (decryptIfNeeded(shop.refreshToken) as string | null) || undefined,
-        shopId: shop.shopId,
-        tokenExpiresAt: shop.tokenExpiresAt || undefined,
-      },
-      onTokenRefresh
-    );
-
-    try {
-      const orders = await fetchReceiptsForShop(client, shop.shopId, shop.shopName || 'Etsy', options);
-      allOrders.push(...orders);
-      logger.info(`[EtsyOrderSync] Fetched ${orders.length} orders from shop ${shop.shopName || shop.shopId}`);
-    } catch (err) {
-      logger.error(`[EtsyOrderSync] Failed to fetch orders from shop ${shop.shopId}`, err instanceof Error ? err : new Error(String(err)));
-    }
-  }
-
-  return allOrders;
 }
 
-async function fetchReceiptsForShop(
-  client: EtsyClient,
+function isNotFound(err: unknown): boolean {
+  return /Etsy API error: 404/.test(String((err as any)?.message || ''));
+}
+
+/**
+ * GET /shops/{shopId}/receipts/{receiptId}. Returns null on 404 or when the
+ * shop is not connected for this user.
+ */
+export async function fetchEtsyReceiptRawFromApi(
+  userId: string,
   shopId: string,
-  shopName: string,
-  options?: { lastSync?: Date }
-): Promise<UIOrder[]> {
-  const PAGE_LIMIT = 100;
-  let offset = 0;
-  const allReceipts: any[] = [];
-
-  const params: Record<string, any> = {
-    limit: PAGE_LIMIT,
-    offset: 0,
-    includes: ['Transactions'],
-  };
-
-  // Always use 30-day window — Etsy receipts are cheap to fetch and we need full coverage
-  const thirtyDaysAgo = Math.floor((Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000);
-  params.min_created = thirtyDaysAgo;
-
-  let hasMore = true;
-  while (hasMore) {
-    params.offset = offset;
-    console.log(`[EtsyOrderSync] Fetching receipts with params:`, JSON.stringify(params));
-    const result = await client.getReceipts(params);
-    console.log(`[EtsyOrderSync] Got ${result.count || 0} total, ${(result.results || []).length} in this page`);
-    const receipts = result.results || [];
-    allReceipts.push(...receipts);
-
-    if (receipts.length < PAGE_LIMIT) {
-      hasMore = false;
-    } else {
-      offset += PAGE_LIMIT;
-    }
-
-    if (allReceipts.length > 500) break;
+  receiptId: string,
+  priority: EtsyPriority = EtsyPriority.Webhook,
+): Promise<any | null> {
+  if (!/^\d+$/.test(String(receiptId))) throw new Error(`Invalid Etsy receipt id: ${receiptId}`);
+  const shop = await prisma.etsyShop.findFirst({ where: { userId, shopId, isActive: true }, select: { shopId: true } });
+  if (!shop) return null;
+  try {
+    const receipt = await etsyGet(userId, shopId, `/shops/${shopId}/receipts/${receiptId}`, priority);
+    return receipt && receipt.receipt_id ? receipt : null;
+  } catch (err) {
+    if (isNotFound(err)) return null;
+    throw err;
   }
-
-  // Resolve listing images from EtsyListing cache using listing_id from transactions
-  const listingIds = new Set<bigint>();
-  for (const receipt of allReceipts) {
-    for (const tx of (receipt.transactions || [])) {
-      if (tx.listing_id) listingIds.add(BigInt(tx.listing_id));
-    }
-  }
-
-  const imageMap = new Map<string, string>();
-  if (listingIds.size > 0) {
-    try {
-      const cached = await prisma.etsyListing.findMany({
-        where: { etsyListingId: { in: [...listingIds] } },
-        select: { etsyListingId: true, thumbnailUrl570xN: true, thumbnailUrl170x135: true },
-      });
-      for (const l of cached) {
-        const url = l.thumbnailUrl570xN || l.thumbnailUrl170x135 || '';
-        if (url) imageMap.set(String(l.etsyListingId), url);
-      }
-    } catch (err) {
-      logger.warn('[EtsyOrderSync] Failed to batch-fetch listing images from cache', { error: (err as Error).message });
-    }
-  }
-
-  // Fallback: fetch images from Etsy API for listings not in cache
-  const missingIds = [...listingIds].filter(id => !imageMap.has(String(id)));
-  if (missingIds.length > 0) {
-    logger.info(`[EtsyOrderSync] Fetching ${missingIds.length} listing images from Etsy API (not in cache)`);
-    // Batch in groups of 10 to avoid hammering the API
-    for (let i = 0; i < missingIds.length; i += 10) {
-      const batch = missingIds.slice(i, i + 10);
-      await Promise.allSettled(batch.map(async (id) => {
-        const url = await client.getListingFirstImage(String(id));
-        if (url) imageMap.set(String(id), url);
-      }));
-    }
-  }
-
-  return allReceipts.map((receipt) => mapReceiptToUIOrder(receipt, shopId, shopName, imageMap));
 }
+
+export type ReceiptsPageParams = {
+  minLastModified?: number;
+  minCreated?: number;
+  sortOn?: 'created' | 'updated' | 'receipt_id';
+  sortOrder?: 'asc' | 'desc';
+  limit?: number;
+  /** Only used inside a one-second tie of updated_timestamp (keyset paging). */
+  offset?: number;
+};
+
+/** One page of GET /shops/{shopId}/receipts (keyset-friendly). */
+export async function fetchReceiptsPage(
+  userId: string,
+  shopId: string,
+  p: ReceiptsPageParams,
+  priority: EtsyPriority = EtsyPriority.Reconcile,
+): Promise<{ results: any[]; count: number }> {
+  const q = new URLSearchParams();
+  q.set('limit', String(Math.min(Math.max(p.limit ?? 100, 1), 100)));
+  if (p.offset) q.set('offset', String(p.offset));
+  if (p.minLastModified != null) q.set('min_last_modified', String(Math.floor(p.minLastModified)));
+  if (p.minCreated != null) q.set('min_created', String(Math.floor(p.minCreated)));
+  if (p.sortOn) q.set('sort_on', p.sortOn);
+  if (p.sortOrder) q.set('sort_order', p.sortOrder);
+  q.set('includes', 'Transactions');
+  const data = await etsyGet(userId, shopId, `/shops/${shopId}/receipts?${q.toString()}`, priority);
+  return { results: Array.isArray(data?.results) ? data.results : [], count: Number(data?.count) || 0 };
+}
+
+// ---------------------------------------------------------------------------
+// Listing images (cache only)
+// ---------------------------------------------------------------------------
+
+export function listingIdsOfReceipts(receipts: any[]): bigint[] {
+  const ids = new Set<string>();
+  for (const r of receipts || []) {
+    for (const tx of r?.transactions || []) {
+      if (tx?.listing_id && /^\d+$/.test(String(tx.listing_id))) ids.add(String(tx.listing_id));
+    }
+  }
+  return [...ids].map((s) => BigInt(s));
+}
+
+/** Thumbnail map from the EtsyListing cache; `missing` = listing ids not cached (for ensureListingsCached). */
+export async function listingImagesFromCache(shopId: string, listingIds: bigint[]): Promise<{ imageMap: Map<string, string>; missing: bigint[] }> {
+  const imageMap = new Map<string, string>();
+  if (listingIds.length === 0) return { imageMap, missing: [] };
+  try {
+    const cached = await prisma.etsyListing.findMany({
+      where: { etsyListingId: { in: listingIds } },
+      select: { etsyListingId: true, thumbnailUrl570xN: true, thumbnailUrl170x135: true },
+    });
+    for (const l of cached) {
+      const url = l.thumbnailUrl570xN || l.thumbnailUrl170x135 || '';
+      if (url) imageMap.set(String(l.etsyListingId), url);
+    }
+  } catch (err) {
+    logger.warn('[EtsyOrderSync] Listing image cache lookup failed', { shopId, error: (err as Error).message });
+  }
+  const missing = listingIds.filter((id) => !imageMap.has(String(id)));
+  return { imageMap, missing };
+}
+
+// ---------------------------------------------------------------------------
+// Mapping
+// ---------------------------------------------------------------------------
 
 function parseEtsyPrice(price: any): number {
   if (!price) return 0;
@@ -145,7 +135,18 @@ function parseEtsyPrice(price: any): number {
   return 0;
 }
 
-function mapReceiptToUIOrder(receipt: any, shopId: string, shopName: string, imageMap: Map<string, string>): UIOrder {
+/**
+ * Variation pairs of a transaction for variantKey matching. Entries without
+ * a value_id (buyer personalization text) are not part of the offering identity.
+ */
+export function variantPairsOfTransaction(tx: any): EtsyVariantPair[] {
+  const vars = Array.isArray(tx?.variations) ? tx.variations : [];
+  return vars
+    .filter((v: any) => Number.isFinite(Number(v?.property_id)) && v?.value_id !== null && v?.value_id !== undefined && v?.value_id !== '')
+    .map((v: any) => ({ propertyId: Number(v.property_id), valueId: Number(v.value_id), value: v.formatted_value ?? null }));
+}
+
+export function mapReceiptToUIOrder(receipt: any, shopId: string, shopName: string, imageMap: Map<string, string>): UIOrder {
   const transactions = receipt.transactions || [];
 
   const lineItems = transactions.map((tx: any, idx: number) => {
@@ -154,6 +155,8 @@ function mapReceiptToUIOrder(receipt: any, shopId: string, shopName: string, ima
       .join(', ');
 
     const listingImage = tx.listing_id ? (imageMap.get(String(tx.listing_id)) || '') : '';
+    const pairs = variantPairsOfTransaction(tx);
+    const keys = pairs.length > 0 ? etsyVariantKeys(pairs) : { variantKey: '', variantValueKey: '' };
 
     return {
       id: String(tx.transaction_id || `${receipt.receipt_id}-${idx}`),
@@ -164,17 +167,17 @@ function mapReceiptToUIOrder(receipt: any, shopId: string, shopName: string, ima
       sku: tx.product_data?.sku || tx.sku || '',
       image: listingImage,
       variantInfo: variations || '',
+      listingRef: tx.listing_id ? String(tx.listing_id) : null,
+      variantRef: keys.variantKey,
+      variantValueKey: keys.variantValueKey,
+      shipBy: Number(tx.expected_ship_date) > 0 ? new Date(Number(tx.expected_ship_date) * 1000).toISOString() : undefined,
     };
   });
 
   const customerName = receipt.name || '';
-  const nameParts = customerName.trim().split(/\s+/);
 
   // Etsy receipts surface two free-text fields the seller must see during
-  // fulfillment: gift_message (added by the buyer when checking out as a gift)
-  // and message_from_buyer (the "note to seller" / personalization request).
-  // Sellers doing custom orders rely on these — drop them and we silently lose
-  // customer requests.
+  // fulfillment: gift_message and message_from_buyer.
   const rawGiftMessage =
     typeof receipt.gift_message === 'string' ? receipt.gift_message.trim() : '';
   const rawBuyerMessage =
@@ -182,10 +185,7 @@ function mapReceiptToUIOrder(receipt: any, shopId: string, shopName: string, ima
       ? receipt.message_from_buyer.trim()
       : '';
 
-  // Transactions can also carry per-line personalization in
-  // `personalization` / `buyer_request`. Pull them as a fallback so custom-order
-  // shops still get the buyer's instructions if Etsy puts them at the
-  // transaction level instead of the receipt level.
+  // Per-line personalization fallback.
   const transactionPersonalizations = transactions
     .map((tx: any) => {
       const personalization =
@@ -200,23 +200,13 @@ function mapReceiptToUIOrder(receipt: any, shopId: string, shopName: string, ima
   const customerNote =
     rawBuyerMessage || transactionPersonalizations || '';
 
-  // Etsy returns the buyer's shipping address as top-level fields on the
-  // receipt object. When the shop's OAuth token predates the `address_r`
-  // scope (added Jan 31 2026) or the buyer's account restricts sharing,
-  // ALL address fields come back null. Defaulting country to 'US' in that
-  // case falsely tags every foreign order as US — the reported bug. Only
-  // fall back to 'US' when we have at least ONE other address signal
-  // (city / zip / street), meaning Etsy actually delivered the address and
-  // the country field is genuinely missing rather than the whole address
-  // being redacted.
+  // Only fall back to 'US' when Etsy delivered at least one other address
+  // field (a fully redacted address must not be tagged as US).
   const hasAnyAddress = Boolean(receipt.first_line || receipt.city || receipt.zip || receipt.state);
   const rawCountry = typeof receipt.country_iso === 'string' ? receipt.country_iso.trim().toUpperCase() : '';
   const resolvedCountry = rawCountry || (hasAnyAddress ? 'US' : '');
   if (!rawCountry && hasAnyAddress) {
     logger.warn('Etsy receipt missing country_iso — defaulting to US', { receiptId: receipt.receipt_id });
-  }
-  if (!hasAnyAddress) {
-    logger.warn('Etsy receipt returned no address fields — token may lack address_r scope', { receiptId: receipt.receipt_id, shopId: String(shopName || '') });
   }
 
   return {
@@ -247,109 +237,63 @@ function mapReceiptToUIOrder(receipt: any, shopId: string, shopName: string, ima
     marketplaceOrderDate: receipt.created_timestamp
       ? new Date(receipt.created_timestamp * 1000).toISOString()
       : undefined,
-    // Etsy's `expected_ship_date` lives on each transaction (not the receipt
-    // top level — a common miss). Use the EARLIEST expected_ship_date across
-    // the receipt's line items so a multi-item order surfaces the tightest
-    // deadline. This matches what Etsy's seller dashboard uses to bucket
-    // orders into "Ship today" / "Ship tomorrow".
-    shipByDate: (() => {
-      const txs = Array.isArray(receipt.transactions) ? receipt.transactions : [];
-      const stamps = txs
-        .map((tx: any) => Number(tx?.expected_ship_date))
-        .filter((n: number) => Number.isFinite(n) && n > 0);
-      if (stamps.length === 0) return undefined;
-      const earliest = Math.min(...stamps);
-      return new Date(earliest * 1000).toISOString();
-    })(),
+    // Earliest expected_ship_date across the receipt's transactions.
+    shipByDate: etsyShipByDate(receipt)?.toISOString(),
     giftMessage: rawGiftMessage || undefined,
     customerNote: customerNote || undefined,
-    // Etsy receipts carry shipments[] once tracking is pushed to Etsy — by the
-    // Chrome extension OR any 3rd-party shipping app. Mapping it here lets
-    // orders self-heal with tracking on every sync even when the label was
-    // never created or logged inside KolayXport. Latest shipment wins.
-    trackingNumber: (() => {
-      const ships = Array.isArray(receipt.shipments) ? receipt.shipments : [];
-      const codes = ships.map((s: any) => s?.tracking_code).filter(Boolean);
-      return codes.length ? String(codes[codes.length - 1]) : undefined;
-    })(),
+    // Latest shipment tracking (pushed by the extension or any 3rd-party app).
+    trackingNumber: etsyLatestTrackingCode(receipt) || undefined,
     rawData: receipt,
     commodityDesc: lineItems[0]?.title || '',
-  };
+  } as UIOrder;
 }
 
-function mapEtsyStatus(receipt: any): string {
-  // Order matters: a canceled order can still have was_paid/was_shipped=true
-  // (they were paid+shipped before the cancel), so the cancel check has to
-  // win over both — otherwise refunded orders look perfectly healthy in our
-  // UI and the user can't tell what's been refunded.
-  const externalStatus = typeof receipt.status === 'string' ? receipt.status : '';
-  if (
-    receipt.is_dead ||
-    receipt.is_refunded ||
-    externalStatus === 'Canceled' ||
-    externalStatus === 'Cancelled' ||
-    externalStatus === 'Fully Refunded'
-  ) {
-    return 'CANCELLED';
-  }
-  if (receipt.is_shipped || receipt.was_shipped) return 'SHIPPED';
-  if (receipt.is_paid || receipt.was_paid) return 'PAID';
-  if (externalStatus === 'Completed') return 'SHIPPED';
-  if (externalStatus === 'Paid') return 'PAID';
-  return 'AWAITING_FULFILLMENT';
+export function etsyShipByDate(receipt: any): Date | null {
+  const txs = Array.isArray(receipt?.transactions) ? receipt.transactions : [];
+  const stamps = txs
+    .map((tx: any) => Number(tx?.expected_ship_date))
+    .filter((n: number) => Number.isFinite(n) && n > 0);
+  if (stamps.length === 0) return null;
+  return new Date(Math.min(...stamps) * 1000);
+}
+
+export function etsyTrackingCodes(receipt: any): string[] {
+  const ships = Array.isArray(receipt?.shipments) ? receipt.shipments : [];
+  return ships.map((s: any) => (s?.tracking_code ? String(s.tracking_code).trim() : '')).filter(Boolean);
+}
+
+export function etsyLatestTrackingCode(receipt: any): string | null {
+  const codes = etsyTrackingCodes(receipt);
+  return codes.length ? codes[codes.length - 1] : null;
+}
+
+/** Earliest shipment notification time on the receipt (when Etsy marked it shipped). */
+export function etsyShippedAt(receipt: any): Date | null {
+  const ships = Array.isArray(receipt?.shipments) ? receipt.shipments : [];
+  const stamps = ships
+    .map((s: any) => Number(s?.shipment_notification_timestamp))
+    .filter((n: number) => Number.isFinite(n) && n > 0);
+  if (stamps.length > 0) return new Date(Math.min(...stamps) * 1000);
+  return null;
+}
+
+export function mapEtsyStatus(receipt: any): string {
+  return mapEtsyReceiptStatus(receipt);
 }
 
 /**
- * Fetch ONE Etsy receipt (webhook path) and map it with the same mapper the
- * bulk sync uses. Uses the shared lock-protected token helper so a webhook
- * refresh can't race the order sync on Etsy's single-use refresh token.
- * Returns null when Etsy reports the receipt doesn't exist (404).
+ * Fetch ONE Etsy receipt and map it (legacy helper kept for callers that only
+ * need the mapped shape). Returns null when Etsy reports the receipt doesn't
+ * exist (404) or the shop is not connected.
  */
 export async function fetchSingleEtsyReceipt(
   userId: string,
   shopId: string,
   receiptId: string,
 ): Promise<UIOrder | null> {
-  if (!/^\d+$/.test(receiptId)) throw new Error(`Invalid Etsy receipt id: ${receiptId}`);
-  const shop = await prisma.etsyShop.findFirst({
-    where: { userId, shopId, isActive: true },
-    select: { shopId: true, shopName: true },
-  });
-  if (!shop) return null;
-
-  // Lazy imports keep the draft engine out of the order-sync import graph.
-  const { getEtsyAccessToken } = await import('@/lib/etsy/etsyToken');
-  const { callEtsyAPI } = await import('@/lib/etsy/draftService');
-  const accessToken = await getEtsyAccessToken(shopId, userId);
-
-  let receipt: any;
-  try {
-    receipt = await callEtsyAPI(`/shops/${shopId}/receipts/${receiptId}`, accessToken);
-  } catch (err: any) {
-    if (/Etsy API error: 404/.test(String(err?.message || ''))) return null;
-    throw err;
-  }
-  if (!receipt || !receipt.receipt_id) return null;
-
-  const imageMap = new Map<string, string>();
-  const listingIds = (receipt.transactions || [])
-    .map((tx: any) => tx?.listing_id)
-    .filter(Boolean)
-    .map((id: any) => BigInt(id));
-  if (listingIds.length > 0) {
-    try {
-      const cached = await prisma.etsyListing.findMany({
-        where: { etsyListingId: { in: listingIds } },
-        select: { etsyListingId: true, thumbnailUrl570xN: true, thumbnailUrl170x135: true },
-      });
-      for (const l of cached) {
-        const url = l.thumbnailUrl570xN || l.thumbnailUrl170x135 || '';
-        if (url) imageMap.set(String(l.etsyListingId), url);
-      }
-    } catch (err) {
-      logger.warn('[EtsyOrderSync] Single receipt image lookup failed', { error: (err as Error).message });
-    }
-  }
-
-  return mapReceiptToUIOrder(receipt, shop.shopId, shop.shopName || 'Etsy', imageMap);
+  const receipt = await fetchEtsyReceiptRawFromApi(userId, shopId, receiptId, EtsyPriority.Webhook);
+  if (!receipt) return null;
+  const shop = await prisma.etsyShop.findFirst({ where: { userId, shopId }, select: { shopName: true } });
+  const { imageMap } = await listingImagesFromCache(shopId, listingIdsOfReceipts([receipt]));
+  return mapReceiptToUIOrder(receipt, shopId, shop?.shopName || 'Etsy', imageMap);
 }

@@ -1,0 +1,318 @@
+{
+  "stockSync": {
+    "pageTitle": "Stok Senkronu",
+    "pageSubtitle": "Bir kanalda satılan ürün diğer kanallarda otomatik düşsün, fazla satış olmasın.",
+    "status": {
+      "disabled": "Kapalı",
+      "dryRun": "Deneme modu",
+      "live": "Canlı",
+      "globallyDisabled": "Geçici olarak durduruldu"
+    },
+    "statusHelp": {
+      "disabled": "Stok senkronu kapalı. Hiçbir pazaryerinde stok değiştirilmiyor.",
+      "dryRun": "Deneme modu: satışlar sayılıyor ve neyin gönderileceği hesaplanıyor, ama hiçbir pazaryerine yazılmıyor.",
+      "live": "Canlı: stok değişiklikleri bağlı tüm kanallara gönderiliyor.",
+      "globallyDisabled": "Stok senkronu bakım nedeniyle geçici olarak durduruldu. Hiçbir pazaryerine yazılmıyor."
+    },
+    "channels": {
+      "etsy": "Etsy",
+      "trendyol": "Trendyol",
+      "shopify": "Shopify",
+      "ebay": "eBay",
+      "wix": "Wix",
+      "amazon": "Amazon",
+      "hepsiburada": "Hepsiburada"
+    },
+    "common": {
+      "save": "Kaydet",
+      "cancel": "Vazgeç",
+      "close": "Kapat",
+      "retry": "Tekrar dene",
+      "back": "Geri",
+      "next": "İleri",
+      "skip": "Atla",
+      "loading": "Yükleniyor…",
+      "search": "Ara",
+      "refresh": "Yenile",
+      "none": "—",
+      "units": "{count} adet"
+    },
+    "settings": {
+      "title": "Durum ve ayarlar",
+      "restockOnCancel": "İptal edilen siparişte stoğu geri ekle",
+      "restockOnCancelHelp": "İptal edilen siparişin ürünleri stoğa geri döner. İadeler otomatik eklenmez.",
+      "autoFixDrift": "Uyumsuzlukları otomatik düzelt (sadece azaltır)",
+      "autoFixDriftHelp": "Bir pazaryeri elimizdekinden fazla gösteriyorsa saatlik kontrolde düşürülür. Artırma asla otomatik yapılmaz.",
+      "zeroAction": "Etsy'de stok bitince",
+      "zeroDisable": "Varyasyonu kapat (tek ürünlü ilan pasife alınır)",
+      "zeroDeactivate": "İlanı pasife al",
+      "seedReserved": "Kargolanmamış satışları başlangıç stoğundan düş",
+      "seedReservedHelp": "Satılmış ama henüz gönderilmemiş ürünler başlangıç sayısından çıkarılır.",
+      "openWizard": "Kurulum sihirbazı",
+      "goLive": "Canlıya geç",
+      "backToDryRun": "Deneme moduna dön",
+      "disable": "Stok senkronunu kapat",
+      "disableConfirmTitle": "Stok senkronu kapatılsın mı?",
+      "disableConfirmBody": "Eşleşmeler ve geçmiş saklanır. Kapalıyken hiçbir pazaryerinde stok değişmez.",
+      "restore": "Canlıya geçiş öncesine dön",
+      "saved": "Ayarlar kaydedildi",
+      "channelsTitle": "Senkronlanan kanallar",
+      "counts": {
+        "items": "Ürün",
+        "activeLinks": "Bağlı ilan",
+        "needsReview": "Sayı bekleyen",
+        "suggested": "Öneri",
+        "failed": "Son 24 saatte hata"
+      }
+    },
+    "dryRunReport": {
+      "title": "Deneme modu raporu",
+      "wouldHaveSent": "{count} stok güncellemesi gönderilecekti",
+      "risksPrevented": "{count} fazla satış riski önlenecekti",
+      "riskExample": "{sku}: {soldOn} satışından sonra {exposedOn} {shown} gösteriyordu, elde {available} vardı",
+      "empty": "Henüz bir şey yok. Satış geldikçe burada neyin gönderileceğini göreceksin."
+    },
+    "wizard": {
+      "title": "Stok senkronu kurulumu",
+      "steps": {
+        "channels": "Kanallar",
+        "matches": "Eşleşmeler",
+        "unmatched": "Eşleşmeyenler",
+        "seed": "Başlangıç stoğu",
+        "preview": "Önizleme",
+        "enable": "Deneme modu"
+      },
+      "channelsIntro": "Stoğunu birlikte yönetmek istediğin kanalları seç. Her kanalda bir satışın bize ne kadar sürede ulaştığı yazıyor; bu süre içinde fazla satış riski vardır.",
+      "oversellWindow": "Satış ~{minutes} dk içinde görülür",
+      "notConnected": "Bağlı değil",
+      "comingSoon": "Yakında",
+      "writeUnsupported": "Sadece okunur (stok yazılamaz)",
+      "matchesIntro": "Aynı SKU'ya sahip ilanları tek üründe topladık. Kontrol et ve onayla.",
+      "selectAll": "Tümünü seç",
+      "confirmSelected": "{count} ürünü onayla",
+      "confirmed": "{count} ürün onaylandı",
+      "needsReview": "Kontrol gerekli",
+      "reviewReasons": {
+        "zero": "Bir kanalda stok 0",
+        "high": "Bir kanalda 100 veya fazla",
+        "ratio": "Kanallar arasında büyük fark",
+        "shared_pool_conflict": "Aynı SKU'lu ilanlarda farklı sayılar"
+      },
+      "seedQtyLabel": "Gerçek stok",
+      "sharedPool": "{channel} içinde {count} ilan aynı stoğu paylaşır",
+      "noMatches": "Birden fazla kanalda aynı SKU'ya sahip ilan bulunamadı.",
+      "singleChannel": "Tek kanalda olanlar ({count})",
+      "unmatchedIntro": "Bu ilanların SKU'su yok veya başka kanalda eşi yok. İstersen elle bağla.",
+      "unmatchedCount": "{count} eşleşmeyen ilan",
+      "linkToItem": "Bağla",
+      "generateSkus": "Etsy için SKU üret",
+      "generateSkusHelp": "Seçili Etsy ilanları için SKU önerilir ve taslak olarak kaydedilir. Etsy'ye sen \"Etsy'ye gönder\" deyince yazılır.",
+      "generateStaged": "{count} ilan için SKU taslağı oluşturuldu",
+      "looseTitle": "Benzer SKU'lar (otomatik bağlanmaz)",
+      "titleTitle": "Benzer başlıklar (otomatik bağlanmaz)",
+      "seedIntro": "Başlangıç stoğu nasıl belirlensin?",
+      "policy": {
+        "min": "Kanallardaki en düşük sayı",
+        "minHelp": "Önerilen. Kontrol gerektiren ürünler için sayıyı sen girersin.",
+        "etsy_master": "Etsy'deki sayı esas",
+        "etsy_masterHelp": "Etsy'deki adet başlangıç stoğu olur.",
+        "manual": "Hepsini elle gireceğim",
+        "manualHelp": "Her ürün için gerçek sayıyı sen girersin."
+      },
+      "coverage": "Son 30 günün satışlarının %{percent} kadarı eşleşen ürünlere ait",
+      "previewIntro": "Canlıya geçince her ilana ne gönderileceği. Bu adımda hiçbir şey gönderilmez.",
+      "enableIntro": "Deneme modunda satışlar sayılır ve neyin gönderileceği hesaplanır, ama hiçbir pazaryerine yazılmaz. Raporu inceleyip hazır olduğunda \"Canlıya geç\" dersin.",
+      "enableButton": "Deneme modunu başlat",
+      "enabled": "Deneme modu başladı",
+      "needsReviewLeft": "{count} ürün için sayı girmen gerekiyor; bunlar sayı girilene kadar senkronlanmaz."
+    },
+    "preview": {
+      "title": "Önizleme",
+      "liveRead": "Pazaryerlerinden güncel sayılar okunuyor…",
+      "totals": {
+        "pushes": "{count} güncelleme",
+        "deactivations": "{count} ilan pasife alınacak",
+        "disabledVariations": "{count} varyasyon kapatılacak",
+        "bigDrops": "{count} ilanda %50'den fazla düşüş",
+        "needsReview": "{count} ürün sayı bekliyor",
+        "capped": "{count} ilan son görülen sayıyla gösteriliyor"
+      },
+      "remote": "Pazaryerinde",
+      "target": "Olacak",
+      "effect": {
+        "none": "Değişiklik yok",
+        "set": "{from} → {to}",
+        "deactivate": "İlan pasife alınır",
+        "disable_variation": "Varyasyon kapatılır",
+        "unsupported": "Desteklenmiyor"
+      },
+      "remoteSource": {
+        "live": "güncel",
+        "last_seen": "son görülen",
+        "none": "bilinmiyor"
+      },
+      "noChanges": "Gönderilecek değişiklik yok."
+    },
+    "goLive": {
+      "title": "Canlıya geç",
+      "intro": "Canlıya geçince stok değişiklikleri pazaryerlerine yazılır. Geçişten önceki sayılar 7 gün saklanır; istersen geri dönebilirsin.",
+      "typeToConfirm": "Bazı ilanlar pasife alınacak veya varyasyonlar kapatılacak. Onaylamak için {word} yaz.",
+      "word": "CANLI",
+      "confirm": "Canlıya geç",
+      "success": "Stok senkronu canlı",
+      "refreshPreview": "Önizlemeyi yenile"
+    },
+    "restore": {
+      "title": "Canlıya geçiş öncesine dön",
+      "body": "Her ilan geçişten önceki sayıya (o zamandan beri satılanlar düşülerek) geri ayarlanır ve stok senkronu kapanır.",
+      "word": "GERİ AL",
+      "typeToConfirm": "Onaylamak için {word} yaz",
+      "confirm": "Geri yükle",
+      "success": "{applied} ilan geri yüklendi, {failed} başarısız",
+      "none": "Geri yüklenebilecek bir kayıt yok"
+    },
+    "items": {
+      "title": "Ürünler",
+      "empty": "Henüz senkronlanan ürün yok. Kurulum sihirbazıyla başla.",
+      "search": "SKU veya başlık ara",
+      "filter": {
+        "all": "Tümü",
+        "active": "Aktif",
+        "needs_review": "Sayı bekleyen",
+        "paused": "Durdurulan"
+      },
+      "onHand": "Stok",
+      "safetyBuffer": "Güvenlik payı",
+      "tracking": "Takip",
+      "tracked": "Takip ediliyor",
+      "untracked": "Takip edilmiyor",
+      "links": "Kanallar",
+      "adjust": "Stoğu düzelt",
+      "why": "Bu sayı neden?",
+      "enterCount": "Sayıyı gir",
+      "pause": "Durdur",
+      "resume": "Devam ettir",
+      "statusLabels": {
+        "active": "Aktif",
+        "paused": "Durduruldu",
+        "needs_review": "Sayı bekliyor"
+      },
+      "openPushes": "{count} gönderim bekliyor",
+      "lastError": "Son hata: {error}",
+      "sku": "SKU",
+      "product": "Ürün"
+    },
+    "link": {
+      "statusLabels": {
+        "active": "Aktif",
+        "paused": "Durduruldu",
+        "suggested": "Öneri",
+        "error": "Hata",
+        "unsupported": "Desteklenmiyor"
+      },
+      "reasons": {
+        "account_changed": "Mağaza bağlantısı değişti",
+        "user": "Sen durdurdun",
+        "structure": "İlan varyasyon yapısı değişti",
+        "variant_missing": "Varyasyon bulunamadı",
+        "coming_soon": "Yakında",
+        "catalog_v3_or_unverified": "Wix stok yazımı henüz doğrulanmadı",
+        "untracked": "Pazaryerinde stok takibi kapalı",
+        "untracked_or_location": "Stok takibi veya konum bulunamadı",
+        "legacy_listing": "Eski tip eBay ilanı",
+        "no_offer": "eBay teklifi yok",
+        "no_inventory_item": "eBay stok kaydı yok",
+        "listing_removed": "İlan kaldırılmış",
+        "listing_inactive": "İlan pasif",
+        "listing_expired": "İlan süresi dolmuş",
+        "listing_sold_out": "İlan tükendi",
+        "listing_draft": "İlan taslakta",
+        "variation_disabled": "Varyasyon Etsy'de kapatıldı",
+        "unsupported": "Desteklenmiyor"
+      },
+      "remote": "Pazaryerinde",
+      "target": "Hedef",
+      "remoteUnknown": "bilinmiyor",
+      "unlink": "Bağlantıyı kaldır",
+      "unlinkConfirm": "Bu ilanın stok bağlantısı kaldırılsın mı?",
+      "accept": "Onayla",
+      "pause": "Durdur",
+      "resume": "Devam ettir",
+      "unitsPerSale": "Satış başına adet",
+      "buffer": "İlan payı",
+      "maxListed": "En fazla gösterilecek",
+      "deactivatedByStock": "Stok bittiği için pasife alındı",
+      "settings": "İlan ayarları"
+    },
+    "adjust": {
+      "title": "Stoğu düzelt",
+      "modeSet": "Yeni sayı",
+      "modeDelta": "Ekle / çıkar",
+      "setTo": "Gerçek stok",
+      "delta": "Değişim (örn. 5 veya -2)",
+      "note": "Not (isteğe bağlı)",
+      "save": "Kaydet",
+      "success": "Stok güncellendi: {onHand}"
+    },
+    "mapping": {
+      "title": "İlanı bir ürüne bağla",
+      "searchItems": "Ürün ara",
+      "newSku": "Yeni ürün SKU'su",
+      "existing": "Mevcut ürüne bağla",
+      "create": "Yeni ürün oluştur",
+      "link": "Bağla",
+      "success": "İlan bağlandı",
+      "candidate": "Bağlanacak ilan"
+    },
+    "timeline": {
+      "title": "Stok geçmişi",
+      "empty": "Henüz hareket yok.",
+      "adopt": "Bu artışı kabul et",
+      "adopted": "Artış stoğa eklendi",
+      "entries": {
+        "sale": "{channel} #{order} satıldı: −{units} → {after}",
+        "saleAdjust": "{channel} #{order} adedi değişti: {delta} → {after}",
+        "cancel": "{channel} #{order} iptal edildi: +{units} → {after}",
+        "manual": "Elle düzeltildi: {delta} → {after}",
+        "manualEditor": "Etsy düzenleyicisinden değiştirildi: {delta} → {after}",
+        "adopt": "{channel} artışı kabul edildi: +{delta} → {after}",
+        "seed": "Başlangıç stoğu: {after}",
+        "remoteDrop": "{channel} stoğu siparişsiz düştü: −{units} → {after}",
+        "remoteDropMatched": "{channel} #{order} satışı (önce stok düşüşü olarak görüldü): −{units}",
+        "driftFix": "Uyumsuzluk düzeltildi: {delta} → {after}",
+        "other": "Stok değişti: {delta} → {after}",
+        "pushApplied": "{channel} {from}→{to} gönderildi ✓",
+        "pushDraft": "{channel} taslak senkronuyla {to} yazıldı ✓",
+        "pushDeactivated": "{channel} ilanı stok bittiği için pasife alındı",
+        "pushReactivated": "{channel} ilanı yeniden aktif edildi ({to})",
+        "pushSkipped": "{channel} zaten doğru ({qty})",
+        "pushDryRun": "Deneme: {channel} {to} olacaktı",
+        "pushFailed": "{channel} güncellenemedi ({to}): {error}",
+        "pushPending": "{channel} {to} gönderiliyor…",
+        "remoteIncrease": "{channel} stoğu dışarıdan arttı: {from} → {to}"
+      }
+    },
+    "managed": {
+      "chip": "Stok senkronu yönetiyor ({qty})",
+      "tooltip": "Bu varyasyonun adedi stok senkronundan gelir. Burada değiştirirsen yeni sayı stok düzeltmesi olarak kaydedilir.",
+      "dryRunTooltip": "Stok senkronu deneme modunda: bu adet henüz otomatik değiştirilmiyor."
+    },
+    "errors": {
+      "generic": "Bir sorun oluştu. Tekrar dene.",
+      "account_not_owned": "Bu mağaza hesabına erişim yok.",
+      "token_missing": "Önce güncel önizlemeyi aç.",
+      "token_invalid": "Önizleme geçersiz. Yenile ve tekrar dene.",
+      "token_expired": "Önizlemenin süresi doldu (15 dk). Yenile ve tekrar dene.",
+      "typed_confirm_required": "Onay kelimesini doğru yaz.",
+      "plan_changed": "Önizlemeden sonra bir şey değişti (satış, bağlantı veya ayar). Önizlemeyi yenile ve tekrar onayla.",
+      "not_enabled": "Önce deneme modunu başlat.",
+      "already_live": "Stok senkronu zaten canlı.",
+      "needs_seed": "Önce bu ürünün stok sayısını gir.",
+      "snapshot_not_found": "Geri yüklenecek kayıt bulunamadı.",
+      "snapshot_expired": "Kaydın süresi dolmuş (7 gün).",
+      "already_restored": "Bu kayıt zaten geri yüklendi.",
+      "invalid_quantity": "Geçerli bir sayı gir.",
+      "invalid_value": "Geçerli bir değer gir."
+    }
+  }
+}

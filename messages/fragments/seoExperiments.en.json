@@ -1,0 +1,68 @@
+{
+  "seoExperiments": {
+    "title": "SEO experiments",
+    "intro": "When you change titles, tags or photos, KolayXport compares views and orders 14 days before and after, against your listings that did not change.",
+    "empty": "No experiments yet. Change a title, tags or photos on an active listing and the result appears here about 15 days later.",
+    "filters": {
+      "all": "All",
+      "collecting": "Measuring",
+      "ready": "Results"
+    },
+    "kind": {
+      "kolayxport": "Edit from KolayXport",
+      "external": "Edit on Etsy"
+    },
+    "listingsCount": "{count, plural, one {# listing} other {# listings}}",
+    "andMore": "+{count} more",
+    "changeKinds": {
+      "title": "Title",
+      "tags": "Tags",
+      "images": "Photos"
+    },
+    "status": {
+      "collecting": "Measuring",
+      "low_traffic": "Low traffic",
+      "ready": "Result ready",
+      "insufficient_data": "Not enough data",
+      "confounded": "Overlapping edits",
+      "cancelled": "Cancelled"
+    },
+    "statusHelp": {
+      "collecting": "Result on {date}.",
+      "low_traffic": "Fewer than 30 views in the 14 days before the change, so the result may not be reliable. Still measuring — result on {date}.",
+      "insufficient_data": "Too few views or orders to say anything reliable.",
+      "confounded": "Another change to the same listing happened during the measurement, so the effect can't be separated.",
+      "cancelled": "This experiment was cancelled."
+    },
+    "verdict": {
+      "improved": "Views went up",
+      "worse": "Views went down",
+      "inconclusive": "No clear effect"
+    },
+    "confidence": {
+      "label": "Confidence",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "control": {
+      "shop": "Compared with your other listings",
+      "category": "Compared with your listings in the same category",
+      "none": "No comparison listings — treat with caution"
+    },
+    "metrics": {
+      "viewsBefore": "Views before",
+      "viewsAfter": "Views after",
+      "ordersBefore": "Orders before",
+      "ordersAfter": "Orders after",
+      "lift": "Change vs. comparison",
+      "liftValue": "{value}%",
+      "rank": "Search rank",
+      "rankDelta": "{count, plural, one {# keyword} other {# keywords}} · average {delta, number} places",
+      "rankNone": "No tracked keywords"
+    },
+    "seasonal": "Holiday season: Nov 15 – Jan 5 traffic swings can distort this result.",
+    "changedAt": "Changed {date}",
+    "loadFailed": "Couldn't load SEO experiments."
+  }
+}

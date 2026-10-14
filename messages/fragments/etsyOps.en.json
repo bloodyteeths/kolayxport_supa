@@ -1,0 +1,60 @@
+{
+  "etsyOps": {
+    "common": {
+      "never": "never",
+      "none": "—",
+      "justNow": "just now",
+      "minutesAgo": "{count, plural, one {# min ago} other {# min ago}}",
+      "hoursAgo": "{count, plural, one {# hour ago} other {# hours ago}}",
+      "daysAgo": "{count, plural, one {# day ago} other {# days ago}}",
+      "refresh": "Refresh",
+      "loading": "Loading…",
+      "loadFailed": "Could not load"
+    },
+    "backbone": {
+      "title": "Etsy event backbone",
+      "worker": "Worker",
+      "loop": "In-process loop",
+      "running": "running",
+      "stopped": "not running",
+      "lastPass": "Last pass",
+      "inFlight": "Events in progress",
+      "lastReceived": "Last webhook received",
+      "oldestDue": "Oldest waiting event",
+      "failed24h": "Failed (24h)",
+      "queue": "Queue by status",
+      "budget": "Etsy API budget (today)",
+      "usedToday": "Daily quota used",
+      "remote": "Etsy says",
+      "remoteValue": "{remaining} of {limit} left",
+      "localCalls": "Calls counted here",
+      "perShopCap": "Per-shop background cap",
+      "throttled": "Throttled / deferred",
+      "jobs": "Scheduled jobs",
+      "lastSuccess": "Last success",
+      "runningSince": "Running since",
+      "lastFailure": "Last failure",
+      "backlogByShop": "Backlog by shop",
+      "recentFailed": "Recent failed events",
+      "replay": "Replay",
+      "replayShop": "Replay all failed for this shop",
+      "replayShown": "Replay all shown",
+      "replayed": "{count, plural, =0 {Nothing to replay} one {# event re-queued} other {# events re-queued}}",
+      "replayFailed": "Replay failed",
+      "shop": "Shop",
+      "attempts": "Attempts"
+    },
+    "status": {
+      "received": "waiting",
+      "processing": "processing",
+      "blocked_reauth": "needs reconnect",
+      "failed": "failed",
+      "coalesced": "merged",
+      "done": "done",
+      "ignored": "ignored"
+    },
+    "draftSync": {
+      "stockOverrideFailed": "Stock sync manages this listing and its quantities could not be applied. Your draft was kept — try syncing again."
+    }
+  }
+}

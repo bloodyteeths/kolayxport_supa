@@ -1,0 +1,60 @@
+{
+  "etsyOps": {
+    "common": {
+      "never": "hiç",
+      "none": "—",
+      "justNow": "az önce",
+      "minutesAgo": "{count, plural, one {# dk önce} other {# dk önce}}",
+      "hoursAgo": "{count, plural, one {# saat önce} other {# saat önce}}",
+      "daysAgo": "{count, plural, one {# gün önce} other {# gün önce}}",
+      "refresh": "Yenile",
+      "loading": "Yükleniyor…",
+      "loadFailed": "Yüklenemedi"
+    },
+    "backbone": {
+      "title": "Etsy olay altyapısı",
+      "worker": "İşleyici",
+      "loop": "Uygulama içi döngü",
+      "running": "çalışıyor",
+      "stopped": "çalışmıyor",
+      "lastPass": "Son tur",
+      "inFlight": "İşlenen olaylar",
+      "lastReceived": "Son gelen webhook",
+      "oldestDue": "En eski bekleyen olay",
+      "failed24h": "Başarısız (24 sa)",
+      "queue": "Duruma göre kuyruk",
+      "budget": "Etsy API bütçesi (bugün)",
+      "usedToday": "Kullanılan günlük kota",
+      "remote": "Etsy'ye göre",
+      "remoteValue": "{limit} kotadan {remaining} kaldı",
+      "localCalls": "Burada sayılan çağrılar",
+      "perShopCap": "Mağaza başı arka plan limiti",
+      "throttled": "Yavaşlatılan / ertelenen",
+      "jobs": "Zamanlanmış görevler",
+      "lastSuccess": "Son başarılı",
+      "runningSince": "Çalışma başlangıcı",
+      "lastFailure": "Son hata",
+      "backlogByShop": "Mağazaya göre birikme",
+      "recentFailed": "Son başarısız olaylar",
+      "replay": "Yeniden dene",
+      "replayShop": "Bu mağazanın tüm başarısızlarını yeniden dene",
+      "replayShown": "Gösterilenlerin hepsini yeniden dene",
+      "replayed": "{count, plural, =0 {Yeniden denenecek olay yok} one {# olay yeniden kuyruğa alındı} other {# olay yeniden kuyruğa alındı}}",
+      "replayFailed": "Yeniden deneme başarısız",
+      "shop": "Mağaza",
+      "attempts": "Deneme"
+    },
+    "status": {
+      "received": "bekliyor",
+      "processing": "işleniyor",
+      "blocked_reauth": "yeniden bağlanma gerekli",
+      "failed": "başarısız",
+      "coalesced": "birleştirildi",
+      "done": "tamamlandı",
+      "ignored": "yok sayıldı"
+    },
+    "draftSync": {
+      "stockOverrideFailed": "Bu ilan stok senkronu tarafından yönetiliyor ve miktarlar uygulanamadı. Taslağınız korundu — senkronu tekrar deneyin."
+    }
+  }
+}

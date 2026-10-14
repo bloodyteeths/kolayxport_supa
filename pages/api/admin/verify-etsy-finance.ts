@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { runCronGuard } from '@/lib/cron/idempotency';
-import { EtsyClient } from '@/lib/integrations/etsyClient';
+import { EtsyClient, EtsyPriority } from '@/lib/integrations/etsyClient';
 import { decryptIfNeeded } from '@/lib/crypto/credentials';
 
 // Read-only reconciliation of the Etsy dashboard against the real Etsy API.
@@ -30,7 +30,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     refreshToken: (decryptIfNeeded(shop.refreshToken) as string | null) || undefined,
     shopId: shop.shopId,
     tokenExpiresAt: shop.tokenExpiresAt || undefined,
-  }, async () => {});
+    userId: shop.userId,
+    priority: EtsyPriority.Reconcile,
+  });
 
   const receipts: any[] = [];
   for (let offset = 0; ; offset += 100) {

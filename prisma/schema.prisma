@@ -12,67 +12,71 @@ datasource db {
 }
 
 model User {
-  id                    String                  @id
-  name                  String?
-  email                 String?                 @unique
-  emailVerified         DateTime?
-  image                 String?
-  password              String?
-  googleAccountId       String?                 @unique
-  googleSheetId         String?                 @unique
-  driveFolderId         String?
-  userAppsScriptId      String?                 @unique
-  createdAt             DateTime                @default(now())
-  updatedAt             DateTime                @updatedAt
-  lastSyncedAt          DateTime?
-  onboardingStep        Int?                    @default(0)
-  shippingSettings      Json?
-  billingInterval       String?
-  labelCount            Int                     @default(0)
-  orderSyncCount        Int                     @default(0)
-  stripeCustomerId      String?                 @unique
-  subscriptionPlan      String?
-  subscriptionStatus    String?
-  billingProvider       String? // 'stripe' | 'shopify'
-  shopifySubscriptionId String?                 @unique
-  trialExpiresAt        DateTime?
-  usageResetAt          DateTime?
-  role                  String                  @default("user")
-  accounts              Account[]
-  marketplaceConfigs    MarketplaceConfig[]
-  orders                Order[]
-  products              Product[]
-  sessions              Session[]
-  shipperProfile        ShipperProfile?
-  syncLogs              SyncLog[]
-  syncOperations        SyncOperation[]
-  integrationSettings   Credential?
-  etsyAddresses         EtsyAddress[]
-  trackingSubmissions   TrackingSubmission[]    @relation("UserTrackingSubmissions")
-  senkronOrderData      SenkronOrderData[]      @relation("UserSenkronData")
-  etsyShops             EtsyShop[]              @relation("UserEtsyShops")
-  ebayTrackedProducts   EbayTrackedProduct[]
-  ebayTrackedSellers    EbayTrackedSeller[]
-  ebayNicheResearch     EbayNicheResearch[]
-  rankTrackedKeywords   RankTrackedKeyword[]
-  arbitrageScanJobs     ArbitrageScanJob[]
-  arbitrageResults      ArbitrageResultRecord[]
-  productCosts          ProductCost[]
-  financialTransactions FinancialTransaction[]
-  financialSyncCursors  FinancialSyncCursor[]
-  trendyolProducts      TrendyolProduct[]
-  wixSites              WixSite[]               @relation("UserWixSites")
-  wixProducts           WixProduct[]
-  shopifyShops          ShopifyShop[]           @relation("UserShopifyShops")
-  shopifyProducts       ShopifyProduct[]
-  amazonTrackedProducts AmazonTrackedProduct[]
-  amazonPriceSnapshots  AmazonPriceSnapshot[]
-  amazonNicheResearch   AmazonNicheResearch[]
-  etsyListingDrafts     EtsyListingDraft[]
-  ebayListingDrafts     EbayListingDraft[]
-  ebayListings          EbayListing[]
-  adminAuditLogs        AdminAuditLog[]         @relation("AdminAuditLogs")
-  notifications         Notification[]
+  id                      String                   @id
+  name                    String?
+  email                   String?                  @unique
+  emailVerified           DateTime?
+  image                   String?
+  password                String?
+  googleAccountId         String?                  @unique
+  googleSheetId           String?                  @unique
+  driveFolderId           String?
+  userAppsScriptId        String?                  @unique
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  lastSyncedAt            DateTime?
+  onboardingStep          Int?                     @default(0)
+  shippingSettings        Json?
+  billingInterval         String?
+  labelCount              Int                      @default(0)
+  orderSyncCount          Int                      @default(0)
+  stripeCustomerId        String?                  @unique
+  subscriptionPlan        String?
+  subscriptionStatus      String?
+  billingProvider         String? // 'stripe' | 'shopify'
+  shopifySubscriptionId   String?                  @unique
+  trialExpiresAt          DateTime?
+  usageResetAt            DateTime?
+  role                    String                   @default("user")
+  accounts                Account[]
+  marketplaceConfigs      MarketplaceConfig[]
+  orders                  Order[]
+  products                Product[]
+  sessions                Session[]
+  shipperProfile          ShipperProfile?
+  syncLogs                SyncLog[]
+  syncOperations          SyncOperation[]
+  integrationSettings     Credential?
+  etsyAddresses           EtsyAddress[]
+  trackingSubmissions     TrackingSubmission[]     @relation("UserTrackingSubmissions")
+  senkronOrderData        SenkronOrderData[]       @relation("UserSenkronData")
+  etsyShops               EtsyShop[]               @relation("UserEtsyShops")
+  ebayTrackedProducts     EbayTrackedProduct[]
+  ebayTrackedSellers      EbayTrackedSeller[]
+  ebayNicheResearch       EbayNicheResearch[]
+  rankTrackedKeywords     RankTrackedKeyword[]
+  arbitrageScanJobs       ArbitrageScanJob[]
+  arbitrageResults        ArbitrageResultRecord[]
+  productCosts            ProductCost[]
+  financialTransactions   FinancialTransaction[]
+  financialSyncCursors    FinancialSyncCursor[]
+  trendyolProducts        TrendyolProduct[]
+  wixSites                WixSite[]                @relation("UserWixSites")
+  wixProducts             WixProduct[]
+  shopifyShops            ShopifyShop[]            @relation("UserShopifyShops")
+  shopifyProducts         ShopifyProduct[]
+  amazonTrackedProducts   AmazonTrackedProduct[]
+  amazonPriceSnapshots    AmazonPriceSnapshot[]
+  amazonNicheResearch     AmazonNicheResearch[]
+  etsyListingDrafts       EtsyListingDraft[]
+  ebayListingDrafts       EbayListingDraft[]
+  ebayListings            EbayListing[]
+  adminAuditLogs          AdminAuditLog[]          @relation("AdminAuditLogs")
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
+  notificationSettings    NotificationSettings?
+  stockSettings           StockSettings?
+  stockItems              StockItem[]
 }
 
 model Account {
@@ -178,6 +182,20 @@ model Order {
   trackingSubmissions         TrackingSubmission[] @relation("OrderTrackingSubmissions")
   senkronData                 SenkronOrderData?    @relation("OrderSenkronData")
 
+  // ---- Order lifecycle (W4) ----
+  /// etsy-api | ebay-api | trendyol | shopify | wix | amazon | veeqo | shippo | ...
+  source             String?
+  cancelledAt        DateTime?
+  deliveredAt        DateTime?
+  shipByAt           DateTime?
+  shippedLate        Boolean?
+  returnWindowEndsAt DateTime?
+  orderHash          String?
+  itemsHash          String?
+  lastEventAt        DateTime?
+  lastRemoteCheckAt  DateTime?
+  effects            OrderEffect[]
+
   @@unique([userId, marketplace, marketplaceKey])
   @@index([userId])
   @@index([marketplace, marketplaceKey])
@@ -186,41 +204,71 @@ model Order {
   @@index([userId, externalStatus])
   @@index([userId, marketplace])
   @@index([userId, uiOrderDate])
+  @@index([userId, status, shipByAt])
+  @@index([userId, shippedAt])
+  @@index([userId, source])
+  @@index([userId, updatedAt, id])
+}
+
+/// Transactional outbox of order side effects, unique per (orderId, effect).
+model OrderEffect {
+  id            String    @id @default(cuid())
+  orderId       String
+  /// e.g. notify_new | stock_apply:<itemsHash>:<statusClass> | close_tracking_cancelled |
+  /// cancel_label_alert | close_tracking_shipped | shipped_external | delivered_metrics
+  effect        String
+  status        String    @default("pending") // pending | done | failed
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime  @default(now())
+  lastError     String?
+  payload       Json?
+  createdAt     DateTime  @default(now())
+  doneAt        DateTime?
+  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, effect])
+  @@index([status, nextAttemptAt])
 }
 
 model OrderItem {
-  id             String     @id @default(cuid())
-  orderId        String
-  sku            String?
-  productName    String?
-  variantInfo    String?
-  quantity       Int        @default(1)
-  unitPrice      Decimal?   @db.Decimal(10, 2)
-  totalPrice     Decimal?   @db.Decimal(10, 2)
-  notes          String?
-  image          String     @default("")
-  marketplaceKey String?
-  shipBy         DateTime?
-  orderNumber    String?
-  uniqueLineKey  String?
-  productId      String?
-  remoteLineId   String?
-  countryOfMfg   String?
-  harmonizedCode String?
-  weightKg       Float?     @default(0.5)
+  id              String     @id @default(cuid())
+  orderId         String
+  sku             String?
+  productName     String?
+  variantInfo     String?
+  quantity        Int        @default(1)
+  unitPrice       Decimal?   @db.Decimal(10, 2)
+  totalPrice      Decimal?   @db.Decimal(10, 2)
+  notes           String?
+  image           String     @default("")
+  marketplaceKey  String?
+  shipBy          DateTime?
+  orderNumber     String?
+  uniqueLineKey   String?
+  productId       String?
+  remoteLineId    String?
+  countryOfMfg    String?
+  harmonizedCode  String?
+  weightKg        Float?     @default(0.5)
   // Marks when the user manually edited this item's weight. When set, the
   // order sync writer must not overwrite weightKg from marketplace rawData.
-  weightEditedAt DateTime?
-  recipientEmail String?    @map("recipient_email")
-  labelJobs      LabelJob[]
-  order          Order      @relation("OrderToOrderItem", fields: [orderId], references: [id], onDelete: Cascade)
-  product        Product?   @relation(fields: [productId], references: [id])
-  shipments      Shipment[]
+  weightEditedAt  DateTime?
+  recipientEmail  String?    @map("recipient_email")
+  /// Etsy listing_id / eBay item id / channel listing id
+  listingRef      String?
+  /// Etsy variantKey / Shopify variant id / Wix variantId
+  variantRef      String?
+  variantValueKey String?
+  labelJobs       LabelJob[]
+  order           Order      @relation("OrderToOrderItem", fields: [orderId], references: [id], onDelete: Cascade)
+  product         Product?   @relation(fields: [productId], references: [id])
+  shipments       Shipment[]
 
   @@unique([remoteLineId, orderId], name: "remoteLineId_orderId")
   @@index([orderId])
   @@index([sku])
   @@index([orderId, sku])
+  @@index([listingRef])
 }
 
 model Product {
@@ -417,6 +465,10 @@ model Shipment {
   isEdi           Boolean?   @default(true)
   packageType     String?
   signatureOption String?
+  /// status vocabulary adds 'void_requested' | 'voided'
+  voidedAt        DateTime?
+  voidError       String?
+  voidMethod      String? // carrier_api | manual
   order           Order      @relation("OrderToShipment", fields: [orderId], references: [id], onDelete: Cascade)
   orderItem       OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
 
@@ -520,6 +572,9 @@ model TrackingSubmission {
   etsySubmittedAt  DateTime?
   etsySubmitStatus String?   @default("pending") // pending | submitted | failed
   etsySubmitError  String?
+  // etsySubmitStatus vocabulary adds 'submitted_external' | 'cancelled'
+  closedReason     String?
+  closedAt         DateTime?
 
   order Order @relation("OrderTrackingSubmissions", fields: [orderId], references: [id], onDelete: Cascade)
   user  User  @relation("UserTrackingSubmissions", fields: [submittedBy], references: [id], onDelete: Cascade)
@@ -546,9 +601,23 @@ model EtsyShop {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  user     User               @relation("UserEtsyShops", fields: [userId], references: [id], onDelete: Cascade)
-  listings EtsyListing[]      @relation("EtsyShopListings")
-  drafts   EtsyListingDraft[] @relation("EtsyShopDrafts")
+  // ---- Event backbone (W1) ----
+  lastWebhookAt          DateTime?
+  orderPollCursor        Int?
+  lastOrderPollAt        DateTime?
+  orderPollFailures      Int       @default(0)
+  lastOrderReconcileAt   DateTime?
+  lastListingReconcileAt DateTime?
+  needsReauth            Boolean   @default(false)
+  needsReauthAt          DateTime?
+  tokenRefreshLeaseUntil DateTime?
+
+  user              User                   @relation("UserEtsyShops", fields: [userId], references: [id], onDelete: Cascade)
+  listings          EtsyListing[]          @relation("EtsyShopListings")
+  drafts            EtsyListingDraft[]     @relation("EtsyShopDrafts")
+  listingVersions   EtsyListingVersion[]
+  listingDailyStats EtsyListingDailyStat[]
+  seoExperiments    SeoExperiment[]
 
   @@unique([userId, shopId]) // One record per user-shop combination
   @@index([userId])
@@ -623,12 +692,127 @@ model EtsyListing {
   // Cache control
   syncedAt DateTime @default(now())
 
-  etsyShop EtsyShop @relation("EtsyShopListings", fields: [etsyShopId], references: [shopId], onDelete: Cascade)
+  // ---- Listing intel (W3) ----
+  hasVariations      Boolean   @default(false)
+  quantityOnProperty Int[]     @default([])
+  inventorySyncedAt  DateTime?
+  contentHash        String?
+  lastWebhookAt      DateTime?
+  lastRefreshAt      DateTime?
+  stateChangedAt     DateTime?
+
+  etsyShop  EtsyShop              @relation("EtsyShopListings", fields: [etsyShopId], references: [shopId], onDelete: Cascade)
+  offerings EtsyListingOffering[]
 
   @@unique([etsyShopId, etsyListingId])
   @@index([etsyShopId])
   @@index([etsyShopId, state])
   @@index([etsyShopId, etsyCreatedTimestamp])
+}
+
+/// Cached Etsy inventory offerings keyed by variantKey (never product_id:
+/// Etsy regenerates product ids on every inventory PUT).
+model EtsyListingOffering {
+  id              String      @id @default(cuid())
+  etsyShopId      String
+  etsyListingId   BigInt
+  /// '' = no variations, '*' = shared quantity
+  variantKey      String
+  variantValueKey String
+  /// informational only (Etsy regenerates it on each PUT)
+  productId       BigInt?
+  offeringId      BigInt?
+  sku             String?
+  skuNormalized   String?
+  quantity        Int         @default(0)
+  isEnabled       Boolean     @default(true)
+  priceAmount     Int?
+  priceDivisor    Int?
+  propertyValues  Json        @default("[]")
+  remoteUpdatedTs Int         @default(0)
+  syncedAt        DateTime    @default(now())
+  listing         EtsyListing @relation(fields: [etsyShopId, etsyListingId], references: [etsyShopId, etsyListingId], onDelete: Cascade)
+
+  @@unique([etsyShopId, etsyListingId, variantKey])
+  @@index([etsyShopId, skuNormalized])
+}
+
+/// Listing version history with attribution.
+model EtsyListingVersion {
+  id              String   @id @default(cuid())
+  userId          String
+  etsyShopId      String
+  etsyListingId   BigInt
+  remoteUpdatedTs Int      @default(0)
+  capturedAt      DateTime @default(now())
+  source          String
+  attribution     String // kolayxport_draft | kolayxport_stock | external | unknown
+  draftId         String?
+  syncAttemptId   String?
+  stockPushId     String?
+  webhookEventId  String?
+  batchKey        String?
+  contentHash     String
+  changedKeys     String[] @default([])
+  diff            Json     @default("{}")
+  snapshot        Json?
+  state           String?
+  isTombstone     Boolean  @default(false)
+  shop            EtsyShop @relation(fields: [etsyShopId], references: [shopId], onDelete: Cascade)
+
+  @@index([etsyShopId, etsyListingId, capturedAt])
+  @@index([userId, capturedAt])
+  @@index([batchKey])
+}
+
+/// Daily per-listing stats (views/favorites deltas, sales).
+model EtsyListingDailyStat {
+  id             String   @id @default(cuid())
+  etsyShopId     String
+  etsyListingId  BigInt
+  date           DateTime @db.Date
+  viewsTotal     Int?
+  favoritesTotal Int?
+  views          Int?
+  favorites      Int?
+  unitsSold      Int      @default(0)
+  orders         Int      @default(0)
+  revenueMinor   Int      @default(0)
+  currency       String?
+  state          String?
+  taxonomyId     Int?
+  shop           EtsyShop @relation(fields: [etsyShopId], references: [shopId], onDelete: Cascade)
+
+  @@unique([etsyShopId, etsyListingId, date])
+  @@index([etsyShopId, date])
+}
+
+/// SEO change cohorts evaluated against a control after windowDays.
+model SeoExperiment {
+  id          String    @id @default(cuid())
+  userId      String
+  etsyShopId  String
+  cohortKey   String    @unique
+  listingIds  BigInt[]
+  versionIds  String[]
+  changeKinds String[]
+  changedAt   DateTime
+  windowDays  Int       @default(14)
+  /// collecting | low_traffic | ready | insufficient_data | confounded | cancelled
+  status      String    @default("collecting")
+  /// shop | category | none
+  controlType String?
+  seasonal    Boolean   @default(false)
+  evaluatedAt DateTime?
+  metrics     Json?
+  verdict     String?
+  confidence  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  shop        EtsyShop  @relation(fields: [etsyShopId], references: [shopId], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([etsyShopId, changedAt])
 }
 
 model EtsyListingDraft {
@@ -692,10 +876,15 @@ model EtsyDraftSyncAttempt {
   result      Json?
   error       String?
 
+  /// Listing updated_timestamp observed right after the sync (attribution).
+  remoteUpdatedTimestamp Int?
+  etsyListingId          BigInt?
+
   draft EtsyListingDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
 
   @@index([draftId])
   @@index([status])
+  @@index([etsyListingId, startedAt])
 }
 
 model EbayListingDraft {
@@ -792,12 +981,70 @@ model WebhookEvent {
   /// Coalescing key, e.g. "listing:123" or "receipt:456".
   resourceKey   String?
 
+  // ---- Event backbone (W1) ----
+  // Etsy status vocabulary adds 'coalesced' | 'blocked_reauth'. Terminal stays
+  // 'failed'; errors keep using errorMessage.
+  /// Union of event types absorbed by this (winning) row.
+  eventTypes          String[]  @default([])
+  /// 0 = critical ... higher = less urgent.
+  priority            Int       @default(5)
+  processingStartedAt DateTime?
+  heartbeatAt         DateTime?
+  /// min(createdAt) of the rows this winner absorbed.
+  firstReceivedAt     DateTime?
+  note                String?
+  /// Defers (rate limit/budget/lock) that did not consume an attempt.
+  deferrals           Int       @default(0)
+
   @@index([provider, eventType])
   @@index([status])
   @@index([createdAt])
   @@index([userId])
   @@index([provider, status, nextAttemptAt])
   @@index([provider, shopId, resourceKey])
+  @@index([provider, status, priority, nextAttemptAt])
+  @@index([provider, shopId, status])
+}
+
+/// Local per-day Etsy API call counters (fallback when no quota header was seen).
+model EtsyApiUsage {
+  id        String   @id @default(cuid())
+  day       DateTime @db.Date
+  shopId    String
+  priority  Int
+  calls     Int      @default(0)
+  throttled Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([day, shopId, priority])
+  @@index([day])
+}
+
+/// Latest Etsy-reported daily quota (x-limit-per-day / x-remaining-today).
+model EtsyApiQuota {
+  day            DateTime @id @db.Date
+  limitPerDay    Int?
+  remainingToday Int?
+  observedAt     DateTime @default(now())
+}
+
+/// Scheduler run ledger: one row per (job, time bucket).
+model JobRun {
+  id          String    @id @default(cuid())
+  jobName     String
+  bucket      String
+  status      String    @default("running") // running | succeeded | failed
+  attempt     Int       @default(1)
+  owner       String? // hostname:pid
+  startedAt   DateTime  @default(now())
+  heartbeatAt DateTime  @default(now())
+  finishedAt  DateTime?
+  result      Json?
+  error       String?
+
+  @@unique([jobName, bucket])
+  @@index([jobName, status, finishedAt])
+  @@index([startedAt])
 }
 
 /// Audit trail for every admin write action.
@@ -1268,20 +1515,20 @@ model FinancialTransaction {
 }
 
 model FinancialSyncCursor {
-  id           String   @id @default(cuid())
-  userId       String
-  marketplace  String
-  lastSyncedTo DateTime
-  totalSynced  Int      @default(0)
+  id              String   @id @default(cuid())
+  userId          String
+  marketplace     String
+  lastSyncedTo    DateTime
+  totalSynced     Int      @default(0)
   // Current marketplace account balance (Etsy: latest ledger balance) — money
   // earned but not yet disbursed to bank. Powers the "banked" panel.
-  currentBalance   Decimal? @db.Decimal(12, 2)
-  balanceCurrency  String?
+  currentBalance  Decimal? @db.Decimal(12, 2)
+  balanceCurrency String?
   // Funds the marketplace is holding (eBay exposes this via seller_funds_summary;
   // Etsy does not). Money earned but not available for payout yet.
-  heldFunds        Decimal? @db.Decimal(12, 2)
-  updatedAt    DateTime @updatedAt
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  heldFunds       Decimal? @db.Decimal(12, 2)
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, marketplace])
 }
@@ -1652,6 +1899,242 @@ model Notification {
   updatedAt  DateTime  @updatedAt
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // ---- Notification center v2 (W5) ----
+  entityType String?
+  entityId   String?
+  /// false = activity feed only (no unread badge)
+  badge      Boolean                @default(true)
+  raiseCount Int                    @default(0)
+  deliveries NotificationDelivery[]
+
   @@unique([userId, dedupeKey])
   @@index([userId, readAt, createdAt])
+  @@index([userId, badge, readAt, resolvedAt])
+  @@index([type, createdAt])
+}
+
+/// Outbox for out-of-app deliveries (email, telegram) of a notification raise.
+model NotificationDelivery {
+  id             String       @id @default(cuid())
+  notificationId String
+  channel        String // email | telegram
+  raiseSeq       Int          @default(0)
+  status         String       @default("pending") // pending | held | digest | sent | failed | skipped
+  attempts       Int          @default(0)
+  nextAttemptAt  DateTime     @default(now())
+  error          String?
+  sentAt         DateTime?
+  createdAt      DateTime     @default(now())
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, channel, raiseSeq])
+  @@index([status, nextAttemptAt])
+}
+
+/// Per-type channel preferences. type = NotificationType or '*'.
+model NotificationPreference {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  inApp     Boolean  @default(true)
+  email     Boolean  @default(false)
+  telegram  Boolean  @default(false)
+  emailMode String   @default("instant") // instant | digest
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+}
+
+/// Per-user notification settings (one row per user).
+model NotificationSettings {
+  userId           String    @id
+  locale           String?
+  timezone         String    @default("Europe/Istanbul")
+  preset           String    @default("recommended") // critical | recommended | all | custom
+  emailEnabled     Boolean   @default(true)
+  quietHoursStart  Int?      @default(23)
+  quietHoursEnd    Int?      @default(8)
+  digestHour       Int       @default(8)
+  lastDigestAt     DateTime?
+  telegramChatId   String?
+  telegramLinkedAt DateTime?
+  updatedAt        DateTime  @updatedAt
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================================
+// Stock sync (W2). Ships disabled: nothing writes stock to any marketplace
+// until the seller completes the wizard and presses Go Live.
+// ============================================================================
+
+model StockSettings {
+  userId               String    @id
+  enabled              Boolean   @default(false)
+  dryRun               Boolean   @default(true)
+  enabledAt            DateTime?
+  goLiveAt             DateTime?
+  restockOnCancel      Boolean   @default(true)
+  /// lower-only automatic drift fixes
+  autoFixDrift         Boolean   @default(false)
+  etsyZeroStockAction  String    @default("disable_variation")
+  seedPolicy           String    @default("min")
+  seedSubtractReserved Boolean   @default(true)
+  channels             String[]  @default([])
+  shopifyLocationId    String?
+  orderScanCursorAt    DateTime?
+  orderScanCursorId    String?
+  updatedAt            DateTime  @updatedAt
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model StockItem {
+  id           String        @id @default(cuid())
+  userId       String
+  /// normalizeSku() output
+  sku          String
+  displaySku   String
+  title        String?
+  imageUrl     String?
+  onHand       Int           @default(0)
+  safetyBuffer Int           @default(0)
+  tracking     String        @default("tracked") // tracked | untracked
+  status       String        @default("active") // active | paused | needs_review
+  seededAt     DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  links        StockLink[]
+  ledger       StockLedger[]
+  pushes       StockPush[]
+
+  @@unique([userId, sku])
+  @@index([userId, status])
+}
+
+model StockLink {
+  id                    String    @id @default(cuid())
+  userId                String
+  stockItemId           String
+  channel               String
+  accountRef            String
+  /// etsy listingId | ebay sku/offer | trendyol barcode | shopify productId | wix productId | amazon sellerSku
+  externalId            String
+  /// etsy variantKey | shopify inventory_item_id | wix variantId
+  variantRef            String    @default("")
+  variantValueKey       String?
+  locationRef           String?
+  remoteSku             String?
+  title                 String?
+  matchType             String    @default("auto_exact") // auto_exact | suggested_loose | manual
+  status                String    @default("suggested") // suggested | active | paused | error | unsupported
+  statusReason          String?
+  unitsPerSale          Int       @default(1)
+  buffer                Int       @default(0)
+  maxListedQty          Int?
+  lastSeenRemoteQty     Int?
+  lastSeenRemoteTs      Int?
+  lastSeenAt            DateTime?
+  unattributedDrop      Int       @default(0)
+  unattributedDropSince DateTime?
+  deactivatedByStock    Boolean   @default(false)
+  deactivatedAt         DateTime?
+  lastPushedQty         Int?
+  lastPushedAt          DateTime?
+  confirmedAt           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  stockItem             StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channel, accountRef, externalId, variantRef])
+  @@index([stockItemId])
+  @@index([userId, channel, status])
+  @@index([channel, accountRef, externalId])
+}
+
+model StockLedger {
+  id             String    @id @default(cuid())
+  userId         String
+  stockItemId    String
+  /// seed | sale | sale_adjust | cancel | manual_adjust | remote_adjust | drift_fix
+  kind           String
+  delta          Int
+  qtyAfter       Int
+  channel        String?
+  linkId         String?
+  orderId        String?
+  orderKey       String?
+  idempotencyKey String    @unique
+  sourceEventId  String?
+  actor          String    @default("system")
+  note           String?
+  createdAt      DateTime  @default(now())
+  stockItem      StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([stockItemId, createdAt])
+  @@index([orderKey, stockItemId])
+}
+
+model StockPush {
+  id             String    @id @default(cuid())
+  userId         String
+  stockItemId    String
+  linkId         String
+  /// = linkId while pending, else null
+  pendingKey     String?   @unique
+  /// sale | cancel | adjust | remote_adjust | reconcile | manual | seed | restore
+  reason         String
+  targetQty      Int
+  freshRemoteQty Int?
+  sentQty        Int?
+  /// pending | in_flight | unknown | awaiting_batch | applied | skipped | failed | dry_run | superseded
+  status         String    @default("pending")
+  attempts       Int       @default(0)
+  nextAttemptAt  DateTime  @default(now())
+  claimedAt      DateTime?
+  appliedAt      DateTime?
+  remoteQtyAfter Int?
+  externalRef    String?
+  lastError      String?
+  ledgerId       String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  stockItem      StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+  @@index([linkId, status])
+  @@index([userId, createdAt])
+}
+
+model StockObservation {
+  id              String   @id @default(cuid())
+  userId          String
+  linkId          String
+  stockItemId     String?
+  remoteQty       Int
+  prevSeenQty     Int?
+  delta           Int?
+  /// echo | baseline | expected | unattributed_drop | increase_alert | stale_ignored | deferred
+  kind            String
+  source          String
+  eventId         String?
+  remoteUpdatedTs Int?
+  createdAt       DateTime @default(now())
+
+  @@index([linkId, createdAt])
+  @@index([userId, createdAt])
+}
+
+model StockSnapshot {
+  id         String    @id @default(cuid())
+  userId     String
+  reason     String    @default("go_live")
+  takenAt    DateTime  @default(now())
+  expiresAt  DateTime
+  /// [{linkId, remoteQty}]
+  data       Json
+  restoredAt DateTime?
+
+  @@index([userId, takenAt])
 }

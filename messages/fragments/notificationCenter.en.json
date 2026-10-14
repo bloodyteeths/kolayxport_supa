@@ -1,0 +1,146 @@
+{
+  "notificationCenter": {
+    "types": {
+      "orderNew": "New order {orderNumber}",
+      "orderCanceled": "Order {orderNumber} was cancelled",
+      "orderCanceledAfterLabel": "Order {orderNumber} was cancelled after its label was created. Void the label",
+      "orderShippedExternal": "Order {orderNumber} was marked as shipped outside KolayXport",
+      "dispatchOverdue": "{count, plural, one {# order is} other {# orders are}} past the ship-by date",
+      "dispatchDueToday": "{count, plural, one {# order} other {# orders}} must ship today",
+      "dispatchDueTomorrow": "{count, plural, one {# order} other {# orders}} must ship tomorrow",
+      "listingDeactivated": "Etsy listing \"{title}\" was deactivated",
+      "listingExpired": "Etsy listing \"{title}\" expired",
+      "listingDeleted": "Etsy listing \"{title}\" was deleted",
+      "listingChangedExternally": "\"{title}\" was changed outside KolayXport",
+      "stockOutOfStock": "{sku} is out of stock",
+      "stockPushFailed": "Stock update for {sku} on {channel} failed",
+      "stockDrift": "{count, plural, one {# stock mismatch} other {# stock mismatches}} found today",
+      "stockUnmatchedSale": "{count, plural, one {# sale} other {# sales}} could not be matched to a stock item",
+      "seoExperimentReady": "SEO test results are ready for \"{title}\"",
+      "webhookBacklog": "The Etsy event queue is backing up"
+    },
+    "typeLabels": {
+      "orderNew": "New orders",
+      "orderCanceled": "Cancelled orders",
+      "orderCanceledAfterLabel": "Cancelled after label",
+      "orderShippedExternal": "Shipped outside KolayXport",
+      "orderSyncFailed": "Order sync failed",
+      "dispatchOverdue": "Late shipments",
+      "dispatchDueToday": "Ship today",
+      "dispatchDueTomorrow": "Ship tomorrow",
+      "listingDeactivated": "Listing deactivated",
+      "listingDeleted": "Listing deleted",
+      "listingExpired": "Listing expired",
+      "listingChangedExternally": "Listing changed outside KolayXport",
+      "draftSyncFailed": "Sync to Etsy failed",
+      "draftConflict": "Listing edit conflict",
+      "seoExperimentReady": "SEO test results",
+      "stockOutOfStock": "Out of stock",
+      "stockPushFailed": "Stock update failed",
+      "stockDrift": "Stock mismatch",
+      "stockUnmatchedSale": "Unmatched sale",
+      "reauthRequired": "Connection expired",
+      "usageNearLimit": "Usage near limit",
+      "usageLimitReached": "Usage limit reached",
+      "webhookBacklog": "Webhook backlog (admin)"
+    },
+    "groups": {
+      "all": "All",
+      "orders": "Orders",
+      "dispatch": "Shipping deadlines",
+      "listings": "Listings",
+      "stock": "Stock",
+      "account": "Account",
+      "system": "System"
+    },
+    "severity": {
+      "info": "Info",
+      "warning": "Warning",
+      "error": "Critical"
+    },
+    "page": {
+      "title": "Notifications",
+      "subtitle": "Orders, shipping deadlines, listings and stock alerts in one place",
+      "tabs": {
+        "unread": "Unread",
+        "all": "All",
+        "activity": "Activity",
+        "preferences": "Preferences"
+      },
+      "markAllRead": "Mark all read",
+      "markRead": "Mark as read",
+      "open": "Open",
+      "today": "Today",
+      "earlier": "Earlier",
+      "loadMore": "Load more",
+      "loading": "Loading…",
+      "resolved": "Resolved",
+      "unread": "Unread",
+      "receivedAt": "Received {date}",
+      "filterLabel": "Filter by category",
+      "empty": {
+        "unread": "You're all caught up",
+        "unreadHint": "Alerts that need your attention will appear here as they happen.",
+        "all": "No notifications yet",
+        "activity": "No activity yet",
+        "activityHint": "Events that don't need your attention (for example new orders, or orders shipped outside KolayXport) are listed here."
+      },
+      "loadError": "Couldn't load notifications"
+    },
+    "panel": {
+      "seeAll": "See all",
+      "empty": "No notifications",
+      "settings": "Notification settings"
+    },
+    "prefs": {
+      "title": "Notification preferences",
+      "subtitle": "Choose what reaches you in the app and by email",
+      "levelTitle": "Notification level",
+      "presets": {
+        "critical": "Critical only",
+        "recommended": "Recommended",
+        "all": "Everything"
+      },
+      "presetHints": {
+        "critical": "Only problems that need action now: cancelled after label, deleted or deactivated listings, failed stock updates, expired connections.",
+        "recommended": "New orders in the activity feed; instant email for labels cancelled after printing, shipping deadlines, listing problems and expired connections; a daily summary for stock-outs and expiring listings.",
+        "all": "Every notification in the app and by email."
+      },
+      "custom": "Custom",
+      "customHint": "You changed some notification types. Picking a level resets them.",
+      "emailTitle": "Email",
+      "emailEnabled": "Send email notifications",
+      "emailHint": "Sent to your account email address.",
+      "quietTitle": "Quiet hours",
+      "quietEnabled": "Hold non-critical emails during quiet hours",
+      "quietHint": "Critical alerts are always sent immediately.",
+      "quietFrom": "From",
+      "quietTo": "To",
+      "digestTitle": "Daily summary",
+      "digestHour": "Send the daily summary at",
+      "digestHint": "Items set to \"Daily summary\" are collected into one email.",
+      "timezone": "Time zone",
+      "advanced": "Advanced: per notification type",
+      "columns": {
+        "inApp": "In app",
+        "email": "Email",
+        "digest": "Daily summary"
+      },
+      "activityOnly": "Activity feed only",
+      "telegram": "Telegram",
+      "comingSoon": "Coming soon",
+      "telegramHint": "Get instant alerts in Telegram.",
+      "saved": "Preferences saved",
+      "saveFailed": "Couldn't save preferences",
+      "loadFailed": "Couldn't load preferences",
+      "hour": "{hour}:00"
+    },
+    "email": {
+      "open": "Open in KolayXport",
+      "footer": "Manage notification emails",
+      "digestSubject": "{count, plural, one {# notification} other {# notifications}} today",
+      "digestIntro": "Your daily KolayXport summary ({count, plural, one {# item} other {# items}}):",
+      "digestMore": "…and {count} more in KolayXport."
+    }
+  }
+}

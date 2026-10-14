@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "KolayXport — Etsy, eBay & Amazon Research Tool",
-  "version": "9.5.0",
+  "version": "9.6.0",
   "description": "Research overlays for Etsy, eBay & Amazon (tracked sales, SEO, competition) plus Etsy order sync and tracking entry for KolayXport.",
   "author": "Kolayxport",
   "icons": {
@@ -13,7 +13,8 @@
   "permissions": [
     "storage",
     "cookies",
-    "contextMenus"
+    "contextMenus",
+    "alarms"
   ],
   "host_permissions": [
     "https://kolayxport.com/*",

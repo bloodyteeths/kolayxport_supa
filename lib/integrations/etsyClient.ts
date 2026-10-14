@@ -1,5 +1,9 @@
-// Using built-in fetch in Node.js 18+
 import { logger } from '../logger';
+import { etsyFetch, etsyAuthHeaders } from '../etsy/http';
+import { EtsyPriority } from '../etsy/rateBudget';
+import { getEtsyAccessToken, isInvalidTokenResponseBody, type GetEtsyAccessTokenOptions } from '../etsy/etsyToken';
+
+export { EtsyPriority };
 
 export interface EtsyTrackingData {
   shopId: string;
@@ -21,6 +25,10 @@ export interface EtsyCredentials {
   refreshToken?: string;
   shopId: string;
   tokenExpiresAt?: Date;
+  /** Owner of the shop: scopes the token lookup to that user's EtsyShop/Credential row. */
+  userId?: string;
+  /** Etsy rate-budget priority for every call this client makes. Default Reconcile. */
+  priority?: EtsyPriority;
 }
 
 export interface EtsyTokenRefreshResponse {
@@ -31,164 +39,65 @@ export interface EtsyTokenRefreshResponse {
 }
 
 /**
- * Etsy API client for tracking submissions using OAuth v3 API
- * Requires transactions_r and transactions_w scopes
+ * Etsy API client (receipts, tracking, finance) using OAuth v3.
+ *
+ * Tokens: every request asks lib/etsy/etsyToken.getEtsyAccessToken for the
+ * current token (DB-leased refresh, the only Etsy token POST in the app) and
+ * retries once with a forced refresh on a 401 invalid_token. The constructor's
+ * accessToken is only used for shops with neither an EtsyShop nor a
+ * Credential row (scripts). onTokenRefresh is kept for signature
+ * compatibility and is never called: tokens are persisted by etsyToken.
+ *
+ * HTTP: every request goes through lib/etsy/http.etsyFetch (rate budget,
+ * quota headers) at creds.priority (default Reconcile).
  */
 export class EtsyClient {
   private accessToken: string;
-  private refreshToken?: string;
   private shopId: string;
-  private tokenExpiresAt?: Date;
+  private userId?: string;
+  private priority: EtsyPriority;
   private baseUrl = 'https://openapi.etsy.com/v3';
-  private onTokenRefresh?: (newCredentials: EtsyCredentials) => Promise<void>;
-  private refreshPromise: Promise<void> | null = null;
 
   constructor(credentials: EtsyCredentials, onTokenRefresh?: (newCredentials: EtsyCredentials) => Promise<void>) {
+    void onTokenRefresh;
     this.accessToken = credentials.accessToken;
-    this.refreshToken = credentials.refreshToken;
     this.shopId = credentials.shopId;
-    this.tokenExpiresAt = credentials.tokenExpiresAt;
-    this.onTokenRefresh = onTokenRefresh;
+    this.userId = credentials.userId;
+    this.priority = credentials.priority ?? EtsyPriority.Reconcile;
   }
 
-  /**
-   * Check if the access token needs refreshing (expires within 5 minutes)
-   */
-  private needsTokenRefresh(): boolean {
-    if (!this.tokenExpiresAt) return false;
-    const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
-    return this.tokenExpiresAt <= fiveMinutesFromNow;
-  }
-
-  /**
-   * Refresh the access token using the refresh token.
-   * Uses a lock to prevent concurrent refresh attempts (race condition fix).
-   */
-  private async refreshAccessToken(): Promise<void> {
-    // If a refresh is already in progress, wait for it instead of starting another
-    if (this.refreshPromise) {
-      return this.refreshPromise;
-    }
-
-    this.refreshPromise = this.doRefreshAccessToken().finally(() => {
-      this.refreshPromise = null;
-    });
-
-    return this.refreshPromise;
-  }
-
-  /**
-   * Performs the actual token refresh against the Etsy OAuth endpoint.
-   */
-  private async doRefreshAccessToken(): Promise<void> {
-    if (!this.refreshToken) {
-      throw new Error('No refresh token available for token refresh');
-    }
-
-    const url = 'https://api.etsy.com/v3/public/oauth/token';
-
-    if (!process.env.ETSY_API_KEY) {
-      throw new Error('ETSY_API_KEY environment variable is not set');
-    }
-
-    const payload = {
-      grant_type: 'refresh_token',
-      client_id: process.env.ETSY_API_KEY,
-      refresh_token: this.refreshToken
-    };
-
-    logger.info('Refreshing Etsy access token', {
-      shopId: this.shopId
-    });
-
+  private async currentToken(opts?: GetEtsyAccessTokenOptions): Promise<string> {
     try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: new URLSearchParams(payload).toString()
-      });
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        logger.error('Etsy token refresh failed', undefined, {
-          status: response.status,
-          statusText: response.statusText,
-          body: errorBody
-        });
-        throw new Error(`Token refresh failed: ${response.status} - ${errorBody}`);
-      }
-
-      const tokenData = await response.json() as EtsyTokenRefreshResponse;
-
-      // Update internal state
-      this.accessToken = tokenData.access_token;
-      this.refreshToken = tokenData.refresh_token;
-      this.tokenExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
-
-      logger.info('Etsy access token refreshed successfully', {
-        shopId: this.shopId,
-        expiresAt: this.tokenExpiresAt
-      });
-
-      // Notify the callback to update credentials in database
-      if (this.onTokenRefresh) {
-        await this.onTokenRefresh({
-          accessToken: this.accessToken,
-          refreshToken: this.refreshToken,
-          shopId: this.shopId,
-          tokenExpiresAt: this.tokenExpiresAt
-        });
-      }
-
-    } catch (error) {
-      logger.error('Failed to refresh Etsy access token',
-        error instanceof Error ? error : new Error(String(error)), {
-          shopId: this.shopId
-        });
-      throw error;
+      this.accessToken = await getEtsyAccessToken(this.shopId, this.userId, opts);
+    } catch (err: any) {
+      // No stored shop/credential (e.g. scripts with a pasted token): use the constructor token.
+      if (err?.code !== 'SHOP_NOT_FOUND') throw err;
     }
+    return this.accessToken;
+  }
+
+  private send(url: string, options: any, token: string): Promise<Response> {
+    return etsyFetch(url, {
+      ...options,
+      headers: { ...(options?.headers || {}), ...etsyAuthHeaders(token) },
+    }, { priority: this.priority, shopId: this.shopId });
   }
 
   /**
-   * Make an authenticated request with automatic token refresh
+   * Make an authenticated request; on a 401 invalid_token/expired, force one
+   * token refresh and retry once.
    */
   private async makeAuthenticatedRequest(url: string, options: any): Promise<Response> {
-    // Check if token needs refresh before making the request
-    if (this.needsTokenRefresh()) {
-      await this.refreshAccessToken();
-    }
+    const token = await this.currentToken();
+    const response = await this.send(url, options, token);
+    if (response.status !== 401) return response;
 
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        ...options.headers,
-        'Authorization': `Bearer ${this.accessToken}`,
-        'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_API_SECRET || '').trim()}`
-      }
-    });
-
-    // If we get a 401, try refreshing the token once
-    if (response.status === 401 && this.refreshToken) {
-      logger.info('Received 401, attempting token refresh', {
-        shopId: this.shopId
-      });
-      
-      await this.refreshAccessToken();
-      
-      // Retry the request with the new token
-      return await fetch(url, {
-        ...options,
-        headers: {
-          ...options.headers,
-          'Authorization': `Bearer ${this.accessToken}`,
-          'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_API_SECRET || '').trim()}`
-        }
-      });
-    }
-
-    return response;
+    const body = await response.clone().text().catch(() => '');
+    if (!isInvalidTokenResponseBody(body)) return response;
+    logger.info('Received 401 invalid_token from Etsy, forcing a token refresh', { shopId: this.shopId });
+    const fresh = await this.currentToken({ forceRefresh: true, rejectedToken: token });
+    if (fresh === token) return response;
+    return this.send(url, options, fresh);
   }
 
   /**

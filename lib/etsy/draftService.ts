@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { AsyncLocalStorage } from 'async_hooks';
 import path from 'path';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
@@ -21,8 +22,6 @@ import {
 
 const ETSY_API_BASE = 'https://openapi.etsy.com/v3/application';
 const UPLOAD_ROOT = ETSY_DRAFT_UPLOAD_ROOT;
-const ETSY_FETCH_TIMEOUT_MS = 30_000;
-const ETSY_FETCH_MAX_RETRIES = 3;
 const MAX_IMAGE_SOURCE_BYTES = 25 * 1024 * 1024;
 const MAX_VIDEO_SOURCE_BYTES = 130 * 1024 * 1024;
 
@@ -31,51 +30,15 @@ const SYNCABLE_STATUSES = ['draft', 'failed', 'conflict'];
 
 type JsonMap = Record<string, any>;
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-/**
- * fetch() for Etsy: 30s timeout per attempt, and retries on 429 / 5xx
- * honouring Retry-After (capped). Only idempotent-safe on Etsy's side because
- * 429/5xx responses mean the write was not applied; network timeouts are NOT
- * retried for non-GET requests (the write may have landed).
- */
-export async function etsyFetch(url: string, init: RequestInit = {}, timeoutMs: number = ETSY_FETCH_TIMEOUT_MS): Promise<Response> {
-  const method = String(init.method || 'GET').toUpperCase();
-  let lastErr: any = null;
-  for (let attempt = 0; attempt <= ETSY_FETCH_MAX_RETRIES; attempt++) {
-    let response: Response;
-    try {
-      response = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
-    } catch (err: any) {
-      lastErr = err;
-      const isTimeout = err?.name === 'TimeoutError' || err?.name === 'AbortError';
-      if (method === 'GET' && attempt < ETSY_FETCH_MAX_RETRIES) {
-        await sleep(500 * 2 ** attempt);
-        continue;
-      }
-      throw new Error(isTimeout ? `Etsy API timeout after ${Math.round(timeoutMs / 1000)}s (${method})` : `Etsy API network error: ${err?.message || err}`);
-    }
-    if ((response.status === 429 || response.status >= 500) && attempt < ETSY_FETCH_MAX_RETRIES) {
-      const retryAfter = Number(response.headers.get('retry-after'));
-      const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
-        ? Math.min(retryAfter * 1000, 30_000)
-        : Math.min(1000 * 2 ** attempt, 8_000);
-      await response.text().catch(() => undefined);
-      logger.warn('Etsy API transient error, retrying', { status: response.status, method, attempt: attempt + 1, waitMs });
-      await sleep(waitMs);
-      continue;
-    }
-    return response;
-  }
-  throw lastErr || new Error('Etsy API request failed');
-}
-
-function etsyAuthHeaders(accessToken: string) {
-  return {
-    Authorization: `Bearer ${accessToken}`,
-    'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_API_SECRET || '').trim()}`,
-  };
-}
+// Etsy HTTP lives in ./http (rate budget + quota headers). Re-exported here so
+// existing `import { etsyFetch, callEtsyAPI } from '@/lib/etsy/draftService'`
+// call sites keep working.
+import { etsyFetch, callEtsyAPI, etsyAuthHeaders } from './http';
+export { etsyFetch, callEtsyAPI, etsyAuthHeaders };
+import { EtsyPriority, getEtsyBudgetContext, withEtsyBudget } from './rateBudget';
+import { withListingInventoryLock } from './inventoryLock';
+import { mergeFreshInventoryQuantities, reportedVariantKey, stripEditorFields } from './inventoryMerge';
+import { applyStockToEtsyDraftInventory, isListingStockManaged, settleEtsyDraftStockEcho } from '@/lib/stock/hooks';
 
 export function toSerializable<T>(value: T): T {
   return JSON.parse(JSON.stringify(value, (_key, val) => (typeof val === 'bigint' ? val.toString() : val)));
@@ -139,23 +102,6 @@ function notifyDraftProblem(userId: string, draft: any, type: 'draftSyncFailed' 
   });
 }
 
-export async function callEtsyAPI(endpoint: string, accessToken: string, options: RequestInit = {}) {
-  const response = await etsyFetch(`${ETSY_API_BASE}${endpoint}`, {
-    ...options,
-    headers: {
-      ...etsyAuthHeaders(accessToken),
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Etsy API error: ${response.status} - ${errorText}`);
-  }
-  if (response.status === 204 || response.headers.get('content-length') === '0') return { success: true };
-  return response.json();
-}
-
 async function getListingSnapshot(shopId: string, listingId: bigint | number | string, userId: string, accessToken?: string) {
   if (BigInt(listingId) < BigInt(0)) {
     return {
@@ -172,7 +118,9 @@ async function getListingSnapshot(shopId: string, listingId: bigint | number | s
   // cache only if Etsy is unreachable.
   try {
     const token = accessToken || await getEtsyAccessToken(shopId, userId);
-    const remote = await callEtsyAPI(`/listings/${listingId}`, token);
+    // includes=Inventory: the base inventory lets the sync tell which variant
+    // quantities the user changed (see inventoryMerge.ts).
+    const remote = await getListingWithInventory(listingId, token);
     return {
       baseEtsyUpdatedTimestamp: remote.updated_timestamp || 0,
       baseSnapshot: remote,
@@ -374,7 +322,7 @@ function sanitizeInventoryForEtsy(inventory: JsonMap, fallbackReadinessStateId?:
     return propertyIdMap.get(numeric) || numeric || propertyId;
   };
   const cleanProducts = products.map((product: JsonMap) => {
-    const { product_id, is_deleted, ...rest } = product;
+    const { product_id, is_deleted, kx_loaded_quantity, ...rest } = product;
     const clean: JsonMap = { ...rest };
     if (Array.isArray(clean.offerings)) {
       clean.offerings = clean.offerings.map((offering: JsonMap) => {
@@ -1242,7 +1190,81 @@ function resolveTemporaryIds(fields: JsonMap, idMap: Record<string, number>) {
   return resolved;
 }
 
-export async function refreshListingCache(shopId: string, listingId: bigint, accessToken: string) {
+// Re-entrancy guard: refreshListingCache delegates to listingCache.refreshListingFull,
+// and the W0 stub of refreshListingFull delegates back here. A call that
+// re-enters while a delegation is in flight runs the legacy upsert directly.
+const refreshDelegation = new AsyncLocalStorage<boolean>();
+
+export type RefreshListingCacheOptions = {
+  userId?: string;
+  draftId?: string;
+  syncAttemptId?: string;
+  source?: 'draft_sync' | 'manual_refresh' | 'webhook';
+};
+
+/**
+ * Refreshes one listing in the EtsyListing cache and returns the raw Etsy
+ * listing (signature unchanged). Delegates to listingCache.refreshListingFull
+ * (W3: timestamp-guarded upsert, offerings, versions). A deleted listing
+ * throws 'Etsy API error: 404 ...' like before. With a syncAttemptId, the
+ * post-sync updated_timestamp is stored on the EtsyDraftSyncAttempt for
+ * attribution.
+ */
+export async function refreshListingCache(shopId: string, listingId: bigint, accessToken: string, opts: RefreshListingCacheOptions = {}) {
+  if (refreshDelegation.getStore()) return legacyRefreshListingCache(shopId, listingId, accessToken);
+
+  let userId = opts.userId;
+  if (!userId) {
+    const shop = await prisma.etsyShop.findUnique({ where: { shopId }, select: { userId: true } }).catch(() => null);
+    userId = shop?.userId;
+  }
+  if (!userId) return legacyRefreshListingCache(shopId, listingId, accessToken);
+
+  const { refreshListingFull } = await import('@/lib/etsy/listingCache');
+  const result = await refreshDelegation.run(true, () => refreshListingFull({
+    userId: userId as string,
+    shopId,
+    listingId,
+    accessToken,
+    source: opts.source ?? (opts.draftId || opts.syncAttemptId ? 'draft_sync' : 'manual_refresh'),
+    ...(opts.draftId ? { draftId: opts.draftId } : {}),
+    ...(opts.syncAttemptId ? { syncAttemptId: opts.syncAttemptId } : {}),
+  }));
+  if (result.deleted) throw new Error(`Etsy API error: 404 - listing ${listingId} not found`);
+
+  const listing = result.listing;
+  const remoteTs = Number(result.remoteUpdatedTs ?? listing?.updated_timestamp ?? 0);
+  if (opts.syncAttemptId) {
+    await prisma.etsyDraftSyncAttempt.update({
+      where: { id: opts.syncAttemptId },
+      data: {
+        etsyListingId: listingId,
+        ...(Number.isFinite(remoteTs) && remoteTs > 0 ? { remoteUpdatedTimestamp: Math.trunc(remoteTs) } : {}),
+      },
+    }).catch((err: any) => logger.warn('Could not record post-sync timestamp on sync attempt', { error: err?.message }));
+  }
+  return listing;
+}
+
+/** Fetches a listing with its inventory (falls back to the plain listing if includes is rejected). */
+async function getListingWithInventory(listingId: bigint | number | string, accessToken: string) {
+  try {
+    return await callEtsyAPI(`/listings/${listingId}?includes=Inventory`, accessToken);
+  } catch (err: any) {
+    if (!/Etsy API error: 400/.test(String(err?.message || ''))) throw err;
+    logger.warn('Etsy getListing rejected includes=Inventory; using plain listing', { listingId: String(listingId) });
+    return callEtsyAPI(`/listings/${listingId}`, accessToken);
+  }
+}
+
+/** Inventory products of a draft's base snapshot (present when the snapshot was taken with includes=Inventory). */
+function baseInventoryProducts(baseSnapshot: any): any[] | null {
+  const products = baseSnapshot?.inventory?.products;
+  return Array.isArray(products) ? products : null;
+}
+
+/** Today's listing + images upsert (used directly only as the re-entrancy fallback). */
+export async function legacyRefreshListingCache(shopId: string, listingId: bigint, accessToken: string) {
   const listing = await callEtsyAPI(`/listings/${listingId}`, accessToken);
   let firstImage: any = null;
   let imageCount = 0;
@@ -1691,7 +1713,12 @@ function firstOfferingReadiness(inventory: any): number | null {
   return null;
 }
 
+/** Runs a draft sync at Interactive priority in the Etsy rate budget. */
 export async function syncDraft(draftId: string, userId: string, options: SyncDraftOptions = {}): Promise<SyncDraftResult> {
+  return withEtsyBudget({ userId, priority: EtsyPriority.Interactive }, () => syncDraftInner(draftId, userId, options));
+}
+
+async function syncDraftInner(draftId: string, userId: string, options: SyncDraftOptions = {}): Promise<SyncDraftResult> {
   const force = Boolean(options.force);
 
   // ---- Atomic claim -------------------------------------------------------
@@ -1734,6 +1761,8 @@ export async function syncDraft(draftId: string, userId: string, options: SyncDr
     include: { media: { orderBy: { createdAt: 'asc' } } },
   });
   if (!draft) throw new EtsyDraftError('DRAFT_NOT_FOUND', 'Draft not found', { status: 404, key: 'draftSync.draftNotFound' });
+  const budgetCtx = getEtsyBudgetContext();
+  if (budgetCtx && !budgetCtx.shopId) budgetCtx.shopId = draft.etsyShopId;
 
   let queuedActions: any[] = ((draft.queuedActions as any[]) || []);
   const requestPlan = {
@@ -1753,6 +1782,8 @@ export async function syncDraft(draftId: string, userId: string, options: SyncDr
   const syncedMediaIds: string[] = [];
   const results: any[] = [];
   const warnings: SyncWarning[] = [];
+  let stockOverrides: Array<{ variantKey: string; from: number; to: number }> = [];
+  let freshQuantities: Array<{ variantKey: string; from: number; to: number }> = [];
   let syncedListingId = BigInt(draft.etsyListingId);
   let accessToken = '';
   let deletedListing = false;
@@ -1783,7 +1814,7 @@ export async function syncDraft(draftId: string, userId: string, options: SyncDr
     let remoteListing: any = null;
     if (!isNewLocalListing) {
       try {
-        remoteListing = await callEtsyAPI(`/listings/${syncedListingId}`, accessToken);
+        remoteListing = await getListingWithInventory(syncedListingId, accessToken);
       } catch (err: any) {
         if (!(hasDeleteAction && isMissingListingError(err))) throw err;
       }
@@ -1960,9 +1991,12 @@ export async function syncDraft(draftId: string, userId: string, options: SyncDr
         logger.warn('Could not fetch current inventory before inventory sync', { listingId: String(syncedListingId), error: err.message });
       }
     }
-    let routedInventory: JsonMap | null = null;
-    if (needsRoutedInventoryWrite && currentInventory) {
-      const products = (Array.isArray(currentInventory.products) ? currentInventory.products : []).filter((p: any) => !p?.is_deleted);
+    // Single-offering listing: price/quantity/readiness edited as plain fields
+    // are applied onto the live inventory. Built here from the early read for
+    // validation (fail before any write), and rebuilt from the fresh read
+    // inside the inventory lock right before the PUT.
+    const buildRoutedInventory = (source: any): JsonMap => {
+      const products = (Array.isArray(source?.products) ? source.products : []).filter((p: any) => !p?.is_deleted);
       const isMultiVariation = products.length > 1 || products.some((p: any) => Array.isArray(p?.property_values) && p.property_values.length > 0);
       if (isMultiVariation && routesPriceOrQty) {
         throw new EtsyDraftError(
@@ -1971,8 +2005,8 @@ export async function syncDraft(draftId: string, userId: string, options: SyncDr
           { status: 400, key: 'draftSync.inventoryPatchRequired' },
         );
       }
-      routedInventory = {
-        ...currentInventory,
+      return {
+        ...source,
         products: products.map((p: any) => ({
           ...p,
           offerings: (Array.isArray(p.offerings) ? p.offerings : []).filter((o: any) => !o?.is_deleted).map((o: any) => ({
@@ -1983,6 +2017,10 @@ export async function syncDraft(draftId: string, userId: string, options: SyncDr
           })),
         })),
       };
+    };
+    let routedInventory: JsonMap | null = null;
+    if (needsRoutedInventoryWrite && currentInventory) {
+      routedInventory = buildRoutedInventory(currentInventory);
     }
     if (hasInventoryPatch && routesPriceOrQty) {
       logger.info('Draft sync: field price/quantity ignored in favour of inventory patch', { draftId: draft.id });
@@ -2135,26 +2173,113 @@ export async function syncDraft(draftId: string, userId: string, options: SyncDr
     // requires it per offering for physical listings). Fallback order:
     // explicit (field/processing time) → current offerings → listing →
     // the shop's first processing profile.
+    //
+    // The whole read-modify-write runs inside the per-listing inventory lock
+    // (shared with stock pushes): fresh GET -> quantities the user did not
+    // change take the fresh remote value -> stock-sync hook -> PUT. So a sale
+    // that landed after the draft was staged is never overwritten by the
+    // staged (older, higher) quantity.
     const inventoryToWrite = hasInventoryPatch ? inventory : routedInventory;
     if (inventoryToWrite?.products) {
-      let fallbackReadinessStateId: number | null = explicitReadinessId
-        ?? firstOfferingReadiness(currentInventory)
-        ?? (remoteListing?.readiness_state_id ? Number(remoteListing.readiness_state_id) : null)
-        ?? createdReadinessId;
-      if (!fallbackReadinessStateId && isPhysical) {
-        const first = (await getReadinessDefs())[0];
-        fallbackReadinessStateId = first?.readiness_state_id ? Number(first.readiness_state_id) : null;
-      }
-      const payload = sanitizeInventoryForEtsy(inventoryToWrite, fallbackReadinessStateId);
-      if (explicitReadinessId) {
-        for (const product of payload.products || []) {
-          for (const offering of product.offerings || []) offering.readiness_state_id = explicitReadinessId;
+      await withListingInventoryLock(String(syncedListingId), async () => {
+        let freshInventory: any = null;
+        if (!isNewLocalListing) {
+          try {
+            freshInventory = await callEtsyAPI(`/listings/${syncedListingId}/inventory`, accessToken);
+          } catch (err: any) {
+            if (needsRoutedInventoryWrite) throw err;
+            // Without the fresh read the merge cannot protect quantities that
+            // sold since staging: writing the staged list would restore the
+            // older, higher quantities (oversell). Fail the attempt and keep
+            // the draft for a retry — unless this is a legacy draft whose
+            // patch carries neither a base inventory nor loaded quantities
+            // (nothing could be merged anyway: previous behaviour).
+            const patchProducts = Array.isArray(inventoryToWrite.products) ? inventoryToWrite.products : [];
+            const canMerge = Boolean(baseInventoryProducts(draft.baseSnapshot))
+              || patchProducts.some((p: any) => p && p.kx_loaded_quantity !== undefined && p.kx_loaded_quantity !== null);
+            if (hasInventoryPatch && canMerge) throw err;
+            logger.warn('Could not re-read inventory inside the inventory lock', { listingId: String(syncedListingId), error: err.message });
+          }
         }
-      }
-      results.push(await callEtsyAPI(`/listings/${syncedListingId}/inventory?max_variations_supported=3`, accessToken, {
-        method: 'PUT',
-        body: JSON.stringify(payload),
-      }));
+
+        let working: JsonMap = inventoryToWrite;
+        let userChangedVariantKeys = new Set<string>();
+        if (!hasInventoryPatch && needsRoutedInventoryWrite && freshInventory) {
+          working = buildRoutedInventory(freshInventory);
+          if (routed.quantity !== undefined) {
+            for (const p of working.products || []) userChangedVariantKeys.add(reportedVariantKey(p));
+          }
+        } else if (hasInventoryPatch) {
+          const merged = mergeFreshInventoryQuantities({
+            draftProducts: Array.isArray(inventoryToWrite.products) ? inventoryToWrite.products : [],
+            baseProducts: baseInventoryProducts(draft.baseSnapshot),
+            freshProducts: freshInventory?.products,
+          });
+          working = { ...inventoryToWrite, products: merged.products.map((p: any) => stripEditorFields(p)) };
+          userChangedVariantKeys = merged.userChangedVariantKeys;
+          freshQuantities = merged.refreshed;
+          if (merged.refreshed.length) {
+            logger.info('Draft sync: kept fresh Etsy quantities for variants the user did not change', {
+              draftId: draft.id, listingId: String(syncedListingId), refreshed: merged.refreshed.length,
+            });
+          }
+        }
+
+        // W2 echo markers created by the stock overlay; settled after the PUT
+        // (an unsettled marker is verified by the push worker after ~5 min).
+        let stockEchoIds: string[] = [];
+        if (!isNewLocalListing) {
+          try {
+            const stock = await applyStockToEtsyDraftInventory({
+              userId: draft.userId,
+              shopId: draft.etsyShopId,
+              listingId: String(syncedListingId),
+              actorUserId: userId,
+              products: Array.isArray(working.products) ? working.products : [],
+              userChangedVariantKeys,
+            });
+            working = { ...working, products: stock.products };
+            stockOverrides = stock.overridden;
+            stockEchoIds = Array.isArray(stock.echoPushIds) ? stock.echoPushIds : [];
+          } catch (stockErr: any) {
+            const managed = await isListingStockManaged(draft.userId, draft.etsyShopId, String(syncedListingId)).catch(() => true);
+            if (managed) {
+              throw new EtsyDraftError(
+                'STOCK_OVERRIDE_FAILED',
+                'Stock sync manages this listing and its quantities could not be applied. The draft was kept; try again.',
+                { status: 409, key: 'draftSync.stockOverrideFailed' },
+              );
+            }
+            logger.warn('Stock hook failed for an unmanaged listing; continuing', { draftId: draft.id, error: stockErr?.message });
+          }
+        }
+
+        try {
+          let fallbackReadinessStateId: number | null = explicitReadinessId
+            ?? firstOfferingReadiness(freshInventory)
+            ?? firstOfferingReadiness(currentInventory)
+            ?? (remoteListing?.readiness_state_id ? Number(remoteListing.readiness_state_id) : null)
+            ?? createdReadinessId;
+          if (!fallbackReadinessStateId && isPhysical) {
+            const first = (await getReadinessDefs())[0];
+            fallbackReadinessStateId = first?.readiness_state_id ? Number(first.readiness_state_id) : null;
+          }
+          const payload = sanitizeInventoryForEtsy(working, fallbackReadinessStateId);
+          if (explicitReadinessId) {
+            for (const product of payload.products || []) {
+              for (const offering of product.offerings || []) offering.readiness_state_id = explicitReadinessId;
+            }
+          }
+          results.push(await callEtsyAPI(`/listings/${syncedListingId}/inventory?max_variations_supported=3`, accessToken, {
+            method: 'PUT',
+            body: JSON.stringify(payload),
+          }));
+          await settleEtsyDraftStockEcho(stockEchoIds, true);
+        } catch (putErr) {
+          await settleEtsyDraftStockEcho(stockEchoIds, false);
+          throw putErr;
+        }
+      });
     }
 
     // ---- Media -----------------------------------------------------------
@@ -2230,7 +2355,12 @@ export async function syncDraft(draftId: string, userId: string, options: SyncDr
     }
 
     // ---- Success ---------------------------------------------------------
-    const finalListing = await refreshListingCache(draft.etsyShopId, syncedListingId, accessToken)
+    const finalListing = await refreshListingCache(draft.etsyShopId, syncedListingId, accessToken, {
+      userId: draft.userId,
+      draftId: draft.id,
+      syncAttemptId: attempt.id,
+      source: 'draft_sync',
+    })
       .catch((err) => { logger.warn('Draft sync cache refresh failed', { error: err.message }); return null; });
     const warningSummary = warnings.length ? warnings.map((w) => w.message).join(' | ').slice(0, 2000) : null;
     await prisma.etsyListingDraft.update({
@@ -2251,7 +2381,14 @@ export async function syncDraft(draftId: string, userId: string, options: SyncDr
       data: {
         status: 'success',
         finishedAt: new Date(),
-        result: toSerializable({ count: results.length, etsyListingId: String(syncedListingId), partial: warnings.length > 0, warnings }) as any,
+        result: toSerializable({
+          count: results.length,
+          etsyListingId: String(syncedListingId),
+          partial: warnings.length > 0,
+          warnings,
+          ...(stockOverrides.length ? { stockOverrides } : {}),
+          ...(freshQuantities.length ? { freshQuantities } : {}),
+        }) as any,
       },
     });
 
@@ -2278,7 +2415,7 @@ export async function syncDraft(draftId: string, userId: string, options: SyncDr
     let rebase: JsonMap = {};
     if ((results.length > 0 || syncedMediaIds.length > 0) && syncedListingId > BigInt(0) && !deletedListing && accessToken) {
       try {
-        const live = await callEtsyAPI(`/listings/${syncedListingId}`, accessToken);
+        const live = await getListingWithInventory(syncedListingId, accessToken);
         if (live?.updated_timestamp) rebase = { baseEtsyUpdatedTimestamp: live.updated_timestamp, baseSnapshot: live };
       } catch { /* keep old base */ }
     }

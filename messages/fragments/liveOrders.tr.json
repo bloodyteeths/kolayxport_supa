@@ -1,0 +1,30 @@
+{
+  "liveOrders": {
+    "toast": {
+      "newOrder": "Yeni sipariş",
+      "newOrderFrom": "Yeni {marketplace} siparişi",
+      "newOrders": "{count, plural, one {# yeni sipariş} other {# yeni sipariş}}",
+      "items": "{count, plural, one {# ürün} other {# ürün}}",
+      "cancelled": "{orderNumber} numaralı sipariş iptal edildi",
+      "cancelledHint": "Kargolamadan önce kontrol edin",
+      "open": "Aç",
+      "close": "Kapat"
+    },
+    "sound": {
+      "on": "Sipariş sesi açık",
+      "muted": "Sipariş sesi kapalı",
+      "needsClick": "Sipariş sesi için bir kez tıklamanız gerekiyor",
+      "clickToMute": "Kapatmak için tıklayın",
+      "clickToEnable": "Açmak ve deneme sesini duymak için tıklayın"
+    },
+    "status": {
+      "live": "Canlı: yeni siparişler anında görünür",
+      "connecting": "Canlı güncellemelere bağlanılıyor…",
+      "offline": "Canlı güncellemeler durdu, yeniden bağlanılıyor",
+      "polling": "Canlı bağlantı koptu, her dakika kontrol ediliyor"
+    },
+    "badge": {
+      "new": "Yeni"
+    }
+  }
+}

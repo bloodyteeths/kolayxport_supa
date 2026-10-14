@@ -2,17 +2,16 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { runCronGuard } from '@/lib/cron/idempotency';
+import { etsyFetch, etsyPublicHeaders } from '@/lib/etsy/http';
+import { EtsyPriority } from '@/lib/etsy/rateBudget';
 
 const ETSY_API_BASE = 'https://openapi.etsy.com/v3/application';
 const MAX_KEYWORDS_PER_RUN = 200; // Self-hosted: no timeout limit, process more per run
 const RATE_LIMIT_MS = 120;
 
 async function callEtsyPublicAPI(endpoint: string) {
-  const apiKey = (process.env.ETSY_API_KEY || '').trim().replace(/^"|"$/g, '');
-  const apiSecret = (process.env.ETSY_API_SECRET || '').trim().replace(/^"|"$/g, '');
-  const response = await fetch(`${ETSY_API_BASE}${endpoint}`, {
-    headers: { 'x-api-key': `${apiKey}:${apiSecret}` },
-  });
+  // Through etsyFetch for the shared rate budget (Reconcile priority); no retries (unchanged behaviour).
+  const response = await etsyFetch(`${ETSY_API_BASE}${endpoint}`, { headers: etsyPublicHeaders() }, { priority: EtsyPriority.Reconcile, retries: 0 });
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`Etsy Public API error: ${response.status} - ${errorText}`);

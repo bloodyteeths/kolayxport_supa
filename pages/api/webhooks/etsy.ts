@@ -5,18 +5,22 @@ import { logIntegrationEvent, logSecurityEvent } from '@/lib/admin/events';
 import { verifyEtsyWebhook } from '@/lib/etsy/webhooks/verify';
 import {
   ETSY_WEBHOOK_PROVIDER,
+  etsyEventPriority,
   isSupportedEtsyEvent,
-  kickEtsyWebhookProcessing,
   resourceKeyFor,
-} from '@/lib/etsy/webhooks/processor';
+} from '@/lib/etsy/webhooks/events';
+import { kickEtsyWorker } from '@/lib/etsy/webhooks/worker';
 
 /**
  * Etsy webhook receiver (Standard Webhooks / Svix signing).
  *
  * Verifies the signature, stores the event (dedupe on webhook-id), answers
- * 200 immediately and leaves all Etsy API work to the queue processor
- * (lib/etsy/webhooks/processor.ts), kicked in-process and swept by
- * /api/cron/process-etsy-webhooks.
+ * 200 immediately and leaves all Etsy API work to the queue worker
+ * (lib/etsy/webhooks/worker.ts). Every stored event triggers one in-process
+ * kick, whatever the env flags say; the 5 s worker loop, the 'etsy-webhook-sweep'
+ * scheduler job and /api/cron/process-etsy-webhooks are the safety nets.
+ *
+ * Queue priority: order.* = 0, inventory.out_of_stock = 1, everything else = 2.
  */
 
 export const config = {
@@ -26,7 +30,21 @@ export const config = {
 };
 
 const MAX_BODY_BYTES = 64 * 1024;
+const LAST_WEBHOOK_WRITE_MS = 60_000;
 let missingSecretLogged = false;
+const lastWebhookWrite = new Map<string, number>();
+
+/** EtsyShop.lastWebhookAt, written at most once per 60 s per shop. Never throws. */
+function touchLastWebhookAt(shopId: string, now: Date) {
+  const prev = lastWebhookWrite.get(shopId) || 0;
+  if (now.getTime() - prev < LAST_WEBHOOK_WRITE_MS) return;
+  lastWebhookWrite.set(shopId, now.getTime());
+  if (lastWebhookWrite.size > 5_000) lastWebhookWrite.clear();
+  prisma.etsyShop.updateMany({
+    where: { shopId, OR: [{ lastWebhookAt: null }, { lastWebhookAt: { lt: new Date(now.getTime() - LAST_WEBHOOK_WRITE_MS) } }] },
+    data: { lastWebhookAt: now },
+  }).catch(() => undefined);
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -88,6 +106,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         errorMessage: supported ? null : 'ignored:unsupported event or missing shop_id',
         shopId,
         resourceKey: resourceKeyFor(eventType, payload),
+        eventTypes: [eventType],
+        priority: etsyEventPriority(eventType),
+        firstReceivedAt: now,
         payload: { ...payload, __webhookTimestamp: verified.timestamp },
         nextAttemptAt: supported ? now : null,
         processedAt: supported ? null : now,
@@ -109,5 +130,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   res.status(200).json({ ok: true });
-  if (supported) setImmediate(() => kickEtsyWebhookProcessing());
+  if (shopId) touchLastWebhookAt(shopId, now);
+  // Orders: short debounce so the seller sees them within seconds. Listing
+  // bursts (listing.updated + inventory.updated) get 3 s to coalesce.
+  if (supported) setImmediate(() => kickEtsyWorker(etsyEventPriority(eventType) === 0 ? 500 : 3_000));
 }

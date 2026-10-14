@@ -1,0 +1,139 @@
+{
+  "listingHistory": {
+    "navLabel": "Etsy activity",
+    "editorTab": "History",
+    "pageTitle": "Etsy activity",
+    "pageSubtitle": "Every change to your Etsy listings, who made it, and whether SEO edits paid off.",
+    "tabs": {
+      "changes": "Changes",
+      "seo": "SEO experiments"
+    },
+    "shopLabel": "Shop",
+    "allShops": "All shops",
+    "connectDescription": "Connect your Etsy shop to see listing changes and SEO results.",
+    "filters": {
+      "all": "All",
+      "external": "Changed on Etsy",
+      "kolayxport_draft": "Synced from KolayXport",
+      "kolayxport_stock": "Stock sync",
+      "unknown": "Found in a check"
+    },
+    "attribution": {
+      "external": "Changed on Etsy",
+      "kolayxport_draft": "Synced from KolayXport",
+      "kolayxport_stock": "Stock sync",
+      "unknown": "Found in a check"
+    },
+    "freshness": {
+      "live": "Etsy live · last change {time}",
+      "liveNoChange": "Etsy live · no changes yet",
+      "delayed": "Delayed · checked once a day · last check {time}",
+      "delayedNever": "Delayed · not checked yet",
+      "needsReauth": "Reconnect Etsy to keep listings up to date",
+      "tooltipLive": "Etsy tells KolayXport about every change within seconds.",
+      "tooltipDelayed": "Etsy has not sent change notifications recently, so listings are re-checked every night. Use Sync listings to refresh now."
+    },
+    "keys": {
+      "created": "Listing created",
+      "deleted": "Listing deleted",
+      "title": "Title",
+      "description": "Description",
+      "tags": "Tags",
+      "materials": "Materials",
+      "price": "Price",
+      "currency": "Currency",
+      "state": "Status",
+      "taxonomyId": "Category",
+      "shopSectionId": "Shop section",
+      "whoMade": "Who made it",
+      "whenMade": "When made",
+      "isSupply": "Supply",
+      "processingMin": "Processing (min)",
+      "processingMax": "Processing (max)",
+      "shippingProfileId": "Shipping profile",
+      "returnPolicyId": "Return policy",
+      "itemWeight": "Weight",
+      "itemWeightUnit": "Weight unit",
+      "itemLength": "Length",
+      "itemWidth": "Width",
+      "itemHeight": "Height",
+      "itemDimensionsUnit": "Dimension unit",
+      "isPersonalizable": "Personalization",
+      "personalizationIsRequired": "Personalization required",
+      "personalizationInstructions": "Personalization instructions",
+      "personalizationCharCountMax": "Personalization max characters",
+      "hasVariations": "Variations",
+      "images": "Photos",
+      "offerings": "Variations",
+      "videos": "Video"
+    },
+    "states": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "draft": "Draft",
+      "expired": "Expired",
+      "sold_out": "Sold out",
+      "removed": "Deleted",
+      "edit": "Editing"
+    },
+    "diff": {
+      "from": "Before",
+      "to": "After",
+      "empty": "(empty)",
+      "yes": "Yes",
+      "no": "No",
+      "tagsAdded": "Added",
+      "tagsRemoved": "Removed",
+      "imagesAdded": "{count, plural, one {# photo added} other {# photos added}}",
+      "imagesRemoved": "{count, plural, one {# photo removed} other {# photos removed}}",
+      "imagesReordered": "Photo order changed",
+      "imagesAlt": "{count, plural, one {Alt text changed on # photo} other {Alt text changed on # photos}}",
+      "offeringsAdded": "{count, plural, one {# variation added} other {# variations added}}",
+      "offeringsRemoved": "{count, plural, one {# variation removed} other {# variations removed}}",
+      "offeringChanged": "{label}: {fields}",
+      "offeringFieldSku": "SKU",
+      "offeringFieldPrice": "price",
+      "offeringFieldIsEnabled": "on/off",
+      "noDetails": "No visible details for this change."
+    },
+    "history": {
+      "title": "History",
+      "empty": "No changes recorded yet. Changes made on Etsy or from KolayXport will appear here.",
+      "loadMore": "Show older",
+      "restore": "Restore as draft",
+      "restoreTitle": "Restore this version as a draft?",
+      "restoreBody": "KolayXport stages these values as a draft. Nothing changes on Etsy until you review the draft and press Sync to Etsy.",
+      "restoreConfirm": "Create draft",
+      "restoreCancel": "Cancel",
+      "restored": "Draft created. Review it, then sync to Etsy.",
+      "restoredPartial": "Draft created. Some parts can't be restored: {parts}.",
+      "nothingToRestore": "This version matches the listing already — nothing to restore.",
+      "restoreFailed": "Couldn't create the draft.",
+      "unrestorable": {
+        "images_deleted": "deleted photos",
+        "inventory": "variations and stock",
+        "state": "listing status",
+        "personalization": "personalization questions",
+        "videos": "video",
+        "variations": "price (set per variation)",
+        "cleared_value": "cleared fields"
+      },
+      "tombstone": "This listing was deleted on Etsy."
+    },
+    "activity": {
+      "empty": "No listing changes yet. Edits on Etsy and syncs from KolayXport show up here within seconds.",
+      "loadMore": "Show more",
+      "viewListing": "Open on Etsy",
+      "changedFields": "{count, plural, one {# change} other {# changes}}",
+      "deletedListing": "Deleted listing",
+      "newItems": "{count, plural, one {# new change} other {# new changes}} — show"
+    },
+    "errors": {
+      "loadFailed": "Couldn't load listing activity.",
+      "versionNotFound": "That version no longer exists.",
+      "versionNotRestorable": "That version can't be restored.",
+      "listingGone": "This listing no longer exists on Etsy.",
+      "stockSyncManaged": "Stock sync manages this listing's quantities. Change them in Stock sync or through a draft."
+    }
+  }
+}

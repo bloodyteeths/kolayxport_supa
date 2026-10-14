@@ -2,7 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';
-import { EtsyClient } from '../../../lib/integrations/etsyClient';
+import { EtsyClient, EtsyPriority } from '../../../lib/integrations/etsyClient';
+import { mapEtsyReceiptFinance } from '@/lib/etsy/receiptFinance';
 import type { EtsyCredentials } from '../../../lib/integrations/etsyClient';
 import { getUserAccessToken, EbayNotConnectedError } from '../../../lib/integrations/ebayClient';
 import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
@@ -704,6 +705,8 @@ export async function handleEtsySync(userId: string, body: any, res: NextApiResp
       refreshToken: etsyCreds.refreshToken,
       shopId: etsyCreds.shopId,
       tokenExpiresAt: etsyCreds.tokenExpiresAt || undefined,
+      userId,
+      priority: EtsyPriority.Reconcile,
     },
     onTokenRefresh
   );
@@ -750,11 +753,11 @@ export async function handleEtsySync(userId: string, body: any, res: NextApiResp
     const batch = allReceipts.slice(i, i + UPSERT_BATCH);
     await Promise.all(batch.map(receipt => {
       const receiptId = String(receipt.receipt_id);
-      const status = (receipt.status || '').toLowerCase();
-
-      // Determine transaction type from receipt status
-      const isRefund = status === 'refunded' || status === 'returned';
-      const transactionType = isRefund ? 'Return' : 'Sale';
+      // Every receipt is a 'Sale' (net of sales tax). Refunds/cancellations are
+      // counted once, from the ledger's refund_gross entries (Phase 4) — see
+      // lib/etsy/receiptFinance.ts for why mapping them here would double count.
+      const mapped = mapEtsyReceiptFinance(receipt);
+      const transactionType = mapped.transactionType;
 
       // Product name: first transaction title or concatenated
       let productName: string | null = null;
@@ -771,9 +774,7 @@ export async function handleEtsySync(userId: string, body: any, res: NextApiResp
       // authorities — that money is never the seller's, so it must not inflate
       // revenue. total_tax_cost is the exact tax portion (matches the ledger's
       // sales_tax entries). Remaining amount = items + buyer-paid shipping.
-      const taxCost = EtsyClient.etsyMoney(receipt.total_tax_cost || { amount: 0, divisor: 100 });
-      let amount = EtsyClient.etsyMoney(receipt.grandtotal || { amount: 0, divisor: 100 }) - taxCost;
-      if (isRefund) amount = -Math.abs(amount);
+      const amount = mapped.amount;
 
       // Etsy shipping is buyer-paid — NOT a seller expense.
       // Real Etsy fees are NOT estimated here anymore. They come from the
@@ -784,7 +785,7 @@ export async function handleEtsySync(userId: string, body: any, res: NextApiResp
       const commission: number | null = null;
 
       // Currency
-      const currency = receipt.grandtotal?.currency_code || 'USD';
+      const currency = mapped.currency;
 
       // Transaction date
       const transactionDate = receipt.create_timestamp
@@ -1102,6 +1103,8 @@ async function handleDebugLedger(userId: string, body: any, res: NextApiResponse
       refreshToken: etsyCreds.refreshToken,
       shopId: etsyCreds.shopId,
       tokenExpiresAt: etsyCreds.tokenExpiresAt || undefined,
+      userId,
+      priority: EtsyPriority.Reconcile,
     },
     onTokenRefresh
   );

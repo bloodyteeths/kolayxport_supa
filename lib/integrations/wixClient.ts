@@ -295,6 +295,25 @@ export class WixApiClient {
     return data;
   }
 
+  /**
+   * Absolute per-variant quantities (Stores Catalog V1:
+   * PATCH /stores/v2/inventoryItems/product/{productId}). Used by stock sync
+   * only when STOCK_WIX_WRITE_VERIFIED=1 (see lib/stock/adapters/wix.ts);
+   * verify the shape on a test product before enabling. Sites on Catalog V3
+   * reject this endpoint.
+   */
+  async setInventoryVariantQuantities(productId: string, variants: { variantId: string; quantity: number }[]): Promise<any> {
+    return this.request<any>(`/stores/v2/inventoryItems/product/${encodeURIComponent(productId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        inventoryItem: {
+          trackQuantity: true,
+          variants: variants.map((v) => ({ variantId: v.variantId, quantity: Math.max(0, Math.trunc(v.quantity)) })),
+        },
+      }),
+    });
+  }
+
   // ─── Collections ──────────────────────────────────────────
 
   async queryCollections(params: { limit?: number; offset?: number } = {}): Promise<{ collections: any[]; totalResults: number }> {

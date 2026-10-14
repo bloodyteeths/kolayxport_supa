@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { upsertMarketplaceOrder, publishOrderWrites, type LiveWrite } from '@/lib/orders/marketplaceOrderWrite';
 import { logger } from "@/lib/logger";
 import { decryptIfNeeded } from "@/lib/crypto/credentials";
 import { isTrendyolEnabled } from "@/lib/config";
@@ -120,18 +121,18 @@ export async function syncTrendyolRecentOrdersForUser(userId: string): Promise<S
     }
 
     const BATCH_SIZE = 5;
+    const liveWrites: LiveWrite[] = [];
     const total = uiOrders.length;
     for (let i = 0; i < uiOrders.length; i += BATCH_SIZE) {
       const batch = uiOrders.slice(i, i + BATCH_SIZE);
       for (const ui of batch) {
         try {
           const orderData = mapUIToPrisma(ui, userId);
-          const itemsData = (ui.line_items || []).map((item: any) => mapUIItemToPrisma(item, orderData));
-          await prisma.order.upsert({
-            where: { userId_marketplace_marketplaceKey: { userId, marketplace: orderData.marketplace, marketplaceKey: orderData.marketplaceKey } },
-            update: { ...orderData, userId, items: { deleteMany: {}, create: itemsData } },
-            create: { ...orderData, userId, items: { create: itemsData } },
+          const write = await upsertMarketplaceOrder(userId, orderData, ui.line_items || [], {
+            source: 'trendyol',
+            recipientEmail: orderData.rawData?.customerEmail || null,
           });
+          if (write.live) liveWrites.push(write.live);
           successful++;
         } catch (err: any) {
           failed++;
@@ -147,6 +148,8 @@ export async function syncTrendyolRecentOrdersForUser(userId: string): Promise<S
         await new Promise((r) => setTimeout(r, 300));
       }
     }
+
+    publishOrderWrites(userId, liveWrites, 'trendyol');
 
     if (syncId) {
       await completeSync(syncId, failed === 0, { processedOrders: processed, successfulOrders: successful, failedOrders: failed, totalOrders: total, errors });
@@ -181,27 +184,6 @@ function mapUIToPrisma(uiOrder: any, userId: string) {
     shippingLabelUrl: null,
     trackingNumber: null,
     labelStatus: null,
-  };
-}
-
-function mapUIItemToPrisma(lineItem: any, orderData: any) {
-  return {
-    sku: lineItem.sku || null,
-    productName: lineItem.title || null,
-    variantInfo: lineItem.variantInfo || null,
-    quantity: lineItem.quantity || 1,
-    unitPrice: lineItem.value || null,
-    totalPrice: (lineItem.value || 0) * (lineItem.quantity || 1),
-    image: lineItem.image || "",
-    marketplaceKey: String(lineItem.id || Date.now()),
-    shipBy: lineItem.shipBy ? new Date(lineItem.shipBy) : null,
-    orderNumber: orderData.orderNumber,
-    uniqueLineKey: String(lineItem.id || Date.now()),
-    remoteLineId: String(lineItem.id || Date.now()),
-    weightKg: lineItem.weight || 0.5,
-    harmonizedCode: lineItem.hs_code || null,
-    countryOfMfg: null,
-    recipientEmail: orderData.rawData?.customerEmail || null,
   };
 }
 

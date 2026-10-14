@@ -49,6 +49,12 @@ const withPWA = require('@ducanh2912/next-pwa').default({
         handler: 'NetworkOnly',
       },
       {
+        // Live SSE stream never ends: caching it would buffer an endless body
+        // and could replay stale events offline.
+        urlPattern: /\/api\/live\/.*/i,
+        handler: 'NetworkOnly',
+      },
+      {
         urlPattern: /\/api\/.*/i,
         handler: 'NetworkFirst',
         options: {

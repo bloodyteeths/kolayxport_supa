@@ -1,0 +1,57 @@
+{
+  "orderPipeline": {
+    "labelGuard": {
+      "cancelledTitle": "This order was cancelled",
+      "shippedTitle": "This order was already shipped",
+      "orderNumber": "Order {orderNumber}",
+      "cancelled": "The marketplace reports this order as cancelled or refunded. A new label would be charged by the carrier.",
+      "shippedExternally": "The marketplace shows this order as shipped, but no label or tracking number was created in KolayXport. It was probably shipped another way.",
+      "overrideHint": "Create the label only if you are sure you still need to ship it.",
+      "keepSafe": "Don't create",
+      "createAnyway": "Create label anyway"
+    },
+    "badges": {
+      "cancelledAfterLabel": "Cancelled after label",
+      "labelCost": "label {cost} {currency}",
+      "labelTracking": "{carrier} label: {tracking}",
+      "cancelled": "Cancelled",
+      "voidRequested": "Void requested",
+      "shippedExternally": "Shipped outside KolayXport",
+      "late": "Late",
+      "shippedLate": "Shipped late",
+      "labelNotPushed": "Tracking not on Etsy",
+      "labelNotPushedHint": "The label is ready but the tracking number is not on Etsy yet. Push it with the Chrome extension.",
+      "delivered": "Delivered",
+      "returnWindow": "{days, plural, =0 {Return window ends today} one {# day left to return} other {# days left to return}}"
+    },
+    "void": {
+      "voidLabel": "Void label",
+      "confirmManual": "I cancelled it manually",
+      "openCarrierPortal": "Open carrier site",
+      "manualRequired": "This carrier can't be voided automatically. Cancel the label on the carrier's site, then tap \"I cancelled it manually\".",
+      "done": "Label voided",
+      "confirmed": "Marked as cancelled",
+      "failed": "The label could not be voided"
+    },
+    "dispatchState": {
+      "no_label": "No label",
+      "label_not_pushed": "Tracking not on Etsy",
+      "shipped_on_etsy": "Shipped on Etsy"
+    },
+    "dispatchHealth": {
+      "title": "On-time dispatch (Star Seller criterion 1/3)",
+      "empty": "No shipped Etsy orders in the last {days} days yet.",
+      "onTimeWithTracking": "shipped on time with tracking",
+      "target": "Star Seller requires 95% or more.",
+      "onTime": "On time",
+      "shipped": "Shipped",
+      "late": "Late",
+      "avgHandling": "Avg. handling",
+      "hours": "{hours} h",
+      "openNoLabel": "{count} open without label",
+      "openLabelNotPushed": "{count} label ready, tracking not on Etsy",
+      "deliveryDays": "Delivery time (days)",
+      "p50p90": "median {p50} · p90 {p90} ({n})"
+    }
+  }
+}

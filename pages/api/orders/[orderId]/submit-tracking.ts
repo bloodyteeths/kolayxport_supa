@@ -2,7 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../../lib/prisma';
 import { getAuthUser } from '@/lib/auth';
 import { logger } from '../../../../lib/logger';
-import { EtsyClient, EtsyTrackingData, EtsyCredentials } from '../../../../lib/integrations/etsyClient';
+import { EtsyClient, EtsyPriority, EtsyTrackingData, EtsyCredentials } from '../../../../lib/integrations/etsyClient';
+import { publishLive, publishOrderEvent } from '@/lib/live/publish';
 import { createWixClient } from '../../../../lib/integrations/wixClient';
 import { getUserAccessToken } from '../../../../lib/integrations/ebayClient';
 import { getValidToken, submitAmazonTracking, regionForMarketplaceId } from '../../../../lib/integrations/amazonClient';
@@ -119,10 +120,12 @@ export default async function handler(
         },
       });
 
-      await prisma.order.update({
+      const updatedEtsyOrder = await prisma.order.update({
         where: { id: orderId as string },
         data: { trackingNumber: trackingNumber },
       });
+      publishLive(user.id, { type: 'shipment', kind: 'tracking_submitted', orderId: orderId as string, trackingNumber });
+      publishOrderEvent(user.id, updatedEtsyOrder, 'updated');
 
       logger.info('Etsy tracking saved locally (pending Chrome extension push)', {
         orderId,
@@ -378,13 +381,15 @@ export default async function handler(
     });
 
     // Update our local database with tracking info
-    await prisma.order.update({
+    const shippedOrder = await prisma.order.update({
       where: { id: orderId as string },
       data: {
         trackingNumber: trackingNumber,
         status: 'shipped',
       },
     });
+    publishLive(user.id, { type: 'shipment', kind: 'tracking_submitted', orderId: orderId as string, trackingNumber });
+    publishOrderEvent(user.id, shippedOrder, 'shipped');
 
     logger.info('Tracking number submitted successfully', {
       orderId,
@@ -438,7 +443,9 @@ async function saveTrackingLocally(
       ...(errorMessage ? { errorMessage } : {}),
     },
   });
-  await prisma.order.update({ where: { id: orderId }, data: { trackingNumber, status: 'shipped' } });
+  const row = await prisma.order.update({ where: { id: orderId }, data: { trackingNumber, status: 'shipped' } });
+  publishLive(userId, { type: 'shipment', kind: 'tracking_submitted', orderId, trackingNumber });
+  publishOrderEvent(userId, row, 'shipped');
 }
 
 function getCarrierName(carrierId: number): string {
@@ -922,7 +929,10 @@ async function submitEtsyTracking(
     accessToken: accessTokenPlain,
     refreshToken: refreshTokenPlain || undefined,
     shopId: targetShop.shopId,
-    tokenExpiresAt: targetShop.tokenExpiresAt || undefined
+    tokenExpiresAt: targetShop.tokenExpiresAt || undefined,
+    // Tracking push precedes an irreversible customer notification: Critical priority, scoped to the owner.
+    userId,
+    priority: EtsyPriority.Critical,
   };
 
   // Create token refresh callback to update database (re-encrypt on write).

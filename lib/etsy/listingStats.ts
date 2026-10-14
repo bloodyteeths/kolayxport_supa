@@ -16,6 +16,7 @@
  * because the page values come from the client and could be forged.
  */
 import prisma from '@/lib/prisma';
+import { etsyFetch } from './http';
 
 const ETSY_BASE = 'https://openapi.etsy.com/v3/application';
 const DAY_MS = 24 * 3600 * 1000;
@@ -74,7 +75,9 @@ export class EtsyPublicApiError extends Error {
 }
 
 async function etsyGet(path: string): Promise<any> {
-  const res = await fetch(`${ETSY_BASE}${path}`, { headers: { 'x-api-key': etsyKey() } });
+  // Through etsyFetch for the shared rate budget; priority from the caller's
+  // context (Interactive by default); no retries (unchanged behaviour).
+  const res = await etsyFetch(`${ETSY_BASE}${path}`, { headers: { 'x-api-key': etsyKey() } }, { retries: 0 });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new EtsyPublicApiError(res.status, `Etsy API ${res.status}: ${text.slice(0, 200)}`);

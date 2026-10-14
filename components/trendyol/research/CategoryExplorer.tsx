@@ -12,9 +12,15 @@ import {
   Package, Users, Tag, BarChart2, TrendingUp, Store,
   ExternalLink, BadgeCheck, Timer, Search, X, Home,
   Shirt, Smartphone, Baby, Wrench, Car, BookOpen, Gamepad2,
-  Pencil, Hammer, Dumbbell,
+  Pencil, Hammer, Dumbbell, FilePlus2,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { useRouter } from 'next/router';
+import { toast } from 'react-hot-toast';
+import { useConnections } from '@/lib/hooks/useConnections';
+import {
+  prefillHref, writeListingPrefill, type ListingPrefillTarget,
+} from '@/components/etsy/research/shared/listingPrefill';
 
 import { useTrendyolResearchStore, useSortedProducts } from '@/lib/stores/useTrendyolResearchStore';
 import type { FlatCategory } from '@/lib/stores/useTrendyolResearchStore';
@@ -131,9 +137,38 @@ interface ProductCardProps {
   expanded: boolean;
   onToggle: () => void;
   t: ReturnType<typeof useTranslations>;
+  /** Connected marketplaces a listing can be started on from this product. */
+  listingTargets: ListingPrefillTarget[];
+  onCreateListing: (product: TrendyolProduct, target: ListingPrefillTarget) => void;
 }
 
-function ProductCard({ product, isMobile, expanded, onToggle, t }: ProductCardProps) {
+/** Build the prefill payload for a Trendyol product (nothing is published). */
+function trendyolProductToPrefill(product: TrendyolProduct, target: ListingPrefillTarget) {
+  // Another seller's product: its (Turkish) name, attribute copy and photos
+  // are NOT copied into the listing. The name becomes the research query and
+  // the attribute values become keywords, so the creator's AI writes original
+  // English copy. The user adds their own photos.
+  const attrs = (product.productAttributes || [])
+    .filter(a => a && typeof a.attributeName === 'string' && typeof a.attributeValueName === 'string');
+  const name = typeof product.name === 'string' ? product.name.trim().slice(0, 200) : '';
+  const keywords = attrs.map(a => a.attributeValueName).slice(0, 15);
+  return {
+    target,
+    source: 'trendyol-research' as const,
+    keywords,
+    price: product.priceTry > 0 ? product.priceTry : undefined,
+    currency: 'TRY',
+    categoryHint: product.categoryName || undefined,
+    research: name ? {
+      query: name,
+      topTags: [],
+      topKeywords: keywords.map(keyword => ({ keyword, count: 0, pct: 0 })),
+      priceStats: null,
+    } : undefined,
+  };
+}
+
+function ProductCard({ product, isMobile, expanded, onToggle, t, listingTargets, onCreateListing }: ProductCardProps) {
   const hasDiscount = product.originalPriceTry > product.priceTry;
   const discountPct = hasDiscount
     ? Math.round(((product.originalPriceTry - product.priceTry) / product.originalPriceTry) * 100)
@@ -299,6 +334,24 @@ function ProductCard({ product, isMobile, expanded, onToggle, t }: ProductCardPr
           )}
         </Box>
 
+        {/* Start a listing from this product (opens the creator prefilled) */}
+        {listingTargets.length > 0 && (
+          <Box sx={{ display: 'flex', gap: 0.5, mt: 1, flexWrap: 'wrap' }}>
+            {listingTargets.map(target => (
+              <Button
+                key={target}
+                size="small"
+                variant="outlined"
+                onClick={() => onCreateListing(product, target)}
+                startIcon={<FilePlus2 size={13} />}
+                sx={{ flex: 1, minHeight: isMobile ? 44 : 32, fontSize: '0.7rem', textTransform: 'none', fontWeight: 600, borderRadius: '8px' }}
+              >
+                {target === 'etsy' ? t('createEtsyListing') : t('createEbayListing')}
+              </Button>
+            ))}
+          </Box>
+        )}
+
         {/* Mobile expandable details */}
         {isMobile && (
           <>
@@ -408,6 +461,21 @@ export default function CategoryExplorer() {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const [expandedCardId, setExpandedCardId] = useState<number | null>(null);
+  const router = useRouter();
+  const { has: hasConnection } = useConnections();
+  const listingTargets = useMemo<ListingPrefillTarget[]>(() => {
+    const out: ListingPrefillTarget[] = [];
+    if (hasConnection('etsy') === true) out.push('etsy');
+    if (hasConnection('ebay') === true) out.push('ebay');
+    return out;
+  }, [hasConnection]);
+  const handleCreateListing = useCallback((product: TrendyolProduct, target: ListingPrefillTarget) => {
+    if (!writeListingPrefill(trendyolProductToPrefill(product, target))) {
+      toast.error(t('prefillFailed'));
+      return;
+    }
+    router.push(prefillHref(target));
+  }, [router, t]);
   const [localSearch, setLocalSearch] = useState('');
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -875,6 +943,8 @@ export default function CategoryExplorer() {
                 expanded={expandedCardId === product.id}
                 onToggle={() => setExpandedCardId(prev => prev === product.id ? null : product.id)}
                 t={t}
+                listingTargets={listingTargets}
+                onCreateListing={handleCreateListing}
               />
             ))}
           </Box>

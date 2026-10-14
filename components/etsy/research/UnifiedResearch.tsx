@@ -12,8 +12,9 @@ import {
   Heart, Gauge, Info, ExternalLink, Zap, AlertTriangle,
   CheckCircle, XCircle, Pin, Flame, Star, Search, Compass,
   Hash, Tag, Copy, Activity, Calendar, Lightbulb, ArrowRight,
-  Clock, Trash2,
+  Clock, Trash2, FilePlus2,
 } from 'lucide-react';
+import { useRouter } from 'next/router';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 
@@ -31,6 +32,8 @@ import {
   KeywordCard, DemandCompetitionGauge, StickyScoreBar, useTableSort,
 } from './shared/ui';
 import ComparisonPanel from './ComparisonPanel';
+import { prefillHref, writeListingPrefill, dominantCurrency } from './shared/listingPrefill';
+import { normalizeTags } from '@/lib/etsy/seoRules';
 
 interface UnifiedResearchProps {
   userListings?: any[];
@@ -47,6 +50,7 @@ export default function UnifiedResearch({ userListings, onNavigateToShopIntel }:
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const [expandedCard, setExpandedCard] = useState<number | null>(null);
+  const router = useRouter();
 
   // Store state
   const items = useEtsyResearchStore(s => s.items);
@@ -114,6 +118,35 @@ export default function UnifiedResearch({ userListings, onNavigateToShopIntel }:
     }
     return sorted;
   }, [items, compSort]);
+
+  // Open the Etsy creator prefilled from this research (top tags/keywords,
+  // median price, market data for the creator's AI). Nothing is published.
+  const handleCreateFromResearch = () => {
+    const s = useEtsyResearchStore.getState();
+    const searched = (s.query || query || '').trim();
+    const currency = dominantCurrency(items);
+    const topTags = enrichedTags.slice(0, 40).map(tg => tg.tag);
+    const ok = writeListingPrefill({
+      target: 'etsy',
+      source: 'etsy-research',
+      // The search phrase is a starting point; the creator's AI turns it into a full title.
+      title: searched,
+      tags: normalizeTags(topTags).tags,
+      keywords: enrichedKeywords.slice(0, 15).map(k => k.keyword),
+      price: currency && priceStats ? priceStats.median : undefined,
+      currency,
+      research: {
+        query: searched,
+        topTags: s.serverTagFreq.slice(0, 20),
+        topKeywords: s.serverKeywords.length > 0
+          ? s.serverKeywords.slice(0, 15)
+          : enrichedKeywords.slice(0, 15).map(k => ({ keyword: k.keyword, count: k.count, pct: k.pct })),
+        priceStats: priceStats && currency ? { min: priceStats.min, avg: priceStats.avg, median: priceStats.median, max: priceStats.max } : null,
+      },
+    });
+    if (!ok) { toast.error(t('ur_prefillFailed')); return; }
+    router.push(prefillHref('etsy'));
+  };
 
   // ========== PRE-SEARCH STATE ==========
   if (!hasData && !loading) {
@@ -259,6 +292,20 @@ export default function UnifiedResearch({ userListings, onNavigateToShopIntel }:
         { label: t('ur_shops'), value: String(uniqueShops), color: '#2196F3' },
         ...(demandScore ? [{ label: t('ur_opportunity'), value: `${demandScore.score}/100`, color: demandScore.score >= 70 ? '#4caf50' : demandScore.score >= 40 ? '#ff9800' : '#f44336' }] : []),
       ]} />
+
+      {/* ── Create listing from this research ── */}
+      <Paper sx={{ ...glassCard, p: 1.5, mb: 2, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+        <Box sx={{ flex: '1 1 220px', minWidth: 0 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{t('ur_createListingTitle')}</Typography>
+          <Typography variant="caption" color="text.secondary">{t('ur_createListingDesc')}</Typography>
+        </Box>
+        <Button variant="contained" onClick={handleCreateFromResearch}
+          disabled={loading || !hasData}
+          startIcon={<FilePlus2 size={16} />}
+          sx={{ background: GRADIENTS.primary, borderRadius: '10px', minHeight: 44, textTransform: 'none', fontWeight: 700, ...(isMobile && { width: '100%' }) }}>
+          {t('ur_createListing')}
+        </Button>
+      </Paper>
 
       {/* ── Section 2: Demand vs Competition Gauges ── */}
       {demandScore && (

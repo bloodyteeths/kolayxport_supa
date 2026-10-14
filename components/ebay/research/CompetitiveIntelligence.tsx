@@ -13,6 +13,9 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import useLocaleStore from '@/lib/stores/useLocaleStore';
+import useEbayResearchStore from '@/lib/stores/useEbayResearchStore';
+import { formatMoney, marketplaceCurrency } from './marketplaces';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -88,7 +91,12 @@ interface MarketSnapshot {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const fmt = (n: number) => `$${n.toFixed(2)}`;
+// Amounts are fetched for the page's selected marketplace, so format in its currency.
+const fmt = (n: number) => {
+  let locale = 'en';
+  try { locale = useLocaleStore.getState().locale || 'en'; } catch { /* store unavailable */ }
+  return formatMoney(n, marketplaceCurrency(useEbayResearchStore.getState().marketplace), locale);
+};
 const pct = (n: number) => `${n.toFixed(1)}%`;
 
 const TRENDS_KEY = 'kolayxport_market_trends';
@@ -205,6 +213,7 @@ const PIE_COLORS = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4
 
 function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: string; marketplace: string; userListings?: any[]; onNavigate?: (tool: string, data?: any) => void }) {
   const t = useTranslations('ebay.research.competitive');
+  const tA = useTranslations('ebayResearch');
   const suggestedSellers = useMemo(() => {
     if (!userListings?.length) return [];
     const sellers = new Map<string, { username: string; feedback: number }>();
@@ -515,7 +524,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
             <Users size={20} />
             <span>{deepDiveSeller} — {t('sellerDetailsTitle')}</span>
           </Box>
-          <IconButton size="small" onClick={() => setDeepDiveOpen(false)}>
+          <IconButton aria-label={tA('close')} size="small" onClick={() => setDeepDiveOpen(false)}>
             <X size={18} />
           </IconButton>
         </DialogTitle>
@@ -570,7 +579,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
                         </TableCell>
                         <TableCell align="center">
                           {item.itemWebUrl && (
-                            <IconButton size="small" href={item.itemWebUrl} target="_blank" rel="noopener">
+                            <IconButton aria-label={tA('openOnEbay')} size="small" href={item.itemWebUrl} target="_blank" rel="noopener">
                               <ExternalLink size={14} />
                             </IconButton>
                           )}
@@ -741,7 +750,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
                       </TableCell>
                       <TableCell align="center">
                         {item.itemWebUrl && (
-                          <IconButton size="small" href={item.itemWebUrl} target="_blank" rel="noopener">
+                          <IconButton aria-label={tA('openOnEbay')} size="small" href={item.itemWebUrl} target="_blank" rel="noopener">
                             <ExternalLink size={14} />
                           </IconButton>
                         )}
@@ -798,6 +807,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
 
 function ListingComparison({ marketplace }: { marketplace: string }) {
   const t = useTranslations('ebay.research.competitive');
+  const tA = useTranslations('ebayResearch');
   const [inputs, setInputs] = useState<string[]>(['']);
   const [listings, setListings] = useState<(ItemDetails | null)[]>([]);
   const [loading, setLoading] = useState<boolean[]>([]);
@@ -918,7 +928,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
                 {loading[idx] ? <CircularProgress size={16} /> : t('add')}
               </Button>
               {inputs.length > 1 && (
-                <IconButton size="small" onClick={() => removeInput(idx)} color="error">
+                <IconButton aria-label={tA('remove')} size="small" onClick={() => removeInput(idx)} color="error">
                   <Trash2 size={16} />
                 </IconButton>
               )}
@@ -1095,7 +1105,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
                   {validListings.map((l, i) => (
                     <TableCell key={i} align="center">
                       {l.itemWebUrl && (
-                        <IconButton size="small" href={l.itemWebUrl} target="_blank" rel="noopener">
+                        <IconButton aria-label={tA('openOnEbay')} size="small" href={l.itemWebUrl} target="_blank" rel="noopener">
                           <ExternalLink size={14} />
                         </IconButton>
                       )}
@@ -1117,6 +1127,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
 
 function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string; onNavigate?: (tool: string, data?: any) => void; userId?: string }) {
   const t = useTranslations('ebay.research.competitive');
+  const tA = useTranslations('ebayResearch');
   const [keyword, setKeyword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -1427,7 +1438,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
                 <Users size={20} />
                 <span>{trendDeepDiveSeller} — {t('sellerDetailsTitle')}</span>
               </Box>
-              <IconButton size="small" onClick={() => setTrendDeepDiveOpen(false)}>
+              <IconButton aria-label={tA('close')} size="small" onClick={() => setTrendDeepDiveOpen(false)}>
                 <X size={18} />
               </IconButton>
             </DialogTitle>
@@ -1480,7 +1491,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
                             </TableCell>
                             <TableCell align="center">
                               {item.itemWebUrl && (
-                                <IconButton size="small" href={item.itemWebUrl} target="_blank" rel="noopener">
+                                <IconButton aria-label={tA('openOnEbay')} size="small" href={item.itemWebUrl} target="_blank" rel="noopener">
                                   <ExternalLink size={14} />
                                 </IconButton>
                               )}
@@ -1568,7 +1579,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
                           <TableCell align="right">{snap.uniqueSellers}</TableCell>
                           <TableCell align="right">{pct(snap.freeShippingPct)}</TableCell>
                           <TableCell align="center">
-                            <IconButton size="small" color="error" onClick={() => deleteSnapshot(globalIdx)}>
+                            <IconButton aria-label={tA('delete')} size="small" color="error" onClick={() => deleteSnapshot(globalIdx)}>
                               <Trash2 size={14} />
                             </IconButton>
                           </TableCell>
@@ -1618,7 +1629,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
                     <TableCell align="right">{snap.totalListings}</TableCell>
                     <TableCell align="right">{fmt(snap.avgPrice)}</TableCell>
                     <TableCell align="center">
-                      <IconButton size="small" color="error" onClick={e => { e.stopPropagation(); deleteSnapshot(i); }}>
+                      <IconButton aria-label={tA('delete')} size="small" color="error" onClick={e => { e.stopPropagation(); deleteSnapshot(i); }}>
                         <Trash2 size={14} />
                       </IconButton>
                     </TableCell>

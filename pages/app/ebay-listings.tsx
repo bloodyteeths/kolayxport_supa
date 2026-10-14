@@ -99,6 +99,11 @@ import SmartPricing from '@/components/ebay/SmartPricing';
 import DuplicateDetector from '@/components/ebay/DuplicateDetector';
 import BackupManager from '@/components/ebay/BackupManager';
 import { stageEbayDraft, syncEbayDraft } from '@/lib/ebay/draftClient';
+import {
+  readListingPrefill,
+  listingPrefillSourceLabel,
+  type ListingPrefillPayload,
+} from '@/components/ebay/research/listingPrefill';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -194,6 +199,33 @@ function plainTextToHtml(text: string): string {
     .filter(Boolean)
     .map((para) => `<p>${para.replace(/\n/g, '<br>')}</p>`)
     .join('\n');
+}
+
+/**
+ * Maps a validated research hand-off (?prefill=session) onto the creator's
+ * prefill. The key is stable per source+title so reopening the same research
+ * resumes that autosaved session instead of piling up new ones.
+ */
+function researchPayloadToEbayPrefill(p: ListingPrefillPayload): EbayListingPrefill | null {
+  const title = p.title ? clampTitle(p.title) : '';
+  const keywords = [...(p.keywords || []), ...(p.tags || [])];
+  if (!title && keywords.length === 0 && !p.description) return null;
+  // A bare numeric category ID adds nothing to the AI seed.
+  const hint = p.categoryHint && !/^\d+$/.test(p.categoryHint) ? p.categoryHint : '';
+  const seedParts = [p.title || '', keywords.join(' '), hint].filter(Boolean);
+  let hash = 5381;
+  const keySource = `${p.source}|${p.title || ''}|${keywords.slice(0, 5).join(',')}`;
+  for (let i = 0; i < keySource.length; i++) hash = ((hash << 5) + hash + keySource.charCodeAt(i)) | 0;
+  return {
+    key: `research:${p.source}:${(hash >>> 0).toString(36)}`,
+    sourceLabel: listingPrefillSourceLabel(p.source),
+    title,
+    aiSeed: seedParts.join(' — ').slice(0, 200),
+    description: p.description ? plainTextToHtml(p.description) : '',
+    price: typeof p.price === 'number' ? p.price.toFixed(2) : undefined,
+    currency: p.currency,
+    images: p.imageUrls,
+  };
 }
 
 /**
@@ -1068,6 +1100,44 @@ function EbayListingsPage() {
 
   const creatorOpenRef = React.useRef(false);
   creatorOpenRef.current = creatorOpen;
+
+  /**
+   * Research -> eBay: ?prefill=session reads 'kx:listingPrefill' from
+   * sessionStorage (only when target is 'ebay'), drops the param and opens the
+   * creator prefilled. Nothing is published until the seller presses publish.
+   */
+  const prefillHandled = React.useRef(false);
+  const prefillParam = typeof router.query.prefill === 'string' ? router.query.prefill : '';
+  useEffect(() => {
+    if (!router.isReady || prefillParam !== 'session' || !userId) return;
+    if (prefillHandled.current) return;
+    prefillHandled.current = true;
+
+    const { prefill: _dropPrefill, ...rest } = router.query;
+    router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+
+    const payload = readListingPrefill('ebay');
+    const prefill = payload ? researchPayloadToEbayPrefill(payload) : null;
+    if (!prefill) {
+      // Storage blocked, entry gone (e.g. refresh) or nothing valid survived: tell the seller instead of failing silently.
+      toast.error(t('prefillMissing'), { id: 'ebay-prefill-missing' });
+      return;
+    }
+
+    const open = async () => {
+      if (creatorOpenRef.current) {
+        const replace = await confirm({
+          title: t('crosslistReplaceTitle'),
+          description: t('crosslistReplaceDesc'),
+          confirmLabel: t('crosslistReplaceConfirm'),
+        });
+        if (!replace) return;
+      }
+      setCreatorPrefill(prefill);
+      setCreatorOpen(true);
+    };
+    void open();
+  }, [router.isReady, prefillParam, userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const closeCreator = useCallback(() => {
     setCreatorOpen(false);

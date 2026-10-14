@@ -35,6 +35,7 @@ import {
   Pin,
   PinOff,
   Plus,
+  Search,
 } from 'lucide-react';
 import useSWR, { mutate } from 'swr';
 import { useAuth } from '@/lib/auth-context';
@@ -45,6 +46,9 @@ import useLocaleStore from '@/lib/stores/useLocaleStore';
 import useMessageCountStore from '@/lib/stores/useMessageCountStore';
 import TrialNotification from './TrialNotification';
 import { useConnections } from '@/lib/hooks/useConnections';
+import CommandPalette from './CommandPalette';
+import MobileTabBar, { MOBILE_TAB_BAR_HEIGHT } from './MobileTabBar';
+import NotificationBell from './NotificationBell';
 
 /**
  * AppLayout: For authenticated application routes (e.g., /app/*)
@@ -105,29 +109,43 @@ let pinnedMemo = null;
 /**
  * Nav items may carry `requires`: a provider (or list of providers, any of
  * which unlocks the item). Items without `requires` are always shown.
+ * Groups with `bottom: true` are pinned to the foot of the sidebar.
  */
 function getNavGroups(t) {
   return [
     {
-      id: 'main',
+      id: 'home',
       label: null,
       items: [
         { href: '/app', icon: LayoutDashboard, label: t('overview') },
-        { href: '/app/labels', icon: FileText, label: t('labelsNav') },
-        { href: '/app/analytics', icon: TrendingUp, label: t('analytics') },
-        { href: '/app/financials', icon: Wallet, label: t('financials') },
       ],
     },
     {
-      id: 'marketplaces',
-      label: t('marketplaces'),
+      id: 'orders',
+      label: t('labelsNav'),
       items: [
-        { href: '/app/etsy-listings', icon: Store, label: t('etsyListings'), requires: 'etsy' },
-        { href: '/app/ebay-listings', icon: ShoppingBag, label: t('ebayListings'), requires: 'ebay' },
-        { href: '/app/trendyol-urunler', icon: Package, label: t('trendyolProducts'), requires: 'trendyol' },
-        { href: '/app/wix-urunler', icon: Package, label: t('wixProducts'), requires: 'wix' },
-        { href: '/app/shopify-urunler', icon: ShoppingBag, label: t('shopifyProducts'), requires: 'shopify' },
+        { href: '/app/labels', icon: FileText, label: t('allOrders') },
+        // Senkron stays reachable as the production / packing list.
+        { href: '/app/senkron', icon: ShoppingCart, label: t('productionList') },
+      ],
+    },
+    {
+      id: 'listings',
+      label: t('listings'),
+      items: [
+        { href: '/app/etsy-listings', icon: Store, label: t('etsyListings'), requires: 'etsy', listings: true },
+        { href: '/app/ebay-listings', icon: ShoppingBag, label: t('ebayListings'), requires: 'ebay', listings: true },
+        { href: '/app/trendyol-urunler', icon: Package, label: t('trendyolProducts'), requires: 'trendyol', listings: true },
+        { href: '/app/wix-urunler', icon: Package, label: t('wixProducts'), requires: 'wix', listings: true },
+        { href: '/app/shopify-urunler', icon: ShoppingBag, label: t('shopifyProducts'), requires: 'shopify', listings: true },
         { href: '/ayarlar?tab=connections', icon: Plus, label: t('connectStore'), connectCta: true },
+      ],
+    },
+    {
+      id: 'messages',
+      label: null,
+      items: [
+        { href: '/app/mesajlar', icon: Mail, label: t('messages'), requires: ['wix', 'trendyol'], messageBadge: true },
       ],
     },
     {
@@ -135,6 +153,7 @@ function getNavGroups(t) {
       label: t('research'),
       items: [
         { href: '/app/etsy-research', icon: Target, label: t('etsyResearch') },
+        // eBay research also hosts the arbitrage scanner (tab inside the page).
         { href: '/app/ebay-research', icon: Target, label: t('ebayResearch') },
         { href: '/app/trendyol-arastirma', icon: Target, label: t('trendyolResearch') },
         // Product search/niche tools use the platform Creators API, not the
@@ -143,19 +162,22 @@ function getNavGroups(t) {
       ],
     },
     {
-      id: 'operations',
-      label: t('operations'),
+      id: 'finance',
+      label: t('finance'),
       items: [
-        { href: '/app/senkron', icon: ShoppingCart, label: t('sync') },
+        { href: '/app/analytics', icon: TrendingUp, label: t('reports') },
+        { href: '/app/financials', icon: Wallet, label: t('financials') },
       ],
     },
     {
-      id: 'management',
-      label: t('management'),
+      id: 'account',
+      label: null,
+      bottom: true,
       items: [
-        { href: '/app/entegrasyonlar-ve-rehberler', icon: Link2, label: t('integrations') },
         { href: '/ayarlar', icon: Settings, label: t('settings'), reauthDot: true },
         { href: '/faturalar', icon: Receipt, label: t('invoices') },
+        { href: '/app/nasil-kullanirim', icon: LifeBuoy, label: t('help') },
+        { href: '/app/entegrasyonlar-ve-rehberler', icon: Link2, label: t('integrations') },
       ],
     },
   ];
@@ -233,6 +255,44 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
       }),
     }))
     .filter((group) => group.items.length > 0);
+
+  const topNavGroups = navGroups.filter((group) => !group.bottom);
+  const bottomNavGroups = navGroups.filter((group) => group.bottom);
+
+  // Listings tab target: first visible (connected / still-unknown) marketplace
+  // listings page; with none connected, the connections settings tab.
+  const listingItems = navGroups.flatMap((g) => g.items).filter((item) => item.listings);
+  const knownConnectedListing = listingItems.find((item) => knownConnected(item.requires) === true);
+  const listingsHref = (knownConnectedListing || listingItems[0])?.href || '/ayarlar?tab=connections';
+  const listingsPathsKey = listingItems.map((item) => item.href).join('|');
+  const listingsPaths = React.useMemo(() => (listingsPathsKey ? listingsPathsKey.split('|') : []), [listingsPathsKey]);
+
+  // Command palette destinations (same gating as the sidebar). Keyed by a
+  // stable string so the memo does not churn on every render.
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  // Shortcut hint differs per OS; resolved after mount to keep SSR markup stable.
+  const [isMacLike, setIsMacLike] = useState(false);
+  useEffect(() => {
+    try {
+      setIsMacLike(/Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || ''));
+    } catch {
+      // ignore
+    }
+  }, []);
+  const destinationsKey = navGroups
+    .map((g) => g.items.map((item) => `${item.href}\u0001${item.label}\u0001${g.label || ''}`).join('\u0002'))
+    .join('\u0002');
+  const paletteDestinations = React.useMemo(
+    () => navGroups.flatMap((g) => g.items.map((item) => ({
+      href: item.href,
+      label: item.label,
+      section: g.label,
+      icon: item.icon,
+    }))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [destinationsKey],
+  );
+  const canCreateEtsyListing = isUnlocked('etsy');
 
   // Messages (Wix + Trendyol inbox): only poll when one of them is connected.
   const messagesAvailable = isUnlocked(['wix', 'trendyol']);
@@ -425,6 +485,105 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
     await supabaseSignOut();
   };
 
+  const showLabels = isMobile || expanded;
+
+
+  const renderNavItems = (items) => (
+    <ul className="space-y-0.5">
+      {items.map((item) => {
+        const IconComponent = item.icon;
+        const active = isActive(item.href);
+        const showDot = item.reauthDot && hasReauth;
+        const badgeCount = item.messageBadge && messagesEnabled ? messageCount : 0;
+        const badgeText = badgeCount > 0 ? (badgeCount > 99 ? '99+' : String(badgeCount)) : null;
+        let ariaLabel;
+        if (showDot) ariaLabel = `${item.label} — ${t('reauthNeeded')}`;
+        else if (badgeText) ariaLabel = `${item.label} (${badgeCount})`;
+        return (
+          <li key={item.href}>
+            <Link
+              href={item.href}
+              onClick={() => { if (isMobile) closeSidebar(); }}
+              className={`flex items-center rounded-lg text-[13px] font-medium transition-all duration-150 group relative ${
+                isMobile ? 'px-4 py-3.5 mobile-nav-item' : 'px-3 py-2.5'
+              } ${
+                active
+                  ? 'text-blue-700'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+              }`}
+              style={active ? {
+                backgroundColor: '#eff6ff',
+                borderLeft: showLabels ? '3px solid #2563eb' : 'none',
+                paddingLeft: showLabels ? (isMobile ? '13px' : '9px') : undefined,
+              } : (item.connectCta ? { color: '#2563eb' } : {})}
+              aria-label={ariaLabel}
+              aria-current={active ? 'page' : undefined}
+            >
+              <span className="relative flex-shrink-0 inline-flex">
+                <IconComponent
+                  size={19}
+                  className="flex-shrink-0"
+                  style={{ color: active ? '#2563eb' : undefined }}
+                />
+                {(showDot || (badgeText && !showLabels)) && (
+                  <span
+                    className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white"
+                    aria-hidden="true"
+                  />
+                )}
+              </span>
+              <motion.span
+                initial={{ opacity: 0, width: 0 }}
+                animate={{
+                  opacity: showLabels ? 1 : 0,
+                  width: showLabels ? 'auto' : 0,
+                  marginLeft: showLabels ? '0.625rem' : 0
+                }}
+                transition={{ duration: 0.15 }}
+                className="whitespace-nowrap overflow-hidden flex-1 min-w-0"
+              >
+                {item.label}
+              </motion.span>
+              {badgeText && showLabels && (
+                <span
+                  className="ml-2 min-w-[20px] h-[20px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 flex-shrink-0"
+                  aria-hidden="true"
+                >
+                  {badgeText}
+                </span>
+              )}
+
+              {/* Tooltip for collapsed state */}
+              {!expanded && isDesktop && (
+                <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-slate-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none whitespace-nowrap z-50 shadow-lg">
+                  {item.label}
+                  {showDot && ` — ${t('reauthNeeded')}`}
+                  {badgeText && ` (${badgeText})`}
+                </div>
+              )}
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
+  );
+
+  // Headings when expanded; a thin divider stands in for every section break
+  // when the rail is collapsed (and for unlabeled sections when expanded).
+  const renderNavGroup = (group, gi) => (
+    <div key={group.id} className={gi > 0 ? (showLabels ? 'mt-4' : 'mt-2') : ''}>
+      {gi > 0 && (!group.label || !showLabels) && (
+        <div className="mx-3 mb-2 border-t border-slate-100" aria-hidden="true" />
+      )}
+      {group.label && showLabels && (
+        <div className="px-3 mb-1.5">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">{group.label}</span>
+        </div>
+      )}
+      {renderNavItems(group.items)}
+    </div>
+  );
+
   // User initials for avatar
   const userInitials = user?.email ? user.email.charAt(0).toUpperCase() : 'K';
 
@@ -548,82 +707,17 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 overflow-y-auto py-3 px-2">
-            {navGroups.map((group, gi) => (
-              <div key={group.id} className={gi > 0 ? 'mt-5' : ''}>
-                {/* Section label */}
-                {group.label && (isMobile || expanded) && (
-                  <div className="px-3 mb-1.5">
-                    <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">{group.label}</span>
+          <nav className="flex-1 overflow-y-auto py-3 px-2 flex flex-col">
+            {topNavGroups.map((group, gi) => renderNavGroup(group, gi))}
+            {bottomNavGroups.length > 0 && (
+              <div className="mt-auto pt-4">
+                {bottomNavGroups.map((group) => (
+                  <div key={group.id} className="pt-2" style={{ borderTop: '1px solid #f1f5f9' }}>
+                    {renderNavItems(group.items)}
                   </div>
-                )}
-                {!group.label && gi > 0 && (
-                  <div className="mx-3 mb-2 border-t border-slate-100" />
-                )}
-                <ul className="space-y-0.5">
-                  {group.items.map((item) => {
-                    const IconComponent = item.icon;
-                    const active = isActive(item.href);
-                    const showDot = item.reauthDot && hasReauth;
-                    return (
-                      <li key={item.href}>
-                        <Link
-                          href={item.href}
-                          onClick={() => { if (isMobile) closeSidebar(); }}
-                          className={`flex items-center rounded-lg text-[13px] font-medium transition-all duration-150 group relative ${
-                            isMobile ? 'px-4 py-3.5 mobile-nav-item' : 'px-3 py-2.5'
-                          } ${
-                            active
-                              ? 'text-blue-700'
-                              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
-                          }`}
-                          style={active ? {
-                            backgroundColor: '#eff6ff',
-                            borderLeft: expanded || isMobile ? '3px solid #2563eb' : 'none',
-                            paddingLeft: expanded || isMobile ? (isMobile ? '13px' : '9px') : undefined,
-                          } : (item.connectCta ? { color: '#2563eb' } : {})}
-                          aria-label={showDot ? `${item.label} — ${t('reauthNeeded')}` : undefined}
-                        >
-                          <span className="relative flex-shrink-0 inline-flex">
-                            <IconComponent
-                              size={19}
-                              className="flex-shrink-0"
-                              style={{ color: active ? '#2563eb' : undefined }}
-                            />
-                            {showDot && (
-                              <span
-                                className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white"
-                                aria-hidden="true"
-                              />
-                            )}
-                          </span>
-                          <motion.span
-                            initial={{ opacity: 0, width: 0 }}
-                            animate={{
-                              opacity: (isMobile || expanded) ? 1 : 0,
-                              width: (isMobile || expanded) ? 'auto' : 0,
-                              marginLeft: (isMobile || expanded) ? '0.625rem' : 0
-                            }}
-                            transition={{ duration: 0.15 }}
-                            className="whitespace-nowrap overflow-hidden"
-                          >
-                            {item.label}
-                          </motion.span>
-
-                          {/* Tooltip for collapsed state */}
-                          {!expanded && isDesktop && (
-                            <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-slate-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none whitespace-nowrap z-50 shadow-lg">
-                              {item.label}
-                              {showDot && ` — ${t('reauthNeeded')}`}
-                            </div>
-                          )}
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
+                ))}
               </div>
-            ))}
+            )}
           </nav>
 
           {/* User section at bottom */}
@@ -686,10 +780,10 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
               borderBottom: '1px solid rgba(226, 232, 240, 0.8)',
             }}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
               {isMobile && (
                 <button
-                  className="w-11 h-11 -ml-2 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                  className="w-11 h-11 -ml-2 flex-shrink-0 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
                   onClick={() => isOpen ? closeSidebar() : openSidebar()}
                   aria-label={hasReauth ? `${t('toggleMenu')} — ${t('reauthNeeded')}` : t('toggleMenu')}
                   aria-expanded={isOpen}
@@ -712,7 +806,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
             </div>
 
             {/* Right actions */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 flex-shrink-0">
               <button
                 onClick={() => setLocale(locale === 'tr' ? 'en' : 'tr')}
                 className="px-2 py-1 text-xs font-semibold rounded-lg border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-300 transition-colors"
@@ -720,7 +814,21 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
                 {locale === 'tr' ? 'EN' : 'TR'}
               </button>
 
-              {messagesAvailable && (
+              <button
+                type="button"
+                onClick={() => setPaletteOpen(true)}
+                className="w-11 h-11 sm:w-auto sm:h-auto sm:p-2 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+                title={`${t('search')} (${isMacLike ? '⌘' : 'Ctrl+'}K)`}
+                aria-label={t('search')}
+                aria-keyshortcuts={isMacLike ? 'Meta+K' : 'Control+K'}
+              >
+                <Search size={19} />
+              </button>
+
+              <NotificationBell enabled={Boolean(session)} />
+
+              {/* On phones the bottom tab bar already carries Messages. */}
+              {messagesAvailable && !(isMobile && messagesEnabled) && (
                 <button
                   onClick={() => router.push('/app/mesajlar')}
                   className="relative w-11 h-11 sm:w-auto sm:h-auto sm:p-2 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
@@ -751,12 +859,38 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
           {/* ─── Page Content ─────────────────────────────── */}
           <main ref={mainRef} className={`flex-1 overflow-y-auto ${
             isMobile ? 'p-1.5' : 'p-2 sm:p-3 lg:p-4'
-          }`} style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', backgroundColor: '#f8fafc' }}>
+          }`} style={{
+            // On phones the fixed bottom tab bar overlays the page; reserve its
+            // height (plus the home-indicator inset) so content is never hidden.
+            paddingBottom: isMobile
+              ? `calc(${MOBILE_TAB_BAR_HEIGHT + 8}px + env(safe-area-inset-bottom, 0px))`
+              : 'env(safe-area-inset-bottom, 0px)',
+            backgroundColor: '#f8fafc',
+          }}>
             <TrialNotification userSubscription={userSubscription} />
             {children}
           </main>
         </div>
       </div>
+
+      {isMobile && (
+        <MobileTabBar
+          listingsHref={listingsHref}
+          listingsPaths={listingsPaths}
+          showMessages={messagesEnabled}
+          messageCount={messageCount}
+          moreDot={hasReauth}
+          moreOpen={isOpen}
+          onMore={() => (isOpen ? closeSidebar() : openSidebar())}
+        />
+      )}
+
+      <CommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        destinations={paletteDestinations}
+        canCreateEtsyListing={canCreateEtsyListing}
+      />
     </>
   );
 };

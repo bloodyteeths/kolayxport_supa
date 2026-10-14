@@ -186,7 +186,17 @@
     "unpinSidebar": "Unpin menu",
     "reauthNeeded": "A connection needs to be re-authorized",
     "closeMenu": "Close menu",
-    "toggleMenu": "Toggle navigation menu"
+    "toggleMenu": "Toggle navigation menu",
+    "allOrders": "All orders",
+    "home": "Home",
+    "listings": "Listings",
+    "finance": "Finance",
+    "reports": "Reports",
+    "productionList": "Production list",
+    "help": "Help",
+    "more": "More",
+    "mainNavigation": "Main navigation",
+    "search": "Search"
   },
   "manualOrder": {
     "addButton": "Add Manual Order",
@@ -1902,7 +1912,16 @@
       "monthlySales": "Monthly sales",
       "salesKindMeasured": "measured",
       "salesKindEstimated": "estimate",
-      "salesKindInsufficient": "not enough data"
+      "salesKindInsufficient": "not enough data",
+      "costPrice": "Cost price",
+      "avgMarket": "Market average",
+      "roasHelp": "Return on ad spend (revenue ÷ ad cost)",
+      "totalFees": "Total fees",
+      "adsCost": "Ad cost",
+      "keywordToTrack": "Keyword to track",
+      "addKeyword": "Add keyword",
+      "noTrackedKeywords": "No tracked keywords yet",
+      "rank": "Rank"
     },
     "marketResearch": {
       "myShop": "My Shop",
@@ -3393,7 +3412,8 @@
       "importedImagesHint": "{count, plural, one {# photo} other {# photos}} imported from the source listing. They are downloaded only when you publish or sync this listing.",
       "importedImagesFailed": "Imported photos couldn't be added to the draft.",
       "prefilledFromEbay": "Prefilled from your eBay listing. Review every field, choose a category and add tags. Nothing is published until you press Create & Publish.",
-      "prefilledFromEtsy": "Duplicated from an existing listing. Change the title before saving. Nothing reaches Etsy until you publish or sync."
+      "prefilledFromEtsy": "Duplicated from an existing listing. Change the title before saving. Nothing reaches Etsy until you publish or sync.",
+      "prefilledFromResearch": "Prefilled from your research. Write a full title, choose a category and review every field. Nothing is published until you press Create & Publish."
     },
     "seo": {
       "seoScore": "SEO Score",
@@ -4141,7 +4161,9 @@
         "retry": "Retry",
         "quotaExhausted": "eBay daily quota exhausted",
         "quotaResetsAt": "Resets at {time}",
-        "connectEbayForUnlimited": "Connect your own eBay account in settings to get your own daily quota."
+        "connectEbayForUnlimited": "Connect your own eBay account in settings to get your own daily quota.",
+        "listOnEbay": "List on eBay",
+        "close": "Close"
       },
       "category": {
         "title": "Category Explorer",
@@ -4741,7 +4763,8 @@
         "jewelryWatches": "Jewelry & Watches",
         "sneakersAuth": "Sneakers (Authenticated)",
         "businessIndustrial": "Business & Industrial",
-        "musicalInstruments": "Musical Instruments & Gear"
+        "musicalInstruments": "Musical Instruments & Gear",
+        "totalResultsCount": "{count, plural, one {# result} other {# results}}"
       },
       "keyword": {
         "title": "Keyword Intelligence",
@@ -6700,7 +6723,48 @@
     "ebayUrlOrItemId": "eBay URL or Item ID",
     "ebayUrlPlaceholder": "https://www.ebay.com/itm/... or 123456789",
     "addDialogCancel": "Cancel",
-    "addDialogAdd": "Add"
+    "addDialogAdd": "Add",
+    "pageHeading": "eBay Product Intelligence",
+    "pageSubheading": "Market research, product tracking, niche analysis and competitor monitoring",
+    "toolsLabel": "Research tools",
+    "moreTools": "More tools",
+    "retry": "Try again",
+    "close": "Close",
+    "copy": "Copy",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "actions": "Actions",
+    "minShort": "Min",
+    "maxShort": "Max",
+    "soldCount": "{count} sold",
+    "createListingFromThis": "Create listing from this",
+    "createListingFailed": "Couldn't open the listing creator. Please try again.",
+    "keywordPlaceholderExample": "e.g. wireless earbuds, bluetooth speaker, yoga mat",
+    "nichePlaceholderExample": "e.g. vintage jewelry, phone case, led lights",
+    "sellerPlaceholderExample": "e.g. top_seller_2024, best.deals.shop",
+    "addNotePlaceholder": "Add note...",
+    "newTag": "New tag",
+    "noteLabel": "Note",
+    "tagLabel": "Tag",
+    "categoryAnalysisFailed": "Category analysis failed",
+    "analyzeBtn": "Analyze",
+    "nicheTip1": "Low competition + high demand = the best opportunities",
+    "nicheTip2": "Focus on niches with an opportunity score of 70+",
+    "nicheTip3": "Save niches and regularly check price and competition changes",
+    "nicheTip4": "Study the best-selling products to learn which features matter",
+    "backToExplore": "Back to explore",
+    "demandScore": "Demand Score",
+    "competitionScore": "Competition Score",
+    "competition": "Competition",
+    "noTrackedSellers": "You aren't tracking any sellers yet",
+    "noTrackedSellersSub": "Add competitor sellers to monitor price and stock changes. Enter an eBay username in the field above.",
+    "howToTrackSellers": "How does seller tracking work?",
+    "sellerStep1": "Enter a competitor's eBay username",
+    "sellerStep2": "Automatically track new products, price changes and stock updates",
+    "sellerStep3": "Monitor the seller's feedback score and positive rating",
+    "sellerStep4": "See the seller's products and compare them with your own niches",
+    "positivePct": "{pct}% positive",
+    "positivePctHeader": "Positive %"
   },
   "amazonResearch": {
     "title": "Amazon Research",
@@ -7062,6 +7126,11 @@
       "renew": "Renew queued in a local draft. Sync to Etsy to apply.",
       "deactivate": "Deactivate queued in a local draft. Sync to Etsy to apply.",
       "saved": "Draft saved. Sync to Etsy to apply."
+    },
+    "prefill": {
+      "connectEtsy": "Connect an Etsy shop to create a listing from this research.",
+      "notFound": "The research data to prefill was not found. Start again from the research page.",
+      "priceCurrencyMismatch": "Price not copied: the research price is in {from}, your Etsy shop prices in {to}."
     }
   },
   "ebayListings": {
@@ -7328,7 +7397,8 @@
     "crosslistReplaceConfirm": "Use Etsy listing",
     "listOnEtsy": "List on Etsy",
     "crosslistLoading": "Loading the Etsy listing…",
-    "crosslistLoadFailed": "Couldn't load the Etsy listing to copy."
+    "crosslistLoadFailed": "Couldn't load the Etsy listing to copy.",
+    "prefillMissing": "Research data could not be loaded. Start a new listing."
   },
   "etsyResearch": {
     "pageTitle": "Etsy Research",
@@ -7461,7 +7531,32 @@
     "ai_copyAll": "Copy All Tags",
     "ai_copied": "Copied!",
     "ai_clearAll": "Clear All Results",
-    "ai_cleared": "Results cleared"
+    "ai_cleared": "Results cleared",
+    "lg_titleInvalid": "The AI title doesn't meet Etsy's title rules (too long or invalid characters). Edit it before saving.",
+    "lg_descOptIn": "The description replaces your current one in full. It is only saved when you tick it.",
+    "ur_createListing": "Create listing from this",
+    "ur_createListingTitle": "Turn this research into a listing",
+    "ur_createListingDesc": "Opens the listing creator with the top tags, keywords and median price. Nothing is published until you publish it.",
+    "ur_prefillFailed": "Couldn't hand the data to the listing creator. Check that your browser allows site storage.",
+    "ci_createListingFromShop": "Create listing from this shop's data",
+    "lg_savedAsDraft": "Saved as draft — sync from the listings page.",
+    "lg_openListings": "Open listings",
+    "lg_applyFailed": "Couldn't save the changes as a draft",
+    "lg_listingFallback": "Listing",
+    "lg_applyHint": "Generate a title, tag or description fix first",
+    "lg_applyAsDraft": "Save fixes as draft",
+    "lg_useInNewListing": "Use in new listing",
+    "lg_applyExplain": "This is your listing. Fixes are saved as a draft; Etsy changes only when you sync it from the listings page.",
+    "lg_notOwnListing": "This listing isn't in your selected shop, so fixes can only be used for a new listing.",
+    "ai_pickListing": "Optimize one of my listings (optional)",
+    "ai_pickListingHelp": "Fills the fields with the listing's title and tags",
+    "ai_savedAsDraft": "Saved as draft — sync from the listings page.",
+    "ai_openListings": "Open listings",
+    "ai_applyFailed": "Couldn't save the changes as a draft",
+    "ai_applyAsDraft": "Save to listing as draft",
+    "ai_useInNewListing": "Use in new listing",
+    "ai_applyExplain": "Saved as a draft on the selected listing. Etsy changes only when you sync it.",
+    "ai_newListingExplain": "Opens the listing creator with these results. Nothing is published until you publish it."
   },
   "ordersTable": {
     "orderId": "Order ID",
@@ -7630,7 +7725,10 @@
     "showLess": "Show less",
     "authorized": "Authorized",
     "viewOnTrendyol": "View on Trendyol",
-    "browseAll": "Browse All"
+    "browseAll": "Browse All",
+    "createEtsyListing": "Etsy listing",
+    "createEbayListing": "eBay listing",
+    "prefillFailed": "Couldn't hand the product to the listing creator. Check that your browser allows site storage."
   },
   "trendyolListings": {
     "title": "Trendyol Products",
@@ -9006,5 +9104,77 @@
       "description": "Link your {name} account and your data will show up here automatically.",
       "cta": "Connect {name}"
     }
+  },
+  "notifications": {
+    "kinds": {
+      "label": "label",
+      "orderSync": "order sync",
+      "generic": "usage"
+    },
+    "markAllRead": "Mark all read",
+    "loading": "Loading…",
+    "unread": "Unread",
+    "fallback": "You have a new notification",
+    "types": {
+      "draftSyncFailed": "Sync to Etsy failed for \"{title}\"",
+      "draftConflict": "\"{title}\" was changed on Etsy: review it before syncing",
+      "reauthRequired": "Your {provider} connection expired. Reconnect it in Settings",
+      "orderSyncFailed": "Order sync from {provider} failed",
+      "usageNearLimit": "You have used {used} of {limit} {kind, select, orderSync {order syncs} label {labels} other {credits}} this period",
+      "usageLimitReached": "You have reached your {kind, select, orderSync {order sync} label {label} other {usage}} limit. Upgrade your plan to continue"
+    }
+  },
+  "commandPalette": {
+    "title": "Command palette",
+    "placeholder": "Search pages, actions or orders…",
+    "actions": "Actions",
+    "goTo": "Go to",
+    "orders": "Orders",
+    "syncOrders": "Sync orders",
+    "syncOrdersHint": "Fetch the latest orders from your stores",
+    "newEtsyListing": "New Etsy listing",
+    "newEtsyListingHint": "Open Etsy listings to create a listing",
+    "searchOrdersFor": "Search orders for “{query}”",
+    "noResults": "No results",
+    "searching": "Searching…",
+    "close": "Close",
+    "hintNavigate": "to navigate",
+    "hintSelect": "to select",
+    "hintClose": "to close"
+  },
+  "printSlips": {
+    "pickSummary": "{orders, plural, one {# order} other {# orders}} · {lines, plural, one {# line} other {# lines}} · {units, plural, one {# unit} other {# units}}",
+    "ordersWithoutItems": "{count, plural, one {# order has} other {# orders have}} no item details and {count, plural, one {is} other {are}} not included: {orders}",
+    "packingSlips": "Packing slips",
+    "packingSlip": "Packing slip",
+    "pickList": "Pick list",
+    "print": "Print",
+    "signIn": "Sign in",
+    "notSignedIn": "Sign in to print packing slips and pick lists.",
+    "noIds": "No orders selected. Select orders on the labels page and try again.",
+    "tooMany": "You can print up to {max} orders at once.",
+    "missing": "{count, plural, one {# order} other {# orders}} could not be loaded (deleted or not in your account).",
+    "empty": "None of the selected orders could be found.",
+    "orderNumber": "Order #{number}",
+    "orderDate": "Order date",
+    "shipTo": "Ship to",
+    "from": "From",
+    "items": "Items",
+    "qty": "Qty",
+    "totalQty": "Total qty",
+    "sku": "SKU",
+    "variation": "Variation",
+    "itemNote": "Note",
+    "noItems": "No items.",
+    "totalUnits": "{count, plural, one {# unit} other {# units}}",
+    "giftMessage": "Gift message",
+    "buyerNote": "Buyer note",
+    "thankYou": "Thank you for your order!",
+    "generatedAt": "Generated {date}",
+    "picked": "Picked",
+    "noSku": "No SKU",
+    "neededFor": "Orders",
+    "popupBlocked": "Your browser blocked the new tab. Allow pop-ups for this site and try again.",
+    "truncated": "Only the first {max} selected orders were opened."
   }
 }

@@ -8,10 +8,13 @@ import {
 import {
   Search, TrendingUp, Copy, Download, RotateCcw, ExternalLink,
   ArrowUpDown, Trash2, Sparkles, Type, Hash, Layers, Eye,
-  CheckCircle, XCircle, Info, Zap, Plus, Minus, ShoppingBag, BarChart3,
+  CheckCircle, XCircle, Info, Zap, Plus, Minus, ShoppingBag, BarChart3, FilePlus2,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import useLocaleStore from '@/lib/stores/useLocaleStore';
+import { formatMoney, marketplaceCurrency } from './marketplaces';
+import useCreateListingPrefill from './useCreateListingPrefill';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -101,7 +104,6 @@ const MAX_TITLE_LENGTH = 80;
 // Helpers
 // ---------------------------------------------------------------------------
 
-const fmt = (n: number) => `$${n.toFixed(2)}`;
 const pct = (n: number) => `${n.toFixed(1)}%`;
 
 function extractWords(title: string): string[] {
@@ -342,6 +344,9 @@ function downloadCSV(content: string, filename: string) {
 
 export default function KeywordIntelligence({ userId, marketplace, userListings, onNavigate }: KeywordIntelligenceProps) {
   const t = useTranslations('ebay.research.keyword');
+  const tr = useTranslations('ebayResearch');
+  const locale = useLocaleStore(s => s.locale);
+  const createListing = useCreateListingPrefill();
   const [activeTab, setActiveTab] = useState(0);
 
   // --- User keywords from listings ---
@@ -438,6 +443,10 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
     return rows;
   }, [keywordRows, sortField, sortDir]);
 
+  // Prices come back in the searched marketplace's currency.
+  const currency = items.find(i => i?.price?.currency)?.price.currency || marketplaceCurrency(marketplace);
+  const fmt = (n: number) => formatMoney(n, currency, locale);
+
   const handleSort = useCallback(
     (field: SortField) => {
       if (sortField === field) {
@@ -531,6 +540,32 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
   const titleVariations = useMemo(() => {
     return generateTitleVariations(sortedKeywords, MAX_TITLE_LENGTH);
   }, [sortedKeywords]);
+
+  /** Hand the research to the eBay listing creator (opens it prefilled; nothing is published). */
+  const handleCreateListing = useCallback((titleOverride?: string) => {
+    const prices = items
+      .map(i => parseFloat(i?.price?.value ?? ''))
+      .filter(n => Number.isFinite(n) && n > 0)
+      .sort((a, b) => a - b);
+    const median = prices.length ? prices[Math.floor(prices.length / 2)] : undefined;
+    const top = sortedKeywords.slice(0, 13).map(k => k.keyword);
+    createListing({
+      target: 'ebay',
+      source: 'ebay-research',
+      title: (titleOverride || titleText || titleVariations[0] || query).trim(),
+      keywords: top,
+      price: median,
+      currency,
+      research: {
+        tool: 'keyword_intelligence',
+        marketplace,
+        query,
+        listingsAnalyzed: items.length,
+        topKeywords: sortedKeywords.slice(0, 30).map(k => ({ keyword: k.keyword, usagePercent: k.usagePercent, score: k.score })),
+        topPhrases: bigrams.slice(0, 10).map(b => b.phrase),
+      },
+    });
+  }, [items, sortedKeywords, createListing, titleText, titleVariations, query, currency, marketplace, bigrams]);
 
   const addKeywordToTitle = useCallback(
     (word: string) => {
@@ -720,7 +755,16 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
               variant="outlined"
               size="small"
             />
-            <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
+            <Box sx={{ ml: 'auto', display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              <Button
+                size="small"
+                variant="contained"
+                startIcon={<FilePlus2 size={14} />}
+                onClick={() => handleCreateListing()}
+                sx={{ minHeight: { xs: 44, md: 36 }, width: { xs: '100%', sm: 'auto' }, background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}
+              >
+                {tr('createListingFromThis')}
+              </Button>
               <Tooltip title={t('copyTop30Tooltip')}>
                 <Button size="small" variant="outlined" startIcon={<Copy size={14} />} onClick={copyAllKeywords} sx={{ borderColor: '#6366f1', color: '#6366f1' }}>
                   {t('copyAll')}
@@ -802,6 +846,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                           <Tooltip title={t('viewProducts')}>
                             <IconButton
                               size="small"
+                              aria-label={t('viewProducts')}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onNavigate('product_database', { keyword: row.keyword });
@@ -813,6 +858,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                           <Tooltip title={t('nicheAnalysis')}>
                             <IconButton
                               size="small"
+                              aria-label={t('nicheAnalysis')}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onNavigate('niche_finder', { keyword: row.keyword });
@@ -1185,7 +1231,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                   startIcon={<Minus size={14} />}
                   onClick={removeLastWord}
                   disabled={!titleText}
-                  sx={{ borderColor: '#6366f1', color: '#6366f1' }}
+                  sx={{ minHeight: { xs: 44, md: 36 }, borderColor: '#6366f1', color: '#6366f1' }}
                 >
                   {t('removeLastWord')}
                 </Button>
@@ -1201,6 +1247,16 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                   sx={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}
                 >
                   {t('copyButton')}
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<FilePlus2 size={14} />}
+                  onClick={() => handleCreateListing(titleText)}
+                  disabled={!titleText}
+                  sx={{ minHeight: { xs: 44, md: 36 }, width: { xs: '100%', sm: 'auto' }, borderColor: '#6366f1', color: '#6366f1' }}
+                >
+                  {tr('createListingFromThis')}
                 </Button>
               </Box>
 
@@ -1256,6 +1312,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                       <Tooltip title={t('useThisTitle')}>
                         <IconButton
                           size="small"
+                          aria-label={t('useThisTitle')}
                           onClick={() => {
                             setTitleText(v);
                             toast.success(t('titleSelected'));
@@ -1267,6 +1324,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                       <Tooltip title={t('copyTooltip')}>
                         <IconButton
                           size="small"
+                          aria-label={t('copyTooltip')}
                           onClick={() => {
                             navigator.clipboard.writeText(v);
                             toast.success(t('copied'));

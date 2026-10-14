@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { encryptIfNeeded } from '@/lib/crypto/credentials';
 import { verifyOAuthState } from '@/lib/auth/oauthState';
+import { resolveNotification, notificationKeys } from '@/lib/notifications';
 
 export default async function handler(
   req: NextApiRequest,
@@ -240,6 +241,8 @@ export default async function handler(
       });
 
       etsyShopSaved = true;
+      // A successful (re)connect clears any open "reconnect Etsy" alert for this shop.
+      void resolveNotification(userId, notificationKeys.reauth('etsy', shopData.shop_id.toString()));
       logger.info('Successfully stored shop in EtsyShop model', {
         userId,
         shopId: shopData.shop_id,

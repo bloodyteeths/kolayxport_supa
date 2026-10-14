@@ -142,12 +142,15 @@ function KeywordCard({ kw, expanded, onToggle }: { kw: KeywordCoverage; expanded
 
 export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, onNavigate, navigateData, onConsumeNavigateData }: SeoAnalyzerProps) {
   const t = useTranslations('ebay.research.seoAnalyzer');
+  const tA = useTranslations('ebayResearch');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const [keyword, setKeyword] = useState('');
   const [myTitle, setMyTitle] = useState('');
   const [selectedMarketplace, setSelectedMarketplace] = useState(defaultMarketplace || 'EBAY_US');
+  // Follow the page-level marketplace picker when it changes.
+  useEffect(() => { if (defaultMarketplace) setSelectedMarketplace(defaultMarketplace); }, [defaultMarketplace]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SeoResult | null>(null);
 
@@ -619,7 +622,7 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
                   <Paper variant="outlined" sx={{ p: 1.5, mb: 1.5, bgcolor: '#fff5f5', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <Typography variant="body2">{myTitle}</Typography>
-                      <IconButton size="small" onClick={() => copyToClipboard(myTitle)}>
+                      <IconButton aria-label={tA('copy')} size="small" onClick={() => copyToClipboard(myTitle)}>
                         <Copy size={14} />
                       </IconButton>
                     </Box>
@@ -629,7 +632,7 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
                   <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#f0fdf4', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 2, boxShadow: '0 0 8px rgba(16,185,129,0.08)' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <Typography variant="body2" fontWeight={600}>{optimizedTitle}</Typography>
-                      <IconButton size="small" onClick={() => copyToClipboard(optimizedTitle)}>
+                      <IconButton aria-label={tA('copy')} size="small" onClick={() => copyToClipboard(optimizedTitle)}>
                         <Copy size={14} />
                       </IconButton>
                     </Box>

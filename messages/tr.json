@@ -186,7 +186,17 @@
     "unpinSidebar": "Menü sabitlemesini kaldır",
     "reauthNeeded": "Bir bağlantının yeniden yetkilendirilmesi gerekiyor",
     "closeMenu": "Menüyü kapat",
-    "toggleMenu": "Gezinme menüsünü aç/kapat"
+    "toggleMenu": "Gezinme menüsünü aç/kapat",
+    "allOrders": "Tüm siparişler",
+    "home": "Ana sayfa",
+    "listings": "Ürünler",
+    "finance": "Finans",
+    "reports": "Raporlar",
+    "productionList": "Üretim listesi",
+    "help": "Yardım",
+    "more": "Daha fazla",
+    "mainNavigation": "Ana gezinme",
+    "search": "Ara"
   },
   "manualOrder": {
     "addButton": "Manuel Sipariş Ekle",
@@ -1902,7 +1912,16 @@
       "monthlySales": "Aylık satış",
       "salesKindMeasured": "ölçülen",
       "salesKindEstimated": "tahmin",
-      "salesKindInsufficient": "yetersiz veri"
+      "salesKindInsufficient": "yetersiz veri",
+      "costPrice": "Maliyet fiyatı",
+      "avgMarket": "Pazar ortalaması",
+      "roasHelp": "Reklam harcaması getirisi (gelir ÷ reklam maliyeti)",
+      "totalFees": "Toplam kesintiler",
+      "adsCost": "Reklam maliyeti",
+      "keywordToTrack": "Takip edilecek anahtar kelime",
+      "addKeyword": "Anahtar kelime ekle",
+      "noTrackedKeywords": "Henüz takip edilen anahtar kelime yok",
+      "rank": "Sıra"
     },
     "marketResearch": {
       "myShop": "Mağazam",
@@ -3393,7 +3412,8 @@
       "importedImagesHint": "Kaynak ilandan {count} fotoğraf alındı. Sadece bu ilanı yayınladığında veya senkronize ettiğinde indirilir.",
       "importedImagesFailed": "Alınan fotoğraflar taslağa eklenemedi.",
       "prefilledFromEbay": "eBay ilanından dolduruldu. Tüm alanları kontrol et, kategori seç ve etiket ekle. Oluştur ve Yayınla'ya basana kadar hiçbir şey yayınlanmaz.",
-      "prefilledFromEtsy": "Mevcut bir ilandan çoğaltıldı. Kaydetmeden önce başlığı değiştir. Yayınlayana veya senkronize edene kadar Etsy'ye hiçbir şey gitmez."
+      "prefilledFromEtsy": "Mevcut bir ilandan çoğaltıldı. Kaydetmeden önce başlığı değiştir. Yayınlayana veya senkronize edene kadar Etsy'ye hiçbir şey gitmez.",
+      "prefilledFromResearch": "Araştırmanızdan dolduruldu. Tam bir başlık yazın, kategori seçin ve her alanı kontrol edin. Oluştur ve Yayınla'ya basana kadar hiçbir şey yayınlanmaz."
     },
     "video": {
       "add": "Video Ekle",
@@ -4141,7 +4161,9 @@
         "retry": "Tekrar Dene",
         "quotaExhausted": "eBay günlük kotası doldu",
         "quotaResetsAt": "Sıfırlanma: {time}",
-        "connectEbayForUnlimited": "Kendi eBay hesabınızı bağlayarak kendi günlük kotanıza sahip olabilirsiniz."
+        "connectEbayForUnlimited": "Kendi eBay hesabınızı bağlayarak kendi günlük kotanıza sahip olabilirsiniz.",
+        "listOnEbay": "eBay'de listele",
+        "close": "Kapat"
       },
       "category": {
         "title": "Kategori Keşfedici",
@@ -4741,7 +4763,8 @@
         "jewelryWatches": "Mücevher ve Saatler",
         "sneakersAuth": "Spor Ayakkabılar (Doğrulanmış)",
         "businessIndustrial": "İş & Endüstri",
-        "musicalInstruments": "Müzik Aletleri & Ekipmanları"
+        "musicalInstruments": "Müzik Aletleri & Ekipmanları",
+        "totalResultsCount": "{count} sonuç"
       },
       "keyword": {
         "title": "Anahtar Kelime Istihbarati",
@@ -6700,7 +6723,48 @@
     "ebayUrlOrItemId": "eBay URL veya Ürün ID",
     "ebayUrlPlaceholder": "https://www.ebay.com/itm/... veya 123456789",
     "addDialogCancel": "İptal",
-    "addDialogAdd": "Ekle"
+    "addDialogAdd": "Ekle",
+    "pageHeading": "eBay Ürün İstihbaratı",
+    "pageSubheading": "Pazar araştırması, ürün takibi, niş analizi ve rakip izleme",
+    "toolsLabel": "Araştırma araçları",
+    "moreTools": "Diğer araçlar",
+    "retry": "Tekrar dene",
+    "close": "Kapat",
+    "copy": "Kopyala",
+    "expand": "Genişlet",
+    "collapse": "Daralt",
+    "actions": "İşlemler",
+    "minShort": "Min",
+    "maxShort": "Maks",
+    "soldCount": "{count} satış",
+    "createListingFromThis": "Bundan ilan oluştur",
+    "createListingFailed": "İlan oluşturucu açılamadı. Lütfen tekrar deneyin.",
+    "keywordPlaceholderExample": "örn. wireless earbuds, bluetooth speaker, yoga mat",
+    "nichePlaceholderExample": "örn. vintage jewelry, phone case, led lights",
+    "sellerPlaceholderExample": "örn. top_seller_2024, best.deals.shop",
+    "addNotePlaceholder": "Not ekle...",
+    "newTag": "Yeni etiket",
+    "noteLabel": "Not",
+    "tagLabel": "Etiket",
+    "categoryAnalysisFailed": "Kategori analizi başarısız",
+    "analyzeBtn": "Analiz Et",
+    "nicheTip1": "Düşük rekabet + yüksek talep = en iyi fırsatlar",
+    "nicheTip2": "Fırsat puanı 70+ olan nişlere odaklanın",
+    "nicheTip3": "Nişleri kaydedin ve fiyat/rekabet değişimlerini düzenli olarak kontrol edin",
+    "nicheTip4": "En çok satan ürünleri inceleyerek hangi özelliklerin önemli olduğunu anlayın",
+    "backToExplore": "Keşfetmeye dön",
+    "demandScore": "Talep Puanı",
+    "competitionScore": "Rekabet Puanı",
+    "competition": "Rekabet",
+    "noTrackedSellers": "Henüz takip ettiğiniz satıcı yok",
+    "noTrackedSellersSub": "Rakip satıcıları ekleyerek fiyat ve stok değişikliklerini izleyin. Yukarıdaki alana eBay kullanıcı adı girin.",
+    "howToTrackSellers": "Satıcı takibi nasıl kullanılır?",
+    "sellerStep1": "Rakip satıcının eBay kullanıcı adını girin",
+    "sellerStep2": "Yeni ürün, fiyat değişikliği ve stok güncellemelerini otomatik takip edin",
+    "sellerStep3": "Satıcının puanını ve olumlu geri bildirim oranını izleyin",
+    "sellerStep4": "Satıcının ürünlerini görüp kendi nişlerinizle karşılaştırın",
+    "positivePct": "%{pct} olumlu",
+    "positivePctHeader": "Olumlu %"
   },
   "amazonResearch": {
     "title": "Amazon Araştırma",
@@ -7062,6 +7126,11 @@
       "renew": "Yenileme yerel taslağa eklendi. Uygulamak için Etsy'ye senkronize et.",
       "deactivate": "Deaktif etme yerel taslağa eklendi. Uygulamak için Etsy'ye senkronize et.",
       "saved": "Taslak kaydedildi. Uygulamak için Etsy'ye senkronize et."
+    },
+    "prefill": {
+      "connectEtsy": "Bu araştırmadan ilan oluşturmak için bir Etsy mağazası bağlayın.",
+      "notFound": "Doldurulacak araştırma verisi bulunamadı. Araştırma sayfasından yeniden başlayın.",
+      "priceCurrencyMismatch": "Fiyat kopyalanmadı: araştırma fiyatı {from}, Etsy mağazanız {to} kullanıyor."
     }
   },
   "ebayListings": {
@@ -7328,7 +7397,8 @@
     "crosslistReplaceConfirm": "Etsy ilanını kullan",
     "listOnEtsy": "Etsy'de listele",
     "crosslistLoading": "Etsy ilanı yükleniyor…",
-    "crosslistLoadFailed": "Kopyalanacak Etsy ilanı yüklenemedi."
+    "crosslistLoadFailed": "Kopyalanacak Etsy ilanı yüklenemedi.",
+    "prefillMissing": "Araştırma verisi yüklenemedi. Yeni bir ilan oluşturun."
   },
   "etsyResearch": {
     "pageTitle": "Etsy Araştırma",
@@ -7461,7 +7531,32 @@
     "ai_copyAll": "Tüm Tagları Kopyala",
     "ai_copied": "Kopyalandı!",
     "ai_clearAll": "Tüm Sonuçları Temizle",
-    "ai_cleared": "Sonuçlar temizlendi"
+    "ai_cleared": "Sonuçlar temizlendi",
+    "lg_titleInvalid": "AI başlığı Etsy başlık kurallarına uymuyor (çok uzun veya geçersiz karakter). Kaydetmeden önce düzenleyin.",
+    "lg_descOptIn": "Açıklama mevcut açıklamanızın tamamının yerine geçer. Yalnızca işaretlerseniz kaydedilir.",
+    "ur_createListing": "Bundan ilan oluştur",
+    "ur_createListingTitle": "Bu araştırmayı ilana dönüştür",
+    "ur_createListingDesc": "İlan oluşturucuyu en iyi etiketler, anahtar kelimeler ve medyan fiyatla açar. Siz yayınlayana kadar hiçbir şey yayınlanmaz.",
+    "ur_prefillFailed": "Veriler ilan oluşturucuya aktarılamadı. Tarayıcınızın site depolamasına izin verdiğini kontrol edin.",
+    "ci_createListingFromShop": "Bu mağazanın verileriyle ilan oluştur",
+    "lg_savedAsDraft": "Taslak olarak kaydedildi — ilanlar sayfasından senkronize edin.",
+    "lg_openListings": "İlanları aç",
+    "lg_applyFailed": "Değişiklikler taslak olarak kaydedilemedi",
+    "lg_listingFallback": "İlan",
+    "lg_applyHint": "Önce başlık, etiket veya açıklama düzeltmesi oluşturun",
+    "lg_applyAsDraft": "Düzeltmeleri taslak olarak kaydet",
+    "lg_useInNewListing": "Yeni ilanda kullan",
+    "lg_applyExplain": "Bu sizin ilanınız. Düzeltmeler taslak olarak kaydedilir; Etsy yalnızca ilanlar sayfasından senkronize ettiğinizde değişir.",
+    "lg_notOwnListing": "Bu ilan seçili mağazanızda değil; düzeltmeler yalnızca yeni bir ilan için kullanılabilir.",
+    "ai_pickListing": "İlanlarımdan birini optimize et (isteğe bağlı)",
+    "ai_pickListingHelp": "Alanları ilanın başlığı ve etiketleriyle doldurur",
+    "ai_savedAsDraft": "Taslak olarak kaydedildi — ilanlar sayfasından senkronize edin.",
+    "ai_openListings": "İlanları aç",
+    "ai_applyFailed": "Değişiklikler taslak olarak kaydedilemedi",
+    "ai_applyAsDraft": "İlana taslak olarak kaydet",
+    "ai_useInNewListing": "Yeni ilanda kullan",
+    "ai_applyExplain": "Seçili ilana taslak olarak kaydedilir. Etsy yalnızca senkronize ettiğinizde değişir.",
+    "ai_newListingExplain": "İlan oluşturucuyu bu sonuçlarla açar. Siz yayınlayana kadar hiçbir şey yayınlanmaz."
   },
   "ordersTable": {
     "orderId": "Sipariş Kimliği",
@@ -7630,7 +7725,10 @@
     "showLess": "Daha az göster",
     "authorized": "Yetkili",
     "viewOnTrendyol": "Trendyol'da Gör",
-    "browseAll": "Tümüne Göz At"
+    "browseAll": "Tümüne Göz At",
+    "createEtsyListing": "Etsy ilanı",
+    "createEbayListing": "eBay ilanı",
+    "prefillFailed": "Ürün ilan oluşturucuya aktarılamadı. Tarayıcınızın site depolamasına izin verdiğini kontrol edin."
   },
   "trendyolListings": {
     "title": "Trendyol Ürünler",
@@ -9006,5 +9104,77 @@
       "description": "{name} hesabınızı bağlayın, verileriniz burada otomatik olarak görünsün.",
       "cta": "{name} bağla"
     }
+  },
+  "notifications": {
+    "kinds": {
+      "label": "etiket",
+      "orderSync": "sipariş senkronu",
+      "generic": "kullanım"
+    },
+    "markAllRead": "Tümünü okundu işaretle",
+    "loading": "Yükleniyor…",
+    "unread": "Okunmadı",
+    "fallback": "Yeni bir bildiriminiz var",
+    "types": {
+      "draftSyncFailed": "\"{title}\" için Etsy'ye senkronizasyon başarısız oldu",
+      "draftConflict": "\"{title}\" Etsy'de değiştirildi, senkronize etmeden önce kontrol edin",
+      "reauthRequired": "{provider} bağlantınızın süresi doldu. Ayarlar'dan yeniden bağlanın",
+      "orderSyncFailed": "{provider} sipariş senkronizasyonu başarısız oldu",
+      "usageNearLimit": "Bu dönemde {limit} {kind, select, orderSync {sipariş senkronizasyonu} label {etiket} other {kullanım}} hakkınızın {used} tanesini kullandınız",
+      "usageLimitReached": "{kind, select, orderSync {Sipariş senkronizasyonu} label {Etiket} other {Kullanım}} limitinize ulaştınız. Devam etmek için planınızı yükseltin"
+    }
+  },
+  "commandPalette": {
+    "title": "Komut paleti",
+    "placeholder": "Sayfa, işlem veya sipariş ara…",
+    "actions": "İşlemler",
+    "goTo": "Git",
+    "orders": "Siparişler",
+    "syncOrders": "Siparişleri senkronize et",
+    "syncOrdersHint": "Mağazalarınızdan en son siparişleri çeker",
+    "newEtsyListing": "Yeni Etsy ürünü",
+    "newEtsyListingHint": "Ürün oluşturmak için Etsy ürünlerini açar",
+    "searchOrdersFor": "Siparişlerde “{query}” ara",
+    "noResults": "Sonuç bulunamadı",
+    "searching": "Aranıyor…",
+    "close": "Kapat",
+    "hintNavigate": "gezin",
+    "hintSelect": "seç",
+    "hintClose": "kapat"
+  },
+  "printSlips": {
+    "pickSummary": "{orders} sipariş · {lines} satır · {units} adet",
+    "ordersWithoutItems": "{count} siparişin ürün bilgisi yok ve listeye dahil edilmedi: {orders}",
+    "packingSlips": "Paketleme fişleri",
+    "packingSlip": "Paketleme fişi",
+    "pickList": "Toplama listesi",
+    "print": "Yazdır",
+    "signIn": "Giriş yap",
+    "notSignedIn": "Paketleme fişi ve toplama listesi yazdırmak için giriş yapın.",
+    "noIds": "Sipariş seçilmedi. Etiketler sayfasında sipariş seçip tekrar deneyin.",
+    "tooMany": "Tek seferde en fazla {max} sipariş yazdırabilirsiniz.",
+    "missing": "{count} sipariş yüklenemedi (silinmiş veya hesabınıza ait değil).",
+    "empty": "Seçilen siparişlerin hiçbiri bulunamadı.",
+    "orderNumber": "Sipariş #{number}",
+    "orderDate": "Sipariş tarihi",
+    "shipTo": "Teslimat adresi",
+    "from": "Gönderen",
+    "items": "Ürünler",
+    "qty": "Adet",
+    "totalQty": "Toplam adet",
+    "sku": "SKU",
+    "variation": "Varyasyon",
+    "itemNote": "Not",
+    "noItems": "Ürün yok.",
+    "totalUnits": "{count} adet",
+    "giftMessage": "Hediye mesajı",
+    "buyerNote": "Alıcı notu",
+    "thankYou": "Siparişiniz için teşekkür ederiz!",
+    "generatedAt": "Oluşturulma: {date}",
+    "picked": "Toplandı",
+    "noSku": "SKU yok",
+    "neededFor": "Siparişler",
+    "popupBlocked": "Tarayıcınız yeni sekmeyi engelledi. Bu site için açılır pencerelere izin verip tekrar deneyin.",
+    "truncated": "Seçilen siparişlerden yalnızca ilk {max} tanesi açıldı."
   }
 }

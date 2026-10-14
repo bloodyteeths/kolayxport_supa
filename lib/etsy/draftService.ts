@@ -117,6 +117,27 @@ function mediaIdentity(media: any) {
 // clawd Etsy API and video upload routes.
 import { getEtsyAccessToken } from './etsyToken';
 export { getEtsyAccessToken };
+import { notify, resolveNotification, notificationKeys, NOTIFICATION_LINKS } from '@/lib/notifications';
+
+/** Human label for a draft in notifications: staged title > base title > listing id. */
+function draftNotificationTitle(draft: any): string {
+  const staged = draft?.fieldPatch && typeof draft.fieldPatch === 'object' ? draft.fieldPatch.title : null;
+  const base = draft?.baseSnapshot && typeof draft.baseSnapshot === 'object' ? draft.baseSnapshot.title : null;
+  const title = (typeof staged === 'string' && staged.trim()) || (typeof base === 'string' && base.trim()) || '';
+  return (title || `#${String(draft?.etsyListingId ?? '')}`).slice(0, 120);
+}
+
+/** Fire-and-forget: never blocks or fails the sync path (notify/resolve never reject). */
+function notifyDraftProblem(userId: string, draft: any, type: 'draftSyncFailed' | 'draftConflict') {
+  void notify(userId, {
+    type,
+    severity: type === 'draftConflict' ? 'warning' : 'error',
+    titleKey: `types.${type}`,
+    params: { title: draftNotificationTitle(draft) },
+    link: NOTIFICATION_LINKS.etsyListings,
+    dedupeKey: notificationKeys.draft(String(draft.id)),
+  });
+}
 
 export async function callEtsyAPI(endpoint: string, accessToken: string, options: RequestInit = {}) {
   const response = await etsyFetch(`${ETSY_API_BASE}${endpoint}`, {
@@ -1787,6 +1808,7 @@ export async function syncDraft(draftId: string, userId: string, options: SyncDr
           } else {
             const message = 'Listing changed on Etsy after these edits were staged. Review it, then sync again with "apply anyway" to overwrite.';
             await prisma.etsyListingDraft.update({ where: { id: draft.id }, data: { status: 'conflict', lastSyncError: message } });
+            notifyDraftProblem(userId, draft, 'draftConflict');
             await prisma.etsyDraftSyncAttempt.update({
               where: { id: attempt.id },
               data: {
@@ -1834,6 +1856,7 @@ export async function syncDraft(draftId: string, userId: string, options: SyncDr
         data: { status: 'success', finishedAt: new Date(), result: { count: results.length, etsyListingId: String(syncedListingId), deleted: true } },
       });
       for (const media of draft.media) await unlinkDraftUploadFile(media.localPath);
+      void resolveNotification(userId, notificationKeys.draft(String(draft.id)));
       return { status: 'success', draftId: draft.id, count: results.length, deleted: true, etsyListingId: String(syncedListingId) };
     }
 
@@ -2233,6 +2256,7 @@ export async function syncDraft(draftId: string, userId: string, options: SyncDr
     });
 
     for (const media of draft.media) await unlinkDraftUploadFile(media.localPath);
+    void resolveNotification(userId, notificationKeys.draft(String(draft.id)));
     return {
       status: 'success',
       draftId: draft.id,
@@ -2263,6 +2287,7 @@ export async function syncDraft(draftId: string, userId: string, options: SyncDr
       where: { id: draft.id },
       data: { status: 'failed', lastSyncError: message, queuedActions, ...rebase },
     }).catch(() => undefined);
+    notifyDraftProblem(userId, draft, 'draftSyncFailed');
     await prisma.etsyDraftSyncAttempt.update({
       where: { id: attempt.id },
       data: {
@@ -2289,5 +2314,6 @@ export async function discardDraft(draftId: string, userId: string) {
   }
   for (const media of draft.media) await unlinkDraftUploadFile(media.localPath);
   await prisma.etsyListingDraft.update({ where: { id: draft.id }, data: { status: 'cancelled' } });
+  void resolveNotification(userId, notificationKeys.draft(String(draft.id)));
   return { success: true };
 }

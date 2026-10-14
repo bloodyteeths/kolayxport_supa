@@ -12,6 +12,7 @@ import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
 import { EtsyDraftError } from './draftErrors';
+import { notify, resolveNotification, notificationKeys, NOTIFICATION_LINKS } from '@/lib/notifications';
 
 const TOKEN_REFRESH_SKEW_MS = 5 * 60 * 1000;
 const TOKEN_FETCH_TIMEOUT_MS = 30_000;
@@ -63,7 +64,9 @@ async function exchangeRefreshToken(shopId: string, refreshToken: string) {
       // No reauth flag column exists on EtsyShop; the typed error lets the UI
       // show a "reconnect Etsy" prompt.
       logger.warn('Etsy refresh token rejected (invalid_grant) — shop needs reauthorization', { shopId });
-      throw reauthError();
+      const err = reauthError();
+      (err as any).invalidGrant = true; // getEtsyAccessToken raises the reauthRequired notification
+      throw err;
     }
     throw new Error(`Failed to refresh Etsy token: ${response.status} ${response.statusText}`);
   }
@@ -104,42 +107,69 @@ export async function getEtsyAccessToken(shopId: string, userId?: string): Promi
     }
   }
 
-  return prisma.$transaction(async (tx) => {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`etsy-token:${shopId}`}))`;
+  // Owner of the shop/credential actually refreshed (for notifications) and
+  // whether a refresh token exchange succeeded in this call.
+  let ownerUserId: string | undefined = userId;
+  let refreshed = false as boolean;
+  const notifyKey = notificationKeys.reauth('etsy', shopId);
 
-    const lockedShop = await tx.etsyShop.findFirst({
-      where: { shopId, isActive: true, ...(userId ? { userId } : {}) },
-      select: { accessToken: true, refreshToken: true, tokenExpiresAt: true },
-    });
-    if (lockedShop) {
-      if (!tokenNeedsRefresh(lockedShop.tokenExpiresAt)) return decryptIfNeeded(lockedShop.accessToken) as string;
-      const plainRefresh = decryptIfNeeded(lockedShop.refreshToken) as string | null;
+  try {
+    const token = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`etsy-token:${shopId}`}))`;
+
+      const lockedShop = await tx.etsyShop.findFirst({
+        where: { shopId, isActive: true, ...(userId ? { userId } : {}) },
+        select: { accessToken: true, refreshToken: true, tokenExpiresAt: true, userId: true },
+      });
+      if (lockedShop) {
+        ownerUserId = lockedShop.userId || ownerUserId;
+        if (!tokenNeedsRefresh(lockedShop.tokenExpiresAt)) return decryptIfNeeded(lockedShop.accessToken) as string;
+        const plainRefresh = decryptIfNeeded(lockedShop.refreshToken) as string | null;
+        if (!plainRefresh) throw reauthError('No Etsy refresh token — reconnect the Etsy shop');
+        const next = await exchangeRefreshToken(shopId, plainRefresh);
+        await tx.etsyShop.updateMany({
+          where: { shopId },
+          data: { accessToken: encryptIfNeeded(next.accessToken), refreshToken: encryptIfNeeded(next.refreshToken), tokenExpiresAt: next.tokenExpiresAt },
+        });
+        refreshed = true;
+        return next.accessToken;
+      }
+
+      const credential = await tx.credential.findFirst({
+        where: { etsyShopId: shopId, ...(userId ? { userId } : {}) },
+        select: { etsyAccessToken: true, etsyRefreshToken: true, etsyTokenExpiresAt: true, userId: true },
+      });
+      if (!credential?.etsyAccessToken) throw shopNotFoundError();
+      ownerUserId = credential.userId || ownerUserId;
+      if (!tokenNeedsRefresh(credential.etsyTokenExpiresAt)) return decryptIfNeeded(credential.etsyAccessToken) as string;
+      const plainRefresh = decryptIfNeeded(credential.etsyRefreshToken) as string | null;
       if (!plainRefresh) throw reauthError('No Etsy refresh token — reconnect the Etsy shop');
       const next = await exchangeRefreshToken(shopId, plainRefresh);
-      await tx.etsyShop.updateMany({
-        where: { shopId },
-        data: { accessToken: encryptIfNeeded(next.accessToken), refreshToken: encryptIfNeeded(next.refreshToken), tokenExpiresAt: next.tokenExpiresAt },
+      await tx.credential.updateMany({
+        where: { etsyShopId: shopId, ...(userId ? { userId } : {}) },
+        data: {
+          etsyAccessToken: encryptIfNeeded(next.accessToken),
+          etsyRefreshToken: encryptIfNeeded(next.refreshToken),
+          etsyTokenExpiresAt: next.tokenExpiresAt,
+        },
       });
+      refreshed = true;
       return next.accessToken;
+    }, { timeout: 60_000, maxWait: 60_000 });
+    // A successful refresh proves the grant is valid again (e.g. after reconnect).
+    if (refreshed && ownerUserId) void resolveNotification(ownerUserId, notifyKey);
+    return token;
+  } catch (err: any) {
+    if (err?.invalidGrant && ownerUserId) {
+      void notify(ownerUserId, {
+        type: 'reauthRequired',
+        severity: 'error',
+        titleKey: 'types.reauthRequired',
+        params: { provider: 'Etsy' },
+        link: NOTIFICATION_LINKS.connections,
+        dedupeKey: notifyKey,
+      });
     }
-
-    const credential = await tx.credential.findFirst({
-      where: { etsyShopId: shopId, ...(userId ? { userId } : {}) },
-      select: { etsyAccessToken: true, etsyRefreshToken: true, etsyTokenExpiresAt: true },
-    });
-    if (!credential?.etsyAccessToken) throw shopNotFoundError();
-    if (!tokenNeedsRefresh(credential.etsyTokenExpiresAt)) return decryptIfNeeded(credential.etsyAccessToken) as string;
-    const plainRefresh = decryptIfNeeded(credential.etsyRefreshToken) as string | null;
-    if (!plainRefresh) throw reauthError('No Etsy refresh token — reconnect the Etsy shop');
-    const next = await exchangeRefreshToken(shopId, plainRefresh);
-    await tx.credential.updateMany({
-      where: { etsyShopId: shopId, ...(userId ? { userId } : {}) },
-      data: {
-        etsyAccessToken: encryptIfNeeded(next.accessToken),
-        etsyRefreshToken: encryptIfNeeded(next.refreshToken),
-        etsyTokenExpiresAt: next.tokenExpiresAt,
-      },
-    });
-    return next.accessToken;
-  }, { timeout: 60_000, maxWait: 60_000 });
+    throw err;
+  }
 }

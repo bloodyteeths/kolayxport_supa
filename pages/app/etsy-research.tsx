@@ -9,6 +9,7 @@ import withAuth from '@/components/withAuth';
 import { useAuth } from '@/lib/auth-context';
 import { useEtsyResearchStore } from '@/lib/stores/useEtsyResearchStore';
 import { useTranslations } from 'next-intl';
+import { useRouter } from 'next/router';
 
 // Lazy load sub-components
 const UnifiedResearch = lazy(() => import('@/components/etsy/research/UnifiedResearch'));
@@ -59,8 +60,28 @@ function EtsyResearchPage() {
 
   // Map activeView to tab index
   const tabIndex = activeView === 'research' ? 0 : activeView === 'grader' ? 1 : 2;
+
+  // Persist the active tab in the URL (?tab=research|grader|shopIntel).
+  const router = useRouter();
+  const tabParam = typeof router.query.tab === 'string' ? router.query.tab : '';
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (tabParam === 'research' || tabParam === 'grader' || tabParam === 'shopIntel') {
+      if (tabParam !== useEtsyResearchStore.getState().activeView) setActiveView(tabParam);
+    }
+  }, [router.isReady, tabParam]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const changeView = useCallback((view: 'research' | 'grader' | 'shopIntel') => {
+    setActiveView(view);
+    router.replace(
+      { pathname: router.pathname, query: { ...router.query, tab: view } },
+      undefined,
+      { shallow: true, scroll: false },
+    );
+  }, [router, setActiveView]);
+
   const handleTabChange = (_: any, newValue: number) => {
-    setActiveView(newValue === 0 ? 'research' : newValue === 1 ? 'grader' : 'shopIntel');
+    changeView(newValue === 0 ? 'research' : newValue === 1 ? 'grader' : 'shopIntel');
   };
 
   // Auto-fetch discovery data on mount
@@ -145,7 +166,7 @@ function EtsyResearchPage() {
           {activeView === 'research' && (
             <UnifiedResearch
               userListings={listings}
-              onNavigateToShopIntel={() => setActiveView('shopIntel')}
+              onNavigateToShopIntel={() => changeView('shopIntel')}
             />
           )}
           {activeView === 'grader' && (
@@ -158,7 +179,7 @@ function EtsyResearchPage() {
 
         {/* Floating AI Panel */}
         <Suspense fallback={null}>
-          <AiOptimizePanel />
+          <AiOptimizePanel shopId={selectedShopId} userListings={listings} />
         </Suspense>
       </Box>
     </AppLayout>

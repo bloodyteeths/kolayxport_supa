@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   Box, Typography, Paper, Button, TextField, InputAdornment,
-  FormControlLabel, Switch, Alert, Chip, IconButton,
+  FormControlLabel, Switch, Alert, Chip, IconButton, Checkbox,
   CircularProgress, LinearProgress, Tabs, Tab, useMediaQuery,
   Tooltip,
 } from '@mui/material';
@@ -9,11 +9,16 @@ import { useTheme } from '@mui/material/styles';
 import {
   CheckCircle, XCircle, Copy, TrendingUp, Target,
   Search, Zap, Link, AlertTriangle, Lightbulb, Sparkles,
-  RefreshCw,
+  RefreshCw, FilePlus2, Save,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import NextLink from 'next/link';
+import { useRouter } from 'next/router';
 import { useLocale } from '@/lib/i18n/useLocale';
+import { stageEtsyDraft } from '@/lib/etsy/draftClient';
+import { notify } from '@/lib/notify';
+import { coerceAiString, coerceAiStringArray, normalizeTags, normalizeTitle, checkTitle, TITLE_MAX } from '@/lib/etsy/seoRules';
 
 import {
   useEtsyResearchStore,
@@ -23,6 +28,7 @@ import {
 } from '@/lib/stores/useEtsyResearchStore';
 import type { FeeProfile, ProfitCalc } from './shared/types';
 import { fmt } from './shared/utils';
+import { prefillHref, writeListingPrefill, dominantCurrency } from './shared/listingPrefill';
 import {
   ScoreRing, glassCard, GRADIENTS, pillTabsSx, PremiumEmptyState, BeforeAfter,
 } from './shared/ui';
@@ -42,6 +48,11 @@ export default function ListingGrader({ shopId, userListings }: { shopId?: strin
   const [fixedTitle, setFixedTitle] = useState<string | null>(null);
   const [fixedTags, setFixedTags] = useState<string[] | null>(null);
   const [fixedDescription, setFixedDescription] = useState<string | null>(null);
+  const [applyLoading, setApplyLoading] = useState(false);
+  // Which generated fixes get staged. Description is opt-in: a generated
+  // description must never silently replace the seller's full copy.
+  const [stageFields, setStageFields] = useState({ title: true, tags: true, description: false });
+  const router = useRouter();
 
   // Profit Calculator
   const [purchaseCost, setPurchaseCost] = useState('');
@@ -87,9 +98,31 @@ export default function ListingGrader({ shopId, userListings }: { shopId?: strin
   const handleAnalyze = async () => {
     const id = extractListingId(analyzeInput);
     if (!id) return;
+    setFixedTitle(null);
+    setFixedTags(null);
+    setFixedDescription(null);
+    setStageFields({ title: true, tags: true, description: false });
     await fetchListingAnalysis(id);
+    // analyze_listing_url returns the listing fields flat, while this view and
+    // the store's audit read `listingAnalysis.listing` (with Etsy's price
+    // object + images). Nest them so the grader, fixes and audit all work.
+    const current: any = useEtsyResearchStore.getState().listingAnalysis;
+    if (current && !current.listing && current.listing_id) {
+      const priceNum = typeof current.price === 'number' ? current.price : 0;
+      const imageCount = Number(current.imageCount) || 0;
+      useEtsyResearchStore.setState({
+        listingAnalysis: {
+          ...current,
+          listing: {
+            ...current,
+            price: { amount: Math.round(priceNum * 100), divisor: 100 },
+            images: Array.from({ length: Math.min(imageCount, 20) }, () => null),
+          },
+        },
+      });
+    }
     // Auto-trigger audit
-    fetchListingAudit();
+    if (useEtsyResearchStore.getState().listingAnalysis?.listing) fetchListingAudit();
   };
 
   // One-click fix handlers
@@ -113,10 +146,14 @@ export default function ListingGrader({ shopId, userListings }: { shopId?: strin
           market_context,
         }),
       });
-      const data = await res.json();
-      if (data.optimized_title) {
-        setFixedTitle(data.optimized_title);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+      const title = coerceAiString(data?.optimized_title);
+      if (title) {
+        setFixedTitle(title);
         toast.success(tGrader('lg_titleFixed'));
+      } else {
+        toast.error(tGrader('lg_fixError'));
       }
     } catch (err) {
       toast.error(tGrader('lg_fixError'));
@@ -134,21 +171,37 @@ export default function ListingGrader({ shopId, userListings }: { shopId?: strin
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'suggest_tags',
+          // The result REPLACES the listing's tags (apply / new listing).
+          mode: 'replace',
           title: listingAnalysis.listing.title,
-          current_tags: listingAnalysis.listing.tags || [],
+          tags_current: listingAnalysis.listing.tags || [],
           market_context: items.length > 0 ? { topTags: items.flatMap(i => i.tags || []).slice(0, 20) } : undefined,
         }),
       });
-      const data = await res.json();
-      if (data.suggested_tags?.length > 0) {
-        setFixedTags(data.suggested_tags);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+      // API returns { suggestions }; older shape was { suggested_tags }.
+      const tags = normalizeTags(coerceAiStringArray(data?.suggestions ?? data?.suggested_tags)).tags;
+      if (tags.length > 0) {
+        setFixedTags(tags);
         toast.success(tGrader('lg_tagsFixed'));
+      } else {
+        toast.error(tGrader('lg_fixError'));
       }
     } catch (err) {
       toast.error(tGrader('lg_fixError'));
     } finally {
       setFixLoading(null);
     }
+  };
+
+  // Full description: the analysis truncates it to 500 chars, so prefer the
+  // shop's own cached listing when this is one of the user's listings.
+  const fullDescription = (): string => {
+    const id = String(listingAnalysis?.listing?.listing_id ?? '');
+    const own = id ? (userListings || []).find((l: any) => String(l?.listing_id) === id) : null;
+    const ownDesc = coerceAiString(own?.description);
+    return ownDesc || coerceAiString(listingAnalysis?.listing?.description);
   };
 
   const handleFixDescription = async () => {
@@ -162,18 +215,117 @@ export default function ListingGrader({ shopId, userListings }: { shopId?: strin
           action: 'generate_description',
           title: listingAnalysis.listing.title,
           tags: listingAnalysis.listing.tags || [],
+          // Improve the seller's real copy (shipping, personalization, care)
+          // instead of writing a generic one from title + tags.
+          existing_description: fullDescription() || undefined,
         }),
       });
-      const data = await res.json();
-      if (data.description) {
-        setFixedDescription(data.description);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+      const desc = coerceAiString(data?.description);
+      if (desc) {
+        setFixedDescription(desc);
         toast.success(tGrader('lg_descFixed'));
+      } else {
+        toast.error(tGrader('lg_fixError'));
       }
     } catch (err) {
       toast.error(tGrader('lg_fixError'));
     } finally {
       setFixLoading(null);
     }
+  };
+
+  // --- Own listing? Only then can the fixes be staged onto it. -------------
+  const analyzedListing: any = listingAnalysis?.listing ?? null;
+  const analyzedId = analyzedListing?.listing_id != null ? String(analyzedListing.listing_id) : '';
+  const isOwnListing = Boolean(
+    shopId && analyzedId && (
+      String(analyzedListing?.shop_id ?? '') === String(shopId) ||
+      (userListings || []).some((l: any) => String(l?.listing_id) === analyzedId)
+    ),
+  );
+  const hasFixes = Boolean(fixedTitle || (fixedTags && fixedTags.length) || fixedDescription);
+  const selectedFixCount =
+    (fixedTitle && stageFields.title ? 1 : 0) +
+    (fixedTags && fixedTags.length && stageFields.tags ? 1 : 0) +
+    (fixedDescription && stageFields.description ? 1 : 0);
+
+  // Stage the selected AI fixes as an Etsy draft (fieldPatch). Never writes to
+  // Etsy: the user syncs from the listings page.
+  const handleApplyAsDraft = async () => {
+    if (!shopId || !analyzedId || selectedFixCount === 0) return;
+    const fields: Record<string, unknown> = {};
+    if (fixedTitle && stageFields.title) {
+      const title = normalizeTitle(fixedTitle).slice(0, TITLE_MAX).trim();
+      const check = checkTitle(title);
+      const hard = check.issues.filter((i) => i === 'empty' || i === 'too_long' || i === 'bad_first_char' || i === 'disallowed_separator');
+      if (hard.length > 0) { toast.error(tGrader('lg_titleInvalid')); return; }
+      fields.title = title;
+    }
+    if (fixedTags && fixedTags.length && stageFields.tags) {
+      const tags = normalizeTags(fixedTags).tags;
+      if (tags.length) fields.tags = tags;
+    }
+    if (fixedDescription && stageFields.description) fields.description = fixedDescription;
+    if (Object.keys(fields).length === 0) return;
+    setApplyLoading(true);
+    try {
+      await stageEtsyDraft({ shopId, listingId: analyzedId, fields });
+      const toastId = `grader-draft-${analyzedId}`;
+      toast.success(
+        <span>
+          {tGrader('lg_savedAsDraft')}{' '}
+          <NextLink href="/app/etsy-listings" onClick={() => toast.dismiss(toastId)} style={{ fontWeight: 700, color: 'inherit', textDecoration: 'underline' }}>
+            {tGrader('lg_openListings')}
+          </NextLink>
+        </span>,
+        { id: toastId, duration: 8000 },
+      );
+    } catch (err) {
+      notify.error(err, tGrader('lg_applyFailed'));
+    } finally {
+      setApplyLoading(false);
+    }
+  };
+
+  // Open the Etsy creator prefilled with the fixed (or current) copy + market data.
+  const handleUseInNewListing = () => {
+    if (!analyzedListing) return;
+    const auditTitle = coerceAiString(listingAudit?.optimized_title);
+    const auditTags = coerceAiStringArray(listingAudit?.suggested_tags);
+    // Never copy a competitor's own title/tags — only AI output (plus the
+    // listing's own copy when it is the user's listing).
+    const tags = fixedTags && fixedTags.length ? fixedTags : auditTags.length ? auditTags
+      : isOwnListing ? coerceAiStringArray(analyzedListing.tags) : [];
+    const ownTitle = isOwnListing ? coerceAiString(analyzedListing.title) : '';
+    // The analyzed listing's own price has no currency in the analysis, so
+    // use the searched market's median when its currency is known.
+    const currency = dominantCurrency(items);
+    const price = currency && priceStats ? priceStats.median : undefined;
+    const ok = writeListingPrefill({
+      target: 'etsy',
+      source: 'etsy-research',
+      title: fixedTitle || auditTitle || ownTitle,
+      description: fixedDescription || undefined,
+      tags: normalizeTags(tags).tags,
+      price,
+      currency,
+      research: items.length > 0 ? {
+        query: useEtsyResearchStore.getState().query || coerceAiString(analyzedListing.title).slice(0, 200),
+        topTags: useEtsyResearchStore.getState().serverTagFreq.slice(0, 20),
+        topKeywords: useEtsyResearchStore.getState().serverKeywords.slice(0, 15),
+        // Price stats only when the market currency is known.
+        priceStats: priceStats && currency ? { min: priceStats.min, avg: priceStats.avg, median: priceStats.median, max: priceStats.max } : null,
+      } : {
+        // No search loaded: the analyzed title becomes the research query so
+        // the creator's AI writes its own copy instead of copying it.
+        query: coerceAiString(analyzedListing.title).slice(0, 200),
+        topTags: [], topKeywords: [], priceStats: null,
+      },
+    });
+    if (!ok) { toast.error(tGrader('ur_prefillFailed')); return; }
+    router.push(prefillHref('etsy'));
   };
 
   // Fee profiles
@@ -263,8 +415,56 @@ export default function ListingGrader({ shopId, userListings }: { shopId?: strin
         <Box>
           {/* Listing title */}
           <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1.5 }}>
-            {listingAnalysis.listing?.title || 'Listing'}
+            {listingAnalysis.listing?.title || listingAnalysis.title || tGrader('lg_listingFallback')}
           </Typography>
+
+          {/* Actions: stage fixes onto own listing / start a new listing */}
+          {analyzedListing && (
+            <Paper sx={{ ...glassCard, p: 1.5, mb: 2 }}>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                {isOwnListing && hasFixes && (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, flex: '1 1 100%' }}>
+                    {([
+                      { key: 'title', on: Boolean(fixedTitle), label: t('title') },
+                      { key: 'tags', on: Boolean(fixedTags && fixedTags.length), label: t('tags') },
+                      { key: 'description', on: Boolean(fixedDescription), label: t('description') },
+                    ] as const).filter((f) => f.on).map((f) => (
+                      <FormControlLabel key={f.key} sx={{ mr: 1, minHeight: 44 }}
+                        control={<Checkbox checked={stageFields[f.key]} onChange={(e) => setStageFields((s) => ({ ...s, [f.key]: e.target.checked }))} />}
+                        label={<Typography variant="body2">{f.label}</Typography>} />
+                    ))}
+                    {fixedDescription && (
+                      <Typography variant="caption" color="text.secondary" sx={{ flex: '1 1 100%' }}>
+                        {tGrader('lg_descOptIn')}
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+                {isOwnListing && (
+                  <Tooltip title={hasFixes ? '' : tGrader('lg_applyHint')}>
+                    <span style={{ flex: isMobile ? '1 1 100%' : '0 0 auto' }}>
+                      <Button variant="contained" fullWidth={isMobile}
+                        onClick={handleApplyAsDraft}
+                        disabled={selectedFixCount === 0 || applyLoading}
+                        startIcon={applyLoading ? <CircularProgress size={14} /> : <Save size={16} />}
+                        sx={{ minHeight: 44, borderRadius: '10px', textTransform: 'none', fontWeight: 700, background: hasFixes ? GRADIENTS.primary : undefined }}>
+                        {tGrader('lg_applyAsDraft')}
+                      </Button>
+                    </span>
+                  </Tooltip>
+                )}
+                <Button variant="outlined" fullWidth={isMobile}
+                  onClick={handleUseInNewListing}
+                  startIcon={<FilePlus2 size={16} />}
+                  sx={{ minHeight: 44, borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}>
+                  {tGrader('lg_useInNewListing')}
+                </Button>
+              </Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                {isOwnListing ? tGrader('lg_applyExplain') : tGrader('lg_notOwnListing')}
+              </Typography>
+            </Paper>
+          )}
 
           {/* Overall SEO Score — large centered ring */}
           {listingAnalysis.seoScore && (

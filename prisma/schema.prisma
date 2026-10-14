@@ -72,6 +72,7 @@ model User {
   ebayListingDrafts     EbayListingDraft[]
   ebayListings          EbayListing[]
   adminAuditLogs        AdminAuditLog[]         @relation("AdminAuditLogs")
+  notifications         Notification[]
 }
 
 model Account {
@@ -1632,4 +1633,25 @@ model EtsyPublicListingSnapshot {
   @@index([listingId, capturedAt])
   @@index([shopId, capturedAt])
   @@index([capturedAt])
+}
+
+/// In-app notification (bell). Text is rendered client-side via next-intl:
+/// t(titleKey, params) under the 'notifications' namespace.
+model Notification {
+  id         String    @id @default(cuid())
+  userId     String
+  type       String
+  severity   String // 'info' | 'warning' | 'error'
+  titleKey   String
+  params     Json?
+  link       String?
+  dedupeKey  String?
+  readAt     DateTime?
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, readAt, createdAt])
 }

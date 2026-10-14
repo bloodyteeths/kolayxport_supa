@@ -13,6 +13,49 @@ import { fetchEtsyOrders } from './integrations/etsyOrderSync';
 import { fetchEbayOrders } from './integrations/ebayOrderSync';
 import type { VeeqoOrder } from './types';
 import { batchExecuteStatusUpdateHook } from './hooks/statusUpdateHook';
+import { notify, resolveNotification, notificationKeys, NOTIFICATION_LINKS } from './notifications';
+
+const ORDER_SYNC_PROVIDER_LABELS: Record<string, string> = {
+  veeqo: 'Veeqo',
+  shippo: 'Shippo',
+  amazon: 'Amazon',
+  etsy: 'Etsy',
+  ebay: 'eBay',
+};
+
+/** Fire-and-forget orderSyncFailed notification (one row per provider). */
+function notifyOrderSyncFailed(userId: string, provider: string) {
+  void notify(userId, {
+    type: 'orderSyncFailed',
+    severity: 'warning',
+    titleKey: 'types.orderSyncFailed',
+    params: { provider: ORDER_SYNC_PROVIDER_LABELS[provider] || provider },
+    link: NOTIFICATION_LINKS.labels,
+    dedupeKey: notificationKeys.orderSync(provider),
+  });
+}
+
+/**
+ * Wraps one provider's fetch: success resolves its orderSyncFailed
+ * notification, failure raises it. The promise outcome is passed through
+ * unchanged (rejections are re-thrown).
+ *
+ * Caveat: fetchVeeqoOrders / fetchShippoOrders currently swallow HTTP errors
+ * and resolve with [] / partial results, so only mapping errors reject here.
+ * Etsy/eBay fetchers swallow everything and are therefore NOT wrapped.
+ */
+function trackOrderSource<T>(userId: string, provider: string, promise: Promise<T>): Promise<T> {
+  return promise.then(
+    (value) => {
+      void resolveNotification(userId, notificationKeys.orderSync(provider));
+      return value;
+    },
+    (err) => {
+      notifyOrderSyncFailed(userId, provider);
+      throw err;
+    },
+  );
+}
 
 function splitName(fullName: string) {
   const parts = (fullName || '').trim().split(/\\s+/);
@@ -890,13 +933,15 @@ export async function syncAllOrders(userId: string, options: {
     
     // Fetch orders from all sources in parallel
     const fetchPromises: Promise<UIOrder[]>[] = [];
+    const pushTracked = (provider: string, p: Promise<UIOrder[]>) =>
+      fetchPromises.push(trackOrderSource(userId, provider, p));
 
     // CRITICAL FIX: Use separate if statements instead of else-if to fetch from BOTH sources
     if ((typeof source === 'undefined' || source === 'veeqo') && veeqoApiKey) {
       if (options.syncType === 'fast') {
         logger.info(`[FastSync] Triggering Veeqo fetch (first page only). Options:`, { userId, source, veeqoApiKey: !!veeqoApiKey, lastSyncTime });
         const veeqoClient = createVeeqoClient(veeqoApiKey);
-        fetchPromises.push(
+        pushTracked('veeqo',
           (async () => {
             const orders = await fetchVeeqoOrders({ apiKey: veeqoApiKey, page: 1, perPage: 100, lastSync: lastSyncTime });
             logger.info(`[FastSync] Veeqo fetch returned ${orders.length} orders.`, { userId });
@@ -916,7 +961,7 @@ export async function syncAllOrders(userId: string, options: {
       } else {
         logger.info(`[FullSync] Triggering Veeqo fetch with API key present. Options:`, { userId, source, veeqoApiKey: !!veeqoApiKey, lastSyncTime });
         const veeqoClient = createVeeqoClient(veeqoApiKey);
-        fetchPromises.push(
+        pushTracked('veeqo',
           (async () => {
             const orders = await fetchVeeqoOrders({ apiKey: veeqoApiKey, lastSync: lastSyncTime });
             logger.info(`[FullSync] Veeqo fetch returned ${orders.length} orders.`, { userId });
@@ -947,7 +992,7 @@ export async function syncAllOrders(userId: string, options: {
         const shippoDateFilter = sixHoursAgo.toISOString();
         logger.info(`[FastSync] Shippo date filter: ${shippoDateFilter}`);
         
-        fetchPromises.push(
+        pushTracked('shippo',
           fetchShippoOrders(shippoToken, { 
             page: '1', 
             results: '100',
@@ -1027,7 +1072,7 @@ export async function syncAllOrders(userId: string, options: {
           const shippoOptions = lastSyncTime ? { object_created_gte: lastSyncTime.toISOString() } : {};
           logger.info(`[FullSync] Shippo options:`, shippoOptions);
           
-          fetchPromises.push(
+          pushTracked('shippo',
           fetchShippoOrders(shippoToken, shippoOptions).then(orders => {
             logger.info(`[FullSync] Shippo fetch returned ${orders.length} orders.`, { userId });
             return orders.map(order => {
@@ -1195,9 +1240,11 @@ export async function syncAllOrders(userId: string, options: {
                     }
                   }
 
+                  void resolveNotification(userId, notificationKeys.orderSync('amazon'));
                   return orders;
                 } catch (err: any) {
                   logger.error('[AmazonSync] Order sync failed', err, { userId });
+                  notifyOrderSyncFailed(userId, 'amazon');
                   return [];
                 }
               })()
@@ -1206,6 +1253,7 @@ export async function syncAllOrders(userId: string, options: {
         }
       } catch (err: any) {
         logger.error('[AmazonSync] Failed to initialize', err, { userId });
+        notifyOrderSyncFailed(userId, 'amazon');
       }
     }
 
@@ -1216,6 +1264,9 @@ export async function syncAllOrders(userId: string, options: {
         console.log(`[OrderSync] Etsy shops found: ${etsyShops.length}`);
         if (etsyShops.length > 0) {
           fetchPromises.push(
+            // Not wrapped in trackOrderSource: fetchEtsyOrders swallows per-shop
+            // errors and resolves with partial/empty results, so "resolved" does
+            // not mean "succeeded" and would wrongly clear orderSyncFailed.
             fetchEtsyOrders(userId, { lastSync: lastSyncTime }).catch(err => {
               logger.error('[EtsyOrderSync] Failed', err instanceof Error ? err : new Error(String(err)));
               return [] as UIOrder[];
@@ -1234,6 +1285,8 @@ export async function syncAllOrders(userId: string, options: {
         console.log(`[OrderSync] eBay credentials found: ${!!(cred as any)?.ebayAccessToken}`);
         if ((cred as any)?.ebayAccessToken) {
           fetchPromises.push(
+            // Not wrapped in trackOrderSource (see Etsy above): fetchEbayOrders
+            // swallows token/API errors and resolves with [].
             fetchEbayOrders(userId, { lastSync: lastSyncTime }).catch(err => {
               console.error('[EbayOrderSync] Failed:', err);
               return [] as UIOrder[];

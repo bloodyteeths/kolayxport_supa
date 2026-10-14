@@ -2,7 +2,7 @@ import React from 'react';
 import AppLayout from '../../components/AppLayout';
 import { NextSeo } from 'next-seo';
 import { motion } from 'framer-motion';
-import { HelpCircle, Settings, ExternalLink, Link as LinkIcon, ListChecks } from 'lucide-react';
+import { HelpCircle, Settings, ExternalLink, Link as LinkIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 
@@ -107,15 +107,6 @@ export default function HowToUsePage() {
         </Step>
         <p className="mt-4 text-sm text-slate-500">
           {t('shippoWarning')}
-        </p>
-      </GuideSection>
-
-      <GuideSection title={t('otherGuidesTitle')} icon={ListChecks} id="other-guides">
-        <p>
-          {t('otherGuidesDesc')}
-        </p>
-        <p className="mt-2">
-          {t('trendyolLink')}
         </p>
       </GuideSection>
 

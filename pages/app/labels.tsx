@@ -20,6 +20,7 @@ import ShippingCostCell from '@/components/labels/ShippingCostCell';
 import PrintLabelButton from '@/components/labels/PrintLabelButton';
 import CopyAddressControl from '@/components/labels/CopyAddressControl';
 import LabelsBulkBar from '@/components/labels/LabelsBulkBar';
+import PrintSelectionActions from '@/components/print/PrintSelectionActions';
 import { getLatestLabel, getTrackingPair, carrierToVeeqoId, openLabelUrl } from '@/components/labels/labelLinks';
 import CopyButton from '@/components/ui/CopyButton';
 import ErrorState from '@/components/ui/ErrorState';
@@ -3078,6 +3079,24 @@ function LabelsPage(props: { source?: string; channel?: string }) {
             </Box>
           </Box>
         )}
+        {/* Sticky wrapper so the print actions ride on top of the bulk bar.
+            TODO: move into LabelsBulkBar once it exposes an actions slot. */}
+        <Box sx={{ position: 'sticky', bottom: 0, zIndex: 5 }}>
+        {selectedOrderIds.length > 0 && (
+          <Box
+            sx={{
+              display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'flex-end',
+              px: { xs: 1, sm: 1.5 }, py: 0.75, mx: { xs: 0, sm: 0.5 },
+              bgcolor: 'background.paper', borderTop: '1px solid', borderColor: 'divider',
+              borderTopLeftRadius: { xs: 0, sm: 12 }, borderTopRightRadius: { xs: 0, sm: 12 },
+              // Cancel LabelsBulkBar's mt so the two bars read as one surface,
+              // and sit above its elevation shadow so no seam shows.
+              mb: -0.5, position: 'relative', zIndex: 6,
+            }}
+          >
+            <PrintSelectionActions orderIds={selectedOrderIds} />
+          </Box>
+        )}
         <LabelsBulkBar
           count={selectedOrderIds.length}
           pageAllSelected={orderGroups.length > 0 && orderGroups.every(g => !!selectedOrders[g.orderId])}
@@ -3096,6 +3115,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
           onEtgb={handleProcessEtgb}
           getAddressesTsv={buildAddressesTsv}
         />
+        </Box>
       </Box>
 
       {drawerOrder && (

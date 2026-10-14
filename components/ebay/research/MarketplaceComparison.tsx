@@ -97,6 +97,7 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const t = useTranslations('ebayResearch');
+  const tA = useTranslations('ebayResearch');
 
   const [keyword, setKeyword] = useState('');
   const [selectedMarkets, setSelectedMarkets] = useState<Set<string>>(new Set(MARKETPLACES.map(m => m.id)));
@@ -435,7 +436,7 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
                     </Typography>
                     <ScoreBadge score={data.opportunityScore} label={t('mc_opportunityLabel')} />
                   </Box>
-                  <IconButton size="small">
+                  <IconButton aria-label={tA(expanded ? 'collapse' : 'expand')} size="small">
                     {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                   </IconButton>
                 </Box>

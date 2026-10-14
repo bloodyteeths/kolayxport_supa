@@ -10,9 +10,12 @@ import {
   Store, Star, Users, ExternalLink, Search, ShoppingCart,
   Eye, Heart, ShoppingBag, Sparkles, DollarSign, Target, Calendar,
   Zap, MessageSquare, ThumbsUp, ThumbsDown, Flame, Copy, Clock,
-  TrendingUp, BarChart3, Link,
+  TrendingUp, BarChart3, Link, FilePlus2,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { useRouter } from 'next/router';
+import { normalizeTags } from '@/lib/etsy/seoRules';
+import { prefillHref, writeListingPrefill, dominantCurrency } from './shared/listingPrefill';
 
 import { useTranslations } from 'next-intl';
 import { useEtsyResearchStore, useComputedShopStats, useComputedDeepDive } from '@/lib/stores/useEtsyResearchStore';
@@ -114,6 +117,33 @@ export default function CompetitorIntelligence() {
 
   const shopStats = useComputedShopStats();
   const deepDiveStats = useComputedDeepDive();
+  const router = useRouter();
+  const tResearch = useTranslations('etsyResearch');
+
+  // Open the Etsy creator prefilled with this shop's top tags + price data.
+  // Competitor titles/images are NOT copied; nothing is published.
+  const handleCreateFromShop = () => {
+    if (!deepDiveStats) return;
+    const currency = dominantCurrency(deepDiveListings || []);
+    const ok = writeListingPrefill({
+      target: 'etsy',
+      source: 'etsy-research',
+      tags: normalizeTags(deepDiveStats.topTags.map(tg => tg.tag)).tags,
+      price: currency && deepDiveStats.priceMedian > 0 ? Math.round(deepDiveStats.priceMedian * 100) / 100 : undefined,
+      currency,
+      research: {
+        query: deepDiveShop?.shop_name || '',
+        topTags: deepDiveStats.topTags,
+        topKeywords: [],
+        priceStats: currency && deepDiveStats.priceMax > 0 ? {
+          min: deepDiveStats.priceMin, avg: deepDiveStats.priceAvg,
+          median: deepDiveStats.priceMedian, max: deepDiveStats.priceMax,
+        } : null,
+      },
+    });
+    if (!ok) { toast.error(tResearch('ur_prefillFailed')); return; }
+    router.push(prefillHref('etsy'));
+  };
 
   const hasData = items.length > 0;
 
@@ -529,6 +559,14 @@ export default function CompetitorIntelligence() {
             <StatCard label={t('maxPrice')} value={fmt(deepDiveStats.priceMax)} color="#f44336" />
             <StatCard label={t('avgFavorites')} value={String(deepDiveStats.avgFav)} color="#e91e63" icon={<Heart size={18} />} />
             <StatCard label={t('avgViews')} value={String(deepDiveStats.avgViews)} color="#ff9800" icon={<Eye size={18} />} />
+          </Box>
+
+          <Box sx={{ mb: 2 }}>
+            <Button variant="outlined" onClick={handleCreateFromShop}
+              startIcon={<FilePlus2 size={16} />}
+              sx={{ minHeight: 44, borderRadius: '10px', textTransform: 'none', fontWeight: 600, ...(isMobile && { width: '100%' }) }}>
+              {tResearch('ci_createListingFromShop')}
+            </Button>
           </Box>
 
           {/* ================================================================ */}

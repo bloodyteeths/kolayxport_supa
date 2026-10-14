@@ -154,6 +154,7 @@ function savedNicheToData(n: SavedNiche): NicheData {
 
 export default function NicheComparison({ userId, onNavigate }: NicheComparisonProps) {
   const t = useTranslations('ebay.nicheComparison');
+  const tA = useTranslations('ebayResearch');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -298,7 +299,7 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
                   <ScoreBadge score={slot.data.opportunityScore} label={t('opportunityScore')} />
                 )}
                 {slots.length > 2 && (
-                  <IconButton size="small" onClick={() => removeSlot(index)} sx={{ ml: 'auto' }}>
+                  <IconButton aria-label={tA('remove')} size="small" onClick={() => removeSlot(index)} sx={{ ml: 'auto' }}>
                     <X size={16} />
                   </IconButton>
                 )}

@@ -5,10 +5,12 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import PostAddIcon from '@mui/icons-material/PostAdd';
 import { useTranslations } from 'next-intl';
 import type { ArbitrageResult } from '../../../../lib/arbitrage/types';
 import useLocaleStore from '../../../../lib/stores/useLocaleStore';
 import { formatCurrency, formatPercent, getVerdictConfig } from './arbitrageConstants';
+import useCreateListingPrefill, { keywordsFromTitle } from '../useCreateListingPrefill';
 
 interface Props {
   result: ArbitrageResult | null;
@@ -21,11 +23,43 @@ export default function ArbitrageProductDetail({ result, open, onClose }: Props)
   const locale = useLocaleStore(s => s.locale);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const createListing = useCreateListingPrefill();
 
   if (!result) return null;
 
   const { trendyol, ebay, financials, score, verdict, matchTier, translatedQuery, exchangeRate } = result;
   const vc = getVerdictConfig(verdict);
+
+  /** Open the eBay creator prefilled with this product. The seller reviews everything; nothing is published here. */
+  const handleListOnEbay = () => {
+    const englishSeed = translatedQuery || ebay.topItems[0]?.title || '';
+    const images = [...(Array.isArray(trendyol.images) ? trendyol.images : []), trendyol.imageUrl]
+      .filter((u): u is string => typeof u === 'string' && u.startsWith('https://'));
+    createListing({
+      target: 'ebay',
+      source: 'arbitrage',
+      title: englishSeed || trendyol.name,
+      keywords: keywordsFromTitle([englishSeed, ...ebay.topItems.slice(0, 3).map(i => i.title)].join(' ')),
+      price: financials.suggestedPriceUsd > 0 ? financials.suggestedPriceUsd : undefined,
+      currency: 'USD',
+      imageUrls: images,
+      categoryHint: ebay.categoryName || ebay.categoryId || undefined,
+      research: {
+        tool: 'arbitrage',
+        trendyolUrl: trendyol.url,
+        trendyolName: trendyol.name,
+        brand: trendyol.brand,
+        barcode: trendyol.barcode,
+        ebayCategoryId: ebay.categoryId,
+        ebayMedianPriceUsd: ebay.medianPrice,
+        ebayTotalListings: ebay.totalListings,
+        totalCostUsd: financials.totalCostUsd,
+        profitUsd: financials.profitUsd,
+        roiPercent: financials.roiPercent,
+        comparables: ebay.topItems.slice(0, 5).map(i => ({ title: i.title, price: i.price, sold: i.soldQuantity })),
+      },
+    });
+  };
 
   return (
     <Drawer
@@ -53,7 +87,7 @@ export default function ArbitrageProductDetail({ result, open, onClose }: Props)
             />
           )}
         </Box>
-        <IconButton onClick={onClose} size="small"><CloseIcon /></IconButton>
+        <IconButton onClick={onClose} size="small" aria-label={ta('close')}><CloseIcon /></IconButton>
       </Box>
 
       {/* Trendyol Product */}
@@ -79,16 +113,28 @@ export default function ArbitrageProductDetail({ result, open, onClose }: Props)
             </Typography>
           </Box>
         </Box>
-        <Button
-          size="small"
-          variant="outlined"
-          href={trendyol.url}
-          target="_blank"
-          startIcon={<OpenInNewIcon />}
-          sx={{ mt: 1, fontSize: '0.82rem' }}
-        >
-          {ta('openOnTrendyol')}
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
+          <Button
+            size="small"
+            variant="contained"
+            onClick={handleListOnEbay}
+            startIcon={<PostAddIcon />}
+            sx={{ fontSize: '0.82rem', minHeight: 44, flex: isMobile ? '1 1 100%' : '0 0 auto' }}
+          >
+            {ta('listOnEbay')}
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            href={trendyol.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            startIcon={<OpenInNewIcon />}
+            sx={{ fontSize: '0.82rem', minHeight: 44, flex: isMobile ? '1 1 100%' : '0 0 auto' }}
+          >
+            {ta('openOnTrendyol')}
+          </Button>
+        </Box>
       </Paper>
 
       {/* eBay Comparables */}

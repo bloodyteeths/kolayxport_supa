@@ -735,6 +735,7 @@ function AspectSuggester({ userId, marketplace }: { userId: string; marketplace:
 // ---------------------------------------------------------------------------
 function BulkTitleOptimizer({ userId }: { userId: string }) {
   const t = useTranslations('ebay.research.ai');
+  const tA = useTranslations('ebayResearch');
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -803,7 +804,7 @@ function BulkTitleOptimizer({ userId }: { userId: string }) {
                     <Typography variant="body2" fontWeight={500} sx={{ color: '#10b981' }}>{r.optimized}</Typography>
                   </TableCell>
                   <TableCell>
-                    <IconButton size="small" onClick={() => copyToClipboard(r.optimized, t)}>
+                    <IconButton aria-label={tA('copy')} size="small" onClick={() => copyToClipboard(r.optimized, t)}>
                       <Copy size={14} />
                     </IconButton>
                   </TableCell>

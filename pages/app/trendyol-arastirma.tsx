@@ -1,4 +1,5 @@
-import React, { useState, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useCallback, useEffect, lazy, Suspense } from 'react';
+import { useRouter } from 'next/router';
 import {
   Box, CircularProgress, Typography, Paper, List, ListItemButton,
   ListItemIcon, ListItemText, Drawer, IconButton, useMediaQuery, useTheme,
@@ -27,6 +28,7 @@ const GRADIENTS = {
 };
 
 const SIDEBAR_WIDTH = 220;
+const NAV_IDS = ['dashboard', 'category', 'price', 'sellers', 'brands', 'profit', 'ai-report'];
 
 function TrendyolResearchPage() {
   const { user } = useAuth();
@@ -49,14 +51,31 @@ function TrendyolResearchPage() {
     { id: 'ai-report', label: t('navAiReport'), icon: Sparkles, desc: '' },
   ];
 
-  const handleNavigate = useCallback((navId: string) => {
+  // Persist the active section in the URL (?tab=<nav id>).
+  const router = useRouter();
+  const tabParam = typeof router.query.tab === 'string' ? router.query.tab : '';
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (NAV_IDS.includes(tabParam)) setActiveNav(tabParam);
+  }, [router.isReady, tabParam]);
+
+  const selectNav = useCallback((navId: string) => {
     setActiveNav(navId);
+    router.replace(
+      { pathname: router.pathname, query: { ...router.query, tab: navId } },
+      undefined,
+      { shallow: true, scroll: false },
+    );
+  }, [router]);
+
+  const handleNavigate = useCallback((navId: string) => {
+    selectNav(navId);
     if (isMobile) setSidebarOpen(false);
-  }, [isMobile]);
+  }, [isMobile, selectNav]);
 
   const handleNavigateFromDashboard = useCallback((navId: string) => {
-    setActiveNav(navId);
-  }, []);
+    selectNav(navId);
+  }, [selectNav]);
 
   const sidebarContent = (
     <Box sx={{ width: SIDEBAR_WIDTH, pt: 1 }}>

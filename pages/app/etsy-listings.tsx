@@ -82,6 +82,8 @@ import SEOIndicator from '@/components/etsy/SEOIndicator';
 import { checkTags, checkTitle, TAG_MAX_COUNT, TITLE_MIN, TITLE_MAX } from '@/lib/etsy/seoRules';
 import ListingEditorDrawer from '@/components/etsy/ListingEditorDrawer';
 import ListingCreatorDialog, { type CopySourceData } from '@/components/etsy/ListingCreatorDialog';
+import type { MarketResearchData } from '@/components/etsy/research/shared/types';
+import { consumeListingPrefill, toMarketResearchData } from '@/components/etsy/research/shared/listingPrefill';
 import { useConnections } from '@/lib/hooks/useConnections';
 import ConnectEmptyState, { RequireConnection } from '@/components/ui/ConnectEmptyState';
 import { useConfirm } from '@/lib/hooks/useConfirm';
@@ -1212,6 +1214,8 @@ function EtsyListingsPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   // Prefill for the creator: "Duplicate as new" or an incoming eBay cross-list.
   const [creatorCopySource, setCreatorCopySource] = useState<CopySourceData | null>(null);
+  // Market research handed over by a research page (?prefill=session).
+  const [creatorResearch, setCreatorResearch] = useState<MarketResearchData | null>(null);
   const [findReplaceOpen, setFindReplaceOpen] = useState(false);
   const [smartPricingOpen, setSmartPricingOpen] = useState(false);
   const [duplicateDetectorOpen, setDuplicateDetectorOpen] = useState(false);
@@ -1929,14 +1933,16 @@ function EtsyListingsPage() {
   };
 
   // --- Creator open helpers ---
-  const openCreator = useCallback((source: CopySourceData | null) => {
+  const openCreator = useCallback((source: CopySourceData | null, research: MarketResearchData | null = null) => {
     setCreatorCopySource(source);
+    setCreatorResearch(research);
     setCreateDialogOpen(true);
   }, []);
 
   const closeCreator = useCallback(() => {
     setCreateDialogOpen(false);
     setCreatorCopySource(null);
+    setCreatorResearch(null);
   }, []);
 
   // --- Duplicate as new: open the creator prefilled from the row. Nothing is
@@ -2276,6 +2282,74 @@ function EtsyListingsPage() {
       }
     })();
   }, [router.isReady, crosslistParam, selectedShopId, listingsLoadedFor]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // --- Prefill from a research page (?prefill=session) -----------------------
+  // Contract: sessionStorage 'kx:listingPrefill' (see listingPrefill.ts). Opens
+  // the creator prefilled; nothing is staged or published until the user saves
+  // / publishes in the creator.
+  const prefillParam = typeof router.query.prefill === 'string' ? router.query.prefill : '';
+  const prefillHandledRef = useRef(false);
+  useEffect(() => {
+    if (!router.isReady || prefillParam !== 'session' || prefillHandledRef.current) return;
+    // No Etsy shop: say so instead of waiting forever. The entry stays in
+    // sessionStorage so the hand-off still works after connecting in this tab.
+    if (shopsLoaded && shops.length === 0) {
+      prefillHandledRef.current = true;
+      const { prefill: _drop, ...rest } = router.query;
+      router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+      notify.info(t('prefill.connectEtsy'));
+      return;
+    }
+    if (!selectedShopId) return;
+    // Wait for this shop's listings so the shop currency is known.
+    if (listingsLoadedFor !== selectedShopId) return;
+    prefillHandledRef.current = true;
+
+    const { prefill: _drop, ...rest } = router.query;
+    router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+
+    const p = consumeListingPrefill('etsy');
+    if (!p) {
+      notify.info(t('prefill.notFound'));
+      return;
+    }
+    const currentShopCurrency = shopCurrencyRef.current;
+    // Etsy prices are in the shop currency: carry numbers only on a known match.
+    const currencyOk = Boolean(currentShopCurrency) && (!p.currency || p.currency === currentShopCurrency);
+    const priceOk = p.price != null && currencyOk;
+    // Research payload; when absent, keywords / category hint still become a
+    // minimal market context so the creator's AI uses them.
+    const rawResearch = p.research ?? ((p.keywords && p.keywords.length) || p.categoryHint ? {
+      query: p.categoryHint || p.title || '',
+      topTags: [],
+      topKeywords: (p.keywords || []).map((keyword) => ({ keyword, count: 0, pct: 0 })),
+      priceStats: null,
+    } : undefined);
+    let research = toMarketResearchData(rawResearch);
+    if (research) {
+      // Fold contract keywords in when the payload had none of its own.
+      if (research.topKeywords.length === 0 && p.keywords && p.keywords.length) {
+        research = { ...research, topKeywords: p.keywords.map((keyword) => ({ keyword, count: 0, pct: 0 })) };
+      }
+      // Price stats in another / unknown currency would mislead the user and the AI.
+      if (!currencyOk) research = { ...research, priceStats: null };
+    }
+    openCreator({
+      source: 'research',
+      title: p.title || '',
+      description: p.description || '',
+      tags: p.tags || [],
+      price: priceOk ? p.price : undefined,
+      imageUrls: p.imageUrls || [],
+    }, research);
+    if (p.price != null && !priceOk) {
+      if (!currentShopCurrency) {
+        notify.info(t('crosslist.priceCurrencyUnknown'));
+      } else if (p.currency) {
+        notify.info(t('prefill.priceCurrencyMismatch', { from: p.currency, to: currentShopCurrency }));
+      }
+    }
+  }, [router.isReady, prefillParam, selectedShopId, listingsLoadedFor, shopsLoaded, shops.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Staged new listings (create_listing drafts) ---------------------------
   // They have a negative local id until the first sync creates them on Etsy, so
@@ -3416,7 +3490,7 @@ function EtsyListingsPage() {
         shopSections={shopSections}
         shippingProfiles={shippingProfiles}
         returnPolicies={returnPolicies}
-        marketResearchData={null}
+        marketResearchData={creatorResearch}
         currencyCode={shopCurrency}
         onCreated={(listingId) => {
           // ListingCreatorDialog already toasted the outcome (local draft save,

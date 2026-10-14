@@ -3,6 +3,7 @@ import prisma from '../prisma';
 import { getAuthUser } from '../auth';
 import { logger } from '../logger';
 import { User } from '@prisma/client';
+import { notify, resolveByPrefix, invalidateResolveMemo, notificationKeys, NOTIFICATION_LINKS } from '../notifications';
 
 interface UserWithSubscription extends User {
   subscriptionPlan: string | null;
@@ -23,7 +24,25 @@ const plans = {
   shopify_free: { orderSyncLimit: Infinity, labelLimit: Infinity },
 };
 
-const checkUsage = async (userId: string, limitType: 'orderSync' | 'label') => {
+type LimitType = 'orderSync' | 'label';
+/** Mirrors LimitReason in lib/http/limitInterceptor.ts. */
+type LimitReason = 'trial' | 'noSubscription' | 'planLimit' | 'invalidPlan';
+
+interface UsageCheck {
+  allowed: boolean;
+  error?: string;
+  reason?: LimitReason;
+  used?: number;
+  limit?: number;
+  plan?: string;
+  /** Usage period id for notification dedupe ('trial' or the reset date). */
+  period?: string;
+}
+
+const NEAR_LIMIT_RATIO = 0.8;
+const USAGE_RESOLVE_MEMO_MS = 10 * 60 * 1000;
+
+const checkUsage = async (userId: string, limitType: LimitType): Promise<UsageCheck> => {
   const user = (await prisma.user.findUnique({
     where: { id: userId },
   })) as UserWithSubscription | null;
@@ -59,6 +78,8 @@ const checkUsage = async (userId: string, limitType: 'orderSync' | 'label') => {
     user.labelCount = 0;
     user.usageResetAt = nextReset;
     logger.info('Monthly usage counters reset', { userId });
+    // New period: earlier near-limit / limit-reached notifications are stale.
+    void resolveByPrefix(userId, 'usage:');
   }
 
   const { subscriptionPlan, subscriptionStatus, orderSyncCount, labelCount, trialExpiresAt } = user;
@@ -74,32 +95,96 @@ const checkUsage = async (userId: string, limitType: 'orderSync' | 'label') => {
   if (subscriptionStatus === 'trialing' && trialExpiresAt && new Date() < trialExpiresAt) {
     const trialLimits = { orderSync: 50, label: 10 };
     const currentCount = limitType === 'orderSync' ? orderSyncCount : labelCount;
+    const usage = { used: currentCount, limit: trialLimits[limitType], plan: 'trial', period: 'trial' };
     if (currentCount >= trialLimits[limitType]) {
-      return { allowed: false, error: 'Trial limit reached.' };
+      return { allowed: false, error: 'Trial limit reached.', reason: 'trial', ...usage };
     }
-    return { allowed: true };
+    return { allowed: true, ...usage };
   }
 
   // If trial is over and no active subscription, block access
   if (subscriptionStatus !== 'active') {
-    return { allowed: false, error: 'No active subscription.' };
+    return { allowed: false, error: 'No active subscription.', reason: 'noSubscription', plan: subscriptionPlan ?? undefined };
   }
   
   // Handle case where user is active but has no plan
   if (!subscriptionPlan || !plans[subscriptionPlan]) {
     logger.error('User has active subscription but an invalid plan is assigned', undefined, { userId, subscriptionPlan });
-    return { allowed: false, error: 'Subscription plan not found or invalid. Please contact support.' };
+    return {
+      allowed: false,
+      error: 'Subscription plan not found or invalid. Please contact support.',
+      reason: 'invalidPlan',
+      plan: subscriptionPlan ?? undefined,
+    };
   }
   
   const planLimits = plans[subscriptionPlan];
   const currentCount = limitType === 'orderSync' ? orderSyncCount : labelCount;
 
-  if (currentCount >= planLimits[`${limitType}Limit`]) {
-    return { allowed: false, error: `${limitType} limit reached for your plan.` };
+  const planLimit: number = planLimits[`${limitType}Limit`];
+  const usage = {
+    used: currentCount,
+    // Infinity is not JSON-serialisable; omit the limit for unlimited plans.
+    limit: Number.isFinite(planLimit) ? planLimit : undefined,
+    plan: subscriptionPlan,
+    period: user.usageResetAt ? new Date(user.usageResetAt).toISOString().slice(0, 10) : 'current',
+  };
+
+  if (currentCount >= planLimit) {
+    return { allowed: false, error: `${limitType} limit reached for your plan.`, reason: 'planLimit', ...usage };
   }
 
-  return { allowed: true };
+  return { allowed: true, ...usage };
 };
+
+/**
+ * Raise / clear usage notifications. Fire-and-forget: notify/resolve never
+ * reject, use onlyIfNew + in-process memos so steady-state requests do not
+ * touch the DB on every call.
+ */
+function emitUsageNotifications(userId: string, limitType: LimitType, check: UsageCheck) {
+  if (!check.period || typeof check.used !== 'number' || typeof check.limit !== 'number' || check.limit <= 0) return;
+  const nearKey = notificationKeys.usage(`${limitType}:near`, check.period);
+  const reachedKey = notificationKeys.usage(`${limitType}:reached`, check.period);
+
+  if (!check.allowed) {
+    if (check.reason !== 'trial' && check.reason !== 'planLimit') return;
+    void notify(userId, {
+      type: 'usageLimitReached',
+      severity: 'error',
+      titleKey: 'types.usageLimitReached',
+      params: { kind: limitType },
+      link: NOTIFICATION_LINKS.pricing,
+      dedupeKey: reachedKey,
+      onlyIfNew: true,
+    });
+    // The "near" warning is superseded by "reached".
+    void resolveByPrefix(userId, `usage:${limitType}:near:`, { memoTtlMs: USAGE_RESOLVE_MEMO_MS });
+    // The next allowed request (e.g. right after an upgrade) must clear this
+    // row immediately instead of waiting out the allowed-path memo.
+    invalidateResolveMemo(userId, `usage:${limitType}:`);
+    return;
+  }
+
+  const near = check.used / check.limit >= NEAR_LIMIT_RATIO;
+  if (near) {
+    void notify(userId, {
+      type: 'usageNearLimit',
+      severity: 'warning',
+      titleKey: 'types.usageNearLimit',
+      params: { kind: limitType, used: check.used, limit: check.limit },
+      link: NOTIFICATION_LINKS.pricing,
+      dedupeKey: nearKey,
+      onlyIfNew: true,
+    });
+  }
+  // Allowed: any "reached" row (e.g. after an upgrade) and rows from other
+  // periods are stale. Memoised, so at most one query per user per 10 min.
+  void resolveByPrefix(userId, `usage:${limitType}:`, {
+    exceptKeys: near ? [nearKey] : [],
+    memoTtlMs: USAGE_RESOLVE_MEMO_MS,
+  });
+}
 
 export const withUsageLimiter = (handler, limitType: 'orderSync' | 'label') => {
   return async (req: NextApiRequest, res: NextApiResponse) => {
@@ -108,9 +193,20 @@ export const withUsageLimiter = (handler, limitType: 'orderSync' | 'label') => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { allowed, error } = await checkUsage(user.id, limitType);
-    if (!allowed) {
-      return res.status(402).json({ error: 'Payment Required', details: error });
+    const check = await checkUsage(user.id, limitType);
+    emitUsageNotifications(user.id, limitType, check);
+    if (!check.allowed) {
+      // limitType / used / limit / plan / reason are read by
+      // lib/http/limitInterceptor.ts parseLimitResponse (details kept for compatibility).
+      return res.status(402).json({
+        error: 'Payment Required',
+        details: check.error,
+        limitType,
+        ...(check.reason ? { reason: check.reason } : {}),
+        ...(typeof check.used === 'number' ? { used: check.used } : {}),
+        ...(typeof check.limit === 'number' ? { limit: check.limit } : {}),
+        ...(check.plan ? { plan: check.plan } : {}),
+      });
     }
 
     // Increment the counter after a successful operation

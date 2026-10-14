@@ -14,6 +14,7 @@ import { toast } from 'react-hot-toast';
 
 interface CategoryExplorerProps {
   userId: string;
+  marketplace?: string;
   onNavigate?: (tool: string, data?: any) => void;
 }
 
@@ -81,6 +82,7 @@ function CategoryTreeNode({
   onSelect: (id: string, name: string) => void;
   selectedId: string | null;
 }) {
+  const tA = useTranslations('ebayResearch');
   const [expanded, setExpanded] = useState(false);
   const hasChildren = node.children && node.children.length > 0;
   const isSelected = selectedId === node.categoryId;
@@ -106,7 +108,7 @@ function CategoryTreeNode({
         }}
       >
         {hasChildren ? (
-          <IconButton size="small" sx={{ mr: 0.5, p: 0.25, color: '#6366f1' }} onClick={(e) => { e.stopPropagation(); setExpanded(prev => !prev); }}>
+          <IconButton aria-label={tA(expanded ? 'collapse' : 'expand')} size="small" sx={{ mr: 0.5, p: 0.25, color: '#6366f1' }} onClick={(e) => { e.stopPropagation(); setExpanded(prev => !prev); }}>
             {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           </IconButton>
         ) : (
@@ -136,8 +138,9 @@ function CategoryTreeNode({
   );
 }
 
-export default function CategoryExplorer({ userId, onNavigate }: CategoryExplorerProps) {
+export default function CategoryExplorer({ userId, marketplace = 'EBAY_US', onNavigate }: CategoryExplorerProps) {
   const t = useTranslations('ebay.categoryExplorer');
+  const tA = useTranslations('ebayResearch');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -171,6 +174,18 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
     return { count: bestsellers.length, avgPrice: avg };
   }, [bestsellers]);
 
+  // Category tree and bestsellers are per marketplace: refetch when the picker changes (not on mount).
+  const prevMarketplace = useRef(marketplace);
+  useEffect(() => {
+    if (prevMarketplace.current === marketplace) return;
+    prevMarketplace.current = marketplace;
+    setTreeLoaded(false);
+    setTreeExpanded(false);
+    setTreeCategories([]);
+    if (selectedCategory) selectCategory(selectedCategory.id, selectedCategory.name);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [marketplace]);
+
   const loadCategoryTree = async () => {
     if (treeLoaded) {
       setTreeExpanded(prev => !prev);
@@ -178,7 +193,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
     }
     setTreeLoading(true);
     try {
-      const data = await ebayApiCall('top_categories', userId, { marketplace_id: 'EBAY_US' });
+      const data = await ebayApiCall('top_categories', userId, { marketplace_id: marketplace });
       setTreeCategories(data.categories || []);
       setTreeLoaded(true);
       setTreeExpanded(true);
@@ -196,7 +211,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
     try {
       const data = await ebayApiCall('category_bestsellers', userId, {
         category_id: id,
-        marketplace_id: 'EBAY_US',
+        marketplace_id: marketplace,
       });
       setBestsellers(data.items || []);
     } catch (err: any) {
@@ -317,7 +332,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             {treeLoading && <CircularProgress size={16} />}
-            <IconButton size="small">
+            <IconButton aria-label={tA(treeExpanded ? 'collapse' : 'expand')} size="small">
               {treeExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
             </IconButton>
           </Box>

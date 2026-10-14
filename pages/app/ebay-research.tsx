@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useRouter } from 'next/router';
 import {
   Box, Typography, Paper, TextField, Button, Tabs, Tab,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -6,7 +7,7 @@ import {
   MenuItem, FormControl, InputLabel, CircularProgress, Divider,
   InputAdornment, Dialog, DialogTitle, DialogContent, DialogActions,
   Slider, Card, CardContent, Collapse, useMediaQuery, useTheme,
-  Grid, Badge, Skeleton, TableSortLabel,
+  Grid, Badge, Skeleton, TableSortLabel, Menu, ListSubheader, ListItemIcon, ListItemText,
 } from '@mui/material';
 import {
   Search, TrendingUp, TrendingDown, Star, ExternalLink,
@@ -14,7 +15,7 @@ import {
   DollarSign, Users, FolderTree, Gauge, Package, Target,
   ChevronDown, ChevronUp, Edit3, Tag, Clock, AlertTriangle,
   Save, X, Copy, ShoppingBag, Globe, Filter, ArrowUpDown,
-  Sparkles, Zap, Download, Layers, Lightbulb,
+  Sparkles, Zap, Download, Layers, Lightbulb, MoreHorizontal, FilePlus2,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
@@ -32,6 +33,10 @@ import AiOptimizationHub from '@/components/ebay/research/AiOptimizationHub';
 import MarketplaceComparison from '@/components/ebay/research/MarketplaceComparison';
 import CategoryExplorer from '@/components/ebay/research/CategoryExplorer';
 import NicheComparison from '@/components/ebay/research/NicheComparison';
+import useEbayResearchStore from '@/lib/stores/useEbayResearchStore';
+import useLocaleStore from '@/lib/stores/useLocaleStore';
+import { EBAY_RESEARCH_MARKETPLACES, formatMoney, currencySymbol, marketplaceCurrency, marketplaceDomain, isEbayResearchMarketplace } from '@/components/ebay/research/marketplaces';
+import useCreateListingPrefill, { keywordsFromTitle } from '@/components/ebay/research/useCreateListingPrefill';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -44,7 +49,6 @@ interface SearchFilters {
   priceMax: number;
   condition: string;
   sortBy: string;
-  marketplace: string;
 }
 
 interface ProductResult {
@@ -93,6 +97,8 @@ interface TrackedProduct {
 
 interface NicheReport {
   keyword: string;
+  /** Marketplace the report was produced on (prices are in its currency). */
+  marketplace?: string;
   demandScore: number;
   competitionScore: number;
   totalListings: number;
@@ -176,15 +182,7 @@ const SORT_DATA = [
   { value: 'StartTimeNewest', labelKey: 'sortNewest' },
 ];
 
-const MARKETPLACES_DATA = [
-  { value: 'EBAY_US', labelKey: 'marketplaceUS', flag: '🇺🇸' },
-  { value: 'EBAY_GB', labelKey: 'marketplaceGB', flag: '🇬🇧' },
-  { value: 'EBAY_DE', labelKey: 'marketplaceDE', flag: '🇩🇪' },
-  { value: 'EBAY_FR', labelKey: 'marketplaceFR', flag: '🇫🇷' },
-  { value: 'EBAY_IT', labelKey: 'marketplaceIT', flag: '🇮🇹' },
-  { value: 'EBAY_ES', labelKey: 'marketplaceES', flag: '🇪🇸' },
-  { value: 'EBAY_AU', labelKey: 'marketplaceAU', flag: '🇦🇺' },
-];
+const MARKETPLACES_DATA = EBAY_RESEARCH_MARKETPLACES;
 
 const POPULAR_CATEGORIES_DATA = [
   { id: '11450', nameKey: 'catClothing', emoji: '👗' },
@@ -219,9 +217,11 @@ const SCORE_GLOW = (score: number, invert = false) => {
 // Utility Components
 // ---------------------------------------------------------------------------
 
-function ExpandedPriceChart({ snapshots, title, onClose }: { snapshots: { price: number; soldQuantity?: number; timestamp: string }[]; title?: string; onClose: () => void }) {
+function ExpandedPriceChart({ snapshots, title, currency = 'USD', onClose }: { snapshots: { price: number; soldQuantity?: number; timestamp: string }[]; title?: string; currency?: string; onClose: () => void }) {
   const t = useTranslations('ebayResearch');
   const { formatDate } = useLocale();
+  const locale = useLocaleStore(s => s.locale);
+  const money = (n: number, d = 2) => formatMoney(n, currency, locale, d);
   if (!snapshots || snapshots.length < 2) return null;
   const data = snapshots.slice(-30);
   const prices = data.map(s => s.price);
@@ -252,13 +252,13 @@ function ExpandedPriceChart({ snapshots, title, onClose }: { snapshots: { price:
           <Typography variant="subtitle1" fontWeight={700}>{t('priceHistory')}</Typography>
           {title && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', maxWidth: 350, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</Typography>}
         </Box>
-        <IconButton size="small" onClick={onClose}><X size={18} /></IconButton>
+        <IconButton size="small" onClick={onClose} aria-label={t('close')}><X size={18} /></IconButton>
       </DialogTitle>
       <DialogContent sx={{ bgcolor: '#fafbff' }}>
         <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-          <Chip label={`${t('latest')}: $${latest.price.toFixed(2)}`} size="small" sx={{ bgcolor: '#6366f1', color: '#fff', fontWeight: 600 }} />
-          <Chip label={`Min: $${min.toFixed(2)}`} size="small" variant="outlined" sx={{ borderColor: 'rgba(99,102,241,0.3)' }} />
-          <Chip label={`Max: $${max.toFixed(2)}`} size="small" variant="outlined" sx={{ borderColor: 'rgba(99,102,241,0.3)' }} />
+          <Chip label={`${t('latest')}: ${money(latest.price)}`} size="small" sx={{ bgcolor: '#6366f1', color: '#fff', fontWeight: 600 }} />
+          <Chip label={`${t('minShort')}: ${money(min)}`} size="small" variant="outlined" sx={{ borderColor: 'rgba(99,102,241,0.3)' }} />
+          <Chip label={`${t('maxShort')}: ${money(max)}`} size="small" variant="outlined" sx={{ borderColor: 'rgba(99,102,241,0.3)' }} />
           <Chip
             label={`${changeVal >= 0 ? '+' : ''}${changeVal.toFixed(1)}%`}
             size="small"
@@ -285,7 +285,7 @@ function ExpandedPriceChart({ snapshots, title, onClose }: { snapshots: { price:
               return (
                 <g key={pct}>
                   <line x1={padX} y1={y} x2={svgW - padX} y2={y} stroke="#e5e7eb" strokeDasharray="4" />
-                  <text x={padX - 4} y={y + 4} textAnchor="end" fontSize="10" fill="#9ca3af">${val.toFixed(0)}</text>
+                  <text x={padX - 4} y={y + 4} textAnchor="end" fontSize="10" fill="#9ca3af">{money(val, 0)}</text>
                 </g>
               );
             })}
@@ -314,7 +314,7 @@ function ExpandedPriceChart({ snapshots, title, onClose }: { snapshots: { price:
               {data.map((s, i) => {
                 const maxSold = Math.max(...data.map(d => d.soldQuantity || 0), 1);
                 return (
-                  <Tooltip key={i} title={`${s.soldQuantity || 0} sold - ${formatDate(s.timestamp)}`}>
+                  <Tooltip key={i} title={`${t('soldCount', { count: s.soldQuantity || 0 })} - ${formatDate(s.timestamp)}`}>
                     <Box sx={{
                       flex: 1, minWidth: 3,
                       height: `${Math.max(((s.soldQuantity || 0) / maxSold) * 100, 3)}%`,
@@ -332,9 +332,10 @@ function ExpandedPriceChart({ snapshots, title, onClose }: { snapshots: { price:
   );
 }
 
-function MiniPriceChart({ snapshots, title, expandable = true }: { snapshots: { price: number; soldQuantity?: number; timestamp: string }[]; title?: string; expandable?: boolean }) {
+function MiniPriceChart({ snapshots, title, currency = 'USD', expandable = true }: { snapshots: { price: number; soldQuantity?: number; timestamp: string }[]; title?: string; currency?: string; expandable?: boolean }) {
   const t = useTranslations('ebayResearch');
   const { formatDate } = useLocale();
+  const locale = useLocaleStore(s => s.locale);
   const [expanded, setExpanded] = useState(false);
   if (!snapshots || snapshots.length < 2) return <Typography variant="caption" color="text.secondary">{t('noData')}</Typography>;
   const prices = snapshots.map(s => s.price);
@@ -349,7 +350,7 @@ function MiniPriceChart({ snapshots, title, expandable = true }: { snapshots: { 
         title={expandable ? t('clickDetailedChart') : undefined}
       >
         {snapshots.slice(-30).map((s, i, arr) => (
-          <Tooltip key={i} title={`$${s.price.toFixed(2)} - ${formatDate(s.timestamp)}`}>
+          <Tooltip key={i} title={`${formatMoney(s.price, currency, locale)} - ${formatDate(s.timestamp)}`}>
             <Box sx={{
               flex: 1, minWidth: 2, maxWidth: 6,
               height: `${Math.max(((s.price - min) / range) * 100, 5)}%`,
@@ -361,7 +362,7 @@ function MiniPriceChart({ snapshots, title, expandable = true }: { snapshots: { 
           </Tooltip>
         ))}
       </Box>
-      {expanded && <ExpandedPriceChart snapshots={snapshots} title={title} onClose={() => setExpanded(false)} />}
+      {expanded && <ExpandedPriceChart snapshots={snapshots} title={title} currency={currency} onClose={() => setExpanded(false)} />}
     </>
   );
 }
@@ -408,15 +409,17 @@ function StatCard({ icon, label, value, sub }: { icon: React.ReactNode; label: s
   );
 }
 
-function PriceStatsBar({ stats }: { stats: PriceStats | null }) {
+function PriceStatsBar({ stats, currency = 'USD' }: { stats: PriceStats | null; currency?: string }) {
   const t = useTranslations('ebayResearch');
+  const locale = useLocaleStore(s => s.locale);
+  const money = (n: number) => formatMoney(n, currency, locale);
   if (!stats) return null;
   return (
     <Paper sx={{ p: 1.5, mb: 2, display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', alignItems: 'center', background: 'linear-gradient(135deg, #fafbff 0%, #f5f0ff 100%)', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
-      <Chip icon={<DollarSign size={14} />} label={`Min: $${stats.min.toFixed(2)}`} size="small" variant="outlined" />
-      <Chip icon={<BarChart2 size={14} />} label={`${t('avg')}: $${stats.avg.toFixed(2)}`} size="small" color="primary" variant="outlined" />
-      <Chip icon={<Target size={14} />} label={`${t('median')}: $${stats.median.toFixed(2)}`} size="small" variant="outlined" />
-      <Chip icon={<DollarSign size={14} />} label={`Max: $${stats.max.toFixed(2)}`} size="small" variant="outlined" />
+      <Chip icon={<DollarSign size={14} />} label={`${t('minShort')}: ${money(stats.min)}`} size="small" variant="outlined" />
+      <Chip icon={<BarChart2 size={14} />} label={`${t('avg')}: ${money(stats.avg)}`} size="small" color="primary" variant="outlined" />
+      <Chip icon={<Target size={14} />} label={`${t('median')}: ${money(stats.median)}`} size="small" variant="outlined" />
+      <Chip icon={<DollarSign size={14} />} label={`${t('maxShort')}: ${money(stats.max)}`} size="small" variant="outlined" />
       <Chip icon={<Package size={14} />} label={`${(stats.totalResults ?? 0).toLocaleString()} ${t('results')}`} size="small" color="secondary" />
     </Paper>
   );
@@ -522,7 +525,7 @@ function mapNicheProduct(p: any): ProductResult {
     legacyItemId: p.legacyItemId,
     title: p.title || '',
     price: typeof p.price === 'number' ? p.price : parseFloat(p.price?.value || '0'),
-    currency: p.currency || 'USD',
+    currency: typeof p.currency === 'string' ? p.currency : '',
     imageUrl: p.imageUrl || p.image?.imageUrl || '',
     condition: p.condition || '',
     seller: typeof p.seller === 'string' ? p.seller : p.seller?.username || '',
@@ -587,8 +590,16 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
     priceMax: 10000,
     condition: '',
     sortBy: 'BestMatch',
-    marketplace: 'EBAY_US',
   });
+  const marketplace = useEbayResearchStore(s => s.marketplace);
+  const setMarketplace = useEbayResearchStore(s => s.setMarketplace);
+  const locale = useLocaleStore(s => s.locale);
+  // Marketplace the current results were fetched on; picker changes don't re-search, so price with this.
+  const [searchMarketplace, setSearchMarketplace] = useState<string>(marketplace);
+  const mpCurrency = marketplaceCurrency(searchMarketplace);
+  // Filters (min/max price) apply to the next search, i.e. the picker's marketplace.
+  const filterCurrency = marketplaceCurrency(marketplace);
+  const createListing = useCreateListingPrefill();
   const [results, setResults] = useState<ProductResult[]>([]);
   const [priceStats, setPriceStats] = useState<PriceStats | null>(null);
   const [topKeywords, setTopKeywords] = useState<{ word: string; count: number }[]>([]);
@@ -602,6 +613,19 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
   const [showTips, setShowTips] = useState(false);
   const [autoLoadTrigger, setAutoLoadTrigger] = useState(0);
   const productSort = useTableSort<ProductResult>(results, '', 'desc');
+  const handleCreateListing = useCallback((product: ProductResult) => {
+    // Competitor photos are not carried over: reusing another seller's images breaks eBay rules.
+    createListing({
+      target: 'ebay',
+      source: 'ebay-research',
+      title: product.title,
+      keywords: keywordsFromTitle(product.title),
+      price: product.price > 0 ? product.price : undefined,
+      currency: product.currency || mpCurrency,
+      // categoryHint is free text for the AI seed; a bare eBay category ID would only add noise, so it rides in `research`.
+      research: { tool: 'product_database', marketplace: searchMarketplace, keyword: filters.keyword, categoryId: filters.categoryId || undefined, priceStats, referenceItemId: product.legacyItemId || product.itemId },
+    });
+  }, [createListing, mpCurrency, searchMarketplace, filters.categoryId, filters.keyword, priceStats]);
 
   // Consume navigateData to pre-fill keyword and auto-search
   useEffect(() => {
@@ -637,7 +661,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
         max_price: filters.priceMax < 10000 ? filters.priceMax : '',
         condition: filters.condition,
         sort: filters.sortBy,
-        marketplace_id: filters.marketplace,
+        marketplace_id: marketplace,
         offset: newOffset,
         limit: 50,
       });
@@ -648,6 +672,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
         setResults(items);
       }
       setPriceStats(data.priceStats || null);
+      setSearchMarketplace(marketplace);
       if (!append) setTopKeywords(data.topKeywords || []);
       setOffset(newOffset + items.length);
       setHasMore((data.total || 0) > newOffset + items.length);
@@ -656,7 +681,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
     } finally {
       setLoading(false);
     }
-  }, [filters, offset, userId]);
+  }, [filters, offset, userId, marketplace]);
 
   const handleTrack = useCallback(async (product: ProductResult) => {
     try {
@@ -774,7 +799,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
           <TextField
             size="small"
             label={t('keyword')}
-            placeholder="e.g.: wireless earbuds, bluetooth speaker, yoga mat"
+            placeholder={t('keywordPlaceholderExample')}
             helperText={t('keywordHelperText')}
             value={filters.keyword}
             onChange={e => updateFilter('keyword', e.target.value)}
@@ -841,7 +866,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
             {/* Marketplace */}
             <FormControl size="small" sx={{ minWidth: { xs: '48%', sm: 130 } }}>
               <InputLabel>{t('marketplace')}</InputLabel>
-              <Select value={filters.marketplace} label={t('marketplace')} onChange={e => updateFilter('marketplace', e.target.value)}>
+              <Select value={marketplace} label={t('marketplace')} onChange={e => setMarketplace(String(e.target.value))}>
                 {MARKETPLACES_DATA.map(m => (
                   <MenuItem key={m.value} value={m.value}>{m.flag} {t(m.labelKey)}</MenuItem>
                 ))}
@@ -876,7 +901,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
               value={filters.priceMin || ''}
               onChange={e => updateFilter('priceMin', Number(e.target.value))}
               sx={{ width: { xs: '45%', sm: 100 } }}
-              InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+              InputProps={{ startAdornment: <InputAdornment position="start">{currencySymbol(filterCurrency, locale)}</InputAdornment> }}
             />
             <TextField
               size="small"
@@ -885,7 +910,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
               value={filters.priceMax >= 10000 ? '' : filters.priceMax}
               onChange={e => updateFilter('priceMax', Number(e.target.value) || 10000)}
               sx={{ width: { xs: '45%', sm: 100 } }}
-              InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+              InputProps={{ startAdornment: <InputAdornment position="start">{currencySymbol(filterCurrency, locale)}</InputAdornment> }}
             />
           </Box>
         </Collapse>
@@ -902,7 +927,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
       )}
 
       {/* Price Stats */}
-      <PriceStatsBar stats={priceStats} />
+      <PriceStatsBar stats={priceStats} currency={mpCurrency} />
 
       {/* Top Keywords */}
       {topKeywords.length > 0 && (
@@ -968,7 +993,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
         /* Mobile Card View */
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           {results.map(product => (
-            <MobileProductCard key={product.itemId} product={product} onTrack={handleTrack} onSellerSearch={handleSellerSearch} tracked={trackingIds.has(product.itemId)} onNavigate={onNavigate} />
+            <MobileProductCard key={product.itemId} product={product} onTrack={handleTrack} onSellerSearch={handleSellerSearch} tracked={trackingIds.has(product.itemId)} onNavigate={onNavigate} onCreateListing={handleCreateListing} />
           ))}
         </Box>
       ) : (
@@ -1027,7 +1052,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
                     )}
                   </TableCell>
                   <TableCell align="right">
-                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#6366f1' }}>${product.price.toFixed(2)}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#6366f1' }}>{formatMoney(product.price, product.currency || mpCurrency, locale)}</Typography>
                   </TableCell>
                   <TableCell align="center">
                     <SoldBadge count={product.estimatedSold} />
@@ -1053,7 +1078,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
                     {product.freeShipping ? (
                       <Chip label={t('free')} size="small" color="success" variant="outlined" sx={{ height: 26, fontSize: '0.82rem' }} />
                     ) : product.shippingCost != null ? (
-                      <Typography variant="caption">${product.shippingCost.toFixed(2)}</Typography>
+                      <Typography variant="caption">{formatMoney(product.shippingCost, product.currency || mpCurrency, locale)}</Typography>
                     ) : (
                       <Typography variant="caption" color="text.secondary">-</Typography>
                     )}
@@ -1063,6 +1088,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
                       <Tooltip title={trackingIds.has(product.itemId) ? t('tracking') : t('trackProduct')}>
                         <IconButton
                           size="small"
+                          aria-label={trackingIds.has(product.itemId) ? t('tracking') : t('trackProduct')}
                           color={trackingIds.has(product.itemId) ? 'primary' : 'default'}
                           onClick={() => handleTrack(product)}
                           disabled={trackingIds.has(product.itemId)}
@@ -1073,20 +1099,25 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
                       </Tooltip>
                       {onNavigate && (
                         <Tooltip title={t('nicheAnalysis')}>
-                          <IconButton size="small" sx={{ borderRadius: 2, transition: 'all 0.2s ease', '&:hover': { bgcolor: 'rgba(99,102,241,0.08)' } }} onClick={() => onNavigate('niche_finder', { keyword: product.title.split(' ').slice(0, 4).join(' ') })}>
+                          <IconButton size="small" aria-label={t('nicheAnalysis')} sx={{ borderRadius: 2, transition: 'all 0.2s ease', '&:hover': { bgcolor: 'rgba(99,102,241,0.08)' } }} onClick={() => onNavigate('niche_finder', { keyword: product.title.split(' ').slice(0, 4).join(' ') })}>
                             <Gauge size={16} />
                           </IconButton>
                         </Tooltip>
                       )}
                       {onNavigate && (
                         <Tooltip title={t('seoCheck')}>
-                          <IconButton size="small" sx={{ borderRadius: 2, transition: 'all 0.2s ease', '&:hover': { bgcolor: 'rgba(99,102,241,0.08)' } }} onClick={() => onNavigate('seo_analyzer', { keyword: product.title.split(' ').slice(0, 4).join(' '), title: product.title })}>
+                          <IconButton size="small" aria-label={t('seoCheck')} sx={{ borderRadius: 2, transition: 'all 0.2s ease', '&:hover': { bgcolor: 'rgba(99,102,241,0.08)' } }} onClick={() => onNavigate('seo_analyzer', { keyword: product.title.split(' ').slice(0, 4).join(' '), title: product.title })}>
                             <Target size={16} />
                           </IconButton>
                         </Tooltip>
                       )}
+                      <Tooltip title={t('createListingFromThis')}>
+                        <IconButton size="small" aria-label={t('createListingFromThis')} onClick={() => handleCreateListing(product)} sx={{ borderRadius: 2, transition: 'all 0.2s ease', '&:hover': { bgcolor: 'rgba(99,102,241,0.08)' } }}>
+                          <FilePlus2 size={16} />
+                        </IconButton>
+                      </Tooltip>
                       <Tooltip title={t('openOnEbay')}>
-                        <IconButton size="small" component="a" href={product.itemUrl} target="_blank" rel="noopener noreferrer" sx={{ borderRadius: 2, transition: 'all 0.2s ease', '&:hover': { bgcolor: 'rgba(99,102,241,0.08)' } }}>
+                        <IconButton size="small" aria-label={t('openOnEbay')} component="a" href={product.itemUrl} target="_blank" rel="noopener noreferrer" sx={{ borderRadius: 2, transition: 'all 0.2s ease', '&:hover': { bgcolor: 'rgba(99,102,241,0.08)' } }}>
                           <ExternalLink size={16} />
                         </IconButton>
                       </Tooltip>
@@ -1116,13 +1147,15 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
 }
 
 // Mobile product card for search results
-function MobileProductCard({ product, onTrack, onSellerSearch, tracked, onNavigate }: {
+function MobileProductCard({ product, onTrack, onSellerSearch, tracked, onNavigate, onCreateListing }: {
   product: ProductResult; onTrack: (p: ProductResult) => void;
   onSellerSearch: (s: string) => void; tracked: boolean;
   onNavigate?: (tool: string, data?: any) => void;
+  onCreateListing?: (p: ProductResult) => void;
 }) {
   const t = useTranslations('ebayResearch');
   const { formatDate, formatDateTime } = useLocale();
+  const locale = useLocaleStore(s => s.locale);
   const [expanded, setExpanded] = useState(false);
   return (
     <Paper sx={{ overflow: 'hidden', background: '#fff', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)', boxShadow: '0 2px 12px rgba(0,0,0,0.04)', transition: 'all 0.2s ease', '&:hover': { boxShadow: '0 4px 16px rgba(0,0,0,0.08)' } }}>
@@ -1141,7 +1174,7 @@ function MobileProductCard({ product, onTrack, onSellerSearch, tracked, onNaviga
             {product.title}
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#6366f1' }}>${product.price.toFixed(2)}</Typography>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#6366f1' }}>{formatMoney(product.price, product.currency, locale)}</Typography>
             <SoldBadge count={product.estimatedSold} />
             {product.topRated && <Star size={14} color="#ed6c02" fill="#ed6c02" />}
           </Box>
@@ -1168,7 +1201,7 @@ function MobileProductCard({ product, onTrack, onSellerSearch, tracked, onNaviga
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
             <Typography variant="caption" color="text.secondary">{t('shipping')}:</Typography>
             <Typography variant="caption">
-              {product.freeShipping ? t('free') : product.shippingCost != null ? `$${product.shippingCost.toFixed(2)}` : '-'}
+              {product.freeShipping ? t('free') : product.shippingCost != null ? formatMoney(product.shippingCost, product.currency, locale) : '-'}
             </Typography>
           </Box>
           <Divider />
@@ -1196,7 +1229,7 @@ function MobileProductCard({ product, onTrack, onSellerSearch, tracked, onNaviga
                 startIcon={<Target size={14} />}
                 onClick={() => onNavigate('seo_analyzer', { keyword: product.title.split(' ').slice(0, 4).join(' '), title: product.title })}
               >
-                SEO
+                {t('seoCheck')}
               </Button>
             )}
             <Button
@@ -1204,8 +1237,17 @@ function MobileProductCard({ product, onTrack, onSellerSearch, tracked, onNaviga
               startIcon={<ExternalLink size={14} />}
               component="a" href={product.itemUrl} target="_blank" rel="noopener noreferrer"
             >
-              eBay
+              {t('openOnEbay')}
             </Button>
+            {onCreateListing && (
+              <Button
+                size="small" variant="contained" sx={{ flex: '1 1 100%', minHeight: 44, borderRadius: 2, background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}
+                startIcon={<FilePlus2 size={14} />}
+                onClick={() => onCreateListing(product)}
+              >
+                {t('createListingFromThis')}
+              </Button>
+            )}
           </Box>
         </Box>
       </Collapse>
@@ -1220,6 +1262,7 @@ function MobileProductCard({ product, onTrack, onSellerSearch, tracked, onNaviga
 function ProductTracker({ userId, userListings, onNavigate }: { userId: string; userListings?: any[]; onNavigate?: (tool: string, data?: any) => void }) {
   const t = useTranslations('ebayResearch');
   const { formatDate, formatDateTime } = useLocale();
+  const locale = useLocaleStore(s => s.locale);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -1400,7 +1443,7 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
         </Button>
         <Tooltip title={t('downloadCSV')}>
           <span>
-            <IconButton size="small" onClick={handleExportCsv} disabled={tracked.length === 0} sx={{ color: '#6366f1' }}>
+            <IconButton size="small" aria-label={t('downloadCSV')} onClick={handleExportCsv} disabled={tracked.length === 0} sx={{ color: '#6366f1' }}>
               <Download size={18} />
             </IconButton>
           </span>
@@ -1503,12 +1546,12 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
                     </Typography>
                   </TableCell>
                   <TableCell align="right">
-                    <Typography variant="body2" fontWeight={700} sx={{ color: '#6366f1' }}>${(product.currentPrice || 0).toFixed(2)}</Typography>
+                    <Typography variant="body2" fontWeight={700} sx={{ color: '#6366f1' }}>{formatMoney(product.currentPrice || 0, product.currency, locale)}</Typography>
                     {product.snapshots?.length > 1 && (() => {
                       const oldest = product.snapshots[product.snapshots.length - 1];
                       return oldest.price !== product.currentPrice ? (
                         <Typography variant="caption" color="text.secondary" sx={{ textDecoration: 'line-through' }}>
-                          ${oldest.price.toFixed(2)}
+                          {formatMoney(oldest.price, product.currency, locale)}
                         </Typography>
                       ) : null;
                     })()}
@@ -1524,7 +1567,7 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
                     <Typography variant="body2">{product.totalSold ?? 0}</Typography>
                   </TableCell>
                   <TableCell>
-                    <MiniPriceChart snapshots={product.snapshots} />
+                    <MiniPriceChart snapshots={product.snapshots} title={product.title} currency={product.currency} />
                   </TableCell>
                   <TableCell sx={{ maxWidth: 150 }}>
                     {editingNotes === product.id ? (
@@ -1537,10 +1580,10 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
                           maxRows={3}
                           sx={{ flex: 1 }}
                         />
-                        <IconButton size="small" color="primary" onClick={() => handleSaveNotes(product.id)}>
+                        <IconButton size="small" color="primary" aria-label={t('save')} onClick={() => handleSaveNotes(product.id)}>
                           <Save size={14} />
                         </IconButton>
-                        <IconButton size="small" onClick={() => setEditingNotes(null)}>
+                        <IconButton size="small" aria-label={t('addDialogCancel')} onClick={() => setEditingNotes(null)}>
                           <X size={14} />
                         </IconButton>
                       </Box>
@@ -1550,7 +1593,7 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
                         sx={{ cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
                         onClick={() => { setEditingNotes(product.id); setNotesText(product.notes || ''); }}
                       >
-                        {product.notes || 'Not ekle...'}
+                        {product.notes || t('addNotePlaceholder')}
                       </Typography>
                     )}
                   </TableCell>
@@ -1559,7 +1602,7 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
                       {(product.tags || []).slice(0, 3).map(tag => (
                         <Chip key={tag} label={tag} size="small" sx={{ height: 26, fontSize: '0.82rem' }} />
                       ))}
-                      <IconButton size="small" onClick={() => setTagDialog({ id: product.id, tags: product.tags || [] })}>
+                      <IconButton size="small" aria-label={t('editTags')} onClick={() => setTagDialog({ id: product.id, tags: product.tags || [] })}>
                         <Tag size={12} />
                       </IconButton>
                     </Box>
@@ -1574,25 +1617,29 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
                       {onNavigate && (
                         <>
                           <Tooltip title={t('seoAnalysis')}>
-                            <IconButton size="small" onClick={() => onNavigate('seo_analyzer', { keyword: product.title })}>
+                            <IconButton size="small" aria-label={t('seoAnalysis')} onClick={() => onNavigate('seo_analyzer', { keyword: product.title })}>
                               <Target size={16} />
                             </IconButton>
                           </Tooltip>
                           <Tooltip title={t('aiAssistant')}>
-                            <IconButton size="small" onClick={() => onNavigate('ai_hub', { title: product.title })}>
+                            <IconButton size="small" aria-label={t('aiAssistant')} onClick={() => onNavigate('ai_hub', { title: product.title })}>
                               <Sparkles size={16} />
                             </IconButton>
                           </Tooltip>
                         </>
                       )}
                       {product.itemWebUrl || product.legacyItemId ? (
-                        <IconButton size="small" component="a" href={product.itemWebUrl || `https://www.ebay.com/itm/${product.legacyItemId}`} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink size={16} />
-                        </IconButton>
+                        <Tooltip title={t('viewOnEbay')}>
+                          <IconButton size="small" aria-label={t('viewOnEbay')} component="a" href={product.itemWebUrl || `https://www.ebay.com/itm/${product.legacyItemId}`} target="_blank" rel="noopener noreferrer">
+                            <ExternalLink size={16} />
+                          </IconButton>
+                        </Tooltip>
                       ) : null}
-                      <IconButton size="small" color="error" onClick={() => handleRemove(product.id)}>
-                        <Trash2 size={16} />
-                      </IconButton>
+                      <Tooltip title={t('deleteLabel')}>
+                        <IconButton size="small" color="error" aria-label={t('deleteLabel')} onClick={() => handleRemove(product.id)}>
+                          <Trash2 size={16} />
+                        </IconButton>
+                      </Tooltip>
                     </Box>
                   </TableCell>
                 </TableRow>
@@ -1650,18 +1697,18 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
             <TextField
               size="small"
               fullWidth
-              label="Yeni Etiket"
+              label={t('newTag')}
               value={newTag}
               onChange={e => setNewTag(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && tagDialog && handleAddTag(tagDialog.id)}
             />
             <Button variant="outlined" onClick={() => tagDialog && handleAddTag(tagDialog.id)} disabled={!newTag.trim()}>
-              Ekle
+              {t('addDialogAdd')}
             </Button>
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setTagDialog(null)}>Kapat</Button>
+          <Button onClick={() => setTagDialog(null)}>{t('close')}</Button>
         </DialogActions>
       </Dialog>
 
@@ -1680,8 +1727,8 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
             />
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setEditingNotes(null)}>Iptal</Button>
-            <Button variant="contained" onClick={() => editingNotes && handleSaveNotes(editingNotes)}>Kaydet</Button>
+            <Button onClick={() => setEditingNotes(null)}>{t('addDialogCancel')}</Button>
+            <Button variant="contained" onClick={() => editingNotes && handleSaveNotes(editingNotes)}>{t('save')}</Button>
           </DialogActions>
         </Dialog>
       )}
@@ -1698,6 +1745,7 @@ function TrackedProductMobileCard({ product, onRemove, onEditNotes, onOpenTags, 
 }) {
   const t = useTranslations('ebayResearch');
   const { formatDate, formatDateTime } = useLocale();
+  const locale = useLocaleStore(s => s.locale);
   const [expanded, setExpanded] = useState(false);
   return (
     <Paper sx={{ overflow: 'hidden', background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
@@ -1712,7 +1760,7 @@ function TrackedProductMobileCard({ product, onRemove, onEditNotes, onOpenTags, 
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography variant="body2" fontWeight={500} noWrap>{product.title}</Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-            <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#6366f1' }}>${(product.currentPrice || 0).toFixed(2)}</Typography>
+            <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#6366f1' }}>{formatMoney(product.currentPrice || 0, product.currency, locale)}</Typography>
             {product.snapshots?.length > 1 ? (() => {
               const oldest = product.snapshots[product.snapshots.length - 1];
               const change = oldest.price > 0 ? ((product.currentPrice - oldest.price) / oldest.price) * 100 : 0;
@@ -1733,7 +1781,7 @@ function TrackedProductMobileCard({ product, onRemove, onEditNotes, onOpenTags, 
           {product.snapshots?.length > 1 && (
             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
               <Typography variant="caption" color="text.secondary">{t('firstPrice')}:</Typography>
-              <Typography variant="caption">${product.snapshots[product.snapshots.length - 1].price.toFixed(2)}</Typography>
+              <Typography variant="caption">{formatMoney(product.snapshots[product.snapshots.length - 1].price, product.currency, locale)}</Typography>
             </Box>
           )}
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -1741,7 +1789,7 @@ function TrackedProductMobileCard({ product, onRemove, onEditNotes, onOpenTags, 
             <Typography variant="caption">{product.totalSold ?? 0}</Typography>
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="caption" color="text.secondary">Son Kontrol:</Typography>
+            <Typography variant="caption" color="text.secondary">{t('lastChecked')}:</Typography>
             <Typography variant="caption">
               {product.lastCheckedAt ? formatDateTime(product.lastCheckedAt, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
             </Typography>
@@ -1756,35 +1804,35 @@ function TrackedProductMobileCard({ product, onRemove, onEditNotes, onOpenTags, 
           {/* Price Chart */}
           <Box>
             <Typography variant="caption" color="text.secondary">{t('priceHistory')}:</Typography>
-            <MiniPriceChart snapshots={product.snapshots} />
+            <MiniPriceChart snapshots={product.snapshots} title={product.title} currency={product.currency} />
           </Box>
           {/* Notes */}
           {product.notes && (
             <Box>
-              <Typography variant="caption" color="text.secondary">Not:</Typography>
+              <Typography variant="caption" color="text.secondary">{t('noteLabel')}:</Typography>
               <Typography variant="caption" display="block">{product.notes}</Typography>
             </Box>
           )}
           <Divider />
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
             <Button size="small" variant="outlined" onClick={() => onEditNotes(product.id, product.notes || '')} startIcon={<Edit3 size={12} />}>
-              Not
+              {t('noteLabel')}
             </Button>
             <Button size="small" variant="outlined" onClick={() => onOpenTags(product.id, product.tags || [])} startIcon={<Tag size={12} />}>
-              Etiket
+              {t('tagLabel')}
             </Button>
             {onNavigate && (
               <>
                 <Button size="small" variant="outlined" onClick={() => onNavigate('seo_analyzer', { keyword: product.title })} startIcon={<Target size={12} />}>
-                  SEO
+                  {t('seoAnalysis')}
                 </Button>
                 <Button size="small" variant="outlined" onClick={() => onNavigate('ai_hub', { title: product.title })} startIcon={<Sparkles size={12} />}>
-                  AI
+                  {t('aiAssistant')}
                 </Button>
               </>
             )}
             <Button size="small" variant="outlined" color="error" onClick={() => onRemove(product.id)} startIcon={<Trash2 size={12} />} sx={{ ml: 'auto' }}>
-              Sil
+              {t('deleteLabel')}
             </Button>
           </Box>
         </Box>
@@ -1804,9 +1852,16 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const [keyword, setKeyword] = useState('');
-  const [marketplace, setMarketplace] = useState('EBAY_US');
+  const marketplace = useEbayResearchStore(s => s.marketplace);
+  const setMarketplace = useEbayResearchStore(s => s.setMarketplace);
+  const locale = useLocaleStore(s => s.locale);
+  const createListing = useCreateListingPrefill();
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState<NicheReport | null>(null);
+  // Price in the currency of the marketplace the report came from, not the one picked now.
+  const reportMarketplace = report?.marketplace || marketplace;
+  const mpCurrency = marketplaceCurrency(reportMarketplace);
+  const money = (n: number, d = 2) => formatMoney(n, mpCurrency, locale, d);
   const [savedNiches, setSavedNiches] = useState<NicheReport[]>([]);
   const [loadingNiches, setLoadingNiches] = useState(true);
   const [savingNiche, setSavingNiche] = useState(false);
@@ -1815,6 +1870,32 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
   const [showTips, setShowTips] = useState(false);
   const [autoLoadTrigger, setAutoLoadTrigger] = useState(0);
   const nicheProductSort = useTableSort<ProductResult>(report?.topProducts || [], 'estimatedSold', 'desc');
+
+  const handleCreateListingFromNiche = useCallback(() => {
+    if (!report) return;
+    const titles = (report.topProducts || []).slice(0, 5).map(p => p.title).join(' ');
+    createListing({
+      target: 'ebay',
+      source: 'ebay-research',
+      title: report.keyword,
+      keywords: keywordsFromTitle(`${report.keyword} ${titles}`),
+      price: report.medianPrice > 0 ? report.medianPrice : undefined,
+      currency: mpCurrency,
+      research: {
+        tool: 'niche_finder',
+        marketplace: reportMarketplace,
+        keyword: report.keyword,
+        demandScore: report.demandScore,
+        competitionScore: report.competitionScore,
+        opportunityScore: report.opportunityScore,
+        avgPrice: report.avgPrice,
+        medianPrice: report.medianPrice,
+        priceMin: report.priceMin,
+        priceMax: report.priceMax,
+        topProducts: (report.topProducts || []).slice(0, 10).map(p => ({ title: p.title, price: p.price, sold: p.estimatedSold })),
+      },
+    });
+  }, [report, createListing, mpCurrency, reportMarketplace]);
 
   // Consume navigateData to pre-fill keyword
   useEffect(() => {
@@ -1859,6 +1940,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
       const data = await apiCall('niche_analyze', userId, { q: keyword, marketplace_id: marketplace });
       const mapped: NicheReport = {
         keyword: data.query || keyword,
+        marketplace,
         demandScore: data.demandScore || 0,
         competitionScore: data.competitionScore || 0,
         totalListings: data.totalResults || 0,
@@ -1908,6 +1990,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
       const data = await apiCall('niche_analyze', userId, { category_id: categoryId, marketplace_id: marketplace });
       const mapped: NicheReport = {
         keyword: categoryName,
+        marketplace,
         demandScore: data.demandScore || 0,
         competitionScore: data.competitionScore || 0,
         totalListings: data.totalResults || 0,
@@ -1934,7 +2017,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
       };
       setReport(mapped);
     } catch (err: any) {
-      toast.error(err.message || 'Kategori analizi basarisiz');
+      toast.error(err.message || t('categoryAnalysisFailed'));
     } finally {
       setLoading(false);
       setCategoryAnalyzing(null);
@@ -1947,7 +2030,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
     try {
       await apiPost('save_niche', userId, {
         query: report.keyword,
-        marketplace: marketplace || 'EBAY_US',
+        marketplace: report.marketplace || marketplace,
         totalResults: report.totalListings,
         avgPrice: report.avgPrice,
         medianPrice: report.medianPrice,
@@ -1962,7 +2045,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
     } finally {
       setSavingNiche(false);
     }
-  }, [report, userId, fetchSavedNiches]);
+  }, [report, userId, fetchSavedNiches, marketplace]);
 
   const handleDeleteNiche = useCallback(async (id: string) => {
     try {
@@ -1976,9 +2059,11 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
 
   const handleLoadNiche = (niche: any) => {
     // Saved niches from DB have `query` field, mapped niches have `keyword`
+    const nicheMarketplace = isEbayResearchMarketplace(niche.marketplace) ? niche.marketplace : undefined;
     const mapped: NicheReport = {
       id: niche.id,
       keyword: niche.keyword || niche.query || '',
+      marketplace: nicheMarketplace || marketplace,
       demandScore: niche.demandScore || 0,
       competitionScore: niche.competitionScore || 0,
       totalListings: niche.totalListings || niche.totalResults || 0,
@@ -2003,6 +2088,8 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
     };
     setReport(mapped);
     setKeyword(mapped.keyword);
+    // Re-analysing a saved niche should hit the marketplace it was saved from.
+    if (nicheMarketplace && nicheMarketplace !== marketplace) setMarketplace(nicheMarketplace);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -2024,7 +2111,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
           <TextField
             size="small"
             label={t('keywordOrCategory')}
-            placeholder="or: vintage jewelry, phone case, led lights"
+            placeholder={t('nichePlaceholderExample')}
             helperText={t('nicheAnalysisHelper')}
             value={keyword}
             onChange={e => setKeyword(e.target.value)}
@@ -2036,7 +2123,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
           />
           <FormControl size="small" sx={{ minWidth: 130 }}>
             <InputLabel>{t('marketplace')}</InputLabel>
-            <Select value={marketplace} label="Pazar Yeri" onChange={e => setMarketplace(e.target.value)}>
+            <Select value={marketplace} label={t('marketplace')} onChange={e => setMarketplace(String(e.target.value))}>
               {MARKETPLACES_DATA.map(m => (
                 <MenuItem key={m.value} value={m.value}>{m.flag} {t(m.labelKey)}</MenuItem>
               ))}
@@ -2050,7 +2137,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
             transition: 'all 0.2s ease',
             '&:hover': { background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)', boxShadow: '0 4px 12px rgba(99,102,241,0.4)' },
           }}>
-            {loading ? <CircularProgress size={20} sx={{ color: '#fff' }} /> : 'Analiz Et'}
+            {loading ? <CircularProgress size={20} sx={{ color: '#fff' }} /> : t('analyzeBtn')}
           </Button>
           <Chip
             icon={<Lightbulb size={14} />}
@@ -2074,13 +2161,13 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
         {/* Tips */}
         <Collapse in={showTips}>
           <Paper sx={{ p: 2, mt: 1.5, bgcolor: '#f8faff', borderRadius: 2, border: '1px solid rgba(99,102,241,0.08)' }}>
-            <Typography variant="subtitle2" fontWeight={700} gutterBottom>Ipuclari</Typography>
+            <Typography variant="subtitle2" fontWeight={700} gutterBottom>{t('tips')}</Typography>
             <Typography variant="body2" color="text.secondary" component="div">
               <ul style={{ margin: 0, paddingLeft: 16 }}>
-                <li>Dusuk rekabet + yuksek talep = en iyi firsatlar</li>
-                <li>Firsat skoru 70+ olan nislere odaklanin</li>
-                <li>Nis kaydedin ve duzenli olarak fiyat/rekabet degisimlerini kontrol edin</li>
-                <li>En cok satan urunleri inceleyerek hangi ozelliklerin onemli oldugunu anlayin</li>
+                <li>{t('nicheTip1')}</li>
+                <li>{t('nicheTip2')}</li>
+                <li>{t('nicheTip3')}</li>
+                <li>{t('nicheTip4')}</li>
               </ul>
             </Typography>
           </Paper>
@@ -2153,17 +2240,26 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
             borderRadius: 3,
             border: '1px solid rgba(99,102,241,0.08)',
           }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e1b4b' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1, flexWrap: 'wrap', gap: 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e1b4b', wordBreak: 'break-word' }}>
                 &ldquo;{report.keyword}&rdquo; {t('nicheReport')}
               </Typography>
-              <Box sx={{ display: 'flex', gap: 1 }}>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={<FilePlus2 size={14} />}
+                  onClick={handleCreateListingFromNiche}
+                  sx={{ borderRadius: 2, minHeight: { xs: 44, md: 36 }, background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}
+                >
+                  {t('createListingFromThis')}
+                </Button>
                 <Button
                   variant="text"
                   size="small"
                   onClick={() => { setReport(null); setKeyword(''); }}
                 >
-                  Kesfetmeye Don
+                  {t('backToExplore')}
                 </Button>
                 <Button
                   variant="outlined"
@@ -2181,7 +2277,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
                       {t('viewProducts')}
                     </Button>
                     <Button size="small" variant="outlined" startIcon={<Target size={14} />} onClick={() => onNavigate('seo_analyzer', { keyword: report.keyword })} sx={{ borderRadius: 2, borderColor: '#6366f1', color: '#6366f1', transition: 'all 0.2s ease', '&:hover': { borderColor: '#4f46e5', bgcolor: 'rgba(99,102,241,0.04)' } }}>
-                      SEO
+                      {t('seoCheck')}
                     </Button>
                   </>
                 )}
@@ -2190,10 +2286,10 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
 
             <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap', mb: 2 }}>
               <Paper sx={{ minWidth: { xs: '45%', sm: 140 }, background: '#fff', borderRadius: 3, border: '1px solid rgba(99,102,241,0.1)', boxShadow: '0 1px 8px rgba(99,102,241,0.06)', transition: 'all 0.2s ease', '&:hover': { boxShadow: '0 2px 16px rgba(99,102,241,0.12)' } }}>
-                <ScoreDisplay label="Talep Skoru" score={report.demandScore} />
+                <ScoreDisplay label={t('demandScore')} score={report.demandScore} />
               </Paper>
               <Paper sx={{ minWidth: { xs: '45%', sm: 140 }, background: '#fff', borderRadius: 3, border: '1px solid rgba(99,102,241,0.1)', boxShadow: '0 1px 8px rgba(99,102,241,0.06)', transition: 'all 0.2s ease', '&:hover': { boxShadow: '0 2px 16px rgba(99,102,241,0.12)' } }}>
-                <ScoreDisplay label="Rekabet Skoru" score={report.competitionScore} invert />
+                <ScoreDisplay label={t('competitionScore')} score={report.competitionScore} invert />
               </Paper>
               <Paper sx={{ minWidth: { xs: '90%', sm: 140 }, background: '#fff', borderRadius: 3, border: '1px solid rgba(99,102,241,0.1)', boxShadow: '0 2px 12px rgba(99,102,241,0.08)', transition: 'all 0.2s ease', '&:hover': { boxShadow: '0 4px 20px rgba(99,102,241,0.15)' } }}>
                 <ScoreDisplay label={t('opportunityScore')} score={report.opportunityScore || 0} />
@@ -2204,12 +2300,12 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
             <Box sx={{ mt: 2, mb: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
               {report.demandLabel && (
                 <Alert severity={report.demandScore >= 70 ? 'success' : report.demandScore >= 40 ? 'warning' : 'error'} sx={{ py: 0 }}>
-                  <Typography variant="body2"><strong>Talep:</strong> {report.demandLabel}</Typography>
+                  <Typography variant="body2"><strong>{t('demand')}:</strong> {report.demandLabel}</Typography>
                 </Alert>
               )}
               {report.competitionLabel && (
                 <Alert severity={report.competitionScore <= 30 ? 'success' : report.competitionScore <= 60 ? 'warning' : 'error'} sx={{ py: 0 }}>
-                  <Typography variant="body2"><strong>Rekabet:</strong> {report.competitionLabel}</Typography>
+                  <Typography variant="body2"><strong>{t('competition')}:</strong> {report.competitionLabel}</Typography>
                 </Alert>
               )}
               {report.opportunityLabel && (
@@ -2223,9 +2319,9 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'center' }}>
               <StatCard icon={<Package size={16} />} label={t('totalListings')} value={report.totalListings.toLocaleString()} />
               <StatCard icon={<Users size={16} />} label={t('uniqueSellers')} value={report.uniqueSellers.toLocaleString()} />
-              <StatCard icon={<DollarSign size={16} />} label={t('avgPrice')} value={`$${report.avgPrice.toFixed(2)}`} />
-              <StatCard icon={<Target size={16} />} label={t('medianPrice')} value={`$${report.medianPrice.toFixed(2)}`} />
-              <StatCard icon={<ArrowUpDown size={16} />} label={t('priceRange')} value={`$${report.priceMin.toFixed(0)} - $${report.priceMax.toFixed(0)}`} />
+              <StatCard icon={<DollarSign size={16} />} label={t('avgPrice')} value={money(report.avgPrice)} />
+              <StatCard icon={<Target size={16} />} label={t('medianPrice')} value={money(report.medianPrice)} />
+              <StatCard icon={<ArrowUpDown size={16} />} label={t('priceRange')} value={`${money(report.priceMin, 0)} - ${money(report.priceMax, 0)}`} />
               <StatCard icon={<ShoppingBag size={16} />} label={t('freeShipping')} value={`%${report.freeShippingPct.toFixed(0)}`} />
               <StatCard icon={<Users size={16} />} label={t('sellerDensity')} value={`%${report.sellerConcentration.toFixed(0)}`} sub={t('top10SellerShare')} />
               {report.avgSoldPerItem !== undefined && (
@@ -2318,7 +2414,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
                             {p.title}
                           </a>
                         </Typography>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700, flexShrink: 0, color: '#6366f1' }}>${p.price.toFixed(2)}</Typography>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700, flexShrink: 0, color: '#6366f1' }}>{formatMoney(p.price, p.currency || mpCurrency, locale)}</Typography>
                       </Box>
                       <Box sx={{ display: 'flex', gap: 1, mt: 0.5, alignItems: 'center' }}>
                         <SoldBadge count={p.estimatedSold} />
@@ -2366,7 +2462,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
                             </Typography>
                           </TableCell>
                           <TableCell align="right">
-                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#6366f1' }}>${p.price.toFixed(2)}</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#6366f1' }}>{formatMoney(p.price, p.currency || mpCurrency, locale)}</Typography>
                           </TableCell>
                           <TableCell align="center">
                             <SoldBadge count={p.estimatedSold} />
@@ -2430,7 +2526,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
                   sx={{ bgcolor: `${SCORE_COLOR(niche.demandScore)}22`, color: SCORE_COLOR(niche.demandScore), fontWeight: 600 }}
                 />
                 <Chip
-                  label={`Rekabet: ${niche.competitionScore}`}
+                  label={`${t('competition')}: ${niche.competitionScore}`}
                   size="small"
                   sx={{ bgcolor: `${SCORE_COLOR(niche.competitionScore, true)}22`, color: SCORE_COLOR(niche.competitionScore, true), fontWeight: 600 }}
                 />
@@ -2438,12 +2534,12 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
               </Box>
               <Box sx={{ display: 'flex', gap: 0.5 }}>
                 <Tooltip title={t('loadReport')}>
-                  <IconButton size="small" onClick={() => handleLoadNiche(niche)} sx={{ borderRadius: 2, bgcolor: 'rgba(99,102,241,0.06)', color: '#6366f1', transition: 'all 0.2s ease', '&:hover': { bgcolor: 'rgba(99,102,241,0.15)' } }}>
+                  <IconButton size="small" aria-label={t('loadReport')} onClick={() => handleLoadNiche(niche)} sx={{ borderRadius: 2, bgcolor: 'rgba(99,102,241,0.06)', color: '#6366f1', transition: 'all 0.2s ease', '&:hover': { bgcolor: 'rgba(99,102,241,0.15)' } }}>
                     <Eye size={16} />
                   </IconButton>
                 </Tooltip>
                 <Tooltip title={t('delete')}>
-                  <IconButton size="small" color="error" onClick={() => niche.id && handleDeleteNiche(niche.id)} sx={{ borderRadius: 2, transition: 'all 0.2s ease' }}>
+                  <IconButton size="small" color="error" aria-label={t('delete')} onClick={() => niche.id && handleDeleteNiche(niche.id)} sx={{ borderRadius: 2, transition: 'all 0.2s ease' }}>
                     <Trash2 size={16} />
                   </IconButton>
                 </Tooltip>
@@ -2524,11 +2620,12 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
     }
   }, [userId, notesText]);
 
+  const marketplace = useEbayResearchStore(s => s.marketplace);
   const handleViewProducts = useCallback((sellerUsername: string) => {
-    // Open in new tab or navigate to product database with seller filter
-    const url = `https://www.ebay.com/sch/${encodeURIComponent(sellerUsername)}/m.html`;
+    // Seller's store on the selected marketplace's eBay site
+    const url = `https://www.${marketplaceDomain(marketplace)}/sch/${encodeURIComponent(sellerUsername)}/m.html`;
     window.open(url, '_blank', 'noopener,noreferrer');
-  }, []);
+  }, [marketplace]);
 
   if (loading) {
     return (
@@ -2555,7 +2652,7 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
           <TextField
             size="small"
             label={t('ebayUsername')}
-            placeholder="or: top_seller_2024, best.deals.shop"
+            placeholder={t('sellerPlaceholderExample')}
             helperText={t('sellerUsernameHelp')}
             value={username}
             onChange={e => setUsername(e.target.value)}
@@ -2580,17 +2677,17 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
       {sellers.length === 0 ? (
         <Box>
           <EmptyState
-            message="Henuz takip ettiginiz satici yok"
-            sub="Rakip saticilari ekleyerek fiyat ve stok degisikliklerini izleyin. Yukaridaki alana eBay kullanici adi girin."
+            message={t('noTrackedSellers')}
+            sub={t('noTrackedSellersSub')}
           />
           <Paper sx={{ p: 2, mt: 2, bgcolor: '#f8faff', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
-            <Typography variant="subtitle2" fontWeight={700} gutterBottom>Satici Takibi Nasil Kullanilir?</Typography>
+            <Typography variant="subtitle2" fontWeight={700} gutterBottom>{t('howToTrackSellers')}</Typography>
             <Typography variant="body2" color="text.secondary" component="div">
               <ul style={{ margin: 0, paddingLeft: 16 }}>
-                <li>Rakip saticilarin eBay kullanici adini girin</li>
-                <li>Yeni urun, fiyat degisikligi ve stok guncellemelerini otomatik takip edin</li>
-                <li>Satici puanini ve olumlu geri bildirim oranini izleyin</li>
-                <li>Saticinin urunlerini gorup kendi nisleriyle karsilastirin</li>
+                <li>{t('sellerStep1')}</li>
+                <li>{t('sellerStep2')}</li>
+                <li>{t('sellerStep3')}</li>
+                <li>{t('sellerStep4')}</li>
               </ul>
             </Typography>
           </Paper>
@@ -2612,7 +2709,7 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
                       sx={{ height: 22, borderColor: 'rgba(99,102,241,0.3)', fontWeight: 600, color: '#6366f1' }}
                     />
                     <Chip
-                      label={`%${seller.feedbackPct || '0'} olumlu`}
+                      label={t('positivePct', { pct: seller.feedbackPct || '0' })}
                       size="small"
                       sx={{
                         height: 22,
@@ -2623,7 +2720,7 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
                     />
                   </Box>
                 </Box>
-                <IconButton size="small" color="error" onClick={() => handleRemoveSeller(seller.id)}>
+                <IconButton size="small" color="error" aria-label={t('remove')} onClick={() => handleRemoveSeller(seller.id)} sx={{ width: 44, height: 44 }}>
                   <Trash2 size={16} />
                 </IconButton>
               </Box>
@@ -2640,10 +2737,10 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
                       multiline
                       maxRows={3}
                     />
-                    <IconButton size="small" color="primary" onClick={() => handleSaveNotes(seller.id)}>
+                    <IconButton size="small" color="primary" aria-label={t('save')} onClick={() => handleSaveNotes(seller.id)}>
                       <Save size={14} />
                     </IconButton>
-                    <IconButton size="small" onClick={() => setEditingNotes(null)}>
+                    <IconButton size="small" aria-label={t('addDialogCancel')} onClick={() => setEditingNotes(null)}>
                       <X size={14} />
                     </IconButton>
                   </Box>
@@ -2653,7 +2750,7 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
                     sx={{ cursor: 'pointer', color: seller.notes ? 'text.primary' : 'text.secondary', '&:hover': { color: 'primary.main' } }}
                     onClick={() => { setEditingNotes(seller.id); setNotesText(seller.notes || ''); }}
                   >
-                    {seller.notes || 'Not ekle...'}
+                    {seller.notes || t('addNotePlaceholder')}
                   </Typography>
                 )}
               </Box>
@@ -2690,7 +2787,7 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
               </Box>
 
               <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1, textAlign: 'right' }}>
-                Son kontrol: {seller.lastCheckedAt ? formatDateTime(seller.lastCheckedAt, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
+                {t('lastChecked')}: {seller.lastCheckedAt ? formatDateTime(seller.lastCheckedAt, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
               </Typography>
             </Paper>
           ))}
@@ -2704,13 +2801,13 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
                 <TableCell sx={{ fontWeight: 600, color: '#4338ca' }}>{t('username')}</TableCell>
                 <TableCell align="center" sortDirection={sellerSort.sortKey === 'feedbackScore' ? sellerSort.sortDir : false}>
                   <TableSortLabel active={sellerSort.sortKey === 'feedbackScore'} direction={sellerSort.sortKey === 'feedbackScore' ? sellerSort.sortDir : 'desc'} onClick={() => sellerSort.handleSort('feedbackScore')}>
-                    Puan
+                    {t('feedbackScore')}
                   </TableSortLabel>
                 </TableCell>
-                <TableCell align="center">Olumlu %</TableCell>
-                <TableCell>Notlar</TableCell>
-                <TableCell align="center">Son Kontrol</TableCell>
-                <TableCell align="center">Aksiyonlar</TableCell>
+                <TableCell align="center">{t('positivePctHeader')}</TableCell>
+                <TableCell>{t('notes')}</TableCell>
+                <TableCell align="center">{t('lastChecked')}</TableCell>
+                <TableCell align="center">{t('actions')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -2750,10 +2847,10 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
                           maxRows={2}
                           sx={{ flex: 1 }}
                         />
-                        <IconButton size="small" color="primary" onClick={() => handleSaveNotes(seller.id)}>
+                        <IconButton size="small" color="primary" aria-label={t('save')} onClick={() => handleSaveNotes(seller.id)}>
                           <Save size={14} />
                         </IconButton>
-                        <IconButton size="small" onClick={() => setEditingNotes(null)}>
+                        <IconButton size="small" aria-label={t('addDialogCancel')} onClick={() => setEditingNotes(null)}>
                           <X size={14} />
                         </IconButton>
                       </Box>
@@ -2763,7 +2860,7 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
                         sx={{ cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
                         onClick={() => { setEditingNotes(seller.id); setNotesText(seller.notes || ''); }}
                       >
-                        {seller.notes || 'Not ekle...'}
+                        {seller.notes || t('addNotePlaceholder')}
                       </Typography>
                     )}
                   </TableCell>
@@ -2777,24 +2874,24 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
                       {onNavigate && (
                         <>
                           <Tooltip title={t('viewProducts')}>
-                            <IconButton size="small" onClick={() => onNavigate('product_database', { keyword: seller.sellerUsername })}>
+                            <IconButton size="small" aria-label={t('viewProducts')} onClick={() => onNavigate('product_database', { keyword: seller.sellerUsername })}>
                               <Package size={16} />
                             </IconButton>
                           </Tooltip>
                           <Tooltip title={t('competitiveIntelligence')}>
-                            <IconButton size="small" onClick={() => onNavigate('competitive_intelligence', { seller: seller.sellerUsername })}>
+                            <IconButton size="small" aria-label={t('competitiveIntelligence')} onClick={() => onNavigate('competitive_intelligence', { seller: seller.sellerUsername })}>
                               <Eye size={16} />
                             </IconButton>
                           </Tooltip>
                         </>
                       )}
                       <Tooltip title={t('viewOnEbay')}>
-                        <IconButton size="small" onClick={() => handleViewProducts(seller.sellerUsername)}>
+                        <IconButton size="small" aria-label={t('viewOnEbay')} onClick={() => handleViewProducts(seller.sellerUsername)}>
                           <ExternalLink size={16} />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title={t('remove')}>
-                        <IconButton size="small" color="error" onClick={() => handleRemoveSeller(seller.id)}>
+                        <IconButton size="small" color="error" aria-label={t('remove')} onClick={() => handleRemoveSeller(seller.id)}>
                           <Trash2 size={16} />
                         </IconButton>
                       </Tooltip>
@@ -2814,212 +2911,176 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
 // Main Page Component
 // ---------------------------------------------------------------------------
 
-const SECTIONS = [
-  {
-    labelKey: 'sectionResearch',
-    icon: <Search size={18} />,
-    descriptionKey: 'sectionResearchDesc',
-    welcomeKey: 'sectionResearchWelcome',
-    subTabs: [
-      { labelKey: 'tabProductDatabase', icon: <Package size={14} /> },
-      { labelKey: 'tabCategoryNiche', icon: <Gauge size={14} /> },
-      { labelKey: 'tabKeywordAnalysis', icon: <Tag size={14} /> },
-      { labelKey: 'tabArbitrageFinder', icon: <Globe size={14} /> },
-      { labelKey: 'tabMarketComparison', icon: <Globe size={14} /> },
-      { labelKey: 'tabCategoryExplorer', icon: <Layers size={14} /> },
-      { labelKey: 'tabNicheComparison', icon: <BarChart2 size={14} /> },
-    ],
-  },
-  {
-    labelKey: 'sectionTracking',
-    icon: <Bookmark size={18} />,
-    descriptionKey: 'sectionTrackingDesc',
-    welcomeKey: 'sectionTrackingWelcome',
-    subTabs: [
-      { labelKey: 'tabProductTracker', icon: <Bookmark size={14} /> },
-      { labelKey: 'tabSellerTracker', icon: <Users size={14} /> },
-      { labelKey: 'tabCompetitorAnalysis', icon: <Eye size={14} /> },
-    ],
-  },
-  {
-    labelKey: 'sectionOptimization',
-    icon: <TrendingUp size={18} />,
-    descriptionKey: 'sectionOptimizationDesc',
-    welcomeKey: 'sectionOptimizationWelcome',
-    subTabs: [
-      { labelKey: 'tabSeoAnalysis', icon: <Target size={14} /> },
-      { labelKey: 'tabAiAssistant', icon: <Sparkles size={14} /> },
-      { labelKey: 'tabListingOptimizer', icon: <Zap size={14} /> },
-      { labelKey: 'tabFinancialCalc', icon: <DollarSign size={14} /> },
-    ],
-  },
+type SectionId = 'research' | 'tracking' | 'optimization';
+
+type ToolId =
+  | 'product_database' | 'keyword_intelligence' | 'niche_finder' | 'arbitrage'
+  | 'marketplace_comparison' | 'category_explorer' | 'niche_comparison'
+  | 'product_tracker' | 'seller_tracker' | 'competitive_intelligence'
+  | 'seo_analyzer' | 'ai_hub' | 'listing_optimizer' | 'financial';
+
+const SECTIONS: { id: SectionId; labelKey: string }[] = [
+  { id: 'research', labelKey: 'sectionResearch' },
+  { id: 'tracking', labelKey: 'sectionTracking' },
+  { id: 'optimization', labelKey: 'sectionOptimization' },
 ];
 
-function SectionWelcome({ section, userListings = [], sectionIndex }: { section: typeof SECTIONS[number]; userListings?: any[]; sectionIndex?: number }) {
-  const t = useTranslations('ebayResearch');
-  const hasListings = userListings.length > 0;
+/**
+ * Every research tool. `primary` tools are always visible; the rest live under
+ * "More tools" so the page doesn't open with 14 choices.
+ */
+const TOOLS: { id: ToolId; section: SectionId; labelKey: string; icon: React.ReactElement; primary: boolean }[] = [
+  { id: 'product_database', section: 'research', labelKey: 'tabProductDatabase', icon: <Package size={14} />, primary: true },
+  { id: 'keyword_intelligence', section: 'research', labelKey: 'tabKeywordAnalysis', icon: <Tag size={14} />, primary: true },
+  { id: 'niche_finder', section: 'research', labelKey: 'tabCategoryNiche', icon: <Gauge size={14} />, primary: true },
+  { id: 'competitive_intelligence', section: 'tracking', labelKey: 'tabCompetitorAnalysis', icon: <Eye size={14} />, primary: true },
+  { id: 'seo_analyzer', section: 'optimization', labelKey: 'tabSeoAnalysis', icon: <Target size={14} />, primary: true },
+  { id: 'ai_hub', section: 'optimization', labelKey: 'tabAiAssistant', icon: <Sparkles size={14} />, primary: true },
+  { id: 'financial', section: 'optimization', labelKey: 'tabFinancialCalc', icon: <DollarSign size={14} />, primary: false },
+  { id: 'product_tracker', section: 'tracking', labelKey: 'tabProductTracker', icon: <Bookmark size={14} />, primary: false },
+  { id: 'seller_tracker', section: 'tracking', labelKey: 'tabSellerTracker', icon: <Users size={14} />, primary: false },
+  { id: 'listing_optimizer', section: 'optimization', labelKey: 'tabListingOptimizer', icon: <Zap size={14} />, primary: false },
+  { id: 'arbitrage', section: 'research', labelKey: 'tabArbitrageFinder', icon: <Globe size={14} />, primary: false },
+  { id: 'marketplace_comparison', section: 'research', labelKey: 'tabMarketComparison', icon: <Globe size={14} />, primary: false },
+  { id: 'category_explorer', section: 'research', labelKey: 'tabCategoryExplorer', icon: <Layers size={14} />, primary: false },
+  { id: 'niche_comparison', section: 'research', labelKey: 'tabNicheComparison', icon: <BarChart2 size={14} />, primary: false },
+];
 
-  const personalizedMessage = hasListings
-    ? sectionIndex === 0
-      ? t('welcomeListingsAnalysis', { count: userListings.length })
-      : sectionIndex === 1
-        ? t('welcomeCompetitorDetected')
-        : sectionIndex === 2
-          ? t('welcomeListingsOptimization')
-          : null
-    : null;
+const DEFAULT_TOOL: ToolId = 'product_database';
 
-  return (
-    <Paper
-      sx={{
-        p: { xs: 2, sm: 4 },
-        textAlign: 'center',
-        background: 'linear-gradient(135deg, #f8faff 0%, #f0edff 50%, #e0f2fe 100%)',
-        borderRadius: 4,
-        boxShadow: '0 4px 24px rgba(99,102,241,0.08)',
-        border: '1px solid rgba(99,102,241,0.1)',
-        overflow: 'hidden',
-        width: '100%',
-        maxWidth: '100%',
-        boxSizing: 'border-box',
-      }}
-    >
-      <Box sx={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(135deg, #ede9fe 0%, #e0f2fe 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2 }}>{React.cloneElement(section.icon as React.ReactElement, { size: 36, strokeWidth: 1.5, style: { color: '#6366f1' } })}</Box>
-      <Typography variant="h6" fontWeight={700} sx={{ mb: 1 }}>
-        {t(section.labelKey)}
-      </Typography>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: 480, mx: 'auto', wordBreak: 'break-word', px: 1 }}>
-        {t(section.welcomeKey)}
-      </Typography>
-      {personalizedMessage && (
-        <Typography variant="body2" color="primary.main" fontWeight={600} sx={{ mb: 2, maxWidth: 480, mx: 'auto', wordBreak: 'break-word', px: 1 }}>
-          {personalizedMessage}
-        </Typography>
-      )}
-      <Typography variant="body2" color="text.secondary" sx={{ wordBreak: 'break-word' }}>
-        Baslamak icin yukaridaki araclardan birini secin.
-      </Typography>
-    </Paper>
-  );
+function findTool(id: unknown) {
+  return typeof id === 'string' ? TOOLS.find(tool => tool.id === id) : undefined;
 }
 
 function EbayResearchPage() {
   const t = useTranslations('ebayResearch');
-  const { formatDate, formatDateTime, formatNumber } = useLocale();
+  const router = useRouter();
   const { user } = useAuth() as any;
   const userId = user?.id as string | undefined;
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const [mainTab, setMainTab] = useState(0);
-  const [subTab, setSubTab] = useState(0); // auto-select first tool
+  const marketplace = useEbayResearchStore(s => s.marketplace);
+  const setMarketplace = useEbayResearchStore(s => s.setMarketplace);
+  const hydrateMarketplace = useEbayResearchStore(s => s.hydrate);
+  const marketplaceHydrated = useEbayResearchStore(s => s.hydrated);
+
+  useEffect(() => { hydrateMarketplace(); }, [hydrateMarketplace]);
+
+  // Active tool lives in the URL (?tab=<section>&sub=<tool>) so refresh/back/share keep it.
+  const urlSub = typeof router.query.sub === 'string' ? router.query.sub : '';
+  const activeTool: ToolId = findTool(urlSub)?.id ?? DEFAULT_TOOL;
+
+  // Tools stay mounted (hidden) after the first visit so their results survive switching.
+  // Wait for the router so a deep link (?sub=…) doesn't first mount (and fetch) the default tool.
+  const [visited, setVisited] = useState<ToolId[]>([]);
+  useEffect(() => {
+    if (!router.isReady) return;
+    setVisited(prev => (prev.includes(activeTool) ? prev : [...prev, activeTool]));
+  }, [activeTool, router.isReady]);
+
+  const [moreAnchor, setMoreAnchor] = useState<HTMLElement | null>(null);
   const [userListings, setUserListings] = useState<any[]>([]);
   const [userListingsLoading, setUserListingsLoading] = useState(true);
   const [userListingsError, setUserListingsError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadUserListings = useCallback(async (useCache: boolean, isCancelled: () => boolean = () => false) => {
     if (!userId) return;
-
-    // Try localStorage cache first (1-hour TTL)
-    const CACHE_KEY = `kolayxport_ebay_listings_${userId}`;
-    try {
-      const cached = localStorage.getItem(CACHE_KEY);
-      if (cached) {
-        const { listings, ts } = JSON.parse(cached);
-        if (Date.now() - ts < 3600000 && listings?.length > 0) {
-          setUserListings(listings);
-          setUserListingsLoading(false);
-          return;
+    const CACHE_KEY = `kolayxport_ebay_listings_${userId}_${marketplace}`;
+    if (useCache) {
+      // localStorage cache first (1-hour TTL)
+      try {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const { listings, ts } = JSON.parse(cached);
+          if (Date.now() - ts < 3600000 && Array.isArray(listings) && listings.length > 0) {
+            setUserListings(listings);
+            setUserListingsError(null);
+            setUserListingsLoading(false);
+            return;
+          }
         }
-      }
-    } catch { /* ignore cache errors */ }
+      } catch { /* ignore cache errors */ }
+    }
 
-    let attempt = 0;
+    setUserListingsLoading(true);
+    setUserListingsError(null);
     const maxAttempts = 3;
-
-    const fetchListings = async () => {
-      setUserListingsLoading(true);
-      setUserListingsError(null);
-      while (attempt < maxAttempts) {
-        try {
-          const r = await fetch(`/api/clawd/ebay?action=my_legacy_listings&user_id=${userId}&marketplace_id=EBAY_US`, {
-            credentials: 'same-origin',
-          });
-          if (!r.ok) {
-            const errText = await r.text().catch(() => '');
-            if (r.status === 401 || r.status === 403) {
-              setUserListingsError('auth');
-              setUserListings([]);
-              setUserListingsLoading(false);
-              return;
-            }
-            throw new Error(`${r.status}: ${errText}`);
-          }
-          const data = await r.json();
-          const listings = data.listings || [];
-          setUserListings(listings);
-          if (listings.length > 0) {
-            try { localStorage.setItem(CACHE_KEY, JSON.stringify({ listings, ts: Date.now() })); } catch { /* quota */ }
-          }
-          setUserListingsLoading(false);
-          return;
-        } catch (err: any) {
-          attempt++;
-          if (attempt >= maxAttempts) {
-            setUserListingsError('network');
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const r = await fetch(`/api/clawd/ebay?action=my_legacy_listings&user_id=${encodeURIComponent(userId)}&marketplace_id=${marketplace}`, {
+          credentials: 'same-origin',
+        });
+        if (isCancelled()) return;
+        if (!r.ok) {
+          if (r.status === 401 || r.status === 403) {
+            setUserListingsError('auth');
             setUserListings([]);
             setUserListingsLoading(false);
             return;
           }
-          await new Promise(r => setTimeout(r, 1000 * attempt));
+          throw new Error(String(r.status));
         }
+        const data = await r.json();
+        if (isCancelled()) return;
+        const listings = Array.isArray(data?.listings) ? data.listings : [];
+        setUserListings(listings);
+        if (listings.length > 0) {
+          try { localStorage.setItem(CACHE_KEY, JSON.stringify({ listings, ts: Date.now() })); } catch { /* quota */ }
+        }
+        setUserListingsLoading(false);
+        return;
+      } catch {
+        if (isCancelled()) return;
+        if (attempt >= maxAttempts) {
+          setUserListingsError('network');
+          setUserListings([]);
+          setUserListingsLoading(false);
+          return;
+        }
+        await new Promise(res => setTimeout(res, 1000 * attempt));
       }
-    };
-    fetchListings();
-  }, [userId]);
+    }
+  }, [userId, marketplace]);
+
+  useEffect(() => {
+    // Wait for the remembered marketplace so we don't fetch (or flash) EBAY_US listings first.
+    if (!marketplaceHydrated) return;
+    let cancelled = false;
+    loadUserListings(true, () => cancelled);
+    return () => { cancelled = true; };
+  }, [loadUserListings, marketplaceHydrated]);
 
   const [globalSearch, setGlobalSearch] = useState('');
-  const [navigateData, setNavigateData] = useState<any>(null);
+  // Cross-tool hand-off data, scoped to the tool it was sent to (mounted tools must not consume each other's).
+  const [nav, setNav] = useState<{ tool: ToolId; data: any } | null>(null);
 
-  const handleMainTabChange = (_: any, v: number) => {
-    setMainTab(v);
-    setSubTab(0); // auto-select first tool in new section
-  };
+  const selectTool = useCallback((id: ToolId) => {
+    const tool = findTool(id);
+    if (!tool) return;
+    const { tab: _tab, sub: _sub, ...rest } = router.query;
+    router.replace({ pathname: router.pathname, query: { ...rest, tab: tool.section, sub: tool.id } }, undefined, { shallow: true, scroll: false });
+  }, [router]);
 
   // Cross-tool navigation handler
   const handleNavigate = useCallback((tool: string, data?: any) => {
-    setNavigateData(data || null);
-    switch (tool) {
-      case 'product_database': setMainTab(0); setSubTab(0); break;
-      case 'niche_finder': setMainTab(0); setSubTab(1); break;
-      case 'keyword_intelligence': setMainTab(0); setSubTab(2); break;
-      case 'product_tracker': setMainTab(1); setSubTab(0); break;
-      case 'seller_tracker': setMainTab(1); setSubTab(1); break;
-      case 'competitive_intelligence': setMainTab(1); setSubTab(2); break;
-      case 'seo_analyzer': setMainTab(2); setSubTab(0); break;
-      case 'ai_hub': setMainTab(2); setSubTab(1); break;
-      case 'listing_optimizer': setMainTab(2); setSubTab(2); break;
-      case 'financial': setMainTab(2); setSubTab(3); break;
-      case 'marketplace_comparison': setMainTab(0); setSubTab(4); break;
-      case 'category_explorer': setMainTab(0); setSubTab(5); break;
-      case 'niche_comparison': setMainTab(0); setSubTab(6); break;
-    }
+    const target = findTool(tool);
+    if (!target) return;
+    setNav(data ? { tool: target.id, data } : null);
+    selectTool(target.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
+  }, [selectTool]);
 
-  const clearNavigateData = useCallback(() => setNavigateData(null), []);
+  const clearNavigateData = useCallback(() => setNav(null), []);
 
   // Global search: detect eBay URL vs keyword vs @seller
   const handleGlobalSearch = useCallback(() => {
     const q = globalSearch.trim();
     if (!q) return;
-    if (q.includes('ebay.com/itm/')) {
-      // eBay URL → go to product tracker
+    if (/ebay\.[a-z.]+\/itm\//i.test(q)) {
       handleNavigate('product_tracker', { addUrl: q });
     } else if (q.startsWith('@')) {
-      // Seller name → go to seller tracker
       handleNavigate('seller_tracker', { username: q.slice(1) });
     } else {
-      // Keyword → go to product database with search
       handleNavigate('product_database', { keyword: q });
     }
     setGlobalSearch('');
@@ -3033,19 +3094,84 @@ function EbayResearchPage() {
     );
   }
 
-  const currentSection = SECTIONS[mainTab];
+  const navDataFor = (id: ToolId) => (nav?.tool === id ? nav.data : null);
+
+  const renderTool = (id: ToolId): React.ReactNode => {
+    switch (id) {
+      case 'product_database': return <ProductDatabase userId={userId} userListings={userListings} userListingsLoading={userListingsLoading} onNavigate={handleNavigate} navigateData={navDataFor(id)} onConsumeNavigateData={clearNavigateData} />;
+      case 'niche_finder': return <NicheFinder userId={userId} userListings={userListings} onNavigate={handleNavigate} navigateData={navDataFor(id)} onConsumeNavigateData={clearNavigateData} />;
+      case 'keyword_intelligence': return <KeywordIntelligence userId={userId} marketplace={marketplace} userListings={userListings} onNavigate={handleNavigate} />;
+      case 'arbitrage': return <ArbitrageScanner userId={userId} />;
+      case 'marketplace_comparison': return <MarketplaceComparison userId={userId} onNavigate={handleNavigate} />;
+      case 'category_explorer': return <CategoryExplorer userId={userId} marketplace={marketplace} onNavigate={handleNavigate} />;
+      case 'niche_comparison': return <NicheComparison userId={userId} onNavigate={handleNavigate} />;
+      case 'product_tracker': return <ProductTracker userId={userId} userListings={userListings} onNavigate={handleNavigate} />;
+      case 'seller_tracker': return <SellerTracker userId={userId} userListings={userListings} onNavigate={handleNavigate} />;
+      case 'competitive_intelligence': return <CompetitiveIntelligence userId={userId} marketplace={marketplace} userListings={userListings} onNavigate={handleNavigate} />;
+      case 'seo_analyzer': return <SeoAnalyzer userId={userId} marketplace={marketplace} onNavigate={handleNavigate} navigateData={navDataFor(id)} onConsumeNavigateData={clearNavigateData} />;
+      case 'ai_hub': return <AiOptimizationHub userId={userId} marketplace={marketplace} onNavigate={handleNavigate} navigateData={navDataFor(id)} onConsumeNavigateData={clearNavigateData} />;
+      case 'listing_optimizer': return <ListingOptimizer userId={userId} marketplace={marketplace} userListings={userListings} onNavigate={handleNavigate} />;
+      case 'financial': return <FinancialIntelligence userId={userId} marketplace={marketplace} userListings={userListings} onNavigate={handleNavigate} />;
+      default: return null;
+    }
+  };
+
+  const primaryTools = TOOLS.filter(tool => tool.primary);
+  const activeDef = findTool(activeTool)!;
+  // A "more" tool that is open gets its own chip so the seller can see where they are.
+  const visibleTools = activeDef.primary ? primaryTools : [...primaryTools, activeDef];
+
+  const chipSx = (selected: boolean) => ({
+    fontWeight: selected ? 700 : 500,
+    fontSize: '0.8rem',
+    height: isMobile ? 44 : 36,
+    px: 0.5,
+    flexShrink: 0,
+    whiteSpace: 'nowrap',
+    transition: 'all 0.2s ease',
+    ...(selected
+      ? {
+          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+          color: '#fff',
+          boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
+          border: 'none',
+          '& .MuiChip-icon': { fontSize: 14, color: '#fff' },
+        }
+      : {
+          background: '#f8faff',
+          border: '1px solid rgba(99,102,241,0.15)',
+          color: '#4b5563',
+          '&:hover': { background: '#f0edff', borderColor: '#6366f1' },
+        }),
+  });
 
   return (
-    <Box sx={{ maxWidth: 1800, mx: 'auto', px: isMobile ? 0.5 : 1, py: 1, width: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
+    <Box sx={{ maxWidth: 1800, mx: 'auto', px: isMobile ? 0.5 : 1, py: 1, width: '100%', boxSizing: 'border-box' }}>
 
       {/* Header */}
-      <Box sx={{ mb: 2, overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
-        <Typography variant={isMobile ? 'h6' : 'h5'} sx={{ fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1e1b4b', letterSpacing: '-0.02em' }}>
-          eBay Urun Istihbarati
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ wordBreak: 'break-word' }}>
-          Pazar arastirmasi, urun takibi, nis analizi ve rakip izleme
-        </Typography>
+      <Box sx={{ mb: 2, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1.5, flexWrap: 'wrap' }}>
+        <Box sx={{ minWidth: 0, flex: '1 1 260px' }}>
+          <Typography variant={isMobile ? 'h6' : 'h5'} sx={{ fontWeight: 900, color: '#1e1b4b', letterSpacing: '-0.02em', wordBreak: 'break-word' }}>
+            {t('pageHeading')}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ wordBreak: 'break-word' }}>
+            {t('pageSubheading')}
+          </Typography>
+        </Box>
+        <FormControl size="small" sx={{ minWidth: 180, flex: isMobile ? '1 1 100%' : '0 0 auto' }}>
+          <InputLabel id="ebay-research-marketplace">{t('marketplace')}</InputLabel>
+          <Select
+            labelId="ebay-research-marketplace"
+            value={marketplace}
+            label={t('marketplace')}
+            onChange={e => setMarketplace(String(e.target.value))}
+            sx={{ minHeight: 44, bgcolor: '#fff' }}
+          >
+            {MARKETPLACES_DATA.map(m => (
+              <MenuItem key={m.value} value={m.value}>{m.flag} {t(m.labelKey)} ({m.currency})</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
       </Box>
 
       {/* Global Search Bar */}
@@ -3058,94 +3184,75 @@ function EbayResearchPage() {
           value={globalSearch}
           onChange={e => setGlobalSearch(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleGlobalSearch()}
+          inputProps={{ 'aria-label': t('searchPlaceholder') }}
           InputProps={{
             startAdornment: <InputAdornment position="start"><Search size={18} style={{ color: '#6366f1' }} /></InputAdornment>,
           }}
           sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: '#fff', '& fieldset': { border: 'none' } }, '& .MuiFormHelperText-root': { color: 'rgba(255,255,255,0.7)' } }}
         />
-        <Button variant="contained" onClick={handleGlobalSearch} disabled={!globalSearch.trim()} sx={{ minWidth: isMobile ? 50 : 80, borderRadius: 2, bgcolor: '#fff', color: '#6366f1', fontWeight: 700, '&:hover': { bgcolor: '#f0edff' }, '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.5)', color: 'rgba(99,102,241,0.4)' } }}>
+        <Button
+          variant="contained"
+          onClick={handleGlobalSearch}
+          disabled={!globalSearch.trim()}
+          aria-label={t('searchBtn')}
+          sx={{ minWidth: isMobile ? 44 : 80, minHeight: 44, borderRadius: 2, bgcolor: '#fff', color: '#6366f1', fontWeight: 700, '&:hover': { bgcolor: '#f0edff' }, '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.5)', color: 'rgba(99,102,241,0.4)' } }}
+        >
           {isMobile ? <Search size={18} /> : t('searchBtn')}
         </Button>
       </Paper>
 
-      {/* Main Section Tabs */}
-      <Paper sx={{ mb: 2, overflow: 'hidden', width: '100%', maxWidth: '100%', boxShadow: '0 2px 16px rgba(0,0,0,0.06)', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)', background: '#fff' }}>
-        <Tabs
-          value={mainTab}
-          onChange={handleMainTabChange}
-          variant={isMobile ? 'scrollable' : 'fullWidth'}
-          scrollButtons={isMobile ? 'auto' : false}
-          allowScrollButtonsMobile
-          sx={{
-            '& .MuiTab-root': {
-              textTransform: 'none',
-              fontWeight: 600,
-              minHeight: isMobile ? 48 : 64,
-              py: 1.5,
-              minWidth: isMobile ? 'auto' : undefined,
-              px: isMobile ? 1.5 : 2,
-            },
-          }}
-        >
-          {SECTIONS.map((section, i) => (
-            <Tab
-              key={i}
-              label={
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                    {section.icon}
-                    <span style={{ fontWeight: 700, fontSize: isMobile ? '0.8rem' : '0.95rem', whiteSpace: 'nowrap' }}>{t(section.labelKey)}</span>
-                  </Box>
-                  {!isMobile && (
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.85rem', lineHeight: 1.2 }}>
-                      {t(section.descriptionKey)}
-                    </Typography>
-                  )}
-                </Box>
-              }
-            />
-          ))}
-        </Tabs>
-      </Paper>
-
-      {/* Sub-tab pills */}
-      <Box sx={{ display: 'flex', flexWrap: isMobile ? 'nowrap' : 'wrap', gap: 1, mb: 2, overflowX: isMobile ? 'auto' : 'visible', overflowY: 'hidden', width: '100%', maxWidth: '100%', pb: isMobile ? 0.5 : 0, WebkitOverflowScrolling: 'touch', '&::-webkit-scrollbar': { display: 'none' }, msOverflowStyle: 'none', scrollbarWidth: 'none' }}>
-        {currentSection.subTabs.map((st, i) => (
+      {/* Tool picker: primary tools + "More tools" */}
+      <Box
+        component="nav"
+        aria-label={t('toolsLabel')}
+        sx={{ display: 'flex', flexWrap: isMobile ? 'nowrap' : 'wrap', gap: 1, mb: 2, overflowX: isMobile ? 'auto' : 'visible', overflowY: 'hidden', width: '100%', maxWidth: '100%', pb: isMobile ? 0.5 : 0, WebkitOverflowScrolling: 'touch', '&::-webkit-scrollbar': { display: 'none' }, msOverflowStyle: 'none', scrollbarWidth: 'none' }}
+      >
+        {visibleTools.map(tool => (
           <Chip
-            key={i}
-            icon={st.icon as React.ReactElement}
-            label={t(st.labelKey)}
+            key={tool.id}
+            aria-current={activeTool === tool.id ? 'page' : undefined}
+            icon={tool.icon}
+            label={t(tool.labelKey)}
             clickable
-            onClick={() => setSubTab(i)}
-            sx={{
-              fontWeight: subTab === i ? 700 : 500,
-              fontSize: '0.8rem',
-              height: 36,
-              px: 0.5,
-              flexShrink: 0,
-              whiteSpace: 'nowrap',
-              transition: 'all 0.2s ease',
-              ...(subTab === i
-                ? {
-                    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                    color: '#fff',
-                    boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
-                    border: 'none',
-                    '& .MuiChip-icon': { fontSize: 14, color: '#fff' },
-                  }
-                : {
-                    background: '#f8faff',
-                    border: '1px solid rgba(99,102,241,0.15)',
-                    color: '#4b5563',
-                    '&:hover': {
-                      background: '#f0edff',
-                      borderColor: '#6366f1',
-                    },
-                  }),
-            }}
+            onClick={() => selectTool(tool.id)}
+            sx={chipSx(activeTool === tool.id)}
           />
         ))}
+        <Chip
+          icon={<MoreHorizontal size={14} />}
+          label={t('moreTools')}
+          clickable
+          aria-haspopup="menu"
+          aria-expanded={Boolean(moreAnchor)}
+          onClick={e => setMoreAnchor(e.currentTarget)}
+          sx={chipSx(false)}
+        />
       </Box>
+      <Menu
+        anchorEl={moreAnchor}
+        open={Boolean(moreAnchor)}
+        onClose={() => setMoreAnchor(null)}
+        slotProps={{ paper: { sx: { maxHeight: 480, minWidth: 240 } } }}
+      >
+        {SECTIONS.flatMap(section => {
+          const tools = TOOLS.filter(tool => !tool.primary && tool.section === section.id);
+          if (tools.length === 0) return [];
+          return [
+            <ListSubheader key={`h-${section.id}`} sx={{ lineHeight: '32px', fontWeight: 700 }}>{t(section.labelKey)}</ListSubheader>,
+            ...tools.map(tool => (
+              <MenuItem
+                key={tool.id}
+                selected={activeTool === tool.id}
+                onClick={() => { setMoreAnchor(null); selectTool(tool.id); }}
+                sx={{ minHeight: 44 }}
+              >
+                <ListItemIcon sx={{ color: '#6366f1' }}>{tool.icon}</ListItemIcon>
+                <ListItemText primary={t(tool.labelKey)} />
+              </MenuItem>
+            )),
+          ];
+        })}
+      </Menu>
 
       {/* User listings status bar */}
       {userListingsLoading && (
@@ -3170,46 +3277,18 @@ function EbayResearchPage() {
               ? t('listingsAuthError')
               : t('listingsLoadError')}
           </Typography>
-          <Button size="small" variant="outlined" onClick={() => {
-            setUserListingsLoading(true);
-            setUserListingsError(null);
-            fetch(`/api/clawd/ebay?action=my_legacy_listings&user_id=${userId}&marketplace_id=EBAY_US`, {
-              credentials: 'same-origin',
-            })
-              .then(async (r) => r.ok ? r.json() : { listings: [] })
-              .then(data => {
-                setUserListings(data.listings || []);
-                if (data.listings?.length > 0) {
-                  try { localStorage.setItem(`kolayxport_ebay_listings_${userId}`, JSON.stringify({ listings: data.listings, ts: Date.now() })); } catch { /* */ }
-                }
-              })
-              .catch(() => { setUserListings([]); setUserListingsError('network'); })
-              .finally(() => setUserListingsLoading(false));
-          }}>
-            Tekrar Dene
+          <Button size="small" variant="outlined" sx={{ minHeight: { xs: 44, md: 36 } }} onClick={() => { loadUserListings(false); }}>
+            {t('retry')}
           </Button>
         </Paper>
       )}
 
-      {/* Section 0: Arastirma */}
-      {mainTab === 0 && subTab === 0 && <ProductDatabase userId={userId} userListings={userListings} userListingsLoading={userListingsLoading} onNavigate={handleNavigate} navigateData={navigateData} onConsumeNavigateData={clearNavigateData} />}
-      {mainTab === 0 && subTab === 1 && <NicheFinder userId={userId} userListings={userListings} onNavigate={handleNavigate} navigateData={navigateData} onConsumeNavigateData={clearNavigateData} />}
-      {mainTab === 0 && subTab === 2 && <KeywordIntelligence userId={userId} marketplace="EBAY_US" userListings={userListings} onNavigate={handleNavigate} />}
-      {mainTab === 0 && subTab === 3 && <ArbitrageScanner userId={userId} />}
-      {mainTab === 0 && subTab === 4 && <MarketplaceComparison userId={userId} onNavigate={handleNavigate} />}
-      {mainTab === 0 && subTab === 5 && <CategoryExplorer userId={userId} onNavigate={handleNavigate} />}
-      {mainTab === 0 && subTab === 6 && <NicheComparison userId={userId} onNavigate={handleNavigate} />}
-
-      {/* Section 1: Takip */}
-      {mainTab === 1 && subTab === 0 && <ProductTracker userId={userId} userListings={userListings} onNavigate={handleNavigate} />}
-      {mainTab === 1 && subTab === 1 && <SellerTracker userId={userId} userListings={userListings} onNavigate={handleNavigate} />}
-      {mainTab === 1 && subTab === 2 && <CompetitiveIntelligence userId={userId} marketplace="EBAY_US" userListings={userListings} onNavigate={handleNavigate} />}
-
-      {/* Section 2: Optimizasyon */}
-      {mainTab === 2 && subTab === 0 && <SeoAnalyzer userId={userId} onNavigate={handleNavigate} navigateData={navigateData} onConsumeNavigateData={clearNavigateData} />}
-      {mainTab === 2 && subTab === 1 && <AiOptimizationHub userId={userId} onNavigate={handleNavigate} navigateData={navigateData} onConsumeNavigateData={clearNavigateData} />}
-      {mainTab === 2 && subTab === 2 && <ListingOptimizer userId={userId} marketplace="EBAY_US" userListings={userListings} onNavigate={handleNavigate} />}
-      {mainTab === 2 && subTab === 3 && <FinancialIntelligence userId={userId} marketplace="EBAY_US" userListings={userListings} onNavigate={handleNavigate} />}
+      {/* Tools: mounted on first visit, then kept (hidden) so switching back keeps results without refetching */}
+      {TOOLS.filter(tool => visited.includes(tool.id)).map(tool => (
+        <Box key={tool.id} role="region" aria-label={t(tool.labelKey)} sx={{ display: tool.id === activeTool ? 'block' : 'none' }}>
+          {renderTool(tool.id)}
+        </Box>
+      ))}
     </Box>
   );
 }
@@ -3217,7 +3296,6 @@ function EbayResearchPage() {
 // --- Layout wrapper ---
 function EbayResearchPageWithLayout(props: any): JSX.Element {
   const t = useTranslations('ebayResearch');
-  const { formatDate, formatDateTime, formatNumber } = useLocale();
   return (
     <AppLayout title={t('pageTitle')}>
       <EbayResearchPage {...props} />

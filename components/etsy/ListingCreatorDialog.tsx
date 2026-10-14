@@ -42,7 +42,7 @@ import {
   aiErrorCode, AiRequestError, checkTags, checkTitle, normalizeTags, normalizeTitle, splitCommaList,
   ETSY_MAX_IMAGES, ETSY_WHEN_MADE_OPTIONS, normalizeWhenMade, TAG_MAX_COUNT, TAG_MAX_LEN, TITLE_MAX, TITLE_MIN, whenMadeLabelKey,
 } from '@/lib/etsy/seoRules';
-import type { MarketResearchData } from './MarketResearch';
+import type { MarketResearchData } from './research/shared/types';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -77,8 +77,8 @@ export interface CopySourceData {
    * the draft is synced (the user's explicit publish/sync), never from the browser.
    */
   imageUrls?: string[];
-  /** Where the prefill came from, for the info banner. */
-  source?: 'etsy' | 'ebay';
+  /** Where the prefill came from, for the info banner. 'research' = a research page (?prefill=session). */
+  source?: 'etsy' | 'ebay' | 'research';
 }
 
 /** Keep only plain https URLs, de-duplicated, capped at Etsy's photo limit. */
@@ -2111,7 +2111,7 @@ export default function ListingCreatorDialog({
       <Box sx={{ px: 3, py: 3, flex: 1, overflow: 'auto' }}>
         {copySource?.source && activeStep === 0 && (
           <Alert severity="info" sx={{ mb: 2 }}>
-            {t(copySource.source === 'ebay' ? 'prefilledFromEbay' : 'prefilledFromEtsy')}
+            {t(copySource.source === 'ebay' ? 'prefilledFromEbay' : copySource.source === 'research' ? 'prefilledFromResearch' : 'prefilledFromEtsy')}
           </Alert>
         )}
         {pendingRestore && (

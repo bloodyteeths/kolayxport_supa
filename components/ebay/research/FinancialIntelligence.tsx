@@ -13,6 +13,9 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import useLocaleStore from '@/lib/stores/useLocaleStore';
+import useEbayResearchStore from '@/lib/stores/useEbayResearchStore';
+import { formatMoney, marketplaceCurrency } from './marketplaces';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 
 // ---------------------------------------------------------------------------
@@ -96,7 +99,12 @@ const COMMON_FEE_PRESETS = [
 // Helpers
 // ---------------------------------------------------------------------------
 
-const fmt = (n: number) => `$${n.toFixed(2)}`;
+// Amounts are fetched for the page's selected marketplace, so format in its currency.
+const fmt = (n: number) => {
+  let locale = 'en';
+  try { locale = useLocaleStore.getState().locale || 'en'; } catch { /* store unavailable */ }
+  return formatMoney(n, marketplaceCurrency(useEbayResearchStore.getState().marketplace), locale);
+};
 const pct = (n: number) => `${n.toFixed(1)}%`;
 
 const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -980,6 +988,7 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
 
 function ROITracker({ userListings }: { userListings?: any[] }) {
   const t = useTranslations('ebay.research.financial');
+  const tA = useTranslations('ebayResearch');
   const confirmDialog = useConfirm();
   const [entries, setEntries] = useState<ROIEntry[]>([]);
   const [productName, setProductName] = useState('');
@@ -1585,7 +1594,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
                       </TableCell>
                       <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>{e.date}</TableCell>
                       <TableCell align="center">
-                        <IconButton size="small" color="error" onClick={() => handleDelete(e.id)}>
+                        <IconButton aria-label={tA('delete')} size="small" color="error" onClick={() => handleDelete(e.id)}>
                           <Trash2 size={14} />
                         </IconButton>
                       </TableCell>

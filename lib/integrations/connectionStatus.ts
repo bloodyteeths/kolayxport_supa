@@ -14,6 +14,7 @@
  * Consumed by:  GET /api/integrations/status  ->  lib/hooks/useConnections.ts
  */
 import prisma from '@/lib/prisma';
+import { getOpenReauthFlags, resolveNotification, type OpenReauthFlag } from '@/lib/notifications';
 
 export const CONNECTION_PROVIDERS = [
   'etsy',
@@ -54,12 +55,16 @@ export const MARKETPLACE_PROVIDERS: readonly ConnectionProvider[] = [
  * - missing_refresh_token:    access token present but refresh token missing
  *                             for a provider whose access tokens are short-lived
  * - incomplete_credentials:   some but not all required fields are filled in
+ * - reauth_required:          the provider rejected our stored grant at runtime
+ *                             (e.g. Etsy invalid_grant) — an unresolved
+ *                             reauthRequired Notification exists for it
  */
 export type ConnectionReason =
   | 'token_expired_no_refresh'
   | 'refresh_token_expired'
   | 'missing_refresh_token'
-  | 'incomplete_credentials';
+  | 'incomplete_credentials'
+  | 'reauth_required';
 
 export interface ConnectionAccount {
   /** Stable id for React keys / disconnect calls (DB row id, or `legacy-<id>` / `credential`). */
@@ -165,8 +170,60 @@ function credentialEntry(
   return entry([], filled > 0);
 }
 
+/** Etsy access tokens live 1h; tokenExpiresAt - this ~= when the token was issued. */
+const ETSY_ACCESS_TOKEN_LIFETIME_MS = 60 * 60 * 1000;
+
+/**
+ * Mark accounts flagged by an unresolved reauthRequired notification.
+ * accountId (from the dedupe key 'reauth:<provider>:<accountId>') is matched
+ * against the account's externalId. Only a flag WITHOUT an accountId flags
+ * every account of the provider.
+ *
+ * Stale flags are skipped and resolved (fire-and-forget) so neither Settings
+ * nor the bell keeps asking for a reconnect:
+ *  - the flagged account is no longer connected (shop removed/deactivated);
+ *  - `tokenIssuedAt` shows a token issued after the flag was raised (the user
+ *    reconnected via OAuth; no refresh runs for ~1h so etsyToken cannot clear it).
+ */
+function applyRuntimeReauthFlags(
+  userId: string,
+  connections: ConnectionsMap,
+  flags: OpenReauthFlag[],
+  tokenIssuedAt: Partial<Record<ConnectionProvider, Map<string, number>>>,
+) {
+  for (const flag of flags) {
+    const provider = flag.provider as ConnectionProvider;
+    if (!(CONNECTION_PROVIDERS as readonly string[]).includes(provider)) continue;
+    const current = connections[provider];
+    const accounts0 = current?.connected ? current.accounts : [];
+
+    let targets: ConnectionAccount[];
+    if (flag.accountId) {
+      targets = accounts0.filter((a) => a.externalId === flag.accountId);
+      const issuedAt = tokenIssuedAt[provider]?.get(flag.accountId);
+      const reconnected = typeof issuedAt === 'number' && issuedAt > flag.createdAt.getTime();
+      if (targets.length === 0 || reconnected) {
+        if (flag.dedupeKey) void resolveNotification(userId, flag.dedupeKey);
+        continue;
+      }
+    } else {
+      targets = accounts0;
+    }
+    if (!current || targets.length === 0) continue;
+
+    const accounts = current.accounts.map((a) =>
+      targets.includes(a) && !a.needsReauth ? { ...a, needsReauth: true, reason: 'reauth_required' as const } : a,
+    );
+    connections[provider] = entry(accounts);
+  }
+}
+
 export async function getConnectionStatus(userId: string): Promise<ConnectionStatusResponse> {
   const now = Date.now();
+
+  // Runtime re-auth signals (one indexed query, never throws). Runs in
+  // parallel with the main snapshot query.
+  const reauthFlagsPromise = getOpenReauthFlags(userId);
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -388,6 +445,17 @@ export async function getConnectionStatus(userId: string): Promise<ConnectionSta
       { name: c?.parasutCompanyId ? `Paraşüt ${c.parasutCompanyId}` : 'Paraşüt', externalId: c?.parasutCompanyId ?? null },
     ),
   };
+
+  // When each Etsy account's current access token was issued (expiry - 1h).
+  const etsyIssued = new Map<string, number>();
+  for (const sh of user?.etsyShops ?? []) {
+    if (sh.shopId && sh.tokenExpiresAt) etsyIssued.set(sh.shopId, sh.tokenExpiresAt.getTime() - ETSY_ACCESS_TOKEN_LIFETIME_MS);
+  }
+  if (c?.etsyShopId && c.etsyTokenExpiresAt && !etsyIssued.has(c.etsyShopId)) {
+    etsyIssued.set(c.etsyShopId, c.etsyTokenExpiresAt.getTime() - ETSY_ACCESS_TOKEN_LIFETIME_MS);
+  }
+
+  applyRuntimeReauthFlags(userId, connections, await reauthFlagsPromise, { etsy: etsyIssued });
 
   const lastExt = user?.trackingSubmissions?.[0]?.etsySubmittedAt ?? null;
 

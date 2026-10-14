@@ -14,6 +14,9 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import useLocaleStore from '@/lib/stores/useLocaleStore';
+import useEbayResearchStore from '@/lib/stores/useEbayResearchStore';
+import { formatMoney, marketplaceCurrency } from './marketplaces';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -104,7 +107,12 @@ interface CompetitorMetrics {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const fmt = (n: number) => `$${n.toFixed(2)}`;
+// Amounts are fetched for the page's selected marketplace, so format in its currency.
+const fmt = (n: number) => {
+  let locale = 'en';
+  try { locale = useLocaleStore.getState().locale || 'en'; } catch { /* store unavailable */ }
+  return formatMoney(n, marketplaceCurrency(useEbayResearchStore.getState().marketplace), locale);
+};
 
 function calcTitleScore(len: number): number {
   if (len >= 80) return 25;
@@ -339,6 +347,7 @@ function ComparisonBar({ label, myValue, avgValue, unit, higherIsBetter = true }
 
 export default function ListingOptimizer({ userId, marketplace, userListings, onNavigate }: ListingOptimizerProps) {
   const t = useTranslations('ebay.listingOptimizer');
+  const tA = useTranslations('ebayResearch');
   // ── State ──
   const [subTab, setSubTab] = useState(0);
   const [listings, setListings] = useState<ScoredListing[]>([]);
@@ -836,7 +845,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                           onClick={() => setExpandedId(isExpanded ? null : listing.itemId)}
                         >
                           <TableCell sx={{ p: 0.5 }}>
-                            <IconButton size="small">
+                            <IconButton aria-label={tA(isExpanded ? 'collapse' : 'expand')} size="small">
                               {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                             </IconButton>
                           </TableCell>
@@ -1676,7 +1685,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                         </TableCell>
                         <TableCell>
                           {item.itemWebUrl && (
-                            <IconButton size="small" onClick={() => window.open(item.itemWebUrl, '_blank')}>
+                            <IconButton aria-label={tA('openOnEbay')} size="small" onClick={() => window.open(item.itemWebUrl, '_blank')}>
                               <ExternalLink size={14} />
                             </IconButton>
                           )}

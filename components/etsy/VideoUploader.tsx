@@ -6,6 +6,7 @@ import AddLinkIcon from '@mui/icons-material/AddLink';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import { draftErrorI18n } from '@/lib/etsy/seoRules';
 import { stageEtsyDraft, stageEtsyDraftFile } from '@/lib/etsy/draftClient';
 
 interface VideoInfo {
@@ -24,6 +25,12 @@ interface VideoUploaderProps {
 
 export default function VideoUploader({ listingId, shopId, videos, onVideoChanged }: VideoUploaderProps) {
   const t = useTranslations('etsy.video');
+  const tEtsyRoot = useTranslations('etsy');
+  /** Server validation errors carry an i18n key (etsy.validation.*, etsy.draftSync.*); never show raw text. */
+  const draftErr = (err: unknown, fallback: string): string => {
+    const i18n = draftErrorI18n(err);
+    return i18n && tEtsyRoot.has(i18n.key as any) ? tEtsyRoot(i18n.key as any, i18n.params as any) : fallback;
+  };
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [deleteConfirm, setDeleteConfirm] = useState<VideoInfo | null>(null);
@@ -63,12 +70,11 @@ export default function VideoUploader({ listingId, shopId, videos, onVideoChange
     try {
       await stageEtsyDraftFile({ shopId, listingId, file, kind: 'video', operation: 'upload' });
       setUploadProgress(100);
-      toast.success('Video upload saved to draft. Sync to Etsy when ready.');
+      toast.success(t('uploadStaged'));
       onVideoChanged();
     } catch (err: any) {
-      const detail = `${err?.message || t('uploadError')} (${(file.size / 1024 / 1024).toFixed(1)} MB, ${file.type || 'unknown'})`;
       console.error('[VideoUploader] upload failed', { name: file.name, size: file.size, type: file.type, error: err });
-      toast.error(detail, { duration: 6000 });
+      toast.error(draftErr(err, t('uploadErrorDetail', { size: (file.size / 1024 / 1024).toFixed(1), type: file.type || '?' })), { duration: 6000 });
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -94,12 +100,13 @@ export default function VideoUploader({ listingId, shopId, videos, onVideoChange
         listingId,
         media: [{ kind: 'video', operation: 'upload', sourceUrl: videoUrl.trim() }],
       });
-      toast.success('Video URL saved to draft. Sync to Etsy when ready.');
+      toast.success(t('urlStaged'));
       setUrlDialogOpen(false);
       setVideoUrl('');
       onVideoChanged();
     } catch (err: any) {
-      toast.error(err.message || t('uploadError'));
+      console.error('[VideoUploader] URL staging failed', err);
+      toast.error(draftErr(err, t('uploadError')));
     } finally {
       setUploading(false);
     }
@@ -114,11 +121,12 @@ export default function VideoUploader({ listingId, shopId, videos, onVideoChange
         listingId,
         media: [{ kind: 'video', operation: 'delete', etsyMediaId: deleteConfirm.video_id }],
       });
-      toast.success('Video delete saved to draft. Sync to Etsy when ready.');
+      toast.success(t('deleteStaged'));
       setDeleteConfirm(null);
       onVideoChanged();
     } catch (err: any) {
-      toast.error(err.message || t('deleteError'));
+      console.error('[VideoUploader] delete staging failed', err);
+      toast.error(draftErr(err, t('deleteError')));
     } finally {
       setDeleting(false);
     }

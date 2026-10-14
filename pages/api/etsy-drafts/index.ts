@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { getAuthUser } from '@/lib/auth';
 import { toSerializable, upsertDraftPatch, recoverStaleSyncingDrafts } from '@/lib/etsy/draftService';
+import { draftErrorResponse } from '@/lib/etsy/draftErrors';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const user = await getAuthUser(req, res);
@@ -41,9 +42,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         personalization,
         media,
         queuedActions,
+        removeQueuedActions,
         replaceFields,
       } = req.body || {};
       if (!shop_id || !listing_id) return res.status(400).json({ error: 'shop_id and listing_id are required' });
+      if (removeQueuedActions !== undefined && (!Array.isArray(removeQueuedActions) || removeQueuedActions.some((t: unknown) => typeof t !== 'string'))) {
+        return res.status(400).json({ error: 'removeQueuedActions must be an array of action types' });
+      }
 
       const draft = await upsertDraftPatch({
         userId: user.id,
@@ -54,8 +59,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         inventory,
         variationImages,
         personalization,
+        // Sanitised in upsertDraftPatch: client media can never set localPath,
+        // and sourceUrl must be a public https URL.
         media,
         queuedActions,
+        removeQueuedActions,
         replaceFields: Boolean(replaceFields),
       });
       return res.status(200).json({ draft: toSerializable(draft) });
@@ -63,6 +71,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err: any) {
-    return res.status(500).json({ error: err.message || 'Draft request failed' });
+    const { status, body } = draftErrorResponse(err, 'Draft request failed');
+    return res.status(status).json(body);
   }
 }

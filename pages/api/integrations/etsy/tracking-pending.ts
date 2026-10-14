@@ -2,46 +2,23 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { getAuthUser } from '@/lib/auth';
+import { applyExtensionCors } from '@/lib/security/internalApiKey';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // CORS for Chrome extension
-  const origin = req.headers.origin;
-  const ALLOWED_EXTENSION_IDS = [process.env.CHROME_EXTENSION_ID].filter(Boolean);
-  if (origin && (origin.startsWith('chrome-extension://') || origin.startsWith('moz-extension://'))) {
-    const extensionId = origin.replace('chrome-extension://', '').replace('moz-extension://', '');
-    if (ALLOWED_EXTENSION_IDS.length === 0 || ALLOWED_EXTENSION_IDS.includes(extensionId)) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-    }
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', 'https://kolayxport.com');
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cookie, X-Extension-Version, X-Extension-Auth');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  // CORS: kolayxport.com + configured official extension origin only (fail closed).
+  applyExtensionCors(req, res, 'GET, OPTIONS');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  // Auth: NextAuth session or extension fallback via shop name
-  let user = await getAuthUser(req, res);
-
-  if (!user && origin && origin.startsWith('chrome-extension://')) {
-    const shopName = req.query.shopName as string | undefined;
-    if (shopName) {
-      const shop = await prisma.etsyShop.findFirst({
-        where: { shopName: { equals: shopName, mode: 'insensitive' }, isActive: true },
-        select: { userId: true, user: { select: { id: true, email: true, name: true } } },
-      });
-      if (shop?.user) {
-        user = { id: shop.user.id, email: shop.user.email, name: shop.user.name };
-      }
-    }
-  }
+  // Auth: NextAuth cookie session or Bearer token from /api/auth/extension only.
+  // No fallback by (public) Etsy shop name.
+  const user = await getAuthUser(req, res);
 
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
   try {
-    console.log('[tracking-pending] Authenticated user', { userId: user.id, email: user.email });
+    console.log('[tracking-pending] Authenticated user', { userId: user.id });
 
     // Resolve Etsy shop names to match orders by marketplace
     const etsyShops = await prisma.etsyShop.findMany({
@@ -49,14 +26,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       select: { shopName: true },
     });
     const etsyShopNames = etsyShops.map((s) => s.shopName).filter((n): n is string => !!n);
-    console.log('[tracking-pending] Etsy shops for user', { userId: user.id, etsyShopNames });
 
     // Find tracking submissions for Etsy orders that haven't been pushed via extension yet
     // Orders may have shop name (e.g. "BelleCoutureGifts") as marketplace, not "etsy"
     const pending = await prisma.trackingSubmission.findMany({
       where: {
         submittedBy: user.id,
-        etsySubmitStatus: 'pending',
+        // needs_manual = typed by the extension but saving wasn't confirmed; keep offering it.
+        etsySubmitStatus: { in: ['pending', 'needs_manual'] },
         order: {
           OR: [
             { marketplace: { contains: 'etsy', mode: 'insensitive' } },
@@ -70,6 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         id: true,
         trackingNumber: true,
         carrierName: true,
+        etsySubmitStatus: true,
         order: {
           select: {
             id: true,
@@ -93,6 +71,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       customerName: ts.order.customerName,
       trackingNumber: ts.trackingNumber,
       carrierName: ts.carrierName,
+      status: ts.etsySubmitStatus,
     }));
 
     logger.info('[tracking-pending] Returning pending Etsy tracking', {

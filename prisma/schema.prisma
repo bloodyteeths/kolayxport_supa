@@ -776,10 +776,27 @@ model WebhookEvent {
   userId       String?
   createdAt    DateTime @default(now())
 
+  // ---- Async processing queue (used by Etsy webhooks; null for Stripe) ----
+  // Etsy status lifecycle: received | processing | done | ignored | failed
+  /// Verified webhook body. Etsy payloads carry ids only (no buyer PII).
+  payload       Json?
+  /// Processing attempts so far.
+  attempts      Int       @default(0)
+  /// When the processor may next pick this event up (null = not queued).
+  nextAttemptAt DateTime?
+  /// When processing last finished (done/ignored/failed/coalesced).
+  processedAt   DateTime?
+  /// Provider shop/account id the event belongs to (Etsy shop_id).
+  shopId        String?
+  /// Coalescing key, e.g. "listing:123" or "receipt:456".
+  resourceKey   String?
+
   @@index([provider, eventType])
   @@index([status])
   @@index([createdAt])
   @@index([userId])
+  @@index([provider, status, nextAttemptAt])
+  @@index([provider, shopId, resourceKey])
 }
 
 /// Audit trail for every admin write action.
@@ -1582,4 +1599,37 @@ model CronLock {
   @@unique([jobName, bucket])
   @@index([jobName, bucket])
   @@index([createdAt])
+}
+
+/// Append-only snapshots of PUBLIC Etsy listing/shop counters, written whenever
+/// any user views a listing through the Chrome extension (/api/ext/listing-stats).
+/// Real sales velocity = delta of shopSoldCount between two snapshots of the same
+/// shop. Counter columns come from the Etsy public API only (trusted); the page*
+/// columns are what the viewer's browser scraped from the listing page and are
+/// display-only — never used for velocity math because clients can forge them.
+model EtsyPublicListingSnapshot {
+  id                 String   @id @default(cuid())
+  listingId          String
+  shopId             String
+  /// Shop transaction_sold_count at capture time (Etsy API).
+  shopSoldCount      Int?
+  /// Shop review_count at capture time (Etsy API).
+  shopReviewCount    Int?
+  /// Listing num_favorers (Etsy API).
+  listingFavorites   Int?
+  /// Listing review count (Etsy API /listings/{id}/reviews count).
+  listingReviewCount Int?
+  /// Listing views (Etsy API; may be absent).
+  listingViews       Int?
+  price              Float?
+  currency           String?
+  /// Page-scraped "N people bought this in the last 24 hours" (untrusted, display only).
+  pageBoughtLast24h  Int?
+  /// Page-scraped "In N carts" (untrusted, display only).
+  pageInCarts        Int?
+  capturedAt         DateTime @default(now())
+
+  @@index([listingId, capturedAt])
+  @@index([shopId, capturedAt])
+  @@index([capturedAt])
 }

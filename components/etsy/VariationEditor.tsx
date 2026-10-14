@@ -14,6 +14,7 @@ import {
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import { draftErrorI18n } from '@/lib/etsy/seoRules';
 import { stageEtsyDraft, fetchEtsyDrafts } from '@/lib/etsy/draftClient';
 
 // --- Types ---
@@ -472,6 +473,16 @@ export default function VariationEditor(props: VariationEditorProps) {
 
 function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: VariationEditorProps) {
   const t = useTranslations('etsy.variation');
+  const tEtsy = useTranslations('etsy');
+  /** Translated message for a save failure — never the raw server text. */
+  const variationErrorMessage = (err: unknown): string => {
+    const i18n = draftErrorI18n(err);
+    if (i18n && tEtsy.has(i18n.key as any)) return tEtsy(i18n.key as any, i18n.params as any);
+    // Locally thrown validation errors are already translated via t().
+    if (err instanceof Error && err.name === 'Error' && err.message) return err.message;
+    console.error('[VariationEditor] save failed', err);
+    return t('saveFailedGeneric');
+  };
   const [products, setProducts] = useState<Product[]>([]);
   const [originalProducts, setOriginalProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1327,12 +1338,12 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
       }
 
       await stageEtsyDraft({ shopId, listingId, inventory: { products: productsToSave, price_on_property, quantity_on_property, sku_on_property } });
-      toast.success('Variations saved to draft. Sync to Etsy when ready.');
+      toast.success(t('variationsStaged'));
       setOriginalProducts(JSON.parse(JSON.stringify(productsToSave)));
       setOriginalPriceOnPropertyIds(price_on_property);
       onSaved();
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error(variationErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -1344,9 +1355,9 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
     setSavingPhotos(true);
     try {
       await stageEtsyDraft({ shopId, listingId, variationImages: { variation_images: variationImages } });
-      toast.success('Variation photos saved to draft. Sync to Etsy when ready.');
+      toast.success(t('variationPhotosStaged'));
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error(variationErrorMessage(err));
     } finally {
       setSavingPhotos(false);
     }

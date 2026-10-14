@@ -297,7 +297,10 @@ export default function ListingGrader({ shopId, userListings }: { shopId?: strin
           {listingAnalysis.velocity && (
             <Alert severity="info" sx={{ mb: 2, borderRadius: '12px' }}>
               <Typography variant="body2">
-                {t('estMonthlySales')}: <strong>{listingAnalysis.velocity.estMonthlySales?.toFixed(1)}</strong> |
+                {t('monthlySales')}: <strong>{listingAnalysis.velocity.estMonthlySales != null
+                  ? listingAnalysis.velocity.estMonthlySales.toFixed(1)
+                  : listingAnalysis.velocity.monthlySalesUpperBound != null ? `< ${listingAnalysis.velocity.monthlySalesUpperBound}` : '—'}</strong>{' '}
+                ({t(listingAnalysis.velocity.salesKind === 'measured' ? 'salesKindMeasured' : listingAnalysis.velocity.salesKind === 'estimated' ? 'salesKindEstimated' : 'salesKindInsufficient')}) |
                 {t('age')}: <strong>{listingAnalysis.velocity.ageMonths?.toFixed(0)} {t('ageMonths')}</strong> |
                 {t('favorite')}: <strong>{formatNumber(listingAnalysis.listing?.num_favorers ?? 0)}</strong>
               </Typography>

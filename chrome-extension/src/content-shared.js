@@ -26,6 +26,13 @@ const KX_INLINE_CSS = `
 .kx-data-row .kx-green { color: #2e7d32; }
 .kx-data-row .kx-orange { color: #e65100; }
 .kx-data-row .kx-red { color: #c62828; }
+.kx-data-row .kx-mini-badge {
+  display: inline-block; padding: 0 5px; border-radius: 8px; font-size: 9px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.3px; line-height: 1.6;
+}
+.kx-data-row .kx-mini-measured { background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; }
+.kx-data-row .kx-mini-estimated { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
+.kx-data-row .kx-mini-none { background: #eee; color: #777; border: 1px solid #ddd; }
 .kx-stats-bar {
   background: #f5f5fa; border: 1px solid #e0e0e8; border-radius: 8px;
   padding: 10px 14px; margin: 10px 0; font-size: 12px;
@@ -81,6 +88,23 @@ const KX_INLINE_CSS = `
 .kx-stats-bar .kx-metric > span:last-child {
   font-size: 13px; line-height: 1.3;
 }
+.kx-stats-bar .kx-sales {
+  background: #fff; border: 1px solid #e8e8ee; border-radius: 6px; padding: 8px 10px; margin-bottom: 6px;
+}
+.kx-stats-bar .kx-sales-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.kx-stats-bar .kx-sales-value { font-size: 16px; font-weight: 800; color: #222; }
+.kx-stats-bar .kx-sales-rev { font-size: 12px; font-weight: 700; color: #1565c0; }
+.kx-stats-bar .kx-badge {
+  display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 10px; font-weight: 800;
+  letter-spacing: 0.3px; text-transform: uppercase; line-height: 1.6;
+}
+.kx-stats-bar .kx-badge-measured { background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; }
+.kx-stats-bar .kx-badge-estimated { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
+.kx-stats-bar .kx-badge-none { background: #eee; color: #666; border: 1px solid #ddd; }
+.kx-stats-bar .kx-badge-conf { background: #f3f3f8; color: #555; border: 1px solid #e0e0e8; text-transform: none; font-weight: 600; }
+.kx-stats-bar .kx-sales-how { font-size: 11px; color: #666; margin-top: 4px; line-height: 1.45; }
+.kx-stats-bar .kx-sales-meta { font-size: 10px; color: #999; margin-top: 3px; }
+.kx-stats-bar .kx-signal { color: #1b5e20; }
 `;
 
 function injectInlineCSS() {
@@ -235,10 +259,32 @@ async function apiCall(action, params = {}) {
   });
 }
 
+async function listingStatsCall(listingId, page) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(
+      { type: 'kx_listing_stats', params: { listingId, page } },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        if (response?.error) {
+          const err = new Error(response.error);
+          err.status = response.status;
+          reject(err);
+          return;
+        }
+        resolve(response);
+      }
+    );
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 function formatNum(n) {
+  n = Number(n) || 0;
   if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
   if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
   return String(n);
@@ -377,6 +423,51 @@ const _i18n = {
     lowStockItems: 'Az Stok',
     avgConversion: 'Ort. Dönüşüm',
     revenuePerListing: 'Ürün Başına Gelir',
+    salesPerMonth: 'satış/ay',
+    badgeMeasured: 'Ölçüldü',
+    badgeEstimated: 'Tahmin',
+    badgeInsufficient: 'Yetersiz veri',
+    confHigh: 'Güven: yüksek',
+    confMedium: 'Güven: orta',
+    confLow: 'Güven: düşük',
+    revenueApprox: 'gelir/ay (tahmini)',
+    lessThan: '<',
+    howMeasured: 'Mağaza satışları {days} günde +{delta} arttı (Etsy API, {perDay}/gün). Bu ürün mağazanın son {window} gündeki yorumlarının %{share}\'ine sahip ({mine}/{total}).',
+    howMeasuredLifetime: 'Mağaza satışları {days} günde +{delta} arttı (Etsy API, {perDay}/gün). Ürün payı tüm zamanların yorumlarından: %{share} ({mine}/{total}).',
+    howEstimated: 'Bu ürün son {window} günde {recent} yorum aldı × bu mağazanın gerçek satış/yorum oranı {ratio} ({sold} satış / {reviews} yorum).',
+    howEstimatedNone: 'Bu ürün son {window} günde hiç yorum almadı. Mağazanın satış/yorum oranı {ratio} ile aylık satış muhtemelen {upper}\'in altında.',
+    howInsufficient: 'Satış hesaplamak için yeterli gerçek veri yok (mağazada yeterli yorum yok). Tahmin göstermiyoruz.',
+    howShopOnly: 'Ölçülen mağaza hızı: {days} günde +{delta} satış ({perDay}/gün, Etsy API). Bu ürüne pay atamak için yeterli yorum yok.',
+    measuredAfter: 'Ölçülen değer, bu mağaza için ilk kayıttan 24 saat sonra görünür.',
+    trackingSince: 'Takip: {date} tarihinden beri · {count} kayıt',
+    updatedAgo: 'Veri: {age} önce',
+    minutes: 'dk',
+    hours: 'sa',
+    days: 'gün',
+    justNow: 'az önce',
+    listingDeltas: 'Son {days} gün: {favs} favori, {reviews} yorum',
+    bought24h: 'Etsy: son 24 saatte {n} satış',
+    inCarts: 'Sepette: {n}',
+    bestsellerBadge: 'Etsy Bestseller',
+    starSeller: 'Star Seller',
+    favorites: 'Favori',
+    age: 'Yaş',
+    stock: 'Stok',
+    shopSalesLifetime: 'Mağaza Satış',
+    salesPerReview: 'Satış/Yorum',
+    signInRequired: 'Gerçek satış verileri için kolayxport.com\'da oturum açın.',
+    sourceApi: 'Etsy API',
+    sourcePage: 'Etsy sayfası',
+    salesMo: 'Satış/ay',
+    revenueMo: 'Gelir/ay',
+    cardTipMeasured: 'Ölçüldü: mağaza {days} günde +{delta} sattı; bu ürün son {window} günün yorumlarının {mine}/{total}\'i.',
+    cardTipEstimated: 'Tahmin: son {window} günde {recent} yorum × mağazanın satış/yorum oranı {ratio}.',
+    cardTipUpper: 'Tahmin: son {window} günde yorum yok; mağaza oranı {ratio} ile muhtemelen bu değerin altında.',
+    cardTipInsufficient: 'Yeterli gerçek veri yok — tahmin gösterilmiyor.',
+    cardTipPending: 'Mağaza verisi yükleniyor…',
+    shopHowMeasured: 'Mağaza satışları {days} günde +{delta} arttı (Etsy API). Gelir = satış × ort. fiyat {avg}.',
+    shopHowEstimated: 'Son {window} günde {recent} mağaza yorumu × satış/yorum oranı {ratio}. Gelir = satış × ort. fiyat {avg}.',
+    topRecent: 'En çok yorum alan (son dönem)',
   },
   en: {
     loading: 'KolayXport loading...',
@@ -435,10 +526,59 @@ const _i18n = {
     lowStockItems: 'Low Stock',
     avgConversion: 'Avg Conversion',
     revenuePerListing: 'Rev/Listing',
+    salesPerMonth: 'sales/mo',
+    badgeMeasured: 'Measured',
+    badgeEstimated: 'Estimate',
+    badgeInsufficient: 'Not enough data',
+    confHigh: 'Confidence: high',
+    confMedium: 'Confidence: medium',
+    confLow: 'Confidence: low',
+    revenueApprox: 'revenue/mo (approx.)',
+    lessThan: '<',
+    howMeasured: 'Shop sold +{delta} in {days} days (Etsy API, {perDay}/day). This listing has {share}% of the shop\'s reviews in the last {window} days ({mine} of {total}).',
+    howMeasuredLifetime: 'Shop sold +{delta} in {days} days (Etsy API, {perDay}/day). Listing share from lifetime reviews: {share}% ({mine} of {total}).',
+    howEstimated: 'This listing got {recent} reviews in the last {window} days × this shop\'s real sales-per-review ratio {ratio} ({sold} sales / {reviews} reviews).',
+    howEstimatedNone: 'No reviews on this listing in the last {window} days. With this shop\'s sales-per-review ratio of {ratio}, monthly sales are likely below {upper}.',
+    howInsufficient: 'Not enough real data to compute sales (too few shop reviews). We don\'t show a guess.',
+    howShopOnly: 'Measured shop velocity: +{delta} sales in {days} days ({perDay}/day, Etsy API). Not enough reviews to attribute a share to this listing.',
+    measuredAfter: 'A measured figure appears 24h after this shop was first tracked.',
+    trackingSince: 'Tracked since {date} · {count} snapshots',
+    updatedAgo: 'Data: {age} ago',
+    minutes: 'min',
+    hours: 'h',
+    days: 'd',
+    justNow: 'just now',
+    listingDeltas: 'Last {days} days: {favs} favorites, {reviews} reviews',
+    bought24h: 'Etsy: {n} bought in last 24h',
+    inCarts: 'In carts: {n}',
+    bestsellerBadge: 'Etsy Bestseller',
+    starSeller: 'Star Seller',
+    favorites: 'Favorites',
+    age: 'Age',
+    stock: 'Stock',
+    shopSalesLifetime: 'Shop Sales',
+    salesPerReview: 'Sales/Review',
+    signInRequired: 'Sign in at kolayxport.com to see real sales data.',
+    sourceApi: 'Etsy API',
+    sourcePage: 'Etsy page',
+    salesMo: 'Sales/mo',
+    revenueMo: 'Revenue/mo',
+    cardTipMeasured: 'Measured: shop sold +{delta} in {days} days; this listing has {mine} of {total} shop reviews in the last {window} days.',
+    cardTipEstimated: 'Estimate: {recent} reviews in the last {window} days × this shop\'s sales-per-review ratio {ratio}.',
+    cardTipUpper: 'Estimate: no reviews in the last {window} days; with the shop ratio {ratio} sales are likely below this.',
+    cardTipInsufficient: 'Not enough real data — no guess shown.',
+    cardTipPending: 'Loading shop data…',
+    shopHowMeasured: 'Shop sold +{delta} in {days} days (Etsy API). Revenue = sales × avg price {avg}.',
+    shopHowEstimated: '{recent} shop reviews in the last {window} days × sales-per-review ratio {ratio}. Revenue = sales × avg price {avg}.',
+    topRecent: 'Most reviewed (recent)',
   },
 };
 
-function t(key) { return _i18n[_lang]?.[key] || _i18n.en[key] || key; }
+function t(key, vars) {
+  let s = _i18n[_lang]?.[key] || _i18n.en[key] || key;
+  if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined && vars[k] !== null ? String(vars[k]) : m));
+  return s;
+}
 
 function demandLabel(score) {
   if (score === 'hot') return { text: t('demandHot'), cssClass: 'kx-red' };
@@ -452,6 +592,152 @@ function demandColor(score) {
   if (score === 'good') return '#2e7d32';
   if (score === 'moderate') return '#e65100';
   return '#999';
+}
+
+
+// ---------------------------------------------------------------------------
+// Sales display helpers shared by search / shop overlays (DOM-built, no innerHTML)
+// ---------------------------------------------------------------------------
+function el(tag, cls, text, style) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined && text !== null) n.textContent = String(text);
+  if (style) n.style.cssText = style;
+  return n;
+}
+
+function formatMoney(amount, currency) {
+  if (amount === null || amount === undefined) return '—';
+  const cur = currency || 'USD';
+  try {
+    return new Intl.NumberFormat(_lang === 'tr' ? 'tr-TR' : 'en-US', { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(amount);
+  } catch (_) {
+    return cur + ' ' + formatNum(amount);
+  }
+}
+
+function formatSales(n) {
+  if (n === null || n === undefined) return '—';
+  return n >= 10 ? formatNum(Math.round(n)) : String(Math.round(n * 10) / 10);
+}
+
+function cardTooltip(sales) {
+  const i = (sales && sales.inputs) || {};
+  switch (sales && sales.kind) {
+    case 'measured':
+      return t('cardTipMeasured', { delta: i.shopSoldDelta, days: i.spanDays, mine: i.shareListingReviews, total: i.shareShopReviews, window: i.shareWindowDays });
+    case 'estimated':
+      return sales.monthlySales !== null && sales.monthlySales !== undefined
+        ? t('cardTipEstimated', { recent: i.recentListingReviews, window: i.windowDays, ratio: i.salesPerReview })
+        : t('cardTipUpper', { window: i.windowDays, ratio: i.salesPerReview });
+    case 'pending':
+      return t('cardTipPending');
+    default:
+      return t('cardTipInsufficient');
+  }
+}
+
+/** Inline row under a listing card. `stats` is a CardStats from listings_batch. */
+function buildCardRow(stats, avg) {
+  const row = el('div', 'kx-data-row');
+  row.dataset.kxListing = stats.listingId;
+  const sales = stats.sales || { kind: 'insufficient' };
+  row.title = cardTooltip(sales);
+  const sep = () => row.appendChild(el('span', 'kx-sep', '·'));
+
+  if (sales.kind === 'pending') {
+    row.appendChild(el('span', null, '…'));
+  } else if (sales.monthlySales !== null && sales.monthlySales !== undefined) {
+    row.appendChild(el('span', salesColor(sales.monthlySales), (sales.kind === 'estimated' ? '~' : '') + formatSales(sales.monthlySales) + t('perMonth'), 'font-weight:700;'));
+  } else if (sales.monthlySalesUpperBound !== null && sales.monthlySalesUpperBound !== undefined) {
+    row.appendChild(el('span', 'kx-orange', '<' + formatSales(sales.monthlySalesUpperBound) + t('perMonth'), 'font-weight:700;'));
+  } else {
+    row.appendChild(el('span', null, '—'));
+  }
+  if (sales.kind !== 'pending') {
+    const cls = sales.kind === 'measured' ? 'kx-mini-measured' : sales.kind === 'estimated' ? 'kx-mini-estimated' : 'kx-mini-none';
+    const label = sales.kind === 'measured' ? t('badgeMeasured') : sales.kind === 'estimated' ? t('badgeEstimated') : t('badgeInsufficient');
+    row.appendChild(el('span', 'kx-mini-badge ' + cls, label));
+  }
+  if (sales.monthlyRevenue) {
+    sep();
+    row.appendChild(el('span', 'kx-green', '≈' + formatMoney(sales.monthlyRevenue, stats.currency) + t('perMonth')));
+  }
+  if (stats.favorites !== null && stats.favorites !== undefined) {
+    sep();
+    row.appendChild(el('span', null, '♥ ' + formatNum(stats.favorites)));
+  }
+  if (stats.quantity !== null && stats.quantity !== undefined && stats.quantity > 0 && stats.quantity <= 3) {
+    sep();
+    row.appendChild(el('span', 'kx-red', t('lowStock'), 'font-weight:700;'));
+  }
+  if (avg && avg.price && stats.price && (!avg.currency || avg.currency === stats.currency)) {
+    const diff = priceVsAvg(stats.price, avg.price);
+    if (diff) { sep(); row.appendChild(el('span', diff.cssClass, diff.text)); }
+  }
+  return row;
+}
+
+function findListingCard(link) {
+  return link.closest('[data-listing-id]') ||
+         link.closest('[data-listing-card-v2]') ||
+         link.closest('.v2-listing-card') ||
+         link.closest('.listing-link') ||
+         link.closest('.wt-grid__item-xs-6') ||
+         link.closest('[class*="listing-card"]') ||
+         link.parentElement?.parentElement || link.parentElement;
+}
+
+function pageListingIds() {
+  const ids = [];
+  document.querySelectorAll('a[href*="/listing/"]').forEach(link => {
+    const match = link.href.match(/\/listing\/(\d+)/);
+    if (match && !ids.includes(match[1])) ids.push(match[1]);
+  });
+  return ids;
+}
+
+/** Render/replace the KX row on each visible card for the given stats map. */
+function renderCardRows(statsById, avg) {
+  const processed = new Set();
+  document.querySelectorAll('a[href*="/listing/"]').forEach(link => {
+    const match = link.href.match(/\/listing\/(\d+)/);
+    if (!match || processed.has(match[1])) return;
+    const stats = statsById[match[1]];
+    if (!stats) return;
+    processed.add(match[1]);
+    const card = findListingCard(link);
+    if (!card) return;
+    const old = card.querySelector('.kx-data-row');
+    const row = buildCardRow(stats, avg);
+    if (old) old.replaceWith(row); else card.appendChild(row);
+  });
+}
+
+/**
+ * Fetch per-card stats in batches of 48, then re-poll the ids whose shop data
+ * was still 'pending' (the server caps fresh shop fetches per request).
+ */
+async function loadCardStats(ids, avg, isStillCurrent) {
+  const all = {};
+  const chunks = [];
+  for (let i = 0; i < ids.length; i += 48) chunks.push(ids.slice(i, i + 48));
+  let pending = [];
+  for (const chunk of chunks) {
+    if (!isStillCurrent()) return all;
+    const res = await apiCall('listings_batch', { listingIds: chunk });
+    Object.assign(all, res.listings || {});
+    pending = pending.concat(res.pendingIds || []);
+    renderCardRows(all, avg);
+  }
+  for (let round = 0; round < 3 && pending.length && isStillCurrent(); round++) {
+    await new Promise(r => setTimeout(r, 2500));
+    const res = await apiCall('listings_batch', { listingIds: pending.slice(0, 48) });
+    Object.assign(all, res.listings || {});
+    pending = (res.pendingIds || []).concat(pending.slice(48));
+    renderCardRows(all, avg);
+  }
+  return all;
 }
 
 // ---------------------------------------------------------------------------
@@ -478,6 +764,10 @@ window.__KX_SHARED = {
   onUrlChange,
   SELECTORS,
   apiCall,
+  listingStatsCall,
+  el, formatMoney, formatSales,
+  buildCardRow, renderCardRows, loadCardStats, pageListingIds, findListingCard,
+  lang: _lang,
   formatNum, formatPrice,
   competitionColor, scoreClass, salesColor,
   computeBestSellerRanks, priceVsAvg,

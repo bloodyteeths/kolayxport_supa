@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { validateEtsyFields, summarizeValidation, ETSY_REQUIRED_FIELDS } from '@/lib/etsy/validation';
+import { validateEtsyFields, summarizeValidation, ETSY_REQUIRED_FIELDS, WHEN_MADE_OPTIONS, whenMadeLabelKey } from '@/lib/etsy/validation';
 import {
   Drawer,
   Box,
@@ -57,6 +57,7 @@ import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { useLocale } from '@/lib/i18n/useLocale';
 import SEOIndicator from './SEOIndicator';
+import { aiErrorCode, AiRequestError, draftErrorI18n, normalizeTags, normalizeTitle, splitCommaList, TAG_MAX_COUNT, TAG_MAX_LEN } from '@/lib/etsy/seoRules';
 import ImageManager from './ImageManager';
 import VideoUploader from './VideoUploader';
 import PersonalizationEditor, { type PersonalizationQuestion } from './PersonalizationEditor';
@@ -70,7 +71,7 @@ import ScheduledUpdateDialog, {
   useScheduledUpdateExecutor,
   type ScheduledChanges,
 } from './ScheduledUpdateDialog';
-import { discardEtsyDraft, fetchEtsyDrafts, stageEtsyDraft, syncEtsyDraft } from '@/lib/etsy/draftClient';
+import { discardEtsyDraft, fetchEtsyDrafts, removeEtsyDraftQueuedActions, stageEtsyDraft, syncEtsyDraft } from '@/lib/etsy/draftClient';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -136,6 +137,7 @@ interface ListingData {
   shop_section_id?: number;
   processing_min?: number;
   processing_max?: number;
+  readiness_state_id?: number | null;
   who_made?: string;
   when_made?: string;
   is_supply?: boolean;
@@ -196,6 +198,7 @@ interface EditableFields {
   return_policy_id: number | '';
   processing_min: number | '';
   processing_max: number | '';
+  readiness_state_id: number | '';
   item_weight: number | '';
   item_weight_unit: string;
   item_length: number | '';
@@ -211,8 +214,6 @@ interface EditableFields {
 const WHO_MADE_KEYS = ['i_did', 'collective', 'someone_else'] as const;
 const WHO_MADE_I18N: Record<string, string> = { i_did: 'iDid', collective: 'collective', someone_else: 'someoneElse' };
 
-const WHEN_MADE_KEYS = ['made_to_order', '2020_2025', '2010_2019', '2004_2009', 'before_2004', '2000_2003', '1990s', '1980s', '1970s', '1960s'] as const;
-const WHEN_MADE_I18N: Record<string, string> = { made_to_order: 'madeToOrder', '2020_2025': '2020_2025', '2010_2019': '2010_2019', '2004_2009': '2004_2009', before_2004: 'before_2004', '2000_2003': '2000_2003', '1990s': '1990s', '1980s': '1980s', '1970s': '1970s', '1960s': '1960s' };
 
 const WEIGHT_UNITS = [
   { value: 'oz', label: 'oz' },
@@ -291,6 +292,7 @@ function buildInitialFields(listing: ListingData): EditableFields {
     return_policy_id: listing.return_policy_id ?? '',
     processing_min: listing.processing_min ?? '',
     processing_max: listing.processing_max ?? '',
+    readiness_state_id: listing.readiness_state_id ?? '',
     item_weight: listing.item_weight ?? '',
     item_weight_unit: listing.item_weight_unit || 'g',
     item_length: listing.item_length ?? '',
@@ -342,6 +344,13 @@ export default function ListingEditorDrawer({
   refreshKey,
 }: ListingEditorDrawerProps) {
   const t = useTranslations('etsy');
+  /** Translated draft-staging error (server i18n key when present) — never raw server text. */
+  const draftErr = (err: unknown, fallbackKey: string): string => {
+    const i18n = draftErrorI18n(err);
+    if (i18n && t.has(i18n.key as any)) return t(i18n.key as any, i18n.params as any);
+    console.error('[ListingEditorDrawer]', err);
+    return t(fallbackKey as any);
+  };
   const { config, formatDate, formatNumber } = useLocale();
 
   // Loading / data state
@@ -488,9 +497,9 @@ export default function ListingEditorDrawer({
         queuedActions: [{ type: 'create_shipping_profile', tempId, payload }],
       });
       setDraftId(draft?.id || null);
-      setStagedShippingProfiles(prev => [...prev, { shipping_profile_id: tempId, title: `${payload.title} (pending)` }]);
+      setStagedShippingProfiles(prev => [...prev, { shipping_profile_id: tempId, title: t('editor.pendingName', { name: payload.title }) }]);
       updateField('shipping_profile_id', tempId);
-      toast.success('Shipping profile saved to draft. Sync to Etsy to create it.');
+      toast.success(t('editor.shippingProfileStaged'));
       setCreateShippingOpen(false);
       setNewShipping({ title: '', origin_country_iso: config.defaultCountryOfOrigin || 'TR', primary_cost: '0', secondary_cost: '0', min_processing_days: '1', max_processing_days: '3', destination_country_iso: '' });
     } catch (e: any) {
@@ -517,9 +526,9 @@ export default function ListingEditorDrawer({
         queuedActions: [{ type: 'create_return_policy', tempId, payload }],
       });
       setDraftId(draft?.id || null);
-      setStagedReturnPolicies(prev => [...prev, { return_policy_id: tempId, description: 'Pending return policy', accepts_returns: payload.accepts_returns, accepts_exchanges: payload.accepts_exchanges }]);
+      setStagedReturnPolicies(prev => [...prev, { return_policy_id: tempId, description: t('editor.pendingReturnPolicy'), accepts_returns: payload.accepts_returns, accepts_exchanges: payload.accepts_exchanges }]);
       updateField('return_policy_id', tempId);
-      toast.success('Return policy saved to draft. Sync to Etsy to create it.');
+      toast.success(t('editor.returnPolicyStaged'));
       setCreateReturnOpen(false);
       setNewReturn({ accepts_returns: true, accepts_exchanges: true, return_deadline: '30' });
     } catch (e: any) {
@@ -542,9 +551,9 @@ export default function ListingEditorDrawer({
         queuedActions: [{ type: 'create_shop_section', tempId, payload: { title } }],
       });
       setDraftId(draft?.id || null);
-      setStagedShopSections(prev => [...prev, { shop_section_id: tempId, title: `${title} (pending)` }]);
+      setStagedShopSections(prev => [...prev, { shop_section_id: tempId, title: t('editor.pendingName', { name: title }) }]);
       updateField('shop_section_id', tempId);
-      toast.success('Shop section saved to draft. Sync to Etsy to create it.');
+      toast.success(t('editor.shopSectionStaged'));
       setCreateSectionOpen(false);
       setNewSectionTitle('');
     } catch (e: any) {
@@ -739,14 +748,12 @@ export default function ListingEditorDrawer({
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `AI istegi basarisiz (HTTP ${res.status})`);
-      }
-
-      return await res.json();
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new AiRequestError(aiErrorCode(data));
+      if (!data || typeof data !== 'object') throw new AiRequestError('invalid_ai_response');
+      return data;
     } catch (err: any) {
-      toast.error(err.message || t('editor.aiRequestFailed'));
+      toast.error(err instanceof AiRequestError && err.code ? t(`aiErrors.${err.code}` as any) : t('editor.aiRequestFailed'));
       return null;
     } finally {
       setAiLoading((prev) => ({ ...prev, [action]: false }));
@@ -755,14 +762,11 @@ export default function ListingEditorDrawer({
 
   const handleAIOptimizeTitle = useCallback(async () => {
     const result = await callAI('optimize_title');
-    const newTitle = result?.optimized_title || result?.title;
+    if (!result) return;
+    // Shared SEO rules: Title Case, commas-only separators, cleaned characters.
+    const newTitle = normalizeTitle(result.optimized_title);
     if (!newTitle) {
       toast.error(t('editor.aiTitleFailed'));
-      return;
-    }
-    // Reject garbled single-character output
-    if (typeof newTitle !== 'string' || newTitle.split(/[\s,]+/).filter(Boolean).every((w: string) => w.length <= 1)) {
-      toast.error(t('editor.aiBrokenTitle'));
       return;
     }
     updateField('title', newTitle);
@@ -771,20 +775,23 @@ export default function ListingEditorDrawer({
 
   const handleAIGenerateDescription = useCallback(async () => {
     const result = await callAI('generate_description');
-    if (result?.description) {
+    if (typeof result?.description === 'string' && result.description.trim()) {
       updateField('description', result.description);
       toast.success(t('editor.descriptionCreated'));
     }
   }, [callAI]);
 
   const handleAISuggestTags = useCallback(async () => {
-    const result = await callAI('suggest_tags');
-    const tags = result?.suggestions || result?.tags;
-    if (tags && Array.isArray(tags)) {
+    const result = await callAI('suggest_tags', { mode: 'add' });
+    if (!result || !fields) return;
+    const { tags } = normalizeTags(result.suggestions, { title: fields.title, dropTitleOverlap: true });
+    if (tags.length > 0) {
       setAiTagSuggestions(tags);
       toast.success(t('editor.tagSuggestionsReceived', { count: tags.length }));
+    } else {
+      toast.error(t('aiErrors.ai_tags_failed'));
     }
-  }, [callAI]);
+  }, [callAI, fields]);
 
   const handleRankCheck = useCallback(async () => {
     if (!rankKeyword.trim() || !listingId) return;
@@ -1117,10 +1124,10 @@ export default function ListingEditorDrawer({
           }
           setAutoSaveStatus('saved');
           setLastSavedAt(new Date());
-          toast.success('Draft field changes cleared. Sync to Etsy will not apply reverted fields.');
+          toast.success(t('editor.draftFieldsCleared'));
           onSaved();
         } catch (err: any) {
-          toast.error(err.message || t('editor.updateFailed'));
+          toast.error(draftErr(err, 'editor.updateFailed'));
         } finally {
           setSaving(false);
         }
@@ -1159,6 +1166,11 @@ export default function ListingEditorDrawer({
       if (changed.processing_max !== undefined && changed.processing_max !== '') {
         payload.processing_max = Number(changed.processing_max);
       }
+      // Processing profile: routed server-side onto every inventory offering
+      // (Etsy's updateListing ignores it).
+      if (changed.readiness_state_id !== undefined && changed.readiness_state_id !== '') {
+        payload.readiness_state_id = Number(changed.readiness_state_id);
+      }
       if (changed.item_weight !== undefined && changed.item_weight !== '') {
         payload.item_weight = Number(changed.item_weight);
       }
@@ -1182,7 +1194,7 @@ export default function ListingEditorDrawer({
 
       const draft = await stageEtsyDraft({ shopId, listingId, fields: payload, replaceFields: true });
       setDraftId(draft?.id || null);
-      toast.success('Draft saved. Sync to Etsy when ready.');
+      toast.success(t('editor.draftSavedSyncLater'));
 
       // Clear the localStorage draft — changes are now in the DB-backed draft
       if (listingId) clearDraft(listingId);
@@ -1197,7 +1209,7 @@ export default function ListingEditorDrawer({
 
       onSaved();
     } catch (err: any) {
-      toast.error(err.message || t('editor.updateFailed'));
+      toast.error(draftErr(err, 'editor.updateFailed'));
     } finally {
       setSaving(false);
     }
@@ -1258,10 +1270,10 @@ export default function ListingEditorDrawer({
     try {
       const draft = await stageEtsyDraft({ shopId, listingId, taxonomy: { properties: changed } });
       setDraftId(draft?.id || null);
-      toast.success('Category details saved to draft');
+      toast.success(t('editor.categoryDetailsStaged'));
       onSaved();
     } catch (err: any) {
-      toast.error(err.message || 'Could not update Etsy category details');
+      toast.error(draftErr(err, 'editor.categoryDetailsFailed'));
     } finally {
       setSavingTaxonomy(false);
     }
@@ -1277,10 +1289,10 @@ export default function ListingEditorDrawer({
     try {
       const draft = await stageEtsyDraft({ shopId, listingId, queuedActions: [{ type: 'publish' }] });
       setDraftId(draft?.id || null);
-      toast.success('Publish queued in draft. Sync to Etsy to apply.');
+      toast.success(t('editor.publishQueued'));
       onSaved();
     } catch (err: any) {
-      toast.error(err.message || t('editor.publishFailed'));
+      toast.error(draftErr(err, 'editor.publishFailed'));
     } finally {
       setPublishing(false);
     }
@@ -1296,10 +1308,10 @@ export default function ListingEditorDrawer({
     try {
       const draft = await stageEtsyDraft({ shopId, listingId, queuedActions: [{ type: 'deactivate' }] });
       setDraftId(draft?.id || null);
-      toast.success('Deactivate queued in draft. Sync to Etsy to apply.');
+      toast.success(t('editor.deactivateQueued'));
       onSaved();
     } catch (err: any) {
-      toast.error(err.message || t('editor.deactivateFailed'));
+      toast.error(draftErr(err, 'editor.deactivateFailed'));
     } finally {
       setDeactivating(false);
     }
@@ -1315,11 +1327,11 @@ export default function ListingEditorDrawer({
     try {
       const draft = await stageEtsyDraft({ shopId, listingId, queuedActions: [{ type: 'renew' }] });
       setDraftId(draft?.id || null);
-      toast.success('Renew queued in draft. Sync to Etsy to apply.');
+      toast.success(t('editor.renewQueued'));
       setRenewDialogOpen(false);
       onSaved();
     } catch (err: any) {
-      toast.error(err.message || t('editor.renewFailed'));
+      toast.error(draftErr(err, 'editor.renewFailed'));
     } finally {
       setRenewing(false);
     }
@@ -1335,10 +1347,10 @@ export default function ListingEditorDrawer({
     try {
       const draft = await stageEtsyDraft({ shopId, listingId, queuedActions: [{ type: 'copy' }] });
       setDraftId(draft?.id || null);
-      toast.success('Copy queued in draft. Sync to Etsy to apply.');
+      toast.success(t('editor.copyQueued'));
       onSaved();
     } catch (err: any) {
-      toast.error(err.message || t('editor.copyFailed'));
+      toast.error(draftErr(err, 'editor.copyFailed'));
     } finally {
       setCopying(false);
     }
@@ -1354,11 +1366,12 @@ export default function ListingEditorDrawer({
     try {
       const draft = await stageEtsyDraft({ shopId, listingId, queuedActions: [{ type: 'delete' }] });
       setDraftId(draft?.id || null);
-      toast.success('Delete queued in draft. Sync to Etsy to apply.');
+      setDraftQueuedDelete(true);
+      toast.success(t('editor.deleteQueued'));
       setDeleteDialogOpen(false);
       onSaved();
     } catch (err: any) {
-      toast.error(err.message || t('editor.deleteFailed'));
+      toast.error(draftErr(err, 'editor.deleteFailed'));
     } finally {
       setDeleting(false);
     }
@@ -1366,6 +1379,8 @@ export default function ListingEditorDrawer({
 
   const [draftStatus, setDraftStatus] = useState<string | null>(null);
   const [draftLastError, setDraftLastError] = useState<string | null>(null);
+  const [draftQueuedDelete, setDraftQueuedDelete] = useState(false);
+  const [cancellingQueuedDelete, setCancellingQueuedDelete] = useState(false);
 
   // Client-side Etsy validation. Recomputed whenever the user edits a field.
   // canSyncToEtsy gates the Sync button; canSaveDraft only blocks the local
@@ -1391,6 +1406,90 @@ export default function ListingEditorDrawer({
     );
   }, [fields, listing?.taxonomy_id]);
 
+  // --------------------------------------------------
+  // Processing profiles (Etsy readiness states)
+  // --------------------------------------------------
+  type ReadinessStateOption = {
+    readiness_state_id: number;
+    readiness_state: string;
+    min_processing_days: number | null;
+    max_processing_days: number | null;
+    processing_days_display_label?: string | null;
+  };
+  const [readinessStates, setReadinessStates] = useState<ReadinessStateOption[]>([]);
+  const [readinessLoadError, setReadinessLoadError] = useState(false);
+  const [newProfileOpen, setNewProfileOpen] = useState(false);
+  const [newProfile, setNewProfile] = useState<{ readiness_state: string; min: number | ''; max: number | '' }>({ readiness_state: 'made_to_order', min: 1, max: 3 });
+  const [creatingProfile, setCreatingProfile] = useState(false);
+
+  useEffect(() => {
+    if (!open || !shopId) return;
+    let cancelled = false;
+    fetch(`/api/clawd/etsy?action=get_readiness_states&shop_id=${shopId}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((d) => {
+        if (cancelled) return;
+        setReadinessStates(Array.isArray(d?.readiness_states) ? d.readiness_states : []);
+        setReadinessLoadError(false);
+      })
+      .catch(() => { if (!cancelled) setReadinessLoadError(true); });
+    return () => { cancelled = true; };
+  }, [open, shopId]);
+
+  const readinessLabel = (s: ReadinessStateOption) => {
+    const state = s.readiness_state === 'ready_to_ship' ? t('processingProfile.readyToShip') : t('processingProfile.madeToOrder');
+    const range = s.processing_days_display_label
+      || t('processingProfile.daysRange', { min: s.min_processing_days ?? '?', max: s.max_processing_days ?? '?' });
+    return `${state} · ${range}`;
+  };
+
+  const handleCreateProfile = async () => {
+    const min = Number(newProfile.min);
+    const max = Number(newProfile.max);
+    if (!Number.isInteger(min) || !Number.isInteger(max) || min < 1 || max > 10 || min > max) {
+      toast.error(t('processingProfile.rangeError'));
+      return;
+    }
+    setCreatingProfile(true);
+    try {
+      const res = await fetch(`/api/clawd/etsy?action=create_readiness_state&shop_id=${shopId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          readiness_state: newProfile.readiness_state,
+          min_processing_time: min,
+          max_processing_time: max,
+          processing_time_unit: 'days',
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.readiness_state_id) throw new Error(data?.error || `HTTP ${res.status}`);
+      const created: ReadinessStateOption = {
+        readiness_state_id: Number(data.readiness_state_id),
+        readiness_state: data.readiness_state || newProfile.readiness_state,
+        min_processing_days: data.min_processing_days ?? min,
+        max_processing_days: data.max_processing_days ?? max,
+        processing_days_display_label: data.processing_days_display_label || null,
+      };
+      setReadinessStates((prev) => [...prev, created]);
+      updateField('readiness_state_id', created.readiness_state_id);
+      setNewProfileOpen(false);
+      toast.success(t('processingProfile.created'));
+    } catch (err: any) {
+      toast.error(err?.message || t('processingProfile.createFailed'));
+    } finally {
+      setCreatingProfile(false);
+    }
+  };
+
+  // Render a validation error via its i18n key (etsy.validation.*), falling
+  // back to the legacy message for errors without a key.
+  const validationMessage = useCallback(
+    (err?: { key?: string; params?: Record<string, string | number>; message: string } | null) =>
+      (err ? (err.key ? t(err.key as any, (err.params || {}) as any) : err.message) : ''),
+    [t],
+  );
+
   const refreshDraftState = useCallback(async () => {
     if (!shopId || !listingId) return;
     try {
@@ -1399,10 +1498,12 @@ export default function ListingEditorDrawer({
       setDraftId(top?.id || null);
       setDraftStatus(top?.status || null);
       setDraftLastError(top?.lastSyncError || null);
+      setDraftQueuedDelete(Array.isArray(top?.queuedActions) && top.queuedActions.some((a: any) => a?.type === 'delete' && !a?.completedAt));
     } catch {
       setDraftId(null);
       setDraftStatus(null);
       setDraftLastError(null);
+      setDraftQueuedDelete(false);
     }
   }, [shopId, listingId]);
 
@@ -1410,19 +1511,50 @@ export default function ListingEditorDrawer({
     if (open) refreshDraftState();
   }, [open, refreshDraftState]);
 
-  const handleSyncDraft = async () => {
+  // `opts` is ignored when used directly as an onClick handler (the click
+  // event has no `force`). force=true is only passed from the conflict
+  // banner's explicit "Apply anyway" button.
+  const handleSyncDraft = async (opts?: { force?: boolean }) => {
     if (!draftId) return;
+    const force = opts?.force === true;
     setSyncingDraft(true);
     try {
-      const result = await syncEtsyDraft(draftId);
-      toast.success('Draft synced to Etsy');
+      const result = await syncEtsyDraft(draftId, { force });
+      if (Array.isArray(result?.warnings) && result.warnings.length > 0) {
+        const details = result.warnings
+          .map((w: any) => (w?.key ? t(w.key, w.params || {}) : w?.message))
+          .filter(Boolean)
+          .join(' • ');
+        toast.error(t('draftSync.syncedWithWarnings', { details }), { duration: 10000 });
+      } else {
+        toast.success(t('editor.draftSynced'));
+      }
       setDraftId(null);
       await fetchListing();
       onSaved();
     } catch (err: any) {
-      toast.error(err.message || 'Could not sync draft');
+      // Conflict / validation / failure: the server already updated the
+      // draft's status + lastSyncError — reload it so the banner shows.
+      await refreshDraftState();
+      toast.error(draftErr(err, 'editor.draftSyncFailed'));
     } finally {
       setSyncingDraft(false);
+    }
+  };
+
+  const handleCancelQueuedDelete = async () => {
+    if (!draftId) return;
+    setCancellingQueuedDelete(true);
+    try {
+      await removeEtsyDraftQueuedActions(draftId, ['delete']);
+      setDraftQueuedDelete(false);
+      toast.success(t('draftSync.queuedDeleteRemoved'));
+      await refreshDraftState();
+      onSaved();
+    } catch (err: any) {
+      toast.error(err?.key ? t(err.key, err.params || {}) : (err.message || t('editor.errorOccurred')));
+    } finally {
+      setCancellingQueuedDelete(false);
     }
   };
 
@@ -1432,11 +1564,11 @@ export default function ListingEditorDrawer({
     try {
       await discardEtsyDraft(draftId);
       setDraftId(null);
-      toast.success('Draft discarded');
+      toast.success(t('editor.draftDiscarded'));
       await fetchListing();
       onSaved();
     } catch (err: any) {
-      toast.error(err.message || 'Could not discard draft');
+      toast.error(draftErr(err, 'editor.draftDiscardFailed'));
     } finally {
       setDiscardingDraft(false);
     }
@@ -1583,6 +1715,27 @@ export default function ListingEditorDrawer({
           </Box>
         </Box>
 
+        {/* Queued listing delete — lets the user un-queue it without discarding the draft */}
+        {draftId && draftQueuedDelete && (
+          <Alert
+            severity="warning"
+            sx={{ borderRadius: 0, borderLeft: 0, borderRight: 0 }}
+            action={
+              <Button
+                color="inherit"
+                size="small"
+                onClick={handleCancelQueuedDelete}
+                disabled={cancellingQueuedDelete}
+                startIcon={cancellingQueuedDelete ? <CircularProgress size={14} color="inherit" /> : undefined}
+              >
+                {t('draftSync.removeQueuedDelete')}
+              </Button>
+            }
+          >
+            {t('draftSync.deleteQueuedNotice')}
+          </Alert>
+        )}
+
         {/* Failed / conflict banner — explains why and offers next steps */}
         {draftId && (draftStatus === 'failed' || draftStatus === 'conflict') && (() => {
           const isConflict = draftStatus === 'conflict';
@@ -1608,32 +1761,44 @@ export default function ListingEditorDrawer({
               sx={{ borderRadius: 0, borderLeft: 0, borderRight: 0 }}
               action={
                 <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Button
-                    color="inherit"
-                    size="small"
-                    onClick={handleSyncDraft}
-                    disabled={syncingDraft}
-                    startIcon={syncingDraft ? <CircularProgress size={14} color="inherit" /> : undefined}
-                  >
-                    {syncingDraft ? 'Sync...' : 'Tekrar Sync'}
-                  </Button>
+                  {isConflict ? (
+                    <Button
+                      color="inherit"
+                      size="small"
+                      onClick={() => handleSyncDraft({ force: true })}
+                      disabled={syncingDraft}
+                      startIcon={syncingDraft ? <CircularProgress size={14} color="inherit" /> : undefined}
+                    >
+                      {syncingDraft ? t('draftSync.applyingAnyway') : t('draftSync.applyAnyway')}
+                    </Button>
+                  ) : (
+                    <Button
+                      color="inherit"
+                      size="small"
+                      onClick={() => handleSyncDraft()}
+                      disabled={syncingDraft}
+                      startIcon={syncingDraft ? <CircularProgress size={14} color="inherit" /> : undefined}
+                    >
+                      {syncingDraft ? t('editor.syncing') : t('editor.retrySync')}
+                    </Button>
+                  )}
                   <Button
                     color="inherit"
                     size="small"
                     onClick={handleDiscardDraft}
                     disabled={discardingDraft}
                   >
-                    {discardingDraft ? 'Siliniyor...' : 'Taslağı Sil'}
+                    {discardingDraft ? t('editor.discarding') : t('editor.discardDraft')}
                   </Button>
                 </Box>
               }
             >
               <Box sx={{ fontWeight: 600, mb: 0.5 }}>
-                {isConflict ? 'Etsy üzerinde bu listing değişmiş.' : 'Bu taslak Etsy\'e gönderilemedi.'}
+                {isConflict ? t('draftSync.conflictTitle') : 'Bu taslak Etsy\'e gönderilemedi.'}
               </Box>
               <Box sx={{ fontSize: 13 }}>
                 {isConflict
-                  ? 'Değişikliklerini gözden geçir; istediğin halde uygula için tekrar Sync\'e bas. İptal etmek istersen "Taslağı Sil".'
+                  ? t('draftSync.conflictBody')
                   : friendly(draftLastError)}
               </Box>
               {!isConflict && draftLastError && (
@@ -1666,7 +1831,7 @@ export default function ListingEditorDrawer({
             </Box>
             <Box component="ul" sx={{ m: 0, pl: 2.5, fontSize: 13 }}>
               {validation.errors.slice(0, 5).map((err) => (
-                <li key={`${err.field}-${err.message}`}>{err.message}</li>
+                <li key={`${err.field}-${err.message}`}>{validationMessage(err)}</li>
               ))}
               {validation.errors.length > 5 && (
                 <li>… ve {validation.errors.length - 5} kontrol daha</li>
@@ -1928,7 +2093,7 @@ export default function ListingEditorDrawer({
                       error={Boolean(validation.byField.title)}
                       helperText={
                         validation.byField.title
-                          ? validation.byField.title.message
+                          ? validationMessage(validation.byField.title)
                           : `${fields.title.length}/140 karakter`
                       }
                       inputProps={{ maxLength: 140 }}
@@ -1962,7 +2127,7 @@ export default function ListingEditorDrawer({
                       error={Boolean(validation.byField.description)}
                       helperText={
                         validation.byField.description
-                          ? validation.byField.description.message
+                          ? validationMessage(validation.byField.description)
                           : `${fields.description.length} karakter`
                       }
                     />
@@ -2090,9 +2255,10 @@ export default function ListingEditorDrawer({
                             if (e.key === ',') {
                               e.preventDefault();
                               const input = (e.target as HTMLInputElement).value.trim();
-                              if (input && fields.tags.length < 13) {
-                                const newTags = input.split(',').map((s) => s.trim()).filter(Boolean).map((t) => t.substring(0, 20));
-                                const merged = [...new Set([...fields.tags, ...newTags])].slice(0, 13);
+                              if (input && fields.tags.length < TAG_MAX_COUNT) {
+                                const { tags: merged, dropped } = normalizeTags([...fields.tags, ...splitCommaList(input)], { max: TAG_MAX_COUNT });
+                                const tooLong = dropped.filter((d) => d.reason === 'too_long').map((d) => d.tag);
+                                if (tooLong.length) toast.error(t('editor.tagsTooLongDropped', { max: TAG_MAX_LEN, tags: tooLong.join(', ') }));
                                 updateField('tags', merged);
                                 // Clear the input
                                 const autocompleteInput = (e.target as HTMLInputElement);
@@ -2108,8 +2274,9 @@ export default function ListingEditorDrawer({
                             const pasted = e.clipboardData.getData('text');
                             if (pasted.includes(',')) {
                               e.preventDefault();
-                              const newTags = pasted.split(',').map((s) => s.trim()).filter(Boolean).map((t) => t.substring(0, 20));
-                              const merged = [...new Set([...fields.tags, ...newTags])].slice(0, 13);
+                              const { tags: merged, dropped } = normalizeTags([...fields.tags, ...splitCommaList(pasted)], { max: TAG_MAX_COUNT });
+                              const tooLong = dropped.filter((d) => d.reason === 'too_long').map((d) => d.tag);
+                              if (tooLong.length) toast.error(t('editor.tagsTooLongDropped', { max: TAG_MAX_LEN, tags: tooLong.join(', ') }));
                               updateField('tags', merged);
                             }
                           }}
@@ -2127,7 +2294,7 @@ export default function ListingEditorDrawer({
                         disabled={!!aiLoading.suggest_tags || !fields.title}
                         sx={{ textTransform: 'none', fontSize: '0.875rem', minHeight: 40 }}
                       >
-                        AI Etiket Oner
+                        {t('editor.aiSuggestTags')}
                       </Button>
                       {fields.tags.length > 0 && (
                         <Button
@@ -2136,11 +2303,15 @@ export default function ListingEditorDrawer({
                           color="secondary"
                           startIcon={aiLoading.suggest_tags ? <CircularProgress size={14} /> : <AutoFixHighIcon sx={{ fontSize: 16 }} />}
                           onClick={async () => {
-                            const result = await callAI('suggest_tags');
-                            const suggested = result?.suggestions || result?.tags;
-                            if (suggested && Array.isArray(suggested)) {
-                              updateField('tags', suggested.slice(0, 13));
-                              toast.success(t('editor.tagsReplaced', { count: Math.min(suggested.length, 13) }));
+                            // Replace mode: AI may keep strong current tags; output passes the shared rules.
+                            const result = await callAI('suggest_tags', { mode: 'replace' });
+                            if (!result) return;
+                            const { tags: suggested } = normalizeTags(result.suggestions, { title: fields.title, dropTitleOverlap: true });
+                            if (suggested.length > 0) {
+                              updateField('tags', suggested);
+                              toast.success(t('editor.tagsReplaced', { count: suggested.length }));
+                            } else {
+                              toast.error(t('aiErrors.ai_tags_failed'));
                             }
                           }}
                           disabled={!!aiLoading.suggest_tags || !fields.title}
@@ -2180,7 +2351,7 @@ export default function ListingEditorDrawer({
                                 size="medium"
                                 color="secondary"
                                 onClick={() => {
-                                  updateField('tags', aiTagSuggestions.slice(0, 13));
+                                  updateField('tags', normalizeTags(aiTagSuggestions, { max: TAG_MAX_COUNT }).tags);
                                   setAiTagSuggestions([]);
                                   toast.success(t('editor.allTagsReplaced'));
                                 }}
@@ -2192,8 +2363,7 @@ export default function ListingEditorDrawer({
                             <Button
                               size="small"
                               onClick={() => {
-                                const newTags = aiTagSuggestions.filter((t) => !fields.tags.includes(t));
-                                const merged = [...fields.tags, ...newTags].slice(0, 13);
+                                const { tags: merged } = normalizeTags([...fields.tags, ...aiTagSuggestions], { max: TAG_MAX_COUNT });
                                 updateField('tags', merged);
                                 setAiTagSuggestions([]);
                                 toast.success(t('editor.tagsAdded', { count: merged.length - fields.tags.length }));
@@ -2348,7 +2518,7 @@ export default function ListingEditorDrawer({
             {activeTab === 'video' && (
               <Box sx={{ p: { xs: 2, md: 2.5 } }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                  <Typography variant="h6" fontWeight={600}>Video</Typography>
+                  <Typography variant="h6" fontWeight={600}>{t('editor.videoHeading')}</Typography>
                   {videos.length > 0 && (
                     <Chip label={videos.length} size="small" sx={{ height: 26, fontSize: '0.85rem' }} />
                   )}
@@ -2485,7 +2655,7 @@ export default function ListingEditorDrawer({
                     )}
                     {prop.scales && prop.scales.length > 0 && (
                       <FormControl size="small" sx={{ minWidth: 90, mt: 0.25 }}>
-                        <InputLabel sx={{ fontSize: '0.75rem' }}>Scale</InputLabel>
+                        <InputLabel sx={{ fontSize: '0.75rem' }}>{t('editor.scale')}</InputLabel>
                         <Select
                           value={draft.scale_id ? String(draft.scale_id) : ''}
                           label="Scale"
@@ -2541,9 +2711,9 @@ export default function ListingEditorDrawer({
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                       <TuneIcon sx={{ fontSize: 20, color: 'primary.main' }} />
                       <Box>
-                        <Typography variant="subtitle2" fontWeight={700}>Category Attributes</Typography>
+                        <Typography variant="subtitle2" fontWeight={700}>{t('editor.categoryAttributes')}</Typography>
                         <Typography variant="caption" color="text.secondary">
-                          {totalCount > 0 ? `${filledCount} of ${totalCount} filled` : 'No attributes for this category'}
+                          {totalCount > 0 ? t('editor.attributesFilled', { filled: filledCount, total: totalCount }) : t('editor.noAttributes')}
                         </Typography>
                       </Box>
                     </Box>
@@ -2598,7 +2768,7 @@ export default function ListingEditorDrawer({
                   <Box sx={sectionHeaderSx} onClick={() => toggleSection('listing')}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                       <SettingsIcon sx={{ fontSize: 20, color: 'text.secondary' }} />
-                      <Typography variant="subtitle2" fontWeight={700}>Listing Info</Typography>
+                      <Typography variant="subtitle2" fontWeight={700}>{t('editor.listingInfo')}</Typography>
                     </Box>
                     <ExpandMoreIcon sx={{ fontSize: 20, transform: detailsSections.listing ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                   </Box>
@@ -2614,7 +2784,11 @@ export default function ListingEditorDrawer({
                         <FormControl size="small" fullWidth>
                           <InputLabel>{t('editor.whenMadeLabel')}</InputLabel>
                           <Select value={fields.when_made} label={t('editor.whenMadeLabel')} onChange={(e: SelectChangeEvent) => updateField('when_made', e.target.value)}>
-                            {WHEN_MADE_KEYS.map((val) => (<MenuItem key={val} value={val}>{t(`whenMade.${WHEN_MADE_I18N[val]}`)}</MenuItem>))}
+                            {WHEN_MADE_OPTIONS.map((opt) => (<MenuItem key={opt.value} value={opt.value}>{t(`whenMade.${opt.labelKey}`)}</MenuItem>))}
+                            {/* Keep a legacy stored value selectable/visible; validation asks the user to re-pick it. */}
+                            {fields.when_made && !WHEN_MADE_OPTIONS.some((opt) => opt.value === fields.when_made) && (
+                              <MenuItem value={fields.when_made}>{whenMadeLabelKey(fields.when_made) ? t(`whenMade.${whenMadeLabelKey(fields.when_made)}`) : fields.when_made}</MenuItem>
+                            )}
                           </Select>
                         </FormControl>
                       </Box>
@@ -2691,12 +2865,62 @@ export default function ListingEditorDrawer({
                   <Collapse in={detailsSections.shipping}>
                     <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                        {t('editor.processingTimeDays')}
+                        {t('processingProfile.title')}
                       </Typography>
-                      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
-                        <TextField label={t('editor.minLabel')} type="number" value={fields.processing_min} onChange={(e) => updateField('processing_min', e.target.value ? parseInt(e.target.value) : '')} size="small" inputProps={{ min: 1 }} />
-                        <TextField label={t('editor.maxLabel')} type="number" value={fields.processing_max} onChange={(e) => updateField('processing_max', e.target.value ? parseInt(e.target.value) : '')} size="small" inputProps={{ min: 1 }} />
-                      </Box>
+                      {/* Etsy replaced listing processing_min/max with per-offering
+                          processing profiles (readiness_state_id). */}
+                      <FormControl size="small" fullWidth>
+                        <InputLabel>{t('processingProfile.label')}</InputLabel>
+                        <Select
+                          value={fields.readiness_state_id === '' ? '' : String(fields.readiness_state_id)}
+                          label={t('processingProfile.label')}
+                          onChange={(e: SelectChangeEvent) => {
+                            if (e.target.value === '__new__') { setNewProfileOpen(true); return; }
+                            updateField('readiness_state_id', e.target.value ? Number(e.target.value) : '');
+                          }}
+                        >
+                          <MenuItem value=""><em>{t('processingProfile.none')}</em></MenuItem>
+                          {readinessStates.map((s) => (
+                            <MenuItem key={s.readiness_state_id} value={String(s.readiness_state_id)}>{readinessLabel(s)}</MenuItem>
+                          ))}
+                          {fields.readiness_state_id !== '' && !readinessStates.some((s) => s.readiness_state_id === fields.readiness_state_id) && (
+                            <MenuItem value={String(fields.readiness_state_id)}>#{fields.readiness_state_id}</MenuItem>
+                          )}
+                          <MenuItem value="__new__">{t('processingProfile.createNew')}</MenuItem>
+                        </Select>
+                      </FormControl>
+                      <Typography variant="caption" color={readinessLoadError ? 'warning.main' : 'text.secondary'}>
+                        {readinessLoadError ? t('processingProfile.loadFailed') : t('processingProfile.helper')}
+                      </Typography>
+                      <Collapse in={newProfileOpen} unmountOnExit>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, p: 1.5, border: '1px dashed', borderColor: 'divider', borderRadius: 1 }}>
+                          <Typography variant="body2" fontWeight={600}>{t('processingProfile.createTitle')}</Typography>
+                          <FormControl size="small" fullWidth>
+                            <InputLabel>{t('processingProfile.stateLabel')}</InputLabel>
+                            <Select
+                              value={newProfile.readiness_state}
+                              label={t('processingProfile.stateLabel')}
+                              onChange={(e: SelectChangeEvent) => setNewProfile((p) => ({ ...p, readiness_state: e.target.value }))}
+                            >
+                              <MenuItem value="made_to_order">{t('processingProfile.madeToOrder')}</MenuItem>
+                              <MenuItem value="ready_to_ship">{t('processingProfile.readyToShip')}</MenuItem>
+                            </Select>
+                          </FormControl>
+                          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+                            <TextField label={t('processingProfile.minDays')} type="number" size="small" value={newProfile.min} inputProps={{ min: 1, max: 10 }}
+                              onChange={(e) => setNewProfile((p) => ({ ...p, min: e.target.value ? parseInt(e.target.value) : '' }))} />
+                            <TextField label={t('processingProfile.maxDays')} type="number" size="small" value={newProfile.max} inputProps={{ min: 1, max: 10 }}
+                              onChange={(e) => setNewProfile((p) => ({ ...p, max: e.target.value ? parseInt(e.target.value) : '' }))} />
+                          </Box>
+                          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                            <Button size="small" onClick={() => setNewProfileOpen(false)} disabled={creatingProfile}>{t('processingProfile.cancel')}</Button>
+                            <Button size="small" variant="contained" onClick={handleCreateProfile} disabled={creatingProfile}
+                              startIcon={creatingProfile ? <CircularProgress size={14} color="inherit" /> : undefined}>
+                              {t('processingProfile.create')}
+                            </Button>
+                          </Box>
+                        </Box>
+                      </Collapse>
 
                       <Divider />
 
@@ -2989,7 +3213,7 @@ export default function ListingEditorDrawer({
                   title={
                     validation.canSyncToEtsy
                       ? ''
-                      : `Önce şu eksiği düzelt: ${validation.blockReason}`
+                      : `Önce şu eksiği düzelt: ${validationMessage(validation.errors[0])}`
                   }
                   arrow
                   placement="top"
@@ -3003,7 +3227,7 @@ export default function ListingEditorDrawer({
                       sx={{ textTransform: 'none', fontWeight: 700, borderRadius: '8px', minHeight: 48 }}
                       disabled={syncingDraft || discardingDraft || hasChanges() || !validation.canSyncToEtsy}
                       startIcon={syncingDraft ? <CircularProgress size={18} color="inherit" /> : <PublishIcon />}
-                      onClick={handleSyncDraft}
+                      onClick={() => handleSyncDraft()}
                     >
                       {syncingDraft ? 'Syncing...' : hasChanges() ? 'Save Draft First' : 'Sync to Etsy'}
                     </Button>
@@ -3017,7 +3241,7 @@ export default function ListingEditorDrawer({
               title={
                 validation.canSaveDraft
                   ? ''
-                  : `Önce şu hatayı düzelt: ${validation.blockReason}`
+                  : `Önce şu hatayı düzelt: ${validationMessage(validation.errors.find((e) => e.severity === 'block_save') || validation.errors[0])}`
               }
               arrow
               placement="top"

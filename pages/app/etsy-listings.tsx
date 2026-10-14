@@ -77,6 +77,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useTranslations } from 'next-intl';
 
 import SEOIndicator from '@/components/etsy/SEOIndicator';
+import { checkTags, checkTitle, TAG_MAX_COUNT, TITLE_MIN, TITLE_MAX } from '@/lib/etsy/seoRules';
 import ListingEditorDrawer from '@/components/etsy/ListingEditorDrawer';
 import ListingCreatorDialog from '@/components/etsy/ListingCreatorDialog';
 import FindReplaceDialog from '@/components/etsy/FindReplaceDialog';
@@ -239,8 +240,16 @@ function gradeColor(grade: string): string {
 
 function calculateHealth(listing: EtsyListingRow): HealthBreakdown {
   // Tags: 0-13 → 0-25 (proportional)
+  // Only tags that follow the rules count: ≤20 chars, no title-word overlap, no near-duplicates.
   const tagCount = listing.tags?.length || 0;
-  const tagsScore = Math.round(Math.min(tagCount / 13, 1) * 25);
+  const tagCheck = checkTags(listing.tags || [], listing.title || '');
+  const badTags = new Set<string>([
+    ...tagCheck.tooLong,
+    ...tagCheck.overlapping.map((o) => o.tag),
+    ...tagCheck.duplicates.map(([, b]) => b),
+  ]);
+  const validTagCount = Math.max(0, Math.min(tagCount, TAG_MAX_COUNT) - badTags.size);
+  const tagsScore = Math.round(Math.min(validTagCount / TAG_MAX_COUNT, 1) * 25);
   const tagsColor = tagsScore >= 20 ? '#4caf50' : tagsScore >= 12 ? '#ff9800' : '#f44336';
   const tagsLabel = `${tagCount}/13`;
 
@@ -252,7 +261,13 @@ function calculateHealth(listing: EtsyListingRow): HealthBreakdown {
 
   // Title: 0-140 → 0-25 (proportional, target 140 chars)
   const titleLen = listing.title?.length || 0;
-  const titleScore = Math.round(Math.min(titleLen / 140, 1) * 25);
+  const titleCheck = checkTitle(listing.title || '');
+  let titleScore = titleLen >= TITLE_MIN && titleLen <= TITLE_MAX ? 25
+    : titleLen > TITLE_MAX ? 10
+    : Math.round(Math.min(titleLen / TITLE_MIN, 1) * 20);
+  if (titleCheck.issues.some((i) => i === 'repeated_words' || i === 'keyword_stacking' || i === 'disallowed_separator' || i === 'all_caps')) {
+    titleScore = Math.max(0, titleScore - 8);
+  }
   const titleColor = titleScore >= 20 ? '#4caf50' : titleScore >= 12 ? '#ff9800' : '#f44336';
   const titleLabel = `${titleLen}`;
 
@@ -843,6 +858,7 @@ function EtsyListingsPage() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const t = useTranslations('etsyListings');
+  const tEtsy = useTranslations('etsy');
 
   // --- State ---
   const [listings, setListings] = useState<EtsyListingRow[]>([]);
@@ -1575,6 +1591,20 @@ function EtsyListingsPage() {
     }
   };
 
+  // --- Shop currency: Etsy prices every listing in the shop's currency, so the
+  // most common currency among this shop's listings is the shop currency.
+  const shopCurrency = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const l of listings) {
+      const c = l.price?.currency_code;
+      if (c) counts.set(c, (counts.get(c) || 0) + 1);
+    }
+    let best: string | null = null;
+    let bestN = 0;
+    counts.forEach((n, c) => { if (n > bestN) { best = c; bestN = n; } });
+    return best;
+  }, [listings]);
+
   // --- Selected listing objects for bulk operations ---
   const selectedListings = useMemo(() => {
     const idSet = 'ids' in selectedIds ? selectedIds.ids : new Set<GridRowId>();
@@ -1619,35 +1649,78 @@ function EtsyListingsPage() {
     [selectedListings, pendingDraftsByListing]
   );
 
-  const handleSyncSelectedDrafts = useCallback(async () => {
-    if (selectedDraftIds.length === 0 || bulkSyncingDrafts) return;
+  // Drafts blocked because the listing changed on Etsy since they were staged.
+  const [syncConflicts, setSyncConflicts] = useState<Array<{ draftId: string; title: string }> | null>(null);
 
-    const confirmed = window.confirm(
-      `Sync ${selectedDraftIds.length} selected draft${selectedDraftIds.length === 1 ? '' : 's'} to Etsy? This will write the saved draft changes to Etsy.`
-    );
-    if (!confirmed) return;
+  const draftTitleById = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const [listingId, draft] of Object.entries(pendingDraftsByListing)) {
+      if (draft?.id) map[draft.id] = listings.find((l) => String(l.listing_id) === listingId)?.title || `#${listingId}`;
+    }
+    return map;
+  }, [pendingDraftsByListing, listings]);
 
+  /** Translate a server warning/error carrying {key, params}; fall back to its message. */
+  const translateDraftIssue = useCallback((issue: any): string => {
+    if (issue?.key && tEtsy.has(issue.key)) return tEtsy(issue.key, issue.params || {});
+    return typeof issue?.message === 'string' ? issue.message : (typeof issue?.error === 'string' ? issue.error : '');
+  }, [tEtsy]);
+
+  const runBulkDraftSync = useCallback(async (draftIds: string[], force: boolean) => {
     setBulkSyncingDrafts(true);
-    const toastId = toast.loading(`Syncing ${selectedDraftIds.length} draft${selectedDraftIds.length === 1 ? '' : 's'} to Etsy...`);
+    const toastId = toast.loading(t('draftSync.syncing', { count: draftIds.length }));
     try {
-      const result = await syncEtsyDrafts(selectedDraftIds);
+      const result = await syncEtsyDrafts(draftIds, { force });
       const success = result.success ?? 0;
       const failed = result.failed ?? 0;
       const conflicts = result.conflicts ?? 0;
 
       if (failed > 0 || conflicts > 0) {
-        toast.error(`Synced ${success}. ${failed} failed, ${conflicts} blocked by conflict.`, { id: toastId });
+        toast.error(t('draftSync.summaryWithProblems', { success, failed, conflicts }), { id: toastId });
       } else {
-        toast.success(`Synced ${success} draft${success === 1 ? '' : 's'} to Etsy.`, { id: toastId });
+        toast.success(t('draftSync.summarySuccess', { count: success }), { id: toastId });
+      }
+
+      // Failures: name the listing and the (translated) reason.
+      const failedDrafts: any[] = Array.isArray(result.failedDrafts) ? result.failedDrafts : [];
+      const failedResults: any[] = Array.isArray(result.results) ? result.results.filter((r: any) => r?.status === 'failed') : [];
+      failedDrafts.slice(0, 3).forEach((f) => {
+        const full = failedResults.find((r) => r.draftId === f.draftId) || f;
+        toast.error(`${draftTitleById[f.draftId] || f.draftId}: ${translateDraftIssue(full) || t('draftSync.failedGeneric')}`, { duration: 8000 });
+      });
+
+      // Partial success: synced, but some parts were skipped (e.g. a category detail).
+      const partialDrafts: any[] = Array.isArray(result.partialDrafts) ? result.partialDrafts : [];
+      partialDrafts.slice(0, 3).forEach((pd) => {
+        const details = (Array.isArray(pd.warnings) ? pd.warnings : []).map(translateDraftIssue).filter(Boolean).join(' • ');
+        toast(t('draftSync.partialWarning', { title: draftTitleById[pd.draftId] || pd.draftId, details }), { icon: '⚠️', duration: 10000 });
+      });
+
+      // Conflicts: let the user decide whether to overwrite Etsy's newer version.
+      const conflictDrafts: any[] = Array.isArray(result.conflictDrafts) ? result.conflictDrafts : [];
+      if (!force && conflictDrafts.length > 0) {
+        setSyncConflicts(conflictDrafts.map((c) => ({ draftId: c.draftId, title: draftTitleById[c.draftId] || c.draftId })));
       }
 
       await Promise.all([fetchPendingDrafts(), fetchListings()]);
     } catch (err: any) {
-      toast.error(err.message || 'Could not sync selected drafts to Etsy', { id: toastId });
+      toast.error(translateDraftIssue(err) || t('draftSync.failedGeneric'), { id: toastId });
     } finally {
       setBulkSyncingDrafts(false);
     }
-  }, [selectedDraftIds, bulkSyncingDrafts, fetchPendingDrafts, fetchListings]);
+  }, [t, draftTitleById, translateDraftIssue, fetchPendingDrafts, fetchListings]);
+
+  const handleSyncSelectedDrafts = useCallback(async () => {
+    if (selectedDraftIds.length === 0 || bulkSyncingDrafts) return;
+    if (!window.confirm(t('draftSync.confirm', { count: selectedDraftIds.length }))) return;
+    await runBulkDraftSync(selectedDraftIds, false);
+  }, [selectedDraftIds, bulkSyncingDrafts, runBulkDraftSync, t]);
+
+  const handleForceSyncConflicts = useCallback(async () => {
+    const ids = (syncConflicts || []).map((c) => c.draftId);
+    setSyncConflicts(null);
+    if (ids.length > 0) await runBulkDraftSync(ids, true);
+  }, [syncConflicts, runBulkDraftSync]);
 
   // --- DataGrid Columns (Vela-style: image, title+hover actions, stock, price, expires, section, score) ---
   const columns: GridColDef[] = useMemo(
@@ -2423,7 +2496,9 @@ function EtsyListingsPage() {
             )}
           </Box>
 
-          {/* Column Preset Toggle + DataGrid (desktop only) */}
+          {/* Column Preset Toggle + DataGrid (desktop only — not mounted on mobile,
+              where the expandable MobileEtsyListingCard list above is used) */}
+          {!isMobile && (
           <Paper sx={{ width: '100%', display: { xs: 'none', md: 'block' } }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', px: 1.5, pt: 0.5, gap: 0.5 }}>
               <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>{t('viewPreset')}</Typography>
@@ -2514,8 +2589,31 @@ function EtsyListingsPage() {
               }}
             />
           </Paper>
+          )}
         </Box>
       </Box>
+
+      {/* Bulk sync conflicts: listing changed on Etsy after the draft was staged */}
+      <Dialog open={!!syncConflicts} onClose={() => setSyncConflicts(null)} maxWidth="sm" fullWidth fullScreen={isMobile}>
+        <DialogTitle>{t('draftSync.conflictDialogTitle', { count: syncConflicts?.length || 0 })}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 1.5 }}>{t('draftSync.conflictDialogBody')}</Typography>
+          <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
+            {(syncConflicts || []).slice(0, 20).map((c) => (
+              <li key={c.draftId}><Typography variant="body2" sx={{ wordBreak: 'break-word' }}>{c.title}</Typography></li>
+            ))}
+          </Box>
+          <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 1.5 }}>
+            {t('draftSync.conflictDialogWarning')}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSyncConflicts(null)}>{t('cancel')}</Button>
+          <Button variant="contained" color="warning" onClick={handleForceSyncConflicts} disabled={bulkSyncingDrafts}>
+            {t('draftSync.applyAnyway')}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Delete confirmation dialog */}
       {deleteConfirmId !== null && (
@@ -2643,10 +2741,11 @@ function EtsyListingsPage() {
         shippingProfiles={shippingProfiles}
         returnPolicies={returnPolicies}
         marketResearchData={null}
+        currencyCode={shopCurrency}
         onCreated={(listingId) => {
           setCreateDialogOpen(false);
           if (listingId < 0) {
-            toast.success('Listing draft saved locally. Use Sync to Etsy from the draft to create it.');
+            // ListingCreatorDialog already confirmed the local draft save.
             fetchPendingDrafts();
             return;
           }

@@ -4,6 +4,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import { useTranslations } from 'next-intl';
+import { checkTitle, checkTags, computeSeoScore, TAG_MAX_LEN, TITLE_MIN, TITLE_MAX } from '@/lib/etsy/seoRules';
 
 interface TrackedKeyword {
   keyword: string;
@@ -62,51 +63,37 @@ export default function SEOIndicator({
   const titleWords = title?.trim().split(/\s+/).filter(Boolean) || [];
   const titleWordCount = titleWords.length;
 
-  // --- Score calculation (enhanced) ---
-  const tagScore = Math.min(tagCount / 13, 1) * 25;
-  const titleLenScore = titleLength >= 100 && titleLength <= 140 ? 20 : titleLength >= 80 ? 15 : titleLength >= 40 ? 10 : titleLength > 0 ? 3 : 0;
-  const titleWordScore = titleWordCount >= 8 && titleWordCount <= 14 ? 10 : titleWordCount >= 5 ? 7 : titleWordCount > 0 ? 3 : 0;
-  const descScore = descLength >= 300 ? 15 : descLength >= 100 ? 10 : descLength > 0 ? 5 : 0;
+  // --- Rule checks (shared with the server via lib/etsy/seoRules) ---
+  const titleCheck = useMemo(() => checkTitle(title || ''), [title]);
+  const tagsCheck = useMemo(() => checkTags(tags || [], title || ''), [tags, title]);
 
-  // Tag-title overlap score
-  const titleWordsLower = useMemo(() => new Set(title?.toLowerCase().split(/[\s,|·•—–\-/]+/).filter(w => w.length > 2)), [title]);
-  const tagsWithOverlap = useMemo(() => {
-    return (tags || []).map(tag => {
-      const tagWords = tag.toLowerCase().split(/\s+/);
-      const overlapping = tagWords.some(w => w.length > 2 && titleWordsLower.has(w));
-      return { tag, overlapping };
-    });
-  }, [tags, titleWordsLower]);
-  const overlapCount = tagsWithOverlap.filter(t => t.overlapping).length;
-  const overlapScore = tagCount > 0 ? Math.min(overlapCount / Math.min(tagCount, 5), 1) * 10 : 0;
-
-  // Duplicate/similar tags
-  const duplicateTags = useMemo(() => {
-    const seen = new Map<string, string>();
-    const dupes: Array<[string, string]> = [];
-    for (const tag of tags || []) {
-      const normalized = tag.toLowerCase().replace(/\s+/g, ' ').trim();
-      const sorted = normalized.split(' ').sort().join(' ');
-      if (seen.has(sorted)) {
-        dupes.push([seen.get(sorted)!, tag]);
-      } else {
-        seen.set(sorted, tag);
-      }
-    }
-    return dupes;
-  }, [tags]);
-  const noDupeScore = duplicateTags.length === 0 ? 5 : 0;
+  // Tag-title overlap is PENALIZED: Etsy indexes title + tags together, so a
+  // tag repeating a title word wastes a slot.
+  const overlapMap = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const o of tagsCheck.overlapping) m.set(o.tag, o.words);
+    return m;
+  }, [tagsCheck]);
+  const tagsWithOverlap = useMemo(() => (tags || []).map(tag => {
+    const words = overlapMap.get(tag) || [];
+    return { tag, words, overlapping: words.length > 0, tooLong: tag.length > TAG_MAX_LEN };
+  }), [tags, overlapMap]);
+  const overlapCount = tagsCheck.overlapping.length;
+  const duplicateTags = tagsCheck.duplicates;
 
   // Missing attributes
   const hasMaterials = (materials?.length || 0) > 0;
   const hasCategory = !!taxonomyId;
   const hasWeight = !!weight;
-  const attrCount = [hasMaterials, hasCategory, hasWeight].filter(Boolean).length;
-  const attrScore = attrCount >= 3 ? 15 : attrCount >= 2 ? 10 : attrCount >= 1 ? 5 : 0;
 
-  const totalScore = Math.round(Math.min(tagScore + titleLenScore + titleWordScore + descScore + overlapScore + noDupeScore + attrScore, 100));
+  const totalScore = computeSeoScore({
+    title: title || '', tags: tags || [], description: description || '',
+    hasCategory, hasMaterials,
+  });
   const color = totalScore >= 80 ? '#22c55e' : totalScore >= 50 ? '#eab308' : '#ef4444';
   const label = totalScore >= 80 ? t('good') : totalScore >= 50 ? t('medium') : t('weak');
+  const titleIssues = titleCheck.issues.filter(i => i !== 'too_short' && i !== 'too_long' && i !== 'empty');
+  const overlapStatus: 'good' | 'warning' | 'bad' = overlapCount === 0 ? 'good' : overlapCount <= 2 ? 'warning' : 'bad';
 
   // --- Keyword density ---
   const keywordDensity = useMemo(() => {
@@ -168,10 +155,18 @@ export default function SEOIndicator({
             value={`${tagCount}/13`}
           />
           <CheckRow
-            status={titleLength >= 100 && titleLength <= 140 ? 'good' : titleLength >= 80 ? 'warning' : 'bad'}
+            status={titleLength >= TITLE_MIN && titleLength <= TITLE_MAX ? 'good' : titleLength >= 80 && titleLength <= TITLE_MAX ? 'warning' : 'bad'}
             label={t('titleLength')}
-            value={`${titleLength}/140`}
+            value={`${titleLength}/${TITLE_MAX}`}
           />
+          {titleIssues.map(issue => (
+            <CheckRow
+              key={issue}
+              status={issue === 'not_title_case' ? 'warning' : 'bad'}
+              label={t(`titleIssue.${issue}`)}
+              value={issue === 'repeated_words' ? titleCheck.repeatedWords.slice(0, 3).join(', ') : '✗'}
+            />
+          ))}
           <CheckRow
             status={titleWordCount >= 8 && titleWordCount <= 14 ? 'good' : titleWordCount >= 5 ? 'warning' : 'bad'}
             label={t('titleWordCount')}
@@ -190,7 +185,7 @@ export default function SEOIndicator({
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
           <Typography variant="body2" fontWeight={700}>{t('tagTitleOverlap')}</Typography>
           <Typography variant="caption" sx={{
-            color: overlapCount >= 3 ? '#22c55e' : overlapCount >= 1 ? '#eab308' : '#ef4444',
+            color: overlapStatus === 'good' ? '#22c55e' : overlapStatus === 'warning' ? '#eab308' : '#ef4444',
             fontWeight: 600,
           }}>
             {overlapCount}/{tagCount} {t('tagsInTitle')}
@@ -201,19 +196,29 @@ export default function SEOIndicator({
         </Typography>
         {tagCount > 0 && (
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-            {tagsWithOverlap.map(({ tag, overlapping }) => (
-              <Chip
-                key={tag}
-                label={tag}
-                size="small"
-                sx={{
-                  fontSize: '0.75rem', height: 24,
-                  bgcolor: overlapping ? '#dcfce7' : '#fef3c7',
-                  color: overlapping ? '#166534' : '#92400e',
-                  border: overlapping ? '1px solid #86efac' : '1px solid #fde68a',
-                }}
-              />
-            ))}
+            {tagsWithOverlap.map(({ tag, words, overlapping, tooLong }) => {
+              const bad = tooLong;
+              const warn = overlapping;
+              const chip = (
+                <Chip
+                  key={tag}
+                  label={tag}
+                  size="small"
+                  sx={{
+                    fontSize: '0.75rem', height: 24,
+                    bgcolor: bad ? '#fee2e2' : warn ? '#fef3c7' : '#dcfce7',
+                    color: bad ? '#991b1b' : warn ? '#92400e' : '#166534',
+                    border: bad ? '1px solid #fca5a5' : warn ? '1px solid #fde68a' : '1px solid #86efac',
+                  }}
+                />
+              );
+              if (!bad && !warn) return chip;
+              return (
+                <Tooltip key={tag} title={bad ? t('tagTooLong', { max: TAG_MAX_LEN }) : t('tagOverlapWords', { words: words.join(', ') })}>
+                  {chip}
+                </Tooltip>
+              );
+            })}
           </Box>
         )}
       </Box>

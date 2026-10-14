@@ -28,6 +28,7 @@ import {
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { stageEtsyDraft, stageEtsyDraftFile } from '@/lib/etsy/draftClient';
+import { ETSY_MAX_IMAGES } from '@/lib/etsy/seoRules';
 
 // ---------------------------------------------------------------------------
 // Types (kept loose to avoid tight coupling with BulkEditor internals)
@@ -73,7 +74,8 @@ type MediaSource = 'upload' | 'ai' | 'url';
 type PositionTarget = number | 'end';
 type FilterMode = 'all' | 'nophotos' | 'lt5' | 'full' | 'missingalt';
 
-const MAX_IMAGES = 10;
+// Etsy raised the per-listing photo limit from 10 to 20 in 2025.
+const MAX_IMAGES = ETSY_MAX_IMAGES;
 const AI_CONCURRENCY = 3;
 const AI_BATCH_CAP = 60; // guard against enormous accidental AI runs
 
@@ -662,7 +664,11 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
   // -------------------------------------------------------------------------
   // AI generation (Add / Replace with unique per-listing images)
   // -------------------------------------------------------------------------
-  const generateOne = useCallback(async (listing: StudioListing, extraPrompt = ''): Promise<{ base64: string | null; mimeType: string; refUrl?: string }> => {
+  const generateOne = useCallback(async (
+    listing: StudioListing,
+    extraPrompt = '',
+    previous?: { base64: string; mimeType: string } | null,
+  ): Promise<{ base64: string | null; mimeType: string; refUrl?: string }> => {
     const imgs = imagesFor(listing.listing_id);
     const pos = typeof position === 'number' ? position : 1;
     let refUrl: string | undefined;
@@ -680,12 +686,27 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
       basePrompt = aiPrompt.trim() || t('photoStudio.defaultAiPrompt');
     }
     const prompt = extraPrompt ? `${basePrompt}. ${extraPrompt.trim()}` : basePrompt;
+    // References (max 3): the previous AI result when refining a follow-up,
+    // then the target/hero photo, then other synced photos of the listing.
+    const referenceImages = previous && extraPrompt.trim() ? [{ data: previous.base64, mime_type: previous.mimeType }] : [];
+    const referenceUrls: string[] = refUrl ? [refUrl] : [];
+    for (const im of imgs) {
+      if (referenceImages.length + referenceUrls.length >= 3) break;
+      if (im.is_pending_upload || im.listing_image_id <= 0) continue;
+      const u = im.url_fullxfull || im.url_570xN;
+      if (u && !referenceUrls.includes(u)) referenceUrls.push(u);
+    }
     try {
       const res = await fetch('/api/ai/generate-image', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: `${prompt}. Product context: ${listing.title}`,
-          ...(refUrl ? { reference_image_url: refUrl } : {}),
+          marketplace: 'etsy',
+          aspect_ratio: '4:3',
+          // Plain white only for background removal; other ops keep/craft a scene.
+          white_background: op === 'removebg',
+          reference_images: referenceImages,
+          reference_image_urls: referenceUrls.slice(0, Math.max(0, 3 - referenceImages.length)),
         }),
       });
       const data = await res.json();
@@ -735,9 +756,10 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
     const listing = checkedListings.find(l => l.listing_id === listingId);
     if (!preview || !listing) return;
     setPreviews(prev => (prev || []).map(p => p.listingId === listingId ? { ...p, regenerating: true } : p));
-    const r = await generateOne(listing, preview.followUp);
+    // A follow-up refines the previous result; an empty follow-up re-rolls.
+    const r = await generateOne(listing, preview.followUp, preview.base64 ? { base64: preview.base64, mimeType: preview.mimeType } : null);
     setPreviews(prev => (prev || []).map(p => p.listingId === listingId
-      ? { ...p, base64: r.base64 ?? p.base64, mimeType: r.mimeType, status: r.base64 ? 'done' : 'error', regenerating: false, accepted: r.base64 ? true : p.accepted }
+      ? { ...p, base64: r.base64 ?? p.base64, mimeType: r.base64 ? r.mimeType : p.mimeType, status: r.base64 ? 'done' : 'error', regenerating: false, accepted: r.base64 ? true : p.accepted, followUp: r.base64 ? '' : p.followUp }
       : p));
   }, [previews, checkedListings, generateOne]);
 

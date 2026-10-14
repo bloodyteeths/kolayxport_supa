@@ -2,7 +2,10 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';
 import { getAuthUser } from '../../../lib/auth';
-import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
+import { hasValidInternalApiKeyHeader } from '../../../lib/security/internalApiKey';
+import { getEtsyAccessToken as getSharedEtsyAccessToken } from '@/lib/etsy/etsyToken';
+import { checkTitle, checkTags, computeSeoScore } from '@/lib/etsy/seoRules';
+import { getListingStats } from '@/lib/etsy/listingStats';
 
 // Raise body size limit for image uploads (base64 encoding inflates by ~33%,
 // so a 10MB Etsy image arrives as ~14MB JSON body)
@@ -75,120 +78,10 @@ function parseFullName(fullName: string): { firstName: string; lastName: string 
     return { firstName, lastName };
 }
 
-// Refresh the Etsy access token. `refreshToken` MUST be plaintext — callers
-// are expected to decrypt it before invoking this. Rotated tokens are written
-// back to the same row (EtsyShop or legacy Credential) in encrypted form.
-async function refreshEtsyToken(shopId: string, refreshToken: string): Promise<string> {
-    const response = await fetch('https://api.etsy.com/v3/public/oauth/token', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-            grant_type: 'refresh_token',
-            refresh_token: refreshToken,
-            client_id: process.env.ETSY_API_KEY || '',
-        }),
-    });
-
-    if (!response.ok) {
-        throw new Error(`Failed to refresh Etsy token: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    const newExpiresAt = new Date(Date.now() + data.expires_in * 1000);
-    const newAccessToken = data.access_token as string;
-    const newRefreshToken = (data.refresh_token as string) || refreshToken;
-
-    const encAccess = encryptIfNeeded(newAccessToken) as string;
-    const encRefresh = encryptIfNeeded(newRefreshToken) as string;
-
-    // Try updating EtsyShop table first
-    const etsyShopUpdate = await prisma.etsyShop.updateMany({
-        where: { shopId },
-        data: {
-            accessToken: encAccess,
-            refreshToken: encRefresh,
-            tokenExpiresAt: newExpiresAt,
-        },
-    });
-
-    // If no rows updated in EtsyShop, update legacy Credential table instead
-    if (etsyShopUpdate.count === 0) {
-        await prisma.credential.updateMany({
-            where: { etsyShopId: shopId },
-            data: {
-                etsyAccessToken: encAccess,
-                etsyRefreshToken: encRefresh,
-                etsyTokenExpiresAt: newExpiresAt,
-            },
-        });
-    }
-
-    return newAccessToken;
-}
-
-async function getEtsyAccessToken(shopId: string): Promise<string> {
-    // Try EtsyShop table first
-    const etsyShop = await prisma.etsyShop.findFirst({
-        where: {
-            shopId,
-            isActive: true,
-        },
-        select: {
-            accessToken: true,
-            refreshToken: true,
-            tokenExpiresAt: true,
-        },
-    });
-
-    if (etsyShop) {
-        // Tokens are stored as `enc:v1:` envelopes — decrypt before use.
-        // Sending the encrypted blob as a Bearer token returns
-        // 403 "not a Bearer token or token format is incorrect".
-        const plainRefresh = decryptIfNeeded(etsyShop.refreshToken) as string | null;
-        const now = new Date();
-        const expiresAt = etsyShop.tokenExpiresAt;
-
-        if (!expiresAt || expiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
-            if (!plainRefresh) {
-                throw new Error('No refresh token available');
-            }
-            return await refreshEtsyToken(shopId, plainRefresh);
-        }
-
-        const plainAccess = decryptIfNeeded(etsyShop.accessToken) as string;
-        if (!plainAccess) {
-            throw new Error('Etsy access token could not be decrypted');
-        }
-        return plainAccess;
-    }
-
-    // Fallback: check legacy Credential table
-    const credential = await prisma.credential.findFirst({
-        where: { etsyShopId: shopId },
-        select: { etsyAccessToken: true, etsyRefreshToken: true, etsyTokenExpiresAt: true },
-    });
-
-    if (!credential?.etsyAccessToken) {
-        throw new Error('Etsy shop not found or not connected');
-    }
-
-    const plainRefresh = decryptIfNeeded(credential.etsyRefreshToken) as string | null;
-    const now = new Date();
-    const expiresAt = credential.etsyTokenExpiresAt;
-    if (!expiresAt || expiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
-        if (!plainRefresh) {
-            throw new Error('No refresh token available');
-        }
-        return await refreshEtsyToken(shopId, plainRefresh);
-    }
-
-    const plainAccess = decryptIfNeeded(credential.etsyAccessToken) as string;
-    if (!plainAccess) {
-        throw new Error('Etsy access token could not be decrypted');
-    }
-    return plainAccess;
+// Token refresh is shared and serialized per shop with a Postgres advisory
+// lock (Etsy refresh tokens are single-use) — see lib/etsy/etsyToken.ts.
+async function getEtsyAccessToken(shopId: string, userId: string): Promise<string> {
+    return getSharedEtsyAccessToken(shopId, userId);
 }
 
 function validatePersonalizationQuestions(questions: PersonalizationQuestion[]): string | null {
@@ -945,19 +838,25 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
         const now = Math.floor(Date.now() / 1000);
         const ageMonths = Math.max(1, (now - (data.created_timestamp || now)) / (30 * 24 * 3600));
 
-        // SEO score components
-        const titleLen = (data.title || '').length;
-        const tagCount = (data.tags || []).length;
+        // SEO score — the same title/tag rules the editor and AI enforce. The
+        // public /listings/{id} call has no images (includes=images needs
+        // OAuth), so count them via the public images endpoint.
+        const imageCount = await callEtsyPublicAPI(`/listings/${listingId}/images`)
+            .then((r: any) => (Array.isArray(r?.results) ? r.results.length : r?.count || 0))
+            .catch(() => 0);
+        const titleCheck = checkTitle(data.title || '');
+        const tagCheck = checkTags(data.tags || [], data.title || '');
+        const titleScore = titleCheck.issues.length === 0 ? 25 : Math.max(5, 25 - titleCheck.issues.length * 5);
+        const tagScore = Math.max(5, Math.round(Math.min((data.tags || []).length - tagCheck.tooLong.length, 13) / 13 * 25) - tagCheck.overlapping.length * 2 - tagCheck.duplicates.length * 2);
         const descLen = (data.description || '').length;
-        const titleScore = titleLen >= 100 && titleLen <= 140 ? 25 : titleLen >= 70 ? 20 : titleLen >= 40 ? 12 : 5;
-        const tagScore = tagCount >= 13 ? 25 : tagCount >= 10 ? 20 : tagCount >= 5 ? 12 : 5;
         const descScore = descLen >= 500 ? 25 : descLen >= 200 ? 18 : descLen >= 50 ? 10 : 3;
-        const imageScore = data.images?.length >= 8 ? 25 : data.images?.length >= 5 ? 18 : data.images?.length >= 2 ? 10 : 3;
-        const seoScore = Math.min(100, titleScore + tagScore + descScore + imageScore);
+        const imageScore = imageCount >= 8 ? 25 : imageCount >= 5 ? 18 : imageCount >= 2 ? 10 : imageCount >= 1 ? 5 : 0;
+        const seoScore = computeSeoScore({ title: data.title || '', tags: data.tags || [], description: data.description || '', imageCount, hasCategory: !!data.taxonomy_id, hasMaterials: (data.materials || []).length > 0 });
 
-        // Velocity
+        // Velocity — measured from shop sold-count snapshots when available,
+        // otherwise a labelled estimate (never the old favorites × 0.03 guess).
         const favRate = (data.num_favorers || 0) / ageMonths;
-        const estMonthlySales = favRate * 0.03;
+        const stats = await getListingStats(String(listingId), null).catch(() => null);
 
         return res.status(200).json({
             listing_id: data.listing_id,
@@ -972,7 +871,7 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
             taxonomy_id: data.taxonomy_id,
             url: data.url || '',
             created_timestamp: data.created_timestamp,
-            imageCount: data.images?.length || 0,
+            imageCount,
             ageMonths: Math.round(ageMonths),
             seoScore: {
                 total: seoScore,
@@ -984,7 +883,9 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
             },
             velocity: {
                 favRate: Math.round(favRate * 10) / 10,
-                estMonthlySales: Math.round(estMonthlySales * 10) / 10,
+                estMonthlySales: stats?.sales.monthlySales ?? null,
+                salesKind: stats?.sales.kind ?? 'insufficient',
+                monthlySalesUpperBound: stats?.sales.monthlySalesUpperBound ?? null,
             },
         });
     }
@@ -1095,14 +996,15 @@ export default async function handler(
     req: NextApiRequest,
     res: NextApiResponse
 ) {
-    // 1. Authenticate — accept API key OR session auth
-    const apiKey = req.headers['x-api-key'];
-    const envApiKey = process.env.CLAWD_API_KEY;
+    // 1. Authenticate — accept internal API key OR session/Bearer auth
     let authenticated = false;
+    let viaApiKey = false;
+    let sessionUserId: string | null = null;
 
-    // Try API key auth first
-    if (envApiKey && apiKey === envApiKey) {
+    // Try API key auth first (constant-time compare)
+    if (hasValidInternalApiKeyHeader(req)) {
         authenticated = true;
+        viaApiKey = true;
     }
 
     // Fall back to session auth
@@ -1110,6 +1012,7 @@ export default async function handler(
         const user = await getAuthUser(req, res);
         if (user) {
             authenticated = true;
+            sessionUserId = user.id;
         }
     }
 
@@ -1138,9 +1041,45 @@ export default async function handler(
         return res.status(400).json({ error: 'shop_id is required' });
     }
 
+    // Resolve the acting user. Session/Bearer callers always act as themselves.
+    // The internal API key is NOT a free pass to any shop: it must name the user
+    // it acts for explicitly (user_id query param or X-User-Id header).
+    let actingUserId: string | null = sessionUserId;
+    if (viaApiKey) {
+        const headerUserId = req.headers['x-user-id'];
+        const explicit =
+            (typeof req.query.user_id === 'string' && req.query.user_id.trim()) ||
+            (typeof headerUserId === 'string' && headerUserId.trim()) ||
+            '';
+        if (!explicit) {
+            return res.status(400).json({ error: 'user_id is required when authenticating with an API key' });
+        }
+        actingUserId = explicit;
+    }
+    if (!actingUserId) {
+        return res.status(401).json({ error: 'Unauthorized: Invalid or missing authentication' });
+    }
+    const userId: string = actingUserId;
+
+    // Shop ownership: every shop-scoped action requires the shop to belong to the acting user.
+    const ownedShop = await prisma.etsyShop.findFirst({
+        where: { shopId, userId, isActive: true },
+        select: { id: true },
+    });
+    if (!ownedShop) {
+        // Legacy single-shop users may only have the shop on their Credential row.
+        const legacyCred = await prisma.credential.findFirst({
+            where: { etsyShopId: shopId, userId },
+            select: { id: true },
+        });
+        if (!legacyCred) {
+            return res.status(403).json({ error: 'Forbidden: shop does not belong to this user' });
+        }
+    }
+
     try {
-        // Get and refresh Etsy access token if needed
-        const accessToken = await getEtsyAccessToken(shopId);
+        // Get and refresh Etsy access token if needed (scoped to the acting user)
+        const accessToken = await getEtsyAccessToken(shopId, userId);
 
         // Route the request based on path
         const { action, receipt_id, customer } = req.query;
@@ -1375,7 +1314,7 @@ export default async function handler(
             let personalization_questions: any[] = [];
             let images: any[] = [];
 
-            const [personalizationResult, imagesResult] = await Promise.allSettled([
+            const [personalizationResult, imagesResult, inventoryResult] = await Promise.allSettled([
                 callEtsyAPI(
                     `/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
                     accessToken
@@ -1384,7 +1323,19 @@ export default async function handler(
                     `/listings/${listing_id}/images`,
                     accessToken
                 ),
+                // Processing profile (readiness_state_id) lives on inventory
+                // offerings; getListing only returns it for active listings.
+                listing.readiness_state_id
+                    ? Promise.resolve(null)
+                    : callEtsyAPI(`/listings/${listing_id}/inventory`, accessToken),
             ]);
+            let readiness_state_id: number | null = listing.readiness_state_id || null;
+            if (!readiness_state_id && inventoryResult.status === 'fulfilled' && inventoryResult.value) {
+                for (const product of inventoryResult.value.products || []) {
+                    const offering = (product.offerings || []).find((o: any) => o?.readiness_state_id);
+                    if (offering) { readiness_state_id = offering.readiness_state_id; break; }
+                }
+            }
 
             if (personalizationResult.status === 'fulfilled') {
                 personalization_questions = personalizationResult.value.personalization_questions || [];
@@ -1421,6 +1372,7 @@ export default async function handler(
                 shop_section_id: listing.shop_section_id,
                 processing_min: listing.processing_min,
                 processing_max: listing.processing_max,
+                readiness_state_id,
                 who_made: listing.who_made,
                 when_made: listing.when_made,
                 is_supply: listing.is_supply,
@@ -2320,16 +2272,21 @@ export default async function handler(
         // GET /api/clawd/etsy?action=get_readiness_states - Get processing/readiness state definitions
         if (req.method === 'GET' && action === 'get_readiness_states') {
             const data = await callEtsyAPI(
-                `/shops/${shopId}/readiness-state-definitions`,
+                `/shops/${shopId}/readiness-state-definitions?limit=100`,
                 accessToken
             );
 
+            // Etsy returns ShopProcessingProfile: min/max_processing_days +
+            // processing_days_display_label (older payloads used *_time).
             const states = (data.results || []).map((state: any) => ({
                 readiness_state_id: state.readiness_state_id,
                 readiness_state: state.readiness_state,
-                min_processing_time: state.min_processing_time,
-                max_processing_time: state.max_processing_time,
-                processing_time_unit: state.processing_time_unit,
+                min_processing_days: state.min_processing_days ?? state.min_processing_time ?? null,
+                max_processing_days: state.max_processing_days ?? state.max_processing_time ?? null,
+                processing_days_display_label: state.processing_days_display_label || null,
+                min_processing_time: state.min_processing_time ?? state.min_processing_days ?? null,
+                max_processing_time: state.max_processing_time ?? state.max_processing_days ?? null,
+                processing_time_unit: state.processing_time_unit || 'days',
             }));
 
             return res.status(200).json({
@@ -2385,9 +2342,12 @@ export default async function handler(
                 success: true,
                 readiness_state_id: result.readiness_state_id,
                 readiness_state: result.readiness_state,
-                min_processing_time: result.min_processing_time,
-                max_processing_time: result.max_processing_time,
-                processing_time_unit: result.processing_time_unit,
+                min_processing_time: result.min_processing_time ?? result.min_processing_days ?? min_processing_time,
+                max_processing_time: result.max_processing_time ?? result.max_processing_days ?? max_processing_time,
+                min_processing_days: result.min_processing_days ?? null,
+                max_processing_days: result.max_processing_days ?? null,
+                processing_days_display_label: result.processing_days_display_label || null,
+                processing_time_unit: result.processing_time_unit || processing_time_unit,
                 message: 'Processing profile created. Use this readiness_state_id when creating listings.',
             });
         }
@@ -3331,10 +3291,7 @@ export default async function handler(
                 return res.status(400).json({ error: 'keyword and listing_id are required' });
             }
 
-            // Get userId from shop
-            const shop = await prisma.etsyShop.findFirst({ where: { shopId, isActive: true }, select: { userId: true } });
-            if (!shop) return res.status(404).json({ error: 'Shop not found' });
-            const userId = shop.userId;
+            // userId = authenticated acting user; shop ownership was verified up-front.
 
             // Upsert the tracked keyword
             const tracked = await prisma.rankTrackedKeyword.upsert({
@@ -3406,9 +3363,7 @@ export default async function handler(
                 return res.status(400).json({ error: 'listing_id and tags[] are required' });
             }
 
-            const shop = await prisma.etsyShop.findFirst({ where: { shopId, isActive: true }, select: { userId: true } });
-            if (!shop) return res.status(404).json({ error: 'Shop not found' });
-            const userId = shop.userId;
+            // userId = authenticated acting user; shop ownership was verified up-front.
 
             // Bulk upsert all tags — skip rank check to avoid rate limits
             let added = 0;
@@ -3456,9 +3411,7 @@ export default async function handler(
 
         // GET /api/clawd/etsy?action=get_tracked_keywords
         if (req.method === 'GET' && action === 'get_tracked_keywords') {
-            const shop = await prisma.etsyShop.findFirst({ where: { shopId, isActive: true }, select: { userId: true } });
-            if (!shop) return res.status(404).json({ error: 'Shop not found' });
-            const userId = shop.userId;
+            // userId = authenticated acting user; shop ownership was verified up-front.
             // Optional: filter by listing_id
             const listingIdFilter = req.query.listing_id as string | undefined;
             const where: any = { userId, isActive: true };
@@ -3746,10 +3699,13 @@ Return JSON in Turkish (but keep all keywords/tags/titles in English):
 
         // POST /api/clawd/etsy?action=sync_listings — Fetch from Etsy API → upsert to DB
         if (req.method === 'POST' && action === 'sync_listings') {
-            const states = ['active', 'draft', 'inactive'];
+            // Etsy getListingsByShop accepts: active, inactive, sold_out, draft, expired.
+            // All must be fetched, otherwise sold-out/expired listings look "stale" and get deleted.
+            const states = ['active', 'draft', 'inactive', 'sold_out', 'expired'];
             let totalUpserted = 0;
             let totalFetched = 0;
             let totalErrors = 0;
+            let fetchFailed = false;
             const syncedAt = new Date();
 
             for (const state of states) {
@@ -3763,12 +3719,14 @@ Return JSON in Turkish (but keep all keywords/tags/titles in English):
                         data = await callEtsyAPI(endpoint, accessToken);
                     } catch (err: any) {
                         logger.error(`Sync listings fetch failed for state=${state} offset=${offset}`, err);
+                        fetchFailed = true;
                         break;
                     }
 
-                    const results = (data.results || []).filter((l: any) => l.state === state);
-                    logger.info(`Sync: state=${state} offset=${offset} raw=${data.results?.length || 0} filtered=${results.length}`);
-                    if (results.length === 0) break;
+                    const rawResults: any[] = Array.isArray(data?.results) ? data.results : [];
+                    const results = rawResults.filter((l: any) => l.state === state);
+                    logger.info(`Sync: state=${state} offset=${offset} raw=${rawResults.length} filtered=${results.length}`);
+                    if (rawResults.length === 0) break;
                     totalFetched += results.length;
 
                     // Build upsert data for each listing
@@ -3840,15 +3798,17 @@ Return JSON in Turkish (but keep all keywords/tags/titles in English):
                     }
 
                     offset += limit;
-                    if (results.length < limit) break;
+                    // Paginate on the raw page size, not the filtered count.
+                    if (rawResults.length < limit) break;
                 }
             }
 
             logger.info(`Sync complete: fetched=${totalFetched} upserted=${totalUpserted} errors=${totalErrors}`);
 
-            // Only remove stale listings if we successfully synced some
+            // Only remove stale listings after a COMPLETE, error-free sync. A failed page
+            // fetch or failed upsert would otherwise delete live listings from the cache.
             let deletedCount = 0;
-            if (totalUpserted > 0) {
+            if (totalUpserted > 0 && !fetchFailed && totalErrors === 0) {
                 const deleted = await prisma.etsyListing.deleteMany({
                     where: {
                         etsyShopId: shopId,
@@ -3860,12 +3820,13 @@ Return JSON in Turkish (but keep all keywords/tags/titles in English):
 
             // Update shop's last sync timestamp
             await prisma.etsyShop.updateMany({
-                where: { shopId },
+                where: { shopId, userId },
                 data: { lastListingSyncAt: syncedAt },
             });
 
             return res.status(200).json({
-                success: true,
+                success: !fetchFailed,
+                partial: fetchFailed,
                 synced: totalUpserted,
                 fetched: totalFetched,
                 errors: totalErrors,

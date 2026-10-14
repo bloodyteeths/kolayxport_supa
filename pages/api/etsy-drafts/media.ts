@@ -4,6 +4,7 @@ import fs from 'fs';
 import { getAuthUser } from '@/lib/auth';
 import { createDraftMediaFile, toSerializable, upsertDraftPatch } from '@/lib/etsy/draftService';
 import { logger } from '@/lib/logger';
+import { draftErrorResponse, isEtsyDraftError } from '@/lib/etsy/draftErrors';
 
 export const config = {
   api: {
@@ -54,7 +55,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       contentLength, parseMs: Date.now() - startedAt,
     });
 
-    const draft = await upsertDraftPatch({ userId: user.id, shopId, listingId, fields: {} });
+    if (!['image', 'video'].includes(kind) || !['upload', 'ai_upload'].includes(operation)) {
+      try { fs.unlinkSync(file.filepath); } catch {}
+      return res.status(400).json({ error: 'Unsupported media kind/operation' });
+    }
+
+    let draft;
+    try {
+      draft = await upsertDraftPatch({ userId: user.id, shopId, listingId, fields: {} });
+    } catch (stageErr: any) {
+      try { fs.unlinkSync(file.filepath); } catch {}
+      const { status, body } = draftErrorResponse(stageErr, 'Draft could not be created');
+      return res.status(status).json(body);
+    }
     if (!draft) return res.status(500).json({ error: 'Draft could not be created' });
 
     let media;
@@ -70,9 +83,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         contentType: file.mimetype || undefined,
         rank: rankRaw ? Number(rankRaw) : undefined,
         altText: altText || undefined,
-        payload: payloadRaw ? JSON.parse(payloadRaw) : undefined,
+        payload: (() => {
+          if (!payloadRaw) return undefined;
+          try {
+            const parsed = JSON.parse(payloadRaw);
+            return parsed && typeof parsed === 'object' && parsed.name != null ? { name: String(parsed.name).slice(0, 200) } : undefined;
+          } catch {
+            return undefined;
+          }
+        })(),
       });
     } catch (writeErr: any) {
+      try { fs.unlinkSync(file.filepath); } catch {}
+      if (isEtsyDraftError(writeErr)) {
+        const { status, body } = draftErrorResponse(writeErr, 'Media staging failed');
+        return res.status(status).json(body);
+      }
       logger.error('etsy-drafts/media: createDraftMediaFile failed', writeErr, {
         userId: user.id, draftId: draft.id, kind, size: file.size, mimetype: file.mimetype,
       });

@@ -1,25 +1,93 @@
 /**
  * KolayXport Research — Etsy Listing Page
- * Auto-injects inline stats bar below listing title/price area
+ *
+ * Shows listing stats with an honest split between MEASURED numbers (real deltas
+ * of Etsy's shop sold counter between snapshots) and ESTIMATES (this shop's real
+ * sales-per-review ratio x this listing's recent review velocity). Every number
+ * shows its inputs, confidence and data age. Real on-page Etsy signals ("N bought
+ * in the last 24 hours", "In N carts", Bestseller) are shown as-is.
+ * Server: POST /api/ext/listing-stats (via background worker).
  */
 
 (function () {
   'use strict';
 
-  console.log('[KX-listing] script loaded, shared:', !!window.__KX_SHARED, 'cache:', !!window.__KX_CACHE);
-
   function waitForShared(cb, attempts = 0) {
     if (window.__KX_SHARED && window.__KX_CACHE) { cb(); return; }
-    if (attempts > 50) { console.log('[KX-listing] gave up waiting for shared after 50 attempts'); return; }
+    if (attempts > 50) return;
     setTimeout(() => waitForShared(cb, attempts + 1), 100);
   }
 
   waitForShared(init);
 
+  // ---------------------------------------------------------------------------
+  // Real signals Etsy renders on the listing page (EN + TR UI)
+  // ---------------------------------------------------------------------------
+  function parseIntLoose(s) {
+    if (s === null || s === undefined) return null;
+    const n = parseInt(String(s).replace(/[^\d]/g, ''), 10);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function readJsonLdProduct() {
+    for (const script of document.querySelectorAll('script[type="application/ld+json"]')) {
+      try {
+        const json = JSON.parse(script.textContent || 'null');
+        const items = Array.isArray(json) ? json : (json && json['@graph']) ? json['@graph'] : [json];
+        for (const it of items) {
+          if (it && (it['@type'] === 'Product' || (Array.isArray(it['@type']) && it['@type'].includes('Product')))) return it;
+        }
+      } catch (_) { /* ignore malformed blocks */ }
+    }
+    return null;
+  }
+
+  function scrapePageSignals() {
+    const signals = {};
+    const product = readJsonLdProduct();
+    if (product) {
+      const offer = Array.isArray(product.offers) ? product.offers[0] : product.offers;
+      const price = offer ? Number(offer.price ?? offer.lowPrice) : NaN;
+      if (Number.isFinite(price)) signals.pagePrice = price;
+      if (offer && typeof offer.priceCurrency === 'string') signals.pageCurrency = offer.priceCurrency;
+    }
+
+    // Prefer the buy box text; fall back to the whole page (bounded).
+    const buyBox = document.querySelector('[data-buy-box-region], #listing-page-cart, [data-selector="listing-page-buy-box"]');
+    const boxText = (buyBox?.closest('div[class]')?.innerText || buyBox?.innerText || '').slice(0, 20000);
+    const pageText = (document.body.innerText || '').slice(0, 60000);
+    const text = boxText + '\n' + pageText;
+
+    let m =
+      text.match(/(\d[\d,.]*)\+?\s+(?:people|person)\s+bought\s+this\s+in\s+the\s+(?:last|past)\s+24\s+hours/i) ||
+      text.match(/son\s+24\s+saatte\s+(\d[\d,.]*)\+?\s+kişi/i);
+    if (m) signals.boughtLast24h = parseIntLoose(m[1]);
+
+    m = text.match(/\bin\s+(\d[\d,.]*)(\+?)\s+(?:other\s+people'?s\s+)?carts?\b/i) ||
+        text.match(/(\d[\d,.]*)(\+?)\s+(?:kişinin\s+)?sepet(?:inde|te)\b/i);
+    if (m) {
+      signals.inCarts = parseIntLoose(m[1]);
+      signals.inCartsPlus = m[2] === '+';
+    }
+
+    m = text.match(/\bonly\s+(\d[\d,.]*)\s+left\b/i) || text.match(/(?:sadece|yalnızca)\s+(\d[\d,.]*)\s+(?:adet|tane)/i);
+    if (m) signals.onlyLeft = parseIntLoose(m[1]);
+
+    m = boxText.match(/(\d[\d,.]*)\s+sales\b/i) || boxText.match(/(\d[\d,.]*)\s+satış\b/i);
+    if (m) signals.shopSalesOnPage = parseIntLoose(m[1]);
+
+    m = text.match(/(?:reviews?\s+for\s+this\s+item|item\s+reviews)\s*\(?\s*(\d[\d,.]*)/i) ||
+        text.match(/(?:bu\s+ürün\s+için\s+yorumlar|ürün\s+yorumları)\s*\(?\s*(\d[\d,.]*)/i);
+    if (m) signals.itemReviewsOnPage = parseIntLoose(m[1]);
+
+    signals.isBestseller = /\bbestseller\b|\bçok\s+satan\b/i.test(boxText || pageText.slice(0, 8000));
+    signals.isStarSeller = /\bstar\s+seller\b|\byıldız\s+satıcı\b/i.test(boxText || pageText.slice(0, 8000));
+    return signals;
+  }
+
   function init() {
     const S = window.__KX_SHARED;
     const C = window.__KX_CACHE;
-
     let _currentListingId = null;
 
     S.isOverlayEnabled().then(enabled => {
@@ -29,94 +97,55 @@
         processListingPage();
       }
       S.onUrlChange(() => {
-        if (S.getPageType() === 'listing') {
-          // Remove stale stats bar from previous listing
-          const newId = S.SELECTORS.listingId();
-          if (newId !== _currentListingId) {
-            const old = document.getElementById('kx-listing-stats');
-            if (old) old.remove();
-            _currentListingId = null;
-          }
-          S.injectInlineCSS();
-          setTimeout(processListingPage, 500);
+        if (S.getPageType() !== 'listing') return;
+        const newId = S.SELECTORS.listingId();
+        if (newId !== _currentListingId) {
+          const old = document.getElementById('kx-listing-stats');
+          if (old) old.remove();
+          _currentListingId = null;
         }
+        S.injectInlineCSS();
+        setTimeout(processListingPage, 500);
       });
     });
 
     async function processListingPage(retries = 0) {
       const listingId = S.SELECTORS.listingId();
-      if (retries === 0) console.log('[KX-listing] start, id:', listingId, 'path:', location.pathname);
       if (!listingId) return;
-
       if (document.getElementById('kx-listing-stats')) return;
 
       const anchor = findInsertionPoint();
       if (!anchor) {
-        if (retries < 10) {
-          if (retries % 3 === 0) console.log('[KX-listing] waiting for DOM, retry', retries);
-          setTimeout(() => processListingPage(retries + 1), 800);
-        } else {
-          console.log('[KX-listing] gave up finding insertion point');
-        }
+        if (retries < 10) setTimeout(() => processListingPage(retries + 1), 800);
         return;
       }
-      console.log('[KX-listing] found anchor:', anchor.tagName, anchor.className?.substring(0, 40));
 
       _currentListingId = listingId;
       const statsBar = document.createElement('div');
       statsBar.id = 'kx-listing-stats';
       statsBar.className = 'kx-stats-bar';
-      statsBar.innerHTML = `
-        <div class="kx-stats-header">
-          <span class="kx-stats-logo">KX</span>
-          <span>${S.t('loading')}</span>
-        </div>
-      `;
+      statsBar.appendChild(header(S.t('loading')));
       anchor.insertAdjacentElement('afterend', statsBar);
 
       try {
+        const page = scrapePageSignals();
         const data = await C.getOrFetch(
-          `listing:${listingId}`,
-          'listing',
-          () => S.apiCall('listing_enrich', { listingId })
+          `lstats:${listingId}`,
+          'lstats',
+          () => S.listingStatsCall(listingId, page)
         );
-
-        if (!data) {
-          statsBar.remove();
-          return;
-        }
-
-        // Best seller check via search (optional)
-        let bestSellerInfo = null;
-        try {
-          const title = document.querySelector('h1')?.textContent?.trim() || '';
-          const searchWords = title.split(/\s+/).slice(0, 4).join(' ');
-          if (searchWords.length > 3) {
-            const searchData = await C.getOrFetch(
-              `search:${searchWords}`,
-              'search',
-              () => S.apiCall('search_enrich', { query: searchWords })
-            );
-            if (searchData?.listingBadges) {
-              const ranks = S.computeBestSellerRanks(searchData.listingBadges);
-              bestSellerInfo = ranks[listingId];
-            }
-          }
-        } catch (_) {}
-
-        renderStatsBar(statsBar, data, bestSellerInfo);
+        if (S.SELECTORS.listingId() !== listingId) return; // navigated away
+        if (!data) { statsBar.remove(); return; }
+        // Page signals are always the live ones from this render, not the cached copy.
+        renderStatsBar(statsBar, data, page);
       } catch (err) {
-        statsBar.innerHTML = `
-          <div class="kx-stats-header">
-            <span class="kx-stats-logo">KX</span>
-            <span>${err.message || S.t('loadFailed')}</span>
-          </div>
-        `;
+        statsBar.textContent = '';
+        const msg = err && err.status === 401 ? S.t('signInRequired') : (err && err.message) || S.t('loadFailed');
+        statsBar.appendChild(header(msg));
       }
     }
 
     function findInsertionPoint() {
-      // Try specific buy box selectors first
       const selectors = [
         '[data-buy-box-region="price"]',
         '[data-appears-component-name="price"]',
@@ -131,112 +160,201 @@
         const el = document.querySelector(sel);
         if (el) return el;
       }
-
-      // Fallback: find the listing title text on the right side (buy box area)
-      // Etsy puts the title in the buy box, not as a standalone h1
-      const allH1s = document.querySelectorAll('h1');
-      for (const h1 of allH1s) {
-        // Skip h1s in the header/nav area
+      for (const h1 of document.querySelectorAll('h1')) {
         if (h1.closest('header') || h1.closest('nav')) continue;
         return h1.parentElement;
       }
-
-      // Last resort: find "Add to cart" button and go up to its container
-      const addToCart = document.querySelector('button[data-selector="add-to-cart"]') ||
-                        document.querySelector('[data-selector="add-to-cart-button"]') ||
-                        Array.from(document.querySelectorAll('button')).find(b =>
-                          b.textContent.trim().match(/^Add to cart$|^Sepete ekle$/i)
-                        );
-      if (addToCart) {
-        // Walk up to find a good container
-        let container = addToCart.parentElement;
-        for (let i = 0; i < 5 && container; i++) {
-          if (container.offsetWidth > 300) return container;
-          container = container.parentElement;
-        }
-      }
-
       return null;
     }
 
-    function renderStatsBar(el, data, bestSeller) {
-      const { listing, velocity, seoScore, shop } = data;
-      const seo = seoScore?.total || 0;
-      const seoColor = S.scoreClass(seo);
-      const seoPct = Math.min(seo, 100);
-      const seoFillColor = seo >= 70 ? '#4caf50' : seo >= 40 ? '#ff9800' : '#f44336';
+    // ---- DOM helpers (no innerHTML with data) ----
+    function node(tag, cls, text, style) {
+      const n = document.createElement(tag);
+      if (cls) n.className = cls;
+      if (text !== undefined && text !== null) n.textContent = String(text);
+      if (style) n.style.cssText = style;
+      return n;
+    }
 
-      const est = velocity?.estMonthlySales || 0;
-      const revenue = velocity?.estMonthlyRevenue || 0;
-      const estTotal = velocity?.estTotalSales || 0;
-      const demand = velocity?.demandScore || 'low';
-      const favs = listing?.favorites || 0;
-      const views = listing?.views || 0;
-      const reviews = listing?.reviewCount || 0;
-      const age = velocity?.ageMonths || 0;
-      const tagCount = listing?.tagCount || 0;
-      const quantity = listing?.quantity || 0;
-      const lowStock = velocity?.lowStock || false;
+    function header(text, extra) {
+      const h = node('div', 'kx-stats-header');
+      h.appendChild(node('span', 'kx-stats-logo', 'KX'));
+      if (text) h.appendChild(node('span', null, text));
+      if (extra) extra.forEach(e => h.appendChild(e));
+      return h;
+    }
 
-      const dl = S.demandLabel(demand);
-      const demandText = demand === 'hot' ? 'Hot' : demand === 'good' ? 'Good' : demand === 'moderate' ? 'Moderate' : 'Low';
-      const demandColor = demand === 'hot' ? '#c62828' : demand === 'good' ? '#2e7d32' : demand === 'moderate' ? '#e65100' : '#888';
+    function metric(label, value, color) {
+      const m = node('span', 'kx-metric');
+      m.appendChild(node('span', 'kx-metric-label', label));
+      m.appendChild(node('span', null, value, `font-weight:700;${color ? 'color:' + color + ';' : ''}`));
+      return m;
+    }
 
-      // Build clean metric boxes
-      const metrics = [];
-      metrics.push(`<span class="kx-metric"><span class="kx-metric-label">SEO</span><span style="color:${seoFillColor};font-weight:700;">${seo}/100</span></span>`);
-      if (est > 0) metrics.push(`<span class="kx-metric"><span class="kx-metric-label">Est. Sales</span><span style="color:#2e7d32;font-weight:700;">~${est}/mo</span></span>`);
-      if (revenue > 0) metrics.push(`<span class="kx-metric"><span class="kx-metric-label">Est. Revenue</span><span style="color:#1565c0;font-weight:700;">$${S.formatNum(revenue)}/mo</span></span>`);
-      metrics.push(`<span class="kx-metric"><span class="kx-metric-label">Demand</span><span style="color:${demandColor};font-weight:700;">${demandText}</span></span>`);
-      if (reviews > 0) metrics.push(`<span class="kx-metric"><span class="kx-metric-label">Reviews</span><span style="font-weight:700;">${S.formatNum(reviews)}</span></span>`);
-      metrics.push(`<span class="kx-metric"><span class="kx-metric-label">Favs</span><span style="font-weight:700;">${S.formatNum(favs)}</span></span>`);
-      metrics.push(`<span class="kx-metric"><span class="kx-metric-label">Views</span><span style="font-weight:700;">${S.formatNum(views)}</span></span>`);
-      metrics.push(`<span class="kx-metric"><span class="kx-metric-label">Age</span><span>${age} mo</span></span>`);
+    function fmtSales(n) {
+      if (n === null || n === undefined) return '—';
+      return n >= 10 ? S.formatNum(Math.round(n)) : String(Math.round(n * 10) / 10);
+    }
 
-      if (quantity > 0) {
-        const stockColor = quantity <= 3 ? '#c62828' : quantity <= 10 ? '#e65100' : '#444';
-        metrics.push(`<span class="kx-metric"><span class="kx-metric-label">Stock</span><span style="color:${stockColor};font-weight:700;">${quantity}</span></span>`);
+    function fmtMoney(amount, currency) {
+      if (amount === null || amount === undefined) return '—';
+      const cur = currency || 'USD';
+      try {
+        return new Intl.NumberFormat(S.lang === 'tr' ? 'tr-TR' : 'en-US', { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(amount);
+      } catch (_) {
+        return cur + ' ' + S.formatNum(amount);
       }
+    }
 
-      const tagColor = tagCount >= 13 ? '#2e7d32' : tagCount >= 10 ? '#e65100' : '#c62828';
-      metrics.push(`<span class="kx-metric"><span class="kx-metric-label">Tags</span><span style="color:${tagColor};font-weight:700;">${tagCount}/13</span></span>`);
+    function fmtAge(iso) {
+      const ms = Date.now() - Date.parse(iso);
+      if (!Number.isFinite(ms) || ms < 60 * 1000) return S.t('justNow');
+      if (ms < 3600 * 1000) return Math.round(ms / 60000) + ' ' + S.t('minutes');
+      if (ms < 48 * 3600 * 1000) return Math.round(ms / 3600000) + ' ' + S.t('hours');
+      return Math.round(ms / 86400000) + ' ' + S.t('days');
+    }
 
-      if (bestSeller?.isBestSeller) {
-        metrics.push(`<span class="kx-metric"><span class="kx-metric-label">Rank</span><span style="color:#b8860b;font-weight:700;">Top ${bestSeller.percentile}%</span></span>`);
+    function fmtDate(iso) {
+      try { return new Date(iso).toLocaleDateString(S.lang === 'tr' ? 'tr-TR' : 'en-US'); } catch (_) { return iso; }
+    }
+
+    function signed(n) {
+      if (n === null || n === undefined) return '—';
+      return (n > 0 ? '+' : '') + n;
+    }
+
+    function renderSalesBlock(data) {
+      const sales = data.sales || {};
+      const box = node('div', 'kx-sales');
+      const top = node('div', 'kx-sales-top');
+
+      const kind = sales.kind || 'insufficient';
+      const badgeCls = kind === 'measured' ? 'kx-badge kx-badge-measured' : kind === 'estimated' ? 'kx-badge kx-badge-estimated' : 'kx-badge kx-badge-none';
+      const badgeText = kind === 'measured' ? S.t('badgeMeasured') : kind === 'estimated' ? S.t('badgeEstimated') : S.t('badgeInsufficient');
+
+      if (sales.monthlySales !== null && sales.monthlySales !== undefined) {
+        top.appendChild(node('span', 'kx-sales-value', (kind === 'estimated' ? '~' : '') + fmtSales(sales.monthlySales) + ' ' + S.t('salesPerMonth')));
+      } else if (sales.monthlySalesUpperBound !== null && sales.monthlySalesUpperBound !== undefined) {
+        top.appendChild(node('span', 'kx-sales-value', S.t('lessThan') + ' ' + fmtSales(sales.monthlySalesUpperBound) + ' ' + S.t('salesPerMonth')));
       }
-
-      if (shop) {
-        metrics.push(`<span class="kx-metric"><span class="kx-metric-label">Shop Sales</span><span style="font-weight:700;">${S.formatNum(shop.num_sales || 0)}</span></span>`);
-        if (shop.rating) metrics.push(`<span class="kx-metric"><span class="kx-metric-label">Rating</span><span style="font-weight:700;">${shop.rating.toFixed(1)}★</span></span>`);
+      top.appendChild(node('span', badgeCls, badgeText));
+      if (sales.confidence) {
+        const c = sales.confidence === 'high' ? 'confHigh' : sales.confidence === 'medium' ? 'confMedium' : 'confLow';
+        top.appendChild(node('span', 'kx-badge kx-badge-conf', S.t(c)));
       }
-
-      let tagsHtml = '';
-      if (listing?.tags && listing.tags.length > 0) {
-        tagsHtml = `<div data-kx-details style="margin-top:6px;">${listing.tags.map(t => `<span class="kx-tag-pill">${t}</span>`).join('')}</div>`;
+      if (sales.monthlyRevenue !== null && sales.monthlyRevenue !== undefined) {
+        top.appendChild(node('span', 'kx-sales-rev', '≈ ' + fmtMoney(sales.monthlyRevenue, sales.currency) + ' ' + S.t('revenueApprox')));
       }
+      box.appendChild(top);
 
-      el.innerHTML = `
-        <div class="kx-stats-header">
-          <span class="kx-stats-logo">KX</span>
-          ${lowStock ? `<span style="color:#c62828;font-weight:700;font-size:11px;">LOW STOCK</span>` : ''}
-          <button class="kx-collapse-btn" data-kx-collapse>▲</button>
-        </div>
-        <div class="kx-metrics-grid">${metrics.join('')}</div>
-        ${tagsHtml}
-      `;
-
-      const collapseBtn = el.querySelector('[data-kx-collapse]');
-      if (collapseBtn) {
-        collapseBtn.addEventListener('click', () => {
-          const grid = el.querySelector('.kx-metrics-grid');
-          const detailEls = el.querySelectorAll('[data-kx-details]');
-          const isHidden = grid?.style.display === 'none';
-
-          if (grid) grid.style.display = isHidden ? '' : 'none';
-          detailEls.forEach(d => d.style.display = isHidden ? '' : 'none');
-          collapseBtn.textContent = isHidden ? '▲' : '▼';
+      // How it was computed — the actual inputs
+      const i = sales.inputs || {};
+      let how = '';
+      if (kind === 'measured') {
+        how = S.t(i.shareSource === 'lifetime_reviews' ? 'howMeasuredLifetime' : 'howMeasured', {
+          delta: S.formatNum(i.shopSoldDelta), days: i.spanDays, perDay: i.shopSoldPerDay,
+          share: i.share, mine: i.shareListingReviews, total: i.shareShopReviews, window: Math.round(i.shareWindowDays || 0),
         });
+      } else if (kind === 'estimated') {
+        how = S.t(sales.monthlySales !== null && sales.monthlySales !== undefined ? 'howEstimated' : 'howEstimatedNone', {
+          recent: i.recentListingReviews, window: i.windowDays, ratio: i.salesPerReview,
+          sold: S.formatNum(i.shopSold), reviews: S.formatNum(i.shopReviewCount),
+          upper: fmtSales(sales.monthlySalesUpperBound),
+        });
+      } else {
+        how = S.t('howInsufficient');
       }
+      box.appendChild(node('div', 'kx-sales-how', how));
+
+      // Shop velocity measured but couldn't attribute — still a real number worth showing
+      if (kind !== 'measured' && data.shopVelocity && data.shopVelocity.kind === 'measured') {
+        const v = data.shopVelocity;
+        box.appendChild(node('div', 'kx-sales-how',
+          S.t('howShopOnly', { delta: S.formatNum(v.delta), days: v.spanDays, perDay: v.soldPerDay })));
+      }
+
+      // Data age + tracking status
+      const meta = [];
+      if (data.fetchedAt) meta.push(S.t('updatedAgo', { age: fmtAge(data.fetchedAt) }));
+      if (data.tracking && data.tracking.firstSnapshotAt) {
+        meta.push(S.t('trackingSince', { date: fmtDate(data.tracking.firstSnapshotAt), count: data.tracking.snapshotCount }));
+      }
+      if (kind !== 'measured' && (!data.shopVelocity || data.shopVelocity.kind !== 'measured')) meta.push(S.t('measuredAfter'));
+      box.appendChild(node('div', 'kx-sales-meta', meta.join(' · ')));
+      return box;
+    }
+
+    function renderStatsBar(el, data, page) {
+      const L = data.listing || {};
+      const shop = data.shop;
+      el.textContent = '';
+
+      const collapseBtn = node('button', 'kx-collapse-btn', '▲');
+      collapseBtn.type = 'button';
+      el.appendChild(header(null, [collapseBtn]));
+
+      const body = node('div');
+      body.appendChild(renderSalesBlock(data));
+
+      // Real Etsy page signals (what Etsy itself shows to shoppers right now)
+      const signals = [];
+      if (page.boughtLast24h) signals.push(S.t('bought24h', { n: S.formatNum(page.boughtLast24h) }));
+      if (page.inCarts) signals.push(S.t('inCarts', { n: S.formatNum(page.inCarts) + (page.inCartsPlus ? '+' : '') }));
+      if (page.isBestseller) signals.push(S.t('bestsellerBadge'));
+      if (page.isStarSeller) signals.push(S.t('starSeller'));
+      if (signals.length) {
+        const row = node('div', 'kx-stats-row', null, 'margin-bottom:6px;font-size:11px;font-weight:700;');
+        signals.forEach((s, idx) => {
+          if (idx) row.appendChild(node('span', 'kx-sep', '·'));
+          row.appendChild(node('span', 'kx-signal', s));
+        });
+        row.appendChild(node('span', 'kx-sep', '·'));
+        row.appendChild(node('span', null, S.t('sourcePage'), 'color:#999;font-weight:500;'));
+        body.appendChild(row);
+      }
+
+      // Facts (Etsy API) — no formulas here
+      const grid = node('div', 'kx-metrics-grid');
+      const seo = data.seoScore?.total ?? 0;
+      grid.appendChild(metric('SEO', seo + '/100', seo >= 70 ? '#4caf50' : seo >= 40 ? '#ff9800' : '#f44336'));
+      if (L.reviewCount !== null && L.reviewCount !== undefined) grid.appendChild(metric(S.t('reviews'), S.formatNum(L.reviewCount)));
+      if (L.favorites !== null && L.favorites !== undefined) grid.appendChild(metric(S.t('favorites'), S.formatNum(L.favorites)));
+      if (L.views) grid.appendChild(metric(S.t('views'), S.formatNum(L.views)));
+      if (L.ageDays !== null && L.ageDays !== undefined) {
+        grid.appendChild(metric(S.t('age'), L.ageDays >= 60 ? Math.round(L.ageDays / 30) + ' ' + S.t('months') : L.ageDays + ' ' + S.t('days')));
+      }
+      if (L.quantity) {
+        grid.appendChild(metric(S.t('stock'), String(L.quantity), L.quantity <= 3 ? '#c62828' : L.quantity <= 10 ? '#e65100' : null));
+      }
+      const tagCount = L.tagCount || 0;
+      grid.appendChild(metric(S.t('tags'), tagCount + '/13', tagCount >= 13 ? '#2e7d32' : tagCount >= 10 ? '#e65100' : '#c62828'));
+      if (shop) {
+        if (shop.soldCount !== null && shop.soldCount !== undefined) grid.appendChild(metric(S.t('shopSalesLifetime'), S.formatNum(shop.soldCount)));
+        if (shop.salesPerReview) grid.appendChild(metric(S.t('salesPerReview'), String(shop.salesPerReview)));
+        if (shop.rating) grid.appendChild(metric(S.t('rating'), Number(shop.rating).toFixed(1) + '★'));
+      }
+      body.appendChild(grid);
+
+      // Measured listing deltas between snapshots
+      const d = data.listingDeltas;
+      if (d && (d.favorites !== null || d.reviews !== null)) {
+        body.appendChild(node('div', 'kx-sales-meta',
+          S.t('listingDeltas', { days: d.spanDays, favs: signed(d.favorites), reviews: signed(d.reviews) }) + ' (' + S.t('sourceApi') + ')',
+          'margin-top:6px;'));
+      }
+
+      if (Array.isArray(L.tags) && L.tags.length) {
+        const tags = node('div', null, null, 'margin-top:6px;');
+        L.tags.forEach(tg => tags.appendChild(node('span', 'kx-tag-pill', tg)));
+        body.appendChild(tags);
+      }
+
+      el.appendChild(body);
+      collapseBtn.addEventListener('click', () => {
+        const hidden = body.style.display === 'none';
+        body.style.display = hidden ? '' : 'none';
+        collapseBtn.textContent = hidden ? '▲' : '▼';
+      });
     }
   }
 })();

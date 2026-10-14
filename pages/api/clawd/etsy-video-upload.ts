@@ -2,37 +2,11 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';
 import { getAuthUser } from '../../../lib/auth';
-import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
+import { decryptIfNeeded } from '@/lib/crypto/credentials';
+// Locked (per-shop advisory lock) refresh — Etsy refresh tokens are single-use.
+import { getEtsyAccessToken } from '@/lib/etsy/etsyToken';
 import formidable from 'formidable';
 import fs from 'fs';
-
-// `refreshToken` must be plaintext; rotated tokens are persisted encrypted.
-// See pages/api/clawd/etsy.ts for the same pattern.
-async function refreshEtsyToken(shopId: string, refreshToken: string): Promise<string> {
-  const response = await fetch('https://api.etsy.com/v3/public/oauth/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      client_id: (process.env.ETSY_API_KEY || '').trim(),
-      refresh_token: refreshToken,
-    }),
-  });
-  if (!response.ok) throw new Error('Failed to refresh Etsy token');
-  const data = await response.json();
-  const newAccessToken = data.access_token as string;
-  const newRefreshToken = (data.refresh_token as string) || refreshToken;
-
-  await prisma.etsyShop.updateMany({
-    where: { shopId },
-    data: {
-      accessToken: encryptIfNeeded(newAccessToken) as string,
-      refreshToken: encryptIfNeeded(newRefreshToken) as string,
-      tokenExpiresAt: new Date(Date.now() + data.expires_in * 1000),
-    },
-  });
-  return newAccessToken;
-}
 
 type EtsyTokenContext = {
   shopId: string;
@@ -64,7 +38,7 @@ async function getEtsyTokenContext(shopInput: string, userId: string): Promise<E
       if (!plainRefresh) throw new Error('No refresh token available');
       return {
         shopId: etsyShop.shopId,
-        accessToken: await refreshEtsyToken(etsyShop.shopId, plainRefresh),
+        accessToken: await getEtsyAccessToken(etsyShop.shopId, userId),
       };
     }
     const plainAccess = decryptIfNeeded(etsyShop.accessToken) as string;
@@ -90,7 +64,7 @@ async function getEtsyTokenContext(shopInput: string, userId: string): Promise<E
     if (!plainRefresh) throw new Error('No refresh token available');
     return {
       shopId: normalizedShopInput,
-      accessToken: await refreshEtsyToken(normalizedShopInput, plainRefresh),
+      accessToken: await getEtsyAccessToken(normalizedShopInput, userId),
     };
   }
   const plainAccess = decryptIfNeeded(credential.etsyAccessToken) as string;

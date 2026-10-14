@@ -38,6 +38,8 @@ import {
   Divider,
   IconButton,
   Tooltip,
+  Checkbox,
+  FormGroup,
 } from '@mui/material';
 import {
   DeleteOutline,
@@ -62,6 +64,7 @@ import {
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { stageEtsyDraft } from '@/lib/etsy/draftClient';
+import { aiErrorCode, normalizeTags, splitCommaList } from '@/lib/etsy/seoRules';
 
 interface ListingPrice {
   amount: number;
@@ -72,6 +75,7 @@ interface ListingPrice {
 interface SelectedListing {
   listing_id: number;
   title: string;
+  description?: string;
   price: ListingPrice | null;
   tags: string[];
   state: string;
@@ -160,6 +164,8 @@ export default function BulkOperationsBar({
   const [sectionDialogOpen, setSectionDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [aiOptimizeDialogOpen, setAiOptimizeDialogOpen] = useState(false);
+  // Which fields the AI may change. Description is opt-in only.
+  const [aiFields, setAiFields] = useState<{ title: boolean; tags: boolean; description: boolean }>({ title: true, tags: true, description: false });
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
 
   // Copy state
@@ -218,6 +224,7 @@ export default function BulkOperationsBar({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const t = useTranslations('etsy.bulkOps');
+  const tAiErr = useTranslations('etsy.aiErrors');
   const [moreMenuAnchor, setMoreMenuAnchor] = useState<null | HTMLElement>(null);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
@@ -337,8 +344,11 @@ export default function BulkOperationsBar({
   };
 
   const handleAddTagsSubmit = async () => {
-    const tagsToAdd = newTags.split(',').map((t) => t.trim()).filter((t) => t.length > 0);
-    if (tagsToAdd.length === 0) { toast.error(t('toastEnterAtLeastOneTag')); return; }
+    // Comma bulk entry; tags over 20 chars are dropped (never cut mid-word) with feedback.
+    const { tags: tagsToAdd, dropped } = normalizeTags(splitCommaList(newTags), { max: 13 });
+    const tooLong = dropped.filter((d) => d.reason === 'too_long').map((d) => d.tag);
+    if (tooLong.length > 0) toast.error(t('toastTagsTooLongDropped', { tags: tooLong.join(', ') }));
+    if (tagsToAdd.length === 0) { if (tooLong.length === 0) toast.error(t('toastEnterAtLeastOneTag')); return; }
     const violations = selectedListings.filter((l) => l.tags.length + tagsToAdd.length > 13);
     if (violations.length > 0) {
       toast.error(t('toastTagLimitExceeded', { count: violations.length }));
@@ -383,39 +393,57 @@ export default function BulkOperationsBar({
   };
 
   const handleAiOptimizeSubmit = async () => {
+    const fields = (Object.keys(aiFields) as Array<keyof typeof aiFields>).filter((k) => aiFields[k]);
+    if (fields.length === 0) { toast.error(t('toastAiSelectField')); return; }
     setAiOptimizeDialogOpen(false);
     setAiProcessing(true);
     setAiProgress(0);
     setAiResult(null);
     try {
-      const payload = selectedListings.map((l) => ({ listing_id: l.listing_id, title: l.title, tags: l.tags }));
-      const aiRes = await fetch('/api/ai/etsy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'bulk_optimize', listings: payload }),
-      });
-      if (!aiRes.ok) {
-        const errData = await aiRes.json().catch(() => ({}));
-        toast.error(errData.error || t('toastAiOptimizationFailed'));
-        setAiProcessing(false);
-        return;
-      }
-      const { optimized } = await aiRes.json() as {
-        optimized: Array<{ listing_id: number; title?: string; tags?: string[]; description?: string }>;
-      };
-      let success = 0, failed = 0;
-      for (let i = 0; i < optimized.length; i++) {
-        const item = optimized[i];
-        const updateBody: Record<string, any> = {};
-        if (item.title) updateBody.title = item.title;
-        if (item.tags) updateBody.tags = item.tags;
-        if (item.description) updateBody.description = item.description;
-        try {
-          const res = await callUpdateListing(shopId, item.listing_id, updateBody);
-          if (res.ok) success++; else failed++;
-        } catch { failed++; }
-        setAiProgress(((i + 1) / optimized.length) * 100);
-        if (i < optimized.length - 1) await delay(100);
+      // Existing description is always sent as context (trimmed server-side).
+      const payload = selectedListings.map((l) => ({
+        listing_id: l.listing_id, title: l.title, tags: l.tags, description: l.description || '',
+      }));
+      // The API accepts at most 20 listings per call.
+      const chunks: typeof payload[] = [];
+      for (let i = 0; i < payload.length; i += 20) chunks.push(payload.slice(i, i + 20));
+      let success = 0, failed = 0, processed = 0;
+      for (const chunk of chunks) {
+        const aiRes = await fetch('/api/ai/etsy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'bulk_optimize', fields, listings: chunk }),
+        });
+        const data = await aiRes.json().catch(() => ({}));
+        if (!aiRes.ok) {
+          const code = aiErrorCode(data);
+          toast.error(code ? tAiErr(code) : t('toastAiOptimizationFailed'));
+          failed += chunk.length;
+          continue;
+        }
+        const optimized: Array<{ listing_id: number; title?: unknown; tags?: unknown; description?: unknown }> =
+          Array.isArray(data?.optimized) ? data.optimized : [];
+        const allowedIds = new Set(chunk.map((c) => c.listing_id));
+        for (const item of optimized) {
+          if (!item || !allowedIds.has(item.listing_id)) continue;
+          // Stage ONLY the fields the user asked for.
+          const updateBody: Record<string, any> = {};
+          if (aiFields.title && typeof item.title === 'string' && item.title.trim()) updateBody.title = item.title.trim();
+          if (aiFields.tags && Array.isArray(item.tags)) {
+            const { tags } = normalizeTags(item.tags, { title: updateBody.title || chunk.find((c) => c.listing_id === item.listing_id)?.title, dropTitleOverlap: true });
+            if (tags.length > 0) updateBody.tags = tags;
+          }
+          if (aiFields.description && typeof item.description === 'string' && item.description.trim()) updateBody.description = item.description;
+          if (Object.keys(updateBody).length === 0) { failed++; continue; }
+          try {
+            const res = await callUpdateListing(shopId, item.listing_id, updateBody);
+            if (res.ok) success++; else failed++;
+          } catch { failed++; }
+          processed++;
+          setAiProgress((processed / payload.length) * 100);
+          await delay(100);
+        }
+        failed += Math.max(0, chunk.length - optimized.filter((o) => o && allowedIds.has(o.listing_id)).length);
       }
       setAiResult({ success, failed });
       if (failed === 0) toast.success(t('toastAiSuccess', { count: success }));
@@ -1007,21 +1035,33 @@ export default function BulkOperationsBar({
           {t("aiBulkOptimize")}
         </DialogTitle>
         <DialogContent>
-          <Typography variant="body1" sx={{ mb: 2 }}>
-            {t("aiBulkOptimize")}: {selectedCount} listings
+          <Typography variant="body1" sx={{ mb: 1 }}>
+            {t("aiOptimizeCount", { count: selectedCount })}
           </Typography>
-          <Box sx={{ pl: 2, mb: 2 }}>
-            <Typography variant="body2" color="text.secondary">- Titles restructured for SEO</Typography>
-            <Typography variant="body2" color="text.secondary">- Tags optimized by search volume</Typography>
-            <Typography variant="body2" color="text.secondary">- Descriptions generated by AI</Typography>
-          </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+            {t("aiOptimizeChooseFields")}
+          </Typography>
+          <FormGroup sx={{ mb: 2 }}>
+            <FormControlLabel
+              control={<Checkbox checked={aiFields.title} onChange={(e) => setAiFields((f) => ({ ...f, title: e.target.checked }))} />}
+              label={t("aiFieldTitle")}
+            />
+            <FormControlLabel
+              control={<Checkbox checked={aiFields.tags} onChange={(e) => setAiFields((f) => ({ ...f, tags: e.target.checked }))} />}
+              label={t("aiFieldTags")}
+            />
+            <FormControlLabel
+              control={<Checkbox checked={aiFields.description} onChange={(e) => setAiFields((f) => ({ ...f, description: e.target.checked }))} />}
+              label={t("aiFieldDescription")}
+            />
+          </FormGroup>
           <Typography variant="caption" color="warning.main">
-            {t("aiOptimizeWarning")}
+            {t("aiOptimizeWarningStaged")}
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setAiOptimizeDialogOpen(false)}>{t("cancel")}</Button>
-          <Button variant="contained" color="secondary" startIcon={<AutoFixHigh />} onClick={handleAiOptimizeSubmit}>{t("optimize")}
+          <Button variant="contained" color="secondary" startIcon={<AutoFixHigh />} onClick={handleAiOptimizeSubmit} disabled={!aiFields.title && !aiFields.tags && !aiFields.description}>{t("optimize")}
           </Button>
         </DialogActions>
       </Dialog>

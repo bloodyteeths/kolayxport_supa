@@ -1,6 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getAuthUser } from '@/lib/auth';
-import { encode } from 'next-auth/jwt';
+import { getAuthUser, createExtensionToken, EXTENSION_TOKEN_MAX_AGE_SECONDS } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 import { logSecurityEvent } from '@/lib/admin/events';
 
@@ -82,7 +81,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const user = await getAuthUser(req, res);
+    // Cookie session ONLY. A Bearer extension token must not be able to mint
+    // its own replacement, otherwise a leaked token would never expire.
+    const user = await getAuthUser(req, res, { allowBearer: false });
 
     if (!user) {
       // 200 here is intentional: the extension popup uses this response to decide whether
@@ -94,16 +95,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Generate a JWT token the extension can use as Bearer token
-    const token = await encode({
-      token: { sub: user.id, email: user.email, name: user.name },
-      secret: process.env.NEXTAUTH_SECRET!,
-    });
+    // Mint a short-lived, extension-only Bearer token (not a full 30-day session).
+    // It is re-validated against the DB on every use and revoked on password change.
+    const token = await createExtensionToken(user.id);
+    if (!token) {
+      return res.status(200).json({
+        authenticated: false,
+        error: 'Not authenticated',
+        message: 'Please log in to Kolayxport first',
+      });
+    }
 
     res.setHeader('Cache-Control', 'no-store, private');
     return res.status(200).json({
       authenticated: true,
       token,
+      expiresIn: EXTENSION_TOKEN_MAX_AGE_SECONDS,
       user: {
         id: user.id,
         email: user.email,

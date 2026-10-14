@@ -3,11 +3,79 @@ import path from 'path';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
+import { EtsyDraftError, isEtsyDraftError, type DraftIssue } from './draftErrors';
+import {
+  ETSY_DRAFT_UPLOAD_ROOT,
+  assertAllowedSourceUrl,
+  fetchSourceUrlSafely,
+  readDraftUploadFile,
+  unlinkDraftUploadFile,
+} from './mediaSafety';
+import {
+  normalizeWhenMade,
+  validateEtsyFieldPatch,
+  validateEtsyInventory,
+  validateEtsyPersonalization,
+  type FieldError,
+} from './validation';
 
 const ETSY_API_BASE = 'https://openapi.etsy.com/v3/application';
-const UPLOAD_ROOT = process.env.ETSY_DRAFT_UPLOAD_DIR || path.join(process.cwd(), 'uploads', 'etsy-drafts');
+const UPLOAD_ROOT = ETSY_DRAFT_UPLOAD_ROOT;
+const ETSY_FETCH_TIMEOUT_MS = 30_000;
+const ETSY_FETCH_MAX_RETRIES = 3;
+const MAX_IMAGE_SOURCE_BYTES = 25 * 1024 * 1024;
+const MAX_VIDEO_SOURCE_BYTES = 130 * 1024 * 1024;
+
+/** Statuses from which a draft may be claimed for sync. */
+const SYNCABLE_STATUSES = ['draft', 'failed', 'conflict'];
 
 type JsonMap = Record<string, any>;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * fetch() for Etsy: 30s timeout per attempt, and retries on 429 / 5xx
+ * honouring Retry-After (capped). Only idempotent-safe on Etsy's side because
+ * 429/5xx responses mean the write was not applied; network timeouts are NOT
+ * retried for non-GET requests (the write may have landed).
+ */
+export async function etsyFetch(url: string, init: RequestInit = {}, timeoutMs: number = ETSY_FETCH_TIMEOUT_MS): Promise<Response> {
+  const method = String(init.method || 'GET').toUpperCase();
+  let lastErr: any = null;
+  for (let attempt = 0; attempt <= ETSY_FETCH_MAX_RETRIES; attempt++) {
+    let response: Response;
+    try {
+      response = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+    } catch (err: any) {
+      lastErr = err;
+      const isTimeout = err?.name === 'TimeoutError' || err?.name === 'AbortError';
+      if (method === 'GET' && attempt < ETSY_FETCH_MAX_RETRIES) {
+        await sleep(500 * 2 ** attempt);
+        continue;
+      }
+      throw new Error(isTimeout ? `Etsy API timeout after ${Math.round(timeoutMs / 1000)}s (${method})` : `Etsy API network error: ${err?.message || err}`);
+    }
+    if ((response.status === 429 || response.status >= 500) && attempt < ETSY_FETCH_MAX_RETRIES) {
+      const retryAfter = Number(response.headers.get('retry-after'));
+      const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
+        ? Math.min(retryAfter * 1000, 30_000)
+        : Math.min(1000 * 2 ** attempt, 8_000);
+      await response.text().catch(() => undefined);
+      logger.warn('Etsy API transient error, retrying', { status: response.status, method, attempt: attempt + 1, waitMs });
+      await sleep(waitMs);
+      continue;
+    }
+    return response;
+  }
+  throw lastErr || new Error('Etsy API request failed');
+}
+
+function etsyAuthHeaders(accessToken: string) {
+  return {
+    Authorization: `Bearer ${accessToken}`,
+    'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_API_SECRET || '').trim()}`,
+  };
+}
 
 export function toSerializable<T>(value: T): T {
   return JSON.parse(JSON.stringify(value, (_key, val) => (typeof val === 'bigint' ? val.toString() : val)));
@@ -22,7 +90,9 @@ function mergeJson(existing: any, patch: any): any {
 }
 
 function actionKey(action: any) {
-  return JSON.stringify(action || {});
+  // Completion markers are server-side bookkeeping; ignore them for dedupe.
+  const { completedAt, completedResult, ...rest } = action || {};
+  return JSON.stringify(rest);
 }
 
 function mergeQueuedActions(existing: any[] = [], incoming?: any[]) {
@@ -43,74 +113,16 @@ function mediaIdentity(media: any) {
   return `${media.kind}:${media.operation}:${String(media.etsyMediaId)}`;
 }
 
-async function refreshEtsyToken(shopId: string, refreshToken: string): Promise<string> {
-  // `refreshToken` arriving here must already be plaintext — `getEtsyAccessToken`
-  // calls `decryptIfNeeded` before invoking us.
-  const response = await fetch('https://api.etsy.com/v3/public/oauth/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      refresh_token: refreshToken,
-      client_id: process.env.ETSY_API_KEY || '',
-    }),
-  });
-  if (!response.ok) throw new Error(`Failed to refresh Etsy token: ${response.statusText}`);
-  const data = await response.json();
-  const tokenExpiresAt = new Date(Date.now() + data.expires_in * 1000);
-  const accessToken = data.access_token;
-  const refreshTokenNext = data.refresh_token || refreshToken;
-
-  const encAccess = encryptIfNeeded(accessToken);
-  const encRefresh = encryptIfNeeded(refreshTokenNext);
-
-  const updated = await prisma.etsyShop.updateMany({
-    where: { shopId },
-    data: { accessToken: encAccess, refreshToken: encRefresh, tokenExpiresAt },
-  });
-  if (updated.count === 0) {
-    await prisma.credential.updateMany({
-      where: { etsyShopId: shopId },
-      data: { etsyAccessToken: encAccess, etsyRefreshToken: encRefresh, etsyTokenExpiresAt: tokenExpiresAt },
-    });
-  }
-  return accessToken;
-}
-
-export async function getEtsyAccessToken(shopId: string, userId?: string): Promise<string> {
-  const shop = await prisma.etsyShop.findFirst({
-    where: { shopId, isActive: true, ...(userId ? { userId } : {}) },
-    select: { accessToken: true, refreshToken: true, tokenExpiresAt: true },
-  });
-  if (shop) {
-    const plainRefresh = decryptIfNeeded(shop.refreshToken) as string | null;
-    const expiresAt = shop.tokenExpiresAt;
-    if (!expiresAt || expiresAt.getTime() - Date.now() < 5 * 60 * 1000) {
-      if (!plainRefresh) throw new Error('No refresh token available');
-      return refreshEtsyToken(shopId, plainRefresh);
-    }
-    return decryptIfNeeded(shop.accessToken) as string;
-  }
-
-  const credential = await prisma.credential.findFirst({
-    where: { etsyShopId: shopId, ...(userId ? { userId } : {}) },
-    select: { etsyAccessToken: true, etsyRefreshToken: true, etsyTokenExpiresAt: true },
-  });
-  if (!credential?.etsyAccessToken) throw new Error('Etsy shop not found or not connected');
-  const plainRefresh = decryptIfNeeded(credential.etsyRefreshToken) as string | null;
-  if (!credential.etsyTokenExpiresAt || credential.etsyTokenExpiresAt.getTime() - Date.now() < 5 * 60 * 1000) {
-    if (!plainRefresh) throw new Error('No refresh token available');
-    return refreshEtsyToken(shopId, plainRefresh);
-  }
-  return decryptIfNeeded(credential.etsyAccessToken) as string;
-}
+// Locked (advisory-lock) token refresh lives in ./etsyToken, shared with the
+// clawd Etsy API and video upload routes.
+import { getEtsyAccessToken } from './etsyToken';
+export { getEtsyAccessToken };
 
 export async function callEtsyAPI(endpoint: string, accessToken: string, options: RequestInit = {}) {
-  const response = await fetch(`${ETSY_API_BASE}${endpoint}`, {
+  const response = await etsyFetch(`${ETSY_API_BASE}${endpoint}`, {
     ...options,
     headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_API_SECRET || '').trim()}`,
+      ...etsyAuthHeaders(accessToken),
       'Content-Type': 'application/json',
       ...options.headers,
     },
@@ -131,21 +143,31 @@ async function getListingSnapshot(shopId: string, listingId: bigint | number | s
     };
   }
 
-  const cached = await prisma.etsyListing.findUnique({
-    where: { etsyShopId_etsyListingId: { etsyShopId: shopId, etsyListingId: BigInt(listingId) } },
-  });
-  if (cached) {
+  // Prefer the LIVE listing as the conflict base. The EtsyListing cache can be
+  // hours old (it only refreshes on manual sync), and a stale cached
+  // updated_timestamp was one of the two causes of the historical false
+  // "Remote listing changed before sync" conflicts (the other being our own
+  // partial syncs — see the failure path in syncDraft). Fall back to the
+  // cache only if Etsy is unreachable.
+  try {
+    const token = accessToken || await getEtsyAccessToken(shopId, userId);
+    const remote = await callEtsyAPI(`/listings/${listingId}`, token);
+    return {
+      baseEtsyUpdatedTimestamp: remote.updated_timestamp || 0,
+      baseSnapshot: remote,
+    };
+  } catch (err: any) {
+    if (isEtsyDraftError(err)) throw err;
+    const cached = await prisma.etsyListing.findUnique({
+      where: { etsyShopId_etsyListingId: { etsyShopId: shopId, etsyListingId: BigInt(listingId) } },
+    });
+    if (!cached) throw err;
+    logger.warn('Draft snapshot fell back to cached listing', { shopId, listingId: String(listingId), error: err?.message });
     return {
       baseEtsyUpdatedTimestamp: cached.etsyUpdatedTimestamp || 0,
       baseSnapshot: toSerializable(cached),
     };
   }
-  const token = accessToken || await getEtsyAccessToken(shopId, userId);
-  const remote = await callEtsyAPI(`/listings/${listingId}`, token);
-  return {
-    baseEtsyUpdatedTimestamp: remote.updated_timestamp || remote.etsyUpdatedTimestamp || 0,
-    baseSnapshot: remote,
-  };
 }
 
 function buildInventoryCopyPayload(sourceInventoryData: JsonMap) {
@@ -445,11 +467,10 @@ function buildPersonalizationCopyPayload(personalization: JsonMap | null) {
 }
 
 async function linkExistingVideo(accessToken: string, shopId: string | number, listingId: bigint | number | string, videoId: bigint | number | string) {
-  const response = await fetch(`${ETSY_API_BASE}/shops/${shopId}/listings/${listingId}/videos`, {
+  const response = await etsyFetch(`${ETSY_API_BASE}/shops/${shopId}/listings/${listingId}/videos`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_API_SECRET || '').trim()}`,
+      ...etsyAuthHeaders(accessToken),
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: new URLSearchParams({ video_id: String(videoId) }),
@@ -461,19 +482,42 @@ async function linkExistingVideo(accessToken: string, shopId: string | number, l
   return response.json();
 }
 
+/** Throws unless the user owns this (active) Etsy shop. */
+export async function assertShopOwnership(userId: string, shopId: string) {
+  const shop = await prisma.etsyShop.findFirst({
+    where: { shopId: String(shopId), userId, isActive: true },
+    select: { id: true },
+  });
+  if (!shop) {
+    throw new EtsyDraftError('SHOP_NOT_FOUND', 'Etsy shop not found or not connected to this account', {
+      status: 404,
+      key: 'draftSync.shopNotFound',
+    });
+  }
+}
+
+function parseListingId(raw: string | number | bigint): bigint {
+  try {
+    return BigInt(raw);
+  } catch {
+    throw new EtsyDraftError('INVALID_LISTING_ID', 'Invalid listing id', { status: 400, key: 'draftSync.invalidListingId' });
+  }
+}
+
 export async function getOrCreateDraft(params: {
   userId: string;
   shopId: string;
   listingId: string | number | bigint;
   accessToken?: string;
 }) {
-  const listingId = BigInt(params.listingId);
+  await assertShopOwnership(params.userId, params.shopId);
+  const listingId = parseListingId(params.listingId);
   const existing = await prisma.etsyListingDraft.findFirst({
     where: {
       userId: params.userId,
       etsyShopId: params.shopId,
       etsyListingId: listingId,
-      status: { in: ['draft', 'failed', 'conflict'] },
+      status: { in: SYNCABLE_STATUSES },
     },
     orderBy: { updatedAt: 'desc' },
     include: { media: true, syncAttempts: { orderBy: { startedAt: 'desc' }, take: 5 } },
@@ -496,6 +540,120 @@ export async function getOrCreateDraft(params: {
   });
 }
 
+const CLIENT_MEDIA_KINDS = new Set(['image', 'video']);
+const CLIENT_MEDIA_OPERATIONS = new Set(['upload', 'delete', 'reorder', 'update_alt']);
+
+/**
+ * Whitelist client-supplied media ops. `localPath` is NEVER accepted from a
+ * client — only createDraftMediaFile (which writes the file itself) sets it.
+ * `sourceUrl` must be a public https URL (re-validated with DNS at fetch time).
+ */
+function sanitizeClientMedia(media: unknown): JsonMap[] {
+  if (media == null) return [];
+  if (!Array.isArray(media)) {
+    throw new EtsyDraftError('INVALID_MEDIA', 'media must be an array', { key: 'draftSync.invalidMedia' });
+  }
+  if (media.length > 50) {
+    throw new EtsyDraftError('INVALID_MEDIA', 'Too many media operations in one request', { key: 'draftSync.invalidMedia' });
+  }
+  return media.map((raw: any) => {
+    const kind = String(raw?.kind || '');
+    const operation = String(raw?.operation || '');
+    if (!CLIENT_MEDIA_KINDS.has(kind) || !CLIENT_MEDIA_OPERATIONS.has(operation)) {
+      throw new EtsyDraftError('INVALID_MEDIA', `Unsupported media operation ${kind}/${operation}`, { key: 'draftSync.invalidMedia' });
+    }
+    let etsyMediaId: string | null = null;
+    if (raw?.etsyMediaId != null && raw.etsyMediaId !== '') {
+      if (!/^\d{1,20}$/.test(String(raw.etsyMediaId))) {
+        throw new EtsyDraftError('INVALID_MEDIA', 'Invalid media id', { key: 'draftSync.invalidMedia' });
+      }
+      etsyMediaId = String(raw.etsyMediaId);
+    }
+    if (operation !== 'upload' && !etsyMediaId) {
+      throw new EtsyDraftError('INVALID_MEDIA', `${operation} requires an Etsy media id`, { key: 'draftSync.invalidMedia' });
+    }
+    let sourceUrl: string | null = null;
+    if (operation === 'upload') {
+      sourceUrl = assertAllowedSourceUrl(raw?.sourceUrl);
+    }
+    const rank = raw?.rank == null || raw.rank === '' ? null : Number(raw.rank);
+    if (rank != null && (!Number.isInteger(rank) || rank < 1 || rank > 20)) {
+      throw new EtsyDraftError('INVALID_MEDIA', 'Invalid media rank', { key: 'draftSync.invalidMedia' });
+    }
+    const altText = raw?.altText == null ? null : String(raw.altText).slice(0, 500);
+    const filename = raw?.filename == null ? null : String(raw.filename).replace(/[^\w.\- ]/g, '_').slice(0, 200);
+    const contentType = raw?.contentType == null ? null : String(raw.contentType).slice(0, 100);
+    const payload = raw?.payload && typeof raw.payload === 'object' && !Array.isArray(raw.payload)
+      ? { ...(raw.payload.name != null ? { name: String(raw.payload.name).slice(0, 200) } : {}) }
+      : null;
+    return { kind, operation, etsyMediaId, sourceUrl, rank, altText, filename, contentType, payload };
+  });
+}
+
+const QUEUED_ACTION_TYPES = new Set([
+  'create_listing', 'create_shop_section', 'create_shipping_profile', 'create_return_policy',
+  'publish', 'deactivate', 'renew', 'delete', 'copy', 'withdraw',
+]);
+
+function sanitizeQueuedActions(actions: unknown): JsonMap[] | undefined {
+  if (actions === undefined) return undefined;
+  if (!Array.isArray(actions)) {
+    throw new EtsyDraftError('INVALID_ACTIONS', 'queuedActions must be an array', { key: 'draftSync.invalidActions' });
+  }
+  return actions.map((a: any) => {
+    if (!a || typeof a !== 'object' || !QUEUED_ACTION_TYPES.has(String(a.type))) {
+      throw new EtsyDraftError('INVALID_ACTIONS', `Unsupported queued action ${a?.type}`, { key: 'draftSync.invalidActions' });
+    }
+    // Completion markers are server-owned (idempotent retries).
+    const { completedAt, completedResult, ...rest } = a;
+    return rest;
+  });
+}
+
+function hasDraftContent(draftLike: JsonMap, mediaCount: number, queuedActions: any[]) {
+  return (
+    !isEmptyPatch(draftLike.fieldPatch) ||
+    !isEmptyPatch(draftLike.taxonomyPatch) ||
+    !isEmptyPatch(draftLike.inventoryPatch) ||
+    !isEmptyPatch(draftLike.variationImagesPatch) ||
+    !isEmptyPatch(draftLike.personalizationPatch) ||
+    mediaCount > 0 ||
+    queuedActions.some((a) => a?.type !== 'delete')
+  );
+}
+
+function issuesFromErrors(errors: FieldError[]): DraftIssue[] {
+  return errors.map((e) => ({
+    field: e.field,
+    severity: e.severity,
+    key: e.key || 'validation.generic',
+    params: e.params,
+    message: e.message,
+  }));
+}
+
+function throwValidation(errors: FieldError[], code = 'VALIDATION_FAILED') {
+  const first = errors[0];
+  throw new EtsyDraftError(code, first.message, {
+    status: 400,
+    key: first.key,
+    params: first.params,
+    issues: issuesFromErrors(errors),
+  });
+}
+
+/** Rejects a staged delete mixed with any other change (and vice versa). */
+export function assertDeleteIsExclusive(draftLike: JsonMap, mediaCount: number, queuedActions: any[]) {
+  const hasDelete = queuedActions.some((a) => a?.type === 'delete');
+  if (hasDelete && hasDraftContent(draftLike, mediaCount, queuedActions)) {
+    throw new EtsyDraftError(
+      'DELETE_NOT_EXCLUSIVE',
+      'A listing delete cannot be combined with other staged changes. Sync or discard the other changes first, or remove the queued delete.',
+      { status: 409, key: 'draftSync.deleteNotExclusive' },
+    );
+  }
+}
+
 export async function upsertDraftPatch(params: {
   userId: string;
   shopId: string;
@@ -506,28 +664,52 @@ export async function upsertDraftPatch(params: {
   variationImages?: any;
   personalization?: any;
   queuedActions?: any[];
+  /** Action types to drop from the draft's queue (e.g. ['delete']). */
+  removeQueuedActions?: string[];
   media?: Array<JsonMap>;
   replaceFields?: boolean;
 }) {
+  if (params.fields !== undefined && (params.fields === null || typeof params.fields !== 'object' || Array.isArray(params.fields))) {
+    throw new EtsyDraftError('INVALID_FIELDS', 'fields must be an object', { key: 'draftSync.invalidFields' });
+  }
+  const media = sanitizeClientMedia(params.media);
+  const incomingActions = sanitizeQueuedActions(params.queuedActions);
+
+  // Block structurally-invalid values from ever entering the draft
+  // (block_save). block_sync issues are allowed here — the user may still be
+  // editing — and are enforced again at sync time.
+  const saveErrors = [
+    ...validateEtsyFieldPatch(params.fields),
+    ...(params.personalization !== undefined ? validateEtsyPersonalization(params.personalization) : []),
+  ].filter((e) => e.severity === 'block_save');
+  if (saveErrors.length) throwValidation(saveErrors);
+
   const draft = await getOrCreateDraft(params);
+  const removeTypes = new Set((params.removeQueuedActions || []).map(String));
+  let nextActions = incomingActions !== undefined
+    ? mergeQueuedActions((((draft as any).queuedActions as any[]) || []), incomingActions)
+    : (((draft as any).queuedActions as any[]) || []);
+  if (removeTypes.size) nextActions = nextActions.filter((a: any) => !removeTypes.has(String(a?.type)));
+
   const data: JsonMap = {
-    status: 'draft',
-    lastSyncError: null,
+    // A conflict stays a conflict until the user explicitly force-syncs or
+    // discards; editing must not silently clear it.
+    status: (draft as any).status === 'conflict' ? 'conflict' : 'draft',
+    lastSyncError: (draft as any).status === 'conflict' ? (draft as any).lastSyncError : null,
     fieldPatch: params.replaceFields ? (params.fields || {}) : mergeJson((draft as any).fieldPatch, params.fields),
     taxonomyPatch: params.taxonomy !== undefined ? mergeJson((draft as any).taxonomyPatch, params.taxonomy) : (draft as any).taxonomyPatch,
     inventoryPatch: params.inventory !== undefined ? mergeJson((draft as any).inventoryPatch, params.inventory) : (draft as any).inventoryPatch,
     variationImagesPatch: params.variationImages !== undefined ? params.variationImages : (draft as any).variationImagesPatch,
     personalizationPatch: params.personalization !== undefined ? params.personalization : (draft as any).personalizationPatch,
-    queuedActions: params.queuedActions !== undefined
-      ? mergeQueuedActions((((draft as any).queuedActions as any[]) || []), params.queuedActions)
-      : (draft as any).queuedActions,
+    queuedActions: nextActions,
   };
+  // NOTE: the conflict base (baseEtsyUpdatedTimestamp / baseSnapshot) is
+  // deliberately NOT re-snapshotted here for failed/conflict drafts. Doing so
+  // silently "resolved" real conflicts. The base only moves when (a) our own
+  // sync mutates Etsy, or (b) the user force-syncs.
 
-  if (['failed', 'conflict'].includes((draft as any).status)) {
-    const snapshot = await getListingSnapshot(params.shopId, params.listingId, params.userId);
-    data.baseEtsyUpdatedTimestamp = snapshot.baseEtsyUpdatedTimestamp;
-    data.baseSnapshot = snapshot.baseSnapshot;
-  }
+  const existingMediaCount = Array.isArray((draft as any).media) ? (draft as any).media.length : 0;
+  assertDeleteIsExclusive(data, existingMediaCount + media.length, nextActions);
 
   const updated = await prisma.etsyListingDraft.update({
     where: { id: draft.id },
@@ -535,18 +717,18 @@ export async function upsertDraftPatch(params: {
     include: { media: true, syncAttempts: { orderBy: { startedAt: 'desc' }, take: 5 } },
   });
 
-  if (params.media?.length) {
-    const replaceableOps = params.media.filter((media) => (
-      ['reorder', 'update_alt'].includes(String(media.operation)) && media.etsyMediaId != null
+  if (media.length) {
+    const replaceableOps = media.filter((m) => (
+      ['reorder', 'update_alt'].includes(String(m.operation)) && m.etsyMediaId != null
     ));
     if (replaceableOps.length) {
       await prisma.etsyDraftMedia.deleteMany({
         where: {
           draftId: draft.id,
-          OR: replaceableOps.map((media) => ({
-            kind: media.kind,
-            operation: media.operation,
-            etsyMediaId: BigInt(media.etsyMediaId),
+          OR: replaceableOps.map((m) => ({
+            kind: m.kind,
+            operation: m.operation,
+            etsyMediaId: BigInt(m.etsyMediaId),
           })),
         },
       });
@@ -557,10 +739,10 @@ export async function upsertDraftPatch(params: {
       select: { kind: true, operation: true, etsyMediaId: true },
     });
     const existingMediaKeys = new Set(existingMedia.map(mediaIdentity).filter(Boolean));
-    const mediaToCreate = params.media.filter((media) => {
-      const key = mediaIdentity(media);
+    const mediaToCreate = media.filter((m) => {
+      const key = mediaIdentity(m);
       if (!key) return true;
-      if (media.operation === 'delete' && existingMediaKeys.has(key)) return false;
+      if (m.operation === 'delete' && existingMediaKeys.has(key)) return false;
       existingMediaKeys.add(key);
       return true;
     });
@@ -573,19 +755,19 @@ export async function upsertDraftPatch(params: {
     }
 
     await prisma.etsyDraftMedia.createMany({
-      data: mediaToCreate.map((media) => ({
+      data: mediaToCreate.map((m) => ({
         draftId: draft.id,
-        etsyListingId: BigInt(params.listingId),
-        kind: media.kind,
-        operation: media.operation,
-        etsyMediaId: media.etsyMediaId != null ? BigInt(media.etsyMediaId) : null,
-        localPath: media.localPath,
-        sourceUrl: media.sourceUrl,
-        contentType: media.contentType,
-        filename: media.filename,
-        rank: media.rank,
-        altText: media.altText,
-        payload: media.payload,
+        etsyListingId: BigInt(draft.etsyListingId),
+        kind: m.kind,
+        operation: m.operation,
+        etsyMediaId: m.etsyMediaId != null ? BigInt(m.etsyMediaId) : null,
+        localPath: null,
+        sourceUrl: m.sourceUrl,
+        contentType: m.contentType,
+        filename: m.filename,
+        rank: m.rank,
+        altText: m.altText,
+        payload: m.payload ?? undefined,
       })),
     });
   }
@@ -596,9 +778,28 @@ export async function upsertDraftPatch(params: {
   });
 }
 
+/** Remove queued actions (by type) from a draft the user owns. */
+export async function removeQueuedActions(draftId: string, userId: string, types: string[]) {
+  const draft = await prisma.etsyListingDraft.findFirst({ where: { id: draftId, userId } });
+  if (!draft) throw new EtsyDraftError('DRAFT_NOT_FOUND', 'Draft not found', { status: 404, key: 'draftSync.draftNotFound' });
+  if (!SYNCABLE_STATUSES.includes(draft.status)) {
+    throw new EtsyDraftError('DRAFT_NOT_EDITABLE', `Draft is not editable (${draft.status})`, { status: 409, key: 'draftSync.draftNotEditable', params: { status: draft.status } });
+  }
+  const remove = new Set(types.map(String));
+  const next = (((draft.queuedActions as any[]) || [])).filter((a: any) => !remove.has(String(a?.type)));
+  return prisma.etsyListingDraft.update({
+    where: { id: draft.id },
+    data: { queuedActions: next },
+    include: { media: true, syncAttempts: { orderBy: { startedAt: 'desc' }, take: 5 } },
+  });
+}
+
 export function draftUploadDir(userId: string, draftId: string) {
   return path.join(UPLOAD_ROOT, userId, draftId);
 }
+
+const UPLOAD_KINDS = new Set(['image', 'video']);
+const UPLOAD_OPERATIONS = new Set(['upload', 'ai_upload']);
 
 export async function createDraftMediaFile(params: {
   userId: string;
@@ -613,21 +814,39 @@ export async function createDraftMediaFile(params: {
   altText?: string;
   payload?: any;
 }) {
+  if (!UPLOAD_KINDS.has(params.kind) || !UPLOAD_OPERATIONS.has(params.operation)) {
+    throw new EtsyDraftError('INVALID_MEDIA', `Unsupported media upload ${params.kind}/${params.operation}`, { key: 'draftSync.invalidMedia' });
+  }
+  const draft = await prisma.etsyListingDraft.findFirst({
+    where: { id: params.draftId, userId: params.userId },
+    select: { id: true, status: true, queuedActions: true, etsyListingId: true },
+  });
+  if (!draft) throw new EtsyDraftError('DRAFT_NOT_FOUND', 'Draft not found', { status: 404, key: 'draftSync.draftNotFound' });
+  if (((draft.queuedActions as any[]) || []).some((a: any) => a?.type === 'delete')) {
+    throw new EtsyDraftError('DELETE_NOT_EXCLUSIVE',
+      'A listing delete cannot be combined with other staged changes. Sync or discard the other changes first, or remove the queued delete.',
+      { status: 409, key: 'draftSync.deleteNotExclusive' });
+  }
+  // userId / draftId are cuids from our DB, but never trust path segments.
+  if (!/^[\w-]+$/.test(params.userId) || !/^[\w-]+$/.test(params.draftId)) {
+    throw new EtsyDraftError('INVALID_MEDIA', 'Invalid upload path', { key: 'draftSync.invalidMedia' });
+  }
   const dir = draftUploadDir(params.userId, params.draftId);
   await fs.promises.mkdir(dir, { recursive: true });
-  const safeName = `${Date.now()}-${params.filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+  const safeName = `${Date.now()}-${params.filename.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/^\.+/, '').slice(0, 150)}`;
   const target = path.join(dir, safeName);
   await fs.promises.copyFile(params.tempPath, target);
+  const rank = params.rank != null && Number.isInteger(params.rank) && params.rank >= 1 && params.rank <= 20 ? params.rank : undefined;
   return prisma.etsyDraftMedia.create({
     data: {
       draftId: params.draftId,
-      etsyListingId: BigInt(params.listingId),
+      etsyListingId: BigInt(draft.etsyListingId),
       kind: params.kind,
       operation: params.operation,
       localPath: target,
       filename: params.filename,
       contentType: params.contentType,
-      rank: params.rank,
+      rank,
       altText: params.altText,
       payload: params.payload,
     },
@@ -642,14 +861,11 @@ async function uploadImageFromBuffer(accessToken: string, shopId: string, listin
   if (opts.rank !== undefined && opts.rank !== null) formData.append('rank', String(opts.rank));
   if (opts.altText !== undefined && opts.altText !== null) formData.append('alt_text', String(opts.altText));
 
-  const response = await fetch(`${ETSY_API_BASE}/shops/${shopId}/listings/${listingId}/images`, {
+  const response = await etsyFetch(`${ETSY_API_BASE}/shops/${shopId}/listings/${listingId}/images`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_API_SECRET || '').trim()}`,
-    },
+    headers: etsyAuthHeaders(accessToken),
     body: formData,
-  });
+  }, 90_000);
   if (!response.ok) throw new Error(`Image upload failed: ${response.status} - ${await response.text()}`);
   return response.json();
 }
@@ -791,14 +1007,11 @@ async function reorderListingImage(
   if (opts.rank !== undefined && opts.rank !== null) formData.append('rank', String(opts.rank));
   if (opts.altText !== undefined && opts.altText !== null) formData.append('alt_text', String(opts.altText));
 
-  const response = await fetch(`${ETSY_API_BASE}/shops/${shopId}/listings/${listingId}/images`, {
+  const response = await etsyFetch(`${ETSY_API_BASE}/shops/${shopId}/listings/${listingId}/images`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_API_SECRET || '').trim()}`,
-    },
+    headers: etsyAuthHeaders(accessToken),
     body: formData,
-  });
+  }, 90_000);
   if (!response.ok) throw new Error(`Image reassign failed: ${response.status} - ${await response.text()}`);
   return response.json();
 }
@@ -817,15 +1030,14 @@ async function uploadVideoFromBuffer(accessToken: string, shopId: string, listin
   body.set(new Uint8Array(buffer), offset); offset += buffer.length;
   body.set(footer, offset);
 
-  const response = await fetch(`${ETSY_API_BASE}/shops/${shopId}/listings/${listingId}/videos`, {
+  const response = await etsyFetch(`${ETSY_API_BASE}/shops/${shopId}/listings/${listingId}/videos`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_API_SECRET || '').trim()}`,
+      ...etsyAuthHeaders(accessToken),
       'Content-Type': `multipart/form-data; boundary=${boundary}`,
     },
     body,
-  });
+  }, 300_000);
   if (!response.ok) throw new Error(`Video upload failed: ${response.status} - ${await response.text()}`);
   return response.json();
 }
@@ -906,6 +1118,23 @@ function isMediaOnlyDraft(draft: any, queuedActions: any[]) {
   );
 }
 
+/**
+ * Bytes for a staged upload. localPath is only honoured inside the upload
+ * root (and is only ever written by createDraftMediaFile); sourceUrl goes
+ * through the SSRF-hardened fetcher.
+ */
+async function loadStagedMediaBuffer(media: any, kind: 'image' | 'video'): Promise<Buffer> {
+  if (media.localPath) return readDraftUploadFile(media.localPath);
+  if (media.sourceUrl) {
+    const { buffer } = await fetchSourceUrlSafely(String(media.sourceUrl), {
+      maxBytes: kind === 'video' ? MAX_VIDEO_SOURCE_BYTES : MAX_IMAGE_SOURCE_BYTES,
+      expect: kind,
+    });
+    return buffer;
+  }
+  throw new EtsyDraftError('MEDIA_SOURCE_MISSING', 'Staged media has neither a file nor a URL', { key: 'draftSync.mediaFileMissing' });
+}
+
 async function syncMediaOperation(accessToken: string, draft: any, media: any, syncedListingId?: bigint, syncedShopId?: string, context?: MediaSyncContext) {
   const listingId = syncedListingId || BigInt(media.etsyListingId);
   const shopId = syncedShopId || draft.etsyShopId;
@@ -939,7 +1168,7 @@ async function syncMediaOperation(accessToken: string, draft: any, media: any, s
     }
   }
   if (media.kind === 'image' && ['upload', 'ai_upload'].includes(media.operation)) {
-    const buffer = media.localPath ? await fs.promises.readFile(media.localPath) : Buffer.from(await (await fetch(media.sourceUrl)).arrayBuffer());
+    const buffer = await loadStagedMediaBuffer(media, 'image');
     const uploaded = await uploadImageFromBuffer(accessToken, shopId, listingId, buffer, media.contentType || 'image/jpeg', {
       filename: media.filename,
       rank: media.rank,
@@ -975,7 +1204,7 @@ async function syncMediaOperation(accessToken: string, draft: any, media: any, s
     }
   }
   if (media.kind === 'video' && media.operation === 'upload') {
-    const buffer = media.localPath ? await fs.promises.readFile(media.localPath) : Buffer.from(await (await fetch(media.sourceUrl)).arrayBuffer());
+    const buffer = await loadStagedMediaBuffer(media, 'video');
     return uploadVideoFromBuffer(accessToken, shopId, listingId, buffer, media.contentType || 'video/mp4', media.filename || 'video.mp4', media.payload?.name);
   }
   return { skipped: true, mediaId: media.id, operation: media.operation };
@@ -992,7 +1221,7 @@ function resolveTemporaryIds(fields: JsonMap, idMap: Record<string, number>) {
   return resolved;
 }
 
-async function refreshListingCache(shopId: string, listingId: bigint, accessToken: string) {
+export async function refreshListingCache(shopId: string, listingId: bigint, accessToken: string) {
   const listing = await callEtsyAPI(`/listings/${listingId}`, accessToken);
   let firstImage: any = null;
   let imageCount = 0;
@@ -1072,6 +1301,7 @@ async function refreshListingCache(shopId: string, listingId: bigint, accessToke
       syncedAt: new Date(),
     },
   });
+  return listing;
 }
 
 // A sync in flight when the process dies (deploys restart kolayxport.service)
@@ -1102,31 +1332,389 @@ export async function recoverStaleSyncingDrafts(userId: string, shopId?: string)
   return ids.length;
 }
 
-export async function syncDraft(draftId: string, userId: string) {
-  const draft = await prisma.etsyListingDraft.findFirst({
-    where: { id: draftId, userId },
-    include: { media: { orderBy: { createdAt: 'asc' } } },
+/**
+ * Copy a listing (queued `copy` action). Returns the new listing id. Calls
+ * `onCreated` as soon as the new listing + inventory exist so the caller can
+ * mark the action completed (idempotent retries).
+ */
+async function executeCopyAction(
+  accessToken: string,
+  draft: any,
+  action: JsonMap,
+  results: any[],
+  warnings: SyncWarning[],
+  onCreated: (newListingId: bigint) => Promise<void>,
+): Promise<bigint> {
+    const targetShopId = String(action.targetShopId || draft.etsyShopId);
+    if (targetShopId !== String(draft.etsyShopId)) await assertShopOwnership(draft.userId, targetShopId);
+    const sourceListingId = String(draft.etsyListingId);
+    const [
+      source,
+      sourceInventoryResult,
+      sourcePropertiesResult,
+      sourcePersonalizationResult,
+      sourceVideosResult,
+      sourceVariationImagesResult,
+    ] = await Promise.all([
+      callEtsyAPI(`/listings/${sourceListingId}`, accessToken),
+      callEtsyAPI(`/listings/${sourceListingId}/inventory`, accessToken).catch((err) => {
+        logger.warn('Copy listing inventory fetch failed', { sourceListingId, error: err.message });
+        return null;
+      }),
+      callEtsyAPI(`/shops/${draft.etsyShopId}/listings/${sourceListingId}/properties`, accessToken).catch((err) => {
+        logger.warn('Copy listing properties fetch failed', { sourceListingId, error: err.message });
+        return null;
+      }),
+      callEtsyAPI(`/listings/${sourceListingId}/personalization?supports_multiple_personalization_questions=true`, accessToken).catch((err) => {
+        logger.warn('Copy listing personalization fetch failed', { sourceListingId, error: err.message });
+        return null;
+      }),
+      callEtsyAPI(`/listings/${sourceListingId}/videos`, accessToken).catch((err) => {
+        logger.warn('Copy listing videos fetch failed', { sourceListingId, error: err.message });
+        return null;
+      }),
+      callEtsyAPI(`/shops/${draft.etsyShopId}/listings/${sourceListingId}/variation-images`, accessToken).catch((err) => {
+        logger.warn('Copy listing variation images fetch failed', { sourceListingId, error: err.message });
+        return null;
+      }),
+    ]);
+    const price = source.price ? source.price.amount / (source.price.divisor || 100) : 0;
+    const copyPayload: JsonMap = {
+      title: (`COPY - ${source.title || ''}`).substring(0, 140),
+      description: source.description || '',
+      price,
+      quantity: source.quantity || 1,
+      taxonomy_id: source.taxonomy_id,
+      who_made: source.who_made || 'i_did',
+      when_made: source.when_made || 'made_to_order',
+      is_supply: source.is_supply ?? false,
+      state: 'draft',
+      type: source.type || 'physical',
+    };
+    if (source.shipping_profile_id) copyPayload.shipping_profile_id = source.shipping_profile_id;
+    if (source.return_policy_id) copyPayload.return_policy_id = source.return_policy_id;
+    if (source.tags?.length) copyPayload.tags = source.tags.slice(0, 13);
+    if (source.materials?.length) copyPayload.materials = source.materials.slice(0, 13);
+    if (source.shop_section_id) copyPayload.shop_section_id = source.shop_section_id;
+    if (source.readiness_state_id) copyPayload.readiness_state_id = source.readiness_state_id;
+    const created = await callEtsyAPI(`/shops/${targetShopId}/listings?legacy=false`, accessToken, {
+      method: 'POST',
+      body: JSON.stringify(copyPayload),
+    });
+    const syncedListingId = BigInt(created.listing_id);
+    results.push(created);
+
+    const inventoryPayload = sourceInventoryResult ? buildInventoryCopyPayload(sourceInventoryResult) : null;
+    if (inventoryPayload) {
+      try {
+        const inventoryCopyResult = await callEtsyAPI(`/listings/${syncedListingId}/inventory?max_variations_supported=3`, accessToken, {
+          method: 'PUT',
+          body: JSON.stringify(inventoryPayload),
+        });
+        results.push(inventoryCopyResult);
+        logger.info('Draft copy inventory copied', {
+          sourceListingId,
+          newListingId: String(syncedListingId),
+          productCount: inventoryPayload.products.length,
+          priceOnProperty: inventoryPayload.price_on_property,
+          quantityOnProperty: inventoryPayload.quantity_on_property,
+          skuOnProperty: inventoryPayload.sku_on_property,
+        });
+      } catch (inventoryCopyErr: any) {
+        logger.error('Draft copy inventory copy failed', inventoryCopyErr, {
+          sourceListingId,
+          newListingId: String(syncedListingId),
+          productCount: inventoryPayload.products.length,
+          errorMessage: inventoryCopyErr.message,
+        });
+        await callEtsyAPI(`/listings/${syncedListingId}`, accessToken, { method: 'DELETE' }).catch((deleteErr: any) => {
+          logger.warn('Partial copied listing cleanup failed after inventory copy error', {
+            sourceListingId,
+            newListingId: String(syncedListingId),
+            error: deleteErr.message,
+          });
+        });
+        throw inventoryCopyErr;
+      }
+    }
+
+    // The new listing now exists with its inventory: persist that fact before
+    // the best-effort extras so a retry never creates a second copy.
+    await onCreated(syncedListingId);
+
+    const sourceProperties = (sourcePropertiesResult?.results || []) as JsonMap[];
+    for (const property of sourceProperties) {
+      const propertyPayload = buildListingPropertyCopyPayload(property);
+      if (!property.property_id || !propertyPayload) continue;
+      try {
+        results.push(await callEtsyAPI(`/shops/${targetShopId}/listings/${syncedListingId}/properties/${property.property_id}`, accessToken, {
+          method: 'PUT',
+          body: JSON.stringify(propertyPayload),
+        }));
+      } catch (propertyCopyErr: any) {
+        logger.warn('Draft copy listing property failed', {
+          sourceListingId,
+          newListingId: String(syncedListingId),
+          propertyId: property.property_id,
+          error: propertyCopyErr.message,
+        });
+      }
+    }
+
+    const personalizationPayload = buildPersonalizationCopyPayload(sourcePersonalizationResult);
+    if (personalizationPayload) {
+      try {
+        results.push(await callEtsyAPI(`/shops/${targetShopId}/listings/${syncedListingId}/personalization?supports_multiple_personalization_questions=true`, accessToken, {
+          method: 'POST',
+          body: JSON.stringify(personalizationPayload),
+        }));
+      } catch (personalizationCopyErr: any) {
+        logger.warn('Draft copy personalization failed', {
+          sourceListingId,
+          newListingId: String(syncedListingId),
+          error: personalizationCopyErr.message,
+        });
+      }
+    }
+
+    const imageIdMap: Record<string, number> = {};
+    let imageCopyAttempted = 0;
+    let imageCopySucceeded = 0;
+    let imageCopyLastError: string | null = null;
+    try {
+      const images = await callEtsyAPI(`/listings/${sourceListingId}/images`, accessToken);
+      const sourceImageList = ((images.results || []) as any[]).sort((a, b) => (a.rank || 1) - (b.rank || 1));
+      imageCopyAttempted = sourceImageList.length;
+      for (const image of sourceImageList) {
+        if (!image.url_fullxfull) continue;
+        try {
+          const imageResp = await fetch(image.url_fullxfull, { signal: AbortSignal.timeout(60_000) });
+          if (!imageResp.ok) {
+            imageCopyLastError = `download ${imageResp.status}`;
+            logger.warn('Copy listing: source image download failed', { sourceListingId, sourceImageId: image.listing_image_id, status: imageResp.status });
+            continue;
+          }
+          const buffer = Buffer.from(await imageResp.arrayBuffer());
+          const uploadedImage = await uploadImageFromBuffer(accessToken, targetShopId, syncedListingId, buffer, imageResp.headers.get('content-type') || 'image/jpeg', {
+            filename: 'copy-image.jpg',
+            rank: image.rank || 1,
+            overwrite: false,
+          });
+          if (image.listing_image_id && uploadedImage?.listing_image_id) {
+            imageIdMap[String(image.listing_image_id)] = Number(uploadedImage.listing_image_id);
+          }
+          imageCopySucceeded++;
+          results.push(uploadedImage);
+        } catch (perImageErr: any) {
+          imageCopyLastError = perImageErr.message || String(perImageErr);
+          logger.warn('Copy listing: per-image upload failed (continuing)', { sourceListingId, sourceImageId: image.listing_image_id, error: imageCopyLastError });
+        }
+      }
+    } catch (copyImageErr: any) {
+      imageCopyLastError = copyImageErr.message || String(copyImageErr);
+      logger.warn('Copy listing image copy partially failed', { error: imageCopyLastError });
+    }
+    logger.info('Copy listing image copy summary', {
+      sourceListingId,
+      newListingId: String(syncedListingId),
+      attempted: imageCopyAttempted,
+      succeeded: imageCopySucceeded,
+      lastError: imageCopyLastError,
+    });
+    if (imageCopyAttempted > 0 && imageCopySucceeded === 0) {
+      // Partial-success semantics aren't honored downstream — surface
+      // this on the draft itself so the UI can show a clear warning
+      // instead of silently leaving the user with a 0-image listing.
+      warnings.push({
+        type: 'copy_images_failed',
+        key: 'draftSync.copyImagesFailed',
+        params: { attempted: imageCopyAttempted },
+        message: `Copy: 0 of ${imageCopyAttempted} source images copied${imageCopyLastError ? ` (last error: ${imageCopyLastError.slice(0, 200)})` : ''}`,
+      });
+    }
+
+    const sourceVariationImages = (sourceVariationImagesResult?.results || []) as JsonMap[];
+    const copiedVariationImages = sourceVariationImages
+      .map((variationImage) => ({
+        ...variationImage,
+        listing_image_id: imageIdMap[String(variationImage.listing_image_id)],
+      }))
+      .filter((variationImage) => variationImage.listing_image_id);
+    if (copiedVariationImages.length > 0) {
+      try {
+        results.push(await callEtsyAPI(`/shops/${targetShopId}/listings/${syncedListingId}/variation-images`, accessToken, {
+          method: 'POST',
+          body: JSON.stringify({ variation_images: copiedVariationImages }),
+        }));
+      } catch (variationImageCopyErr: any) {
+        logger.warn('Draft copy variation images failed', {
+          sourceListingId,
+          newListingId: String(syncedListingId),
+          count: copiedVariationImages.length,
+          error: variationImageCopyErr.message,
+        });
+      }
+    }
+
+    const sourceVideos = (sourceVideosResult?.results || []) as JsonMap[];
+    for (const video of sourceVideos.slice(0, 1)) {
+      try {
+        if (video.video_id) {
+          results.push(await linkExistingVideo(accessToken, targetShopId, syncedListingId, video.video_id));
+        } else if (video.video_url) {
+          const videoResp = await fetch(video.video_url, { signal: AbortSignal.timeout(300_000) });
+          if (!videoResp.ok) throw new Error(`Video fetch failed: ${videoResp.status}`);
+          const buffer = Buffer.from(await videoResp.arrayBuffer());
+          results.push(await uploadVideoFromBuffer(
+            accessToken,
+            targetShopId,
+            syncedListingId,
+            buffer,
+            videoResp.headers.get('content-type') || 'video/mp4',
+            `copy-video-${sourceListingId}.mp4`,
+            `Copied video ${sourceListingId}`
+          ));
+        }
+      } catch (videoCopyErr: any) {
+        logger.warn('Draft copy video failed', {
+          sourceListingId,
+          newListingId: String(syncedListingId),
+          videoId: video.video_id,
+          error: videoCopyErr.message,
+        });
+      }
+    }
+  return syncedListingId;
+}
+
+export type SyncWarning = {
+  type: string;
+  /** i18n key relative to the `etsy` namespace. */
+  key: string;
+  params?: Record<string, string | number>;
+  message: string;
+};
+
+export type SyncDraftOptions = {
+  /**
+   * Proceed even if the listing changed on Etsy after the draft was staged
+   * (re-bases the draft onto the current remote state first). Default false.
+   */
+  force?: boolean;
+};
+
+export type SyncDraftResult = {
+  status: 'success' | 'conflict';
+  draftId: string;
+  count?: number;
+  deleted?: boolean;
+  etsyListingId?: string;
+  warnings?: SyncWarning[];
+  code?: string;
+  key?: string;
+  error?: string;
+  changedFields?: string[];
+};
+
+// updateListing (PATCH /shops/{shop_id}/listings/{listing_id}) does NOT accept
+// these (Etsy OAS, checked 2026-10-14): price/quantity live on inventory
+// offerings, and processing time moved to offering.readiness_state_id
+// (processing profiles). Etsy silently ignores them on PATCH, so they are
+// routed to PUT /listings/{id}/inventory instead.
+const INVENTORY_ROUTED_KEYS = ['price', 'quantity', 'readiness_state_id', 'processing_min', 'processing_max'] as const;
+const CREATE_ACTION_TYPES = ['create_shop_section', 'create_shipping_profile', 'create_return_policy'];
+const STATE_ACTION_BODIES: Record<string, JsonMap> = {
+  publish: { state: 'active' },
+  deactivate: { state: 'inactive' },
+  renew: { state: 'active' },
+};
+
+function markActionCompleted(actions: any[], index: number, completedResult: JsonMap = {}) {
+  const next = [...actions];
+  next[index] = { ...next[index], completedAt: new Date().toISOString(), completedResult };
+  return next;
+}
+
+async function persistQueuedActions(draftId: string, actions: any[]) {
+  await prisma.etsyListingDraft.update({ where: { id: draftId }, data: { queuedActions: actions } });
+}
+
+function comparableListingValue(key: string, value: any) {
+  if (value === undefined || value === null || value === '') return null;
+  if (key === 'price' && typeof value === 'object') return Math.round((Number(value.amount) / (Number(value.divisor) || 100)) * 100);
+  if (key === 'price') return Math.round(Number(value) * 100);
+  if (Array.isArray(value)) return JSON.stringify(value.map((v) => String(v)));
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
+/**
+ * Which of `keys` differ between the base snapshot and the live listing.
+ * Returns null when the base snapshot is not a raw Etsy listing (old drafts
+ * snapshotted from the DB cache), i.e. a field-level answer is impossible.
+ */
+export function remoteChangedKeys(baseSnapshot: any, remote: any, keys: string[]): string[] | null {
+  if (!baseSnapshot || typeof baseSnapshot !== 'object' || !('listing_id' in baseSnapshot)) return null;
+  return keys.filter((key) => {
+    if (!(key in baseSnapshot) || !(key in remote)) return false; // not observable via getListing
+    return comparableListingValue(key, baseSnapshot[key]) !== comparableListingValue(key, remote[key]);
   });
-  if (!draft) throw new Error('Draft not found');
-  if (!['draft', 'failed', 'conflict'].includes(draft.status)) {
-    // A draft can be orphaned in 'syncing' when the process dies mid-sync
-    // (deploys restart kolayxport.service). Without recovery it is stuck
-    // forever. Treat a long-stale 'syncing' as interrupted: close the orphaned
-    // attempt and let this sync proceed — media re-sync is idempotent and
-    // conflict protection still guards against partial remote changes.
-    const isStaleSyncing =
-      draft.status === 'syncing' &&
-      Date.now() - new Date(draft.updatedAt).getTime() > STALE_SYNCING_MS;
-    if (!isStaleSyncing) throw new Error(`Draft is not syncable (${draft.status})`);
-    logger.warn('Recovering draft stuck in syncing (interrupted sync)', { draftId: draft.id, stuckSince: draft.updatedAt });
+}
+
+function firstOfferingReadiness(inventory: any): number | null {
+  for (const product of Array.isArray(inventory?.products) ? inventory.products : []) {
+    for (const offering of Array.isArray(product?.offerings) ? product.offerings : []) {
+      if (offering?.readiness_state_id) return Number(offering.readiness_state_id);
+    }
+  }
+  return null;
+}
+
+export async function syncDraft(draftId: string, userId: string, options: SyncDraftOptions = {}): Promise<SyncDraftResult> {
+  const force = Boolean(options.force);
+
+  // ---- Atomic claim -------------------------------------------------------
+  // A single conditional UPDATE so two concurrent sync requests (double click,
+  // bulk + single, two tabs) can never both run. A long-stale 'syncing' row
+  // (process died mid-sync) is claimable too.
+  const before = await prisma.etsyListingDraft.findFirst({ where: { id: draftId, userId }, select: { status: true } });
+  if (!before) throw new EtsyDraftError('DRAFT_NOT_FOUND', 'Draft not found', { status: 404, key: 'draftSync.draftNotFound' });
+  const staleCutoff = new Date(Date.now() - STALE_SYNCING_MS);
+  const claim = await prisma.etsyListingDraft.updateMany({
+    where: {
+      id: draftId,
+      userId,
+      OR: [
+        { status: { in: SYNCABLE_STATUSES } },
+        { status: 'syncing', updatedAt: { lt: staleCutoff } },
+      ],
+    },
+    data: { status: 'syncing' },
+  });
+  if (claim.count === 0) {
+    const current = await prisma.etsyListingDraft.findFirst({ where: { id: draftId, userId }, select: { status: true } });
+    const status = current?.status || before.status;
+    throw new EtsyDraftError('DRAFT_NOT_SYNCABLE', `Draft is not syncable (${status})`, {
+      status: 409,
+      key: 'draftSync.notSyncable',
+      params: { status },
+    });
+  }
+  if (before.status === 'syncing') {
+    logger.warn('Recovering draft stuck in syncing (interrupted sync)', { draftId });
     await prisma.etsyDraftSyncAttempt.updateMany({
-      where: { draftId: draft.id, status: 'running' },
+      where: { draftId, status: 'running' },
       data: { status: 'failed', finishedAt: new Date(), error: 'Interrupted (process restarted mid-sync); recovered as stale' },
     });
   }
 
-  const accessToken = await getEtsyAccessToken(draft.etsyShopId, userId);
-  const queuedActions = ((draft.queuedActions as any[]) || []);
+  const draft = await prisma.etsyListingDraft.findFirst({
+    where: { id: draftId, userId },
+    include: { media: { orderBy: { createdAt: 'asc' } } },
+  });
+  if (!draft) throw new EtsyDraftError('DRAFT_NOT_FOUND', 'Draft not found', { status: 404, key: 'draftSync.draftNotFound' });
+
+  let queuedActions: any[] = ((draft.queuedActions as any[]) || []);
   const requestPlan = {
     fields: draft.fieldPatch,
     taxonomy: draft.taxonomyPatch,
@@ -1135,54 +1723,108 @@ export async function syncDraft(draftId: string, userId: string) {
     media: draft.media.map((m: any) => ({ id: m.id, kind: m.kind, operation: m.operation, etsyMediaId: m.etsyMediaId, rank: m.rank })),
     variationImages: draft.variationImagesPatch,
     queuedActions,
+    force,
   };
   const attempt = await prisma.etsyDraftSyncAttempt.create({
-    data: { draftId: draft.id, status: 'running', requestPlan },
+    data: { draftId: draft.id, status: 'running', requestPlan: toSerializable(requestPlan) as any },
   });
 
-  await prisma.etsyListingDraft.update({ where: { id: draft.id }, data: { status: 'syncing', lastSyncError: null } });
   const syncedMediaIds: string[] = [];
+  const results: any[] = [];
+  const warnings: SyncWarning[] = [];
+  let syncedListingId = BigInt(draft.etsyListingId);
+  let accessToken = '';
+  let deletedListing = false;
   try {
-    let syncedListingId = BigInt(draft.etsyListingId);
+    accessToken = await getEtsyAccessToken(draft.etsyShopId, userId);
     const isNewLocalListing = syncedListingId < BigInt(0);
-    const hasDeleteAction = queuedActions.some((action) => action.type === 'delete');
-    const hasCopyAction = queuedActions.some((action) => action.type === 'copy');
-    const results: any[] = [];
+    const pendingActions = () => queuedActions.filter((a) => !a?.completedAt);
+    const hasDeleteAction = pendingActions().some((action) => action.type === 'delete');
     const idMap: Record<string, number> = {};
-    let fields = { ...((draft.fieldPatch as JsonMap) || {}) };
-    let deletedListing = false;
-    const mediaOnlyDraft = isMediaOnlyDraft(draft, queuedActions);
+    let fields: JsonMap = { ...((draft.fieldPatch as JsonMap) || {}) };
+    const mediaOnlyDraft = isMediaOnlyDraft(draft, pendingActions());
+    const copyOnlyDraft = pendingActions().length > 0
+      && pendingActions().every((a) => a.type === 'copy')
+      && draft.media.length === 0
+      && isMediaOnlyDraft({ ...draft, media: [{}] }, []); // i.e. every patch is empty
+    const taxonomy = draft.taxonomyPatch as JsonMap | null;
+    const personalization = draft.personalizationPatch as JsonMap | null;
+    const inventory = draft.inventoryPatch as JsonMap | null;
+    const variationImages = draft.variationImagesPatch as JsonMap | null;
 
-    // Hoisted out of the if-block so the PATCH builder below can backfill the
-    // Etsy provenance trio (who_made/when_made/is_supply) from the current
-    // listing without re-fetching.
+    if (hasDeleteAction) {
+      // Legacy drafts may predate staging-time exclusivity — never run a
+      // delete that would silently drop other staged edits (or vice versa).
+      assertDeleteIsExclusive(draft as any, draft.media.length, pendingActions());
+    }
+
+    // ---- Remote state + conflict protection ------------------------------
     let remoteListing: any = null;
     if (!isNewLocalListing) {
-      remoteListing = await callEtsyAPI(`/listings/${syncedListingId}`, accessToken);
-      const remoteUpdated = remoteListing.updated_timestamp || 0;
-      if (draft.baseEtsyUpdatedTimestamp && remoteUpdated && remoteUpdated !== draft.baseEtsyUpdatedTimestamp) {
-        if (hasDeleteAction || hasCopyAction || mediaOnlyDraft || draft.status === 'conflict') {
-          logger.info('Draft sync skipping conflict check', { draftId: draft.id, reason: hasDeleteAction ? 'delete' : hasCopyAction ? 'copy' : mediaOnlyDraft ? 'media-only' : 'already-conflict' });
+      try {
+        remoteListing = await callEtsyAPI(`/listings/${syncedListingId}`, accessToken);
+      } catch (err: any) {
+        if (!(hasDeleteAction && isMissingListingError(err))) throw err;
+      }
+      const base = draft.baseEtsyUpdatedTimestamp || 0;
+      const remoteUpdated = remoteListing?.updated_timestamp || 0;
+      if (remoteListing && base && remoteUpdated && remoteUpdated > base) {
+        if (force) {
+          logger.info('Draft force-sync: re-basing onto current remote listing', { draftId: draft.id, oldBase: base, remoteUpdated });
+          await prisma.etsyListingDraft.update({ where: { id: draft.id }, data: { baseEtsyUpdatedTimestamp: remoteUpdated, baseSnapshot: remoteListing } });
+        } else if (mediaOnlyDraft || copyOnlyDraft) {
+          // Media ops validate live image ids; copy only reads the source.
+          logger.info('Draft sync skipping conflict check', { draftId: draft.id, reason: mediaOnlyDraft ? 'media-only' : 'copy-only' });
         } else {
-          logger.info('Draft sync auto-resolving stale base timestamp', { draftId: draft.id, oldBase: draft.baseEtsyUpdatedTimestamp, remoteUpdated });
-          await prisma.etsyListingDraft.update({
-            where: { id: draft.id },
-            data: { baseEtsyUpdatedTimestamp: remoteUpdated },
-          });
+          const fieldOnly = isEmptyPatch(taxonomy) && isEmptyPatch(inventory) && isEmptyPatch(personalization)
+            && isEmptyPatch(variationImages) && !hasDeleteAction;
+          const changed = fieldOnly ? remoteChangedKeys(draft.baseSnapshot, remoteListing, Object.keys(fields)) : null;
+          if (changed && changed.length === 0) {
+            // The remote edit didn't touch anything this draft changes (e.g. a
+            // sale bumped updated_timestamp) — safe to re-base and continue.
+            logger.info('Draft sync: remote changed unrelated fields, re-basing', { draftId: draft.id, oldBase: base, remoteUpdated });
+            await prisma.etsyListingDraft.update({ where: { id: draft.id }, data: { baseEtsyUpdatedTimestamp: remoteUpdated } });
+          } else {
+            const message = 'Listing changed on Etsy after these edits were staged. Review it, then sync again with "apply anyway" to overwrite.';
+            await prisma.etsyListingDraft.update({ where: { id: draft.id }, data: { status: 'conflict', lastSyncError: message } });
+            await prisma.etsyDraftSyncAttempt.update({
+              where: { id: attempt.id },
+              data: {
+                status: 'conflict',
+                finishedAt: new Date(),
+                error: message,
+                result: { code: 'REMOTE_CHANGED', baseEtsyUpdatedTimestamp: base, remoteUpdatedTimestamp: remoteUpdated, changedFields: changed ?? null },
+              },
+            });
+            return {
+              status: 'conflict',
+              draftId: draft.id,
+              code: 'REMOTE_CHANGED',
+              key: 'draftSync.conflict',
+              error: message,
+              ...(changed ? { changedFields: changed } : {}),
+            };
+          }
         }
       }
     }
 
-    if (hasDeleteAction && !isNewLocalListing) {
-      try {
-        results.push(await callEtsyAPI(`/listings/${syncedListingId}`, accessToken, { method: 'DELETE' }));
-      } catch (err: any) {
-        if (!isMissingListingError(err)) throw err;
-        results.push({ skipped: true, operation: 'delete', reason: 'listing_already_missing' });
+    // ---- Delete (exclusive) ----------------------------------------------
+    if (hasDeleteAction) {
+      if (!isNewLocalListing && remoteListing) {
+        try {
+          results.push(await callEtsyAPI(`/listings/${syncedListingId}`, accessToken, { method: 'DELETE' }));
+        } catch (err: any) {
+          if (!isMissingListingError(err)) throw err;
+          results.push({ skipped: true, operation: 'delete', reason: 'listing_already_missing' });
+        }
+      } else {
+        results.push({ skipped: true, operation: 'delete', reason: isNewLocalListing ? 'local_listing_never_created' : 'listing_already_missing' });
       }
-      await prisma.etsyListing.deleteMany({
-        where: { etsyShopId: draft.etsyShopId, etsyListingId: syncedListingId },
-      });
+      deletedListing = true;
+      if (!isNewLocalListing) {
+        await prisma.etsyListing.deleteMany({ where: { etsyShopId: draft.etsyShopId, etsyListingId: syncedListingId } });
+      }
       await prisma.etsyListingDraft.update({
         where: { id: draft.id },
         data: { status: 'synced', syncedAt: new Date(), lastSyncError: null },
@@ -1191,109 +1833,269 @@ export async function syncDraft(draftId: string, userId: string) {
         where: { id: attempt.id },
         data: { status: 'success', finishedAt: new Date(), result: { count: results.length, etsyListingId: String(syncedListingId), deleted: true } },
       });
-      for (const media of draft.media) {
-        if (media.localPath) await fs.promises.unlink(media.localPath).catch(() => undefined);
-      }
-      return { status: 'success', draftId: draft.id, count: results.length, deleted: true };
+      for (const media of draft.media) await unlinkDraftUploadFile(media.localPath);
+      return { status: 'success', draftId: draft.id, count: results.length, deleted: true, etsyListingId: String(syncedListingId) };
     }
 
-    for (const action of queuedActions) {
+    // ---- Normalise + validate before touching Etsy -----------------------
+    if (fields.when_made) fields.when_made = normalizeWhenMade(fields.when_made);
+    // Etsy rejects PATCH /listings if any of who_made / when_made / is_supply
+    // is present without the other two. Backfill the missing ones from the
+    // current remote listing so a single-field UI edit still syncs cleanly.
+    const PROVENANCE_KEYS = ['who_made', 'when_made', 'is_supply'] as const;
+    if (PROVENANCE_KEYS.some((k) => k in fields) && remoteListing) {
+      for (const key of PROVENANCE_KEYS) {
+        if (!(key in fields) && remoteListing[key] != null) fields[key] = remoteListing[key];
+      }
+    }
+
+    const pendingCreateTempIds = new Set(
+      queuedActions.filter((a) => CREATE_ACTION_TYPES.includes(a?.type) && a?.tempId != null).map((a) => String(a.tempId)),
+    );
+    const sanitizedInventoryPreview = inventory?.products ? sanitizeInventoryForEtsy(inventory, null) : null;
+    const syncErrors: FieldError[] = [
+      ...validateEtsyFieldPatch(fields),
+      ...validateEtsyPersonalization(personalization),
+      ...(sanitizedInventoryPreview ? validateEtsyInventory(sanitizedInventoryPreview) : []),
+    ];
+
+    // Shop section must still exist on Etsy (recurring "Shop section not found").
+    const sectionId = fields.shop_section_id;
+    if (sectionId != null && sectionId !== '' && Number(sectionId) > 0 && !pendingCreateTempIds.has(String(sectionId))) {
+      try {
+        const sections = await callEtsyAPI(`/shops/${draft.etsyShopId}/sections`, accessToken);
+        const ids = new Set(((sections?.results || []) as any[]).map((s) => String(s.shop_section_id)));
+        if (!ids.has(String(sectionId))) {
+          syncErrors.push({
+            field: 'shop_section_id',
+            severity: 'block_sync',
+            key: 'validation.shopSectionNotFound',
+            message: 'The selected shop section no longer exists on Etsy. Pick another section or leave it empty.',
+          });
+        }
+      } catch (err: any) {
+        logger.warn('Draft sync could not verify shop section', { draftId: draft.id, error: err.message });
+      }
+    }
+    if (syncErrors.length) throwValidation(syncErrors);
+
+    // ---- Readiness (processing profile) helpers --------------------------
+    let readinessDefs: any[] | null = null;
+    const getReadinessDefs = async () => {
+      if (readinessDefs) return readinessDefs;
+      try {
+        const res = await callEtsyAPI(`/shops/${draft.etsyShopId}/readiness-state-definitions`, accessToken);
+        readinessDefs = (res?.results || []) as any[];
+      } catch (err: any) {
+        logger.warn('Could not load readiness state definitions', { shopId: draft.etsyShopId, error: err.message });
+        readinessDefs = [];
+      }
+      return readinessDefs;
+    };
+    const readinessForProcessing = async (min: any, max: any): Promise<number | null> => {
+      const lo = min == null || min === '' ? null : Number(min);
+      const hi = max == null || max === '' ? null : Number(max);
+      if (lo == null && hi == null) return null;
+      const defs = await getReadinessDefs();
+      const match = defs.find((d) => (lo == null || Number(d.min_processing_days) === lo) && (hi == null || Number(d.max_processing_days) === hi));
+      return match ? Number(match.readiness_state_id) : null;
+    };
+
+    // ---- Split fields: PATCH-able vs inventory-routed --------------------
+    const routed: JsonMap = {};
+    if (!isNewLocalListing) {
+      for (const key of INVENTORY_ROUTED_KEYS) {
+        if (key in fields) {
+          routed[key] = fields[key];
+          delete fields[key];
+        }
+      }
+    }
+    let explicitReadinessId: number | null = routed.readiness_state_id ? Number(routed.readiness_state_id) : null;
+    if (!explicitReadinessId && ('processing_min' in routed || 'processing_max' in routed)) {
+      explicitReadinessId = await readinessForProcessing(routed.processing_min, routed.processing_max);
+      if (!explicitReadinessId) {
+        warnings.push({
+          type: 'processing_time_not_mapped',
+          key: 'draftSync.processingNotMapped',
+          params: { min: String(routed.processing_min ?? ''), max: String(routed.processing_max ?? '') },
+          message: `No Etsy processing profile matches ${routed.processing_min ?? '?'}-${routed.processing_max ?? '?'} days; processing time was not changed. Create the processing profile on Etsy or pick an existing one.`,
+        });
+      }
+    }
+    const hasInventoryPatch = Boolean(inventory?.products);
+    const routesPriceOrQty = routed.price !== undefined || routed.quantity !== undefined;
+    const needsRoutedInventoryWrite = !isNewLocalListing && !hasInventoryPatch && (routesPriceOrQty || Boolean(explicitReadinessId));
+    const isPhysical = String(remoteListing?.type || fields.type || 'physical') !== 'download';
+
+    let currentInventory: any = null;
+    if (!isNewLocalListing && (hasInventoryPatch || needsRoutedInventoryWrite)) {
+      try {
+        currentInventory = await callEtsyAPI(`/listings/${syncedListingId}/inventory`, accessToken);
+      } catch (err: any) {
+        if (needsRoutedInventoryWrite) throw err;
+        logger.warn('Could not fetch current inventory before inventory sync', { listingId: String(syncedListingId), error: err.message });
+      }
+    }
+    let routedInventory: JsonMap | null = null;
+    if (needsRoutedInventoryWrite && currentInventory) {
+      const products = (Array.isArray(currentInventory.products) ? currentInventory.products : []).filter((p: any) => !p?.is_deleted);
+      const isMultiVariation = products.length > 1 || products.some((p: any) => Array.isArray(p?.property_values) && p.property_values.length > 0);
+      if (isMultiVariation && routesPriceOrQty) {
+        throw new EtsyDraftError(
+          'INVENTORY_PATCH_REQUIRED',
+          'This listing has variations — edit price and quantity per variation in the Variations tab instead of the single price/quantity fields.',
+          { status: 400, key: 'draftSync.inventoryPatchRequired' },
+        );
+      }
+      routedInventory = {
+        ...currentInventory,
+        products: products.map((p: any) => ({
+          ...p,
+          offerings: (Array.isArray(p.offerings) ? p.offerings : []).filter((o: any) => !o?.is_deleted).map((o: any) => ({
+            ...o,
+            ...(routed.price !== undefined ? { price: Number(String(routed.price).replace(',', '.')) } : {}),
+            ...(routed.quantity !== undefined ? { quantity: Math.trunc(Number(routed.quantity)) } : {}),
+            ...(explicitReadinessId ? { readiness_state_id: explicitReadinessId } : {}),
+          })),
+        })),
+      };
+    }
+    if (hasInventoryPatch && routesPriceOrQty) {
+      logger.info('Draft sync: field price/quantity ignored in favour of inventory patch', { draftId: draft.id });
+    }
+
+    // ---- Queued create actions (idempotent) ------------------------------
+    for (let i = 0; i < queuedActions.length; i++) {
+      const action = queuedActions[i];
+      if (!CREATE_ACTION_TYPES.includes(action?.type)) continue;
+      if (action.completedAt) {
+        const realId = action.completedResult?.realId;
+        if (action.tempId && realId) idMap[String(action.tempId)] = Number(realId);
+        continue;
+      }
+      let created: any;
+      let realId: any;
       if (action.type === 'create_shop_section') {
-        const created = await callEtsyAPI(`/shops/${draft.etsyShopId}/sections`, accessToken, {
+        created = await callEtsyAPI(`/shops/${draft.etsyShopId}/sections`, accessToken, {
           method: 'POST',
           body: JSON.stringify({ title: action.payload?.title || action.title }),
         });
-        const realId = created.shop_section_id || created.section?.shop_section_id;
-        if (action.tempId && realId) idMap[String(action.tempId)] = Number(realId);
-        results.push(created);
+        realId = created.shop_section_id || created.section?.shop_section_id;
       } else if (action.type === 'create_shipping_profile') {
-        const created = await callEtsyAPI(`/shops/${draft.etsyShopId}/shipping-profiles`, accessToken, {
+        created = await callEtsyAPI(`/shops/${draft.etsyShopId}/shipping-profiles`, accessToken, {
           method: 'POST',
           body: JSON.stringify(action.payload || {}),
         });
-        const realId = created.shipping_profile_id || created.shipping_profile?.shipping_profile_id;
-        if (action.tempId && realId) idMap[String(action.tempId)] = Number(realId);
-        results.push(created);
-      } else if (action.type === 'create_return_policy') {
-        const created = await callEtsyAPI(`/shops/${draft.etsyShopId}/policies/return`, accessToken, {
+        realId = created.shipping_profile_id || created.shipping_profile?.shipping_profile_id;
+      } else {
+        created = await callEtsyAPI(`/shops/${draft.etsyShopId}/policies/return`, accessToken, {
           method: 'POST',
           body: JSON.stringify(action.payload || {}),
         });
-        const realId = created.return_policy_id || created.return_policy?.return_policy_id;
-        if (action.tempId && realId) idMap[String(action.tempId)] = Number(realId);
-        results.push(created);
+        realId = created.return_policy_id || created.return_policy?.return_policy_id;
       }
+      if (action.tempId && realId) idMap[String(action.tempId)] = Number(realId);
+      results.push(created);
+      queuedActions = markActionCompleted(queuedActions, i, { realId: realId != null ? String(realId) : null });
+      await persistQueuedActions(draft.id, queuedActions);
     }
 
     fields = resolveTemporaryIds(fields, idMap);
 
+    // ---- New local listing: create on Etsy (idempotent) ------------------
+    let createdReadinessId: number | null = null;
     if (isNewLocalListing) {
-      const createAction = queuedActions.find((action) => action.type === 'create_listing');
-      const createPayload = {
+      const createIndex = queuedActions.findIndex((action) => action.type === 'create_listing');
+      const createAction = createIndex >= 0 ? queuedActions[createIndex] : null;
+      const createPayload: JsonMap = resolveTemporaryIds({
         ...(createAction?.payload || {}),
         ...fields,
         state: 'draft',
-      };
+      }, idMap);
+      if (createPayload.when_made) createPayload.when_made = normalizeWhenMade(createPayload.when_made);
+      if (String(createPayload.type || 'physical') !== 'download' && !createPayload.readiness_state_id) {
+        const fromProcessing = await readinessForProcessing(createPayload.processing_min, createPayload.processing_max);
+        const fallback = fromProcessing ?? (await getReadinessDefs())[0]?.readiness_state_id ?? null;
+        if (!fallback) {
+          throw new EtsyDraftError(
+            'READINESS_STATE_REQUIRED',
+            'Etsy requires a processing profile for physical listings. Create one on Etsy (Settings → Processing profiles) and try again.',
+            { status: 400, key: 'draftSync.readinessStateRequired' },
+          );
+        }
+        createPayload.readiness_state_id = Number(fallback);
+      }
+      createdReadinessId = createPayload.readiness_state_id ? Number(createPayload.readiness_state_id) : null;
       const created = await callEtsyAPI(`/shops/${draft.etsyShopId}/listings?legacy=false`, accessToken, {
         method: 'POST',
         body: JSON.stringify(createPayload),
       });
       syncedListingId = BigInt(created.listing_id);
-      fields = {};
       results.push(created);
+      // Persist the real listing id IMMEDIATELY: if anything below fails, a
+      // retry must patch this listing rather than create a duplicate.
+      if (createIndex >= 0) queuedActions = markActionCompleted(queuedActions, createIndex, { listingId: String(syncedListingId) });
+      await prisma.etsyListingDraft.update({
+        where: { id: draft.id },
+        data: {
+          etsyListingId: syncedListingId,
+          fieldPatch: {},
+          queuedActions,
+          baseEtsyUpdatedTimestamp: created.updated_timestamp || 0,
+          baseSnapshot: created,
+        },
+      });
+      await prisma.etsyDraftMedia.updateMany({ where: { draftId: draft.id }, data: { etsyListingId: syncedListingId } });
+      fields = {};
     }
 
+    // ---- Core listing fields (PATCH) -------------------------------------
     if (fields && Object.keys(fields).length > 0) {
-      // Etsy rejects PATCH /listings if any of who_made / when_made / is_supply
-      // is present without the other two. Backfill the missing ones from the
-      // current remote listing so a single-field UI edit still syncs cleanly.
-      const PROVENANCE_KEYS = ['who_made', 'when_made', 'is_supply'] as const;
-      const touchesProvenance = PROVENANCE_KEYS.some((k) => k in fields);
-      if (touchesProvenance && remoteListing) {
-        for (const key of PROVENANCE_KEYS) {
-          if (!(key in fields) && remoteListing[key] != null) {
-            (fields as JsonMap)[key] = remoteListing[key];
-          }
-        }
-      }
       results.push(await callEtsyAPI(`/shops/${draft.etsyShopId}/listings/${syncedListingId}?legacy=false`, accessToken, {
         method: 'PATCH',
         body: JSON.stringify(fields),
       }));
     }
 
-    const taxonomy = draft.taxonomyPatch as JsonMap | null;
+    // ---- Category attributes (partial success is reported, not swallowed)
     if (taxonomy?.properties && Array.isArray(taxonomy.properties)) {
       for (const prop of taxonomy.properties) {
         const hasValues = Array.isArray(prop.values) && prop.values.length > 0;
         const hasValueIds = Array.isArray(prop.value_ids) && prop.value_ids.length > 0;
-        if (prop.remove || (!hasValues && !hasValueIds)) {
-          try {
+        const isRemoval = prop.remove || (!hasValues && !hasValueIds);
+        try {
+          if (isRemoval) {
             results.push(await callEtsyAPI(`/shops/${draft.etsyShopId}/listings/${syncedListingId}/properties/${prop.property_id}`, accessToken, {
               method: 'DELETE',
             }));
-          } catch (propErr: any) {
-            logger.warn('Draft sync property delete failed', { draftId: draft.id, propertyId: prop.property_id, error: propErr.message });
+          } else {
+            const body: JsonMap = {
+              values: hasValues ? prop.values : [],
+              value_ids: hasValueIds ? prop.value_ids : [],
+            };
+            if (prop.scale_id != null) body.scale_id = prop.scale_id;
+            results.push(await callEtsyAPI(`/shops/${draft.etsyShopId}/listings/${syncedListingId}/properties/${prop.property_id}`, accessToken, {
+              method: 'PUT',
+              body: JSON.stringify(body),
+            }));
           }
-          continue;
-        }
-        const body: JsonMap = {
-          values: hasValues ? prop.values : [],
-          value_ids: hasValueIds ? prop.value_ids : [],
-        };
-        if (prop.scale_id != null) body.scale_id = prop.scale_id;
-        try {
-          results.push(await callEtsyAPI(`/shops/${draft.etsyShopId}/listings/${syncedListingId}/properties/${prop.property_id}`, accessToken, {
-            method: 'PUT',
-            body: JSON.stringify(body),
-          }));
         } catch (propErr: any) {
-          logger.warn('Draft sync property update failed', { draftId: draft.id, propertyId: prop.property_id, error: propErr.message });
+          // Deleting an attribute that isn't set is a no-op for the user.
+          if (isRemoval && isMissingListingError(propErr)) continue;
+          logger.warn(isRemoval ? 'Draft sync property delete failed' : 'Draft sync property update failed', { draftId: draft.id, propertyId: prop.property_id, error: propErr.message });
+          const detail = String(propErr.message || '').replace(/^Etsy API error:\s*/, '').slice(0, 300);
+          warnings.push({
+            type: isRemoval ? 'property_delete_failed' : 'property_update_failed',
+            key: isRemoval ? 'draftSync.propertyDeleteFailed' : 'draftSync.propertyUpdateFailed',
+            params: { property: String(prop.property_name || prop.property_id), detail },
+            message: `Category detail "${prop.property_name || prop.property_id}" was not ${isRemoval ? 'removed' : 'saved'}: ${detail}`,
+          });
         }
       }
     }
 
-    const personalization = draft.personalizationPatch as JsonMap | null;
+    // ---- Personalization -------------------------------------------------
     if (personalization) {
       if (personalization.remove) {
         results.push(await callEtsyAPI(`/shops/${draft.etsyShopId}/listings/${syncedListingId}/personalization?supports_multiple_personalization_questions=true`, accessToken, { method: 'DELETE' }));
@@ -1305,21 +2107,34 @@ export async function syncDraft(draftId: string, userId: string) {
       }
     }
 
-    const inventory = draft.inventoryPatch as JsonMap | null;
-    if (inventory?.products) {
-      let fallbackReadinessStateId: number | string | null = null;
-      try {
-        const currentListing = await callEtsyAPI(`/listings/${syncedListingId}`, accessToken);
-        fallbackReadinessStateId = currentListing.readiness_state_id || null;
-      } catch (err: any) {
-        logger.warn('Could not fetch listing readiness state before inventory sync', { listingId: String(syncedListingId), error: err.message });
+    // ---- Inventory -------------------------------------------------------
+    // readiness_state_id lives on each offering (updateListingInventory
+    // requires it per offering for physical listings). Fallback order:
+    // explicit (field/processing time) → current offerings → listing →
+    // the shop's first processing profile.
+    const inventoryToWrite = hasInventoryPatch ? inventory : routedInventory;
+    if (inventoryToWrite?.products) {
+      let fallbackReadinessStateId: number | null = explicitReadinessId
+        ?? firstOfferingReadiness(currentInventory)
+        ?? (remoteListing?.readiness_state_id ? Number(remoteListing.readiness_state_id) : null)
+        ?? createdReadinessId;
+      if (!fallbackReadinessStateId && isPhysical) {
+        const first = (await getReadinessDefs())[0];
+        fallbackReadinessStateId = first?.readiness_state_id ? Number(first.readiness_state_id) : null;
+      }
+      const payload = sanitizeInventoryForEtsy(inventoryToWrite, fallbackReadinessStateId);
+      if (explicitReadinessId) {
+        for (const product of payload.products || []) {
+          for (const offering of product.offerings || []) offering.readiness_state_id = explicitReadinessId;
+        }
       }
       results.push(await callEtsyAPI(`/listings/${syncedListingId}/inventory?max_variations_supported=3`, accessToken, {
         method: 'PUT',
-        body: JSON.stringify(sanitizeInventoryForEtsy(inventory, fallbackReadinessStateId)),
+        body: JSON.stringify(payload),
       }));
     }
 
+    // ---- Media -----------------------------------------------------------
     const mediaOps = dedupeMediaOps(draft.media);
     const mediaContext = mediaOps.length && !isNewLocalListing
       ? await buildMediaSyncContext(accessToken, syncedListingId)
@@ -1364,7 +2179,6 @@ export async function syncDraft(draftId: string, userId: string) {
       if (op.id) syncedMediaIds.push(op.id);
     }
 
-    const variationImages = draft.variationImagesPatch as JsonMap | null;
     if (variationImages?.variation_images) {
       results.push(await callEtsyAPI(`/shops/${draft.etsyShopId}/listings/${syncedListingId}/variation-images`, accessToken, {
         method: 'POST',
@@ -1372,289 +2186,108 @@ export async function syncDraft(draftId: string, userId: string) {
       }));
     }
 
-    for (const action of queuedActions) {
-      if (action.type === 'publish') {
-        results.push(await callEtsyAPI(`/shops/${draft.etsyShopId}/listings/${syncedListingId}`, accessToken, { method: 'PATCH', body: JSON.stringify({ state: 'active' }) }));
-      } else if (action.type === 'deactivate') {
-        results.push(await callEtsyAPI(`/shops/${draft.etsyShopId}/listings/${syncedListingId}`, accessToken, { method: 'PATCH', body: JSON.stringify({ state: 'inactive' }) }));
-      } else if (action.type === 'renew') {
-        results.push(await callEtsyAPI(`/shops/${draft.etsyShopId}/listings/${syncedListingId}`, accessToken, { method: 'PATCH', body: JSON.stringify({ state: 'active' }) }));
-      } else if (action.type === 'delete') {
-        results.push(await callEtsyAPI(`/listings/${syncedListingId}`, accessToken, { method: 'DELETE' }));
-        deletedListing = true;
-      } else if (action.type === 'copy') {
-        const targetShopId = action.targetShopId || draft.etsyShopId;
-        const sourceListingId = String(draft.etsyListingId);
-        const [
-          source,
-          sourceInventoryResult,
-          sourcePropertiesResult,
-          sourcePersonalizationResult,
-          sourceVideosResult,
-          sourceVariationImagesResult,
-        ] = await Promise.all([
-          callEtsyAPI(`/listings/${sourceListingId}`, accessToken),
-          callEtsyAPI(`/listings/${sourceListingId}/inventory`, accessToken).catch((err) => {
-            logger.warn('Copy listing inventory fetch failed', { sourceListingId, error: err.message });
-            return null;
-          }),
-          callEtsyAPI(`/shops/${draft.etsyShopId}/listings/${sourceListingId}/properties`, accessToken).catch((err) => {
-            logger.warn('Copy listing properties fetch failed', { sourceListingId, error: err.message });
-            return null;
-          }),
-          callEtsyAPI(`/listings/${sourceListingId}/personalization?supports_multiple_personalization_questions=true`, accessToken).catch((err) => {
-            logger.warn('Copy listing personalization fetch failed', { sourceListingId, error: err.message });
-            return null;
-          }),
-          callEtsyAPI(`/listings/${sourceListingId}/videos`, accessToken).catch((err) => {
-            logger.warn('Copy listing videos fetch failed', { sourceListingId, error: err.message });
-            return null;
-          }),
-          callEtsyAPI(`/shops/${draft.etsyShopId}/listings/${sourceListingId}/variation-images`, accessToken).catch((err) => {
-            logger.warn('Copy listing variation images fetch failed', { sourceListingId, error: err.message });
-            return null;
-          }),
-        ]);
-        const price = source.price ? source.price.amount / (source.price.divisor || 100) : 0;
-        const copyPayload: JsonMap = {
-          title: (`COPY - ${source.title || ''}`).substring(0, 140),
-          description: source.description || '',
-          price,
-          quantity: source.quantity || 1,
-          taxonomy_id: source.taxonomy_id,
-          who_made: source.who_made || 'i_did',
-          when_made: source.when_made || 'made_to_order',
-          is_supply: source.is_supply ?? false,
-          state: 'draft',
-          type: source.type || 'physical',
-        };
-        if (source.shipping_profile_id) copyPayload.shipping_profile_id = source.shipping_profile_id;
-        if (source.return_policy_id) copyPayload.return_policy_id = source.return_policy_id;
-        if (source.tags?.length) copyPayload.tags = source.tags.slice(0, 13);
-        if (source.materials?.length) copyPayload.materials = source.materials.slice(0, 13);
-        if (source.shop_section_id) copyPayload.shop_section_id = source.shop_section_id;
-        if (source.readiness_state_id) copyPayload.readiness_state_id = source.readiness_state_id;
-        const created = await callEtsyAPI(`/shops/${targetShopId}/listings?legacy=false`, accessToken, {
-          method: 'POST',
-          body: JSON.stringify(copyPayload),
+    // ---- State actions + copy (each marked completed once done) ----------
+    for (let i = 0; i < queuedActions.length; i++) {
+      const action = queuedActions[i];
+      if (action?.completedAt) continue;
+      if (STATE_ACTION_BODIES[action?.type]) {
+        results.push(await callEtsyAPI(`/shops/${draft.etsyShopId}/listings/${syncedListingId}`, accessToken, {
+          method: 'PATCH',
+          body: JSON.stringify(STATE_ACTION_BODIES[action.type]),
+        }));
+        queuedActions = markActionCompleted(queuedActions, i);
+        await persistQueuedActions(draft.id, queuedActions);
+      } else if (action?.type === 'copy') {
+        const actionIndex = i;
+        syncedListingId = await executeCopyAction(accessToken, draft, action, results, warnings, async (newListingId) => {
+          queuedActions = markActionCompleted(queuedActions, actionIndex, { newListingId: String(newListingId) });
+          await persistQueuedActions(draft.id, queuedActions);
         });
-        syncedListingId = BigInt(created.listing_id);
-        results.push(created);
-
-        const inventoryPayload = sourceInventoryResult ? buildInventoryCopyPayload(sourceInventoryResult) : null;
-        if (inventoryPayload) {
-          try {
-            const inventoryCopyResult = await callEtsyAPI(`/listings/${syncedListingId}/inventory?max_variations_supported=3`, accessToken, {
-              method: 'PUT',
-              body: JSON.stringify(inventoryPayload),
-            });
-            results.push(inventoryCopyResult);
-            logger.info('Draft copy inventory copied', {
-              sourceListingId,
-              newListingId: String(syncedListingId),
-              productCount: inventoryPayload.products.length,
-              priceOnProperty: inventoryPayload.price_on_property,
-              quantityOnProperty: inventoryPayload.quantity_on_property,
-              skuOnProperty: inventoryPayload.sku_on_property,
-            });
-          } catch (inventoryCopyErr: any) {
-            logger.error('Draft copy inventory copy failed', inventoryCopyErr, {
-              sourceListingId,
-              newListingId: String(syncedListingId),
-              productCount: inventoryPayload.products.length,
-              errorMessage: inventoryCopyErr.message,
-            });
-            await callEtsyAPI(`/listings/${syncedListingId}`, accessToken, { method: 'DELETE' }).catch((deleteErr: any) => {
-              logger.warn('Partial copied listing cleanup failed after inventory copy error', {
-                sourceListingId,
-                newListingId: String(syncedListingId),
-                error: deleteErr.message,
-              });
-            });
-            throw inventoryCopyErr;
-          }
-        }
-
-        const sourceProperties = (sourcePropertiesResult?.results || []) as JsonMap[];
-        for (const property of sourceProperties) {
-          const propertyPayload = buildListingPropertyCopyPayload(property);
-          if (!property.property_id || !propertyPayload) continue;
-          try {
-            results.push(await callEtsyAPI(`/shops/${targetShopId}/listings/${syncedListingId}/properties/${property.property_id}`, accessToken, {
-              method: 'PUT',
-              body: JSON.stringify(propertyPayload),
-            }));
-          } catch (propertyCopyErr: any) {
-            logger.warn('Draft copy listing property failed', {
-              sourceListingId,
-              newListingId: String(syncedListingId),
-              propertyId: property.property_id,
-              error: propertyCopyErr.message,
-            });
-          }
-        }
-
-        const personalizationPayload = buildPersonalizationCopyPayload(sourcePersonalizationResult);
-        if (personalizationPayload) {
-          try {
-            results.push(await callEtsyAPI(`/shops/${targetShopId}/listings/${syncedListingId}/personalization?supports_multiple_personalization_questions=true`, accessToken, {
-              method: 'POST',
-              body: JSON.stringify(personalizationPayload),
-            }));
-          } catch (personalizationCopyErr: any) {
-            logger.warn('Draft copy personalization failed', {
-              sourceListingId,
-              newListingId: String(syncedListingId),
-              error: personalizationCopyErr.message,
-            });
-          }
-        }
-
-        const imageIdMap: Record<string, number> = {};
-        let imageCopyAttempted = 0;
-        let imageCopySucceeded = 0;
-        let imageCopyLastError: string | null = null;
-        try {
-          const images = await callEtsyAPI(`/listings/${sourceListingId}/images`, accessToken);
-          const sourceImageList = ((images.results || []) as any[]).sort((a, b) => (a.rank || 1) - (b.rank || 1));
-          imageCopyAttempted = sourceImageList.length;
-          for (const image of sourceImageList) {
-            if (!image.url_fullxfull) continue;
-            try {
-              const imageResp = await fetch(image.url_fullxfull);
-              if (!imageResp.ok) {
-                imageCopyLastError = `download ${imageResp.status}`;
-                logger.warn('Copy listing: source image download failed', { sourceListingId, sourceImageId: image.listing_image_id, status: imageResp.status });
-                continue;
-              }
-              const buffer = Buffer.from(await imageResp.arrayBuffer());
-              const uploadedImage = await uploadImageFromBuffer(accessToken, targetShopId, syncedListingId, buffer, imageResp.headers.get('content-type') || 'image/jpeg', {
-                filename: 'copy-image.jpg',
-                rank: image.rank || 1,
-                overwrite: false,
-              });
-              if (image.listing_image_id && uploadedImage?.listing_image_id) {
-                imageIdMap[String(image.listing_image_id)] = Number(uploadedImage.listing_image_id);
-              }
-              imageCopySucceeded++;
-              results.push(uploadedImage);
-            } catch (perImageErr: any) {
-              imageCopyLastError = perImageErr.message || String(perImageErr);
-              logger.warn('Copy listing: per-image upload failed (continuing)', { sourceListingId, sourceImageId: image.listing_image_id, error: imageCopyLastError });
-            }
-          }
-        } catch (copyImageErr: any) {
-          imageCopyLastError = copyImageErr.message || String(copyImageErr);
-          logger.warn('Copy listing image copy partially failed', { error: imageCopyLastError });
-        }
-        logger.info('Copy listing image copy summary', {
-          sourceListingId,
-          newListingId: String(syncedListingId),
-          attempted: imageCopyAttempted,
-          succeeded: imageCopySucceeded,
-          lastError: imageCopyLastError,
-        });
-        if (imageCopyAttempted > 0 && imageCopySucceeded === 0) {
-          // Partial-success semantics aren't honored downstream — surface
-          // this on the draft itself so the UI can show a clear warning
-          // instead of silently leaving the user with a 0-image listing.
-          await prisma.etsyListingDraft.update({
-            where: { id: draft.id },
-            data: { lastSyncError: `Copy: 0 of ${imageCopyAttempted} source images copied${imageCopyLastError ? ` (last error: ${imageCopyLastError.slice(0, 200)})` : ''}` },
-          }).catch(() => undefined);
-        }
-
-        const sourceVariationImages = (sourceVariationImagesResult?.results || []) as JsonMap[];
-        const copiedVariationImages = sourceVariationImages
-          .map((variationImage) => ({
-            ...variationImage,
-            listing_image_id: imageIdMap[String(variationImage.listing_image_id)],
-          }))
-          .filter((variationImage) => variationImage.listing_image_id);
-        if (copiedVariationImages.length > 0) {
-          try {
-            results.push(await callEtsyAPI(`/shops/${targetShopId}/listings/${syncedListingId}/variation-images`, accessToken, {
-              method: 'POST',
-              body: JSON.stringify({ variation_images: copiedVariationImages }),
-            }));
-          } catch (variationImageCopyErr: any) {
-            logger.warn('Draft copy variation images failed', {
-              sourceListingId,
-              newListingId: String(syncedListingId),
-              count: copiedVariationImages.length,
-              error: variationImageCopyErr.message,
-            });
-          }
-        }
-
-        const sourceVideos = (sourceVideosResult?.results || []) as JsonMap[];
-        for (const video of sourceVideos.slice(0, 1)) {
-          try {
-            if (video.video_id) {
-              results.push(await linkExistingVideo(accessToken, targetShopId, syncedListingId, video.video_id));
-            } else if (video.video_url) {
-              const videoResp = await fetch(video.video_url);
-              if (!videoResp.ok) throw new Error(`Video fetch failed: ${videoResp.status}`);
-              const buffer = Buffer.from(await videoResp.arrayBuffer());
-              results.push(await uploadVideoFromBuffer(
-                accessToken,
-                targetShopId,
-                syncedListingId,
-                buffer,
-                videoResp.headers.get('content-type') || 'video/mp4',
-                `copy-video-${sourceListingId}.mp4`,
-                `Copied video ${sourceListingId}`
-              ));
-            }
-          } catch (videoCopyErr: any) {
-            logger.warn('Draft copy video failed', {
-              sourceListingId,
-              newListingId: String(syncedListingId),
-              videoId: video.video_id,
-              error: videoCopyErr.message,
-            });
-          }
-        }
       }
     }
 
-    if (deletedListing) {
-      await prisma.etsyListing.deleteMany({
-        where: { etsyShopId: draft.etsyShopId, etsyListingId: syncedListingId },
-      });
-    } else {
-      await refreshListingCache(draft.etsyShopId, syncedListingId, accessToken).catch((err) => logger.warn('Draft sync cache refresh failed', { error: err.message }));
-    }
+    // ---- Success ---------------------------------------------------------
+    const finalListing = await refreshListingCache(draft.etsyShopId, syncedListingId, accessToken)
+      .catch((err) => { logger.warn('Draft sync cache refresh failed', { error: err.message }); return null; });
+    const warningSummary = warnings.length ? warnings.map((w) => w.message).join(' | ').slice(0, 2000) : null;
     await prisma.etsyListingDraft.update({
       where: { id: draft.id },
-      data: { status: 'synced', etsyListingId: syncedListingId, syncedAt: new Date(), lastSyncError: null },
+      data: {
+        status: 'synced',
+        etsyListingId: syncedListingId,
+        syncedAt: new Date(),
+        lastSyncError: warningSummary,
+        queuedActions,
+        // Our own writes moved Etsy's updated_timestamp: record the post-sync
+        // value so nothing downstream mistakes it for a remote edit.
+        ...(finalListing?.updated_timestamp ? { baseEtsyUpdatedTimestamp: finalListing.updated_timestamp, baseSnapshot: finalListing } : {}),
+      },
     });
-    await prisma.etsyDraftSyncAttempt.update({ where: { id: attempt.id }, data: { status: 'success', finishedAt: new Date(), result: { count: results.length, etsyListingId: String(syncedListingId) } } });
+    await prisma.etsyDraftSyncAttempt.update({
+      where: { id: attempt.id },
+      data: {
+        status: 'success',
+        finishedAt: new Date(),
+        result: toSerializable({ count: results.length, etsyListingId: String(syncedListingId), partial: warnings.length > 0, warnings }) as any,
+      },
+    });
 
-    for (const media of draft.media) {
-      if (media.localPath) await fs.promises.unlink(media.localPath).catch(() => undefined);
-    }
-    return { status: 'success', draftId: draft.id, count: results.length };
+    for (const media of draft.media) await unlinkDraftUploadFile(media.localPath);
+    return {
+      status: 'success',
+      draftId: draft.id,
+      count: results.length,
+      etsyListingId: String(syncedListingId),
+      ...(warnings.length ? { warnings } : {}),
+    };
   } catch (err: any) {
     if (syncedMediaIds.length > 0) {
       await prisma.etsyDraftMedia.deleteMany({ where: { id: { in: syncedMediaIds } } }).catch(() => undefined);
       for (const m of draft.media.filter((m: any) => syncedMediaIds.includes(m.id))) {
-        if (m.localPath) await fs.promises.unlink(m.localPath).catch(() => undefined);
+        await unlinkDraftUploadFile(m.localPath);
       }
       logger.info('Partial media sync: cleaned up completed media before marking draft failed', { draftId: draft.id, syncedCount: syncedMediaIds.length, totalMedia: draft.media.length });
     }
-    await prisma.etsyListingDraft.update({ where: { id: draft.id }, data: { status: 'failed', lastSyncError: err.message || 'Sync failed' } });
-    await prisma.etsyDraftSyncAttempt.update({ where: { id: attempt.id }, data: { status: 'failed', finishedAt: new Date(), error: err.message || 'Sync failed' } });
+    // If this attempt already changed the listing on Etsy, those changes are
+    // OURS — move the conflict base forward so the retry doesn't report a
+    // false "remote changed" conflict (the main historical false positive).
+    let rebase: JsonMap = {};
+    if ((results.length > 0 || syncedMediaIds.length > 0) && syncedListingId > BigInt(0) && !deletedListing && accessToken) {
+      try {
+        const live = await callEtsyAPI(`/listings/${syncedListingId}`, accessToken);
+        if (live?.updated_timestamp) rebase = { baseEtsyUpdatedTimestamp: live.updated_timestamp, baseSnapshot: live };
+      } catch { /* keep old base */ }
+    }
+    const message = err?.message || 'Sync failed';
+    await prisma.etsyListingDraft.update({
+      where: { id: draft.id },
+      data: { status: 'failed', lastSyncError: message, queuedActions, ...rebase },
+    }).catch(() => undefined);
+    await prisma.etsyDraftSyncAttempt.update({
+      where: { id: attempt.id },
+      data: {
+        status: 'failed',
+        finishedAt: new Date(),
+        error: message,
+        result: toSerializable({
+          count: results.length,
+          partial: results.length > 0,
+          warnings,
+          ...(isEtsyDraftError(err) ? { code: err.code, key: err.key, issues: err.issues } : {}),
+        }) as any,
+      },
+    }).catch(() => undefined);
     throw err;
   }
 }
 
 export async function discardDraft(draftId: string, userId: string) {
   const draft = await prisma.etsyListingDraft.findFirst({ where: { id: draftId, userId }, include: { media: true } });
-  if (!draft) throw new Error('Draft not found');
-  for (const media of draft.media) {
-    if (media.localPath) await fs.promises.unlink(media.localPath).catch(() => undefined);
+  if (!draft) throw new EtsyDraftError('DRAFT_NOT_FOUND', 'Draft not found', { status: 404, key: 'draftSync.draftNotFound' });
+  if (draft.status === 'syncing') {
+    throw new EtsyDraftError('DRAFT_SYNCING', 'Draft is syncing right now — wait for it to finish', { status: 409, key: 'draftSync.draftSyncing' });
   }
+  for (const media of draft.media) await unlinkDraftUploadFile(media.localPath);
   await prisma.etsyListingDraft.update({ where: { id: draft.id }, data: { status: 'cancelled' } });
   return { success: true };
 }

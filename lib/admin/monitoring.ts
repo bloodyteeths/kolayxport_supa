@@ -173,6 +173,45 @@ export async function getIntegrationHealth() {
     ],
     failuresLast24h: integrationFailures24h,
     recent: recentIntegrationEvents,
+    etsyWebhooks: await getEtsyWebhookHealth(),
+  };
+}
+
+// --------------------------------------------------------------------------
+// C2. Etsy webhook queue health
+// --------------------------------------------------------------------------
+/** Counts only — never returns webhook payloads. */
+export async function getEtsyWebhookHealth() {
+  const since24h = new Date(Date.now() - DAY);
+  const [byStatusAll, byStatus24h, oldestPending, recentFailed] = await Promise.all([
+    prisma.webhookEvent.groupBy({ by: ['status'], where: { provider: 'etsy' }, _count: true }),
+    prisma.webhookEvent.groupBy({
+      by: ['status'],
+      where: { provider: 'etsy', createdAt: { gte: since24h } },
+      _count: true,
+    }),
+    prisma.webhookEvent.findFirst({
+      where: { provider: 'etsy', status: { in: ['received', 'processing'] } },
+      orderBy: { createdAt: 'asc' },
+      select: { createdAt: true },
+    }),
+    prisma.webhookEvent.findMany({
+      where: { provider: 'etsy', status: 'failed' },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      select: { id: true, eventType: true, errorMessage: true, attempts: true, createdAt: true },
+    }),
+  ]);
+  const toMap = (rows: Array<{ status: string | null; _count: number }>) =>
+    Object.fromEntries(rows.map(r => [r.status || 'unknown', r._count]));
+  const counts24h = toMap(byStatus24h as any);
+  return {
+    byStatus: toMap(byStatusAll as any),
+    byStatus24h: counts24h,
+    failed24h: counts24h.failed ?? 0,
+    pending: oldestPending ? true : false,
+    oldestPendingAgeMs: oldestPending ? Date.now() - new Date(oldestPending.createdAt).getTime() : null,
+    recentFailed,
   };
 }
 
@@ -189,7 +228,7 @@ export async function getShippingHealth() {
     prisma.labelJob.count({ where: { createdAt: { gte: last7d } } }),
     prisma.labelJob.count({ where: { status: 'failed' } }),
     prisma.labelJob.groupBy({ by: ['carrier', 'status'], _count: true }),
-    prisma.trackingSubmission.count({ where: { status: 'failed' } }),
+    prisma.trackingSubmission.count({ where: { status: { in: ['failed', 'needs_manual'] } } }),
   ]);
 
   return {
@@ -492,7 +531,8 @@ export async function getExtensionHealth() {
     }),
     prisma.trackingSubmission.count({
       where: {
-        etsySubmitStatus: 'failed',
+        // needs_manual = typed but not confirmed saved on Etsy — still needs a human.
+        etsySubmitStatus: { in: ['failed', 'needs_manual'] },
         submittedAt: { gte: last24h },
       },
     }),
@@ -563,7 +603,7 @@ export async function buildNeedsAttentionQueue() {
   ]);
 
   const items: Array<{
-    kind: 'cron-stale' | 'token-expired' | 'billing' | 'webhook-failed' | 'recent-error';
+    kind: 'cron-stale' | 'token-expired' | 'billing' | 'webhook-failed' | 'etsy-webhook' | 'recent-error';
     severity: 'warn' | 'error';
     message: string;
     meta?: Record<string, any>;
@@ -600,6 +640,24 @@ export async function buildNeedsAttentionQueue() {
       severity: 'warn',
       message: `Webhook ${w.provider ?? '?'}/${w.eventType ?? '?'} failed`,
       meta: { id: w.id, errorMessage: w.errorMessage?.slice(0, 200) },
+    });
+  }
+
+  const etsyWh = integrations.etsyWebhooks;
+  if (etsyWh.failed24h > 0) {
+    items.push({
+      kind: 'etsy-webhook',
+      severity: 'warn',
+      message: `${etsyWh.failed24h} Etsy webhook event(s) failed in the last 24h`,
+      meta: { failed24h: etsyWh.failed24h },
+    });
+  }
+  if (etsyWh.oldestPendingAgeMs !== null && etsyWh.oldestPendingAgeMs > 30 * 60 * 1000) {
+    items.push({
+      kind: 'etsy-webhook',
+      severity: 'warn',
+      message: 'Etsy webhook queue has events pending for over 30 minutes (is the process-etsy-webhooks cron running?)',
+      meta: { oldestPendingAgeMs: etsyWh.oldestPendingAgeMs },
     });
   }
 

@@ -3,7 +3,6 @@
  * Runs on kolayxport.com/* and can access httpOnly cookies via same-origin fetch.
  */
 
-console.log('[KX] Content script loaded on:', window.location.href);
 
 // Safe wrapper for chrome.runtime.sendMessage — handles "context invalidated"
 function safeSendMessage(msg) {
@@ -22,37 +21,32 @@ function safeSendMessage(msg) {
   }
 }
 
-// On load, immediately fetch a JWT token from the extension auth endpoint
+// Fetch a token from the extension auth endpoint (same-origin, carries the session cookie)
+// and hand it to the background worker. Resolves to { token, expiresIn, expiresAt, user } or null.
 async function fetchAuthToken() {
   try {
-    console.log('[KX] Fetching auth token from /api/auth/extension...');
     var response = await fetch('/api/auth/extension', {
       method: 'GET',
       credentials: 'include',
       headers: { 'Accept': 'application/json' }
     });
-
-    if (!response.ok) {
-      console.log('[KX] Auth endpoint returned', response.status);
-      return null;
-    }
+    if (!response.ok) return null;
 
     var data = await response.json();
-    console.log('[KX] Auth response:', { authenticated: data.authenticated, hasToken: !!data.token });
-
     if (data.authenticated && data.token) {
+      var user = data.user ? { email: data.user.email || null, name: data.user.name || null } : null;
       await safeSendMessage({
         action: 'authTokenFromPage',
         token: data.token,
-        user: data.user
+        expiresIn: data.expiresIn,
+        expiresAt: data.expiresAt,
+        user: user
       });
-      console.log('[KX] Auth token sent to background');
-      return data.token;
+      return { token: data.token, expiresIn: data.expiresIn, expiresAt: data.expiresAt, user: user };
     }
-
     return null;
   } catch (error) {
-    console.error('[KX] Failed to fetch auth token:', error.message || error);
+    console.warn('[KX] Failed to fetch auth token');
     return null;
   }
 }
@@ -60,9 +54,9 @@ async function fetchAuthToken() {
 // Listen for messages from background script
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   if (request.action === 'getAuthToken') {
-    fetchAuthToken().then(function(token) {
-      if (token) {
-        sendResponse({ success: true, token: token, source: 'nextauth-api' });
+    fetchAuthToken().then(function(result) {
+      if (result) {
+        sendResponse({ success: true, token: result.token, expiresIn: result.expiresIn, expiresAt: result.expiresAt, user: result.user });
       } else {
         sendResponse({ success: false, error: 'Not authenticated on Kolayxport' });
       }
@@ -72,7 +66,6 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 });
 
 // Signal ready and immediately try to get auth token
-console.log('[KX] Content script ready');
 safeSendMessage({ action: 'contentScriptReady', url: window.location.href });
 
 // Fetch token on page load

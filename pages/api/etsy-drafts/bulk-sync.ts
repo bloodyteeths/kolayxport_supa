@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import { syncDraft } from '@/lib/etsy/draftService';
+import { isEtsyDraftError } from '@/lib/etsy/draftErrors';
 
 // Etsy public limit is ~10 req/s per shop with a small burst budget. Each
 // syncDraft call itself fires multiple Etsy requests (PATCH listing, PUT
@@ -16,7 +17,12 @@ type DraftResult = {
   status: string;
   count?: number;
   error?: string;
+  code?: string;
+  key?: string;
+  warnings?: any[];
 };
+
+const MAX_BULK_DRAFTS = 500;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -25,15 +31,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const draftIds = Array.isArray(req.body?.draftIds) ? req.body.draftIds : [];
   if (draftIds.length === 0) return res.status(400).json({ error: 'draftIds is required' });
+  if (draftIds.length > MAX_BULK_DRAFTS) return res.status(400).json({ error: `At most ${MAX_BULK_DRAFTS} drafts per bulk sync` });
+  // Explicit opt-in to overwrite listings that changed on Etsy (default false:
+  // such drafts come back as 'conflict' and are left untouched).
+  const force = req.body?.force === true;
 
   const results: DraftResult[] = [];
   for (let i = 0; i < draftIds.length; i++) {
     const draftId = String(draftIds[i]);
     try {
-      const result = (await syncDraft(draftId, user.id)) as DraftResult;
+      const result = (await syncDraft(draftId, user.id, { force })) as DraftResult;
       results.push(result);
     } catch (err: any) {
-      results.push({ draftId, status: 'failed', error: err?.message || 'Sync failed' });
+      results.push({
+        draftId,
+        status: 'failed',
+        error: err?.message || 'Sync failed',
+        ...(isEtsyDraftError(err) ? { code: err.code, key: err.key } : {}),
+      });
     }
     // Serialized loop with a small inter-request delay so we don't burst past
     // Etsy's 10 r/s shop limit. Skip the delay after the final draft.
@@ -52,6 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Surface partial failures so the UI can tell the user *which* drafts to
     // retry instead of showing a single generic error.
     failedDrafts: failed.map((r) => ({ draftId: r.draftId, error: r.error || 'Sync failed' })),
-    conflictDrafts: conflicts.map((r) => ({ draftId: r.draftId, error: r.error })),
+    conflictDrafts: conflicts.map((r) => ({ draftId: r.draftId, error: r.error, code: r.code })),
+    partialDrafts: results.filter((r) => r.status === 'success' && r.warnings?.length).map((r) => ({ draftId: r.draftId, warnings: r.warnings })),
   });
 }

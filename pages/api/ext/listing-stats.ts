@@ -1,0 +1,54 @@
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { getAuthUser } from '@/lib/auth';
+import { getListingStats, EtsyPublicApiError } from '@/lib/etsy/listingStats';
+
+/**
+ * POST /api/ext/listing-stats
+ * Body: { listingId: string, page?: PageSignals }
+ *
+ * Public Etsy listing stats for the Chrome extension overlay, with measured vs
+ * estimated sales clearly separated (see lib/etsy/listingStats.ts).
+ * Auth: any signed-in KolayXport user (Bearer token from /api/auth/extension).
+ */
+
+// Simple per-user rate limit (in-process): 120 lookups / 10 min.
+const WINDOW_MS = 10 * 60 * 1000;
+const LIMIT = 120;
+const hits = new Map<string, { count: number; resetAt: number }>();
+
+function allow(userId: string): boolean {
+  const now = Date.now();
+  const e = hits.get(userId);
+  if (!e || now > e.resetAt) {
+    hits.set(userId, { count: 1, resetAt: now + WINDOW_MS });
+    return true;
+  }
+  if (e.count >= LIMIT) return false;
+  e.count++;
+  return true;
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  res.setHeader('Cache-Control', 'no-store');
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
+
+  const user = await getAuthUser(req, res).catch(() => null);
+  if (!user) return res.status(401).json({ error: 'Unauthorized' });
+  if (!allow(user.id)) return res.status(429).json({ error: 'Too many lookups, try again in a few minutes' });
+
+  const listingId = String(req.body?.listingId ?? '');
+  if (!/^\d{4,20}$/.test(listingId)) return res.status(400).json({ error: 'valid listingId required' });
+
+  try {
+    const stats = await getListingStats(listingId, req.body?.page);
+    return res.status(200).json(stats);
+  } catch (err) {
+    if (err instanceof EtsyPublicApiError) {
+      const status = err.status === 404 ? 404 : 502;
+      return res.status(status).json({ error: err.status === 404 ? 'Listing not found on Etsy' : 'Etsy API unavailable' });
+    }
+    console.error('[ext/listing-stats]', (err as Error)?.message || err);
+    return res.status(500).json({ error: 'Listing stats failed' });
+  }
+}

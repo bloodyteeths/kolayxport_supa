@@ -13,6 +13,8 @@ import {
   TextField,
   Tooltip,
   Divider,
+  Checkbox,
+  FormControlLabel,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
@@ -23,6 +25,7 @@ import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import EditIcon from '@mui/icons-material/Edit';
 import { toast } from 'react-hot-toast';
 import { fetchEtsyDrafts, stageEtsyDraft, stageEtsyDraftFile } from '@/lib/etsy/draftClient';
+import { aiErrorCode, AiRequestError, draftErrorI18n, ETSY_MAX_IMAGES } from '@/lib/etsy/seoRules';
 
 interface ImageInfo {
   listing_image_id: number;
@@ -79,6 +82,13 @@ function base64ToFile(base64: string, mimeType: string, filename: string): File 
 
 export default function ImageManager({ listingId, shopId, images, onImagesChanged }: ImageManagerProps) {
   const t = useTranslations('etsy.imageManager');
+  const tAiErr = useTranslations('etsy.aiErrors');
+  const tEtsyRoot = useTranslations('etsy');
+  /** Server validation errors carry an i18n key (etsy.validation.*, etsy.draftSync.*); never show raw text. */
+  const draftErr = (err: unknown, fallback: string): string => {
+    const i18n = draftErrorI18n(err);
+    return i18n && tEtsyRoot.has(i18n.key as any) ? tEtsyRoot(i18n.key as any, i18n.params as any) : fallback;
+  };
   const [uploading, setUploading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<ImageInfo | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -113,6 +123,8 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
   const [aiUploading, setAiUploading] = useState(false);
   const [aiFollowUp, setAiFollowUp] = useState('');
   const [aiRefUrl, setAiRefUrl] = useState<string | null>(null); // URL of existing listing image used as reference
+  // Plain white background only for main product shots; off keeps a styled/lifestyle scene.
+  const [aiWhiteBg, setAiWhiteBg] = useState(false);
   const aiRefInputRef = useRef<HTMLInputElement>(null);
 
   // Alt text editing state
@@ -269,10 +281,10 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
       return;
     }
 
-    const remainingSlots = Math.max(0, 10 - sortedImages.length);
+    const remainingSlots = Math.max(0, ETSY_MAX_IMAGES - sortedImages.length);
     const files = validFiles.slice(0, remainingSlots);
     if (validFiles.length > remainingSlots) {
-      toast.error(t('maxImagesError'));
+      toast.error(t('maxImagesError', { max: ETSY_MAX_IMAGES }));
     }
 
     uploadPreviews.forEach((url) => URL.revokeObjectURL(url));
@@ -299,8 +311,8 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
   const handleUploadSubmit = async () => {
     if (uploadFiles.length === 0) return;
 
-    if (sortedImages.length + uploadFiles.length > 10) {
-      toast.error(t('maxImagesError'));
+    if (sortedImages.length + uploadFiles.length > ETSY_MAX_IMAGES) {
+      toast.error(t('maxImagesError', { max: ETSY_MAX_IMAGES }));
       return;
     }
 
@@ -328,7 +340,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
       }
 
       appendPendingUploads(uploadFiles, startRank, uploadAltText.trim() || undefined, stagedMedia);
-      toast.success('Image upload saved to draft. Sync to Etsy when ready.');
+      toast.success(t('uploadStaged'));
       setUploadDialogOpen(false);
       uploadPreviews.forEach((url) => URL.revokeObjectURL(url));
       setUploadFiles([]);
@@ -336,7 +348,8 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
       setDraftMediaReloadKey((key) => key + 1);
       onImagesChanged();
     } catch (err: any) {
-      toast.error(err.message || t('uploadError'));
+      console.error('[ImageManager] upload staging failed', err);
+      toast.error(draftErr(err, t('uploadError')));
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -355,7 +368,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
           sortImagesByRank(current.filter((img) => img.listing_image_id !== deleteConfirm.listing_image_id))
             .map((img, index) => ({ ...img, rank: index + 1 }))
         ));
-        toast.success('Pending image removed from this view. Discard the draft to remove it permanently.');
+        toast.success(t('pendingRemoved'));
         setDeleteConfirm(null);
         return;
       }
@@ -365,11 +378,12 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
         listingId,
         media: [{ kind: 'image', operation: 'delete', etsyMediaId: deleteConfirm.listing_image_id }],
       });
-      toast.success('Image delete saved to draft. Sync to Etsy when ready.');
+      toast.success(t('deleteStaged'));
       setDeleteConfirm(null);
       onImagesChanged();
     } catch (err: any) {
-      toast.error(err.message || t('deleteError'));
+      console.error('[ImageManager] delete staging failed', err);
+      toast.error(draftErr(err, t('deleteError')));
     } finally {
       setDeleting(false);
     }
@@ -395,7 +409,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
 
   const handleSwap = useCallback((direction: 'up' | 'down', img: ImageInfo) => {
     if (img.is_pending_upload) {
-      toast.error('Pending uploads can be reordered after they are synced to Etsy.');
+      toast.error(t('pendingReorderBlocked'));
       return;
     }
 
@@ -438,7 +452,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
     if (!draggingImageId || draggingImageId === targetImageId) return;
     if (draggingImageId < 0 || targetImageId < 0) {
       setDraggingImageId(null);
-      toast.error('Pending uploads can be reordered after they are synced to Etsy.');
+      toast.error(t('pendingReorderBlocked'));
       return;
     }
 
@@ -467,58 +481,81 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
     setAiRefPreview(URL.createObjectURL(file));
   };
 
-  const handleAiGenerate = async () => {
-    if (!aiPrompt.trim()) {
+  /**
+   * Generate an AI image. `promptOverride` fixes the stale-state bug where
+   * setAiPrompt() + generate() still sent the old prompt; `refine` sends the
+   * previous AI result as the first reference so follow-ups edit that image.
+   * The listing's existing photos are used as references by default.
+   */
+  const handleAiGenerate = async (opts?: { promptOverride?: string; refine?: boolean }) => {
+    const promptText = (opts?.promptOverride ?? aiPrompt).trim();
+    if (!promptText) {
       toast.error(t('enterPrompt'));
       return;
     }
 
+    const previous = opts?.refine ? aiResult : null;
     setAiGenerating(true);
     setAiResult(null);
     try {
-      const payload: Record<string, any> = {
-        prompt: aiPrompt.trim(),
-      };
+      const referenceImages: Array<{ data: string; mime_type: string }> = [];
+      if (previous) referenceImages.push({ data: previous.base64, mime_type: previous.mimeType });
+      if (aiRefFile) referenceImages.push({ data: await fileToBase64(aiRefFile), mime_type: aiRefFile.type });
 
-      // Add reference image if provided (uploaded file or existing listing image URL)
-      if (aiRefFile) {
-        const base64 = await fileToBase64(aiRefFile);
-        payload.reference_image = base64;
-        payload.reference_mime_type = aiRefFile.type;
-      } else if (aiRefUrl) {
-        payload.reference_image_url = aiRefUrl;
+      // Explicitly chosen listing photo first, then the listing's synced photos (cover first).
+      const referenceUrls: string[] = [];
+      if (aiRefUrl) referenceUrls.push(aiRefUrl);
+      for (const img of sortedImages) {
+        if (referenceImages.length + referenceUrls.length >= 3) break;
+        if (img.is_pending_upload) continue;
+        const url = img.url_fullxfull || img.url_570xN;
+        if (url && url.startsWith('https://') && !referenceUrls.includes(url)) referenceUrls.push(url);
       }
 
       const res = await fetch('/api/ai/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          prompt: promptText,
+          marketplace: 'etsy',
+          aspect_ratio: '4:3',
+          white_background: aiWhiteBg,
+          reference_images: referenceImages,
+          reference_image_urls: referenceUrls.slice(0, Math.max(0, 3 - referenceImages.length)),
+        }),
       });
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || t('generateFailed'));
-      }
-
-      const data = await res.json();
-      if (data.image_base64) {
-        setAiResult({ base64: data.image_base64, mimeType: data.mime_type || 'image/png' });
-        toast.success(t('generateSuccess'));
-      } else {
-        throw new Error(data.text || t('generateFailed'));
-      }
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new AiRequestError(aiErrorCode(data));
+      if (typeof data?.image_base64 !== 'string' || !data.image_base64) throw new AiRequestError('ai_image_failed');
+      setAiResult({ base64: data.image_base64, mimeType: data.mime_type || 'image/jpeg' });
+      toast.success(t('generateSuccess'));
     } catch (err: any) {
-      toast.error(err.message || t('aiGenerateError'));
+      if (previous) setAiResult(previous);
+      toast.error(err instanceof AiRequestError && err.code ? tAiErr(err.code) : t('aiGenerateError'));
     } finally {
       setAiGenerating(false);
+    }
+  };
+
+  /** Follow-up: refine the current result with extra instructions, or re-roll the same prompt. */
+  const handleAiFollowUp = () => {
+    const extra = aiFollowUp.trim();
+    if (extra) {
+      const nextPrompt = `${aiPrompt.trim()}. Additional changes: ${extra}`;
+      setAiPrompt(nextPrompt);
+      setAiFollowUp('');
+      handleAiGenerate({ promptOverride: nextPrompt, refine: true });
+    } else {
+      handleAiGenerate();
     }
   };
 
   const handleAiAcceptAndUpload = async () => {
     if (!aiResult) return;
 
-    if (sortedImages.length >= 10) {
-      toast.error(t('maxImagesError'));
+    if (sortedImages.length >= ETSY_MAX_IMAGES) {
+      toast.error(t('maxImagesError', { max: ETSY_MAX_IMAGES }));
       return;
     }
 
@@ -544,20 +581,20 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
       if (!staged?.media?.id) {
         // eslint-disable-next-line no-console
         console.error('[ImageManager] AI upload returned no media id', staged);
-        throw new Error('AI image upload did not return a draft id — server may have rejected the file. Try again or use the regular upload button.');
+        throw new Error('missing_media_id');
       }
       // eslint-disable-next-line no-console
       console.log('[ImageManager] AI image staged', { mediaId: staged.media.id, draftId: staged.draftId, rank: nextRank, size: aiFile.size });
 
       appendPendingUploads([aiFile], nextRank, undefined, [staged.media]);
-      toast.success('AI image saved to draft. Sync to Etsy when ready.');
+      toast.success(t('aiImageStaged'));
       setAiDialogOpen(false);
       setDraftMediaReloadKey((key) => key + 1);
       onImagesChanged();
     } catch (err: any) {
       // eslint-disable-next-line no-console
       console.error('[ImageManager] AI upload failed', err);
-      toast.error(err.message || t('uploadError'), { duration: 6000 });
+      toast.error(err?.message === 'missing_media_id' ? t('aiUploadNoDraftId') : draftErr(err, t('uploadError')), { duration: 6000 });
     } finally {
       setAiUploading(false);
     }
@@ -573,7 +610,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
   const handleSaveAltText = async () => {
     if (!editAltImage) return;
     if (editAltImage.is_pending_upload) {
-      toast.error('Alt text for pending uploads is saved during upload. Sync or discard the draft first.');
+      toast.error(t('pendingAltBlocked'));
       return;
     }
     setSavingAlt(true);
@@ -583,11 +620,12 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
         listingId,
         media: [{ kind: 'image', operation: 'update_alt', etsyMediaId: editAltImage.listing_image_id, altText: editAltText.trim() }],
       });
-      toast.success('Alt text saved to draft. Sync to Etsy when ready.');
+      toast.success(t('altTextStaged'));
       setEditAltImage(null);
       onImagesChanged();
     } catch (err: any) {
-      toast.error(err.message || t('altTextUpdateError'));
+      console.error('[ImageManager] alt text staging failed', err);
+      toast.error(draftErr(err, t('altTextUpdateError')));
     } finally {
       setSavingAlt(false);
     }
@@ -821,7 +859,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
         })}
 
         {/* Add image button */}
-        {sortedImages.length < 10 && (
+        {sortedImages.length < ETSY_MAX_IMAGES && (
           <Box
             onClick={() => !uploading && openUploadDialog()}
             sx={{
@@ -846,7 +884,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
         )}
 
         {/* AI generate image button */}
-        {sortedImages.length < 10 && (
+        {sortedImages.length < ETSY_MAX_IMAGES && (
           <Box
             onClick={() => !aiGenerating && openAiDialog()}
             sx={{
@@ -1111,11 +1149,17 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
 
           <Divider sx={{ my: 2 }} />
 
+          <FormControlLabel
+            control={<Checkbox size="small" checked={aiWhiteBg} onChange={(e) => setAiWhiteBg(e.target.checked)} disabled={aiGenerating} />}
+            label={<Typography variant="caption">{t('aiWhiteBg')}</Typography>}
+            sx={{ mb: 1 }}
+          />
+
           {/* Generate button */}
           <Button
             variant="contained"
             fullWidth
-            onClick={handleAiGenerate}
+            onClick={() => handleAiGenerate()}
             disabled={aiGenerating || !aiPrompt.trim()}
             startIcon={aiGenerating ? <CircularProgress size={18} color="inherit" /> : <AutoFixHighIcon />}
             sx={{
@@ -1155,13 +1199,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !aiGenerating) {
                     e.preventDefault();
-                    // Use follow-up as new prompt with reference to current result
-                    const followUpPrompt = aiFollowUp.trim()
-                      ? `${aiPrompt}. Additional changes: ${aiFollowUp.trim()}`
-                      : aiPrompt;
-                    setAiPrompt(followUpPrompt);
-                    setAiFollowUp('');
-                    handleAiGenerate();
+                    handleAiFollowUp();
                   }
                 }}
               />
@@ -1169,13 +1207,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
               <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', mt: 1, flexWrap: 'wrap' }}>
                 <Button
                   variant="outlined"
-                  onClick={() => {
-                    if (aiFollowUp.trim()) {
-                      setAiPrompt(`${aiPrompt}. Additional changes: ${aiFollowUp.trim()}`);
-                      setAiFollowUp('');
-                    }
-                    handleAiGenerate();
-                  }}
+                  onClick={handleAiFollowUp}
                   disabled={aiGenerating}
                   size="small"
                   startIcon={aiGenerating ? <CircularProgress size={14} /> : null}

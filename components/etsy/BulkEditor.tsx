@@ -56,8 +56,13 @@ import {
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import {
+  aiErrorCode, AiRequestError, checkTitle, normalizeTags, normalizeTitle, splitCommaList, tagTitleOverlap,
+  ETSY_WHEN_MADE_OPTIONS, whenMadeLabelKey,
+  ETSY_MAX_IMAGES, TAG_MAX_LEN, TAG_MAX_COUNT, TITLE_MIN, TITLE_MAX,
+} from '@/lib/etsy/seoRules';
 import VariationEditor from './VariationEditor';
-import { stageEtsyDraft, stageEtsyDraftFile } from '@/lib/etsy/draftClient';
+import { fetchEtsyDrafts, stageEtsyDraft, stageEtsyDraftFile } from '@/lib/etsy/draftClient';
 import BulkPhotoStudio from './BulkPhotoStudio';
 import BulkVideoStudio from './BulkVideoStudio';
 
@@ -185,6 +190,87 @@ interface PendingChange {
   personalization_char_count_max?: number;
   taxonomy_id?: number;
   taxonomyProperties?: ListingPropertyPatch[];
+  /**
+   * The bulk operations behind `price` / `quantity`, so multi-variation
+   * listings can apply the same operation to every variation's offering
+   * (Etsy requires an inventory patch for those — INVENTORY_PATCH_REQUIRED).
+   */
+  price_ops?: NumberOp[];
+  quantity_ops?: NumberOp[];
+}
+
+type NumberOp = { op: 'increase_pct' | 'decrease_pct' | 'increase_fixed' | 'decrease_fixed' | 'set'; amount: number };
+
+/** Existing ops for a field; an earlier direct edit becomes an initial 'set'. */
+function priorOps(pending: PendingChange | undefined, field: 'price' | 'quantity'): NumberOp[] {
+  if (!pending) return [];
+  const ops = field === 'price' ? pending.price_ops : pending.quantity_ops;
+  if (ops?.length) return ops;
+  const value = pending[field];
+  return value !== undefined ? [{ op: 'set', amount: value }] : [];
+}
+
+function applyNumberOps(value: number, ops: NumberOp[]): number {
+  return ops.reduce((v, { op, amount }) => {
+    switch (op) {
+      case 'increase_pct': return v * (1 + amount / 100);
+      case 'decrease_pct': return v * (1 - amount / 100);
+      case 'increase_fixed': return v + amount;
+      case 'decrease_fixed': return v - amount;
+      default: return amount;
+    }
+  }, value);
+}
+
+/**
+ * If the listing has variations, build an inventory patch that applies the
+ * pending price/quantity operations to every offering. Returns null for
+ * single-product listings (the plain field patch is correct there).
+ * Starts from a pending draft inventory patch when one exists.
+ */
+async function buildVariationInventoryPatch(
+  shopId: string,
+  listingId: number,
+  changes: PendingChange,
+): Promise<Record<string, any> | null> {
+  const [invRes, drafts] = await Promise.all([
+    fetch(`/api/clawd/etsy?action=get_listing_inventory&listing_id=${listingId}&shop_id=${shopId}`),
+    fetchEtsyDrafts(shopId, listingId).catch(() => []),
+  ]);
+  if (!invRes.ok) return null;
+  const remote = await invRes.json();
+  const pending = Array.isArray(drafts)
+    ? drafts.find((d: any) => ['draft', 'failed', 'conflict'].includes(d.status) && Array.isArray(d.inventoryPatch?.products) && d.inventoryPatch.products.length > 0)
+    : null;
+  const source = pending ? pending.inventoryPatch : remote;
+  const products: any[] = (Array.isArray(source?.products) ? source.products : []).filter((p: any) => !p?.is_deleted);
+  const isMultiVariation = products.length > 1 || products.some((p: any) => Array.isArray(p?.property_values) && p.property_values.length > 0);
+  if (!isMultiVariation) return null;
+
+  const priceOps: NumberOp[] | null = changes.price !== undefined ? (changes.price_ops?.length ? changes.price_ops : [{ op: 'set', amount: changes.price }]) : null;
+  const qtyOps: NumberOp[] | null = changes.quantity !== undefined ? (changes.quantity_ops?.length ? changes.quantity_ops : [{ op: 'set', amount: changes.quantity }]) : null;
+
+  return {
+    products: products.map((p: any) => ({
+      ...p,
+      offerings: (Array.isArray(p.offerings) ? p.offerings : []).filter((o: any) => !o?.is_deleted).map((o: any) => {
+        const next = { ...o };
+        if (priceOps) {
+          const divisor = Number(o.price?.divisor) || 100;
+          const current = (Number(o.price?.amount) || 0) / divisor;
+          const value = Math.max(0.2, Math.round(applyNumberOps(current, priceOps) * 100) / 100);
+          next.price = { ...(o.price || {}), amount: Math.round(value * divisor), divisor };
+        }
+        if (qtyOps) {
+          next.quantity = Math.max(0, Math.trunc(applyNumberOps(Number(o.quantity) || 0, qtyOps)));
+        }
+        return next;
+      }),
+    })),
+    price_on_property: source.price_on_property || [],
+    quantity_on_property: source.quantity_on_property || [],
+    sku_on_property: source.sku_on_property || [],
+  };
 }
 
 interface TaxonomyOption {
@@ -396,13 +482,20 @@ const WHO_MADE_OPTIONS = [
   { value: 'someone_else', label: 'whoMade.someoneElse' },
 ];
 
-const WHEN_MADE_OPTIONS = [
-  { value: 'made_to_order', label: 'whenMade.madeToOrder' },
-  { value: '2020_2025', label: 'whenMade.2020_2025' },
-  { value: '2010_2019', label: 'whenMade.2010_2019' },
-  { value: '2004_2009', label: 'whenMade.2004_2009' },
-  { value: 'before_2004', label: 'whenMade.before2004' },
-];
+// Verified Etsy enum (see lib/etsy/seoRules ETSY_WHEN_MADE_OPTIONS); labels from etsy.whenMade.*
+const WHEN_MADE_OPTIONS = ETSY_WHEN_MADE_OPTIONS.map(value => ({ value, label: whenMadeLabelKey(value) }));
+
+/** Letter grade for a title using the shared SEO rules. */
+function titleGrade(title: string): 'A+' | 'B' | 'C' | 'F' {
+  const len = (title || '').length;
+  const check = checkTitle(title || '');
+  const ruleIssue = check.issues.some(i => i === 'repeated_words' || i === 'keyword_stacking' || i === 'disallowed_separator' || i === 'all_caps');
+  if (len > TITLE_MAX) return 'F';
+  if (len >= TITLE_MIN && !ruleIssue) return 'A+';
+  if (len >= 80) return 'B';
+  if (len >= 60) return 'C';
+  return 'F';
+}
 
 const WEIGHT_UNITS = ['oz', 'lb', 'g', 'kg'];
 const DIMENSION_UNITS = ['in', 'ft', 'mm', 'cm'];
@@ -449,26 +542,27 @@ async function callRemovePersonalization(shopId: string, listingId: number) {
 function InlineTagEditor({
   tags,
   onChange,
+  title = '',
   maxTags = 13,
   maxCharsPerTag = 20,
 }: {
   tags: string[];
   onChange: (tags: string[]) => void;
+  title?: string;
   maxTags?: number;
   maxCharsPerTag?: number;
 }) {
   const t = useTranslations('etsy.bulkEditor');
   const [inputVal, setInputVal] = useState('');
+  const [rejected, setRejected] = useState<string[]>([]);
   const remaining = maxTags - tags.length;
 
   const handleAdd = () => {
-    const newTags = inputVal
-      .split(',')
-      .map(s => s.trim().toLowerCase())
-      .filter(s => s.length > 0 && s.length <= maxCharsPerTag && !tags.includes(s));
-    if (newTags.length === 0) return;
-    const merged = [...tags, ...newTags].slice(0, maxTags);
-    onChange(merged);
+    if (!inputVal.trim()) return;
+    // Comma bulk entry; over-long tags are dropped with inline feedback, never truncated.
+    const { tags: merged, dropped } = normalizeTags([...tags, ...splitCommaList(inputVal)], { max: maxTags });
+    setRejected(dropped.filter(d => d.reason === 'too_long' || d.reason === 'over_limit').map(d => d.tag));
+    if (merged.length !== tags.length || merged.some((tag, i) => tag !== tags[i])) onChange(merged);
     setInputVal('');
   };
 
@@ -500,10 +594,17 @@ function InlineTagEditor({
       >
         {t('inlineEditor.remaining', { count: remaining })}
       </Typography>
+      {rejected.length > 0 && (
+        <Typography variant="caption" color="error" sx={{ display: 'block' }}>
+          {t('inlineEditor.tagsRejected', { tags: rejected.join(', '), max: maxCharsPerTag })}
+        </Typography>
+      )}
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
         {tags.map((tag, i) => {
           const tooLong = tag.length > maxCharsPerTag;
+          const overlap = title ? tagTitleOverlap(tag, title) : [];
           return (
+            <Tooltip key={`${tag}-${i}`} title={tooLong ? t('inlineEditor.tagTooLong', { max: maxCharsPerTag }) : overlap.length ? t('inlineEditor.tagOverlapsTitle', { words: overlap.join(', ') }) : ''}>
             <Chip
               key={`${tag}-${i}`}
               label={
@@ -515,7 +616,8 @@ function InlineTagEditor({
                 </Box>
               }
               size="small"
-              color={tooLong ? 'error' : 'default'}
+              color={tooLong ? 'error' : overlap.length ? 'warning' : 'default'}
+              variant={overlap.length && !tooLong ? 'outlined' : 'filled'}
               onDelete={() => onChange(tags.filter((_, idx) => idx !== i))}
               sx={{
                 height: 28,
@@ -523,6 +625,7 @@ function InlineTagEditor({
                 '& .MuiChip-deleteIcon': { fontSize: '0.9rem' },
               }}
             />
+            </Tooltip>
           );
         })}
       </Box>
@@ -615,6 +718,8 @@ export default function BulkEditor({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const t = useTranslations('etsy.bulkEditor');
+  const tEtsy = useTranslations('etsy');
+  const tAiErr = useTranslations('etsy.aiErrors');
 
   // Navigation
   const [activeField, setActiveField] = useState<FieldCategory>('title');
@@ -632,6 +737,11 @@ export default function BulkEditor({
   const [findValue, setFindValue] = useState('');
   const [replaceValue, setReplaceValue] = useState('');
   const [tagsInput, setTagsInput] = useState('');
+  // Inline feedback: entries in the comma list that exceed Etsy's 20-char tag limit.
+  const tagInputTooLong = useMemo(
+    () => splitCommaList(tagsInput).filter(tag => tag.trim().length > TAG_MAX_LEN),
+    [tagsInput],
+  );
   const [targetSectionId, setTargetSectionId] = useState<number | ''>('');
 
   // About fields
@@ -704,7 +814,7 @@ export default function BulkEditor({
     if (validFiles.length !== files.length) {
       toast.error(t('photos.unsupportedFiles'));
     }
-    setPhotoFiles(validFiles.slice(0, 10));
+    setPhotoFiles(validFiles.slice(0, ETSY_MAX_IMAGES));
   }, [t]);
 
   // Video bulk
@@ -951,7 +1061,11 @@ export default function BulkEditor({
     setPendingChanges(prev => {
       const next = new Map(prev);
       const existing = next.get(listingId) || {};
-      next.set(listingId, { ...existing, ...changes });
+      const merged: PendingChange = { ...existing, ...changes };
+      // A direct (inline) price/quantity edit supersedes earlier bulk operations.
+      if ('price' in changes && !('price_ops' in changes)) delete merged.price_ops;
+      if ('quantity' in changes && !('quantity_ops' in changes)) delete merged.quantity_ops;
+      next.set(listingId, merged);
       return next;
     });
   }, []);
@@ -1014,8 +1128,8 @@ export default function BulkEditor({
           let newTags = [...(current as string[])];
           switch (operation) {
             case 'add': {
-              const adding = tagsInput.split(',').map(s => s.trim().toLowerCase()).filter(s => s.length > 0 && s.length <= 20);
-              newTags = [...new Set([...newTags, ...adding])].slice(0, 13);
+              // Over-long entries are reported inline (tagInputTooLong) and skipped, never truncated.
+              newTags = normalizeTags([...newTags, ...splitCommaList(tagsInput)], { max: TAG_MAX_COUNT }).tags;
               break;
             }
             case 'remove': {
@@ -1028,7 +1142,7 @@ export default function BulkEditor({
               break;
             }
             case 'change_to': {
-              newTags = tagsInput.split(',').map(s => s.trim().toLowerCase()).filter(s => s.length > 0 && s.length <= 20).slice(0, 13);
+              newTags = normalizeTags(splitCommaList(tagsInput), { max: TAG_MAX_COUNT }).tags;
               break;
             }
             case 'ai_rewrite': return;
@@ -1072,7 +1186,11 @@ export default function BulkEditor({
             case 'decrease_fixed': newPrice = currentPrice - amount; break;
             case 'set_price': newPrice = amount; break;
           }
-          updatePending(listing.listing_id, { price: Math.max(0.01, Math.round(newPrice * 100) / 100) });
+          const priceOp: NumberOp = { op: operation === 'set_price' ? 'set' : operation as NumberOp['op'], amount };
+          updatePending(listing.listing_id, {
+            price: Math.max(0.01, Math.round(newPrice * 100) / 100),
+            price_ops: [...priorOps(pendingChanges.get(listing.listing_id), 'price'), priceOp],
+          });
           break;
         }
         case 'quantity': {
@@ -1084,7 +1202,11 @@ export default function BulkEditor({
             case 'increase_fixed': newQty = currentQty + amount; break;
             case 'decrease_fixed': newQty = Math.max(0, currentQty - amount); break;
           }
-          updatePending(listing.listing_id, { quantity: newQty });
+          const qtyOp: NumberOp = { op: operation === 'set_quantity' ? 'set' : operation as NumberOp['op'], amount };
+          updatePending(listing.listing_id, {
+            quantity: newQty,
+            quantity_ops: [...priorOps(pendingChanges.get(listing.listing_id), 'quantity'), qtyOp],
+          });
           break;
         }
         case 'section': {
@@ -1170,8 +1292,12 @@ export default function BulkEditor({
       }
     });
 
+    if (activeField === 'tags' && (operation === 'add' || operation === 'change_to')) {
+      const skipped = normalizeTags(splitCommaList(tagsInput), { max: 1000 }).dropped.filter(d => d.reason === 'too_long');
+      if (skipped.length > 0) toast.error(t('toast.tagsTooLongSkipped', { tags: skipped.map(d => d.tag).join(', '), max: TAG_MAX_LEN }));
+    }
     toast.success(t('toast.appliedToListings', { count: checked.length }));
-  }, [filteredListings, checkedIds, activeField, operation, inputValue, findValue, replaceValue, tagsInput,
+  }, [filteredListings, checkedIds, activeField, operation, inputValue, findValue, replaceValue, tagsInput, pendingChanges,
       targetSectionId, getFieldValue, updatePending, whoMade, whenMade, isSupply,
       weightValue, weightUnit, lengthValue, widthValue, heightValue, dimensionUnit,
       processingMin, processingMax, selectedShippingProfileId, selectedReturnPolicyId,
@@ -1197,43 +1323,58 @@ export default function BulkEditor({
           action: 'bulk_optimize',
           field: fieldForAI,
           instructions: aiInstructions || undefined,
-          listings: checked.map(l => ({
+          // The server caps a request at 20 listings.
+          listings: checked.slice(0, 20).map(l => ({
             listing_id: l.listing_id,
             title: getFieldValue(l, 'title'),
             tags: getFieldValue(l, 'tags'),
-            description: fieldForAI === 'description' ? getFieldValue(l, 'description') : undefined,
+            // Description is always sent as context; it is only rewritten when field === 'description'.
+            description: getFieldValue(l, 'description'),
           })),
         }),
       });
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'AI request failed');
-      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new AiRequestError(aiErrorCode(data));
 
-      const data = await res.json();
-      const optimized = data.optimized || [];
+      const optimized: any[] = Array.isArray(data?.optimized) ? data.optimized : [];
+      const byId = new Map(checked.map(l => [l.listing_id, l]));
+      let applied = 0;
 
       optimized.forEach((opt: any, idx: number) => {
         setAiProgress(Math.round(((idx + 1) / optimized.length) * 100));
+        const listing = opt && byId.get(opt.listing_id);
+        if (!listing) return;
+        // Route every AI result through the shared SEO rules before staging.
         const changes: PendingChange = {};
-        if (fieldForAI === 'title' && opt.title) changes.title = opt.title;
-        if (fieldForAI === 'description' && opt.description) changes.description = opt.description;
-        if (fieldForAI === 'tags' && opt.tags) changes.tags = opt.tags;
+        if (fieldForAI === 'title') {
+          const title = normalizeTitle(opt.title);
+          if (title) changes.title = title;
+        }
+        if (fieldForAI === 'description' && typeof opt.description === 'string' && opt.description.trim()) {
+          changes.description = opt.description;
+        }
+        if (fieldForAI === 'tags') {
+          const { tags } = normalizeTags(opt.tags, { title: getFieldValue(listing, 'title') as string, dropTitleOverlap: true });
+          if (tags.length > 0) changes.tags = tags;
+        }
         if (Object.keys(changes).length > 0) {
           updatePending(opt.listing_id, changes);
+          applied++;
         }
       });
 
-      toast.success(t('toast.aiOptimized', { count: optimized.length }));
+      if (applied === 0) throw new AiRequestError('invalid_ai_response');
+      toast.success(t('toast.aiOptimized', { count: applied }));
+      if (checked.length > 20) toast(t('toast.aiFirst20Only'));
     } catch (err: any) {
-      toast.error(err.message || t('toast.aiOptimizeFailed'));
+      toast.error(err instanceof AiRequestError && err.code ? tAiErr(err.code) : t('toast.aiOptimizeFailed'));
     } finally {
       setAiProcessing(false);
       setAiProgress(0);
       setAiInstructions('');
     }
-  }, [filteredListings, checkedIds, activeField, aiInstructions, getFieldValue, updatePending]);
+  }, [filteredListings, checkedIds, activeField, aiInstructions, getFieldValue, updatePending, t, tAiErr]);
 
   // Single-listing AI magic wand
   const handleSingleListingAI = useCallback(async (listing: SelectedListing, field: 'title' | 'description' | 'tags') => {
@@ -1252,21 +1393,24 @@ export default function BulkEditor({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'optimize_title', title, description, tags }),
         });
-        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'AI failed');
-        const data = await res.json();
-        if (data.optimized_title) {
-          updatePending(listing.listing_id, { title: data.optimized_title });
-          toast.success(t('toast.aiSingleDone'));
-        }
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new AiRequestError(aiErrorCode(data));
+        const newTitle = normalizeTitle(data?.optimized_title);
+        if (!newTitle) throw new AiRequestError('ai_title_failed');
+        updatePending(listing.listing_id, { title: newTitle });
+        const issues = checkTitle(newTitle).issues;
+        if (issues.includes('too_short') || issues.includes('too_long')) toast(t('toast.aiTitleLengthWarning', { count: newTitle.length, min: TITLE_MIN, max: TITLE_MAX }));
+        toast.success(t('toast.aiSingleDone'));
       } else if (field === 'description') {
         const res = await fetch('/api/ai/etsy', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'generate_description', title, tags, materials, existing_description: description }),
         });
-        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'AI failed');
-        const data = await res.json();
-        if (data.description) {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new AiRequestError(aiErrorCode(data));
+        if (typeof data?.description !== 'string' || !data.description.trim()) throw new AiRequestError('ai_description_failed');
+        {
           updatePending(listing.listing_id, { description: data.description });
           toast.success(t('toast.aiSingleDone'));
         }
@@ -1274,21 +1418,22 @@ export default function BulkEditor({
         const res = await fetch('/api/ai/etsy', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'suggest_tags', title, description, tags_current: tags }),
+          // The result REPLACES all tags, so strong current tags may be kept.
+          body: JSON.stringify({ action: 'suggest_tags', mode: 'replace', title, description, tags_current: tags }),
         });
-        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'AI failed');
-        const data = await res.json();
-        if (data.suggestions && Array.isArray(data.suggestions)) {
-          updatePending(listing.listing_id, { tags: data.suggestions });
-          toast.success(t('toast.aiSingleDone'));
-        }
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new AiRequestError(aiErrorCode(data));
+        const { tags: newTags } = normalizeTags(data?.suggestions, { title, dropTitleOverlap: true });
+        if (newTags.length === 0) throw new AiRequestError('ai_tags_failed');
+        updatePending(listing.listing_id, { tags: newTags });
+        toast.success(t('toast.aiSingleDone'));
       }
     } catch (err: any) {
-      toast.error(err.message || t('toast.aiOptimizeFailed'));
+      toast.error(err instanceof AiRequestError && err.code ? tAiErr(err.code) : t('toast.aiOptimizeFailed'));
     } finally {
       setAiLoadingId(null);
     }
-  }, [aiLoadingId, getFieldValue, updatePending]);
+  }, [aiLoadingId, getFieldValue, updatePending, t, tAiErr]);
 
   // Bulk AI alt text for photos
   const handleBulkAltText = useCallback(async () => {
@@ -1441,7 +1586,7 @@ export default function BulkEditor({
       return;
     }
     if (draggingBulkImage.imageId < 0 || targetImageId < 0) {
-      toast.error('Pending uploads can be reordered after they are synced to Etsy.');
+      toast.error(t('toast.pendingReorderBlocked'));
       setDraggingBulkImage(null);
       return;
     }
@@ -1473,7 +1618,7 @@ export default function BulkEditor({
         });
         setPhotoProgress(Math.round(((i + 1) / nextImages.length) * 100));
       }
-      toast.success('Photo order saved to draft. Sync to Etsy when ready.');
+      toast.success(t('toast.photoOrderStaged'));
       onCompleted();
     } catch (err: any) {
       toast.error(err.message || t('photos.orderSaveFailed'));
@@ -1499,7 +1644,7 @@ export default function BulkEditor({
   const handleSaveBulkAltText = async () => {
     if (!bulkPreview) return;
     if (bulkPreview.image.is_pending_upload) {
-      toast.error('Pending uploads can be edited after they are synced to Etsy.');
+      toast.error(t('toast.pendingEditBlocked'));
       return;
     }
     setSavingBulkAlt(true);
@@ -1509,7 +1654,7 @@ export default function BulkEditor({
         listingId: bulkPreview.listing.listing_id,
         media: [{ kind: 'image', operation: 'update_alt', etsyMediaId: bulkPreview.image.listing_image_id, altText: bulkAltText.trim() }],
       });
-      toast.success('Alt text saved to draft. Sync to Etsy when ready.');
+      toast.success(t('toast.altTextStaged'));
       await refreshListingImages([bulkPreview.listing.listing_id], true);
       setBulkPreview(null);
     } catch (err: any) {
@@ -1600,13 +1745,13 @@ export default function BulkEditor({
       const tempId = -Date.now();
       const newSection: ShopSection = {
         shop_section_id: tempId,
-        title: `${newSectionName.trim()} (pending)`,
+        title: t('section.pendingName', { name: newSectionName.trim() }),
       };
       setStagedSectionPayloads(prev => ({ ...prev, [tempId]: { title: newSectionName.trim() } }));
       setLocalSections(prev => [...prev, newSection]);
       setTargetSectionId(newSection.shop_section_id);
       setNewSectionName('');
-      toast.success('Shop section will be created when drafts sync to Etsy.');
+      toast.success(t('toast.sectionStaged'));
     } catch {
       toast.error(t('toast.sectionCreateFailed'));
     } finally {
@@ -1656,6 +1801,22 @@ export default function BulkEditor({
         if (changes.processing_max !== undefined) body.processing_max = changes.processing_max;
         if (changes.taxonomy_id !== undefined) body.taxonomy_id = changes.taxonomy_id;
         const taxonomyProperties = changes.taxonomyProperties;
+
+        // Multi-variation listings can't take a single price/quantity — Etsy
+        // needs the full inventory. Stage the same operation per variation.
+        let variationInventory: Record<string, any> | null = null;
+        if (body.price !== undefined || body.quantity !== undefined) {
+          try {
+            variationInventory = await buildVariationInventoryPatch(shopId, listingId, changes);
+          } catch (invErr) {
+            console.warn(`[BulkEditor] inventory lookup failed for ${listingId}; staging as field patch`, invErr);
+          }
+          if (variationInventory) {
+            delete body.price;
+            delete body.quantity;
+            await stageEtsyDraft({ shopId, listingId, inventory: variationInventory });
+          }
+        }
 
         let personalizationOk = true;
         if (changes.is_personalizable !== undefined) {
@@ -1938,6 +2099,10 @@ export default function BulkEditor({
             placeholder={t("actionBar.commaSeparated", { field: t(fieldDef.label) })}
             value={tagsInput}
             onChange={(e) => setTagsInput(e.target.value)}
+            error={activeField === 'tags' && tagInputTooLong.length > 0}
+            helperText={activeField === 'tags' && tagInputTooLong.length > 0
+              ? t('actionBar.tagsTooLong', { tags: tagInputTooLong.join(', '), max: TAG_MAX_LEN })
+              : undefined}
             sx={{ flex: 1, minWidth: 150 }}
           />
         ) : activeField === 'section' ? (
@@ -1977,10 +2142,10 @@ export default function BulkEditor({
           </>
         ) : activeField === 'etsy_details' ? (
           <FormControl size="small" sx={{ minWidth: 260 }}>
-            <InputLabel>Category group</InputLabel>
+            <InputLabel>{t('etsyDetails.categoryGroup')}</InputLabel>
             <Select
               value={selectedTaxonomyGroup}
-              label="Category group"
+              label={t('etsyDetails.categoryGroup')}
               onChange={(e) => {
                 setSelectedTaxonomyGroup(e.target.value as number);
                 setBulkTaxonomyDraft({});
@@ -1988,7 +2153,7 @@ export default function BulkEditor({
             >
               {taxonomyGroups.map((group) => (
                 <MenuItem key={group.taxonomyId} value={group.taxonomyId}>
-                  {group.taxonomyId} ({group.listings.length} listings)
+                  {t('etsyDetails.groupOption', { id: group.taxonomyId, count: group.listings.length })}
                 </MenuItem>
               ))}
             </Select>
@@ -2229,7 +2394,7 @@ export default function BulkEditor({
               <FormControl size="small" sx={{ minWidth: 160 }}>
                 <InputLabel sx={{ fontSize: '0.82rem' }}>{t('aboutSection.whenMadeLabel')}</InputLabel>
                 <Select value={whenMade} onChange={e => setWhenMade(e.target.value)} label={t("aboutSection.whenMadeLabel")} sx={{ fontSize: '0.85rem' }}>
-                  {WHEN_MADE_OPTIONS.map(o => <MenuItem key={o.value} value={o.value}>{t(o.label)}</MenuItem>)}
+                  {WHEN_MADE_OPTIONS.map(o => <MenuItem key={o.value} value={o.value}>{tEtsy(`whenMade.${o.label}`)}</MenuItem>)}
                 </Select>
               </FormControl>
               <FormControlLabel
@@ -2452,10 +2617,10 @@ export default function BulkEditor({
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
               <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
                 <FormControl size="small" sx={{ minWidth: 260 }}>
-                  <InputLabel>Category group</InputLabel>
+                  <InputLabel>{t('etsyDetails.categoryGroup')}</InputLabel>
                   <Select
                     value={selectedTaxonomyGroup}
-                    label="Category group"
+                    label={t('etsyDetails.categoryGroup')}
                     onChange={(e) => {
                       setSelectedTaxonomyGroup(e.target.value as number);
                       setBulkTaxonomyDraft({});
@@ -2463,7 +2628,7 @@ export default function BulkEditor({
                   >
                     {taxonomyGroups.map((group) => (
                       <MenuItem key={group.taxonomyId} value={group.taxonomyId}>
-                        {group.taxonomyId} ({group.listings.length} listings)
+                        {t('etsyDetails.groupOption', { id: group.taxonomyId, count: group.listings.length })}
                       </MenuItem>
                     ))}
                   </Select>
@@ -2475,18 +2640,18 @@ export default function BulkEditor({
                   disabled={saving || !taxonomyId || Object.keys(bulkTaxonomyDraft).length === 0}
                   sx={{ minHeight: 40, px: 3, fontWeight: 700, textTransform: 'none', borderRadius: '8px' }}
                 >
-                  Apply to this category group
+                  {t('etsyDetails.applyToGroup')}
                 </Button>
               </Box>
               {bulkTaxonomyLoading ? (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <CircularProgress size={18} />
-                  <Typography variant="body2" color="text.secondary">Loading Etsy details...</Typography>
+                  <Typography variant="body2" color="text.secondary">{t('etsyDetails.loading')}</Typography>
                 </Box>
               ) : !taxonomyId ? (
-                <Alert severity="info">Selected listings do not have category IDs.</Alert>
+                <Alert severity="info">{t('etsyDetails.noCategoryIds')}</Alert>
               ) : properties.length === 0 ? (
-                <Alert severity="info">No Etsy details returned for this category.</Alert>
+                <Alert severity="info">{t('etsyDetails.noDetails')}</Alert>
               ) : (
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1.5 }}>
                   {properties.map((prop) => {
@@ -2523,21 +2688,21 @@ export default function BulkEditor({
                               {...params}
                               label={`${prop.display_name || prop.name}${prop.is_required ? ' *' : ''}`}
                               size="small"
-                              helperText={prop.supports_variations ? 'Can also be used for variations' : undefined}
+                              helperText={prop.supports_variations ? t('etsyDetails.variationHint') : undefined}
                             />
                           )}
                           sx={{ flex: 1 }}
                         />
-                        {prop.supports_variations && <Chip label="Variation" size="small" variant="outlined" sx={{ mt: 1 }} />}
+                        {prop.supports_variations && <Chip label={t('etsyDetails.variation')} size="small" variant="outlined" sx={{ mt: 1 }} />}
                         {prop.scales && prop.scales.length > 0 && (
                           <FormControl size="small" sx={{ minWidth: 110 }}>
-                            <InputLabel>Scale</InputLabel>
+                            <InputLabel>{t('etsyDetails.scale')}</InputLabel>
                             <Select
                               value={patch.scale_id ? String(patch.scale_id) : ''}
-                              label="Scale"
+                              label={t('etsyDetails.scale')}
                               onChange={(e) => updateBulkTaxonomyScale(prop.property_id, e.target.value ? Number(e.target.value) : null)}
                             >
-                              <MenuItem value=""><em>None</em></MenuItem>
+                              <MenuItem value=""><em>{t('etsyDetails.none')}</em></MenuItem>
                               {prop.scales.map((scale) => (
                                 <MenuItem key={scale.scale_id} value={String(scale.scale_id)}>
                                   {scale.display_name}
@@ -2774,6 +2939,7 @@ export default function BulkEditor({
                 <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'flex-start' }}>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <InlineTagEditor
+                      title={getFieldValue(listing, 'title') as string}
                       tags={value as string[]}
                       onChange={(newTags) => updatePending(listing.listing_id, { tags: newTags })}
                     />
@@ -3055,12 +3221,12 @@ export default function BulkEditor({
             {activeField === 'etsy_details' && (() => {
               const pending = pendingChanges.get(listing.listing_id);
               if (selectedTaxonomyGroup !== '' && listing.taxonomy_id !== Number(selectedTaxonomyGroup)) {
-                return <Typography variant="caption" color="text.secondary">Different category group</Typography>;
+                return <Typography variant="caption" color="text.secondary">{t('etsyDetails.differentGroup')}</Typography>;
               }
               if (pending?.taxonomyProperties?.length) {
-                return <Chip label={`${pending.taxonomyProperties.length} detail changes`} size="small" color="primary" variant="outlined" />;
+                return <Chip label={t('etsyDetails.detailChanges', { count: pending.taxonomyProperties.length })} size="small" color="primary" variant="outlined" />;
               }
-              return <Typography variant="caption" color="text.secondary">No detail changes staged</Typography>;
+              return <Typography variant="caption" color="text.secondary">{t('etsyDetails.noDetailChanges')}</Typography>;
             })()}
 
             {activeField === 'personalization' && (() => {
@@ -3102,13 +3268,11 @@ export default function BulkEditor({
                   sx={{
                     fontWeight: 700,
                     fontSize: '0.85rem',
-                    color: (value as string).length >= 100 && (value as string).length <= 140 ? 'success.main'
-                      : (value as string).length >= 60 ? 'warning.main' : 'error.main',
+                    color: titleGrade(value as string) === 'A+' ? 'success.main'
+                      : titleGrade(value as string) === 'F' ? 'error.main' : 'warning.main',
                   }}
                 >
-                  {(value as string).length >= 100 && (value as string).length <= 140 ? 'A+'
-                    : (value as string).length >= 80 ? 'B'
-                    : (value as string).length >= 60 ? 'C' : 'F'}
+                  {titleGrade(value as string)}
                 </Typography>
               </Tooltip>
             </Box>

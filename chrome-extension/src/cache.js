@@ -11,6 +11,7 @@ const MAX_CACHE_SIZE = 5 * 1024 * 1024; // 5MB budget
 const TTL = {
   search: 30 * 60 * 1000,     // 30 minutes
   listing: 60 * 60 * 1000,     // 1 hour
+  lstats: 15 * 60 * 1000,      // 15 minutes (listing stats; UI shows data age)
   shop: 24 * 60 * 60 * 1000,   // 24 hours
   trends: 6 * 60 * 60 * 1000,  // 6 hours
 };

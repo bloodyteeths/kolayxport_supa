@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';
 import { getAuthUser } from '../../../lib/auth';
+import { hasValidInternalApiKeyHeader } from '../../../lib/security/internalApiKey';
 import {
   getApplicationToken,
   getEbayTokenFor,
@@ -93,14 +94,14 @@ export default async function handler(
   res: NextApiResponse
 ) {
   // 1. Authenticate --- accept API key OR session auth
-  const apiKey = req.headers['x-api-key'];
-  const envApiKey = process.env.CLAWD_API_KEY;
   let authenticated = false;
+  let viaApiKey = false;
   let sessionUserId: string | null = null;
 
-  // Try API key auth first
-  if (envApiKey && apiKey === envApiKey) {
+  // Try API key auth first (constant-time compare)
+  if (hasValidInternalApiKeyHeader(req)) {
     authenticated = true;
+    viaApiKey = true;
   }
 
   // Fall back to session auth
@@ -117,7 +118,11 @@ export default async function handler(
   }
 
   // Get userId from query param or session (support both user_id and userId)
-  const userId = (req.query.userId as string) || (req.query.user_id as string) || sessionUserId;
+  // A client-supplied userId/user_id is honored ONLY for the internal API-key path.
+  // Session/Bearer callers always act as themselves.
+  const userId = viaApiKey
+    ? ((req.query.userId as string) || (req.query.user_id as string) || null)
+    : sessionUserId;
   if (!userId) {
     return res.status(400).json({ error: 'userId is required' });
   }

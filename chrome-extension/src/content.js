@@ -5,67 +5,55 @@
  * Complements existing Veeqo integration for complete order data
  */
 
-// Determine API endpoint based on current domain
-const getKolayxportAPI = () => {
-  const hostname = window.location.hostname;
-  if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
-    return 'http://localhost:3000/api/integrations/etsy/addresses';
-  } else if (hostname.includes('staging') || hostname.includes('dev')) {
-    return 'https://staging.kolayxport.com/api/integrations/etsy/addresses';
-  }
-  return 'https://kolayxport.com/api/integrations/etsy/addresses';
-};
-
-const API = getKolayxportAPI();
+const EXT_VERSION = (function() {
+  try { return chrome.runtime.getManifest().version; } catch (e) { return ''; }
+})();
 const STORAGE_KEY = 'kx_synced_orders';
 const EMAIL_SYNC_KEY = 'kx_synced_emails';
 const MAX_STORED_IDS = 5000;
 
-// Logging system - since Etsy blocks console, we'll use extension storage and server logs
+// Keys that may carry buyer PII or raw page markup — never persisted to kx_logs.
+const PII_KEY_RE = /name|line1|line2|address|email|city|state|postal|zip|country|html|phone|tracking|notes|personali/i;
+
+function redactForLog(value, depth) {
+  depth = depth || 0;
+  if (value === null || value === undefined) return value;
+  if (typeof value === 'string') return value.length > 200 ? value.slice(0, 200) + '…' : value;
+  if (typeof value !== 'object') return value;
+  if (depth > 2) return '[…]';
+  if (Array.isArray(value)) return value.slice(0, 10).map(function(v) { return redactForLog(v, depth + 1); });
+  var out = {};
+  Object.keys(value).forEach(function(k) {
+    out[k] = PII_KEY_RE.test(k) ? '[redacted]' : redactForLog(value[k], depth + 1);
+  });
+  return out;
+}
+
+// Local diagnostic log (chrome.storage.local, last 100 entries). Redacted: no
+// addresses, emails, buyer names, tracking numbers or raw HTML are stored.
 const log = {
   messages: [],
-  add: function(level, message, data = null) {
-    const timestamp = new Date().toISOString();
-    // Sanitize data to ensure it's serializable (no DOM nodes, circular refs)
+  add: function(level, message, data) {
     let safeData = null;
     if (data !== null && data !== undefined) {
       try {
-        safeData = JSON.parse(JSON.stringify(data));
+        safeData = redactForLog(JSON.parse(JSON.stringify(data)));
       } catch (e) {
-        safeData = String(data);
+        safeData = null;
       }
     }
-    const logEntry = { timestamp, level, message, data: safeData };
-    this.messages.push(logEntry);
-
-    if (this.messages.length > 100) {
-      this.messages = this.messages.slice(-100);
-    }
-
+    this.messages.push({ timestamp: new Date().toISOString(), level: level, message: message, data: safeData });
+    if (this.messages.length > 100) this.messages = this.messages.slice(-100);
     try {
       chrome.storage.local.set({ 'kx_logs': this.messages });
     } catch (e) {
-      // Silent fail if storage write fails
-    }
-
-    if (level === 'error' || level === 'success') {
-      this.sendToServer(logEntry);
+      // storage unavailable (context invalidated)
     }
   },
   info: function(message, data) { this.add('info', message, data); },
   success: function(message, data) { this.add('success', message, data); },
   error: function(message, data) { this.add('error', message, data); },
-  warn: function(message, data) { this.add('warn', message, data); },
-  sendToServer: async function(logEntry) {
-    try {
-      safeSendMessage({
-        action: 'sendLog',
-        log: logEntry
-      });
-    } catch (e) {
-      // Silent fail for logging
-    }
-  }
+  warn: function(message, data) { this.add('warn', message, data); }
 };
 
 // Safe wrapper for chrome.runtime.sendMessage — handles "context invalidated"
@@ -83,7 +71,7 @@ function safeSendMessage(msg) {
   }
 }
 
-log.info('🚀 Kolayxport Etsy Address Enrichment v5.4 Loading', { url: window.location.href });
+log.info('KolayXport Etsy order helper v' + EXT_VERSION + ' loading', { path: window.location.pathname });
 
 // Extract store information from current page
 function getEtsyStoreInfo() {
@@ -149,20 +137,6 @@ function getEtsyStoreInfo() {
   return { shopId, storeName };
 }
 
-// Get authentication token from background service worker
-async function getAuthToken() {
-  try {
-    const response = await safeSendMessage({ action: 'getAuthStatus' });
-    if (response?.authenticated && response.token) {
-      log.info('Got auth token from background script');
-      return response.token;
-    }
-  } catch (e) {
-    log.warn('Could not get auth token from background', e.message);
-  }
-  return null;
-}
-
 // Utility – push in batches and dedupe with chrome.storage.local
 const pushBatch = async batch => {
   if (!batch.length) {
@@ -173,18 +147,14 @@ const pushBatch = async batch => {
   log.info(`Attempting to sync ${batch.length} orders`);
   
   try {
-    log.info('Preparing to sync orders', { 
-      url: API, 
-      orderCount: batch.length,
-      firstOrderId: batch[0]?.orderNumber
-    });
+    log.info('Preparing to sync orders', { orderCount: batch.length });
     
     // Use background script to make the API call (avoids CORS issues)
     log.info('Sending sync request via background script');
     const response = await safeSendMessage({
       action: 'syncOrders',
       orders: batch,
-      source: 'chrome-extension-v5.4-multistore',
+      source: 'chrome-extension-v' + EXT_VERSION + '-multistore',
       timestamp: new Date().toISOString()
     });
     if (!response) {
@@ -194,7 +164,7 @@ const pushBatch = async batch => {
     
     if (response.success) {
       const result = response.result;
-      log.success(`Successfully synced ${batch.length} orders`, result);
+      log.success(`Successfully synced ${batch.length} orders`);
       
       // Update synced orders storage with timestamp for TTL
       const syncedData = (await chrome.storage.local.get({ [STORAGE_KEY]: {} }))[STORAGE_KEY];
@@ -221,7 +191,7 @@ const pushBatch = async batch => {
       log.error(`Sync failed via background script`, { error: response.error });
     }
   } catch (err) {
-    log.error("Sync failed", { message: err.message, stack: err.stack });
+    log.error("Sync failed", { message: err.message });
   }
 };
 
@@ -340,7 +310,7 @@ function expandAddressSections() {
 
 // Core extractor using REAL Etsy DOM structure with fallback selectors
 async function extract() {
-  log.info('Starting order extraction v5.4 with multi-selector fallback');
+  log.info('Starting order extraction');
 
   // First, try to expand any collapsed address sections
   const expandedCount = expandAddressSections();
@@ -394,7 +364,7 @@ async function extract() {
     const orderLinks = document.querySelectorAll(getOrderLinkSelector());
 
     log.error('No order rows found with any selector', {
-      url: window.location.href,
+      path: window.location.pathname,
       bodyClasses,
       hasMainContent: !!mainContent,
       orderLinksCount: orderLinks.length,
@@ -473,16 +443,14 @@ async function extract() {
           break;
         }
       }
-      log.info(`Order ${orderId}: Found buyer name: "${buyerName}"`);
+      log.info(`Order ${orderId}: buyer name ${buyerName ? 'found' : 'missing'}`);
       
       // Order number is the same receipt id we just resolved above.
       let orderNumber = orderId;
-      log.info(`Order ${orderId}: Found order number: ${orderNumber}`);
       
       // Extract order total
       const priceSpan = row.querySelector('.display-inline-block .mr-xs-1');
       const orderTotal = priceSpan?.textContent?.replace(/[^0-9.]/g, '') || '';
-      log.info(`Order ${orderId}: Found total: $${orderTotal}`);
       
       // Extract order date - look for text with "Ordered" prefix
       let orderDate = '';
@@ -552,9 +520,6 @@ async function extract() {
       }
 
       if (addressContainer) {
-        // Log raw address HTML for debugging
-        log.info('Order ' + orderId + ': address container innerHTML', { html: addressContainer.innerHTML.substring(0, 500) });
-
         // Try structured fields first — Etsy uses class names like .name, .first-line, etc.
         const nameSpan = addressContainer.querySelector('.name');
         const firstLineSpan = addressContainer.querySelector('.first-line');
@@ -573,13 +538,13 @@ async function extract() {
             postalCode: zipSpan?.textContent?.trim() || '',
             country: countrySpan?.textContent?.trim() || ''
           };
-          log.info('Order ' + orderId + ': Found structured address', shippingAddress);
+          log.info('Order ' + orderId + ': Found structured address');
         } else {
           // No structured fields — parse entire address as a text block
           // Etsy renders address as line-separated text: Name\nStreet\nCity, ST ZIP\nCountry
           var addressText = addressContainer.innerText || addressContainer.textContent || '';
           shippingAddress = parseAddressText(addressText.trim(), buyerName);
-          log.info('Order ' + orderId + ': Parsed address from text block', shippingAddress);
+          log.info('Order ' + orderId + ': Parsed address from text block');
         }
 
         // If country still empty, try to find it from the last line of the address text
@@ -590,7 +555,7 @@ async function extract() {
             // If last line looks like a country name (not a zip code or state)
             if (lastLine.length > 2 && !/^\d{5}/.test(lastLine) && !/^[A-Z]{2}\s+\d/.test(lastLine)) {
               shippingAddress.country = lastLine;
-              log.info('Order ' + orderId + ': Extracted country from last line: ' + lastLine);
+              log.info('Order ' + orderId + ': Extracted country from last line');
             }
           }
         }
@@ -604,7 +569,7 @@ async function extract() {
           if (addressContent) {
             const addressText = addressContent.textContent.trim();
             shippingAddress = parseAddressText(addressText, buyerName);
-            log.info(`Order ${orderId}: Parsed collapsible address`, shippingAddress);
+            log.info(`Order ${orderId}: Parsed collapsible address`);
           }
         }
       }
@@ -615,7 +580,7 @@ async function extract() {
         if (collapsedAddress) {
           const addressText = collapsedAddress.textContent.trim();
           shippingAddress = parseAddressText(addressText, buyerName);
-          log.info(`Order ${orderId}: Parsed collapsed address fallback`, shippingAddress);
+          log.info(`Order ${orderId}: Parsed collapsed address fallback`);
         }
       }
       
@@ -665,13 +630,13 @@ async function extract() {
       // Only add if we have essential data
       if (orderData.orderNumber && orderData.shippingAddress.name) {
         batch.push(orderData);
-        log.success(`Order ${orderNumber}: Successfully extracted address and notes`, orderData);
+        log.success(`Order ${orderNumber}: address extracted`);
       } else {
-        log.warn(`Order ${orderNumber}: Missing essential data, skipping`, orderData);
+        log.warn(`Order ${orderNumber}: Missing essential data, skipping`);
       }
       
     } catch (error) {
-      log.error(`Row ${index}: Extraction failed`, { message: error.message, stack: error.stack });
+      log.error(`Row ${index}: Extraction failed`, { message: error.message });
     }
   });
   
@@ -684,7 +649,7 @@ async function extract() {
 
 // Message listener for popup communication
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  log.info('Received message from background', request);
+  log.info('Received message', { action: request && request.action });
   
   switch (request.action) {
     case 'scrapeNow':
@@ -701,7 +666,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           title: document.title 
         });
       }).catch(error => {
-        log.error('Manual sync failed', error);
+        log.error('Manual sync failed', { message: error && error.message });
         sendResponse({ 
           status: 'error', 
           error: error.message,
@@ -731,12 +696,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           totalOrdersOnPage: totalOrdersOnPage,
           url: window.location.href,
           scriptLoaded: true,
-          version: '5.4',
+          version: EXT_VERSION,
           isExtracting: isExtracting,
           lastExtractionTime: lastExtractionTime,
           logs: (result.kx_logs || []).slice(-10) // Last 10 logs
         };
-        log.info('Status requested', status);
+        log.info('Status requested');
         sendResponse(status);
       });
       break;
@@ -815,6 +780,33 @@ function debouncedExtract() {
   }, 2000); // 2 second delay to allow for DOM settling
 }
 
+// Find the buyer's email in the open order's detail panel. Only mailto: links
+// that sit inside the panel for THIS order (an ancestor whose text contains the
+// order id) count — a page-wide scan could pick up the seller's own address.
+// Returns '' unless exactly one distinct candidate is found.
+function findBuyerEmailInOrderPanel(orderId) {
+  const candidates = new Set();
+  document.querySelectorAll('a[href^="mailto:"]').forEach(function(a) {
+    if (a.closest('header, nav, footer, #kx-tracking-banner')) return;
+    let email = '';
+    try { email = decodeURIComponent((a.getAttribute('href') || '').replace(/^mailto:/i, '').split('?')[0]).trim(); } catch (e) { return; }
+    if (!/^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$/.test(email)) return;
+    const low = email.toLowerCase();
+    if (low.endsWith('@etsy.com') || low.includes('kolayxport')) return;
+    let el = a.parentElement;
+    for (let i = 0; i < 12 && el && el !== document.body; i++) {
+      if ((el.textContent || '').indexOf(orderId) !== -1) {
+        candidates.add(low);
+        return;
+      }
+      el = el.parentElement;
+    }
+  });
+  if (candidates.size === 1) return [...candidates][0];
+  if (candidates.size > 1) log.warn('Multiple buyer email candidates in order panel, skipping', { orderId, count: candidates.size });
+  return '';
+}
+
 // ── Buyer email watcher ──────────────────────────────────────────────────
 // When the seller opens an order (URL gains order_id=), Etsy renders the
 // buyer's email in the detail panel. Scrape it and push an email-only update;
@@ -829,26 +821,7 @@ async function extractDetailEmail() {
     const syncedEmails = (typeof store[EMAIL_SYNC_KEY] === 'object' && !Array.isArray(store[EMAIL_SYNC_KEY])) ? store[EMAIL_SYNC_KEY] : {};
     if (syncedEmails[orderId]) return;
 
-    // Prefer an explicit mailto link; fall back to a single unambiguous
-    // email in the page text (excluding Etsy's own addresses).
-    let email = '';
-    const mailto = document.querySelector('a[href^="mailto:"]');
-    if (mailto) {
-      email = decodeURIComponent((mailto.getAttribute('href') || '').replace(/^mailto:/i, '').split('?')[0]).trim();
-    }
-    if (!email) {
-      const matches = (document.body.innerText || '').match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) || [];
-      const candidates = new Set();
-      matches.forEach(function(e) {
-        const low = e.toLowerCase();
-        if (!low.endsWith('@etsy.com') && !low.includes('kolayxport')) candidates.add(e.trim());
-      });
-      if (candidates.size === 1) {
-        email = [...candidates][0];
-      } else if (candidates.size > 1) {
-        log.warn('Multiple candidate emails on detail view, skipping', { orderId, count: candidates.size });
-      }
-    }
+    const email = findBuyerEmailInOrderPanel(orderId);
     if (!email || !email.includes('@')) return;
 
     const storeInfo = getEtsyStoreInfo();
@@ -862,7 +835,7 @@ async function extractDetailEmail() {
         shippingAddress: { email: email },
         emailOnly: true
       }],
-      source: 'chrome-extension-v9.4-email',
+      source: 'chrome-extension-v' + EXT_VERSION + '-email',
       timestamp: new Date().toISOString()
     });
     if (response && response.success) {
@@ -906,7 +879,7 @@ observer.observe(document.body, {
   subtree: true 
 });
 
-log.info('Content script v5.4 initialization complete');
+log.info('Content script initialization complete');
 
 // ─── Tracking Push Feature ─────────────────────────────────────────
 // When user navigates to an Etsy order detail page, check if KolayXport
@@ -932,37 +905,39 @@ function randomDelay(minMs, maxMs) {
   return new Promise(r => setTimeout(r, delay));
 }
 
+// Set an input's value in a way React-controlled inputs pick up.
+function setNativeValue(input, value) {
+  const proto = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  const desc = Object.getOwnPropertyDescriptor(proto, 'value');
+  if (desc && desc.set) desc.set.call(input, value);
+  else input.value = value;
+}
+
 // Type text character by character with random delays
 async function humanType(input, text) {
   input.focus();
-  input.value = '';
   input.dispatchEvent(new Event('focus', { bubbles: true }));
+  setNativeValue(input, '');
+  input.dispatchEvent(new Event('input', { bubbles: true }));
 
+  let current = '';
   for (const char of text) {
-    input.value += char;
-    input.dispatchEvent(new Event('input', { bubbles: true }));
+    current += char;
     input.dispatchEvent(new KeyboardEvent('keydown', { key: char, bubbles: true }));
+    setNativeValue(input, current);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
     input.dispatchEvent(new KeyboardEvent('keyup', { key: char, bubbles: true }));
     await randomDelay(50, 180);
   }
 
   input.dispatchEvent(new Event('change', { bubbles: true }));
+  input.dispatchEvent(new Event('blur', { bubbles: true }));
 }
 
-// Wait for an element to appear in DOM
-function waitForElement(selector, parent = document, timeoutMs = 8000) {
-  return new Promise((resolve, reject) => {
-    const existing = parent.querySelector(selector);
-    if (existing) return resolve(existing);
-
-    const obs = new MutationObserver(() => {
-      const el = parent.querySelector(selector);
-      if (el) { obs.disconnect(); resolve(el); }
-    });
-    obs.observe(parent, { childList: true, subtree: true });
-
-    setTimeout(() => { obs.disconnect(); reject(new Error(`Element "${selector}" not found within ${timeoutMs}ms`)); }, timeoutMs);
-  });
+function isVisible(el) {
+  if (!el || !el.isConnected) return false;
+  const r = el.getBoundingClientRect();
+  return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden';
 }
 
 // Map KolayXport carrier names to Etsy carrier dropdown values
@@ -993,62 +968,193 @@ function mapCarrierToEtsy(carrierName) {
   return mapping[name] || 'other';
 }
 
-// Create floating banner UI
+const TRACKING_INPUT_SELECTORS = [
+  'input[name="tracking_code"]',
+  'input[name*="tracking"]',
+  'input[id*="tracking"]',
+  'input[placeholder*="tracking" i]',
+  'input[aria-label*="tracking" i]',
+  'input[data-test-id*="tracking"]',
+  'input[placeholder*="takip" i]',
+  'input[aria-label*="takip" i]',
+];
+
+function findTrackingInput(scope) {
+  for (const sel of TRACKING_INPUT_SELECTORS) {
+    const list = scope.querySelectorAll(sel);
+    for (const el of list) {
+      if (isVisible(el) && !el.closest('#kx-tracking-banner')) return el;
+    }
+  }
+  return null;
+}
+
+// The order-detail container for THIS receipt. All button/input lookups are scoped
+// to it so we never click something on a different order or elsewhere on the page.
+function findOrderDetailContainer(receiptId) {
+  const direct = document.querySelector(
+    '[data-order-id="' + receiptId + '"], [data-receipt-id="' + receiptId + '"]'
+  );
+  if (direct) return direct;
+
+  // Dialog / side panel showing this order
+  const dialogs = document.querySelectorAll('[role="dialog"], [aria-modal="true"], aside');
+  for (const d of dialogs) {
+    if (d.closest('#kx-tracking-banner')) continue;
+    if (isVisible(d) && (d.textContent || '').indexOf(receiptId) !== -1) return d;
+  }
+
+  // Smallest reasonably-sized ancestor of the element that prints the order number
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+    acceptNode: function(n) {
+      return (n.nodeValue || '').indexOf(receiptId) !== -1 && !n.parentElement.closest('#kx-tracking-banner')
+        ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+    }
+  });
+  const textNode = walker.nextNode();
+  if (!textNode) return null;
+  let el = textNode.parentElement;
+  for (let i = 0; i < 10 && el && el !== document.body; i++) {
+    if (el.offsetHeight > 250 && el.querySelector('button')) return el;
+    el = el.parentElement;
+  }
+  return null;
+}
+
+// Where the tracking form lives after opening it: a dialog that contains a tracking
+// input, otherwise the order container itself.
+function findTrackingFormScope(container) {
+  const dialogs = document.querySelectorAll('[role="dialog"], [aria-modal="true"]');
+  for (const d of dialogs) {
+    if (d.closest('#kx-tracking-banner')) continue;
+    if (isVisible(d) && findTrackingInput(d)) return d;
+  }
+  if (container && container.isConnected && findTrackingInput(container)) return container;
+  return null;
+}
+
+// Positive confirmation: the tracking number is rendered as plain text (not inside
+// an input, not in our banner) inside the order container, and no tracking input
+// still holds it — i.e. Etsy saved it and re-rendered the order.
+function trackingConfirmedOnPage(receiptId, trackingNumber) {
+  const container = findOrderDetailContainer(receiptId);
+  if (!container) return false;
+  const needle = String(trackingNumber).replace(/\s+/g, '');
+  if (!needle) return false;
+
+  const openInput = findTrackingInput(document.body);
+  if (openInput && (openInput.value || '').replace(/\s+/g, '') === needle) return false;
+
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+    acceptNode: function(n) {
+      const p = n.parentElement;
+      if (!p || p.closest('#kx-tracking-banner, input, textarea, script, style')) return NodeFilter.FILTER_SKIP;
+      return (n.nodeValue || '').replace(/\s+/g, '').indexOf(needle) !== -1 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+    }
+  });
+  return !!walker.nextNode();
+}
+
+function waitForTrackingConfirmation(receiptId, trackingNumber, timeoutMs) {
+  return new Promise(function(resolve) {
+    const started = Date.now();
+    (function poll() {
+      if (trackingConfirmedOnPage(receiptId, trackingNumber)) return resolve(true);
+      if (Date.now() - started > timeoutMs) return resolve(false);
+      setTimeout(poll, 1000);
+    })();
+  });
+}
+
+// Banner text (TR/EN, same approach as the research overlays)
+const _bannerLang = (function() {
+  try { return chrome.i18n.getUILanguage().startsWith('tr') ? 'tr' : 'en'; }
+  catch (e) { return (navigator.language || '').startsWith('tr') ? 'tr' : 'en'; }
+})();
+const _bannerText = {
+  tr: {
+    title: 'KolayXport Kargo Takip', trackingNo: 'Kargo Takip No', carrier: 'Kargo',
+    push: 'Takip No Gir', working: 'İşleniyor...', retry: 'Tekrar Dene', done: '✓ Onaylandı',
+    searching: 'Sipariş paneli aranıyor...', opening: 'Kargo formu açılıyor...',
+    selectingCarrier: 'Kargo firması seçiliyor...', typing: 'Takip numarası giriliyor...',
+    submitting: 'Gönderiliyor...', verifying: 'Etsy onayı bekleniyor...',
+    confirmed: 'Etsy takip numarasını kaydetti.',
+    noPanel: 'Bu siparişin detay paneli bulunamadı. Sipariş detayını açıp tekrar deneyin.',
+    noForm: 'Takip numarası alanı bulunamadı. Etsy\'de "Siparişi tamamla" formunu açıp tekrar deneyin.',
+    manual: 'Takip no girildi ama kaydet butonu bulunamadı. Lütfen Etsy\'de kaydet butonuna tıklayın — kaydedildiğinde otomatik onaylanacak.',
+    unconfirmed: 'Etsy kaydı onaylanamadı. Siparişte takip numarasını kontrol edin.',
+    lateConfirmed: 'Etsy takip numarasını kaydetti (manuel kayıt algılandı).',
+    etsyError: 'Etsy hata: ',
+  },
+  en: {
+    title: 'KolayXport Tracking', trackingNo: 'Tracking number', carrier: 'Carrier',
+    push: 'Fill tracking', working: 'Working...', retry: 'Retry', done: '✓ Confirmed',
+    searching: 'Looking for the order panel...', opening: 'Opening the tracking form...',
+    selectingCarrier: 'Selecting carrier...', typing: 'Entering tracking number...',
+    submitting: 'Submitting...', verifying: 'Waiting for Etsy to confirm...',
+    confirmed: 'Etsy saved the tracking number.',
+    noPanel: 'Could not find this order\'s detail panel. Open the order and try again.',
+    noForm: 'Tracking number field not found. Open Etsy\'s "Complete order" form and try again.',
+    manual: 'Tracking number entered but no save button was found. Please click save on Etsy — it will be confirmed automatically once saved.',
+    unconfirmed: 'Could not confirm Etsy saved it. Check the tracking number on the order.',
+    lateConfirmed: 'Etsy saved the tracking number (manual save detected).',
+    etsyError: 'Etsy error: ',
+  },
+};
+function bt(key) { return (_bannerText[_bannerLang] && _bannerText[_bannerLang][key]) || _bannerText.en[key] || key; }
+
+function el(tag, styles, text) {
+  const node = document.createElement(tag);
+  if (styles) node.style.cssText = styles;
+  if (text !== undefined && text !== null) node.textContent = String(text);
+  return node;
+}
+
+// Create floating banner UI (DOM-built; server values only ever go into textContent)
 function createTrackingBanner(data) {
-  // Remove existing banner if any
   const existing = document.getElementById('kx-tracking-banner');
   if (existing) existing.remove();
 
-  const banner = document.createElement('div');
-  banner.id = 'kx-tracking-banner';
-  banner.style.cssText = `
-    position: fixed !important;
-    bottom: 20px !important;
-    right: 20px !important;
-    background: #1a1a2e !important;
-    color: #fff !important;
-    padding: 16px 20px !important;
-    border-radius: 12px !important;
-    z-index: 999999 !important;
-    font-size: 13px !important;
+  const banner = el('div', `
+    position: fixed !important; bottom: 20px !important; right: 20px !important;
+    background: #1a1a2e !important; color: #fff !important; padding: 16px 20px !important;
+    border-radius: 12px !important; z-index: 999999 !important; font-size: 13px !important;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
-    max-width: 360px !important;
-    line-height: 1.5 !important;
-  `;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important; max-width: 360px !important; line-height: 1.5 !important;
+  `);
+  banner.id = 'kx-tracking-banner';
 
-  banner.innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-      <img src="${chrome.runtime.getURL('icons/icon-16.png')}" width="16" height="16" style="border-radius:2px;">
-      <strong style="color:#e0e0ff;">KolayXport Tracking</strong>
-      <span id="kx-banner-close" style="margin-left:auto;cursor:pointer;opacity:0.6;font-size:16px;">✕</span>
-    </div>
-    <div style="margin-bottom:10px;">
-      <div style="color:#a0a0d0;font-size:11px;">Kargo Takip No</div>
-      <div style="font-weight:600;font-size:14px;color:#fff;">${data.trackingNumber}</div>
-      <div style="color:#a0a0d0;font-size:11px;margin-top:4px;">Kargo: ${data.carrierName}</div>
-    </div>
-    <button id="kx-push-tracking-btn" style="
-      background: #4CAF50 !important;
-      color: #fff !important;
-      border: none !important;
-      padding: 8px 16px !important;
-      border-radius: 6px !important;
-      cursor: pointer !important;
-      font-size: 13px !important;
-      font-weight: 600 !important;
-      width: 100% !important;
-    ">Takip No Gir</button>
-    <div id="kx-tracking-status" style="margin-top:8px;font-size:11px;color:#a0a0d0;display:none;"></div>
-  `;
+  const head = el('div', 'display:flex;align-items:center;gap:8px;margin-bottom:8px;');
+  const icon = el('img', 'border-radius:2px;');
+  icon.src = chrome.runtime.getURL('icons/icon-16.png');
+  icon.width = 16; icon.height = 16; icon.alt = '';
+  const close = el('span', 'margin-left:auto;cursor:pointer;opacity:0.6;font-size:16px;', '✕');
+  close.setAttribute('role', 'button');
+  close.setAttribute('aria-label', 'Close');
+  head.append(icon, el('strong', 'color:#e0e0ff;', bt('title')), close);
 
+  const body = el('div', 'margin-bottom:10px;');
+  body.append(
+    el('div', 'color:#a0a0d0;font-size:11px;', bt('trackingNo')),
+    el('div', 'font-weight:600;font-size:14px;color:#fff;', data.trackingNumber),
+    el('div', 'color:#a0a0d0;font-size:11px;margin-top:4px;', bt('carrier') + ': ' + (data.carrierName || ''))
+  );
+
+  const btn = el('button', `
+    background: #4CAF50 !important; color: #fff !important; border: none !important;
+    padding: 8px 16px !important; border-radius: 6px !important; cursor: pointer !important;
+    font-size: 13px !important; font-weight: 600 !important; width: 100% !important;
+  `, bt('push'));
+  btn.id = 'kx-push-tracking-btn';
+
+  const status = el('div', 'margin-top:8px;font-size:11px;color:#a0a0d0;display:none;');
+  status.id = 'kx-tracking-status';
+
+  banner.append(head, body, btn, status);
   document.body.appendChild(banner);
 
-  document.getElementById('kx-banner-close').addEventListener('click', () => banner.remove());
-  document.getElementById('kx-push-tracking-btn').addEventListener('click', () => {
-    pushTrackingToEtsy(data);
-  });
-
+  close.addEventListener('click', () => banner.remove());
+  btn.addEventListener('click', () => pushTrackingToEtsy(data));
   return banner;
 }
 
@@ -1062,271 +1168,228 @@ function updateBannerStatus(message, isError = false) {
   }
 }
 
-// Main DOM automation: fill tracking into Etsy order page
+function setBannerButton(state) {
+  const btn = document.getElementById('kx-push-tracking-btn');
+  if (!btn) return;
+  if (state === 'working') {
+    btn.disabled = true; btn.textContent = bt('working'); btn.style.opacity = '0.6';
+  } else if (state === 'done') {
+    btn.disabled = true; btn.textContent = bt('done'); btn.style.opacity = '1'; btn.style.background = '#2e7d32';
+  } else {
+    btn.disabled = false; btn.textContent = bt('retry'); btn.style.opacity = '1';
+  }
+}
+
+// After a non-success report, keep watching for a while: if the seller saves the
+// form manually (or Etsy was just slow) and the number shows up on the order,
+// upgrade the submission to 'submitted'.
+let _lateConfirmWatch = null;
+function watchForLateConfirmation(data, receiptId) {
+  if (_lateConfirmWatch) clearInterval(_lateConfirmWatch);
+  const started = Date.now();
+  _lateConfirmWatch = setInterval(async function() {
+    if (Date.now() - started > 5 * 60 * 1000 || getReceiptIdFromUrl() !== receiptId) {
+      clearInterval(_lateConfirmWatch);
+      _lateConfirmWatch = null;
+      return;
+    }
+    if (trackingConfirmedOnPage(receiptId, data.trackingNumber)) {
+      clearInterval(_lateConfirmWatch);
+      _lateConfirmWatch = null;
+      await confirmSubmission(data.submissionId, 'submitted');
+      updateBannerStatus(bt('lateConfirmed'));
+      setBannerButton('done');
+      log.success('Tracking confirmed on page after manual save');
+    }
+  }, 2000);
+}
+
+// Main DOM automation: fill tracking into the Etsy order page.
+// 'submitted' is reported ONLY after the tracking number is positively seen on
+// the saved order. Unconfirmed saves report 'needs_manual' (retryable); errors report 'failed'.
 async function pushTrackingToEtsy(data) {
   if (trackingPushActive) {
     log.warn('Tracking push already in progress');
     return;
   }
   trackingPushActive = true;
+  setBannerButton('working');
 
-  const btn = document.getElementById('kx-push-tracking-btn');
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = 'İşleniyor...';
-    btn.style.opacity = '0.6';
-  }
+  const receiptId = String(data.receiptId || data.marketplaceKey || getReceiptIdFromUrl() || '');
 
   try {
-    updateBannerStatus('Kargo bilgisi formu aranıyor...');
-    await randomDelay(1000, 2000);
-
-    // Step 1: Find and click "Mark as complete" / "Add tracking" / "Complete order" button
-    // Etsy uses various button texts depending on order state
-    const actionSelectors = [
-      'button[data-tracking-trigger]',
-      'button[data-action="add-tracking"]',
-      '[data-region="shipping-actions"] button',
-      'button.btn-transaction-action',
-    ];
-
-    // Texts that open the tracking form — order matters, most specific first
-    const actionTexts = [
-      'complete order', 'mark as complete', 'mark as shipped',
-      'add tracking', 'complete',
-      'siparişi tamamla', 'gönderildi olarak işaretle', 'kargo bilgisi ekle',
-    ];
-
-    // Texts to AVOID clicking (these are NOT the tracking form opener)
-    const avoidTexts = [
-      'create a shipping label', 'buy shipping label', 'purchase label',
-      'get shipping label', 'kargo etiketi',
-    ];
-
-    let actionButton = null;
-
-    // Try selectors first
-    for (const sel of actionSelectors) {
-      actionButton = document.querySelector(sel);
-      if (actionButton) break;
-    }
-
-    // Fallback: search by button text, but skip "create shipping label" buttons
-    if (!actionButton) {
-      const allButtons = document.querySelectorAll('button, a.btn, [role="button"]');
-      for (const b of allButtons) {
-        var text = (b.textContent || '').toLowerCase().trim();
-        if (avoidTexts.some(function(t) { return text.includes(t); })) continue;
-        if (actionTexts.some(function(t) { return text.includes(t); })) {
-          actionButton = b;
-          break;
-        }
-      }
-    }
-
-    if (!actionButton) {
-      // Maybe the tracking form is already visible
-      const existingForm = document.querySelector('input[name="tracking_code"], input[id*="tracking"], input[placeholder*="tracking"], input[aria-label*="tracking"]');
-      if (!existingForm) {
-        throw new Error('Kargo bilgisi butonu bulunamadı. Sipariş detay sayfasında olduğunuzdan emin olun.');
-      }
-      log.info('Tracking form already visible, skipping button click');
-    } else {
-      updateBannerStatus('Kargo formu açılıyor...');
-      actionButton.click();
-      await randomDelay(2000, 3500);
-    }
-
-    // Step 2: Find carrier dropdown and select carrier
-    updateBannerStatus('Kargo firması seçiliyor...');
+    updateBannerStatus(bt('searching'));
     await randomDelay(800, 1500);
 
-    const carrierValue = mapCarrierToEtsy(data.carrierName);
-    const carrierSelectors = [
-      'select[name="carrier_name"]',
-      'select[id*="carrier"]',
-      'select[aria-label*="carrier"]',
-      'select[data-test-id*="carrier"]',
-    ];
-
-    let carrierSelect = null;
-    for (const sel of carrierSelectors) {
-      carrierSelect = document.querySelector(sel);
-      if (carrierSelect) break;
+    if (trackingConfirmedOnPage(receiptId, data.trackingNumber)) {
+      // Already on the order (e.g. entered earlier) — nothing to type.
+      await confirmSubmission(data.submissionId, 'submitted');
+      updateBannerStatus(bt('confirmed'));
+      setBannerButton('done');
+      return;
     }
 
+    const container = findOrderDetailContainer(receiptId);
+    if (!container) throw Object.assign(new Error(bt('noPanel')), { code: 'ORDER_PANEL_NOT_FOUND' });
+
+    // Step 1: open the tracking form unless it's already open.
+    let formScope = findTrackingFormScope(container);
+    if (!formScope) {
+      const actionSelectors = [
+        'button[data-tracking-trigger]',
+        'button[data-action="add-tracking"]',
+        '[data-region="shipping-actions"] button',
+        'button.btn-transaction-action',
+      ];
+      // Specific phrases only — no bare "complete" match.
+      const actionTexts = [
+        'complete order', 'mark as complete', 'mark as shipped', 'add tracking',
+        'siparişi tamamla', 'gönderildi olarak işaretle', 'kargo bilgisi ekle', 'takip numarası ekle',
+      ];
+      const avoidTexts = [
+        'shipping label', 'purchase label', 'kargo etiketi', 'cancel', 'iptal', 'refund', 'iade',
+      ];
+      let actionButton = null;
+      for (const sel of actionSelectors) {
+        const b = container.querySelector(sel);
+        if (b && isVisible(b)) { actionButton = b; break; }
+      }
+      if (!actionButton) {
+        for (const b of container.querySelectorAll('button, [role="button"]')) {
+          const text = (b.textContent || '').toLowerCase().trim();
+          if (!isVisible(b) || avoidTexts.some(t => text.includes(t))) continue;
+          if (actionTexts.some(t => text.includes(t))) { actionButton = b; break; }
+        }
+      }
+      if (!actionButton) throw Object.assign(new Error(bt('noForm')), { code: 'TRACKING_FORM_NOT_FOUND' });
+
+      updateBannerStatus(bt('opening'));
+      actionButton.click();
+      await randomDelay(2000, 3500);
+      formScope = findTrackingFormScope(container);
+    }
+
+    // Step 2: the tracking input must exist before anything else is touched.
+    const trackingInput = formScope ? findTrackingInput(formScope) : null;
+    if (!trackingInput) throw Object.assign(new Error(bt('noForm')), { code: 'TRACKING_INPUT_NOT_FOUND' });
+
+    // Step 3: carrier (inside the same form scope)
+    updateBannerStatus(bt('selectingCarrier'));
+    await randomDelay(800, 1500);
+    const carrierValue = mapCarrierToEtsy(data.carrierName);
+    const carrierSelect = formScope.querySelector(
+      'select[name="carrier_name"], select[id*="carrier"], select[aria-label*="carrier" i], select[data-test-id*="carrier"]'
+    );
     if (carrierSelect) {
-      // Try to find matching option — prefer exact match over partial
-      const options = carrierSelect.querySelectorAll('option');
-      let matched = false;
-      var exactMatch = null;
-      var partialMatch = null;
-      for (const opt of options) {
+      let exactMatch = null;
+      let partialMatch = null;
+      let otherOpt = null;
+      const wanted = (data.carrierName || '').toLowerCase();
+      for (const opt of carrierSelect.querySelectorAll('option')) {
         const val = (opt.value || '').toLowerCase().trim();
         const text = (opt.textContent || '').toLowerCase().trim();
-        // Exact match: value or text equals carrier name exactly
-        if (val === carrierValue || text === carrierValue || text === data.carrierName.toLowerCase()) {
-          exactMatch = opt;
-          break;
-        }
-        // Partial match: value or text contains carrier name (but not preferred)
-        if (!partialMatch && (val.includes(carrierValue) || text.includes(carrierValue))) {
-          partialMatch = opt;
-        }
+        if (val === carrierValue || text === carrierValue || (wanted && text === wanted)) { exactMatch = opt; break; }
+        if (!partialMatch && carrierValue !== 'other' && (val.includes(carrierValue) || text.includes(carrierValue))) partialMatch = opt;
+        if (!otherOpt && (val === 'other' || text === 'other' || text === 'diğer')) otherOpt = opt;
       }
-      var bestMatch = exactMatch || partialMatch;
-      if (bestMatch) {
-        carrierSelect.value = bestMatch.value;
+      const choice = exactMatch || partialMatch || otherOpt;
+      if (choice) {
+        carrierSelect.value = choice.value;
         carrierSelect.dispatchEvent(new Event('change', { bubbles: true }));
-        matched = true;
-        log.info('Selected carrier: ' + bestMatch.textContent + (exactMatch ? ' (exact)' : ' (partial)'));
-      }
-      if (!matched) {
-        // Default to "Other" if no match
-        for (const opt of options) {
-          if ((opt.value || '').toLowerCase() === 'other' || (opt.textContent || '').toLowerCase() === 'other') {
-            carrierSelect.value = opt.value;
-            carrierSelect.dispatchEvent(new Event('change', { bubbles: true }));
-            break;
-          }
-        }
-        log.warn(`Carrier "${data.carrierName}" not found, selected Other`);
+        log.info('Selected carrier option' + (exactMatch ? ' (exact)' : partialMatch ? ' (partial)' : ' (other)'));
       }
       await randomDelay(1000, 2000);
     } else {
       log.warn('Carrier dropdown not found, proceeding with tracking number only');
     }
 
-    // Step 3: Find tracking number input and type it
-    updateBannerStatus('Takip numarası giriliyor...');
-    await randomDelay(800, 1500);
-
-    const trackingSelectors = [
-      'input[name="tracking_code"]',
-      'input[id*="tracking"]',
-      'input[placeholder*="tracking"]',
-      'input[aria-label*="tracking"]',
-      'input[data-test-id*="tracking"]',
-      'input[name*="tracking"]',
-    ];
-
-    let trackingInput = null;
-    for (const sel of trackingSelectors) {
-      trackingInput = document.querySelector(sel);
-      if (trackingInput) break;
-    }
-
-    if (!trackingInput) {
-      throw new Error('Takip numarası alanı bulunamadı.');
-    }
-
+    // Step 4: type the tracking number and verify it stuck
+    updateBannerStatus(bt('typing'));
+    await randomDelay(600, 1200);
     await humanType(trackingInput, data.trackingNumber);
-    log.info('Tracking number typed successfully');
+    if ((trackingInput.value || '').trim() !== String(data.trackingNumber).trim()) {
+      throw Object.assign(new Error(bt('noForm')), { code: 'TRACKING_INPUT_REJECTED' });
+    }
+    await randomDelay(1200, 2500);
 
-    await randomDelay(1500, 3000);
-
-    // Step 4: Find and click submit/save button
-    updateBannerStatus('Gönderiliyor...');
-
-    const submitTexts = [
-      'submit', 'save', 'kaydet', 'gönder', 'tamamla',
-      'mark as complete', 'confirm', 'complete order',
-    ];
-
-    // Texts to NEVER click as submit
+    // Step 5: submit button — only inside the tracking form scope
+    updateBannerStatus(bt('submitting'));
+    const submitScope = trackingInput.closest('form') || formScope;
     const avoidSubmitTexts = [
-      'create a shipping label', 'buy shipping label', 'purchase label',
-      'get shipping label', 'kargo etiketi', 'cancel', 'iptal',
+      'shipping label', 'purchase label', 'kargo etiketi', 'cancel', 'iptal', 'refund', 'iade', 'back', 'geri',
     ];
-
-    // Look for submit button within the tracking form area
-    const formArea = trackingInput.closest('form') || trackingInput.closest('[role="dialog"]') || trackingInput.closest('.overlay-body') || document.body;
-    const submitButtons = formArea.querySelectorAll('button[type="submit"], input[type="submit"]');
-
+    const submitTexts = [
+      'complete order', 'mark as complete', 'save', 'submit', 'confirm',
+      'siparişi tamamla', 'kaydet', 'gönder', 'onayla',
+    ];
     let submitButton = null;
-
-    // First try type="submit" buttons, filtering out bad ones
-    for (const sb of submitButtons) {
-      var sbText = (sb.textContent || '').toLowerCase().trim();
-      if (!avoidSubmitTexts.some(function(t) { return sbText.includes(t); })) {
-        submitButton = sb;
-        break;
-      }
+    for (const sb of submitScope.querySelectorAll('button[type="submit"], input[type="submit"]')) {
+      const t = (sb.textContent || sb.value || '').toLowerCase().trim();
+      if (isVisible(sb) && !avoidSubmitTexts.some(x => t.includes(x))) { submitButton = sb; break; }
     }
-
-    // Fallback: search by text, skip dangerous buttons
     if (!submitButton) {
-      const allBtns = formArea.querySelectorAll('button, input[type="submit"]');
-      for (const b of allBtns) {
-        var btnText = (b.textContent || '').toLowerCase().trim();
-        if (avoidSubmitTexts.some(function(t) { return btnText.includes(t); })) continue;
-        if (submitTexts.some(function(t) { return btnText.includes(t); })) {
-          submitButton = b;
-          break;
-        }
+      for (const b of submitScope.querySelectorAll('button')) {
+        const t = (b.textContent || '').toLowerCase().trim();
+        if (!isVisible(b) || avoidSubmitTexts.some(x => t.includes(x))) continue;
+        if (submitTexts.some(x => t.includes(x))) { submitButton = b; break; }
       }
     }
 
     if (!submitButton) {
-      updateBannerStatus('Takip no girildi. Lütfen kaydet butonuna manuel tıklayın.', false);
-      // Still confirm as submitted since the number was entered
-      await confirmSubmission(data.submissionId, 'submitted');
+      // Not a success: the number is typed but nothing was saved yet.
+      updateBannerStatus(bt('manual'), true);
+      await confirmSubmission(data.submissionId, 'needs_manual', 'MANUAL_SUBMIT_REQUIRED: tracking typed, no submit button found');
+      setBannerButton('retry');
+      watchForLateConfirmation(data, receiptId);
       return;
     }
 
-    await randomDelay(2000, 3500);
+    await randomDelay(1500, 3000);
     submitButton.click();
     log.info('Submit button clicked');
 
-    // Step 5: Wait for success confirmation
-    await randomDelay(3000, 5000);
-
-    // Check for error messages
-    const errorEl = document.querySelector('.error-message, .alert-error, [role="alert"][class*="error"]');
+    // Step 6: positive confirmation required
+    updateBannerStatus(bt('verifying'));
+    await randomDelay(1500, 2500);
+    const errorEl = (submitScope.isConnected ? submitScope : container).querySelector(
+      '.error-message, .alert-error, [role="alert"][class*="error"], [aria-invalid="true"] ~ [class*="error"]'
+    );
     if (errorEl && errorEl.textContent.trim()) {
-      throw new Error(`Etsy hata: ${errorEl.textContent.trim()}`);
+      throw Object.assign(new Error(bt('etsyError') + errorEl.textContent.trim().slice(0, 200)), { code: 'ETSY_ERROR' });
     }
 
-    // Success!
-    updateBannerStatus('Takip numarası başarıyla girildi!');
+    const confirmed = await waitForTrackingConfirmation(receiptId, data.trackingNumber, 20000);
+    if (!confirmed) {
+      updateBannerStatus(bt('unconfirmed'), true);
+      await confirmSubmission(data.submissionId, 'needs_manual', 'UNCONFIRMED: submit clicked but tracking number not visible on the order');
+      setBannerButton('retry');
+      watchForLateConfirmation(data, receiptId);
+      return;
+    }
+
     await confirmSubmission(data.submissionId, 'submitted');
-
-    // Update button to show success
-    if (btn) {
-      btn.textContent = '✓ Tamamlandı';
-      btn.style.background = '#2e7d32';
-    }
-
-    log.success('Tracking pushed to Etsy successfully', {
-      receiptId: data.receiptId,
-      trackingNumber: data.trackingNumber,
-    });
-
+    updateBannerStatus(bt('confirmed'));
+    setBannerButton('done');
+    log.success('Tracking pushed to Etsy and confirmed on page', { receiptId: receiptId });
   } catch (error) {
-    log.error('Tracking push failed', { message: error.message });
+    const code = error && error.code ? error.code : 'ERROR';
+    log.error('Tracking push failed', { code: code, message: error.message });
     updateBannerStatus(error.message, true);
-    await confirmSubmission(data.submissionId, 'failed', error.message);
-
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = 'Tekrar Dene';
-      btn.style.opacity = '1';
-    }
+    await confirmSubmission(data.submissionId, 'failed', code + ': ' + error.message);
+    setBannerButton('retry');
   } finally {
     trackingPushActive = false;
   }
 }
 
-// Confirm submission status back to KolayXport
+// Confirm submission status back to KolayXport ('submitted' | 'needs_manual' | 'failed')
 async function confirmSubmission(submissionId, status, errorMsg) {
   try {
-    const storeInfo = getEtsyStoreInfo();
     await safeSendMessage({
       action: 'confirmTrackingSubmission',
       submissionId,
       status,
       error: errorMsg,
-      shopName: storeInfo.storeName,
     });
   } catch (e) {
     log.error('Failed to confirm tracking submission', { error: e.message });
@@ -1364,13 +1427,11 @@ async function checkPendingTracking() {
     );
 
     if (match) {
-      log.info('Found pending tracking for this order', match);
+      log.info('Found pending tracking for this order', { receiptId: receiptId });
       pendingTrackingData = match;
       createTrackingBanner(match);
     } else {
-      log.info('No pending tracking for receipt ' + receiptId, {
-        pendingReceipts: response.pending.map(p => p.receiptId),
-      });
+      log.info('No pending tracking for receipt ' + receiptId, { pendingCount: response.pending.length });
     }
   } catch (e) {
     log.error('Failed to check pending tracking', { error: e.message });
@@ -1394,7 +1455,7 @@ const urlObserver = new MutationObserver(() => {
 });
 urlObserver.observe(document.body, { childList: true, subtree: true });
 
-// Add visual indicator (removed after 3 seconds)
+// Add visual indicator (removed after 5 seconds)
 const indicator = document.createElement('div');
 indicator.style.cssText = `
   position: fixed !important;
@@ -1409,6 +1470,6 @@ indicator.style.cssText = `
   font-family: Arial, sans-serif !important;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
 `;
-indicator.textContent = '✅ Kolayxport v5.4 - Kargo Takip Push!';
+indicator.textContent = '✅ KolayXport v' + EXT_VERSION;
 document.body.appendChild(indicator);
 setTimeout(() => indicator.remove(), 5000);

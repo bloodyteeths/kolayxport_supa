@@ -25,6 +25,7 @@ import {
   CircularProgress,
   Tooltip,
   Divider,
+  Checkbox,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
@@ -36,6 +37,10 @@ import { toast } from 'react-hot-toast';
 import { stageEtsyDraft, stageEtsyDraftFile } from '@/lib/etsy/draftClient';
 import { useTranslations } from 'next-intl';
 import SEOIndicator from './SEOIndicator';
+import {
+  aiErrorCode, AiRequestError, checkTags, checkTitle, normalizeTags, normalizeTitle, splitCommaList,
+  ETSY_MAX_IMAGES, ETSY_WHEN_MADE_OPTIONS, normalizeWhenMade, TAG_MAX_COUNT, TAG_MAX_LEN, TITLE_MAX, TITLE_MIN, whenMadeLabelKey,
+} from '@/lib/etsy/seoRules';
 import type { MarketResearchData } from './MarketResearch';
 
 // ---------------------------------------------------------------------------
@@ -68,6 +73,8 @@ interface ListingCreatorDialogProps {
   onCreated: (listingId: number, draftId?: string) => void;
   marketResearchData?: MarketResearchData | null;
   copySource?: CopySourceData | null;
+  /** Shop currency (ISO 4217) — Etsy prices are always in the shop's currency. */
+  currencyCode?: string | null;
 }
 
 interface TaxonomyNode {
@@ -92,8 +99,18 @@ const STEP_KEYS = ['stepContent', 'stepCategoryPrice', 'stepImages', 'stepPrevie
 const WHO_MADE_KEYS_CR = ['i_did', 'collective', 'someone_else'] as const;
 const WHO_MADE_I18N_CR: Record<string, string> = { i_did: 'iDid', collective: 'collective', someone_else: 'someoneElse' };
 
-const WHEN_MADE_KEYS_CR = ['made_to_order', '2020_2025', '2010_2019', '2004_2009', 'before_2004', '2000_2003', '1990s', '1980s', '1970s', '1960s'] as const;
-const WHEN_MADE_I18N_CR: Record<string, string> = { made_to_order: 'madeToOrder', '2020_2025': '2020_2025', '2010_2019': '2010_2019', '2004_2009': '2004_2009', before_2004: 'before_2004', '2000_2003': '2000_2003', '1990s': '1990s', '1980s': '1980s', '1970s': '1970s', '1960s': '1960s' };
+// Verified against Etsy Open API v3 spec — see ETSY_WHEN_MADE_OPTIONS in lib/etsy/seoRules.
+const WHEN_MADE_KEYS_CR = ETSY_WHEN_MADE_OPTIONS;
+
+/** Read a File as raw base64 (no data: prefix). */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 const WEIGHT_UNITS = [
   { value: 'oz', label: 'oz' },
@@ -139,9 +156,11 @@ export default function ListingCreatorDialog({
   onCreated,
   marketResearchData,
   copySource,
+  currencyCode,
 }: ListingCreatorDialogProps) {
   const t = useTranslations('etsy.creator');
   const tEtsy = useTranslations('etsy');
+  const tAiErr = useTranslations('etsy.aiErrors');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -189,11 +208,22 @@ export default function ListingCreatorDialog({
   const [aiImageGenerating, setAiImageGenerating] = useState(false);
   const [aiImageResult, setAiImageResult] = useState<{ base64: string; mimeType: string } | null>(null);
   const [aiImageFollowUp, setAiImageFollowUp] = useState('');
+  // Plain white background only for the main product shot; lifestyle shots keep a styled scene.
+  const [aiImageWhiteBg, setAiImageWhiteBg] = useState(true);
   const aiImageRefInputRef = useRef<HTMLInputElement>(null);
 
   // AI state
   const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
   const [aiTagSuggestions, setAiTagSuggestions] = useState<string[]>([]);
+  // Inline feedback for tags that were dropped (over 20 chars / over 13).
+  const [tagFeedback, setTagFeedback] = useState<string[]>([]);
+
+  /** Replace the tag list through the shared rules; over-long tags are dropped, not truncated. */
+  const applyTags = useCallback((candidate: string[]) => {
+    const { tags: next, dropped } = normalizeTags(candidate, { max: TAG_MAX_COUNT });
+    setTagFeedback(dropped.filter((d) => d.reason === 'too_long' || d.reason === 'over_limit').map((d) => d.tag));
+    setTags(next);
+  }, []);
 
   // Quick-start
   const [quickStartKeyword, setQuickStartKeyword] = useState('');
@@ -203,14 +233,15 @@ export default function ListingCreatorDialog({
   // --------------------------------------------------
   useEffect(() => {
     if (!open || !copySource) return;
-    setTitle(copySource.title ? `COPY - ${copySource.title}`.substring(0, 140) : '');
+    // No "COPY - " prefix: dashes break the commas-only title rule (and validation).
+    setTitle(copySource.title ? normalizeTitle(copySource.title).slice(0, TITLE_MAX) : '');
     setDescription(copySource.description || '');
-    setTags(copySource.tags?.slice(0, 13) || []);
+    setTags(normalizeTags(copySource.tags || [], { max: TAG_MAX_COUNT }).tags);
     setMaterials(copySource.materials || []);
     if (copySource.price) setPrice(String(copySource.price));
     if (copySource.quantity) setQuantity(String(copySource.quantity));
     if (copySource.who_made) setWhoMade(copySource.who_made);
-    if (copySource.when_made) setWhenMade(copySource.when_made);
+    if (copySource.when_made) setWhenMade(normalizeWhenMade(copySource.when_made) || 'made_to_order');
     if (copySource.is_supply !== undefined) setIsSupply(copySource.is_supply);
     if (copySource.shipping_profile_id) setShippingProfileId(copySource.shipping_profile_id);
     if (copySource.return_policy_id) setReturnPolicyId(copySource.return_policy_id);
@@ -287,6 +318,7 @@ export default function ListingCreatorDialog({
         materials,
         price,
         category: selectedTaxonomy?.label || undefined,
+        ...(overrides?.mode ? { mode: overrides.mode } : {}),
       };
 
       // Use prop research data, local cache, or auto-fetch
@@ -308,13 +340,12 @@ export default function ListingCreatorDialog({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || t('aiRequestFailed'));
-      }
-      return await res.json();
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new AiRequestError(aiErrorCode(data));
+      if (!data || typeof data !== 'object') throw new AiRequestError('invalid_ai_response');
+      return data;
     } catch (err: any) {
-      toast.error(err.message || t('aiRequestFailed'));
+      toast.error(err instanceof AiRequestError && err.code ? tAiErr(err.code) : t('aiRequestFailed'));
       return null;
     } finally {
       setAiLoading((prev) => ({ ...prev, [action]: false }));
@@ -323,32 +354,33 @@ export default function ListingCreatorDialog({
 
   const handleAIOptimizeTitle = useCallback(async () => {
     const result = await callAI('optimize_title');
-    const newTitle = result?.optimized_title || result?.title;
-    if (newTitle && typeof newTitle === 'string') {
-      // Sanity check: reject garbled single-character output
-      if (newTitle.split(/[\s,]+/).filter(Boolean).every((w: string) => w.length <= 1)) {
-        toast.error(t('aiBrokenTitle'));
-        return;
-      }
-      setTitle(newTitle);
-      toast.success(t('titleOptimized'));
+    if (!result) return;
+    const newTitle = normalizeTitle(result.optimized_title);
+    if (!newTitle) {
+      toast.error(t('aiBrokenTitle'));
+      return;
     }
+    setTitle(newTitle.slice(0, TITLE_MAX));
+    toast.success(t('titleOptimized'));
   }, [callAI]);
 
   const handleAIGenerateDescription = useCallback(async () => {
     const result = await callAI('generate_description');
-    if (result?.description) {
+    if (typeof result?.description === 'string' && result.description.trim()) {
       setDescription(result.description);
       toast.success(t('descriptionCreated'));
     }
   }, [callAI]);
 
   const handleAISuggestTags = useCallback(async () => {
-    const result = await callAI('suggest_tags');
-    const suggested = result?.suggestions || result?.tags;
-    if (suggested && Array.isArray(suggested)) {
+    const result = await callAI('suggest_tags', { mode: 'add' });
+    if (!result) return;
+    const { tags: suggested } = normalizeTags(result.suggestions, { title, dropTitleOverlap: true });
+    if (suggested.length > 0) {
       setAiTagSuggestions(suggested);
       toast.success(t('tagSuggestionsReceived', { count: suggested.length }));
+    } else {
+      toast.error(tAiErr('ai_tags_failed'));
     }
   }, [callAI]);
 
@@ -365,19 +397,17 @@ export default function ListingCreatorDialog({
     try {
       // 1. Generate optimized title from keyword
       const titleResult = await callAI('optimize_title', { title: keyword });
-      const newTitle = titleResult?.optimized_title || keyword;
-      setTitle(newTitle);
+      const newTitle = normalizeTitle(titleResult?.optimized_title) || normalizeTitle(keyword);
+      setTitle(newTitle.slice(0, TITLE_MAX));
 
       // 2. Generate description
       const descResult = await callAI('generate_description', { title: newTitle });
-      if (descResult?.description) setDescription(descResult.description);
+      if (typeof descResult?.description === 'string' && descResult.description.trim()) setDescription(descResult.description);
 
       // 3. Suggest tags
-      const tagResult = await callAI('suggest_tags', { title: newTitle, tags_current: [] });
-      const suggested = tagResult?.suggestions || tagResult?.tags;
-      if (suggested && Array.isArray(suggested)) {
-        setTags(suggested.slice(0, 13));
-      }
+      const tagResult = await callAI('suggest_tags', { title: newTitle, tags_current: [], mode: 'replace' });
+      const { tags: suggested } = normalizeTags(tagResult?.suggestions, { title: newTitle, dropTitleOverlap: true });
+      if (suggested.length > 0) setTags(suggested);
 
       toast.success(t('aiContentCreated'));
     } catch {
@@ -385,7 +415,7 @@ export default function ListingCreatorDialog({
     } finally {
       setAiLoading((prev) => ({ ...prev, quick_start: false }));
     }
-  }, [quickStartKeyword, callAI]);
+  }, [quickStartKeyword, callAI, t]);
 
   // --------------------------------------------------
   // Reset
@@ -424,6 +454,8 @@ export default function ListingCreatorDialog({
     setAiImageRefPreview(null);
     setAiImageResult(null);
     setAiImageFollowUp('');
+    setAiImageWhiteBg(true);
+    setTagFeedback([]);
   }, []);
 
   const handleClose = () => {
@@ -435,23 +467,46 @@ export default function ListingCreatorDialog({
   // --------------------------------------------------
   // Validation
   // --------------------------------------------------
+  /** Toast the first title-rule problem; returns false if the title can't be saved. */
+  const validateTitleRules = (strict: boolean): boolean => {
+    const tc = checkTitle(title.trim());
+    if (tc.issues.includes('empty')) { toast.error(t('titleRequired')); return false; }
+    if (tc.issues.includes('too_long')) { toast.error(t('titleTooLong', { max: TITLE_MAX, count: tc.length })); return false; }
+    if (tc.issues.includes('bad_first_char')) { toast.error(t('titleBadFirstChar')); return false; }
+    if (tc.issues.includes('disallowed_separator')) { toast.error(t('titleCommasOnly')); return false; }
+    if (strict) {
+      if (tc.issues.includes('too_short')) { toast.error(t('titleTooShort', { min: TITLE_MIN, max: TITLE_MAX, count: tc.length })); return false; }
+      if (tc.issues.includes('repeated_words')) { toast.error(t('titleRepeatedWords', { words: tc.repeatedWords.join(', ') })); return false; }
+      if (tc.issues.includes('keyword_stacking')) { toast.error(t('titleKeywordStacking')); return false; }
+    }
+    return true;
+  };
+
+  /** Toast the first tag-rule problem; returns false if tags break the rules. */
+  const validateTagRules = (): boolean => {
+    const tg = checkTags(tags, title.trim());
+    if (tg.issues.includes('too_many')) { toast.error(t('maxTagsTrimmed')); return false; }
+    if (tg.tooLong.length) { toast.error(t('tagsTooLong', { max: TAG_MAX_LEN, tags: tg.tooLong.join(', ') })); return false; }
+    if (tg.duplicates.length) { toast.error(t('tagsDuplicate', { tags: tg.duplicates.map(([a, b]) => `${a} ≈ ${b}`).join(', ') })); return false; }
+    if (tg.overlapping.length) { toast.error(t('tagsOverlapTitle', { tags: tg.overlapping.map((o) => o.tag).join(', ') })); return false; }
+    return true;
+  };
+
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 0:
-        if (!title.trim()) {
-          toast.error(t('titleRequired'));
-          return false;
-        }
-        if (title.trim().length < 3) {
-          toast.error(t('titleMinLength'));
-          return false;
-        }
+        if (!validateTitleRules(false)) return false;
         if (!description.trim()) {
           toast.error(t('descriptionRequired'));
           return false;
         }
         if (description.trim().length < 10) {
           toast.error(t('descriptionMinLength'));
+          return false;
+        }
+        if (!validateTagRules()) return false;
+        if (!(ETSY_WHEN_MADE_OPTIONS as readonly string[]).includes(whenMade)) {
+          toast.error(t('whenMadeInvalid'));
           return false;
         }
         return true;
@@ -484,6 +539,15 @@ export default function ListingCreatorDialog({
     }
   };
 
+  /** A queued publish must satisfy every listing rule, including at least one photo. */
+  const validateForPublish = (): boolean => {
+    if (!validateStep(0) || !validateStep(1)) return false;
+    if (!validateTitleRules(true)) return false;
+    if (tags.length < 1) { toast.error(t('tagsRequiredForPublish')); return false; }
+    if (selectedFiles.length === 0) { toast.error(t('imageRequiredForPublish')); return false; }
+    return true;
+  };
+
   const handleNext = () => {
     if (validateStep(activeStep)) {
       setActiveStep((prev) => prev + 1);
@@ -500,64 +564,83 @@ export default function ListingCreatorDialog({
   // --------------------------------------------------
   // AI Image Generation (for new listings)
   // --------------------------------------------------
-  const handleAiImageGenerate = async () => {
-    if (!aiImagePrompt.trim()) {
+  /**
+   * Generate an AI image. `promptOverride` avoids the stale-state bug where
+   * setAiImagePrompt() + generate() would still send the previous prompt.
+   * `refine` sends the previous AI result as the first reference so a
+   * follow-up edits that image instead of starting over.
+   */
+  const handleAiImageGenerate = async (opts?: { promptOverride?: string; refine?: boolean }) => {
+    const promptText = (opts?.promptOverride ?? aiImagePrompt).trim();
+    if (!promptText) {
       toast.error(t('enterPrompt'));
       return;
     }
 
+    const previous = opts?.refine ? aiImageResult : null;
     setAiImageGenerating(true);
     setAiImageResult(null);
     try {
-      const payload: Record<string, any> = {
-        prompt: aiImagePrompt.trim(),
-      };
-
-      if (aiImageRefFile) {
-        const base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve((reader.result as string).split(',')[1]);
-          reader.onerror = reject;
-          reader.readAsDataURL(aiImageRefFile);
-        });
-        payload.reference_image = base64;
-        payload.reference_mime_type = aiImageRefFile.type;
+      const references: Array<{ data: string; mime_type: string }> = [];
+      if (previous) references.push({ data: previous.base64, mime_type: previous.mimeType });
+      if (aiImageRefFile) references.push({ data: await fileToBase64(aiImageRefFile), mime_type: aiImageRefFile.type });
+      // The seller's own product photos keep the AI on-product (max 3 refs total, ≤ 5MB each).
+      for (const f of selectedFiles) {
+        if (references.length >= 3) break;
+        if (f.size > 5 * 1024 * 1024 || f.name.startsWith('ai-generated-')) continue;
+        references.push({ data: await fileToBase64(f), mime_type: f.type });
       }
 
       const res = await fetch('/api/ai/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          prompt: promptText,
+          marketplace: 'etsy',
+          aspect_ratio: '4:3',
+          white_background: aiImageWhiteBg,
+          reference_images: references,
+        }),
       });
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || t('imageCreateFailed'));
-      }
-
-      const data = await res.json();
-      if (data.image_base64) {
-        setAiImageResult({ base64: data.image_base64, mimeType: data.mime_type || 'image/png' });
-        toast.success(t('imageCreated'));
-      } else {
-        throw new Error(data.text || t('imageCreateFailed'));
-      }
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new AiRequestError(aiErrorCode(data));
+      if (typeof data?.image_base64 !== 'string' || !data.image_base64) throw new AiRequestError('ai_image_failed');
+      setAiImageResult({ base64: data.image_base64, mimeType: data.mime_type || 'image/jpeg' });
+      toast.success(t('imageCreated'));
     } catch (err: any) {
-      toast.error(err.message || t('aiImageError'));
+      // Keep the previous result visible if a refinement fails.
+      if (previous) setAiImageResult(previous);
+      toast.error(err instanceof AiRequestError && err.code ? tAiErr(err.code) : t('aiImageError'));
     } finally {
       setAiImageGenerating(false);
     }
   };
 
+  /** Follow-up: refine the current AI image with extra instructions, or re-roll the same prompt. */
+  const handleAiImageFollowUp = () => {
+    const extra = aiImageFollowUp.trim();
+    if (extra) {
+      const nextPrompt = `${aiImagePrompt.trim()}. Additional changes: ${extra}`;
+      setAiImagePrompt(nextPrompt);
+      setAiImageFollowUp('');
+      handleAiImageGenerate({ promptOverride: nextPrompt, refine: true });
+    } else {
+      handleAiImageGenerate();
+    }
+  };
+
   const handleAiImageAccept = () => {
-    if (!aiImageResult || selectedFiles.length >= 10) return;
+    if (!aiImageResult) return;
+    if (selectedFiles.length >= ETSY_MAX_IMAGES) { toast.error(t('maxImages', { max: ETSY_MAX_IMAGES })); return; }
 
     // Convert base64 to File
     const byteStr = atob(aiImageResult.base64);
     const arr = new Uint8Array(byteStr.length);
     for (let i = 0; i < byteStr.length; i++) arr[i] = byteStr.charCodeAt(i);
     const blob = new Blob([arr], { type: aiImageResult.mimeType });
-    const file = new File([blob], `ai-generated-${Date.now()}.png`, { type: aiImageResult.mimeType });
+    const ext = aiImageResult.mimeType === 'image/png' ? 'png' : 'jpg';
+    const file = new File([blob], `ai-generated-${Date.now()}.${ext}`, { type: aiImageResult.mimeType });
 
     setSelectedFiles((prev) => [...prev, file]);
     setAiImageResult(null);
@@ -571,15 +654,15 @@ export default function ListingCreatorDialog({
 
     const newFiles = Array.from(files);
     const total = selectedFiles.length + newFiles.length;
-    if (total > 10) {
-      toast.error(t('maxImages'));
+    if (total > ETSY_MAX_IMAGES) {
+      toast.error(t('maxImages', { max: ETSY_MAX_IMAGES }));
       return;
     }
 
     const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     const validFiles = newFiles.filter((f) => {
       if (!validTypes.includes(f.type)) {
-        toast.error(`${f.name}: ${t('unsupportedFormat')}`);
+        toast.error(t('unsupportedFormatFile', { name: f.name }));
         return false;
       }
       return true;
@@ -597,6 +680,7 @@ export default function ListingCreatorDialog({
   // Create listing
   // --------------------------------------------------
   const handleCreate = async (publish: boolean) => {
+    if (publish ? !validateForPublish() : (!validateStep(0) || !validateStep(1))) return;
     setCreating(true);
     try {
       const localDraftListingId = -Date.now();
@@ -610,7 +694,8 @@ export default function ListingCreatorDialog({
         is_supply: isSupply,
         taxonomy_id: selectedTaxonomy!.id,
         price: parseFloat(price),
-        currency_code: 'USD',
+        // Etsy always prices in the shop's currency; only send it when known.
+        ...(currencyCode ? { currency_code: currencyCode } : {}),
         quantity: parseInt(quantity) || 1,
         shipping_profile_id: shippingProfileId,
         return_policy_id: returnPolicyId,
@@ -660,16 +745,17 @@ export default function ListingCreatorDialog({
 
       // Publish if requested
       if (publish) {
-        toast.success('Listing draft saved locally. Sync to Etsy to create and publish it.');
+        toast.success(t('draftSavedPublish'));
       } else {
-        toast.success('Listing draft saved locally. Sync to Etsy to create it.');
+        toast.success(t('draftSavedCreate'));
       }
 
       onCreated(localDraftListingId, draft?.id);
       resetForm();
       onClose();
     } catch (err: any) {
-      toast.error(err.message || t('errorOccurred'));
+      console.error('[ListingCreator] create failed:', err);
+      toast.error(t('errorOccurred'));
     } finally {
       setCreating(false);
     }
@@ -682,7 +768,7 @@ export default function ListingCreatorDialog({
   const STEPS = STEP_KEYS.map((k) => t(k));
 
   const whoMadeLabel = WHO_MADE_I18N_CR[whoMade] ? tEtsy(`whoMade.${WHO_MADE_I18N_CR[whoMade]}`) : whoMade;
-  const whenMadeLabel = WHEN_MADE_I18N_CR[whenMade] ? tEtsy(`whenMade.${WHEN_MADE_I18N_CR[whenMade]}`) : whenMade;
+  const whenMadeLabel = (ETSY_WHEN_MADE_OPTIONS as readonly string[]).includes(whenMade) ? tEtsy(`whenMade.${whenMadeLabelKey(whenMade)}`) : whenMade;
 
   // ================================================================
   // Step 1: Content & AI
@@ -752,8 +838,9 @@ export default function ListingCreatorDialog({
                 variant="outlined"
                 sx={{ fontSize: '0.82rem', height: 26, cursor: 'pointer' }}
                 onClick={() => {
-                  if (tags.length < 13 && !tags.includes(tagItem.tag)) {
-                    setTags((prev) => [...prev, tagItem.tag]);
+                  if (tags.length < TAG_MAX_COUNT && !tags.includes(tagItem.tag)) {
+                    if (tagItem.tag.length > TAG_MAX_LEN) { toast.error(t('tagsTooLong', { max: TAG_MAX_LEN, tags: tagItem.tag })); return; }
+                    applyTags([...tags, tagItem.tag]);
                     toast.success(t('tagAdded', { tag: tagItem.tag }));
                   }
                 }}
@@ -780,6 +867,7 @@ export default function ListingCreatorDialog({
             required
             fullWidth
             helperText={t('titleHelperText', { count: title.length })}
+            error={title.length > 0 && checkTitle(title).issues.some((i) => i === 'disallowed_separator' || i === 'bad_first_char')}
             inputProps={{ maxLength: 140 }}
           />
           <Tooltip title={t('optimizeTitleAI')}>
@@ -831,9 +919,7 @@ export default function ListingCreatorDialog({
             const expanded = newVal.flatMap((v) =>
               typeof v === 'string' ? v.split(',').map((s) => s.trim()).filter(Boolean) : [v]
             );
-            const unique = [...new Set(expanded)].map((t) => t.substring(0, 20)).slice(0, 13);
-            setTags(unique);
-            if (expanded.length > 13) toast.error(t('maxTagsTrimmed'));
+            applyTags(expanded as string[]);
           }}
           renderTags={(value, getTagProps) =>
             value.map((option, index) => (
@@ -842,7 +928,7 @@ export default function ListingCreatorDialog({
                 key={option}
                 label={option}
                 size="small"
-                color={option.length > 20 ? 'error' : undefined}
+                color={option.length > TAG_MAX_LEN ? 'error' : undefined}
               />
             ))
           }
@@ -850,15 +936,16 @@ export default function ListingCreatorDialog({
             <TextField
               {...params}
               label={t('tagsLabel')}
-              helperText={t('tagsHelperText', { count: tags.length })}
+              helperText={tagFeedback.length > 0
+                ? t('tagsDroppedFeedback', { max: TAG_MAX_LEN, tags: tagFeedback.join(', ') })
+                : t('tagsHelperText', { count: tags.length })}
+              error={tagFeedback.length > 0}
               onKeyDown={(e) => {
                 if (e.key === ',') {
                   e.preventDefault();
                   const input = (e.target as HTMLInputElement).value.trim();
-                  if (input && tags.length < 13) {
-                    const newTags = input.split(',').map((s) => s.trim()).filter(Boolean).map((t) => t.substring(0, 20));
-                    const merged = [...new Set([...tags, ...newTags])].slice(0, 13);
-                    setTags(merged);
+                  if (input) {
+                    applyTags([...tags, ...splitCommaList(input)]);
                     const autocompleteInput = (e.target as HTMLInputElement);
                     autocompleteInput.value = '';
                     const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
@@ -871,9 +958,7 @@ export default function ListingCreatorDialog({
                 const pasted = e.clipboardData.getData('text');
                 if (pasted.includes(',')) {
                   e.preventDefault();
-                  const newTags = pasted.split(',').map((s) => s.trim()).filter(Boolean).map((t) => t.substring(0, 20));
-                  const merged = [...new Set([...tags, ...newTags])].slice(0, 13);
-                  setTags(merged);
+                  applyTags([...tags, ...splitCommaList(pasted)]);
                 }
               }}
             />
@@ -899,11 +984,10 @@ export default function ListingCreatorDialog({
               <Button
                 size="small"
                 onClick={() => {
-                  const newTags = aiTagSuggestions.filter((tag) => !tags.includes(tag));
-                  const merged = [...tags, ...newTags].slice(0, 13);
+                  const { tags: merged } = normalizeTags([...tags, ...aiTagSuggestions], { max: TAG_MAX_COUNT });
                   setTags(merged);
                   setAiTagSuggestions([]);
-                  toast.success(t('tagsAdded', { count: merged.length - tags.length }));
+                  toast.success(t('tagsAdded', { count: Math.max(0, merged.length - tags.length) }));
                 }}
                 disabled={aiTagSuggestions.every((tag) => tags.includes(tag))}
                 sx={{ textTransform: 'none', fontSize: '0.85rem', py: 0, minWidth: 0 }}
@@ -914,7 +998,7 @@ export default function ListingCreatorDialog({
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
               {aiTagSuggestions.map((tag) => {
                 const alreadyExists = tags.includes(tag);
-                const isFull = tags.length >= 13;
+                const isFull = tags.length >= TAG_MAX_COUNT;
                 return (
                   <Chip
                     key={tag}
@@ -926,7 +1010,7 @@ export default function ListingCreatorDialog({
                     onClick={
                       alreadyExists || isFull
                         ? undefined
-                        : () => setTags((prev) => [...prev, tag])
+                        : () => applyTags([...tags, tag])
                     }
                     sx={{
                       cursor: alreadyExists || isFull ? 'default' : 'pointer',
@@ -994,7 +1078,7 @@ export default function ListingCreatorDialog({
         >
           {WHEN_MADE_KEYS_CR.map((val) => (
             <MenuItem key={val} value={val}>
-              {tEtsy(`whenMade.${WHEN_MADE_I18N_CR[val]}`)}
+              {tEtsy(`whenMade.${whenMadeLabelKey(val)}`)}
             </MenuItem>
           ))}
         </Select>
@@ -1233,7 +1317,7 @@ export default function ListingCreatorDialog({
           variant="outlined"
           startIcon={<CloudUploadIcon />}
           onClick={() => fileInputRef.current?.click()}
-          disabled={selectedFiles.length >= 10}
+          disabled={selectedFiles.length >= ETSY_MAX_IMAGES}
         >
           {t('selectImages', { count: selectedFiles.length })}
         </Button>
@@ -1374,11 +1458,16 @@ export default function ListingCreatorDialog({
           )}
         </Box>
 
+        <FormControlLabel
+          control={<Checkbox size="small" checked={aiImageWhiteBg} onChange={(e) => setAiImageWhiteBg(e.target.checked)} disabled={aiImageGenerating} />}
+          label={<Typography variant="caption">{t('aiImageWhiteBg')}</Typography>}
+          sx={{ mb: 1 }}
+        />
         <Button
           variant="contained"
           fullWidth
-          onClick={handleAiImageGenerate}
-          disabled={aiImageGenerating || !aiImagePrompt.trim() || selectedFiles.length >= 10}
+          onClick={() => handleAiImageGenerate()}
+          disabled={aiImageGenerating || !aiImagePrompt.trim() || selectedFiles.length >= ETSY_MAX_IMAGES}
           startIcon={aiImageGenerating ? <CircularProgress size={18} color="inherit" /> : <AutoFixHighIcon />}
           sx={{ bgcolor: '#a855f7', '&:hover': { bgcolor: '#9333ea' } }}
         >
@@ -1392,7 +1481,7 @@ export default function ListingCreatorDialog({
             <Box sx={{ textAlign: 'center' }}>
               <img
                 src={`data:${aiImageResult.mimeType};base64,${aiImageResult.base64}`}
-                alt="AI image"
+                alt={t('generatedImage')}
                 style={{
                   maxWidth: '100%',
                   maxHeight: 250,
@@ -1413,11 +1502,7 @@ export default function ListingCreatorDialog({
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !aiImageGenerating) {
                   e.preventDefault();
-                  if (aiImageFollowUp.trim()) {
-                    setAiImagePrompt(`${aiImagePrompt}. Additional changes: ${aiImageFollowUp.trim()}`);
-                    setAiImageFollowUp('');
-                  }
-                  handleAiImageGenerate();
+                  handleAiImageFollowUp();
                 }
               }}
             />
@@ -1425,13 +1510,7 @@ export default function ListingCreatorDialog({
             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', mt: 1, flexWrap: 'wrap' }}>
               <Button
                 variant="outlined"
-                onClick={() => {
-                  if (aiImageFollowUp.trim()) {
-                    setAiImagePrompt(`${aiImagePrompt}. Additional changes: ${aiImageFollowUp.trim()}`);
-                    setAiImageFollowUp('');
-                  }
-                  handleAiImageGenerate();
-                }}
+                onClick={handleAiImageFollowUp}
                 disabled={aiImageGenerating}
                 size="small"
                 startIcon={aiImageGenerating ? <CircularProgress size={14} /> : null}
@@ -1441,7 +1520,7 @@ export default function ListingCreatorDialog({
               <Button
                 variant="contained"
                 onClick={handleAiImageAccept}
-                disabled={selectedFiles.length >= 10}
+                disabled={selectedFiles.length >= ETSY_MAX_IMAGES}
                 color="success"
                 size="small"
   >

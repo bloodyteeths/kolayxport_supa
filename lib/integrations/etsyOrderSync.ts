@@ -298,3 +298,58 @@ function mapEtsyStatus(receipt: any): string {
   if (externalStatus === 'Paid') return 'PAID';
   return 'AWAITING_FULFILLMENT';
 }
+
+/**
+ * Fetch ONE Etsy receipt (webhook path) and map it with the same mapper the
+ * bulk sync uses. Uses the shared lock-protected token helper so a webhook
+ * refresh can't race the order sync on Etsy's single-use refresh token.
+ * Returns null when Etsy reports the receipt doesn't exist (404).
+ */
+export async function fetchSingleEtsyReceipt(
+  userId: string,
+  shopId: string,
+  receiptId: string,
+): Promise<UIOrder | null> {
+  if (!/^\d+$/.test(receiptId)) throw new Error(`Invalid Etsy receipt id: ${receiptId}`);
+  const shop = await prisma.etsyShop.findFirst({
+    where: { userId, shopId, isActive: true },
+    select: { shopId: true, shopName: true },
+  });
+  if (!shop) return null;
+
+  // Lazy imports keep the draft engine out of the order-sync import graph.
+  const { getEtsyAccessToken } = await import('@/lib/etsy/etsyToken');
+  const { callEtsyAPI } = await import('@/lib/etsy/draftService');
+  const accessToken = await getEtsyAccessToken(shopId, userId);
+
+  let receipt: any;
+  try {
+    receipt = await callEtsyAPI(`/shops/${shopId}/receipts/${receiptId}`, accessToken);
+  } catch (err: any) {
+    if (/Etsy API error: 404/.test(String(err?.message || ''))) return null;
+    throw err;
+  }
+  if (!receipt || !receipt.receipt_id) return null;
+
+  const imageMap = new Map<string, string>();
+  const listingIds = (receipt.transactions || [])
+    .map((tx: any) => tx?.listing_id)
+    .filter(Boolean)
+    .map((id: any) => BigInt(id));
+  if (listingIds.length > 0) {
+    try {
+      const cached = await prisma.etsyListing.findMany({
+        where: { etsyListingId: { in: listingIds } },
+        select: { etsyListingId: true, thumbnailUrl570xN: true, thumbnailUrl170x135: true },
+      });
+      for (const l of cached) {
+        const url = l.thumbnailUrl570xN || l.thumbnailUrl170x135 || '';
+        if (url) imageMap.set(String(l.etsyListingId), url);
+      }
+    } catch (err) {
+      logger.warn('[EtsyOrderSync] Single receipt image lookup failed', { error: (err as Error).message });
+    }
+  }
+
+  return mapReceiptToUIOrder(receipt, shop.shopId, shop.shopName || 'Etsy', imageMap);
+}

@@ -1,13 +1,18 @@
 /**
- * Kolayxport Etsy Order Sync - Background Service Worker
- * Auth strategy: kolayxport.js content script fetches JWT from /api/auth/extension
- * (same-origin, includes httpOnly cookies) and pushes it here via authTokenFromPage.
+ * KolayXport — Background Service Worker
+ *
+ * Auth: kolayxport.js (content script on kolayxport.com) fetches a token from
+ * /api/auth/extension (same-origin, carries the session cookie) and pushes it here
+ * via `authTokenFromPage`. Every API call sends it as `Authorization: Bearer`.
+ * The raw token never leaves this worker: popup / content scripts only get a
+ * boolean auth status. On 401 we drop the token, ask an open kolayxport.com tab
+ * for a fresh one, and retry once.
  */
 
-// Configuration
-const KOLAYXPORT_DOMAIN = 'kolayxport.com';
 const API_BASE = 'https://kolayxport.com';
-const AUTH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+// Server-issued tokens may be short-lived (~24h). Refresh well before that unless
+// the server told us the real expiry.
+const DEFAULT_TOKEN_MAX_AGE_MS = 20 * 60 * 60 * 1000;
 const BADGE_COLORS = {
   success: '#4CAF50',
   error: '#F44336',
@@ -15,485 +20,348 @@ const BADGE_COLORS = {
   default: '#2196F3'
 };
 
-// State management
 let authToken = null;
-let syncStats = {
-  totalSynced: 0,
-  lastSyncTime: null,
-  errors: 0
-};
+let authTokenExpiresAt = 0;
+let syncStats = { totalSynced: 0, lastSyncTime: null, errors: 0 };
 
-// Restore auth token from storage on service worker wake-up
-chrome.storage.local.get(['kx_auth_token', 'kx_auth_token_time'], (result) => {
-  if (result.kx_auth_token && result.kx_auth_token_time) {
-    const age = Date.now() - result.kx_auth_token_time;
-    if (age < AUTH_TOKEN_MAX_AGE_MS) {
-      authToken = result.kx_auth_token;
-      console.log('Restored auth token from storage (age: ' + Math.round(age / 1000) + 's)');
-      updateBadge('authenticated');
-    }
-  }
-});
-
-function getApiBase() {
-  return API_BASE;
+function extVersion() {
+  try { return chrome.runtime.getManifest().version; } catch (_) { return ''; }
 }
 
-// Initialize extension
-chrome.runtime.onInstalled.addListener(async (details) => {
+function tokenStillValid(expiresAt) {
+  return typeof expiresAt === 'number' && expiresAt - Date.now() > 60 * 1000;
+}
+
+// Restore auth token on service-worker wake-up
+chrome.storage.local.get(['kx_auth_token', 'kx_auth_token_expires_at', 'kx_auth_token_time'], (result) => {
+  let expiresAt = result.kx_auth_token_expires_at;
+  if (!expiresAt && result.kx_auth_token_time) expiresAt = result.kx_auth_token_time + DEFAULT_TOKEN_MAX_AGE_MS;
+  if (result.kx_auth_token && tokenStillValid(expiresAt)) {
+    authToken = result.kx_auth_token;
+    authTokenExpiresAt = expiresAt;
+    updateBadge('authenticated');
+  }
+});
+
+function computeExpiry(meta) {
+  // Accept either an absolute expiry (ISO / ms / s) or a relative lifetime in seconds.
+  if (meta) {
+    if (meta.expiresAt) {
+      const v = typeof meta.expiresAt === 'number'
+        ? (meta.expiresAt < 1e12 ? meta.expiresAt * 1000 : meta.expiresAt)
+        : Date.parse(meta.expiresAt);
+      if (Number.isFinite(v) && v > Date.now()) return v;
+    }
+    const rel = Number(meta.expiresIn);
+    if (Number.isFinite(rel) && rel > 0) return Date.now() + rel * 1000;
+  }
+  return Date.now() + DEFAULT_TOKEN_MAX_AGE_MS;
+}
+
+function storeToken(token, meta, user) {
+  authToken = token;
+  authTokenExpiresAt = computeExpiry(meta);
+  updateBadge('authenticated');
+  const data = {
+    kx_auth_token: token,
+    kx_auth_token_expires_at: authTokenExpiresAt,
+    kx_auth_token_time: Date.now()
+  };
+  if (user) data.kx_user = { email: user.email || null, name: user.name || null };
+  chrome.storage.local.set(data);
+}
+
+function clearToken() {
+  authToken = null;
+  authTokenExpiresAt = 0;
+  chrome.storage.local.remove(['kx_auth_token', 'kx_auth_token_expires_at', 'kx_auth_token_time', 'kx_last_auth_check']);
+}
+
+chrome.runtime.onInstalled.addListener(async () => {
   chrome.action.setBadgeBackgroundColor({ color: BADGE_COLORS.default });
   chrome.action.setBadgeText({ text: '' });
-
-  await checkAuthentication();
-
-  chrome.contextMenus.create({
-    id: 'syncNow',
-    title: 'Sync Etsy Orders Now',
-    contexts: ['action']
-  });
+  // Old builds stored logs that could contain buyer data — drop them. Tokens issued
+  // before the 9.5 auth change are no longer accepted, so start from a fresh token.
+  chrome.storage.local.remove(['kx_logs', 'kx_api_key']);
+  clearToken();
+  await checkAuthentication({ force: true });
+  chrome.contextMenus.create({ id: 'syncNow', title: 'Sync Etsy Orders Now', contexts: ['action'] });
 });
 
-// Message handling
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   handleMessage(request, sender, sendResponse);
-  return true; // Keep channel open for async response
+  return true;
 });
 
-async function handleMessage(request, sender, sendResponse) {
-  // --- Research API handler ---
-  if (request.type === 'kx_research') {
-    try {
-      if (!authToken) await checkAuthentication();
-      const headers = { 'Content-Type': 'application/json' };
-      if (authToken) {
-        headers['Authorization'] = `Bearer ${authToken}`;
-        headers['X-Extension-Auth'] = authToken;
-        headers['X-Extension-Version'] = chrome.runtime.getManifest().version;
-      }
-
-      const response = await fetch(`${getApiBase()}/api/ext/research`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ action: request.action, ...request.params }),
-      });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: 'API error' }));
-        sendResponse({ error: err.error || `HTTP ${response.status}` });
-        return;
-      }
-
-      sendResponse(await response.json());
-    } catch (err) {
-      sendResponse({ error: err.message || 'Research API error' });
-    }
-    return;
+/**
+ * Authenticated fetch. Adds the Bearer token, and on 401 refreshes the token via
+ * an open kolayxport.com tab and retries exactly once.
+ * Returns { ok, status, data } — data is parsed JSON (or { error } text).
+ */
+async function apiFetch(path, { method = 'GET', body } = {}) {
+  if (!authToken || !tokenStillValid(authTokenExpiresAt)) {
+    if (authToken) clearToken();
+    await checkAuthentication();
   }
+  if (!authToken) return { ok: false, status: 401, data: { error: 'NOT_AUTHENTICATED' } };
 
-  // --- eBay Research API handler ---
-  if (request.type === 'kx_ebay_research') {
-    try {
-      if (!authToken) await checkAuthentication();
+  const doFetch = async () => {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`,
+        'X-Extension-Version': extVersion()
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined
+    });
+    let data;
+    try { data = await res.json(); } catch (_) { data = { error: `HTTP ${res.status}` }; }
+    return { ok: res.ok, status: res.status, data };
+  };
 
-      const stored = await chrome.storage.local.get(['kx_user', 'kx_api_key']);
-      const userId = stored.kx_user?.id || '';
-      const apiKey = stored.kx_api_key || '';
+  let result = await doFetch();
+  if (result.status === 401) {
+    clearToken();
+    await checkAuthentication({ force: true });
+    if (!authToken) {
+      updateBadge('unauthenticated');
+      return { ok: false, status: 401, data: { error: 'NOT_AUTHENTICATED' } };
+    }
+    result = await doFetch();
+    if (result.status === 401) {
+      clearToken();
+      updateBadge('unauthenticated');
+    }
+  }
+  return result;
+}
 
-      const headers = { 'Content-Type': 'application/json' };
-      if (authToken) {
-        headers['Authorization'] = `Bearer ${authToken}`;
-        headers['X-Extension-Auth'] = authToken;
-        headers['X-Extension-Version'] = chrome.runtime.getManifest().version;
-      }
-      headers['x-api-key'] = apiKey;
+function errorOf(result, fallback) {
+  return (result.data && result.data.error) || fallback || `HTTP ${result.status}`;
+}
 
+async function handleMessage(request, sender, sendResponse) {
+  try {
+    // --- Etsy listing stats (measured vs estimated) ---
+    if (request.type === 'kx_listing_stats') {
+      const r = await apiFetch('/api/ext/listing-stats', {
+        method: 'POST',
+        body: { listingId: request.params?.listingId, page: request.params?.page || {} }
+      });
+      sendResponse(r.ok ? r.data : { error: errorOf(r), status: r.status });
+      return;
+    }
+
+    // --- Etsy research (search / shop / legacy listing) ---
+    if (request.type === 'kx_research') {
+      const r = await apiFetch('/api/ext/research', {
+        method: 'POST',
+        body: { action: request.action, ...(request.params || {}) }
+      });
+      sendResponse(r.ok ? r.data : { error: errorOf(r), status: r.status });
+      return;
+    }
+
+    // --- eBay research ---
+    if (request.type === 'kx_ebay_research') {
       const params = request.params || {};
-      let url = '';
-
+      const enc = encodeURIComponent;
+      let path = '';
       switch (request.action) {
         case 'search_enrich':
-          url = `${getApiBase()}/api/clawd/ebay-research?action=product_database&q=${encodeURIComponent(params.query || '')}&user_id=${encodeURIComponent(userId)}&limit=50`;
+          path = `/api/clawd/ebay-research?action=product_database&q=${enc(params.query || '')}&limit=50`;
           break;
         case 'listing_enrich':
-          url = `${getApiBase()}/api/clawd/ebay?action=get_item_details&legacy_item_id=${encodeURIComponent(params.itemId || '')}&user_id=${encodeURIComponent(userId)}`;
+          path = `/api/clawd/ebay?action=get_item_details&legacy_item_id=${enc(params.itemId || '')}`;
           break;
         case 'seo_analyze':
-          url = `${getApiBase()}/api/clawd/ebay?action=analyze_seo&q=${encodeURIComponent(params.query || '')}&my_title=${encodeURIComponent(params.title || '')}&user_id=${encodeURIComponent(userId)}`;
+          path = `/api/clawd/ebay?action=analyze_seo&q=${enc(params.query || '')}&my_title=${enc(params.title || '')}`;
           break;
         case 'niche_analyze':
-          url = `${getApiBase()}/api/clawd/ebay-research?action=niche_analyze&q=${encodeURIComponent(params.query || '')}&user_id=${encodeURIComponent(userId)}`;
+          path = `/api/clawd/ebay-research?action=niche_analyze&q=${enc(params.query || '')}`;
           break;
         default:
           sendResponse({ error: `Unknown eBay action: ${request.action}` });
           return;
       }
-
-      const response = await fetch(url, { method: 'GET', headers });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: 'eBay API error' }));
-        sendResponse({ error: err.error || `HTTP ${response.status}` });
-        return;
-      }
-
-      sendResponse(await response.json());
-    } catch (err) {
-      sendResponse({ error: err.message || 'eBay Research API error' });
+      const r = await apiFetch(path);
+      sendResponse(r.ok ? r.data : { error: errorOf(r, 'eBay API error'), status: r.status });
+      return;
     }
-    return;
-  }
 
-  switch (request.action) {
-    case 'authTokenFromPage':
-      // Token pushed from kolayxport.js content script (same-origin fetch)
-      if (request.token) {
-        console.log('Received auth token from content script');
-        authToken = request.token;
-        updateBadge('authenticated');
-        const storageData = {
-          'kx_auth_token': request.token,
-          'kx_auth_token_time': Date.now(),
-          'kx_last_auth_check': Date.now()
-        };
-        if (request.user) storageData['kx_user'] = request.user;
-        chrome.storage.local.set(storageData);
-      }
-      sendResponse({ success: true });
-      break;
+    switch (request.action) {
+      case 'authTokenFromPage':
+        // Only accept tokens from our own kolayxport.com content script.
+        if (request.token && sender.url && /^https:\/\/(www\.)?kolayxport\.com\//.test(sender.url)) {
+          storeToken(request.token, { expiresAt: request.expiresAt, expiresIn: request.expiresIn }, request.user);
+        }
+        sendResponse({ success: true });
+        break;
 
-    case 'contentScriptReady':
-      // Content script loaded on kolayxport.com – ask it for token if needed
-      if (!authToken && sender.tab?.id) {
-        try {
-          chrome.tabs.sendMessage(sender.tab.id, { action: 'getAuthToken' }, (response) => {
-            if (response?.success && response.token) {
-              authToken = response.token;
-              updateBadge('authenticated');
-              console.log('Got auth token after content script ready');
-            }
-          });
-        } catch (e) {}
-      }
-      sendResponse({ success: true });
-      break;
+      case 'contentScriptReady':
+        if (!authToken) checkAuthentication();
+        sendResponse({ success: true });
+        break;
 
-    case 'getCookies':
-      const cookies = await getCookies(request.domain);
-      sendResponse(cookies);
-      break;
+      case 'syncComplete':
+        handleSyncComplete(request);
+        sendResponse({ success: true });
+        break;
 
-    case 'syncComplete':
-      handleSyncComplete(request);
-      sendResponse({ success: true });
-      break;
-
-    case 'getAuthStatus':
-      if (!authToken) await checkAuthentication();
-      sendResponse({
-        authenticated: !!authToken,
-        token: authToken
-      });
-      break;
-
-    case 'fetchPendingTracking':
-      try {
+      case 'getAuthStatus':
+        // Boolean only — the token itself stays in the service worker.
         if (!authToken) await checkAuthentication();
-        console.log('[fetchPendingTracking] authToken:', authToken ? 'present (' + authToken.substring(0, 20) + '...)' : 'MISSING');
-        if (!authToken) {
-          sendResponse({ success: false, error: 'Not authenticated' });
-          return;
-        }
+        sendResponse({ authenticated: !!authToken });
+        break;
 
-        const trackingUrl = `${getApiBase()}/api/integrations/etsy/tracking-pending${request.shopName ? '?shopName=' + encodeURIComponent(request.shopName) : ''}`;
-        console.log('[fetchPendingTracking] Fetching:', trackingUrl);
-        const trackingResp = await fetch(trackingUrl, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`,
-            'X-Extension-Auth': authToken,
-            'X-Extension-Version': chrome.runtime.getManifest().version
-          }
-        });
-
-        console.log('[fetchPendingTracking] Response status:', trackingResp.status);
-        if (trackingResp.ok) {
-          const trackingData = await trackingResp.json();
-          console.log('[fetchPendingTracking] Got data:', JSON.stringify(trackingData).substring(0, 200));
-          sendResponse({ success: true, ...trackingData });
-        } else {
-          const errorText = await trackingResp.text();
-          console.log('[fetchPendingTracking] Error:', trackingResp.status, errorText.substring(0, 200));
-          sendResponse({ success: false, error: `HTTP ${trackingResp.status}: ${errorText}` });
-        }
-      } catch (error) {
-        console.error('[fetchPendingTracking] Exception:', error.message);
-        sendResponse({ success: false, error: error.message });
+      case 'fetchPendingTracking': {
+        const qs = request.shopName ? `?shopName=${encodeURIComponent(request.shopName)}` : '';
+        const r = await apiFetch(`/api/integrations/etsy/tracking-pending${qs}`);
+        sendResponse(r.ok ? { success: true, ...r.data } : { success: false, error: errorOf(r) });
+        break;
       }
-      break;
 
-    case 'confirmTrackingSubmission':
-      try {
-        if (!authToken) await checkAuthentication();
-        if (!authToken) {
-          sendResponse({ success: false, error: 'Not authenticated' });
-          return;
-        }
-
-        const confirmResp = await fetch(`${getApiBase()}/api/integrations/etsy/tracking-confirm`, {
+      case 'confirmTrackingSubmission': {
+        const r = await apiFetch('/api/integrations/etsy/tracking-confirm', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`,
-            'X-Extension-Auth': authToken,
-            'X-Extension-Version': chrome.runtime.getManifest().version
-          },
-          body: JSON.stringify({
+          body: {
             submissionId: request.submissionId,
             status: request.status,
             error: request.error,
             shopName: request.shopName
-          })
-        });
-
-        if (confirmResp.ok) {
-          const confirmData = await confirmResp.json();
-          sendResponse({ success: true, ...confirmData });
-        } else {
-          const errorText = await confirmResp.text();
-          sendResponse({ success: false, error: `HTTP ${confirmResp.status}: ${errorText}` });
-        }
-      } catch (error) {
-        sendResponse({ success: false, error: error.message });
-      }
-      break;
-
-    case 'sendLog':
-      try {
-        await fetch(`${getApiBase()}/api/integrations/etsy/logs`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ source: 'chrome-extension', log: request.log })
-        });
-      } catch (e) {
-        // Silent fail for logging
-      }
-      sendResponse({ success: true });
-      break;
-
-    case 'syncOrders':
-      try {
-        console.log('Background: Syncing orders to Kolayxport API');
-        const { orders, source, timestamp } = request;
-
-        if (!authToken) {
-          await checkAuthentication();
-        }
-
-        if (!authToken) {
-          sendResponse({ success: false, error: 'Not authenticated' });
-          return;
-        }
-
-        const response = await fetch('https://kolayxport.com/api/integrations/etsy/addresses', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`,
-            'X-Extension-Auth': authToken,
-            'X-Extension-Version': chrome.runtime.getManifest().version
-          },
-          body: JSON.stringify({ orders, source, timestamp })
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          console.log('Background: Sync successful', result);
-          sendResponse({ success: true, result });
-        } else {
-          const errorText = await response.text();
-          if (response.status === 401) {
-            authToken = null;
-            chrome.storage.local.remove(['kx_auth_token', 'kx_auth_token_time', 'kx_last_auth_check']);
-            updateBadge('unauthenticated');
           }
-          console.error('Background: Sync failed', response.status, errorText);
-          sendResponse({ success: false, error: `Server error ${response.status}: ${errorText}` });
-        }
-      } catch (error) {
-        console.error('Background: Sync error', error);
-        sendResponse({ success: false, error: error.message });
+        });
+        sendResponse(r.ok ? { success: true, ...r.data } : { success: false, error: errorOf(r) });
+        break;
       }
-      break;
 
-    default:
-      sendResponse({ error: 'Unknown action' });
+      case 'syncOrders': {
+        const { orders, source, timestamp } = request;
+        const r = await apiFetch('/api/integrations/etsy/addresses', {
+          method: 'POST',
+          body: { orders, source, timestamp }
+        });
+        if (r.ok) {
+          sendResponse({ success: true, result: r.data });
+        } else {
+          sendResponse({ success: false, error: `Server error ${r.status}: ${errorOf(r)}` });
+        }
+        break;
+      }
+
+      default:
+        sendResponse({ error: 'Unknown action' });
+    }
+  } catch (err) {
+    sendResponse({ success: false, error: (err && err.message) || 'Extension error' });
   }
 }
 
-// Authentication check – asks kolayxport.js content script to fetch JWT via same-origin API
-async function checkAuthentication() {
-  try {
-    console.log('Checking authentication...');
-
-    // 1. If we already have a cached token that's fresh, reuse it
-    const stored = await chrome.storage.local.get(['kx_last_auth_check', 'kx_auth_token', 'kx_auth_token_time']);
-    if (!authToken && stored.kx_auth_token && stored.kx_auth_token_time) {
-      const age = Date.now() - stored.kx_auth_token_time;
-      if (age < AUTH_TOKEN_MAX_AGE_MS) {
-        authToken = stored.kx_auth_token;
-        console.log('Restored token from storage during auth check');
-      }
-    }
-    if (authToken) {
-      console.log('Using cached auth token');
-      updateBadge('authenticated');
-      return;
-    }
-
-    // 2. Find an open Kolayxport tab and ask its content script to fetch a token
-    const tabs = await chrome.tabs.query({ url: ['https://kolayxport.com/*', 'https://www.kolayxport.com/*'] });
-    console.log(`Found ${tabs.length} Kolayxport tab(s)`);
-
-    for (const tab of tabs) {
-      if (!tab.id || tab.status !== 'complete') continue;
-      if (tab.url && (tab.url.includes('/login') || tab.url.includes('/auth/'))) continue;
-
-      try {
-        const response = await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('timeout')), 5000);
-          chrome.tabs.sendMessage(tab.id, { action: 'getAuthToken' }, (resp) => {
-            clearTimeout(timeout);
-            if (chrome.runtime.lastError) {
-              reject(new Error(chrome.runtime.lastError.message));
-            } else {
-              resolve(resp);
-            }
-          });
-        });
-
-        if (response?.success && response.token) {
-          console.log('Got auth token from content script');
-          authToken = response.token;
+/**
+ * Ensure we have a token. Uses the cached one if still valid; otherwise asks an
+ * open kolayxport.com tab (content script does a same-origin fetch to
+ * /api/auth/extension). `force` skips the cache.
+ */
+let _authInFlight = null;
+async function checkAuthentication({ force = false } = {}) {
+  if (_authInFlight) return _authInFlight;
+  _authInFlight = (async () => {
+    try {
+      if (!force) {
+        if (authToken && tokenStillValid(authTokenExpiresAt)) {
           updateBadge('authenticated');
-          chrome.storage.local.set({
-            'kx_auth_token': response.token,
-            'kx_auth_token_time': Date.now(),
-            'kx_last_auth_check': Date.now()
-          });
           return;
         }
-      } catch (e) {
-        console.log(`Tab ${tab.id} message failed:`, e.message);
+        const stored = await chrome.storage.local.get(['kx_auth_token', 'kx_auth_token_expires_at', 'kx_auth_token_time']);
+        let expiresAt = stored.kx_auth_token_expires_at;
+        if (!expiresAt && stored.kx_auth_token_time) expiresAt = stored.kx_auth_token_time + DEFAULT_TOKEN_MAX_AGE_MS;
+        if (stored.kx_auth_token && tokenStillValid(expiresAt)) {
+          authToken = stored.kx_auth_token;
+          authTokenExpiresAt = expiresAt;
+          updateBadge('authenticated');
+          return;
+        }
       }
-    }
 
-    // 3. No open tab – check if NextAuth session cookie exists
-    try {
-      const allCookies = await chrome.cookies.getAll({ domain: 'kolayxport.com' });
-      const sessionCookie = allCookies.find(c =>
-        c.name === 'next-auth.session-token' ||
-        c.name === '__Secure-next-auth.session-token'
-      );
-
-      if (sessionCookie) {
-        console.log('NextAuth session cookie found but no open tab to exchange for JWT');
-        updateBadge('warning');
-        return;
+      const tabs = await chrome.tabs.query({ url: ['https://kolayxport.com/*', 'https://www.kolayxport.com/*'] });
+      for (const tab of tabs) {
+        if (!tab.id || tab.status !== 'complete') continue;
+        if (tab.url && (tab.url.includes('/login') || tab.url.includes('/auth/'))) continue;
+        try {
+          const response = await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('timeout')), 5000);
+            chrome.tabs.sendMessage(tab.id, { action: 'getAuthToken' }, (resp) => {
+              clearTimeout(timeout);
+              if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+              else resolve(resp);
+            });
+          });
+          if (response && response.success && response.token) {
+            storeToken(response.token, { expiresAt: response.expiresAt, expiresIn: response.expiresIn }, response.user);
+            return;
+          }
+        } catch (_) { /* try next tab */ }
       }
-    } catch (e) {
-      console.warn('Cookie check failed:', e);
+
+      // No usable tab. If a session cookie exists, the user just needs to open kolayxport.com.
+      try {
+        const cookies = await chrome.cookies.getAll({ domain: 'kolayxport.com' });
+        const hasSession = cookies.some(c =>
+          c.name === 'next-auth.session-token' || c.name === '__Secure-next-auth.session-token'
+        );
+        if (hasSession) {
+          updateBadge('warning');
+          return;
+        }
+      } catch (_) { /* ignore */ }
+
+      authToken = null;
+      updateBadge('unauthenticated');
+    } catch (error) {
+      authToken = null;
+      updateBadge('error');
     }
-
-    // 4. No auth found
-    console.log('No authentication found');
-    authToken = null;
-    updateBadge('unauthenticated');
-
-  } catch (error) {
-    console.error('Auth check failed:', error);
-    authToken = null;
-    updateBadge('error');
-  }
-}
-
-async function getCookies(domain) {
+  })();
   try {
-    const allCookies = await chrome.cookies.getAll({ domain });
-    const cookieObj = {};
-    allCookies.forEach(cookie => { cookieObj[cookie.name] = cookie.value; });
-    if (authToken) cookieObj.kxAuthToken = authToken;
-    return cookieObj;
-  } catch (error) {
-    console.error('Failed to get cookies:', error);
-    return {};
+    await _authInFlight;
+  } finally {
+    _authInFlight = null;
   }
 }
 
-// Sync handling
 function handleSyncComplete(data) {
-  syncStats.totalSynced += data.count;
-  syncStats.lastSyncTime = new Date();
+  syncStats.totalSynced += Number(data.count) || 0;
+  syncStats.lastSyncTime = new Date().toISOString();
   syncStats.errors = 0;
-  updateBadge('success', syncStats.totalSynced.toString());
+  updateBadge('success', String(syncStats.totalSynced));
   chrome.storage.local.set({ syncStats });
 }
 
-// Badge management
 function updateBadge(status, text = '') {
   let color = BADGE_COLORS.default;
   let badgeText = text;
-
   switch (status) {
-    case 'authenticated':
-      color = BADGE_COLORS.success;
-      badgeText = badgeText || '';
-      break;
-    case 'unauthenticated':
-      color = BADGE_COLORS.warning;
-      badgeText = badgeText || '?';
-      break;
-    case 'warning':
-      color = BADGE_COLORS.warning;
-      badgeText = badgeText || '!';
-      break;
-    case 'success':
-      color = BADGE_COLORS.success;
-      break;
-    case 'error':
-      color = BADGE_COLORS.error;
-      break;
+    case 'authenticated': color = BADGE_COLORS.success; break;
+    case 'unauthenticated': color = BADGE_COLORS.warning; badgeText = badgeText || '?'; break;
+    case 'warning': color = BADGE_COLORS.warning; badgeText = badgeText || '!'; break;
+    case 'success': color = BADGE_COLORS.success; break;
+    case 'error': color = BADGE_COLORS.error; break;
   }
-
   chrome.action.setBadgeBackgroundColor({ color });
   chrome.action.setBadgeText({ text: badgeText });
 }
 
-// Context menu handling
-chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  if (info.menuItemId === 'syncNow') {
-    const tabs = await chrome.tabs.query({
-      url: [
-        'https://www.etsy.com/your/orders/*',
-        'https://www.etsy.com/your/shops/*/orders*'
-      ]
-    });
-
-    if (tabs.length > 0) {
-      try {
-        await chrome.tabs.sendMessage(tabs[0].id, { action: 'scrapeNow' });
-      } catch (error) {
-        console.error('Failed to send sync message:', error);
-      }
-    }
+chrome.contextMenus.onClicked.addListener(async (info) => {
+  if (info.menuItemId !== 'syncNow') return;
+  const tabs = await chrome.tabs.query({
+    url: ['https://www.etsy.com/your/orders/*', 'https://www.etsy.com/your/shops/*/orders*']
+  });
+  if (tabs.length > 0) {
+    try { await chrome.tabs.sendMessage(tabs[0].id, { action: 'scrapeNow' }); } catch (_) {}
   }
 });
 
-// Global error handling
-self.addEventListener('error', (event) => {
-  console.error('Service worker error:', event.error);
-});
-
 self.addEventListener('unhandledrejection', (event) => {
-  console.error('Unhandled promise rejection:', event.reason);
+  console.error('Unhandled promise rejection:', event.reason && event.reason.message);
 });

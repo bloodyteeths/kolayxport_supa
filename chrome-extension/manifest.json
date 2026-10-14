@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "KolayXport — Etsy, eBay & Amazon Research Tool",
-  "version": "9.4.0",
-  "description": "Inline sales estimates, SEO scores, competition analysis & revenue data on Etsy, eBay and Amazon pages. AI-powered alternative to Helium 10.",
+  "version": "9.5.0",
+  "description": "Research overlays for Etsy, eBay & Amazon (tracked sales, SEO, competition) plus Etsy order sync and tracking entry for KolayXport.",
   "author": "Kolayxport",
   "icons": {
     "16": "icons/icon-16.png",
@@ -12,11 +12,7 @@
   },
   "permissions": [
     "storage",
-    "activeTab",
-    "scripting",
     "cookies",
-    "alarms",
-    "notifications",
     "contextMenus"
   ],
   "host_permissions": [
@@ -37,8 +33,16 @@
   ],
   "content_scripts": [
     {
-      "matches": ["https://www.etsy.com/*"],
-      "js": ["src/cache.js", "src/content-shared.js", "src/content-search.js", "src/content-listing.js", "src/content-shop.js"],
+      "matches": [
+        "https://www.etsy.com/*"
+      ],
+      "js": [
+        "src/cache.js",
+        "src/content-shared.js",
+        "src/content-search.js",
+        "src/content-listing.js",
+        "src/content-shop.js"
+      ],
       "run_at": "document_idle",
       "all_frames": false,
       "exclude_matches": [
@@ -54,7 +58,9 @@
         "https://www.etsy.com/your/account/your-shop/orders*",
         "https://www.etsy.com/shop-manager/*orders*"
       ],
-      "js": ["src/content.js"],
+      "js": [
+        "src/content.js"
+      ],
       "run_at": "document_idle",
       "all_frames": false
     },
@@ -63,7 +69,9 @@
         "https://kolayxport.com/*",
         "https://www.kolayxport.com/*"
       ],
-      "js": ["src/kolayxport.js"],
+      "js": [
+        "src/kolayxport.js"
+      ],
       "run_at": "document_idle",
       "all_frames": false
     },
@@ -77,7 +85,12 @@
         "https://www.ebay.es/*",
         "https://www.ebay.com.au/*"
       ],
-      "js": ["src/cache.js", "src/content-ebay-shared.js", "src/content-ebay-search.js", "src/content-ebay-listing.js"],
+      "js": [
+        "src/cache.js",
+        "src/content-ebay-shared.js",
+        "src/content-ebay-search.js",
+        "src/content-ebay-listing.js"
+      ],
       "run_at": "document_idle",
       "all_frames": false
     },
@@ -88,7 +101,12 @@
         "https://www.amazon.de/*",
         "https://www.amazon.co.uk/*"
       ],
-      "js": ["src/cache.js", "src/content-amazon-shared.js", "src/content-amazon-search.js", "src/content-amazon-listing.js"],
+      "js": [
+        "src/cache.js",
+        "src/content-amazon-shared.js",
+        "src/content-amazon-search.js",
+        "src/content-amazon-listing.js"
+      ],
       "run_at": "document_idle",
       "all_frames": false
     }
@@ -96,6 +114,16 @@
   "background": {
     "service_worker": "src/background-simple.js"
   },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons/icon-16.png"
+      ],
+      "matches": [
+        "https://www.etsy.com/*"
+      ]
+    }
+  ],
   "action": {
     "default_popup": "src/popup.html",
     "default_title": "KolayXport Etsy & eBay Senkron Durumu",

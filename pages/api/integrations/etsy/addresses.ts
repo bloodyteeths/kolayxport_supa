@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { getAuthUser } from '@/lib/auth';
 import { withUsageLimiter } from '@/lib/middleware/withUsageLimiter';
+import { applyExtensionCors } from '@/lib/security/internalApiKey';
 
 // Etsy's API no longer returns buyer shipping addresses, so the Chrome extension
 // scrapes them off Shop Manager. Map the scraped shape → the Order.shippingAddress
@@ -39,23 +40,11 @@ async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Set CORS headers for Chrome extension (whitelist only known extension IDs)
-  const origin = req.headers.origin;
-  const ALLOWED_EXTENSION_IDS = [process.env.CHROME_EXTENSION_ID].filter(Boolean);
-  if (origin && (origin.startsWith('chrome-extension://') || origin.startsWith('moz-extension://'))) {
-    const extensionId = origin.replace('chrome-extension://', '').replace('moz-extension://', '');
-    if (ALLOWED_EXTENSION_IDS.length === 0 || ALLOWED_EXTENSION_IDS.includes(extensionId)) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-    } else {
-      logger.warn('Unknown extension origin rejected', { origin, extensionId });
-    }
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', 'https://kolayxport.com');
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cookie, X-Extension-Version, X-Extension-Auth');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  
+  // CORS: only kolayxport.com and the configured official extension origin are
+  // reflected (fail closed when no extension id is configured). The extension's
+  // background service worker uses host_permissions and is not subject to CORS.
+  applyExtensionCors(req, res, 'POST, OPTIONS');
+
   // Handle preflight request - don't check auth for OPTIONS
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -65,43 +54,13 @@ async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Debug: log all auth-related headers from extension
-  const authHeader = req.headers.authorization;
-  const extAuth = req.headers['x-extension-auth'];
-  const cookies = req.headers.cookie;
-  logger.info('[ext-debug] Auth headers received', {
-    hasAuthorization: !!authHeader,
-    authorizationPrefix: authHeader ? authHeader.substring(0, 30) + '...' : null,
-    hasExtensionAuth: !!extAuth,
-    extAuthPrefix: extAuth ? String(extAuth).substring(0, 30) + '...' : null,
-    hasSessionCookie: cookies?.includes('next-auth.session-token') || cookies?.includes('__Secure-next-auth.session-token') || false,
-    cookieNames: cookies ? cookies.split(';').map(c => c.trim().split('=')[0]) : [],
-    origin: req.headers.origin,
-  });
-
-  // Get user via NextAuth (cookie or Bearer token)
-  let user = await getAuthUser(req, res);
-
-  // Extension fallback: if extension sends request from chrome-extension:// origin
-  // and provides shop name in orders, look up user via EtsyShop
-  if (!user && origin && origin.startsWith('chrome-extension://')) {
-    const { orders } = req.body || {};
-    const shopName = orders?.[0]?.etsyStoreName || orders?.[0]?.shopName;
-    if (shopName) {
-      const shop = await prisma.etsyShop.findFirst({
-        where: { shopName: { equals: shopName, mode: 'insensitive' }, isActive: true },
-        select: { userId: true, user: { select: { id: true, email: true, name: true } } },
-      });
-      if (shop?.user) {
-        user = { id: shop.user.id, email: shop.user.email, name: shop.user.name };
-        logger.info('[ext-auth] Authenticated via shop name lookup', { shopName, userId: user.id });
-      }
-    }
-  }
+  // Auth: NextAuth cookie session or Bearer token issued by /api/auth/extension.
+  // There is deliberately NO fallback based on a (public) Etsy shop name.
+  const user = await getAuthUser(req, res);
 
   if (!user) {
     logger.warn('Unauthorized Etsy address sync attempt', {
-      hasExtensionAuth: !!extAuth,
+      hasAuthorization: !!req.headers.authorization,
       origin: req.headers.origin,
       userAgent: req.headers['user-agent']
     });
@@ -140,10 +99,18 @@ async function handler(
       try {
         const { orderNumber, etsyStoreId, etsyStoreName, shippingAddress, notes, shipByDate, orderDate } = addressData;
 
-        if (!orderNumber) {
+        // Must be a plain string/number: an object here would be interpreted by Prisma
+        // as a filter (e.g. { contains: '' }) and match arbitrary orders.
+        if (!orderNumber || (typeof orderNumber !== 'string' && typeof orderNumber !== 'number')) {
           results.errors.push({ orderNumber: 'missing', error: 'Order number required' });
           continue;
         }
+        if (etsyStoreId != null && typeof etsyStoreId !== 'string' && typeof etsyStoreId !== 'number') {
+          results.errors.push({ orderNumber: String(orderNumber), error: 'Invalid etsyStoreId' });
+          continue;
+        }
+        const orderNumberStr = String(orderNumber);
+        const etsyStoreIdStr = etsyStoreId != null ? String(etsyStoreId) : '';
 
         if (!shippingAddress || Object.keys(shippingAddress).length === 0) {
           results.errors.push({ orderNumber, error: 'Shipping address required' });
@@ -157,8 +124,8 @@ async function handler(
           where: {
             userId_etsyStoreId_orderNumber: {
               userId,
-              etsyStoreId: etsyStoreId || '',
-              orderNumber
+              etsyStoreId: etsyStoreIdStr,
+              orderNumber: orderNumberStr
             }
           }
         });
@@ -171,8 +138,8 @@ async function handler(
           where: {
             userId_etsyStoreId_orderNumber: {
               userId,
-              etsyStoreId: etsyStoreId || '',
-              orderNumber
+              etsyStoreId: etsyStoreIdStr,
+              orderNumber: orderNumberStr
             }
           },
           update: {
@@ -185,8 +152,8 @@ async function handler(
           },
           create: {
             userId,
-            orderNumber,
-            etsyStoreId: etsyStoreId || '',
+            orderNumber: orderNumberStr,
+            etsyStoreId: etsyStoreIdStr,
             etsyStoreName: etsyStoreName || null,
             shippingAddress: mergedAddr,
             notes: notes || null,
@@ -213,7 +180,7 @@ async function handler(
         const scrapedEmail = (shippingAddress?.email || '').trim();
         if (scrapedStreet || scrapedEmail) {
           const order = await prisma.order.findFirst({
-            where: { userId, orderNumber },
+            where: { userId, orderNumber: orderNumberStr },
             select: { id: true, shippingAddress: true, customerNote: true },
           });
           if (!order) {

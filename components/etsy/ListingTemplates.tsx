@@ -30,6 +30,7 @@ import ApplyIcon from '@mui/icons-material/PlayArrow';
 import AddIcon from '@mui/icons-material/Add';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import { whenMadeLabelKey } from '@/lib/etsy/validation';
 import { useLocale } from '@/lib/i18n/useLocale';
 
 // ---------------------------------------------------------------------------
@@ -141,13 +142,6 @@ const WHO_MADE_KEYS: Record<string, string> = {
   someone_else: 'someoneElse',
 };
 
-const WHEN_MADE_KEYS: Record<string, string> = {
-  made_to_order: 'madeToOrder',
-  '2020_2025': '2020_2025',
-  '2010_2019': '2010_2019',
-  '2004_2009': '2004_2009',
-  before_2004: 'before_2004',
-};
 
 // ===================================================================
 // SaveTemplateDialog — save current listing fields as a template
@@ -282,7 +276,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
   };
 
   const getWhenMadeLabel = (key: string) => {
-    const tKey = WHEN_MADE_KEYS[key];
+    const tKey = whenMadeLabelKey(key);
     return tKey ? tWhen(tKey) : key;
   };
 

@@ -49,7 +49,7 @@ chrome-extension/
 ├── manifest.json         # Extension configuration
 ├── src/
 │   ├── content.js       # Runs on Etsy pages
-│   ├── background.js    # Service worker
+│   ├── background-simple.js # Service worker
 │   ├── popup.html       # Extension popup
 │   ├── popup.js         # Popup logic
 │   └── popup.css        # Popup styles

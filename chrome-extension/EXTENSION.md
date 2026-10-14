@@ -29,7 +29,7 @@ The extension is built using Chrome's Manifest V3 specification, ensuring:
    - Handles dynamic content loading via MutationObserver
    - Manages local storage for duplicate prevention
 
-2. **Background Service Worker** (`src/background.js`)
+2. **Background Service Worker** (`src/background-simple.js`)
    - Manages authentication state
    - Handles cross-origin communication
    - Provides badge notifications
@@ -251,7 +251,7 @@ chrome-extension/
 ├── manifest.json          # Extension manifest (Manifest V3)
 ├── src/
 │   ├── content.js        # Content script for Etsy pages
-│   ├── background.js     # Service worker for coordination
+│   ├── background-simple.js # Service worker for coordination
 │   ├── popup.html        # Extension popup interface
 │   ├── popup.js          # Popup functionality
 │   └── popup.css         # Popup styling

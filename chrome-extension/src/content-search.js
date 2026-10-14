@@ -1,6 +1,8 @@
 /**
  * KolayXport Research — Etsy Search Results
- * Injects: summary bar (sticky) + inline data row below each listing card
+ * Summary bar (market facts from the Etsy API) + a row under each listing card with
+ * MEASURED or ESTIMATED monthly sales (see lib/etsy/listingStats.ts on the server).
+ * Everything is DOM-built; listing/shop data only ever goes into textContent.
  */
 
 (function () {
@@ -17,6 +19,7 @@
   function init() {
     const S = window.__KX_SHARED;
     const C = window.__KX_CACHE;
+    let runToken = 0;
 
     S.isOverlayEnabled().then(enabled => {
       if (!enabled) return;
@@ -35,169 +38,73 @@
     async function processSearchPage() {
       const query = S.SELECTORS.searchQuery();
       if (!query) return;
+      const myRun = ++runToken;
+      const isCurrent = () => myRun === runToken && S.SELECTORS.searchQuery() === query;
 
       const shadow = S.createOverlayContainer('kx-search-overlay', 'top');
-
       let bar = shadow.querySelector('.kx-bar');
       if (!bar) {
         bar = document.createElement('div');
         bar.className = 'kx-bar';
         shadow.appendChild(bar);
       }
-      bar.innerHTML = `<span style="opacity:0.8">${S.t('loading')}</span>`;
+      bar.textContent = '';
+      bar.appendChild(S.el('span', null, S.t('loading'), 'opacity:0.8'));
 
-      const listingIds = extractListingIds();
+      let summary = null;
+      try {
+        const data = await C.getOrFetch(`search2:${query}`, 'search', () => S.apiCall('search_enrich', { query }));
+        if (!isCurrent()) return;
+        summary = data?.summary || null;
+        if (summary) renderSummaryBar(bar, summary, query);
+      } catch (err) {
+        bar.textContent = '';
+        bar.appendChild(S.el('span', null, (err && err.message) || S.t('loadFailed'), 'opacity:0.7'));
+      }
 
       try {
-        const data = await C.getOrFetch(
-          `search:${query}`,
-          'search',
-          () => S.apiCall('search_enrich', { query, listingIds: listingIds.slice(0, 48) })
-        );
-
-        if (!data?.summary) return;
-        renderSummaryBar(shadow, bar, data.summary, query);
-        if (data.listingBadges) {
-          injectDataRows(data.listingBadges, data.summary.avgPrice);
+        const ids = S.pageListingIds().slice(0, 96);
+        if (ids.length) {
+          await S.loadCardStats(ids, summary ? { price: summary.avgPrice, currency: summary.currency } : null, isCurrent);
         }
-      } catch (err) {
-        bar.innerHTML = `<span style="opacity:0.7">${err.message || S.t('loadFailed')}</span>`;
-      }
+      } catch (_) { /* per-card rows are best-effort */ }
     }
 
-    function extractListingIds() {
-      const ids = [];
-      document.querySelectorAll('a[href*="/listing/"]').forEach(link => {
-        const match = link.href.match(/\/listing\/(\d+)/);
-        if (match && !ids.includes(match[1])) ids.push(match[1]);
-      });
-      return ids;
+    function item(label, value, valueStyle) {
+      const wrap = S.el('div', 'kx-bar-item');
+      wrap.appendChild(S.el('span', 'kx-bar-label', label));
+      wrap.appendChild(S.el('span', 'kx-bar-value', value, valueStyle));
+      return wrap;
     }
 
-    function renderSummaryBar(shadow, bar, summary, query) {
+    function renderSummaryBar(bar, summary, query) {
       const compColor = S.competitionColor(summary.competition);
       const compLabel = summary.competition === 'low' ? S.t('compLow') : summary.competition === 'medium' ? S.t('compMed') : S.t('compHigh');
+      const money = (n) => summary.currency ? S.formatMoney(n, summary.currency) : S.formatPrice(n);
 
-      bar.innerHTML = `
-        <div style="display:flex;align-items:center;gap:4px;font-weight:700;">
-          <span style="font-size:10px;background:rgba(255,255,255,0.2);padding:2px 6px;border-radius:4px;">KX</span>
-          "${query}"
-        </div>
-        <div class="kx-bar-divider"></div>
-        <div class="kx-bar-item">
-          <span class="kx-bar-label">${S.t('result')}</span>
-          <span class="kx-bar-value">${S.formatNum(summary.totalResults)}</span>
-        </div>
-        <div class="kx-bar-divider"></div>
-        <div class="kx-bar-item">
-          <span class="kx-bar-label">${S.t('avgPrice')}</span>
-          <span class="kx-bar-value">${S.formatPrice(summary.avgPrice)}</span>
-        </div>
-        <div class="kx-bar-item">
-          <span class="kx-bar-label">${S.t('range')}</span>
-          <span class="kx-bar-value" style="font-size:12px">${S.formatPrice(summary.minPrice)} - ${S.formatPrice(summary.maxPrice)}</span>
-        </div>
-        <div class="kx-bar-divider"></div>
-        ${summary.estMarketRevenue ? `
-          <div class="kx-bar-item">
-            <span class="kx-bar-label">${S.t('estMktRevenue')}</span>
-            <span class="kx-bar-value" style="color:#4caf50;">$${S.formatNum(summary.estMarketRevenue)}</span>
-          </div>
-          <div class="kx-bar-divider"></div>
-        ` : ''}
-        <div class="kx-bar-item">
-          <span class="kx-bar-label">${S.t('avgFav')}</span>
-          <span class="kx-bar-value">${S.formatNum(summary.avgFavorites)}</span>
-        </div>
-        <div class="kx-bar-item">
-          <span class="kx-bar-label">${S.t('shops')}</span>
-          <span class="kx-bar-value">${summary.uniqueShops}</span>
-        </div>
-        <div class="kx-bar-divider"></div>
-        <div class="kx-bar-item">
-          <span class="kx-bar-label">${S.t('competition')}</span>
-          <span class="kx-bar-value" style="color:${compColor}">${compLabel}</span>
-        </div>
-        <div style="margin-left:auto;">
-          <a href="${S.API_BASE}/app/etsy-research" target="_blank" class="kx-btn kx-btn-sm" style="background:rgba(255,255,255,0.2);text-decoration:none;color:#fff;">
-            ${S.t('fullAnalysis')}
-          </a>
-        </div>
-      `;
-    }
+      bar.textContent = '';
+      const title = S.el('div', null, null, 'display:flex;align-items:center;gap:4px;font-weight:700;');
+      title.appendChild(S.el('span', null, 'KX', 'font-size:10px;background:rgba(255,255,255,0.2);padding:2px 6px;border-radius:4px;'));
+      title.appendChild(S.el('span', null, '"' + query + '"'));
+      bar.appendChild(title);
+      bar.appendChild(S.el('div', 'kx-bar-divider'));
+      bar.appendChild(item(S.t('result'), S.formatNum(summary.totalResults)));
+      bar.appendChild(S.el('div', 'kx-bar-divider'));
+      bar.appendChild(item(S.t('avgPrice'), money(summary.avgPrice)));
+      bar.appendChild(item(S.t('range'), money(summary.minPrice) + ' - ' + money(summary.maxPrice), 'font-size:12px'));
+      bar.appendChild(S.el('div', 'kx-bar-divider'));
+      bar.appendChild(item(S.t('avgFav'), S.formatNum(summary.avgFavorites)));
+      bar.appendChild(item(S.t('shops'), String(summary.uniqueShops)));
+      bar.appendChild(S.el('div', 'kx-bar-divider'));
+      bar.appendChild(item(S.t('competition'), compLabel, 'color:' + compColor));
 
-    function injectDataRows(badges, avgPrice) {
-      const ranks = S.computeBestSellerRanks(badges);
-      const links = document.querySelectorAll('a[href*="/listing/"]');
-      const processed = new Set();
-
-      links.forEach(link => {
-        const match = link.href.match(/\/listing\/(\d+)/);
-        if (!match || processed.has(match[1])) return;
-        processed.add(match[1]);
-
-        const id = match[1];
-        const badge = badges[id];
-        if (!badge) return;
-
-        const card = link.closest('[data-listing-id]') ||
-                     link.closest('[data-listing-card-v2]') ||
-                     link.closest('.v2-listing-card') ||
-                     link.closest('.listing-link') ||
-                     link.closest('.wt-grid__item-xs-6') ||
-                     link.closest('[class*="listing-card"]') ||
-                     link.parentElement?.parentElement || link.parentElement;
-        if (!card || card.querySelector('.kx-data-row')) return;
-
-        const rank = ranks[id];
-        const priceDiff = S.priceVsAvg(badge.price, avgPrice);
-        const est = badge.estMonthlySales || 0;
-        const revenue = badge.estMonthlyRevenue || 0;
-        const demand = badge.demandScore || 'low';
-
-        const parts = [];
-
-        // Estimated monthly sales
-        parts.push(`<span class="${S.salesColor(est)}" style="font-weight:700;">~${est}${S.t('perMonth')}</span>`);
-        parts.push('<span class="kx-sep">·</span>');
-
-        // Estimated revenue
-        if (revenue > 0) {
-          parts.push(`<span class="kx-green" style="font-weight:700;">$${S.formatNum(revenue)}${S.t('perMonth')}</span>`);
-          parts.push('<span class="kx-sep">·</span>');
-        }
-
-        // Demand indicator
-        const dl = S.demandLabel(demand);
-        parts.push(`<span class="${dl.cssClass}">${dl.text}</span>`);
-        parts.push('<span class="kx-sep">·</span>');
-
-        // Reviews + Favorites
-        if (badge.reviewCount > 0) {
-          parts.push(`<span>★ ${S.formatNum(badge.reviewCount)}</span>`);
-          parts.push('<span class="kx-sep">·</span>');
-        }
-        parts.push(`<span>♥ ${S.formatNum(badge.favorites || 0)}</span>`);
-        parts.push('<span class="kx-sep">·</span>');
-        parts.push(`<span>👁 ${S.formatNum(badge.views || 0)}</span>`);
-
-        // Low stock signal
-        if (badge.lowStock) {
-          parts.push('<span class="kx-sep">·</span>');
-          parts.push(`<span class="kx-red" style="font-weight:700;">${S.t('lowStock')}</span>`);
-        }
-
-        // Price vs avg
-        if (priceDiff) {
-          parts.push('<span class="kx-sep">·</span>');
-          parts.push(`<span class="${priceDiff.cssClass}">${priceDiff.text}</span>`);
-        }
-
-        const row = document.createElement('div');
-        row.className = 'kx-data-row';
-        row.innerHTML = parts.join('');
-        card.appendChild(row);
-      });
+      const right = S.el('div', null, null, 'margin-left:auto;');
+      const link = S.el('a', 'kx-btn kx-btn-sm', S.t('fullAnalysis'), 'background:rgba(255,255,255,0.2);text-decoration:none;color:#fff;');
+      link.href = S.API_BASE + '/app/etsy-research';
+      link.target = '_blank';
+      link.rel = 'noopener';
+      right.appendChild(link);
+      bar.appendChild(right);
     }
   }
 })();

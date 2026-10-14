@@ -54,7 +54,11 @@ vi.mock('@/lib/prisma', () => ({
       findMany: (...a: any[]) => shopifyFindMany(...a),
     },
     syncOperation: { groupBy: (...a: any[]) => syncOpGroupBy(...a) },
-    webhookEvent: { findMany: (...a: any[]) => webhookFindMany(...a) },
+    webhookEvent: {
+      findMany: (...a: any[]) => webhookFindMany(...a),
+      groupBy: async () => [],
+      findFirst: async () => null,
+    },
     cronLock: { findMany: (...a: any[]) => cronLockFindMany(...a) },
     $queryRaw: (...a: any[]) => queryRaw(...a),
   },

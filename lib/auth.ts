@@ -1,5 +1,5 @@
 import { getServerSession } from 'next-auth';
-import { decode } from 'next-auth/jwt';
+import { decode, encode } from 'next-auth/jwt';
 import { NextApiRequest, NextApiResponse } from 'next';
 import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
@@ -13,6 +13,9 @@ import { credentialsAuthorize } from '@/lib/auth/credentials';
 // We wrap it to prevent it from interfering with CredentialsProvider sign-in,
 // which is a known NextAuth issue when combining adapter + credentials + JWT strategy.
 const prismaAdapter = PrismaAdapter(prisma);
+
+/** Claim that marks a JWT as an extension Bearer token. */
+const EXTENSION_TOKEN_CLAIM = 'kx_ext';
 
 export const authOptions = {
   adapter: prismaAdapter,
@@ -68,6 +71,12 @@ export const authOptions = {
       return true;
     },
     async jwt({ token, user }: any) {
+      // Extension tokens are short-lived Bearer credentials. Never let one be
+      // replayed as a session cookie: NextAuth would re-issue it as a rolling
+      // 30-day session and bypass its expiry/revocation checks.
+      if (token?.[EXTENSION_TOKEN_CLAIM]) {
+        return {};
+      }
       if (user) {
         token.sub = user.id;
       }
@@ -87,14 +96,23 @@ export const authOptions = {
  * Supports: cookie-based session (browser) and Authorization: Bearer (extension/API).
  * Returns { id, email, name } or null if not authenticated.
  */
-export async function getAuthUser(req: NextApiRequest, res: NextApiResponse) {
+export async function getAuthUser(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  opts: { allowBearer?: boolean } = {},
+) {
   // 1. Try cookie-based NextAuth session (normal browser requests)
   const session = await getServerSession(req, res, authOptions);
   if (session?.user?.id) {
     return { id: session.user.id, email: session.user.email, name: session.user.name };
   }
 
-  // 2. Try Authorization: Bearer token (Chrome extension / API clients)
+  if (opts.allowBearer === false) return null;
+
+  // 2. Try Authorization: Bearer token (Chrome extension).
+  //    Only tokens minted by createExtensionToken() are accepted here, and the
+  //    user is re-checked against the DB on every request (deleted users and
+  //    password changes revoke outstanding extension tokens).
   const authHeader = req.headers.authorization;
   const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
   // Also check X-Extension-Auth header
@@ -103,13 +121,20 @@ export async function getAuthUser(req: NextApiRequest, res: NextApiResponse) {
 
   if (token && token !== 'session-detected') {
     try {
-      // Decode NextAuth JWT (encrypted with NEXTAUTH_SECRET)
+      // Decode NextAuth JWT (encrypted with NEXTAUTH_SECRET). decode() rejects
+      // tokens past their `exp`.
       const decoded = await decode({
         token,
         secret: process.env.NEXTAUTH_SECRET!,
       });
-      if (decoded?.sub) {
-        return { id: decoded.sub, email: decoded.email as string, name: decoded.name as string };
+      if (decoded?.sub && decoded[EXTENSION_TOKEN_CLAIM]) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: decoded.sub },
+          select: { id: true, email: true, name: true, password: true },
+        });
+        if (!dbUser) return null;
+        if (decoded.kx_fp !== extensionTokenFingerprint(dbUser.id, dbUser.password)) return null;
+        return { id: dbUser.id, email: dbUser.email, name: dbUser.name };
       }
     } catch {
       // Token is not a valid NextAuth JWT — ignore
@@ -117,6 +142,50 @@ export async function getAuthUser(req: NextApiRequest, res: NextApiResponse) {
   }
 
   return null;
+}
+
+/**
+ * Extension Bearer token lifetime. The extension caches tokens client-side for
+ * up to 7 days (AUTH_TOKEN_MAX_AGE_MS in background-simple.js) and re-fetches a
+ * fresh one every time a kolayxport.com tab becomes visible, so 7 days matches
+ * its cache window without breaking it, while being far shorter than the
+ * previous 30-day full-session token.
+ */
+export const EXTENSION_TOKEN_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
+
+/**
+ * Fingerprint bound into extension tokens. Changes when the user's password
+ * hash changes, which revokes every outstanding extension token for that user.
+ */
+function extensionTokenFingerprint(userId: string, passwordHash: string | null | undefined): string {
+  return crypto
+    .createHmac('sha256', process.env.NEXTAUTH_SECRET || '')
+    .update(`kx-ext-v1:${userId}:${passwordHash || ''}`)
+    .digest('hex')
+    .slice(0, 32);
+}
+
+/**
+ * Mint a short-lived Bearer token for the Chrome extension. Not usable as a
+ * session cookie (see jwt callback) and only accepted by getAuthUser's Bearer path.
+ */
+export async function createExtensionToken(userId: string): Promise<string | null> {
+  const dbUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, name: true, password: true },
+  });
+  if (!dbUser) return null;
+  return encode({
+    token: {
+      sub: dbUser.id,
+      email: dbUser.email,
+      name: dbUser.name,
+      [EXTENSION_TOKEN_CLAIM]: 1,
+      kx_fp: extensionTokenFingerprint(dbUser.id, dbUser.password),
+    },
+    secret: process.env.NEXTAUTH_SECRET!,
+    maxAge: EXTENSION_TOKEN_MAX_AGE_SECONDS,
+  });
 }
 
 /**

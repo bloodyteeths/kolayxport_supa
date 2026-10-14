@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { isUsageLimitError } from '@/lib/notify';
 import { Drawer, Box, Typography, IconButton, TextField, Select, MenuItem, FormControl, InputLabel, Button, Alert, Chip, Autocomplete, Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import CloseIcon from '@mui/icons-material/Close';
@@ -8,6 +9,9 @@ import { useAuth } from '@/lib/auth-context';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { useLocale } from '@/lib/i18n/useLocale';
+import CopyButton from '@/components/ui/CopyButton';
+import PrintLabelButton from '@/components/labels/PrintLabelButton';
+import { openLabelUrl, isOpenableLabelUrl } from '@/components/labels/labelLinks';
 
 // Check if an order has existing successful shipments (labels)
 function hasExistingLabel(order: any): boolean {
@@ -552,6 +556,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
   const [success, setSuccess] = useState(false);
   const { user }: { user: any } = useAuth();
   const [labelUrl, setLabelUrl] = useState<string | null>(null);
+  const [createdTrackingNumber, setCreatedTrackingNumber] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (order) {
@@ -559,6 +564,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
       setSuccess(false);
       setError(null);
       setLabelUrl(null);
+      setCreatedTrackingNumber(null);
       setSaving(false);
       
       const orderValue = order?.orderTotalPrice || 0;
@@ -612,6 +618,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
       setSuccess(false);
       setError(null);
       setLabelUrl(null);
+      setCreatedTrackingNumber(null);
       setSaving(false);
     }
   }, [open]);
@@ -657,6 +664,9 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // The drawer stays open after a label is created and the `order` snapshot's
+    // shipments do not refresh, so block a duplicate create (Enter key too).
+    if (success || saving) return;
     setSaving(true);
     setError(null);
     setSuccess(false);
@@ -746,23 +756,20 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
         await onSaved();
       }
       
-      // Handle label URL after parent has had a chance to update
-      if (data.labelUrl) {
-        if (data.labelUrl.startsWith('data:image/')) {
-          setLabelUrl(data.labelUrl);
-        } else {
-          // Small delay to ensure the parent has time to update
-          setTimeout(() => {
-            window.open(data.labelUrl, '_blank', 'noopener,noreferrer');
-            onClose();
-          }, 500);
+      // Keep the drawer open with the label + tracking number. A window.open
+      // after these awaits is killed by popup blockers, so the user always gets
+      // an "Open / print label" button; a non-image URL is still tried once.
+      setCreatedTrackingNumber(data.trackingNumber || null);
+      if (isOpenableLabelUrl(data.labelUrl)) {
+        setLabelUrl(data.labelUrl);
+        if (!data.labelUrl.startsWith('data:image/')) {
+          openLabelUrl(data.labelUrl, `ups-${order?.orderNumber || 'label'}`);
         }
-      } else {
-        onClose();
       }
     } catch (err: any) {
-      setError(err.message || 'UPS label creation failed');
       setSaving(false);
+      if (isUsageLimitError(err)) return;
+      setError(err.message || 'UPS label creation failed');
     }
   };
 
@@ -1204,15 +1211,32 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
             </Accordion>
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
             {success && <Alert severity="success" sx={{ mb: 2 }}>{t('labelSavedSuccess')}</Alert>}
-            <Button type="submit" variant="contained" color="primary" fullWidth disabled={saving || (!!order && hasExistingLabel(order))}>{saving ? t('saving') : (order && hasExistingLabel(order) ? t('deleteExistingLabel') : t('save'))}</Button>
+            <Button type="submit" variant="contained" color="primary" fullWidth disabled={saving || success || (!!order && hasExistingLabel(order))}>{saving ? t('saving') : (order && hasExistingLabel(order) ? t('deleteExistingLabel') : t('save'))}</Button>
           </form>
-          {labelUrl && (
+          {(labelUrl || createdTrackingNumber) && (
             <Box mt={2} textAlign="center">
               <Typography variant="subtitle1" gutterBottom>{t('upsLabel')}</Typography>
-              <img src={labelUrl} alt="UPS Label" style={{ maxWidth: '100%', border: '1px solid #ccc', marginBottom: 8 }} />
-              <a href={labelUrl} download="ups-label.gif">
-                <Button variant="outlined" color="primary">{t('downloadLabel')}</Button>
-              </a>
+              {createdTrackingNumber && (
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+                  <Typography variant="body2">
+                    {t('trackingNumber')}: <strong style={{ fontFamily: 'monospace' }}>{createdTrackingNumber}</strong>
+                  </Typography>
+                  <CopyButton value={createdTrackingNumber} label={t('trackingNumber')} />
+                </Box>
+              )}
+              {labelUrl && labelUrl.startsWith('data:image/') && (
+                <img src={labelUrl} alt={t('upsLabel')} style={{ maxWidth: '100%', border: '1px solid #ccc', marginBottom: 8 }} />
+              )}
+              {labelUrl && (
+                <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <PrintLabelButton url={labelUrl} label={t('openPrintLabel')} variant="contained" filename={`ups-${order?.orderNumber || 'label'}`} />
+                  {labelUrl.startsWith('data:') && (
+                    <Button component="a" href={labelUrl} download={`ups-${order?.orderNumber || 'label'}.gif`} variant="outlined" color="primary" sx={{ minHeight: { xs: 44, md: 32 } }}>
+                      {t('downloadLabel')}
+                    </Button>
+                  )}
+                </Box>
+              )}
             </Box>
           )}
         </Box>

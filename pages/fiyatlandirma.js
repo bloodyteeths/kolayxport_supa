@@ -52,7 +52,7 @@ export default function FiyatlandirmaPage() {
         if (!res.ok) return;
         const data = await res.json().catch(() => null);
         if (!cancelled && data?.subscription?.billingProvider === 'shopify_free') {
-          router.replace('/ayarlar');
+          router.replace('/ayarlar?tab=billing');
         }
       } catch { /* fail open — public visitors still see the page */ }
     })();

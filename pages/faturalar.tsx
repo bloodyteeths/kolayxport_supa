@@ -67,7 +67,7 @@ export default function FaturalarPage() {
         if (res.ok) {
           const data = await res.json().catch(() => null);
           if (!cancelled && data?.subscription?.billingProvider === 'shopify_free') {
-            router.replace('/ayarlar');
+            router.replace('/ayarlar?tab=billing');
             return;
           }
         }

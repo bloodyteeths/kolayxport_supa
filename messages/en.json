@@ -95,7 +95,14 @@
     "noNotifications": "No new notifications.",
     "notifications": "Notifications",
     "messages": "Messages",
-    "invoices": "Invoices"
+    "invoices": "Invoices",
+    "research": "Research",
+    "connectStore": "Connect a store",
+    "pinSidebar": "Keep menu open",
+    "unpinSidebar": "Unpin menu",
+    "reauthNeeded": "A connection needs to be re-authorized",
+    "closeMenu": "Close menu",
+    "toggleMenu": "Toggle navigation menu"
   },
   "manualOrder": {
     "addButton": "Add Manual Order",
@@ -798,7 +805,32 @@
     "integrationOptions": {
       "all": "All"
     },
-    "shippingUpgradeTooltip": "Buyer paid for the {upgrade} shipping upgrade"
+    "shippingUpgradeTooltip": "Buyer paid for the {upgrade} shipping upgrade",
+    "buyerName": "Buyer name",
+    "etgbStarting": "Starting ETGB for {count} orders...",
+    "etgbSentTo": "ETGB file sent to {email}",
+    "deleteOrderTitle": "Delete order #{orderNumber}?",
+    "deleteOrderDescription": "The order and its labels are removed from KolayXport only. Nothing changes on the marketplace, and a later sync may bring the order back.",
+    "deleteOrderAction": "Delete order",
+    "selectOrdersForEtgb": "Select orders with the checkboxes first",
+    "searchTypeLabel": "Search in",
+    "filters": "Filters",
+    "showResults": "Show {count} orders",
+    "labelReadyTitle": "Label created for #{orderNumber}",
+    "openPrintLabel": "Open / print label",
+    "printLabel": "Print label",
+    "labelOpenFailed": "The label could not be opened",
+    "selectOrder": "Select order {orderNumber}",
+    "copyAddress": "Copy address",
+    "addressCopied": "Address copied",
+    "addressFormatMenu": "Choose address format",
+    "addressFormatIntl": "International format",
+    "addressFormatTr": "Turkish format",
+    "selectPage": "Select page",
+    "selectedCount": "{count} selected",
+    "copyAddressesTsv": "Copy addresses (TSV)",
+    "addressesCopied": "{count} addresses copied",
+    "clearSelection": "Clear"
   },
   "ups": {
     "drawerTitle": "Create UPS Label",
@@ -915,7 +947,9 @@
     "saving": "Saving...",
     "downloadLabel": "Download Label",
     "save": "Save",
-    "deleteExistingLabel": "Delete Existing Label"
+    "deleteExistingLabel": "Delete Existing Label",
+    "trackingNumber": "Tracking number",
+    "openPrintLabel": "Open / print label"
   },
   "mng": {
     "drawerTitle": "Create MNG Kargo Label",
@@ -953,7 +987,11 @@
     "existingLabel": "A label already exists for this order.",
     "missingFields": "Name, phone, city, district and address are required.",
     "trackingNumber": "Tracking Number",
-    "mngLabel": "MNG"
+    "mngLabel": "MNG",
+    "openPrintLabel": "Open / print label",
+    "barcode": "Barcode",
+    "downloadLabel": "Download label",
+    "labelNotReturned": "MNG did not return a label file yet. You can print it later from the MNG portal or this order."
   },
   "settings": {
     "pageTitle": "Settings",
@@ -1147,7 +1185,40 @@
     "etsyTrackingReconnect": "Reconnect shop for tracking automation",
     "etsyTrackingReconnectDesc": "Etsy tracking automation is now active! However, shops connected before this feature need to be reconnected via \"Connect New Shop\" to grant the required permissions.",
     "etsyApiLimited": "Etsy API Restriction",
-    "etsyApiLimitedDesc": "Etsy does not grant tracking and address API access to new integrators. Use the KolayXport Chrome extension or Etsy seller dashboard to enter tracking numbers."
+    "etsyApiLimitedDesc": "Etsy does not grant tracking and address API access to new integrators. Use the KolayXport Chrome extension or Etsy seller dashboard to enter tracking numbers.",
+    "connect": "Connect",
+    "lastSyncAgo": "Last sync {time}",
+    "shopIdLabel": "Shop ID: {id}",
+    "reauthNeeded": "Reconnect needed",
+    "reauthHint": "Access to {provider} has expired. Reconnect to resume syncing.",
+    "disconnectKeepsData": "Orders and listings stay in KolayXport; reconnect anytime.",
+    "connectionsLoadFailed": "Couldn't load your connections",
+    "amazonDetailsLoadFailed": "Couldn't load Amazon marketplaces",
+    "wixWaiting": "Waiting for the Wix installation to finish…",
+    "wixPollTimedOut": "Didn't finish installing on Wix?",
+    "wixPollTimedOutDesc": "We stopped checking. Finish the install in the Wix tab, then retry.",
+    "wixCheckAgain": "Retry",
+    "wixOpenInstallAgain": "Open Wix install again",
+    "oauth": {
+      "connectedGeneric": "{provider} connected successfully!",
+      "failedGeneric": "{provider} connection failed. Please try again.",
+      "unknownSuccess": "Connection completed.",
+      "unknownFailed": "The connection couldn't be completed. Please try again.",
+      "securityCheckFailed": "{provider} connection couldn't be verified. Please start the connection again from this page.",
+      "missingParams": "{provider} didn't return the required details. Please try connecting again.",
+      "shopifyTokenType": "Shopify returned an unsupported access token. Please try connecting again; contact support if it keeps happening.",
+      "shopifyInstallComplete": "Your Shopify store is installed and connected. Welcome to KolayXport!"
+    },
+    "defaultShippingChargesPayment": "Default Shipping Charges Payment Type",
+    "paymentParty": {
+      "SENDER": "Sender",
+      "RECIPIENT": "Recipient",
+      "THIRD_PARTY": "Third Party"
+    },
+    "shippingChargesParty": {
+      "SENDER": "Sender (Default)",
+      "RECIPIENT": "Recipient (Collect)"
+    }
   },
   "fedex": {
     "currencies": {
@@ -1537,7 +1608,25 @@
       "videoHeading": "Video",
       "scale": "Scale",
       "pendingName": "{name} (pending)",
-      "pendingReturnPolicy": "Pending return policy"
+      "pendingReturnPolicy": "Pending return policy",
+      "closeConfirm": {
+        "descriptionLost": "Your edits could not be saved on this device and will be lost if you leave now.",
+        "title": "Leave without saving the draft?",
+        "description": "Your edits stay on this device and come back when you reopen this listing. They are not in your draft or on Etsy until you save the draft and sync.",
+        "leave": "Leave",
+        "keepEditing": "Keep editing",
+        "back": "Back"
+      },
+      "saveStatus": {
+        "unsaved": "Not saved yet",
+        "unsavedHint": "Your latest edits will be saved on this device in a moment.",
+        "device": "Saved on this device · not on Etsy",
+        "deviceHint": "Edits are kept only in this browser. Save the draft, then sync to send them to Etsy.",
+        "draft": "Draft saved · not on Etsy",
+        "draftHint": "Your changes are in a KolayXport draft. Use Sync to Etsy to make them live.",
+        "error": "Autosave failed",
+        "errorHint": "Your latest edits could not be saved on this device. Save the draft to keep them."
+      }
     },
     "countries": {
       "TR": "Turkey",
@@ -3185,7 +3274,22 @@
       "aiImageWhiteBg": "Plain white background (main product shot)",
       "syncingToEtsy": "Creating your listing on Etsy...",
       "publishedOnEtsy": "Listing created and published on Etsy.",
-      "publishSyncFailed": "Saved as a draft, but Etsy rejected it: {error} Fix it and retry from the listings page."
+      "publishSyncFailed": "Saved as a draft, but Etsy rejected it: {error} Fix it and retry from the listings page.",
+      "restore": {
+        "replacedByEdit": "Started a new listing. The earlier unsaved listing will be replaced.",
+        "title": "Restore unsaved listing?",
+        "body": "You have a listing you didn't finish on this device. Photos aren't kept, so you'll need to add them again.",
+        "bodyWithTitle": "You didn't finish \"{title}\" on this device. Photos aren't kept, so you'll need to add them again.",
+        "restore": "Restore",
+        "discard": "Start fresh",
+        "restored": "Unsaved listing restored"
+      },
+      "closeConfirm": {
+        "title": "Close this listing?",
+        "description": "Your text and settings stay on this device, and you can restore them next time. Nothing is sent to Etsy.",
+        "descriptionWithPhotos": "Your text and settings stay on this device, and you can restore them next time. The photos you added are not kept. Nothing is sent to Etsy.",
+        "keepEditing": "Keep editing"
+      }
     },
     "seo": {
       "seoScore": "SEO Score",
@@ -5199,7 +5303,14 @@
       "conditionUsedExcellent": "Used",
       "conditionUsedVeryGood": "Used — Very Good",
       "conditionUsedGood": "Used — Good",
-      "conditionUsedAcceptable": "Used — Acceptable"
+      "conditionUsedAcceptable": "Used — Acceptable",
+      "closeConfirm": {
+        "title": "Discard unsaved changes?",
+        "description": "Your edits haven't been saved to a draft yet. If you close now, they will be lost.",
+        "discard": "Discard changes",
+        "keepEditing": "Keep editing",
+        "close": "Close"
+      }
     },
     "financial": {
       "revenueCalculator": "Revenue Calculator",
@@ -5929,7 +6040,30 @@
     "advancedPlan": "Advanced: 3 marketplaces + 2 carriers",
     "proPlan": "Professional: Unlimited",
     "payWithIyzico": "Pay with iyzico",
-    "statusUnknown": "Unknown Status"
+    "statusUnknown": "Unknown Status",
+    "setup": {
+      "dismiss": "Hide setup checklist",
+      "title": "Get started with KolayXport",
+      "subtitle": "Three quick steps to start managing orders and labels.",
+      "progress": "{done} of {total} done",
+      "done": "Done",
+      "connect": {
+        "title": "Connect a store",
+        "desc": "Link Etsy, eBay, Amazon, Shopify, Wix or Trendyol to bring in your orders and listings.",
+        "cta": "Connect"
+      },
+      "sync": {
+        "title": "Sync your orders",
+        "desc": "Pull in your latest orders so you can create shipping labels.",
+        "cta": "Go to orders"
+      },
+      "sender": {
+        "title": "Set your sender address",
+        "desc": "Your return address is printed on every shipping label.",
+        "cta": "Add address"
+      }
+    },
+    "subscriptionActivated": "Your subscription is now active!"
   },
   "sync": {
     "pageTitle": "Synchronization",
@@ -6146,7 +6280,8 @@
     "ebayUrlPlaceholder": "https://www.ebay.com/itm/123456789 or 123456789",
     "topRated": "Top Rated",
     "addDialogCancel": "Cancel",
-    "addDialogAdd": "Add"
+    "addDialogAdd": "Add",
+    "chromeStoreComing": "The Chrome Web Store listing is coming soon. Until then, contact <support>support</support> for the latest version, and manage your stores in <settings>Settings → Connections</settings>."
   },
   "public": {
     "closeSidebar": "Close sidebar",
@@ -8577,6 +8712,43 @@
         "text": "We can build solutions tailored to your needs. Get in touch with us.",
         "button": "Contact Us"
       }
+    }
+  },
+  "ui": {
+    "copy": {
+      "copy": "Copy",
+      "copyLabel": "Copy {label}",
+      "copied": "Copied to clipboard",
+      "copiedLabel": "{label} copied",
+      "copiedShort": "Copied",
+      "failed": "Couldn't copy. Please select and copy manually.",
+      "nothingToCopy": "Nothing to copy"
+    },
+    "confirm": {
+      "andMore": "and {count} more",
+      "typeToConfirm": "Type <b>{text}</b> to confirm",
+      "typeToConfirmAria": "Confirmation text"
+    },
+    "errorState": {
+      "title": "Couldn't load this data",
+      "message": "Something went wrong while loading. Please try again."
+    },
+    "notify": {
+      "network": "Network error. Check your connection and try again."
+    },
+    "limit": {
+      "trialTitle": "Trial limit reached",
+      "planTitle": "Plan limit reached",
+      "noSubscriptionTitle": "Your subscription isn't active",
+      "invalidPlanTitle": "Subscription problem",
+      "labelMessage": "You can't create more shipping labels on your current plan. Upgrade to continue.",
+      "orderSyncMessage": "You can't sync more orders on your current plan. Upgrade to continue.",
+      "noSubscriptionMessage": "Choose a plan to keep syncing orders and creating labels.",
+      "invalidPlanMessage": "We couldn't find your plan. Please contact support.",
+      "neutralMessage": "This action is currently unavailable for your account. Please contact support.",
+      "usage": "{used} / {limit}",
+      "resetsOn": "Usage resets on {date}",
+      "contactSupport": "Contact support"
     }
   }
 }

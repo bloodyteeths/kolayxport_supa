@@ -156,7 +156,7 @@ export default function EntegrasyonlarPage() {
                 </div>
                 <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 text-right">
                   <a
-                    href="/ayarlar"
+                    href={['etsy', 'ebay', 'amazon', 'wix', 'shopify'].includes(integration.key) ? '/ayarlar?tab=connections' : ['trendyol', 'veeqo', 'ups', 'fedex', 'mng', 'shippo'].includes(integration.key) ? '/ayarlar?tab=apiKeys' : '/ayarlar'}
                     className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline">
                     {t('detailsLink')}
                   </a>

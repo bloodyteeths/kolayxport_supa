@@ -5,7 +5,9 @@ export default function SettingsRedirect() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/ayarlar');
+    if (!router.isReady) return;
+    const tab = typeof router.query.tab === 'string' ? `?tab=${encodeURIComponent(router.query.tab)}` : '';
+    router.replace(`/ayarlar${tab}`);
   }, [router]);
 
   return null;

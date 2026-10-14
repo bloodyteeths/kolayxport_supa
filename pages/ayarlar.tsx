@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Container, Box, Paper, Tabs, Tab, Alert, CircularProgress, Typography } from '@mui/material';
 import CreditCardIcon from '@mui/icons-material/CreditCard';
 import StorefrontIcon from '@mui/icons-material/Storefront';
@@ -12,6 +12,8 @@ import { useLocale } from '@/lib/i18n/useLocale';
 import AppLayout from '../components/AppLayout';
 import PageHeader from '@/components/ui/PageHeader';
 import { useSettings } from '@/lib/hooks/useSettings';
+import { useConnections } from '@/lib/hooks/useConnections';
+import { sanitizeMessage } from '@/lib/notify';
 import BillingPanel from '@/components/settings/BillingPanel';
 import ConnectionsPanel from '@/components/settings/ConnectionsPanel';
 import ApiKeysPanel from '@/components/settings/ApiKeysPanel';
@@ -19,13 +21,36 @@ import SenderProfilePanel from '@/components/settings/SenderProfilePanel';
 import SyncPanel from '@/components/settings/SyncPanel';
 import SettingsSaveBar from '@/components/settings/SettingsSaveBar';
 
-const TAB_KEYS = ['billing', 'connections', 'apiKeys', 'senderProfile', 'syncAdvanced'] as const;
+// Connections is the default (first) tab; every tab stays deep-linkable via ?tab=<key>.
+const TAB_KEYS = ['connections', 'billing', 'apiKeys', 'senderProfile', 'syncAdvanced'] as const;
+type TabKey = typeof TAB_KEYS[number];
+const DEFAULT_TAB: TabKey = 'connections';
+const isTabKey = (v: unknown): v is TabKey => typeof v === 'string' && (TAB_KEYS as readonly string[]).includes(v);
 
-// Toast wrapper so OAuth-callback handling can pass a severity.
-function toast(message: string, severity: 'success' | 'error' | 'info' = 'info') {
-  if (severity === 'success') hotToast.success(message);
-  else if (severity === 'error') hotToast.error(message);
-  else hotToast(message, { icon: 'ℹ️' });
+// Tabs that render from the /api/user/settings payload. The others render immediately.
+const SETTINGS_TABS: readonly TabKey[] = ['billing', 'apiKeys', 'senderProfile'];
+
+// OAuth callbacks redirect here with ?success=<provider>_<x> or ?error=<provider>_<x>[&details=].
+const PROVIDER_NAMES: Record<string, string> = {
+  etsy: 'Etsy', ebay: 'eBay', amazon: 'Amazon', shopify: 'Shopify', wix: 'Wix',
+  trendyol: 'Trendyol', hepsiburada: 'Hepsiburada',
+};
+// Existing per-provider messages in the `settings` namespace.
+const PROVIDER_SUCCESS_KEY: Record<string, string> = {
+  etsy: 'etsyShopConnected', ebay: 'ebayConnectedSuccess', amazon: 'amazonConnectedSuccess',
+  shopify: 'shopifyConnectedSuccess', wix: 'wixConnectedSuccess',
+};
+const PROVIDER_FAILED_KEY: Record<string, string> = {
+  etsy: 'etsyConnectionFailed', ebay: 'ebayConnectionFailed', amazon: 'amazonConnectionFailed',
+  shopify: 'shopifyConnectionFailed', wix: 'wixConnectionFailed',
+};
+const OAUTH_PARAMS = ['success', 'error', 'details'] as const;
+
+/** 'shopify_invalid_state' -> { id: 'shopify', name: 'Shopify', known: true } */
+function providerOf(code: string): { id: string; name: string; known: boolean } | null {
+  const id = code.split('_')[0]?.toLowerCase();
+  if (!id) return null;
+  return { id, name: PROVIDER_NAMES[id] || id, known: !!PROVIDER_NAMES[id] };
 }
 
 export default function AyarlarPage() {
@@ -33,107 +58,131 @@ export default function AyarlarPage() {
   const t = useTranslations('settings');
   const tc = useTranslations('common');
   const { config } = useLocale();
+  const { mutate: refreshConnections } = useConnections();
 
   const {
     formData, subscriptionData, initialDataLoaded, isLoading, fetchError,
     isSubmitting, isDirty, handleInputChange, handleSave, importerJsonError,
   } = useSettings();
 
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = useState<TabKey>(DEFAULT_TAB);
   const [connRefreshKey, setConnRefreshKey] = useState(0);
+  const handledOAuth = useRef<string | null>(null);
 
-  // Sync active tab from ?tab=
+  // Sync active tab from ?tab= (missing / unknown -> Connections).
   useEffect(() => {
+    if (!router.isReady) return;
     const q = router.query.tab;
-    if (typeof q === 'string') {
-      const i = TAB_KEYS.indexOf(q as any);
-      if (i >= 0) setTab(i);
-    }
-  }, [router.query.tab]);
+    setTab(isTabKey(q) ? q : DEFAULT_TAB);
+  }, [router.isReady, router.query.tab]);
 
-  // OAuth callback results — toast, jump to Connections tab, refetch statuses.
+  // OAuth callback results: toast, jump to Connections, refetch statuses, strip the params.
   useEffect(() => {
-    const { success, error, details } = router.query;
-    const detailMsg = details ? ` ${decodeURIComponent(details as string)}` : '';
-    let handled = true;
-    if (success === 'etsy_connected') toast(t('etsyShopConnected'), 'success');
-    else if (success === 'ebay_connected') toast(t('ebayConnectedSuccess'), 'success');
-    else if (success === 'wix_connected') toast(t('wixConnectedSuccess'), 'success');
-    else if (success === 'amazon_connected') toast(t('amazonConnectedSuccess'), 'success');
-    else if (success === 'shopify_connected') toast(t('shopifyConnectedSuccess'), 'success');
-    else if (error === 'wix_auth_failed' || error === 'wix_token_failed' || error === 'wix_callback_failed') toast(`${t('wixConnectionFailed')}${detailMsg}`, 'error');
-    else if (error === 'ebay_auth_failed' || error === 'ebay_token_failed' || error === 'ebay_callback_failed') toast(`${t('ebayConnectionFailed')}${detailMsg}`, 'error');
-    else if (error === 'amazon_auth_failed' || error === 'amazon_callback_failed' || error === 'amazon_csrf_failed' || error === 'amazon_no_marketplace_selected') toast(`${t('amazonConnectionFailed')}${detailMsg}`, 'error');
-    else if (error === 'etsy_callback_failed' || error === 'etsy_auth_failed' || error === 'etsy_token_failed') toast(`${t('etsyConnectionFailed')}${detailMsg}`, 'error');
-    else if (error === 'shopify_hmac_failed' || error === 'shopify_token_failed' || error === 'shopify_connection_failed') toast(`${t('shopifyConnectionFailed')}${detailMsg}`, 'error');
-    else handled = false;
+    if (!router.isReady) return;
+    const success = typeof router.query.success === 'string' ? router.query.success : '';
+    const error = typeof router.query.error === 'string' ? router.query.error : '';
+    if (!success && !error) return;
 
-    if (handled) {
-      setTab(1);
-      setConnRefreshKey(k => k + 1);
-      router.replace({ pathname: '/ayarlar', query: { tab: 'connections' } }, undefined, { shallow: true });
+    const signature = `${success}|${error}`;
+    if (handledOAuth.current === signature) return; // re-render / StrictMode guard
+    handledOAuth.current = signature;
+
+    if (success) {
+      const p = providerOf(success);
+      let msg: string;
+      if (success === 'shopify_install_complete') msg = t('oauth.shopifyInstallComplete');
+      else if (p && PROVIDER_SUCCESS_KEY[p.id]) msg = t(PROVIDER_SUCCESS_KEY[p.id] as any);
+      else if (p?.known) msg = t('oauth.connectedGeneric', { provider: p.name });
+      else msg = t('oauth.unknownSuccess');
+      hotToast.success(msg, { id: `oauth-${signature}` });
+    } else {
+      const rawDetails = typeof router.query.details === 'string' ? router.query.details : '';
+      let decoded = rawDetails;
+      try { decoded = decodeURIComponent(rawDetails); } catch { /* already decoded by Next */ }
+      const details = sanitizeMessage(decoded); // null for technical / JSON / HTML text
+      const p = providerOf(error);
+      let msg: string;
+      if (error === 'amazon_no_marketplace_selected') msg = t('amazonSelectMarketplaceFirst');
+      else if (error === 'shopify_expiring_token_required') msg = t('oauth.shopifyTokenType');
+      else if (p?.known && /_(csrf_failed|invalid_state|hmac_failed)$/.test(error)) msg = t('oauth.securityCheckFailed', { provider: p.name });
+      else if (p?.known && /_missing_params$/.test(error)) msg = t('oauth.missingParams', { provider: p.name });
+      else if (p && PROVIDER_FAILED_KEY[p.id]) msg = t(PROVIDER_FAILED_KEY[p.id] as any);
+      else if (p?.known) msg = t('oauth.failedGeneric', { provider: p.name });
+      else msg = t('oauth.unknownFailed');
+      if (details) msg = `${msg} ${details}`;
+      hotToast.error(msg, { id: `oauth-${signature}`, duration: 7000 });
     }
+
+    setTab('connections');
+    setConnRefreshKey(k => k + 1);
+    void refreshConnections();
+
+    const rest = { ...router.query };
+    OAUTH_PARAMS.forEach(k => { delete rest[k]; });
+    router.replace({ pathname: '/ayarlar', query: { ...rest, tab: 'connections' } }, undefined, { shallow: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router.query]);
+  }, [router.isReady, router.query.success, router.query.error]);
 
-  const handleTabChange = (_: React.SyntheticEvent, v: number) => {
+  const handleTabChange = (_: React.SyntheticEvent, v: TabKey) => {
     setTab(v);
-    router.replace({ pathname: '/ayarlar', query: { tab: TAB_KEYS[v] } }, undefined, { shallow: true });
+    router.replace({ pathname: '/ayarlar', query: { tab: v } }, undefined, { shallow: true });
   };
-
-  if (isLoading && !initialDataLoaded) {
-    return (
-      <AppLayout title={t('loadingTitle')}>
-        <Container sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
-          <CircularProgress />
-          <Typography sx={{ mt: 2 }}>{tc('loading')}</Typography>
-        </Container>
-      </AppLayout>
-    );
-  }
 
   const tabLabel = (icon: React.ReactNode, label: string) => (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>{icon}<span>{label}</span></Box>
   );
 
-  const showSaveBar = tab === 2 || tab === 3;
+  // Only tabs fed by /api/user/settings wait for it; Connections and Sync render at once.
+  const needsSettings = SETTINGS_TABS.includes(tab);
+  const settingsPending = needsSettings && isLoading && !initialDataLoaded;
+  // Never offer Save before the stored settings loaded: it would PATCH blank defaults over them.
+  const showSaveBar = (tab === 'apiKeys' || tab === 'senderProfile') && initialDataLoaded;
 
   return (
     <AppLayout title={t('pageTitle')}>
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4, overflowX: 'hidden', maxWidth: '100%', px: { xs: 1.5, sm: 3 } }}>
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4, maxWidth: '100%', px: { xs: 1.5, sm: 3 } }}>
         <PageHeader title={t('pageTitle')} subtitle={t('pageSubtitle')} />
 
-        {fetchError && <Alert severity="error" sx={{ mb: 2 }}>{fetchError}</Alert>}
+        {needsSettings && fetchError && <Alert severity="error" sx={{ mb: 2 }}>{fetchError}</Alert>}
 
         <Paper elevation={0} sx={{ mb: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
           <Tabs value={tab} onChange={handleTabChange} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile>
-            <Tab label={tabLabel(<CreditCardIcon fontSize="small" />, t('tabs.billing'))} />
-            <Tab label={tabLabel(<StorefrontIcon fontSize="small" />, t('tabs.connections'))} />
-            <Tab label={tabLabel(<VpnKeyIcon fontSize="small" />, t('tabs.apiKeys'))} />
-            <Tab label={tabLabel(<LocalShippingIcon fontSize="small" />, t('tabs.senderProfile'))} />
-            <Tab label={tabLabel(<SyncIcon fontSize="small" />, t('tabs.syncAdvanced'))} />
+            <Tab value="connections" label={tabLabel(<StorefrontIcon fontSize="small" />, t('tabs.connections'))} />
+            <Tab value="billing" label={tabLabel(<CreditCardIcon fontSize="small" />, t('tabs.billing'))} />
+            <Tab value="apiKeys" label={tabLabel(<VpnKeyIcon fontSize="small" />, t('tabs.apiKeys'))} />
+            <Tab value="senderProfile" label={tabLabel(<LocalShippingIcon fontSize="small" />, t('tabs.senderProfile'))} />
+            <Tab value="syncAdvanced" label={tabLabel(<SyncIcon fontSize="small" />, t('tabs.syncAdvanced'))} />
           </Tabs>
         </Paper>
 
-        {tab === 0 && <BillingPanel subscriptionData={subscriptionData} ready={initialDataLoaded} />}
-        {tab === 1 && <ConnectionsPanel refreshKey={connRefreshKey} />}
-        {tab === 2 && (
-          <ApiKeysPanel
-            integrationSettings={formData.integrationSettings || {}}
-            onChange={(name, value) => handleInputChange('integrationSettings', name, value)}
-          />
+        {settingsPending ? (
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 8 }}>
+            <CircularProgress />
+            <Typography sx={{ mt: 2 }} color="text.secondary">{tc('loading')}</Typography>
+          </Box>
+        ) : (
+          <>
+            {tab === 'connections' && <ConnectionsPanel refreshKey={connRefreshKey} />}
+            {tab === 'billing' && <BillingPanel subscriptionData={subscriptionData} ready={initialDataLoaded} />}
+            {tab === 'apiKeys' && (
+              <ApiKeysPanel
+                integrationSettings={formData.integrationSettings || {}}
+                onChange={(name, value) => handleInputChange('integrationSettings', name, value)}
+              />
+            )}
+            {tab === 'senderProfile' && (
+              <SenderProfilePanel
+                shipperProfile={formData.shipperProfile || {}}
+                shippingSettings={formData.shippingSettings || {}}
+                onChangeProfile={(name, value) => handleInputChange('shipperProfile', name, value)}
+                onChangeShipping={(name, value) => handleInputChange('shippingSettings', name, value)}
+                importerJsonError={importerJsonError}
+                etgbCollapsed={config.etgbProminence === 'collapsed'}
+              />
+            )}
+            {tab === 'syncAdvanced' && <SyncPanel />}
+          </>
         )}
-        {tab === 3 && (
-          <SenderProfilePanel
-            shipperProfile={formData.shipperProfile || {}}
-            shippingSettings={formData.shippingSettings || {}}
-            onChangeProfile={(name, value) => handleInputChange('shipperProfile', name, value)}
-            onChangeShipping={(name, value) => handleInputChange('shippingSettings', name, value)}
-            importerJsonError={importerJsonError}
-            etgbCollapsed={config.etgbProminence === 'collapsed'}
-          />
-        )}
-        {tab === 4 && <SyncPanel />}
 
         {showSaveBar && <SettingsSaveBar isDirty={isDirty} isSubmitting={isSubmitting} onSave={handleSave} />}
       </Container>

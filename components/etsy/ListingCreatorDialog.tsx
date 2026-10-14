@@ -36,6 +36,7 @@ import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import { toast } from 'react-hot-toast';
 import { stageEtsyDraft, stageEtsyDraftFile, syncEtsyDraft } from '@/lib/etsy/draftClient';
 import { useTranslations } from 'next-intl';
+import { useConfirm } from '@/lib/hooks/useConfirm';
 import SEOIndicator from './SEOIndicator';
 import {
   aiErrorCode, AiRequestError, checkTags, checkTitle, normalizeTags, normalizeTitle, splitCommaList,
@@ -110,6 +111,83 @@ function fileToBase64(file: File): Promise<string> {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+// ---------------------------------------------------------------------------
+// Local persistence (this device only — nothing here reaches Etsy)
+// ---------------------------------------------------------------------------
+
+/** Work-in-progress listing (form fields, not photos), per shop. */
+const draftStorageKey = (shopId: string) => `kx.etsy.listingDraft.v1:${shopId || 'default'}`;
+/** Last-used shipping profile / return policy / shop section, per shop. */
+const defaultsStorageKey = (shopId: string) => `kx.etsy.lastListingDefaults.v1:${shopId || 'default'}`;
+
+interface CreatorSnapshot {
+  savedAt: number;
+  activeStep: number;
+  title: string;
+  description: string;
+  tags: string[];
+  materials: string[];
+  whoMade: string;
+  whenMade: string;
+  isSupply: boolean;
+  selectedTaxonomy: FlatTaxonomy | null;
+  price: string;
+  quantity: string;
+  shopSectionId: number | '';
+  shippingProfileId: number | '';
+  returnPolicyId: number | '';
+  processingMin: string;
+  processingMax: string;
+  itemWeight: string;
+  itemWeightUnit: string;
+  itemLength: string;
+  itemWidth: string;
+  itemHeight: string;
+  itemDimensionsUnit: string;
+}
+
+interface ListingDefaults {
+  shippingProfileId?: number | '';
+  returnPolicyId?: number | '';
+  shopSectionId?: number | '';
+}
+
+function readStorage<T>(key: string): T | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStorage(key: string, value: unknown): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Quota or private mode — persistence is a convenience, never a requirement.
+  }
+}
+
+function clearStorage(key: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
+function snapshotHasContent(s: Partial<CreatorSnapshot> | null | undefined): boolean {
+  if (!s) return false;
+  return Boolean(
+    (s.title || '').trim() || (s.description || '').trim() || (s.tags?.length || 0) > 0 ||
+    (s.materials?.length || 0) > 0 || s.selectedTaxonomy || (s.price || '').trim(),
+  );
 }
 
 const WEIGHT_UNITS = [
@@ -250,6 +328,130 @@ export default function ListingCreatorDialog({
     if (copySource.shop_section_id) setShopSectionId(copySource.shop_section_id);
     setActiveStep(0); // Start from step 1 so user can review
   }, [open, copySource]);
+
+  // --------------------------------------------------
+  // Autosave to this device + "Restore unsaved listing?" offer
+  // --------------------------------------------------
+  const confirm = useConfirm();
+  const tCommon = useTranslations('common');
+  const [pendingRestore, setPendingRestore] = useState<CreatorSnapshot | null>(null);
+
+  const snapshot: CreatorSnapshot = {
+    savedAt: 0,
+    activeStep, title, description, tags, materials, whoMade, whenMade, isSupply,
+    selectedTaxonomy, price, quantity, shopSectionId, shippingProfileId, returnPolicyId,
+    processingMin, processingMax, itemWeight, itemWeightUnit, itemLength, itemWidth,
+    itemHeight, itemDimensionsUnit,
+  };
+  const snapshotJson = JSON.stringify(snapshot);
+  const formHasContent = snapshotHasContent(snapshot) || selectedFiles.length > 0;
+  const snapshotRef = useRef(snapshot);
+  snapshotRef.current = snapshot;
+
+  // Offer the saved work when the dialog opens (a copy prefill takes precedence).
+  useEffect(() => {
+    if (!open) return;
+    if (copySource) { setPendingRestore(null); return; }
+    const saved = readStorage<CreatorSnapshot>(draftStorageKey(shopId));
+    setPendingRestore(saved && snapshotHasContent(saved) ? saved : null);
+  }, [open, shopId, copySource]);
+
+  // Debounced autosave while open. Paused while the restore offer is pending so
+  // a stray keystroke can't overwrite the saved listing before the user decides.
+  useEffect(() => {
+    // Also paused while creating, so a late write can't resurrect a listing just staged.
+    if (!open || creating || pendingRestore || !snapshotHasContent(snapshotRef.current)) return;
+    const id = setTimeout(() => {
+      writeStorage(draftStorageKey(shopId), { ...snapshotRef.current, savedAt: Date.now() });
+    }, 800);
+    return () => clearTimeout(id);
+  }, [open, shopId, creating, pendingRestore, snapshotJson]);
+
+  // Typing a new listing while the offer is unanswered counts as "Start fresh":
+  // drop the offer so autosave resumes and the new work is kept (and the close
+  // confirm's "stays on this device" stays true).
+  useEffect(() => {
+    if (!open || creating || !pendingRestore || !snapshotHasContent(snapshotRef.current)) return;
+    setPendingRestore(null);
+    toast(t('restore.replacedByEdit'), { icon: '\u2139\uFE0F' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, creating, pendingRestore, snapshotJson]);
+
+  const handleRestore = () => {
+    const saved = pendingRestore;
+    if (!saved) return;
+    setActiveStep(Math.min(Math.max(Number(saved.activeStep) || 0, 0), 2));
+    setTitle(saved.title || '');
+    setDescription(saved.description || '');
+    setTags(normalizeTags(saved.tags || [], { max: TAG_MAX_COUNT }).tags);
+    setMaterials(Array.isArray(saved.materials) ? saved.materials : []);
+    setWhoMade(saved.whoMade || 'i_did');
+    setWhenMade(normalizeWhenMade(saved.whenMade) || 'made_to_order');
+    setIsSupply(Boolean(saved.isSupply));
+    setSelectedTaxonomy(saved.selectedTaxonomy || null);
+    setPrice(saved.price || '');
+    setQuantity(saved.quantity || '1');
+    const sectionOk = saved.shopSectionId === '' || shopSections.some((x) => x.shop_section_id === saved.shopSectionId);
+    if (sectionOk && saved.shopSectionId !== undefined) setShopSectionId(saved.shopSectionId);
+    if (saved.shippingProfileId && shippingProfiles.some((x) => x.shipping_profile_id === saved.shippingProfileId)) {
+      setShippingProfileId(saved.shippingProfileId);
+    }
+    if (saved.returnPolicyId && returnPolicies.some((x) => x.return_policy_id === saved.returnPolicyId)) {
+      setReturnPolicyId(saved.returnPolicyId);
+    }
+    setProcessingMin(saved.processingMin || '');
+    setProcessingMax(saved.processingMax || '');
+    setItemWeight(saved.itemWeight || '');
+    setItemWeightUnit(saved.itemWeightUnit || 'g');
+    setItemLength(saved.itemLength || '');
+    setItemWidth(saved.itemWidth || '');
+    setItemHeight(saved.itemHeight || '');
+    setItemDimensionsUnit(saved.itemDimensionsUnit || 'cm');
+    setPendingRestore(null);
+    toast.success(t('restore.restored'));
+  };
+
+  const handleDiscardRestore = () => {
+    clearStorage(draftStorageKey(shopId));
+    setPendingRestore(null);
+  };
+
+  // --------------------------------------------------
+  // Defaults: shipping profile / return policy / shop section.
+  // One option → pick it. Otherwise → the last one used for this shop.
+  // Stable id keys, not the array props, drive the effect.
+  // --------------------------------------------------
+  const shippingKey = shippingProfiles.map((p) => p.shipping_profile_id).join(',');
+  const returnKey = returnPolicies.map((p) => p.return_policy_id).join(',');
+  const sectionKey = shopSections.map((p) => p.shop_section_id).join(',');
+
+  useEffect(() => {
+    if (!open || copySource) return;
+    const last = readStorage<ListingDefaults>(defaultsStorageKey(shopId)) || {};
+    const ids = (key: string) => (key ? key.split(',').map(Number) : []);
+    const shipIds = ids(shippingKey);
+    const retIds = ids(returnKey);
+    const secIds = ids(sectionKey);
+
+    setShippingProfileId((cur) => {
+      if (cur !== '' && shipIds.includes(cur)) return cur;
+      if (shipIds.length === 1) return shipIds[0];
+      return typeof last.shippingProfileId === 'number' && shipIds.includes(last.shippingProfileId) ? last.shippingProfileId : cur;
+    });
+    setReturnPolicyId((cur) => {
+      if (cur !== '' && retIds.includes(cur)) return cur;
+      if (retIds.length === 1) return retIds[0];
+      return typeof last.returnPolicyId === 'number' && retIds.includes(last.returnPolicyId) ? last.returnPolicyId : cur;
+    });
+    // The section is optional: a remembered "no section" is respected.
+    setShopSectionId((cur) => {
+      if (cur !== '') return cur;
+      if ('shopSectionId' in last) {
+        return typeof last.shopSectionId === 'number' && secIds.includes(last.shopSectionId) ? last.shopSectionId : '';
+      }
+      return secIds.length === 1 ? secIds[0] : cur;
+    });
+  }, [open, shopId, copySource, shippingKey, returnKey, sectionKey]);
 
   // --------------------------------------------------
   // Fetch taxonomy on open
@@ -459,10 +661,24 @@ export default function ListingCreatorDialog({
     setAiImageFollowUp('');
     setAiImageWhiteBg(true);
     setTagFeedback([]);
+    setPendingRestore(null);
   }, []);
 
-  const handleClose = () => {
+  const handleClose = async () => {
     if (creating) return;
+    if (formHasContent) {
+      const ok = await confirm({
+        title: t('closeConfirm.title'),
+        description: selectedFiles.length > 0 ? t('closeConfirm.descriptionWithPhotos') : t('closeConfirm.description'),
+        confirmLabel: tCommon('close'),
+        cancelLabel: t('closeConfirm.keepEditing'),
+      });
+      if (!ok) return;
+      // Flush the latest state so the debounce can't drop the last edits.
+      if (!pendingRestore && snapshotHasContent(snapshotRef.current)) {
+        writeStorage(draftStorageKey(shopId), { ...snapshotRef.current, savedAt: Date.now() });
+      }
+    }
     resetForm();
     onClose();
   };
@@ -723,6 +939,14 @@ export default function ListingCreatorDialog({
         fields: body,
         queuedActions: [{ type: 'create_listing', payload: body }, ...(publish ? [{ type: 'publish' }] : [])],
       });
+
+      // The listing now lives in a DB draft: drop the device copy, remember the picks.
+      clearStorage(draftStorageKey(shopId));
+      writeStorage(defaultsStorageKey(shopId), {
+        shippingProfileId,
+        returnPolicyId,
+        shopSectionId,
+      } satisfies ListingDefaults);
 
       // Upload images
       let stagedImages = 0;
@@ -1709,7 +1933,7 @@ export default function ListingCreatorDialog({
         }}
       >
         <Typography variant="h6">{t('dialogTitle')}</Typography>
-        <IconButton onClick={handleClose} disabled={creating}>
+        <IconButton onClick={handleClose} disabled={creating} aria-label={tCommon('close')} sx={{ minWidth: 44, minHeight: 44 }}>
           <CloseIcon />
         </IconButton>
       </Box>
@@ -1727,6 +1951,29 @@ export default function ListingCreatorDialog({
       </Box>
 
       <Box sx={{ px: 3, py: 3, flex: 1, overflow: 'auto' }}>
+        {pendingRestore && (
+          <Alert
+            severity="info"
+            sx={{ mb: 2, alignItems: { xs: 'flex-start', sm: 'center' }, '& .MuiAlert-message': { flex: 1 } }}
+          >
+            <Typography variant="subtitle2" fontWeight={700}>
+              {t('restore.title')}
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 1 }}>
+              {pendingRestore.title?.trim()
+                ? t('restore.bodyWithTitle', { title: pendingRestore.title.trim().slice(0, 80) })
+                : t('restore.body')}
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              <Button variant="contained" size="small" onClick={handleRestore} sx={{ minHeight: { xs: 44, sm: 32 } }}>
+                {t('restore.restore')}
+              </Button>
+              <Button size="small" color="inherit" onClick={handleDiscardRestore} sx={{ minHeight: { xs: 44, sm: 32 } }}>
+                {t('restore.discard')}
+              </Button>
+            </Box>
+          </Alert>
+        )}
         {stepContent[activeStep]()}
       </Box>
 

@@ -10,51 +10,11 @@ import {
 } from './fedex.types';
 import { logger } from '../logger';
 import { retrieveAsyncShipment, extractShipmentDetails, FedexShipResponse, FedexAsyncError } from './fedex.async';
+// Tokens are cached per (base URL + sha256 of API key/secret), never shared across tenants.
+import { getFedExOAuthToken, invalidateFedExToken, FEDEX_API_BASE_URL } from './fedex.tokenCache';
 
 const DEFAULT_PHONE_NUMBER_TS   = '0000000000';
 const DEFAULT_TERMS_OF_SALE_TS  = 'DDU';
-
-interface FedExAuthToken {
-  accessToken: string;
-  expiresAt: number;
-}
-let fedExTokenCache: FedExAuthToken | null = null;
-
-async function getFedExOAuthToken(
-    shipperConfig: Pick<ShipperProfileData, 'fedexApiKey' | 'fedexApiSecret'>
-): Promise<string> {
-  if (fedExTokenCache && fedExTokenCache.expiresAt > Date.now()) {
-    return fedExTokenCache.accessToken;
-  }
-
-  const tokenUrl = 'https://apis.fedex.com/oauth/token';
-  const params = new URLSearchParams();
-  params.append('grant_type', 'client_credentials');
-  params.append('client_id', shipperConfig.fedexApiKey);
-  params.append('client_secret', shipperConfig.fedexApiSecret);
-
-  try {
-    const response = await axios.post(tokenUrl, params, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    });
-    if (response.status === 200 && response.data.access_token) {
-      const expiresIn = response.data.expires_in || 3600;
-      fedExTokenCache = {
-        accessToken: response.data.access_token,
-        expiresAt: Date.now() + (expiresIn - 300) * 1000,
-      };
-      logger.info('[FedEx Service] OAuth token obtained/refreshed.');
-      return fedExTokenCache.accessToken;
-    } else {
-      logger.error('[FedEx Service] FedEx OAuth Error Response:', new Error(JSON.stringify(response.data)));
-      throw new Error(`FedEx OAuth failed: ${response.data?.errors?.[0]?.message || 'Unknown OAuth error'}`);
-    }
-  } catch (error: any) {
-    const errorData = error.response?.data;
-    logger.error('[FedEx Service] FedEx OAuth Exception:', new Error(JSON.stringify({ errorData, message: error.message })));
-    throw new Error(`FedEx OAuth exception: ${errorData?.errors?.[0]?.message || error.message}`);
-  }
-}
 
 // Allowed labelStockType values when imageType is PDF or PNG (per FedEx Ship v1)
 const ALLOWED_LABEL_STOCK_TYPES = [
@@ -214,7 +174,7 @@ export async function createFedexShipment(
   }
 
   const shipperPhoneCleaned = String(shipper.shipperPhoneNumber).replace(/\D/g, '') || DEFAULT_PHONE_NUMBER_TS;
-  const accessToken = await getFedExOAuthToken(shipper);
+  const accessToken = await getFedExOAuthToken(shipper, FEDEX_API_BASE_URL);
   const shipDate = new Date().toISOString().split('T')[0];
 
   let dimensionsPayload: any = null;
@@ -390,7 +350,7 @@ export async function createFedexShipment(
   logger.info('[FedEx Service] Sending FedEx Ship API request for orderId: ' + orderData.orderId, { payloadSummary: { service: orderData.serviceType, recipientCountry: orderData.recipientCountry }});
 
   try {
-    const shipApiUrl = 'https://apis.fedex.com/ship/v1/shipments';
+    const shipApiUrl = `${FEDEX_API_BASE_URL}/ship/v1/shipments`;
     const apiResponse = await axios.post(shipApiUrl, requestPayload, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -460,6 +420,11 @@ export async function createFedexShipment(
     const errorResponse = error.response;
     const errorData = errorResponse?.data;
     const fedExErrors = errorData?.errors;
+
+    // A rejected token must not be served again from the cache for this tenant.
+    if (errorResponse?.status === 401) {
+      invalidateFedExToken(shipper, FEDEX_API_BASE_URL);
+    }
 
     let errorMessage = `FedEx Ship API Exception: ${error.message}`;
     if (fedExErrors && Array.isArray(fedExErrors) && fedExErrors.length > 0) {

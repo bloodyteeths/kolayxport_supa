@@ -33,7 +33,7 @@ export default async function handler(
     // Create portal session
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: user.stripeCustomerId,
-      return_url: `${req.headers.origin}/ayarlar`,
+      return_url: `${req.headers.origin}/ayarlar?tab=billing`,
     });
 
     return res.status(200).json({ url: portalSession.url });

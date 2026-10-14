@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Menu,
-  Bell,
   Globe,
   UserCircle,
   X,
@@ -32,9 +31,11 @@ import {
   Wallet,
   Mail,
   Receipt,
-  Globe2
+  Globe2,
+  Pin,
+  PinOff,
+  Plus,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
 import useSWR, { mutate } from 'swr';
 import { useAuth } from '@/lib/auth-context';
 import useSidebar from '../hooks/useSidebar';
@@ -43,15 +44,72 @@ import { useTranslations } from 'next-intl';
 import useLocaleStore from '@/lib/stores/useLocaleStore';
 import useMessageCountStore from '@/lib/stores/useMessageCountStore';
 import TrialNotification from './TrialNotification';
+import { useConnections } from '@/lib/hooks/useConnections';
 
 /**
  * AppLayout: For authenticated application routes (e.g., /app/*)
  * Provides sidebar, topbar, and dashboard navigation for logged-in users.
  */
 
+// Store-type providers a user can connect from Settings → Connections. Used to
+// decide whether the "+ Connect a store" nav item is still worth showing.
+// (Veeqo/Shippo are aggregators, carriers are not stores.)
+const STORE_PROVIDERS = ['etsy', 'ebay', 'amazon', 'shopify', 'wix', 'trendyol', 'hepsiburada'];
+
+// Last known connection flags, so a full page reload renders the same nav the
+// user saw last time instead of "everything" and then dropping items.
+const NAV_CONN_CACHE_KEY = 'kx.nav.connections.v1';
+const SIDEBAR_PIN_KEY = 'kx.sidebar.pinned';
+
+// Read browser-only state before paint on the client, without the SSR warning.
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+
+// The cache is tagged with the user id so a different account signing in on
+// the same browser never renders with the previous account's nav.
+function readNavConnCache(uid) {
+  if (!uid) return null;
+  try {
+    const raw = window.localStorage.getItem(NAV_CONN_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || parsed.uid !== uid) return null;
+    const flags = parsed.flags;
+    return flags && typeof flags === 'object' && !Array.isArray(flags) ? flags : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeNavConnCache(uid, flags) {
+  if (!uid) return;
+  try {
+    window.localStorage.setItem(NAV_CONN_CACHE_KEY, JSON.stringify({ uid, flags }));
+  } catch {
+    // storage blocked — nav simply falls back to "show all while loading"
+  }
+}
+
+function clearNavConnCache() {
+  try {
+    window.localStorage.removeItem(NAV_CONN_CACHE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+// Pinned state survives AppLayout remounts (every page renders its own
+// AppLayout), so later mounts render the right width on their first frame.
+// null = not read from storage yet (first client mount; SSR always unpinned).
+let pinnedMemo = null;
+
+/**
+ * Nav items may carry `requires`: a provider (or list of providers, any of
+ * which unlocks the item). Items without `requires` are always shown.
+ */
 function getNavGroups(t) {
   return [
     {
+      id: 'main',
       label: null,
       items: [
         { href: '/app', icon: LayoutDashboard, label: t('overview') },
@@ -61,30 +119,42 @@ function getNavGroups(t) {
       ],
     },
     {
+      id: 'marketplaces',
       label: t('marketplaces'),
       items: [
-        { href: '/app/etsy-listings', icon: Store, label: t('etsyListings') },
-        { href: '/app/etsy-research', icon: Target, label: t('etsyResearch') },
-        { href: '/app/ebay-listings', icon: ShoppingBag, label: t('ebayListings') },
-        { href: '/app/ebay-research', icon: Target, label: t('ebayResearch') },
-        { href: '/app/amazon-research', icon: Globe2, label: t('amazonResearch') },
-        { href: '/app/trendyol-urunler', icon: Package, label: t('trendyolProducts') },
-        { href: '/app/trendyol-arastirma', icon: Target, label: t('trendyolResearch') },
-        { href: '/app/wix-urunler', icon: Package, label: t('wixProducts') },
-        { href: '/app/shopify-urunler', icon: ShoppingBag, label: t('shopifyProducts') },
+        { href: '/app/etsy-listings', icon: Store, label: t('etsyListings'), requires: 'etsy' },
+        { href: '/app/ebay-listings', icon: ShoppingBag, label: t('ebayListings'), requires: 'ebay' },
+        { href: '/app/trendyol-urunler', icon: Package, label: t('trendyolProducts'), requires: 'trendyol' },
+        { href: '/app/wix-urunler', icon: Package, label: t('wixProducts'), requires: 'wix' },
+        { href: '/app/shopify-urunler', icon: ShoppingBag, label: t('shopifyProducts'), requires: 'shopify' },
+        { href: '/ayarlar?tab=connections', icon: Plus, label: t('connectStore'), connectCta: true },
       ],
     },
     {
+      id: 'research',
+      label: t('research'),
+      items: [
+        { href: '/app/etsy-research', icon: Target, label: t('etsyResearch') },
+        { href: '/app/ebay-research', icon: Target, label: t('ebayResearch') },
+        { href: '/app/trendyol-arastirma', icon: Target, label: t('trendyolResearch') },
+        // Product search/niche tools use the platform Creators API, not the
+        // user's seller token, so this works without an Amazon connection.
+        { href: '/app/amazon-research', icon: Globe2, label: t('amazonResearch') },
+      ],
+    },
+    {
+      id: 'operations',
       label: t('operations'),
       items: [
         { href: '/app/senkron', icon: ShoppingCart, label: t('sync') },
       ],
     },
     {
+      id: 'management',
       label: t('management'),
       items: [
         { href: '/app/entegrasyonlar-ve-rehberler', icon: Link2, label: t('integrations') },
-        { href: '/ayarlar', icon: Settings, label: t('settings') },
+        { href: '/ayarlar', icon: Settings, label: t('settings'), reauthDot: true },
         { href: '/faturalar', icon: Receipt, label: t('invoices') },
       ],
     },
@@ -110,21 +180,118 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
   );
   const userSubscription = settingsData?.subscription ?? null;
 
+  // ─── Connection-aware nav ──────────────────────────────────────────
+  // has() is undefined until the first /api/integrations/status response. In
+  // that window we use the flags cached from the last visit; with no cache we
+  // show everything (never hide features from a connected user on a slow load).
+  const { connections, needsReauth } = useConnections();
+  const uid = user?.id || null;
+  const [cachedConn, setCachedConn] = useState(null);
+  useIsomorphicLayoutEffect(() => {
+    setCachedConn(readNavConnCache(uid));
+  }, [uid]);
+  // Stable string key so the write effect does not re-run on every render.
+  const connKey = connections
+    ? Object.keys(connections).sort().map((p) => `${p}:${connections[p]?.connected ? 1 : 0}`).join(',')
+    : '';
+  useEffect(() => {
+    if (!connections) return;
+    const flags = {};
+    Object.keys(connections).forEach((p) => { flags[p] = Boolean(connections[p]?.connected); });
+    writeNavConnCache(uid, flags);
+    setCachedConn(flags);
+  }, [connKey, uid]);
+
+  /** true / false when known (live or cached), undefined when unknown. */
+  const knownConnected = (provider) => {
+    if (connections) return Boolean(connections[provider]?.connected);
+    if (cachedConn && typeof cachedConn[provider] === 'boolean') return cachedConn[provider];
+    return undefined;
+  };
+  const isUnlocked = (requires) => {
+    if (!requires) return true;
+    const list = Array.isArray(requires) ? requires : [requires];
+    const states = list.map(knownConnected);
+    if (states.some((v) => v === true)) return true;
+    if (states.every((v) => v === false)) return false;
+    return true; // unknown → show
+  };
+  const storeStates = STORE_PROVIDERS.map(knownConnected);
+  const showConnectCta = storeStates.every((v) => v !== undefined) && storeStates.some((v) => v === false);
+  const hasReauth = needsReauth.length > 0;
+
   // Free Shopify-tier accounts never see Stripe billing surfaces, including
   // the invoices page (App Store rule 1.2.1).
   const isShopifyFree = userSubscription?.billingProvider === 'shopify_free';
-  const navGroups = getNavGroups(t).map((group) => ({
-    ...group,
-    items: isShopifyFree ? group.items.filter((item) => item.href !== '/faturalar') : group.items,
-  }));
+  const navGroups = getNavGroups(t)
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => {
+        if (isShopifyFree && item.href === '/faturalar') return false;
+        if (item.connectCta) return showConnectCta;
+        return isUnlocked(item.requires);
+      }),
+    }))
+    .filter((group) => group.items.length > 0);
+
+  // Messages (Wix + Trendyol inbox): only poll when one of them is connected.
+  const messagesAvailable = isUnlocked(['wix', 'trendyol']);
+  const messagesEnabled = knownConnected('wix') === true || knownConnected('trendyol') === true;
 
   // Poll message counts every 3 minutes
   useEffect(() => {
+    if (!messagesEnabled) return undefined;
     fetchMessageCounts();
     const interval = setInterval(fetchMessageCounts, 180_000);
     return () => clearInterval(interval);
-  }, [fetchMessageCounts]);
-  const navItems = navGroups.flatMap(g => g.items);
+  }, [fetchMessageCounts, messagesEnabled]);
+
+  // ─── Desktop sidebar: hover expands as an overlay, pin pushes content ──
+  const [hoverOpen, setHoverOpen] = useState(false);
+  const [pinned, setPinned] = useState(() => pinnedMemo ?? false);
+  // On the very first client mount the stored pin is applied after hydration;
+  // that one change must snap, not animate 4rem → 16rem.
+  const instantRef = useRef(pinnedMemo === null);
+  const [pinReady, setPinReady] = useState(pinnedMemo !== null);
+  useIsomorphicLayoutEffect(() => {
+    if (pinnedMemo !== null) return;
+    let stored = false;
+    try {
+      stored = window.localStorage.getItem(SIDEBAR_PIN_KEY) === '1';
+    } catch {
+      // storage unavailable — default unpinned
+    }
+    pinnedMemo = stored;
+    setPinned(stored);
+    setPinReady(true);
+  }, []);
+  useEffect(() => {
+    // Runs after the commit that applied the stored pin; animate from now on.
+    if (pinReady) instantRef.current = false;
+  }, [pinReady]);
+  const instant = instantRef.current;
+  const togglePinned = useCallback(() => {
+    setPinned((prev) => {
+      const next = !prev;
+      pinnedMemo = next;
+      try {
+        window.localStorage.setItem(SIDEBAR_PIN_KEY, next ? '1' : '0');
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, []);
+  // Keyboard users: focusing into the sidebar expands it like hover does.
+  const handleAsideFocus = () => { if (isDesktop) setHoverOpen(true); };
+  const handleAsideBlur = (e) => {
+    if (!isDesktop) return;
+    if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return;
+    setHoverOpen(false);
+  };
+  // `expanded` drives labels/width; on mobile it is the drawer state.
+  const expanded = isMobile ? isOpen : (pinned || hoverOpen);
+  const overlayExpanded = isDesktop && hoverOpen && !pinned;
 
   const isActive = (href) => router.pathname === href;
 
@@ -254,6 +421,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
   }, [isMobile]);
 
   const handleSignOut = async () => {
+    clearNavConnCache();
     await supabaseSignOut();
   };
 
@@ -320,18 +488,22 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
           initial={false}
           animate={{
             x: isMobile ? (isOpen ? 0 : '-100%') : 0,
-            width: isMobile ? '75vw' : (isOpen ? '16rem' : '4rem')
+            width: isMobile ? '75vw' : (expanded ? '16rem' : '4rem')
           }}
-          transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-          onMouseEnter={() => { if (isDesktop) openSidebar(); }}
-          onMouseLeave={() => { if (isDesktop) closeSidebar(); }}
+          transition={{ duration: instant ? 0 : 0.25, ease: [0.4, 0, 0.2, 1] }}
+          onMouseEnter={() => { if (isDesktop) setHoverOpen(true); }}
+          onMouseLeave={() => { if (isDesktop) setHoverOpen(false); }}
+          onFocus={handleAsideFocus}
+          onBlur={handleAsideBlur}
           className={`fixed top-0 left-0 h-full bg-white flex flex-col overflow-hidden ${
             isMobile ? 'z-50' : 'z-40'
           }`}
           style={{
-            width: isMobile ? 'min(75vw, 280px)' : (isOpen ? '16rem' : '4rem'),
+            width: isMobile ? 'min(75vw, 280px)' : (expanded ? '16rem' : '4rem'),
             paddingTop: 'env(safe-area-inset-top, 0px)',
             borderRight: '1px solid rgba(226, 232, 240, 0.8)',
+            // Hover-expanded (unpinned) sidebar floats over the content.
+            boxShadow: overlayExpanded ? '0 10px 30px -8px rgba(15, 23, 42, 0.18)' : 'none',
           }}
         >
           {/* Brand header */}
@@ -343,7 +515,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
               </div>
               <motion.div
                 initial={{ opacity: 0 }}
-                animate={{ opacity: (isMobile || isOpen) ? 1 : 0 }}
+                animate={{ opacity: (isMobile || expanded) ? 1 : 0 }}
                 transition={{ duration: 0.15 }}
                 className="whitespace-nowrap overflow-hidden"
               >
@@ -353,9 +525,24 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
             {isMobile && (
               <button
                 onClick={closeSidebar}
-                className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                className="w-11 h-11 -mr-2 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                aria-label={t('closeMenu')}
               >
                 <X size={18} />
+              </button>
+            )}
+            {isDesktop && expanded && (
+              <button
+                type="button"
+                onClick={togglePinned}
+                className={`p-2 rounded-lg transition-colors flex-shrink-0 ${
+                  pinned ? 'text-blue-600 bg-blue-50 hover:bg-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
+                }`}
+                aria-label={pinned ? t('unpinSidebar') : t('pinSidebar')}
+                aria-pressed={pinned}
+                title={pinned ? t('unpinSidebar') : t('pinSidebar')}
+              >
+                {pinned ? <PinOff size={16} /> : <Pin size={16} />}
               </button>
             )}
           </div>
@@ -363,9 +550,9 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto py-3 px-2">
             {navGroups.map((group, gi) => (
-              <div key={gi} className={gi > 0 ? 'mt-5' : ''}>
+              <div key={group.id} className={gi > 0 ? 'mt-5' : ''}>
                 {/* Section label */}
-                {group.label && (isMobile || isOpen) && (
+                {group.label && (isMobile || expanded) && (
                   <div className="px-3 mb-1.5">
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">{group.label}</span>
                   </div>
@@ -377,6 +564,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
                   {group.items.map((item) => {
                     const IconComponent = item.icon;
                     const active = isActive(item.href);
+                    const showDot = item.reauthDot && hasReauth;
                     return (
                       <li key={item.href}>
                         <Link
@@ -391,21 +579,30 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
                           }`}
                           style={active ? {
                             backgroundColor: '#eff6ff',
-                            borderLeft: isOpen || isMobile ? '3px solid #2563eb' : 'none',
-                            paddingLeft: isOpen || isMobile ? (isMobile ? '13px' : '9px') : undefined,
-                          } : {}}
+                            borderLeft: expanded || isMobile ? '3px solid #2563eb' : 'none',
+                            paddingLeft: expanded || isMobile ? (isMobile ? '13px' : '9px') : undefined,
+                          } : (item.connectCta ? { color: '#2563eb' } : {})}
+                          aria-label={showDot ? `${item.label} — ${t('reauthNeeded')}` : undefined}
                         >
-                          <IconComponent
-                            size={19}
-                            className="flex-shrink-0"
-                            style={{ color: active ? '#2563eb' : undefined }}
-                          />
+                          <span className="relative flex-shrink-0 inline-flex">
+                            <IconComponent
+                              size={19}
+                              className="flex-shrink-0"
+                              style={{ color: active ? '#2563eb' : undefined }}
+                            />
+                            {showDot && (
+                              <span
+                                className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white"
+                                aria-hidden="true"
+                              />
+                            )}
+                          </span>
                           <motion.span
                             initial={{ opacity: 0, width: 0 }}
                             animate={{
-                              opacity: (isMobile || isOpen) ? 1 : 0,
-                              width: (isMobile || isOpen) ? 'auto' : 0,
-                              marginLeft: (isMobile || isOpen) ? '0.625rem' : 0
+                              opacity: (isMobile || expanded) ? 1 : 0,
+                              width: (isMobile || expanded) ? 'auto' : 0,
+                              marginLeft: (isMobile || expanded) ? '0.625rem' : 0
                             }}
                             transition={{ duration: 0.15 }}
                             className="whitespace-nowrap overflow-hidden"
@@ -414,9 +611,10 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
                           </motion.span>
 
                           {/* Tooltip for collapsed state */}
-                          {!isOpen && isDesktop && (
+                          {!expanded && isDesktop && (
                             <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-slate-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none whitespace-nowrap z-50 shadow-lg">
                               {item.label}
+                              {showDot && ` — ${t('reauthNeeded')}`}
                             </div>
                           )}
                         </Link>
@@ -438,9 +636,9 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
               <motion.span
                 initial={{ opacity: 0, width: 0 }}
                 animate={{
-                  opacity: (isMobile || isOpen) ? 1 : 0,
-                  width: (isMobile || isOpen) ? 'auto' : 0,
-                  marginLeft: (isMobile || isOpen) ? '0.625rem' : 0
+                  opacity: (isMobile || expanded) ? 1 : 0,
+                  width: (isMobile || expanded) ? 'auto' : 0,
+                  marginLeft: (isMobile || expanded) ? '0.625rem' : 0
                 }}
                 transition={{ duration: 0.15 }}
                 className="text-[13px] font-medium whitespace-nowrap overflow-hidden"
@@ -448,7 +646,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
                 {t('signOut')}
               </motion.span>
 
-              {!isOpen && isDesktop && (
+              {!expanded && isDesktop && (
                 <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-slate-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none whitespace-nowrap z-50 shadow-lg">
                   {t('signOut')}
                 </div>
@@ -458,8 +656,10 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
         </motion.aside>
 
         {/* ─── Main Content ─────────────────────────────────── */}
-        <div className={`flex-1 flex flex-col h-screen overflow-hidden transition-all duration-300 ease-in-out ${
-          isDesktop ? (isOpen ? 'ml-64' : 'ml-16') : 'ml-0'
+        <div className={`flex-1 flex flex-col h-screen overflow-hidden ${instant ? '' : 'transition-all duration-300 ease-in-out'} ${
+          // Content only makes room for the sidebar when it is pinned open; a
+          // hover-expanded sidebar overlays the page instead of reflowing it.
+          isDesktop ? (pinned ? 'ml-64' : 'ml-16') : 'ml-0'
         }`} style={{ minWidth: 0 }}>
 
           {/* Mobile overlay */}
@@ -489,10 +689,18 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
             <div className="flex items-center gap-3">
               {isMobile && (
                 <button
-                  className="p-2 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                  className="w-11 h-11 -ml-2 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
                   onClick={() => isOpen ? closeSidebar() : openSidebar()}
-                  aria-label="Toggle navigation menu"
+                  aria-label={hasReauth ? `${t('toggleMenu')} — ${t('reauthNeeded')}` : t('toggleMenu')}
+                  aria-expanded={isOpen}
+                  style={{ position: 'relative' }}
                 >
+                  {hasReauth && !isOpen && (
+                    <span
+                      className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white"
+                      aria-hidden="true"
+                    />
+                  )}
                   <div className="w-5 h-5 flex flex-col justify-center items-center gap-[5px]">
                     <span className={`block w-4.5 h-[1.5px] bg-current rounded-full transition-all duration-300 ${isOpen ? 'rotate-45 translate-y-[3.5px] w-4' : ''}`}></span>
                     <span className={`block w-4.5 h-[1.5px] bg-current rounded-full transition-all duration-300 ${isOpen ? 'opacity-0 w-0' : 'w-3.5'}`}></span>
@@ -512,27 +720,21 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
                 {locale === 'tr' ? 'EN' : 'TR'}
               </button>
 
-              <button
-                onClick={() => router.push('/app/mesajlar')}
-                className="relative p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
-                title={t('messages')}
-              >
-                <Mail size={19} />
-                {messageCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full ring-2 ring-white px-1">
-                    {messageCount > 99 ? '99+' : messageCount}
-                  </span>
-                )}
-                <span className="sr-only">{t('messages')}</span>
-              </button>
-
-              <button
-                onClick={() => toast(t('noNotifications'))}
-                className="relative p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
-              >
-                <Bell size={19} />
-                <span className="sr-only">{t('notifications')}</span>
-              </button>
+              {messagesAvailable && (
+                <button
+                  onClick={() => router.push('/app/mesajlar')}
+                  className="relative w-11 h-11 sm:w-auto sm:h-auto sm:p-2 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+                  title={t('messages')}
+                  aria-label={messagesEnabled && messageCount > 0 ? `${t('messages')} (${messageCount})` : t('messages')}
+                >
+                  <Mail size={19} />
+                  {messagesEnabled && messageCount > 0 && (
+                    <span className="absolute top-0.5 right-0.5 sm:-top-0.5 sm:-right-0.5 min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full ring-2 ring-white px-1">
+                      {messageCount > 99 ? '99+' : messageCount}
+                    </span>
+                  )}
+                </button>
+              )}
 
               {/* User avatar */}
               <button

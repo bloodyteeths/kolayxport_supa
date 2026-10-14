@@ -20,6 +20,15 @@ import useLocaleStore from '@/lib/stores/useLocaleStore';
 import trMessages from '@/messages/tr.json';
 import enMessages from '@/messages/en.json';
 import CookieConsent from '@/components/CookieConsent';
+import { ConfirmProvider } from '@/lib/hooks/useConfirm';
+import LimitReachedDialog from '@/components/billing/LimitReachedDialog';
+import { installLimitInterceptor } from '@/lib/http/limitInterceptor';
+
+// Module scope (client only) so the 402 interceptor is active before any page
+// effect issues a request. Idempotent.
+if (typeof window !== 'undefined') {
+  installLimitInterceptor();
+}
 
 export type NextPageWithLayout<P = {}, IP = P> = NextPage<P, IP> & {
   getLayout?: (page: ReactElement) => ReactNode;
@@ -54,6 +63,7 @@ function MyApp({ Component, pageProps }: AppProps) {
     <AuthProvider>
       <NextIntlClientProvider locale={locale} messages={messages[locale]} timeZone="Europe/Istanbul">
       <ThemeProvider theme={theme}>
+      <ConfirmProvider>
         <CssBaseline />
         <Head>
           <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -101,7 +111,9 @@ function MyApp({ Component, pageProps }: AppProps) {
         />
         <Component {...pageProps} />
         <Toaster position="top-center" />
+        <LimitReachedDialog />
         <CookieConsent />
+      </ConfirmProvider>
       </ThemeProvider>
       </NextIntlClientProvider>
     </AuthProvider>

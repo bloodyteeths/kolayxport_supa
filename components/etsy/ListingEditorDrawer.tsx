@@ -55,6 +55,7 @@ import { useTheme } from '@mui/material/styles';
 import { toast } from 'react-hot-toast';
 
 import { useTranslations } from 'next-intl';
+import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useLocale } from '@/lib/i18n/useLocale';
 import SEOIndicator from './SEOIndicator';
 import { aiErrorCode, AiRequestError, draftErrorI18n, normalizeTags, normalizeTitle, splitCommaList, TAG_MAX_COUNT, TAG_MAX_LEN } from '@/lib/etsy/seoRules';
@@ -241,11 +242,39 @@ function getDraftKey(listingId: string): string {
   return `${DRAFT_KEY_PREFIX}${listingId}`;
 }
 
-function saveDraft(listingId: string, fields: EditableFields): void {
+function saveDraft(listingId: string, fields: EditableFields): boolean {
   try {
     localStorage.setItem(getDraftKey(listingId), JSON.stringify(fields));
+    return true;
   } catch {
-    // Storage full or unavailable — silently ignore
+    // Storage full or unavailable
+    return false;
+  }
+}
+
+// Marker: the exact fields last staged into the DB draft. The close effect
+// re-saves the form to localStorage (originalFieldsRef tracks Etsy, not the
+// draft), so on reopen this tells "same as the DB draft" apart from real
+// device-only edits. Only used for the status label / close confirm.
+function getStagedKey(listingId: string): string {
+  return `${getDraftKey(listingId)}:staged`;
+}
+
+function markStaged(listingId: string, fields: EditableFields | null): void {
+  try {
+    if (fields) localStorage.setItem(getStagedKey(listingId), JSON.stringify(fields));
+    else localStorage.removeItem(getStagedKey(listingId));
+  } catch {
+    // Silently ignore
+  }
+}
+
+function matchesStaged(listingId: string, fields: EditableFields): boolean {
+  try {
+    const raw = localStorage.getItem(getStagedKey(listingId));
+    return !!raw && raw === JSON.stringify(fields);
+  } catch {
+    return false;
   }
 }
 
@@ -425,6 +454,9 @@ export default function ListingEditorDrawer({
   // Auto-save state
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'unsaved' | 'saving' | 'saved' | 'error'>('idle');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  // Where the last save landed — only used to label the status in the header:
+  // 'device' = localStorage autosave, 'draft' = DB-backed staged draft. Neither is on Etsy.
+  const [saveTarget, setSaveTarget] = useState<'device' | 'draft' | null>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Change history for undo (stores up to 10 snapshots)
@@ -912,6 +944,8 @@ export default function ListingEditorDrawer({
           if (Object.keys(draftChanges).length > 0) {
             setFields(draft);
             setAutoSaveStatus('saved');
+            // Same fields as the last Save Draft → they are in the DB draft, not device-only.
+            setSaveTarget(matchesStaged(listingId, draft) ? 'draft' : 'device');
             toast(t('editor.draftLoaded'), { icon: '\u270F\uFE0F' });
           }
         }
@@ -939,6 +973,7 @@ export default function ListingEditorDrawer({
       setAiTagSuggestions([]);
       setAutoSaveStatus('idle');
       setLastSavedAt(null);
+      setSaveTarget(null);
       setHistory([]);
       if (autoSaveTimerRef.current) {
         clearTimeout(autoSaveTimerRef.current);
@@ -996,6 +1031,28 @@ export default function ListingEditorDrawer({
   const hasChanges = (): boolean => {
     if (!fields || !originalFieldsRef.current) return false;
     return Object.keys(getChangedFields(originalFieldsRef.current, fields)).length > 0;
+  };
+
+  // Edits not yet in the DB draft. On close they are still kept on this device
+  // (see the !open branch of the fetch effect), but they are easy to forget, so ask.
+  const confirm = useConfirm();
+  const hasEditsOutsideDraft = (): boolean =>
+    hasChanges() && (autoSaveStatus === 'unsaved' || autoSaveStatus === 'saving' || saveTarget !== 'draft');
+  const handleClose = async () => {
+    if (saving) return;
+    if (hasEditsOutsideDraft()) {
+      // If this device's storage failed, the close-time save will fail too.
+      const lost = autoSaveStatus === 'error';
+      const ok = await confirm({
+        title: t('editor.closeConfirm.title'),
+        description: lost ? t('editor.closeConfirm.descriptionLost') : t('editor.closeConfirm.description'),
+        confirmLabel: t('editor.closeConfirm.leave'),
+        cancelLabel: t('editor.closeConfirm.keepEditing'),
+        destructive: lost,
+      });
+      if (!ok) return;
+    }
+    onClose();
   };
 
   // --------------------------------------------------
@@ -1077,9 +1134,13 @@ export default function ListingEditorDrawer({
     }
 
     // Save draft to localStorage — does NOT touch Etsy API
-    saveDraft(listingId, fields);
+    if (!saveDraft(listingId, fields)) {
+      setAutoSaveStatus('error');
+      return;
+    }
     setLastSavedAt(new Date());
     setAutoSaveStatus('saved');
+    setSaveTarget('device');
     // Note: originalFieldsRef is NOT updated here — it tracks Etsy state,
     // so hasChanges() stays true and the "Kaydet" button remains enabled.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1117,13 +1178,14 @@ export default function ListingEditorDrawer({
         try {
           const draft = await stageEtsyDraft({ shopId, listingId, fields: {}, replaceFields: true });
           setDraftId(draft?.id || null);
-          if (listingId) clearDraft(listingId);
+          if (listingId) { clearDraft(listingId); markStaged(listingId, null); }
           if (autoSaveTimerRef.current) {
             clearTimeout(autoSaveTimerRef.current);
             autoSaveTimerRef.current = null;
           }
           setAutoSaveStatus('saved');
           setLastSavedAt(new Date());
+          setSaveTarget('draft');
           toast.success(t('editor.draftFieldsCleared'));
           onSaved();
         } catch (err: any) {
@@ -1197,7 +1259,7 @@ export default function ListingEditorDrawer({
       toast.success(t('editor.draftSavedSyncLater'));
 
       // Clear the localStorage draft — changes are now in the DB-backed draft
-      if (listingId) clearDraft(listingId);
+      if (listingId) { clearDraft(listingId); markStaged(listingId, fields); }
 
       // Reset auto-save state, but keep undo history available after saving the draft.
       if (autoSaveTimerRef.current) {
@@ -1206,6 +1268,7 @@ export default function ListingEditorDrawer({
       }
       setAutoSaveStatus('saved');
       setLastSavedAt(new Date());
+      setSaveTarget('draft');
 
       onSaved();
     } catch (err: any) {
@@ -1603,6 +1666,56 @@ export default function ListingEditorDrawer({
     // Drawer is open but no data yet — nothing to render
   }
 
+  // Header save-status label (see saveTarget). Pending DB drafts count even when idle.
+  const hasPendingDbDraft = !!draftId && (draftStatus === 'draft' || draftStatus === 'failed' || draftStatus === 'conflict');
+  const saveStatusLabel: { text: string; hint: string; color: string } | null = (() => {
+    if (autoSaveStatus === 'error') {
+      return { text: t('editor.saveStatus.error'), hint: t('editor.saveStatus.errorHint'), color: 'error.main' };
+    }
+    if (autoSaveStatus === 'unsaved' || autoSaveStatus === 'saving') {
+      return { text: t('editor.saveStatus.unsaved'), hint: t('editor.saveStatus.unsavedHint'), color: 'warning.main' };
+    }
+    if (autoSaveStatus === 'saved' && saveTarget === 'device' && hasChanges()) {
+      return { text: t('editor.saveStatus.device'), hint: t('editor.saveStatus.deviceHint'), color: 'info.main' };
+    }
+    if ((autoSaveStatus === 'saved' && saveTarget === 'draft') || hasPendingDbDraft) {
+      return { text: t('editor.saveStatus.draft'), hint: t('editor.saveStatus.draftHint'), color: 'success.main' };
+    }
+    return null;
+  })();
+
+  // xs: rendered in the subtitle row so it can wrap; sm+: in the action group.
+  // Tooltip opens on tap (enterTouchDelay 0) and the Box is focusable.
+  const renderSaveStatus = (placement: 'mobile' | 'desktop') => {
+    if (!fields || !saveStatusLabel) return null;
+    return (
+      <Tooltip title={saveStatusLabel.hint} arrow enterTouchDelay={0} leaveTouchDelay={4000}>
+        <Box
+          role="status"
+          aria-live="polite"
+          tabIndex={0}
+          sx={{
+            display: placement === 'mobile' ? { xs: 'flex', sm: 'none' } : { xs: 'none', sm: 'flex' },
+            alignItems: 'center',
+            gap: 0.75,
+            minWidth: 0,
+            ...(placement === 'desktop' ? { mr: 0.5, maxWidth: 260 } : { flexBasis: '100%' }),
+          }}
+        >
+          <Box sx={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, bgcolor: saveStatusLabel.color }} />
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            noWrap={placement === 'desktop'}
+            sx={placement === 'desktop' ? { overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '0.75rem' } : { fontSize: '0.75rem', lineHeight: 1.3 }}
+          >
+            {saveStatusLabel.text}
+          </Typography>
+        </Box>
+      </Tooltip>
+    );
+  };
+
   // Tab config for sidebar navigation
   const editorTabs = [
     { id: 'images', label: t('editor.tabImages'), icon: <ImageIcon fontSize="small" /> },
@@ -1621,7 +1734,7 @@ export default function ListingEditorDrawer({
       <Drawer
         anchor="right"
         open={open}
-        onClose={onClose}
+        onClose={handleClose}
         PaperProps={{
           sx: {
             width: '100%',
@@ -1648,7 +1761,7 @@ export default function ListingEditorDrawer({
         >
           {/* Back button + Title */}
           <Box sx={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0, mr: 1 }}>
-            <IconButton onClick={onClose} sx={{ mr: 1, minWidth: 44, minHeight: 44 }}>
+            <IconButton onClick={handleClose} aria-label={t('editor.closeConfirm.back')} sx={{ mr: 1, minWidth: 44, minHeight: 44 }}>
               <ArrowBackIcon />
             </IconButton>
             <Box sx={{ minWidth: 0, flex: 1 }}>
@@ -1656,7 +1769,7 @@ export default function ListingEditorDrawer({
                 {listing?.title || t('editor.editListing')}
               </Typography>
               {listing && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: 0.5, rowGap: 0.25, mt: 0.25 }}>
                   <Chip
                     label={
                       listing.state === 'active' ? t('editor.active')
@@ -1677,6 +1790,7 @@ export default function ListingEditorDrawer({
                   <Typography variant="caption" color="text.secondary">
                     {listing.views} {t('editor.views')} · {listing.num_favorers} {t('editor.favorites')}
                   </Typography>
+                  {renderSaveStatus('mobile')}
                 </Box>
               )}
             </Box>
@@ -1684,20 +1798,8 @@ export default function ListingEditorDrawer({
 
           {/* Action buttons */}
           <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, alignItems: 'center' }}>
-            {/* Auto-save indicator */}
-            {fields && (
-              <Box
-                sx={{
-                  width: 10, height: 10, borderRadius: '50%', mr: 0.5,
-                  bgcolor:
-                    autoSaveStatus === 'unsaved' ? 'warning.main'
-                    : autoSaveStatus === 'saving' ? 'info.main'
-                    : autoSaveStatus === 'saved' ? 'success.main'
-                    : autoSaveStatus === 'error' ? 'error.main'
-                    : 'grey.400',
-                }}
-              />
-            )}
+            {/* Save status — says where edits live; none of these layers is Etsy (sm+; xs shows it under the title) */}
+            {renderSaveStatus('desktop')}
             <Tooltip title={history.length > 0 ? t('editor.undoTooltip', { count: history.length }) : t('editor.noHistory')}>
               <span>
                 <IconButton onClick={handleUndo} disabled={history.length === 0} sx={{ minWidth: 44, minHeight: 44 }}>
@@ -3078,7 +3180,7 @@ export default function ListingEditorDrawer({
             <Button
               variant="outlined"
               size="medium"
-              onClick={onClose}
+              onClick={handleClose}
               sx={{
                 textTransform: 'none',
                 fontWeight: 600,

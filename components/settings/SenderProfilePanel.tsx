@@ -27,6 +27,11 @@ export default function SenderProfilePanel(props: SenderProfilePanelProps) {
   const t = useTranslations('settings');
   const tc = useTranslations('common');
   const pv = (name: string) => (p?.[name] as string) || '';
+  // FedEx option labels are English in fedex.config; translate by value, falling back to the config label.
+  const optLabel = (group: 'paymentParty' | 'shippingChargesParty', opt: FedExOption) => {
+    const key = `${group}.${opt.value}`;
+    return t.has(key as any) ? t(key as any) : opt.label;
+  };
   const onP = (e: any) => onChangeProfile(e.target.name, e.target.value);
   const onSel = (e: SelectChangeEvent<string>) => onChangeProfile(e.target.name as string, e.target.value as string);
 
@@ -77,15 +82,15 @@ export default function SenderProfilePanel(props: SenderProfilePanelProps) {
             <FormControl fullWidth required>
               <InputLabel id="dutiesPaymentType-label">{t('customsDutyPayment')}</InputLabel>
               <Select labelId="dutiesPaymentType-label" name="dutiesPaymentType" label={t('customsDutyPayment')} value={pv('dutiesPaymentType') || 'SENDER'} onChange={onSel}>
-                {(fedexOptionsData.dutiesPaymentTypes as FedExOption[]).map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
+                {(fedexOptionsData.dutiesPaymentTypes as FedExOption[]).map(opt => <MenuItem key={opt.value} value={opt.value}>{optLabel('paymentParty', opt)}</MenuItem>)}
               </Select>
             </FormControl>
           </Grid>
           <Grid item xs={12} sm={6} md={4}>
             <FormControl fullWidth required>
-              <InputLabel id="defaultShippingChargesPaymentType-label">Default Shipping Charges Payment Type</InputLabel>
-              <Select labelId="defaultShippingChargesPaymentType-label" name="defaultShippingChargesPaymentType" label="Default Shipping Charges Payment Type" value={pv('defaultShippingChargesPaymentType') || 'SENDER'} onChange={onSel}>
-                {(fedexOptionsData.shippingChargesPaymentTypes as FedExOption[]).map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
+              <InputLabel id="defaultShippingChargesPaymentType-label">{t('defaultShippingChargesPayment')}</InputLabel>
+              <Select labelId="defaultShippingChargesPaymentType-label" name="defaultShippingChargesPaymentType" label={t('defaultShippingChargesPayment')} value={pv('defaultShippingChargesPaymentType') || 'SENDER'} onChange={onSel}>
+                {(fedexOptionsData.shippingChargesPaymentTypes as FedExOption[]).map(opt => <MenuItem key={opt.value} value={opt.value}>{optLabel('shippingChargesParty', opt)}</MenuItem>)}
               </Select>
             </FormControl>
           </Grid>

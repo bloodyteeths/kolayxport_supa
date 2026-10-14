@@ -44,6 +44,7 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import { useConfirm } from '@/lib/hooks/useConfirm';
 
 import SEOIndicator from './SEOIndicator';
 import ImageManager from './ImageManager';
@@ -645,6 +646,23 @@ export default function ListingEditorDrawer({
     return Object.keys(getChangedFields(originalFieldsRef.current, fields)).length > 0;
   };
 
+  // Closing with unsaved edits loses them (nothing is autosaved here), so ask first.
+  const confirm = useConfirm();
+  const handleClose = async () => {
+    if (saving) return;
+    if (hasChanges()) {
+      const ok = await confirm({
+        title: t('closeConfirm.title'),
+        description: t('closeConfirm.description'),
+        confirmLabel: t('closeConfirm.discard'),
+        cancelLabel: t('closeConfirm.keepEditing'),
+        destructive: true,
+      });
+      if (!ok) return;
+    }
+    onClose();
+  };
+
   // --------------------------------------------------
   // Save
   // --------------------------------------------------
@@ -1003,7 +1021,12 @@ export default function ListingEditorDrawer({
               {copying ? <CircularProgress size={18} /> : <ContentCopyIcon fontSize="small" />}
             </IconButton>
           </Tooltip>
-          <IconButton size="small" onClick={onClose}>
+          <IconButton
+            size="small"
+            onClick={handleClose}
+            aria-label={t('closeConfirm.close')}
+            sx={{ minWidth: { xs: 44 }, minHeight: { xs: 44 } }}
+          >
             <CloseIcon />
           </IconButton>
         </Box>
@@ -1036,7 +1059,7 @@ export default function ListingEditorDrawer({
       <Drawer
         anchor="right"
         open={open}
-        onClose={onClose}
+        onClose={handleClose}
         PaperProps={{
           sx: {
             width: isMobile ? '100%' : DRAWER_WIDTH,

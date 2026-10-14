@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Drawer, Box, Typography, IconButton, TextField, Select, MenuItem,
   FormControl, InputLabel, Button, Alert, Switch, FormControlLabel,
@@ -10,6 +10,9 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { MNG_SERVICE_TYPES, MNG_PAYMENT_TYPES, MNG_DELIVERY_TYPES, MNG_PACKAGING_TYPES } from '@/lib/mng/mng.config';
+import CopyButton from '@/components/ui/CopyButton';
+import PrintLabelButton from '@/components/labels/PrintLabelButton';
+import { getLatestLabel, toLabelHref } from '@/components/labels/labelLinks';
 
 interface MngOrder {
   orderId: string;
@@ -88,6 +91,14 @@ export default function MngLabelDrawer({ open, onClose, order, onSaved }: MngLab
   const hasExistingLabel = order?.shipments?.some(
     (s: any) => s?.status === 'created' && (s?.trackingNumber || s?.pdfUrl)
   );
+  // Existing label (any carrier) so it can be reprinted from here.
+  const existingLabel = useMemo(
+    () => getLatestLabel({ id: order?.orderId, shipments: order?.shipments || [] }),
+    [order?.orderId, order?.shipments]
+  );
+  // POST /api/labels/mng returns labelUrl and/or raw labelBase64 (PDF).
+  const resultLabelHref = result ? toLabelHref(result.labelUrl, result.labelBase64) : null;
+  const fileBase = `mng-${order?.orderNumber || 'label'}`;
 
   const handleSubmit = async () => {
     if (!order) return;
@@ -170,16 +181,51 @@ export default function MngLabelDrawer({ open, onClose, order, onSaved }: MngLab
       </Box>
 
       <Box sx={{ p: 2, overflowY: 'auto', flex: 1 }}>
-        {hasExistingLabel && (
-          <Alert severity="warning" sx={{ mb: 2 }}>{t('existingLabel')}</Alert>
+        {hasExistingLabel && !result && (
+          <Alert severity="warning" sx={{ mb: 2, '& .MuiAlert-message': { width: '100%' } }}>
+            {t('existingLabel')}
+            {(existingLabel.trackingNumber || existingLabel.url) && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1, flexWrap: 'wrap' }}>
+                {existingLabel.trackingNumber && (
+                  <Box sx={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{existingLabel.trackingNumber}</Typography>
+                    <CopyButton value={existingLabel.trackingNumber} label={t('trackingNumber')} />
+                  </Box>
+                )}
+                {existingLabel.url && (
+                  <PrintLabelButton url={existingLabel.url} label={t('openPrintLabel')} filename={fileBase} />
+                )}
+              </Box>
+            )}
+          </Alert>
         )}
 
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
         {result && (
-          <Alert severity="success" sx={{ mb: 2 }}>
-            {t('trackingNumber')}: <strong>{result.trackingNumber}</strong>
-            {result.barcode && <><br />Barkod: {result.barcode}</>}
+          <Alert severity="success" sx={{ mb: 2, '& .MuiAlert-message': { width: '100%' } }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+              {t('trackingNumber')}:&nbsp;<strong style={{ fontFamily: 'monospace' }}>{result.trackingNumber}</strong>
+              {result.trackingNumber && <CopyButton value={String(result.trackingNumber)} label={t('trackingNumber')} />}
+            </Box>
+            {result.barcode && (
+              <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+                {t('barcode')}:&nbsp;<span style={{ fontFamily: 'monospace' }}>{result.barcode}</span>
+                <CopyButton value={String(result.barcode)} label={t('barcode')} />
+              </Box>
+            )}
+            {resultLabelHref ? (
+              <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
+                <PrintLabelButton url={resultLabelHref} label={t('openPrintLabel')} variant="contained" color="success" filename={fileBase} />
+                {resultLabelHref.startsWith('data:') && (
+                  <Button component="a" href={resultLabelHref} download={`${fileBase}.pdf`} variant="outlined" size="small" sx={{ textTransform: 'none', minHeight: { xs: 44, md: 32 } }}>
+                    {t('downloadLabel')}
+                  </Button>
+                )}
+              </Box>
+            ) : (
+              <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>{t('labelNotReturned')}</Typography>
+            )}
           </Alert>
         )}
 

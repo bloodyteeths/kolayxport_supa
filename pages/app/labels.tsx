@@ -3,25 +3,29 @@ import { useRouter } from 'next/router';
 import { useTranslations } from 'next-intl';
 import { useLocale } from '@/lib/i18n/useLocale';
 import {
-  Box, Button, CircularProgress, Tooltip, Dialog, DialogTitle, DialogContent, Snackbar, Alert, TextField, Select, MenuItem, InputLabel, FormControl, IconButton, Typography, Paper, Accordion, AccordionSummary, AccordionDetails, Chip, Drawer, Fade, List, ListItem, ListItemIcon, ListItemText, ToggleButton, ToggleButtonGroup, Grid, SelectChangeEvent
+  Box, Button, CircularProgress, Tooltip, Dialog, DialogTitle, DialogContent, Alert, TextField, Select, MenuItem, InputLabel, FormControl, IconButton, Typography, Paper, Accordion, AccordionSummary, AccordionDetails, Chip, Drawer, ToggleButton, ToggleButtonGroup, Grid, SelectChangeEvent, Checkbox, LinearProgress, Badge
 } from '@mui/material';
-import { DataGrid, GridColDef, GridPaginationModel, GridRenderCellParams, GridValueGetter, GridRowSelectionModel, GridRowId } from '@mui/x-data-grid';
-import { Sync as SyncIcon, Refresh as RefreshIcon, Search as SearchIcon, Close as CloseIcon, ExpandMore as ExpandMoreIcon, Edit as EditIcon, Check as CheckIcon, Warning as WarningIcon, Error as ErrorIcon, Info as InfoIcon, Lock as LockIcon, FlightTakeoff as FlightTakeoffIcon, Flight as FlightIcon, Delete as DeleteIcon, Email as EmailIcon } from '@mui/icons-material';
+import { Sync as SyncIcon, Refresh as RefreshIcon, Search as SearchIcon, Close as CloseIcon, ExpandMore as ExpandMoreIcon, FlightTakeoff as FlightTakeoffIcon, Flight as FlightIcon, Delete as DeleteIcon, Email as EmailIcon, FilterList as FilterListIcon } from '@mui/icons-material';
 import AmazonMessageDialog from '../../components/amazon/AmazonMessageDialog';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import CancelIcon from '@mui/icons-material/Cancel';
-import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
-import { toast, Toast } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import { useOrders } from '@/lib/hooks/useOrders';
 import { useMarketplaceOptions } from '@/lib/hooks/useMarketplaceOptions';
 // Layout import removed - using AppLayout only
 import AppLayout from '@/components/AppLayout';
-import CircleIcon from '@mui/icons-material/Circle';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import UPSLabelDrawer from '@/components/UPSLabelDrawer';
 import MngLabelDrawer from '@/components/MngLabelDrawer';
 import ManualOrderButton from '@/components/ManualOrderButton';
 import ShippingCostCell from '@/components/labels/ShippingCostCell';
+import PrintLabelButton from '@/components/labels/PrintLabelButton';
+import CopyAddressControl from '@/components/labels/CopyAddressControl';
+import LabelsBulkBar from '@/components/labels/LabelsBulkBar';
+import { getLatestLabel, getTrackingPair, carrierToVeeqoId, openLabelUrl } from '@/components/labels/labelLinks';
+import CopyButton from '@/components/ui/CopyButton';
+import ErrorState from '@/components/ui/ErrorState';
+import { notify, isUsageLimitError } from '@/lib/notify';
+import { useConfirm } from '@/lib/hooks/useConfirm';
+import type { CopyableAddress } from '@/lib/format/address';
 import { isEtsyOrderSync } from '@/lib/utils/etsyDetection';
 import { buildTrendyolProductUrl } from '@/lib/utils/trendyolUrl';
 import withAuth from '@/components/withAuth';
@@ -72,33 +76,6 @@ const VEEQO_CARRIERS_BASE = [
   { value: 14, label: 'Sürat Kargo' },
   { value: 15, label: 'Trendyol Express' },
 ] as const;
-
-function formatDate(iso?: string): string {
-  if (!iso) return '—';
-  try {
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return '—';
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  } catch (e) {
-    console.error('Error formatting date:', e);
-    return '—';
-  }
-}
-
-// Turkish date+time formatter: dd/MM/yy HH:mm
-function fmtDateTr(iso?: string): string {
-  if (!iso) return '—';
-  try {
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return '—';
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear().toString().slice(-2)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  } catch (e) {
-    console.error('Error formatting date:', e);
-    return '—';
-  }
-}
 
 // --- Type for API order structure (before flattening) ---
 interface LocalUIOrder {
@@ -270,13 +247,6 @@ export interface LabelRow {
 }
 
 
-/** Get the product listing URL — prefer pre-resolved direct URL from LabelRow */
-function getProductListingUrl(row: LabelRow): string | null {
-  // Use pre-resolved direct listing URL from Veeqo Product API / EtsyListing DB
-  if (row.listingUrl) return row.listingUrl;
-  return null;
-}
-
 function getMarketplaceOrderUrl(marketplace: string, orderNumber: string, channel?: string): string | null {
   if (!orderNumber || orderNumber === '—') return null;
   const mp = (marketplace || '').toLowerCase();
@@ -323,13 +293,6 @@ const statusColors: Record<string, {bg: string, text: string}> = {
 
 // These option arrays are built inside the component using t() for i18n.
 // Static value-key mappings used to construct them:
-const LABEL_STATUS_KEYS = [
-  { value: '', key: 'all' },
-  { value: 'created', key: 'created' },
-  { value: 'not_created', key: 'notCreated' },
-  { value: 'failed', key: 'failed' },
-] as const;
-
 const ORDER_STATUS_KEYS = [
   { value: '', key: 'all' },
   { value: 'UNSHIPPED', key: 'unshipped' },
@@ -1207,7 +1170,8 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         giftMessage: order.giftMessage || '',
         originalOrder: order,
         labelCreated: latestLabelJob?.status === 'created' && !!latestLabelJob?.trackingNumber,
-        shippingLabelUrl: latestLabelJob?.pdfUrl || (latestLabelJob?.status === 'created' && latestLabelJob?.trackingNumber ? `/api/labels/${item.id}/pdf` : undefined),
+        // No /api/labels/:itemId/pdf route exists — only real stored URLs here.
+        shippingLabelUrl: latestLabelJob?.pdfUrl || undefined,
         labelStockType: order.labelStockType,
         variantInfo: item.variantInfo || '—',
         listingUrl: (() => {
@@ -1342,22 +1306,6 @@ export function validateRowForLabel(row: LabelRow): string[] { // Renamed
   return errors;
 }
 
-function getValidationStatus(row: LabelRow): { status: 'valid' | 'warning' | 'error'; message: string } {
-  const errors = validateRowForLabel(row);
-  if (errors.length === 0) return { status: 'valid', message: 'Ready for label' };
-  
-  const criticalErrors = errors.filter(e => 
-    e.includes('Street address') || e.includes('City') || e.includes('Postal code') || e.includes('Country') ||
-    e.includes('Weight') || e.includes('HS code') || e.includes('Service Type') || e.includes('Packaging Type')
-  );
-  
-  if (criticalErrors.length > 0) {
-    return { status: 'error', message: `Critical: ${criticalErrors.join(', ')}` };
-  }
-  return { status: 'warning', message: `Warnings: ${errors.join(', ')}` };
-}
-
-
 // Add Shippo notes parser helper (already defined in the file, ensure it's kept)
 function parseShippoNotes(notes: string): { to_address?: any; success: boolean } {
   try {
@@ -1408,13 +1356,6 @@ function parseEtsyPersonalization(notes: string): string {
   }
 }
 
-// Add this before the LabelsPage component
-interface LabelFormData {
-  fedexPackagingType: string;
-  labelStockType: string;
-  // Add other fields as needed for the form, e.g. recipientFirstName, etc.
-}
-
 // --- UI deduplication helper ---
 function dedupeLabelRows(rows: LabelRow[]): LabelRow[] {
   const seen = new Map<string, LabelRow>();
@@ -1452,15 +1393,165 @@ function getLabelStatus(row: LabelRow): 'labeled' | 'pending' | 'failed' | 'unla
   return 'unlabeled';
 }
 
+// --- Filter state <-> URL query ---
+// 'failed' maps to the API's labelStatus=failed (the removed label-status Select's only unique option).
+type LabelFilterValue = 'all' | 'unlabeled' | 'labeled' | 'failed';
+const LABEL_FILTER_VALUES: readonly LabelFilterValue[] = ['all', 'unlabeled', 'labeled', 'failed'];
+type SortOption = 'newest' | 'oldest' | 'shipBy' | 'priceHigh' | 'priceLow' | 'customer';
+const SORT_OPTIONS: readonly SortOption[] = ['newest', 'oldest', 'shipBy', 'priceHigh', 'priceLow', 'customer'];
+const SORT_PARAMS: Record<SortOption, { sortBy: string; sort: string }> = {
+  newest: { sortBy: 'orderDate', sort: 'desc' },
+  oldest: { sortBy: 'orderDate', sort: 'asc' },
+  shipBy: { sortBy: 'shipBy', sort: 'asc' },
+  priceHigh: { sortBy: 'price', sort: 'desc' },
+  priceLow: { sortBy: 'price', sort: 'asc' },
+  customer: { sortBy: 'customer', sort: 'asc' },
+};
+
+interface LabelsFilterState {
+  search: string;
+  searchType: string;
+  marketplace: string[];
+  status: string;
+  labelFilter: LabelFilterValue;
+  startDate: string;
+  endDate: string;
+  sort: SortOption;
+}
+
+// Default view = orders that still need a label, last 30 days. The old 7-day
+// window hid unshipped orders older than a week. "No date limit" is not the
+// default because the API's `unlabeled` clause does not exclude closed
+// (cancelled/refunded/delivered) or marketplace-shipped orders, so all-time
+// would list the whole account history. Users can clear the dates (URL from=all).
+const DEFAULT_WINDOW_DAYS = 30;
+
+function localIsoDay(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** Computed on each call so a tab left open across midnight still gets the right window. */
+function getDefaultFilters(): LabelsFilterState {
+  const start = new Date();
+  start.setDate(start.getDate() - DEFAULT_WINDOW_DAYS);
+  return {
+    search: '',
+    searchType: 'all',
+    marketplace: [],
+    status: '',
+    labelFilter: 'unlabeled',
+    startDate: localIsoDay(start),
+    endDate: '',
+    sort: 'newest',
+  };
+}
+
+/** URL value meaning "user cleared the start date" (differs from the default window). */
+const NO_START_DATE = 'all';
+
+const FILTER_QUERY_KEYS = ['q', 'qt', 'mp', 'status', 'label', 'from', 'to', 'sort'] as const;
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+function firstQueryValue(v: string | string[] | undefined): string {
+  return Array.isArray(v) ? (v[0] ?? '') : (v ?? '');
+}
+
+function parseFiltersFromQuery(query: Record<string, string | string[] | undefined>): LabelsFilterState {
+  const label = firstQueryValue(query.label);
+  const sort = firstQueryValue(query.sort) as SortOption;
+  const qt = firstQueryValue(query.qt);
+  const status = firstQueryValue(query.status);
+  const from = firstQueryValue(query.from);
+  const to = firstQueryValue(query.to);
+  const mpRaw = query.mp;
+  const DEFAULT_FILTERS = getDefaultFilters();
+  const marketplace = (Array.isArray(mpRaw) ? mpRaw : mpRaw ? [mpRaw] : []).filter(Boolean);
+  return {
+    search: firstQueryValue(query.q),
+    searchType: SEARCH_TYPE_KEYS.some(o => o.value === qt) ? qt : DEFAULT_FILTERS.searchType,
+    marketplace,
+    status: ORDER_STATUS_FILTER_KEYS.some(o => o.value === status) ? status : DEFAULT_FILTERS.status,
+    labelFilter: (LABEL_FILTER_VALUES as readonly string[]).includes(label) ? (label as LabelFilterValue) : DEFAULT_FILTERS.labelFilter,
+    startDate: from === NO_START_DATE ? '' : ISO_DAY.test(from) ? from : DEFAULT_FILTERS.startDate,
+    endDate: ISO_DAY.test(to) ? to : DEFAULT_FILTERS.endDate,
+    sort: SORT_OPTIONS.includes(sort) ? sort : DEFAULT_FILTERS.sort,
+  };
+}
+
+/** Only non-default values go into the URL, so the bare /app/labels stays the default view. */
+function filtersToQuery(f: LabelsFilterState): Record<string, string | string[]> {
+  const q: Record<string, string | string[]> = {};
+  const DEFAULT_FILTERS = getDefaultFilters();
+  if (f.search.trim()) q.q = f.search.trim();
+  if (f.searchType !== DEFAULT_FILTERS.searchType) q.qt = f.searchType;
+  if (f.marketplace.length > 0) q.mp = f.marketplace;
+  if (f.status) q.status = f.status;
+  if (f.labelFilter !== DEFAULT_FILTERS.labelFilter) q.label = f.labelFilter;
+  if (f.startDate !== DEFAULT_FILTERS.startDate) q.from = f.startDate || NO_START_DATE;
+  if (f.endDate) q.to = f.endDate;
+  if (f.sort !== DEFAULT_FILTERS.sort) q.sort = f.sort;
+  return q;
+}
+
+function sameQuery(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+  const norm = (o: Record<string, unknown>) =>
+    JSON.stringify(Object.keys(o).filter(k => o[k] !== undefined).sort().map(k => [k, Array.isArray(o[k]) ? o[k] : [o[k]]]));
+  return norm(a) === norm(b);
+}
+
+const clean = (v: unknown): string => (typeof v === 'string' && v.trim() && v.trim() !== '—' ? v.trim() : '');
+
+/** Address object for formatAddressForCopy, with Trendyol district/neighborhood when present. */
+function rowToCopyAddress(row: LabelRow): CopyableAddress {
+  let raw: any = row.originalOrder?.rawData;
+  if (typeof raw === 'string') {
+    try { raw = JSON.parse(raw); } catch { raw = {}; }
+  }
+  const ship = (raw && typeof raw === 'object' && raw.shipmentAddress) || {};
+  return {
+    name: `${clean(row.recipientFirstName)} ${clean(row.recipientLastName)}`.trim() || clean(row.originalOrder?.customerName),
+    street1: clean(row.recipientStreet1),
+    street2: clean(row.recipientStreet2),
+    neighborhood: clean(ship.neighborhood),
+    district: clean(ship.district),
+    city: clean(row.recipientCity),
+    state: clean(row.recipientState),
+    postal: clean(row.recipientPostal),
+    country: clean(row.recipientCountry),
+    phone: clean(row.recipientPhone),
+    email: clean(row.recipientEmail),
+  };
+}
+
+const CARD_INTERACTIVE_SELECTOR = 'button, a, input, textarea, select, label, [role="button"], [role="checkbox"], [role="menuitem"], [data-no-card-toggle]';
+
+/**
+ * A card-header click toggles the card only when it is a plain click on the
+ * header: not on a control inside it, not inside a portal (popover/menu
+ * clicks bubble through React), and not the end of a text selection.
+ */
+function shouldToggleFromClick(e: React.MouseEvent<HTMLElement>): boolean {
+  const target = e.target as HTMLElement | null;
+  const header = e.currentTarget;
+  if (!target || !header.contains(target)) return false;
+  const interactive = target.closest(CARD_INTERACTIVE_SELECTOR);
+  if (interactive && interactive !== header) return false;
+  const selection = typeof window !== 'undefined' ? window.getSelection?.() : null;
+  if (selection && selection.toString().trim().length > 0) return false;
+  return true;
+}
+
+const tsvCell = (v: unknown) => String(v ?? '').replace(/[\t\r\n]+/g, ' ').trim();
+
 function LabelsPage(props: { source?: string; channel?: string }) {
   const t = useTranslations('labels');
   const tc = useTranslations('common');
   const tf = useTranslations('fedex');
-  const { config, formatCurrency, formatDate, formatDateTime, formatNumber } = useLocale();
+  const { config, formatDate, formatDateTime } = useLocale();
   const fedexCurrencyCodes = useMemo(() => getFedexCurrencyCodes(tf), [tf]);
 
   // Build i18n option arrays from keys
-  const labelStatusOptions = useMemo(() => LABEL_STATUS_KEYS.map(o => ({ value: o.value, label: t(`labelStatusOptions.${o.key}`) })), [t]);
   const orderStatusOptions = useMemo(() => ORDER_STATUS_KEYS.map(o => ({ value: o.value, label: t(`orderStatusOptions.${o.key}`) })), [t]);
   const orderStatusFilterOptions = useMemo(() => ORDER_STATUS_FILTER_KEYS.map(o => ({ value: o.value, label: t(`orderStatusFilterOptions.${o.key}`), ...('statuses' in o ? { statuses: o.statuses } : {}) })), [t]);
   const searchTypeOptions = useMemo(() => SEARCH_TYPE_KEYS.map(o => ({ value: o.value, label: t(`searchTypeOptions.${o.key}`) })), [t]);
@@ -1478,7 +1569,15 @@ function LabelsPage(props: { source?: string; channel?: string }) {
     }
   }, [formatDate]);
 
-  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
+  const router = useRouter();
+  const confirm = useConfirm();
+  // Filters are initialised from the URL so reload/back keeps them. When the
+  // router is not ready on the first render (hard reload of a static page) the
+  // URL is applied once it becomes ready.
+  const [initialFilters] = useState<LabelsFilterState>(() => (router.isReady ? parseFiltersFromQuery(router.query) : getDefaultFilters()));
+  const [urlHydrated, setUrlHydrated] = useState<boolean>(router.isReady);
+
+  const [paginationModel, setPaginationModel] = useState<{ page: number; pageSize: number }>({
     page: 0,
     pageSize: 15
   });
@@ -1505,60 +1604,109 @@ function LabelsPage(props: { source?: string; channel?: string }) {
   });
   const [submittingTracking, setSubmittingTracking] = useState(false);
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [searchType, setSearchType] = useState('all');
-  const [marketplaceFilter, setMarketplaceFilter] = useState<string[]>([]);
-  const [statusFilter, setStatusFilter] = useState('');
-  const [labelStatusFilter, setLabelStatusFilter] = useState('');
+  const [searchTerm, setSearchTerm] = useState(initialFilters.search);
+  const [searchType, setSearchType] = useState(initialFilters.searchType);
+  const [marketplaceFilter, setMarketplaceFilter] = useState<string[]>(initialFilters.marketplace);
+  const [statusFilter, setStatusFilter] = useState(initialFilters.status);
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [generatingLabelId, setGeneratingLabelId] = useState<string | null>(null);
   const [syncingOrders, setSyncingOrders] = useState(false);
-  const [rawOrderDataModalOpen, setRawOrderDataModalOpen] = useState(false);
-  const [currentRawData, setCurrentRawData] = useState<Record<string, any> | null>(null);
   const [shipperPhoneNumber, setShipperPhoneNumber] = useState('');
   const [hasFedexCredentials, setHasFedexCredentials] = useState(false);
   const [checkingFedexCredentials, setCheckingFedexCredentials] = useState(true);
-  const [labelFilter, setLabelFilter] = useState<'all' | 'unlabeled' | 'labeled'>('all');
+  const [labelFilter, setLabelFilter] = useState<LabelFilterValue>(initialFilters.labelFilter);
+  // Label filter chosen while a search is active (null = 'all' during search).
+  const [searchLabelFilter, setSearchLabelFilter] = useState<LabelFilterValue | null>(null);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   // Kompakt = collapsed cards (click one to expand), Detaylı = all expanded.
   // Replaces the old DataGrid column presets, which stopped doing anything
   // when the page moved to the unified card layout.
   const [cardViewMode, setCardViewMode] = useState<'compact' | 'expanded'>('compact');
-  const [deleteConfirmation, setDeleteConfirmation] = useState<string | null>(null);
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const [shipmentDeleteConfirmation, setShipmentDeleteConfirmation] = useState<string | null>(null);
   const [deletingShipmentId, setDeletingShipmentId] = useState<string | null>(null);
-  const [filterStartDate, setFilterStartDate] = useState(() => {
-    const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    return sevenDaysAgo.toISOString().slice(0, 10);
-  });
-  const [filterEndDate, setFilterEndDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [addressSource, setAddressSource] = useState<'default' | 'shippo'>('default');
-  const [readOnlyAddress, setReadOnlyAddress] = useState(true);
-  const [formData, setFormData] = useState<LabelFormData>({
-    fedexPackagingType: '',
-    labelStockType: 'PAPER_4X6',
-  });
-  
-  // --- ETGB Selection State ---
-  const [etgbSelectedRows, setEtgbSelectedRows] = useState<string[]>([]);
+  const [filterStartDate, setFilterStartDate] = useState(initialFilters.startDate);
+  const [filterEndDate, setFilterEndDate] = useState(initialFilters.endDate);
+  // Latest label created from this page (FedEx). Browsers block window.open
+  // after an await, so the label is always reachable from a button too.
+  const [lastCreatedLabel, setLastCreatedLabel] = useState<{ orderNumber: string; trackingNumber?: string; url: string } | null>(null);
+
+  // --- Selection (ETGB + bulk address copy). Keyed by orderId; keeps the
+  // primary row so selections survive paging.
+  const [selectedOrders, setSelectedOrders] = useState<Record<string, LabelRow>>({});
+  const selectedOrderIds = useMemo(() => Object.keys(selectedOrders), [selectedOrders]);
   const [etgbEnabled, setEtgbEnabled] = useState(false);
   const [processingEtgb, setProcessingEtgb] = useState(false);
 
   // Sort — default newest first (existing behavior); ship-by closest surfaces
   // urgent orders. Sorting is server-side because pagination is server-side.
-  type SortOption = 'newest' | 'oldest' | 'shipBy' | 'priceHigh' | 'priceLow' | 'customer';
-  const [sortOption, setSortOption] = useState<SortOption>('newest');
-  const SORT_PARAMS: Record<SortOption, { sortBy: string; sort: string }> = {
-    newest: { sortBy: 'orderDate', sort: 'desc' },
-    oldest: { sortBy: 'orderDate', sort: 'asc' },
-    shipBy: { sortBy: 'shipBy', sort: 'asc' },
-    priceHigh: { sortBy: 'price', sort: 'desc' },
-    priceLow: { sortBy: 'price', sort: 'asc' },
-    customer: { sortBy: 'customer', sort: 'asc' },
-  };
+  const [sortOption, setSortOption] = useState<SortOption>(initialFilters.sort);
 
   const debouncedSearch = useDebouncedValue(searchTerm, 300);
+
+  const applyFilters = useCallback((f: LabelsFilterState) => {
+    setSearchTerm(f.search);
+    setSearchType(f.searchType);
+    setMarketplaceFilter(f.marketplace);
+    setStatusFilter(f.status);
+    setLabelFilter(f.labelFilter);
+    setFilterStartDate(f.startDate);
+    setFilterEndDate(f.endDate);
+    setSortOption(f.sort);
+  }, []);
+
+  // Late URL hydration (router not ready on first render).
+  useEffect(() => {
+    if (!router.isReady || urlHydrated) return;
+    applyFilters(parseFiltersFromQuery(router.query));
+    setUrlHydrated(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady]);
+
+  // Mirror filters into the URL (shallow replace: no history spam, no refetch of page props).
+  const marketplaceKey = marketplaceFilter.join('\u0001');
+  useEffect(() => {
+    if (!router.isReady || !urlHydrated) return;
+    if (searchTerm !== debouncedSearch) return; // wait for the debounce
+    const filterQuery = filtersToQuery({
+      search: debouncedSearch,
+      searchType,
+      marketplace: marketplaceFilter,
+      status: statusFilter,
+      labelFilter,
+      startDate: filterStartDate,
+      endDate: filterEndDate,
+      sort: sortOption,
+    });
+    const preserved: Record<string, string | string[]> = {};
+    for (const [k, v] of Object.entries(router.query)) {
+      if (v !== undefined && !(FILTER_QUERY_KEYS as readonly string[]).includes(k)) preserved[k] = v;
+    }
+    const nextQuery = { ...preserved, ...filterQuery };
+    if (sameQuery(nextQuery, router.query)) return;
+    router.replace({ pathname: router.pathname, query: nextQuery }, undefined, { shallow: true, scroll: false }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlHydrated, router.isReady, searchTerm, debouncedSearch, searchType, marketplaceKey, statusFilter, labelFilter, filterStartDate, filterEndDate, sortOption]);
+
+  const resetFilters = () => {
+    setSearchLabelFilter(null);
+    applyFilters(getDefaultFilters());
+  };
+  const activeSheetFilterCount = (statusFilter ? 1 : 0) + (marketplaceFilter.length > 0 ? 1 : 0)
+    + (filterStartDate !== getDefaultFilters().startDate || filterEndDate ? 1 : 0);
+
+  // A search means "find this order wherever it is": the API already ignores
+  // the date window while searching, and the default 'unlabeled' filter would
+  // hide every already-labeled match (reprint / find order). While searching,
+  // the label filter is 'all' unless the user picks one during that search;
+  // the persisted (URL) labelFilter is left untouched.
+  const isSearching = searchTerm.trim() !== '';
+  const isDebouncedSearching = debouncedSearch.trim() !== '';
+  useEffect(() => {
+    if (!isSearching) setSearchLabelFilter(null);
+  }, [isSearching]);
+  const effectiveLabelFilter: LabelFilterValue = isDebouncedSearching ? (searchLabelFilter ?? 'all') : labelFilter;
+  const displayedLabelFilter: LabelFilterValue = isSearching ? (searchLabelFilter ?? 'all') : labelFilter;
 
   // Fetch marketplace options
   const { marketplaceOptions: dbMarketplaceOptions, isLoading: isLoadingMarketplaces } = useMarketplaceOptions();
@@ -1566,7 +1714,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
   // When any filter changes, the FIRST fetch must already use page 0 — the old
   // setTimeout-based reset let a request go out with the stale page number
   // (an empty page of the new result set) before resetting.
-  const filterSignature = JSON.stringify([debouncedSearch, searchType, statusFilter, labelStatusFilter, labelFilter, filterStartDate, filterEndDate, marketplaceFilter, sortOption]);
+  const filterSignature = JSON.stringify([debouncedSearch, searchType, statusFilter, effectiveLabelFilter, filterStartDate, filterEndDate, marketplaceFilter, sortOption]);
   const lastFilterSignatureRef = useRef(filterSignature);
   const effectivePage = lastFilterSignatureRef.current === filterSignature ? paginationModel.page : 0;
 
@@ -1586,22 +1734,14 @@ function LabelsPage(props: { source?: string; channel?: string }) {
       endDate: filterEndDate,
       marketplace: marketplaceFilter.length > 0 ? marketplaceFilter : undefined,
       status: statusFilter,
-      labelStatus: labelStatusFilter,
-      labelFilter: labelFilter,
+      labelFilter: effectiveLabelFilter === 'failed' ? undefined : effectiveLabelFilter,
+      labelStatus: effectiveLabelFilter === 'failed' ? 'failed' : undefined,
       sortBy: SORT_PARAMS[sortOption].sortBy,
       sort: SORT_PARAMS[sortOption].sort,
     },
     'labelsPage'
   );
 
-  const marketplaceOptions = useMemo(() => {
-    if (!fetchedOrders || !Array.isArray(fetchedOrders)) {
-      return [{ value: '', label: t('integrationOptions.all') }];
-    }
-    const marketplaces = new Set(fetchedOrders.map((order: any) => order.marketplace).filter(Boolean));
-    const options = Array.from(marketplaces).sort().map(m => ({ value: m, label: m }));
-    return [{ value: '', label: t('integrationOptions.all') }, ...options];
-  }, [fetchedOrders]);
 
   const [labelRows, setLabelRows] = useState<LabelRow[]>([]);
   
@@ -1623,8 +1763,10 @@ function LabelsPage(props: { source?: string; channel?: string }) {
   }, [fetchedOrders]);
 
   // Restore label filter tab interactivity
-  const handleLabelFilter = (_event: React.MouseEvent<HTMLElement>, value: 'all' | 'unlabeled' | 'labeled' | null) => {
-    if (value) setLabelFilter(value);
+  const handleLabelFilter = (_event: React.MouseEvent<HTMLElement>, value: LabelFilterValue | null) => {
+    if (!value) return;
+    if (isSearching) setSearchLabelFilter(value);
+    else setLabelFilter(value);
   };
 
   // All filtering (search, status, marketplace, date, label) is handled server-side via useOrders
@@ -1724,13 +1866,6 @@ function LabelsPage(props: { source?: string; channel?: string }) {
     fetchUserSettings();
   }, []);
   
-  // Clear selection when ETGB is disabled
-  useEffect(() => {
-    if (!etgbEnabled) {
-      setEtgbSelectedRows([]);
-    }
-  }, [etgbEnabled]);
-
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerOrder, setDrawerOrder] = useState<LabelRow | null>(null);
@@ -1763,7 +1898,6 @@ function LabelsPage(props: { source?: string; channel?: string }) {
       // Ensure line_items for the payload is correctly formed by getDefaultValues
     };
     
-    let newAddressSource: 'default' | 'shippo' = 'default';
     if (row.originalOrder?.source === 'veeqo' && row.originalOrder?.channel === 'etsy' && row.originalOrder?.rawData?.notes) {
       const { to_address, success } = parseShippoNotes(row.originalOrder.rawData.notes);
       if (success && to_address) {
@@ -1776,19 +1910,15 @@ function LabelsPage(props: { source?: string; channel?: string }) {
         currentDrawerData.recipientPostal = to_address.zip || currentDrawerData.recipientPostal;
         currentDrawerData.recipientCountry = to_address.country || currentDrawerData.recipientCountry;
         currentDrawerData.recipientPhone = to_address.phone || currentDrawerData.recipientPhone || '';
-        newAddressSource = 'shippo';
-        setReadOnlyAddress(true);
       }
     }
     
     setDrawerOrder(currentDrawerData);
     setDrawerOpen(true);
-    setAddressSource(newAddressSource);
   };
 
   const closeDrawer = () => {
     setDrawerOpen(false);
-    setReadOnlyAddress(true);
   };
 
   const handleDrawerChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent<string>) => {
@@ -1818,656 +1948,6 @@ function LabelsPage(props: { source?: string; channel?: string }) {
     });
   };
 
-  const columns: GridColDef<LabelRow>[] = [
-    {
-      field: 'labelStatus',
-      headerName: t('columnLabel'),
-      width: 30,
-      sortable: false,
-      valueGetter: (_value, row) => {
-        const originalOrder = row?.originalOrder as LocalUIOrder | undefined;
-        const shipments = originalOrder?.shipments || [];
-        const hasShipment = shipments.some(s => s?.status === 'created' && (s?.trackingNumber || s?.pdfUrl));
-
-        if (!row) {
-          return '—';
-        }
-        
-        // Check if we have a label created (either through tracking number, labelCreated flag, shippingLabelUrl, or shipment)
-        const hasLabel = row.trackingNumber || 
-                        row.labelCreated || 
-                        row.shippingLabelUrl || 
-                        row.labelJobStatus === 'created' ||
-                        hasShipment;
-        
-        if (hasLabel) {
-          return t('statusReceived');
-        }
-
-        if (row.labelJobStatus === 'failed') {
-          return t('statusError');
-        }
-
-        if (row.labelJobStatus === 'pending') {
-          return t('statusPending');
-        }
-
-        return t('statusNoLabel');
-      },
-      renderCell: (params: GridRenderCellParams<LabelRow, string>) => {
-        const status = params.value;
-        if (status === t('statusReceived')) {
-          // First try to get tracking number from row, then from shipments array
-          let trackingNumber = params.row.trackingNumber;
-          
-          if (!trackingNumber) {
-            const originalOrder = params.row?.originalOrder as LocalUIOrder | undefined;
-            const shipments = originalOrder?.shipments || [];
-            const latestShipment = shipments.find(s => s?.status === 'created' && s?.trackingNumber);
-            trackingNumber = latestShipment?.trackingNumber || 'Tracking number not available';
-          }
-          
-          // Find the shipment to get its ID for deletion
-          const originalOrder = params.row?.originalOrder as LocalUIOrder | undefined;
-          const shipments = originalOrder?.shipments || [];
-          const latestShipment = shipments.find(s => s?.status === 'created' && (s?.trackingNumber || s?.pdfUrl));
-          
-          return (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <Tooltip title={t('tooltipLabelReceived')}>
-                <span
-                  style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    if (trackingNumber && trackingNumber !== 'Tracking number not available') {
-                      await navigator.clipboard.writeText(trackingNumber);
-                      toast.success(t('trackingCopied'), { duration: 1500 });
-                    }
-                  }}
-                >
-                  <CheckCircleIcon color="success" />
-                </span>
-              </Tooltip>
-              {latestShipment?.id && (
-                <Tooltip title={t('deleteLabel')}>
-                  <IconButton
-                    size="small"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShipmentDeleteConfirmation(latestShipment.id);
-                    }}
-                    sx={{ p: 0.25, '&:hover': { backgroundColor: 'error.light', opacity: 0.8 } }}
-                  >
-                    <DeleteIcon sx={{ fontSize: 14, color: 'error.main' }} />
-                  </IconButton>
-                </Tooltip>
-              )}
-            </Box>
-          );
-        }
-        if (status === t('statusError'))   return <Tooltip title={t('tooltipLabelError')}><CancelIcon color="error" /></Tooltip>;
-        if (status === t('statusPending')) return <Tooltip title={t('tooltipLabelPending')}><HourglassEmptyIcon color="warning" /></Tooltip>;
-        return <Tooltip title={t('tooltipLabelNotCreated')}><CircleIcon color="disabled" /></Tooltip>;
-      },
-    },
-    {
-      field: 'tracking',
-      headerName: t('columnShipping'),
-      width: 50,
-      sortable: false,
-      renderCell: (params: GridRenderCellParams<LabelRow>) => {
-        const row = params.row;
-        const originalOrder = row?.originalOrder as LocalUIOrder | undefined;
-
-        // Check if tracking number exists (manual submissions, label generation, or order-level)
-        const hasManualTracking = originalOrder?.trackingSubmissions &&
-                                 originalOrder.trackingSubmissions.length > 0;
-        const hasLabelTracking = row.trackingNumber;
-        const hasTracking = hasManualTracking || !!hasLabelTracking;
-
-        const handleTrackingClick = () => {
-          setSelectedOrderForTracking(row);
-          setTrackingFormData({
-            trackingNumber: '',
-            carrierId: 3,
-            notifyCustomer: true,
-            updateRemoteOrder: true
-          });
-          setTrackingDialogOpen(true);
-        };
-
-        return (
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <IconButton 
-              size="small" 
-              onClick={handleTrackingClick}
-              sx={{ 
-                color: hasTracking ? 'success.main' : 'text.secondary',
-                '&:hover': { 
-                  backgroundColor: hasTracking ? 'success.light' : 'action.hover',
-                  opacity: 0.8
-                }
-              }}
-            >
-              <Tooltip title={hasTracking ? t('trackingExists') : t('addTracking')}>
-                {hasTracking ? <FlightTakeoffIcon /> : <FlightIcon />}
-              </Tooltip>
-            </IconButton>
-          </Box>
-        );
-      },
-    },
-    {
-      field: 'itemImageUrl',
-      headerName: t('columnProductImage'),
-      width: 72,
-      sortable: false,
-      renderCell: (params: GridRenderCellParams<LabelRow>) => (
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '100%',
-            cursor: 'pointer'
-          }}
-          onClick={() => {
-            const imageUrl = params.value as string || '/placeholder.png';
-            setSelectedImageUrl(imageUrl);
-            setImageModalOpen(true);
-          }}
-        >
-          <img
-            src={params.value as string || '/placeholder.png'}
-            alt={t('columnProductImage')}
-            style={{
-              width: 52,
-              height: 52,
-              objectFit: 'cover',
-              borderRadius: 6,
-            }}
-            onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.png'; }}
-          />
-        </Box>
-      )
-    },
-    {
-      field: 'marketplace',
-      headerName: t('columnStore'),
-      width: 110,
-      renderCell: (params: GridRenderCellParams<LabelRow>) => (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, py: 0.5 }}>
-          <Typography variant="body2" sx={{ lineHeight: 1.2 }}>{params.value}</Typography>
-          {params.row.isMCF && (
-            <Chip label="MCF" size="small" title={t('mcfBadgeTooltip')} sx={{ height: 16, fontSize: '0.6rem', bgcolor: '#fef3c7', color: '#92400e', fontWeight: 700 }} />
-          )}
-          {params.row.isFBA && !params.row.isMCF && (
-            <Chip label="FBA" size="small" title={t('fbaBadgeTooltip')} sx={{ height: 16, fontSize: '0.6rem', bgcolor: '#dbeafe', color: '#1e40af', fontWeight: 700 }} />
-          )}
-        </Box>
-      ),
-    },
-    {
-      field: 'status',
-      headerName: tc('status'),
-      width: 100,
-      renderCell: (params: GridRenderCellParams<LabelRow>) => {
-        const status = params.value?.toUpperCase() || 'UNKNOWN';
-        const config = statusColors[status] || { bg: '#ccc', text: '#000' };
-        const statusOption = orderStatusOptions.find(opt => opt.value === status);
-        const label = statusOption?.label || status.replace(/_/g, ' ');
-        
-        return (
-          <Chip 
-            label={label} 
-            size="small"
-            style={{
-              backgroundColor: config.bg,
-              color: config.text,
-              fontWeight: 500,
-              fontSize: '0.75rem'
-            }}
-          />
-        );
-      }
-    },
-    {
-      field: 'orderDate',
-      headerName: t('columnOrderDate'),
-      width: 110,
-      sortable: true,
-      sortComparator: (v1, v2) => new Date(v1).getTime() - new Date(v2).getTime(),
-      renderCell: (params: GridRenderCellParams<LabelRow>) => {
-        const iso = params.value as string | undefined;
-        if (!iso) return '—';
-        try {
-          const d = new Date(iso);
-          if (isNaN(d.getTime())) return '—';
-          const pad = (n: number) => n.toString().padStart(2, '0');
-          const date = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear().toString().slice(-2)}`;
-          const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-          return (
-            <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%', lineHeight: 1.3 }}>
-              <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{date}</Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>{time}</Typography>
-            </Box>
-          );
-        } catch { return '—'; }
-      },
-    },
-    {
-      field: 'orderNumber',
-      headerName: t('columnOrderNo'),
-      width: 120,
-      renderCell: (params: GridRenderCellParams<LabelRow>) => {
-        const url = getMarketplaceOrderUrl(params.row.marketplace, params.value as string, params.row.channel);
-        return (
-          <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', gap: 0.5 }}>
-            <Typography variant="body2" noWrap>{params.value || '—'}</Typography>
-            {url && (
-              <IconButton
-                size="small"
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                component="a"
-                onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                sx={{ p: 0.25, color: 'primary.main', '&:hover': { color: 'primary.dark' } }}
-              >
-                <OpenInNewIcon sx={{ fontSize: 14 }} />
-              </IconButton>
-            )}
-          </Box>
-        );
-      }
-    },
-    {
-      field: 'customerSevk',
-      headerName: t('columnCustomerShip'),
-      width: 130,
-      valueGetter: (_value, row) => `${row.recipientFirstName || ''} ${row.recipientLastName || ''}`.trim() || row.originalOrder?.customerName || '—'
-    },
-    {
-      field: 'orderTotalPrice',
-      headerName: t('columnTotal'),
-      width: 95,
-      type: 'number',
-      renderCell: (params: GridRenderCellParams<LabelRow>) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-          <Typography variant="body2">
-            {params.value != null && params.value > 0 ? `${(params.value as number).toFixed(2)} ${params.row.currency || ''}`.trim() : '—'}
-          </Typography>
-        </Box>
-      )
-    },
-    {
-      field: 'manualShippingCost',
-      headerName: t('columnShippingCost'),
-      width: 110,
-      sortable: false,
-      renderCell: (params: GridRenderCellParams<LabelRow>) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }} onClick={(e) => e.stopPropagation()}>
-          <ShippingCostCell
-            orderId={params.row.orderId}
-            cost={(params.row.originalOrder as any)?.manualShippingCost != null ? Number((params.row.originalOrder as any).manualShippingCost) : null}
-            currency={(params.row.originalOrder as any)?.manualShippingCostCurrency || null}
-          />
-        </Box>
-      ),
-    },
-    {
-      field: 'title',
-      headerName: t('columnProductName'),
-      minWidth: 180,
-      flex: 2,
-      renderCell: (params: GridRenderCellParams<LabelRow>) => {
-        const listingUrl = getProductListingUrl(params.row);
-        return (
-          <Tooltip title={params.value || ''} placement="bottom-start">
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                height: '100%',
-                gap: 0.5,
-                overflow: 'hidden',
-                minWidth: 0,
-              }}
-            >
-              <Typography
-                variant="body2"
-                sx={{
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  cursor: 'pointer',
-                  flex: 1,
-                  minWidth: 0,
-                }}
-                onClick={() => {
-                  if (params.value) {
-                    navigator.clipboard.writeText(params.value as string);
-                    toast.success(t('productNameCopied'));
-                  }
-                }}
-              >
-                {params.value || '—'}
-              </Typography>
-              {listingUrl && (
-                <IconButton
-                  size="small"
-                  href={listingUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  component="a"
-                  onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                  sx={{ p: 0.25, color: 'primary.main', '&:hover': { color: 'primary.dark' }, flexShrink: 0 }}
-                >
-                  <OpenInNewIcon sx={{ fontSize: 14 }} />
-                </IconButton>
-              )}
-            </Box>
-          </Tooltip>
-        );
-      }
-    },
-    { 
-      field: 'variantInfo',
-      headerName: t('columnVariant'),
-      width: 140,
-      renderCell: (params: GridRenderCellParams<LabelRow>) => (
-        <Tooltip title={params.value || ''} placement="bottom-start">
-          <Box 
-            sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              height: '100%',
-              cursor: 'pointer',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
-            }}
-            onClick={() => {
-              if (params.value) {
-                navigator.clipboard.writeText(params.value as string);
-                toast.success(t('variationCopied'));
-              }
-            }}
-          >
-            <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {params.value || '—'}
-            </Typography>
-          </Box>
-        </Tooltip>
-      )
-    },
-    { field: 'quantity', headerName: t('quantity'), width: 60, type: 'number' },
-    {
-      field: 'shipByDate',
-      headerName: t('shipByDate'),
-      width: 130,
-      valueFormatter: (value: string | undefined) => value ? formatDate(value) : '—',
-    },
-    {
-      field: 'customerNote',
-      headerName: t('customerNote'),
-      width: 150,
-      renderCell: (params: GridRenderCellParams<LabelRow>) => {
-        const note = params.row.customerNote;
-        if (!note || note.trim() === '') {
-          return (
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              height: '100%' 
-            }}>
-              <span style={{ color: '#999' }}>—</span>
-            </div>
-          );
-        }
-
-        const handleCopyClick = async () => {
-          try {
-            await navigator.clipboard.writeText(note);
-            toast.success(t('noteCopied'));
-          } catch (err) {
-            console.error('Failed to copy note:', err);
-            toast.error(t('copyFailed'));
-          }
-        };
-
-        return (
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            height: '100%',
-            fontSize: '13px', 
-            lineHeight: '1.2',
-            maxHeight: '40px',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            cursor: 'pointer',
-            padding: '2px 4px',
-            borderRadius: '4px',
-            transition: 'background-color 0.2s'
-          }}
-          onClick={handleCopyClick}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#f5f5f5';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-          }}
-          title={t('clickToCopy', { context: note })}
-          >
-            {note}
-          </div>
-        );
-      }
-    },
-    {
-      field: 'lastCarrier',
-      headerName: t('carrier'),
-      width: 100, 
-      renderCell: (params: GridRenderCellParams<LabelRow>) => {
-        // Try to get the latest label job's carrier
-        const labelJobs = params.row.originalOrder?.line_items?.find(i => i.id === params.row.itemId)?.labelJobs || [];
-        const latestLabelJob = labelJobs.length > 0 ? labelJobs[0] : null;
-        
-        // Also check shipments for carrier info (UPS creates shipments but not labelJobs)
-        const shipments = params.row.originalOrder?.shipments || [];
-        const latestShipment = shipments.length > 0 ? shipments[0] : null;
-        
-        const carrier = latestLabelJob?.carrier || (latestShipment as any)?.carrier || params.row.lastCarrier;
-        if (carrier === 'FEDEX') {
-          if (latestLabelJob?.pdfUrl) {
-            return (
-              <a
-                href={latestLabelJob.pdfUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ display: 'inline-block' }}
-                title={t('openLabel')}
-              >
-                <img src="/images/FedEx-Logo-PNG-Transparent.png" alt="FedEx" style={{ height: 16, marginLeft: 2, cursor: 'pointer' }} />
-              </a>
-            );
-          }
-          return <img src="/images/FedEx-Logo-PNG-Transparent.png" alt="FedEx" style={{ height: 16, marginLeft: 2 }} title="FedEx" />;
-        }
-        if (carrier === 'UPS') {
-          if (latestLabelJob?.pdfUrl) {
-            return (
-              <a
-                href={latestLabelJob.pdfUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ display: 'inline-block' }}
-                title={t('openLabel')}
-              >
-                <img src="/images/United_Parcel_Service_logo.png" alt="UPS" style={{ height: 16, marginLeft: 2, cursor: 'pointer' }} />
-              </a>
-            );
-          }
-          return <img src="/images/United_Parcel_Service_logo.png" alt="UPS" style={{ height: 16, marginLeft: 2 }} title="UPS" />;
-        }
-        return carrier || '—';
-      }
-    },
-    {
-      field: 'actions',
-      headerName: t('details'),
-      width: 180,
-      minWidth: 180,
-      sortable: false,
-      renderCell: (params: GridRenderCellParams<LabelRow>) => {
-        const fbaDisabled = !!params.row.isFBA;
-        const fbaTooltip = params.row.isMCF
-          ? t('mcfRowDisabled')
-          : fbaDisabled ? t('fbaRowDisabled') : '';
-        const disabledBtn = (label: string, child: React.ReactNode) => (
-          <Tooltip title={label}>
-            <span>{child}</span>
-          </Tooltip>
-        );
-        return (
-        <>
-          {disabledBtn(fbaTooltip,
-            <IconButton onClick={() => openDrawer(params.row as LabelRow)} size="small" disabled={fbaDisabled}>
-              <EditIcon fontSize="small"/>
-            </IconButton>
-          )}
-          {(params.row.marketplace || '').toLowerCase().includes('amazon') && (
-            <Tooltip title={t('amazonMsgTooltip')}>
-              <IconButton
-                size="small"
-                onClick={() => {
-                  const origOrder = params.row.originalOrder as any;
-                  // Pass marketplaceId only when it's a real ID. salesChannel
-                  // is the human name ("Amazon.com.mx") which Amazon rejects.
-                  // Backend resolves loose inputs and falls back to the
-                  // seller's primary marketplaceId if missing.
-                  const mpId = origOrder?.marketplaceId
-                    || origOrder?.rawData?.['sales-channel-marketplace-id']
-                    || origOrder?.rawData?.['marketplace-id']
-                    || origOrder?.rawData?.salesChannel
-                    || undefined;
-                  setAmazonMsgOrder({ orderId: params.row.orderNumber, marketplaceId: mpId });
-                  setAmazonMsgDialogOpen(true);
-                }}
-                sx={{ ml: 0.5 }}
-              >
-                <EmailIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          )}
-          {disabledBtn(fbaTooltip,
-          <Button size="small" variant="outlined" sx={{ml:1}} disabled={fbaDisabled} onClick={() => {
-            // Convert LabelRow to UIOrder format for UPS drawer
-            const originalOrder = params.row.originalOrder as LocalUIOrder | undefined;
-            const uiOrder: UIOrder = {
-              orderId: params.row.orderId,
-              orderNumber: params.row.orderNumber,
-              recipientFirstName: params.row.recipientFirstName,
-              recipientLastName: params.row.recipientLastName,
-              recipientStreet1: params.row.recipientStreet1,
-              recipientStreet2: params.row.recipientStreet2,
-              recipientCity: params.row.recipientCity,
-              recipientState: params.row.recipientState,
-              recipientPostal: params.row.recipientPostal,
-              recipientCountry: params.row.recipientCountry,
-              recipientPhone: params.row.recipientPhone,
-              recipientEmail: params.row.recipientEmail,
-              orderTotalPrice: params.row.orderTotalPrice,
-              currency: params.row.currency,
-              title: params.row.title,
-              weight: params.row.weight,
-              hsCode: params.row.hsCode,
-              countryOfOrigin: params.row.countryOfOrigin,
-              shipments: originalOrder?.shipments || [],
-            };
-            setSelectedOrderForUPS(uiOrder);
-            setUpsDrawerOpen(true);
-          }}>
-            UPS
-          </Button>
-          )}
-          {disabledBtn(fbaTooltip,
-          <Button size="small" variant="outlined" color="secondary" sx={{ml:0.5}} disabled={fbaDisabled} onClick={() => {
-            const originalOrder = params.row.originalOrder as LocalUIOrder | undefined;
-            const mngOrder = buildMngOrder(params.row, originalOrder, shipperPhoneNumber);
-            setSelectedOrderForMNG(mngOrder);
-            setMngDrawerOpen(true);
-          }}>
-            MNG
-          </Button>
-          )}
-        </>
-        );
-      }
-    },
-    {
-      field: 'delete',
-      headerName: tc('delete'),
-      width: 80,
-      sortable: false,
-      renderCell: (params: GridRenderCellParams<LabelRow>) => {
-        const orderId = params.row?.orderId;
-        const orderNumber = params.row?.orderNumber;
-        
-        if (!orderId) return null;
-
-        const isConfirming = deleteConfirmation === orderId;
-        const isDeleting = deletingOrderId === orderId;
-
-        if (isDeleting) {
-          return (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <CircularProgress size={16} />
-            </Box>
-          );
-        }
-
-        if (isConfirming) {
-          return (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <Tooltip title={tc('delete')}>
-                <IconButton
-                  size="small"
-                  onClick={() => handleDeleteOrder(orderId)}
-                  sx={{ color: 'success.main', padding: '2px' }}
-                >
-                  <CheckIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title={tc('cancel')}>
-                <IconButton
-                  size="small"
-                  onClick={() => setDeleteConfirmation(null)}
-                  sx={{ color: 'error.main', padding: '2px' }}
-                >
-                  <CancelIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            </Box>
-          );
-        }
-
-        return (
-          <Tooltip title={t('deleteOrder', { orderNumber })}>
-            <IconButton
-              size="small"
-              onClick={() => setDeleteConfirmation(orderId)}
-              sx={{ color: 'error.main', padding: '4px' }}
-            >
-              <DeleteIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        );
-      }
-    },
-  ];
-
   const handleSync = async () => {
     setSyncingOrders(true);
     const toastId = toast.loading(t('syncingOrders'));
@@ -2487,6 +1967,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
       // Optionally refresh data after sync
       mutate && mutate();
     } catch (e: any) {
+      if (isUsageLimitError(e)) { toast.dismiss(toastId); return; }
       toast.error(t('syncError', { error: e.message }), { id: toastId });
     } finally {
       setSyncingOrders(false);
@@ -2534,7 +2015,8 @@ function LabelsPage(props: { source?: string; channel?: string }) {
       mutate && mutate();
       
     } catch (e: any) {
-      toast.error(`${tc('error')}: ${e.message}`, { id: toastId });
+      toast.dismiss(toastId);
+      notify.error(e, 'labels.trackingFailed');
     } finally {
       setSubmittingTracking(false);
     }
@@ -2544,19 +2026,81 @@ function LabelsPage(props: { source?: string; channel?: string }) {
     const toastId = toast.loading(t('refreshingOrders'));
     mutate().then(() => {
       toast.success(t('refreshSuccess'), { id: toastId });
-    }).catch(() => {
-      toast.error(t('refreshError'), { id: toastId });
+    }).catch((err: unknown) => {
+      toast.dismiss(toastId);
+      notify.error(err, 'labels.refreshError');
     });
+  };
+
+  /** Open the tracking dialog prefilled from the order's latest label/shipment. */
+  const openTrackingDialog = (row: LabelRow) => {
+    const { trackingNumber, carrier } = getTrackingPair(getLatestLabel(row.originalOrder as any), row.trackingNumber, row.lastCarrier);
+    setSelectedOrderForTracking(row);
+    setTrackingFormData({
+      trackingNumber,
+      carrierId: carrierToVeeqoId(carrier),
+      notifyCustomer: true,
+      updateRemoteOrder: true,
+    });
+    setTrackingDialogOpen(true);
+  };
+
+  const toggleOrderSelected = (row: LabelRow, checked: boolean) => {
+    setSelectedOrders(prev => {
+      const next = { ...prev };
+      if (checked) next[row.orderId] = row;
+      else delete next[row.orderId];
+      return next;
+    });
+  };
+
+  const buildAddressesTsv = () => {
+    const header = [t('columnOrderNo'), t('buyerName'), t('addressLine1'), t('addressLine2'), t('city'), t('stateRegion'), t('postalCode'), t('country'), t('phone'), t('email')];
+    const lines = Object.values(selectedOrders).map(r => {
+      const a = rowToCopyAddress(r);
+      return [r.orderNumber, a.name, a.street1, a.street2, a.city, a.state, a.postal, a.country, a.phone, a.email].map(tsvCell).join('\t');
+    });
+    return [header.map(tsvCell).join('\t'), ...lines].join('\n');
+  };
+
+  const buildMngOrderForRow = (row: LabelRow) => buildMngOrder(row, row.originalOrder as LocalUIOrder | undefined, shipperPhoneNumber);
+
+  const openUpsDrawer = (row: LabelRow) => {
+    const originalOrder = row.originalOrder as LocalUIOrder | undefined;
+    const uiOrder: UIOrder = {
+      orderId: row.orderId,
+      orderNumber: row.orderNumber,
+      recipientFirstName: row.recipientFirstName,
+      recipientLastName: row.recipientLastName,
+      recipientStreet1: row.recipientStreet1,
+      recipientStreet2: row.recipientStreet2,
+      recipientCity: row.recipientCity,
+      recipientState: row.recipientState,
+      recipientPostal: row.recipientPostal,
+      recipientCountry: row.recipientCountry,
+      recipientPhone: row.recipientPhone,
+      recipientEmail: row.recipientEmail,
+      orderTotalPrice: row.orderTotalPrice,
+      currency: row.currency,
+      title: row.title,
+      weight: row.weight,
+      hsCode: row.hsCode,
+      countryOfOrigin: row.countryOfOrigin,
+      shipments: originalOrder?.shipments || [],
+    };
+    setSelectedOrderForUPS(uiOrder);
+    setUpsDrawerOpen(true);
   };
   
   const handleProcessEtgb = async () => {
-    if (etgbSelectedRows.length === 0) {
+    const etgbOrderIds = selectedOrderIds;
+    if (etgbOrderIds.length === 0) {
       toast.error(t('selectOrders'));
       return;
     }
     
     setProcessingEtgb(true);
-    const toastId = toast.loading(t('etgbStarting', { count: etgbSelectedRows.length }));
+    const toastId = toast.loading(t('etgbStarting', { count: etgbOrderIds.length }));
     
     try {
       // Get user settings for ETGB recipient email (NextAuth cookie auth)
@@ -2581,7 +2125,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          orderIds: etgbSelectedRows,
+          orderIds: etgbOrderIds,
           recipientEmail: recipientEmail
         })
       });
@@ -2597,7 +2141,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
       if (response.ok && result.success) {
         toast.success(t('etgbSentTo', { email: recipientEmail }), { id: toastId });
         // Clear selection after successful processing
-        setEtgbSelectedRows([]);
+        setSelectedOrders({});
       } else {
         throw new Error(result.error || result.message || t('etgbFailed'));
       }
@@ -2799,7 +2343,12 @@ function LabelsPage(props: { source?: string; channel?: string }) {
       }
       const labelData = await labelResponse.json();
       toast.success(t('labelCreatedWithTracking', { orderNumber: currentFormValues.orderNumber, trackingNumber: labelData.trackingNumber }), { id: toastLabelId, duration: 6000 });
-      if (labelData.labelUrl) window.open(labelData.labelUrl, '_blank', 'noopener,noreferrer');
+      if (labelData.labelUrl) {
+        // Keep a button for the label: the auto-open below runs after several
+        // awaits, so popup blockers usually kill it.
+        setLastCreatedLabel({ orderNumber: currentFormValues.orderNumber, trackingNumber: labelData.trackingNumber, url: labelData.labelUrl });
+        openLabelUrl(labelData.labelUrl, `fedex-${currentFormValues.orderNumber}`);
+      }
       if (labelData.alerts && labelData.alerts.length > 0) {
         labelData.alerts.forEach((alert: any) => {
           toast.custom(
@@ -2813,6 +2362,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
       await mutate();
       if (drawerOpen) closeDrawer();
     } catch (error: any) {
+      if (isUsageLimitError(error)) { toast.dismiss(toastLabelId); return; }
       console.error('Error in handleGenerateLabel process:', error);
       toast.error(error.message || t('unknownError'), { id: toastLabelId, duration: 8000 });
     } finally {
@@ -2820,7 +2370,13 @@ function LabelsPage(props: { source?: string; channel?: string }) {
     }
   };
 
-  const handleDeleteOrder = async (orderId: string) => {
+  const handleDeleteOrder = async (orderId: string, orderNumber: string) => {
+    const ok = await confirm({
+      title: t('deleteOrderTitle', { orderNumber }),
+      description: t('deleteOrderDescription'),
+      destructive: true,
+    });
+    if (!ok) return;
     setDeletingOrderId(orderId);
     try {
       const response = await fetch(`/api/orders/${orderId}/delete`, {
@@ -2832,16 +2388,21 @@ function LabelsPage(props: { source?: string; channel?: string }) {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete order');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || t('deleteError'));
       }
 
       toast.success(t('deleteSuccess'));
-      setDeleteConfirmation(null);
+      setSelectedOrders(prev => {
+        if (!prev[orderId]) return prev;
+        const next = { ...prev };
+        delete next[orderId];
+        return next;
+      });
       await mutate(); // Refresh the orders list
     } catch (error: any) {
       console.error('Error deleting order:', error);
-      toast.error(error.message || t('deleteError'));
+      notify.error(error, 'labels.deleteError');
     } finally {
       setDeletingOrderId(null);
     }
@@ -2859,8 +2420,8 @@ function LabelsPage(props: { source?: string; channel?: string }) {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete shipment');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || t('labelDeleteError'));
       }
 
       toast.success(t('labelDeletedSuccess'));
@@ -2868,85 +2429,115 @@ function LabelsPage(props: { source?: string; channel?: string }) {
       await mutate(); // Refresh the orders list
     } catch (error: any) {
       console.error('Error deleting shipment:', error);
-      toast.error(error.message || t('labelDeleteError'));
+      notify.error(error, 'labels.labelDeleteError');
     } finally {
       setDeletingShipmentId(null);
     }
   };
 
-  const handleViewRawData = (data: Record<string, any>) => {
-    setCurrentRawData(data);
-    setRawOrderDataModalOpen(true);
+
+  const handleMarketplaceChange = (value: string | string[]) => {
+    const arr = typeof value === 'string' ? [value] : value;
+    // The "All" item has value ''; picking it clears the selection.
+    setMarketplaceFilter(arr[arr.length - 1] === '' ? [] : arr.filter(Boolean));
+  };
+
+  /** Filter controls shared by the desktop toolbar and the mobile bottom sheet. */
+  const renderFilterControls = (mode: 'inline' | 'sheet') => {
+    const sheet = mode === 'sheet';
+    const inputSx = sheet ? { fontSize: '0.9rem', minHeight: 44 } : { fontSize: '0.75rem', height: 30 };
+    const menuProps = sheet ? { sx: { zIndex: 1500 } } : undefined;
+    const fieldDisplay = (bp: 'md' | 'lg') => (sheet ? 'flex' : { xs: 'none', [bp]: 'inline-flex' });
+    return (
+      <>
+        <FormControl size="small" variant="outlined" fullWidth={sheet} sx={{ minWidth: 95, display: fieldDisplay('lg') }}>
+          <InputLabel shrink>{t('orderStatus')}</InputLabel>
+          <Select value={statusFilter} label={t('orderStatus')} onChange={e => setStatusFilter(e.target.value)} displayEmpty notched sx={inputSx} MenuProps={menuProps}>
+            {orderStatusFilterOptions.map(opt => <MenuItem key={opt.value} value={opt.value} sx={sheet ? { minHeight: 44 } : undefined}>{opt.label}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <FormControl size="small" variant="outlined" fullWidth={sheet} sx={{ minWidth: 95, display: fieldDisplay('lg') }}>
+          <InputLabel shrink>{t('store')}</InputLabel>
+          <Select
+            multiple
+            value={marketplaceFilter}
+            label={t('store')}
+            notched
+            onChange={(e) => handleMarketplaceChange(e.target.value)}
+            displayEmpty
+            renderValue={(selected) => selected.length === 0 ? <em>{t('all')}</em> : selected.length === 1 ? selected[0] : t('storesCount', { count: selected.length })}
+            disabled={isLoadingMarketplaces}
+            sx={inputSx}
+            MenuProps={{ ...(menuProps || {}), PaperProps: { style: { maxHeight: 7 * 48 + 8, width: 250 } } }}
+          >
+            <MenuItem value="" sx={sheet ? { minHeight: 44 } : undefined}><em>{t('all')}</em></MenuItem>
+            {dbMarketplaceOptions.map(opt => <MenuItem key={opt.value} value={opt.value} sx={sheet ? { minHeight: 44 } : undefined}>{opt.label} ({opt.count})</MenuItem>)}
+          </Select>
+        </FormControl>
+        <Box sx={{ display: sheet ? 'flex' : 'contents', gap: 1 }}>
+          <TextField label={t('startDate')} type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} size="small" InputLabelProps={{ shrink: true }} fullWidth={sheet} sx={{ width: sheet ? undefined : 125, display: fieldDisplay('lg'), '& .MuiInputBase-root': inputSx }} />
+          <TextField label={t('endDate')} type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} size="small" InputLabelProps={{ shrink: true }} fullWidth={sheet} sx={{ width: sheet ? undefined : 125, display: fieldDisplay('lg'), '& .MuiInputBase-root': inputSx }} />
+        </Box>
+        {!sheet && (
+          <Button onClick={resetFilters} variant="text" size="small" sx={{ fontSize: '0.7rem', textTransform: 'none', display: { xs: 'none', lg: 'inline-flex' }, minWidth: 0, px: 0.5 }}>{t('reset')}</Button>
+        )}
+      </>
+    );
   };
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 0, overflow: 'hidden', maxWidth: '100%' }}>
       <Paper elevation={0} sx={{ p: { xs: 0.5, sm: 0.75 }, display: 'flex', gap: 0.5, alignItems: 'center', flexWrap: 'wrap', maxWidth: '100%', flexShrink: 0, borderBottom: '1px solid', borderColor: 'divider', borderRadius: 0, bgcolor: 'background.paper' }}>
         {/* Row 1: Actions + Search + Filters */}
-        <Button variant="contained" color="primary" startIcon={<SyncIcon />} onClick={handleSync} disabled={syncingOrders || isLoading} size="small" sx={{ textTransform: 'none', fontSize: { xs: '0.7rem', sm: '0.78rem' }, px: { xs: 1, sm: 1.5 }, minWidth: 0, whiteSpace: 'nowrap', height: 30 }}>
+        <Button variant="contained" color="primary" startIcon={<SyncIcon />} onClick={handleSync} disabled={syncingOrders || isLoading} size="small" sx={{ textTransform: 'none', fontSize: { xs: '0.7rem', sm: '0.78rem' }, px: { xs: 1, sm: 1.5 }, minWidth: 0, whiteSpace: 'nowrap', height: { xs: 36, md: 30 } }}>
           {syncingOrders ? t('syncing') : t('syncButton')}
         </Button>
         <ManualOrderButton onOrderCreated={() => { mutate(); toast.success(t('orderListRefreshed')); }} />
         {etgbEnabled && (
-          <Button variant="contained" color="secondary" onClick={handleProcessEtgb} disabled={processingEtgb || etgbSelectedRows.length === 0} size="small" sx={{ textTransform: 'none', height: 30 }}>
-            {processingEtgb ? t('processing') : `ETGB (${etgbSelectedRows.length})`}
-          </Button>
+          <Tooltip title={selectedOrderIds.length === 0 ? t('selectOrdersForEtgb') : ''}>
+            <span>
+              <Button variant="contained" color="secondary" onClick={handleProcessEtgb} disabled={processingEtgb || selectedOrderIds.length === 0} size="small" sx={{ textTransform: 'none', height: { xs: 36, md: 30 } }}>
+                {processingEtgb ? t('processing') : `ETGB (${selectedOrderIds.length})`}
+              </Button>
+            </span>
+          </Tooltip>
         )}
         <Box sx={{ display: 'flex', gap: 0.5, flex: 1, minWidth: { xs: '100%', sm: 160 }, maxWidth: { sm: 260 } }}>
           <FormControl size="small" variant="outlined" sx={{ minWidth: 68 }}>
-            <Select value={searchType} onChange={e => setSearchType(e.target.value)} displayEmpty sx={{ fontSize: '0.78rem', height: 30 }}>
+            <Select value={searchType} onChange={e => setSearchType(e.target.value)} displayEmpty inputProps={{ 'aria-label': t('searchTypeLabel') }} sx={{ fontSize: '0.78rem', height: { xs: 40, md: 30 } }}>
               {searchTypeOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
             </Select>
           </FormControl>
-          <TextField size="small" placeholder="Ara..." variant="outlined" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} InputProps={{ endAdornment: <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /> }} sx={{ flex: 1, '& .MuiInputBase-root': { height: 30, fontSize: '0.78rem' } }} />
+          <TextField size="small" placeholder={`${tc('search')}...`} variant="outlined" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} inputProps={{ 'aria-label': tc('search') }} InputProps={{ endAdornment: <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /> }} sx={{ flex: 1, '& .MuiInputBase-root': { height: { xs: 40, md: 30 }, fontSize: '0.78rem' } }} />
         </Box>
-        {/* Inline filters — hidden on mobile */}
-        <FormControl size="small" variant="outlined" sx={{ minWidth: 95, display: { xs: 'none', md: 'inline-flex' } }}>
-          <InputLabel shrink>{t('orderStatus')}</InputLabel>
-          <Select value={statusFilter} label={t('orderStatus')} onChange={e => setStatusFilter(e.target.value)} displayEmpty sx={{ fontSize: '0.75rem', height: 30 }}>
-            {orderStatusFilterOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
-          </Select>
-        </FormControl>
-        <FormControl size="small" variant="outlined" sx={{ minWidth: 95, display: { xs: 'none', md: 'inline-flex' } }}>
-          <InputLabel shrink>{t('labelStatus')}</InputLabel>
-          <Select value={labelStatusFilter} label={t('labelStatus')} onChange={e => setLabelStatusFilter(e.target.value)} displayEmpty sx={{ fontSize: '0.75rem', height: 30 }}>
-            {labelStatusOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
-          </Select>
-        </FormControl>
-        <FormControl size="small" variant="outlined" sx={{ minWidth: 95, display: { xs: 'none', lg: 'inline-flex' } }}>
-          <InputLabel shrink>{t('store')}</InputLabel>
-          <Select
-            multiple
-            value={marketplaceFilter}
-            label={t('store')}
-            onChange={(e) => setMarketplaceFilter(typeof e.target.value === 'string' ? [e.target.value] : e.target.value)}
-            displayEmpty
-            renderValue={(selected) => selected.length === 0 ? <em>{t('all')}</em> : selected.length === 1 ? selected[0] : t('storesCount', { count: selected.length })}
-            disabled={isLoadingMarketplaces}
-            sx={{ fontSize: '0.75rem', height: 30 }}
-            MenuProps={{ PaperProps: { style: { maxHeight: 7 * 48 + 8, width: 250 } } }}
+        {/* Inline filters — below lg the same controls live in the Filters bottom sheet */}
+        {renderFilterControls('inline')}
+        <Badge color="primary" badgeContent={activeSheetFilterCount} invisible={activeSheetFilterCount === 0} sx={{ display: { xs: 'inline-flex', lg: 'none' } }}>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<FilterListIcon sx={{ fontSize: 18 }} />}
+            onClick={() => setFilterSheetOpen(true)}
+            sx={{ textTransform: 'none', minHeight: { xs: 40, md: 30 }, fontSize: '0.78rem' }}
           >
-            <MenuItem value=""><em>{t('all')}</em></MenuItem>
-            {dbMarketplaceOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label} ({opt.count})</MenuItem>)}
-          </Select>
-        </FormControl>
-        <TextField label={t('startDate')} type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} size="small" InputLabelProps={{ shrink: true }} sx={{ width: 125, display: { xs: 'none', lg: 'inline-flex' }, '& .MuiInputBase-root': { height: 30, fontSize: '0.75rem' } }} />
-        <TextField label={t('endDate')} type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} size="small" InputLabelProps={{ shrink: true }} sx={{ width: 125, display: { xs: 'none', lg: 'inline-flex' }, '& .MuiInputBase-root': { height: 30, fontSize: '0.75rem' } }} />
-        <Button onClick={() => { setSearchTerm(''); setSearchType('all'); setStatusFilter(''); setLabelStatusFilter(''); setMarketplaceFilter([]); setLabelFilter('all'); setSortOption('newest'); const now = new Date(); const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); setFilterStartDate(sevenDaysAgo.toISOString().slice(0, 10)); setFilterEndDate(now.toISOString().slice(0, 10)); }} variant="text" size="small" sx={{ fontSize: '0.7rem', textTransform: 'none', display: { xs: 'none', md: 'inline-flex' }, minWidth: 0, px: 0.5 }}>{t('reset')}</Button>
+            {t('filters')}
+          </Button>
+        </Badge>
         {/* Label toggle + view presets + count — pushed right */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, ml: 'auto' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, ml: 'auto', flexWrap: 'wrap' }}>
           <FormControl size="small" variant="outlined" sx={{ minWidth: 110 }}>
             <InputLabel shrink>{t('sortLabel')}</InputLabel>
-            <Select value={sortOption} label={t('sortLabel')} onChange={e => setSortOption(e.target.value as typeof sortOption)} sx={{ fontSize: '0.72rem', height: 30 }}>
-              {(['newest', 'oldest', 'shipBy', 'priceHigh', 'priceLow', 'customer'] as const).map(opt => (
+            <Select value={sortOption} label={t('sortLabel')} onChange={e => setSortOption(e.target.value as SortOption)} sx={{ fontSize: '0.72rem', height: { xs: 40, md: 30 } }}>
+              {SORT_OPTIONS.map(opt => (
                 <MenuItem key={opt} value={opt} sx={{ fontSize: '0.8rem' }}>{t(`sortOptions.${opt}`)}</MenuItem>
               ))}
             </Select>
           </FormControl>
-          <ToggleButtonGroup exclusive size="small" value={labelFilter} onChange={handleLabelFilter} aria-label={t('labelFilter')} sx={{ '& .MuiToggleButton-root': { fontSize: '0.68rem', px: { xs: 0.75, sm: 1.25 }, py: 0.15, height: 26 } }}>
+          <ToggleButtonGroup exclusive size="small" value={displayedLabelFilter} onChange={handleLabelFilter} aria-label={t('labelFilter')} sx={{ '& .MuiToggleButton-root': { fontSize: '0.68rem', px: { xs: 1, sm: 1.25 }, py: 0.15, height: { xs: 40, md: 26 } } }}>
             <ToggleButton value="all">{t('all')}</ToggleButton>
             <ToggleButton value="unlabeled">{t('unlabeled')}</ToggleButton>
             <ToggleButton value="labeled">{t('received')}</ToggleButton>
+            <ToggleButton value="failed">{t('failed')}</ToggleButton>
           </ToggleButtonGroup>
           {/* Card density presets */}
           <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 0.25, borderLeft: '1px solid', borderColor: 'divider', pl: 0.75 }}>
@@ -2975,14 +2566,74 @@ function LabelsPage(props: { source?: string; channel?: string }) {
           </Box>
           <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', fontSize: '0.72rem' }}>{t('ordersCount', { count: total })}</Typography>
           <Tooltip title={t('refresh')}>
-            <span><IconButton onClick={handleRefresh} disabled={isLoading || syncingOrders} color="primary" size="small" sx={{ p: 0.25 }}><RefreshIcon sx={{ fontSize: 18 }} /></IconButton></span>
+            <span><IconButton onClick={handleRefresh} disabled={isLoading || syncingOrders} color="primary" size="small" aria-label={t('refresh')} sx={{ p: 0.25, minWidth: { xs: 40, md: 0 }, minHeight: { xs: 40, md: 0 } }}><RefreshIcon sx={{ fontSize: 18 }} /></IconButton></span>
           </Tooltip>
         </Box>
       </Paper>
 
+      {/* Mobile / tablet filter sheet — same state as the inline controls */}
+      <Drawer
+        anchor="bottom"
+        open={filterSheetOpen}
+        onClose={() => setFilterSheetOpen(false)}
+        PaperProps={{ sx: { borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '85vh', pb: 'env(safe-area-inset-bottom)' } }}
+      >
+        <Box sx={{ px: 2, pt: 1.5, pb: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Typography variant="subtitle1" fontWeight={700}>{t('filters')}</Typography>
+            <IconButton aria-label={tc('close')} onClick={() => setFilterSheetOpen(false)} sx={{ minWidth: 44, minHeight: 44 }}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+          {renderFilterControls('sheet')}
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button variant="outlined" onClick={resetFilters} sx={{ flex: 1, minHeight: 44, textTransform: 'none' }}>{t('reset')}</Button>
+            <Button variant="contained" onClick={() => setFilterSheetOpen(false)} sx={{ flex: 2, minHeight: 44, textTransform: 'none' }}>
+              {isLoading ? <CircularProgress size={18} color="inherit" aria-label={tc('loading')} /> : t('showResults', { count: total })}
+            </Button>
+          </Box>
+        </Box>
+      </Drawer>
+
+      {/* Refetch with rows on screen: keep the rows, show a thin progress bar */}
+      <Box sx={{ height: 3, flexShrink: 0 }}>
+        {isLoading && orderGroups.length > 0 && <LinearProgress sx={{ height: 3 }} aria-label={tc('loading')} />}
+      </Box>
+
+      {lastCreatedLabel && (
+        <Alert
+          severity="success"
+          onClose={() => setLastCreatedLabel(null)}
+          sx={{ mx: { xs: 0.5, sm: 0.75 }, mb: 0.75, alignItems: 'center', flexShrink: 0, '& .MuiAlert-message': { flex: 1, minWidth: 0 } }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {t('labelReadyTitle', { orderNumber: lastCreatedLabel.orderNumber })}
+            </Typography>
+            {lastCreatedLabel.trackingNumber && (
+              <Box sx={{ display: 'inline-flex', alignItems: 'center' }}>
+                <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{lastCreatedLabel.trackingNumber}</Typography>
+                <CopyButton value={lastCreatedLabel.trackingNumber} label={t('trackingNumber')} />
+              </Box>
+            )}
+            <PrintLabelButton url={lastCreatedLabel.url} label={t('openPrintLabel')} variant="contained" color="success" filename={`label-${lastCreatedLabel.orderNumber}`} />
+          </Box>
+        </Alert>
+      )}
+
+      {isError && orderGroups.length > 0 && (
+        <Box sx={{ px: { xs: 0.5, sm: 0.75 }, mb: 0.75, flexShrink: 0 }}>
+          <ErrorState compact onRetry={() => mutate()} />
+        </Box>
+      )}
+
       {/* Unified Card Layout — works on both mobile and desktop */}
       <Box sx={{ flexGrow: 1, overflow: 'auto', minHeight: 0, WebkitOverflowScrolling: 'touch' }}>
-        {isLoading ? (
+        {isError && orderGroups.length === 0 ? (
+          <Box sx={{ p: 2 }}>
+            <ErrorState onRetry={() => mutate()} />
+          </Box>
+        ) : isLoading && orderGroups.length === 0 ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
             <CircularProgress size={32} />
           </Box>
@@ -3001,6 +2652,10 @@ function LabelsPage(props: { source?: string; channel?: string }) {
               const statusConfig = statusColors[group.status?.toUpperCase() || ''] || { bg: '#eee', text: '#333' };
               const statusLabel = orderStatusOptions.find(o => o.value === group.status?.toUpperCase())?.label || group.status || '-';
               const currSymbol = group.currency === 'TRY' ? '₺' : group.currency === 'EUR' ? '€' : group.currency === 'GBP' ? '£' : '$';
+              const latestLabel = getLatestLabel(row.originalOrder as any);
+              const { trackingNumber: groupTracking, carrier: groupCarrier } = getTrackingPair(latestLabel, row.trackingNumber, row.lastCarrier);
+              const isSelected = !!selectedOrders[group.orderId];
+              const toggleExpanded = () => setExpandedCardId(isExpanded ? null : group.orderId);
 
               return (
                 <Paper
@@ -3010,9 +2665,25 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                 >
                   {/* Order header — always visible */}
                   <Box
-                    onClick={() => setExpandedCardId(isExpanded ? null : group.orderId)}
-                    sx={{ display: 'flex', gap: 1.5, p: 1.25, cursor: 'pointer', alignItems: 'center' }}
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={isExpanded}
+                    onClick={(e) => { if (shouldToggleFromClick(e)) toggleExpanded(); }}
+                    onKeyDown={(e) => {
+                      if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
+                        e.preventDefault();
+                        toggleExpanded();
+                      }
+                    }}
+                    sx={{ display: 'flex', gap: { xs: 0.75, sm: 1.5 }, p: 1.25, pl: { xs: 0.25, sm: 0.5 }, cursor: 'pointer', alignItems: 'center', '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: -2 } }}
                   >
+                    <Checkbox
+                      size="small"
+                      checked={isSelected}
+                      onChange={(e) => toggleOrderSelected(row, e.target.checked)}
+                      inputProps={{ 'aria-label': t('selectOrder', { orderNumber: row.orderNumber }) }}
+                      sx={{ p: { xs: 1.25, md: 0.75 }, flexShrink: 0 }}
+                    />
                     {/* Stacked thumbnails for multi-item, single for 1 item */}
                     <Box sx={{ position: 'relative', width: 44, height: 44, flexShrink: 0 }}>
                       {group.items.slice(0, 2).map((item, idx) => (
@@ -3115,6 +2786,10 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                             cost={(row.originalOrder as any)?.manualShippingCost != null ? Number((row.originalOrder as any).manualShippingCost) : null}
                             currency={(row.originalOrder as any)?.manualShippingCostCurrency || null}
                           />
+                          {/* One-tap reprint from the collapsed card; the expanded body has the full button. */}
+                          {latestLabel.url && !isExpanded && (
+                            <PrintLabelButton iconOnly url={latestLabel.url} color="success" filename={`label-${row.orderNumber}`} />
+                          )}
                           <ExpandMoreIcon sx={{ fontSize: 18, color: 'text.disabled', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                         </Box>
                       </Box>
@@ -3164,7 +2839,16 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                             return (
                               <Box key={item.itemId} sx={{ display: 'flex', gap: 1, py: 0.75, alignItems: 'center', borderBottom: idx < group.items.length - 1 ? '1px solid' : 'none', borderColor: 'divider' }}>
                                 {item.itemImageUrl && item.itemImageUrl !== '/placeholder.png' ? (
-                                  <Box component="img" src={item.itemImageUrl} sx={{ width: 36, height: 36, borderRadius: 0.5, objectFit: 'cover', flexShrink: 0 }} />
+                                  <Box
+                                    component="img"
+                                    src={item.itemImageUrl}
+                                    alt={t('columnProductImage')}
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={() => { setSelectedImageUrl(item.itemImageUrl); setImageModalOpen(true); }}
+                                    onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter') { setSelectedImageUrl(item.itemImageUrl); setImageModalOpen(true); } }}
+                                    sx={{ width: 36, height: 36, borderRadius: 0.5, objectFit: 'cover', flexShrink: 0, cursor: 'zoom-in' }}
+                                  />
                                 ) : (
                                   <Box sx={{ width: 36, height: 36, borderRadius: 0.5, bgcolor: 'grey.100', flexShrink: 0 }} />
                                 )}
@@ -3193,11 +2877,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                                     }}
                                   />
                                   <Tooltip title={item.trackingNumber ? t('trackingExists') : t('addTracking')}>
-                                    <IconButton size="small" onClick={() => {
-                                      setSelectedOrderForTracking(item);
-                                      setTrackingFormData({ trackingNumber: '', carrierId: 3, notifyCustomer: true, updateRemoteOrder: true });
-                                      setTrackingDialogOpen(true);
-                                    }} sx={{ p: 0.25, color: item.trackingNumber ? 'success.main' : 'text.secondary' }}>
+                                    <IconButton size="small" aria-label={item.trackingNumber ? t('trackingExists') : t('addTracking')} disabled={!!group.isFBA} onClick={() => openTrackingDialog(item)} sx={{ p: 0.25, minWidth: { xs: 44, md: 28 }, minHeight: { xs: 44, md: 28 }, color: item.trackingNumber ? 'success.main' : 'text.secondary' }}>
                                       {item.trackingNumber ? <FlightTakeoffIcon sx={{ fontSize: 14 }} /> : <FlightIcon sx={{ fontSize: 14 }} />}
                                     </IconButton>
                                   </Tooltip>
@@ -3226,45 +2906,76 @@ function LabelsPage(props: { source?: string; channel?: string }) {
 
                       {/* Address */}
                       <Box sx={{ py: 0.75, borderTop: '1px dashed', borderColor: 'divider' }}>
-                        <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ textTransform: 'uppercase', fontSize: '0.6rem', letterSpacing: 0.5 }}>{t('deliveryAddress')}</Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+                          <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ textTransform: 'uppercase', fontSize: '0.6rem', letterSpacing: 0.5 }}>{t('deliveryAddress')}</Typography>
+                          <CopyAddressControl address={rowToCopyAddress(row)} />
+                        </Box>
                         <Box sx={{ mt: 0.25 }}>
-                          <Typography variant="body2" sx={{ fontSize: '0.78rem' }}>{row.recipientFirstName} {row.recipientLastName}</Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+                            <Typography variant="body2" sx={{ fontSize: '0.78rem', fontWeight: 600 }}>{row.recipientFirstName} {row.recipientLastName}</Typography>
+                            <CopyButton value={rowToCopyAddress(row).name} label={t('buyerName')} />
+                          </Box>
                           <Typography variant="body2" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>{row.recipientStreet1}{row.recipientStreet2 ? `, ${row.recipientStreet2}` : ''}</Typography>
                           <Typography variant="body2" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>{row.recipientCity}{row.recipientState ? `, ${row.recipientState}` : ''} {row.recipientPostal}</Typography>
                           <Typography variant="body2" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>{row.recipientCountry}</Typography>
-                          {row.recipientPhone && <Typography variant="body2" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>{t('phone')}: {row.recipientPhone}</Typography>}
-                          {row.recipientEmail && <Typography variant="body2" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>{t('email')}: {row.recipientEmail}</Typography>}
+                          {row.recipientPhone && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+                              <Typography variant="body2" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
+                                {t('phone')}: <a href={`tel:${row.recipientPhone.replace(/[^\d+]/g, '')}`} style={{ color: 'inherit' }}>{row.recipientPhone}</a>
+                              </Typography>
+                              <CopyButton value={row.recipientPhone.trim()} label={t('phone')} />
+                            </Box>
+                          )}
+                          {row.recipientEmail && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+                              <Typography variant="body2" noWrap sx={{ fontSize: '0.75rem', color: 'text.secondary', minWidth: 0 }}>{t('email')}: {row.recipientEmail}</Typography>
+                              <CopyButton value={row.recipientEmail.trim()} label={t('email')} />
+                            </Box>
+                          )}
                         </Box>
                       </Box>
 
                       {/* Order status & shipping info */}
                       <Box sx={{ py: 0.75, borderTop: '1px dashed', borderColor: 'divider', display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
                         <Chip label={statusLabel} size="small" sx={{ height: 20, fontSize: '0.65rem', bgcolor: statusConfig.bg, color: statusConfig.text }} />
+                        <Box sx={{ display: 'inline-flex', alignItems: 'center' }}>
+                          <Typography variant="caption" color="text.secondary">{t('columnOrderNo')}: {row.orderNumber}</Typography>
+                          <CopyButton value={row.orderNumber !== '—' ? row.orderNumber : ''} label={t('columnOrderNo')} />
+                        </Box>
                         {row.shipByDate && <Typography variant="caption" color="text.secondary">{t('shipBy')}: {(() => {
                           // With time when parseable; extension-scraped raw text ("Ship by tomorrow") falls back to fmtDateTr's dash handling
                           const d = new Date(row.shipByDate);
                           return isNaN(d.getTime()) ? fmtDateTr(row.shipByDate) : formatDateTime(d);
                         })()}</Typography>}
-                        {row.trackingNumber && <Typography variant="caption" color="text.secondary">{t('tracking')}: {row.lastCarrier} {row.trackingNumber}</Typography>}
+                        {groupTracking && (
+                          <Box sx={{ display: 'inline-flex', alignItems: 'center' }}>
+                            <Typography variant="caption" color="text.secondary">{t('tracking')}: {groupCarrier && groupCarrier !== '—' ? `${groupCarrier} ` : ''}<Box component="span" sx={{ fontFamily: 'monospace' }}>{groupTracking}</Box></Typography>
+                            <CopyButton value={groupTracking} label={t('trackingNumber')} />
+                          </Box>
+                        )}
                       </Box>
 
                       {/* Action buttons — order-level */}
-                      <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
+                      <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap', '& .MuiButton-root': { minHeight: { xs: 44, md: 32 } } }}>
+                        {latestLabel.url && (
+                          <PrintLabelButton
+                            url={latestLabel.url}
+                            variant="contained"
+                            color="success"
+                            filename={`label-${row.orderNumber}`}
+                          />
+                        )}
                         <Tooltip title={group.isMCF ? t('mcfRowDisabled') : (group.isFBA ? t('fbaRowDisabled') : '')}>
                         <span>
                         <Button
                           variant="outlined"
                           size="small"
                           disabled={!!group.isFBA}
-                          onClick={() => {
-                            setSelectedOrderForTracking(row);
-                            setTrackingFormData({ trackingNumber: '', carrierId: 3, notifyCustomer: true, updateRemoteOrder: true });
-                            setTrackingDialogOpen(true);
-                          }}
-                          startIcon={row.trackingNumber ? <FlightTakeoffIcon sx={{ fontSize: 14 }} /> : <FlightIcon sx={{ fontSize: 14 }} />}
-                          sx={{ textTransform: 'none', fontSize: '0.8rem', py: 0.75, ...(row.trackingNumber ? { color: 'success.main', borderColor: 'success.main' } : {}) }}
+                          onClick={() => openTrackingDialog(row)}
+                          startIcon={groupTracking ? <FlightTakeoffIcon sx={{ fontSize: 14 }} /> : <FlightIcon sx={{ fontSize: 14 }} />}
+                          sx={{ textTransform: 'none', fontSize: '0.8rem', py: 0.75, ...(groupTracking ? { color: 'success.main', borderColor: 'success.main' } : {}) }}
                         >
-                          {row.trackingNumber ? t('trackingExists') : t('addTracking')}
+                          {groupTracking ? t('trackingExists') : t('addTracking')}
                         </Button>
                         </span>
                         </Tooltip>
@@ -3297,54 +3008,62 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                         </Button>
                         </span>
                         </Tooltip>
+                        <Tooltip title={group.isMCF ? t('mcfRowDisabled') : (group.isFBA ? t('fbaRowDisabled') : '')}>
+                        <span>
                         <Button
                           variant="outlined"
                           size="small"
-                          fullWidth
-                          onClick={() => {
-                            const originalOrder = row.originalOrder as LocalUIOrder | undefined;
-                            const uiOrder: UIOrder = {
-                              orderId: row.orderId,
-                              orderNumber: row.orderNumber,
-                              recipientFirstName: row.recipientFirstName,
-                              recipientLastName: row.recipientLastName,
-                              recipientStreet1: row.recipientStreet1,
-                              recipientStreet2: row.recipientStreet2,
-                              recipientCity: row.recipientCity,
-                              recipientState: row.recipientState,
-                              recipientPostal: row.recipientPostal,
-                              recipientCountry: row.recipientCountry,
-                              recipientPhone: row.recipientPhone,
-                              recipientEmail: row.recipientEmail,
-                              orderTotalPrice: row.orderTotalPrice,
-                              currency: row.currency,
-                              title: row.title,
-                              weight: row.weight,
-                              hsCode: row.hsCode,
-                              countryOfOrigin: row.countryOfOrigin,
-                              shipments: originalOrder?.shipments || [],
-                            };
-                            setSelectedOrderForUPS(uiOrder);
-                            setUpsDrawerOpen(true);
-                          }}
+                          disabled={!!group.isFBA}
+                          onClick={() => openUpsDrawer(row)}
                           sx={{ textTransform: 'none', fontSize: '0.8rem', py: 0.75 }}
                         >
                           {t('upsLabel')}
                         </Button>
+                        </span>
+                        </Tooltip>
+                        <Tooltip title={group.isMCF ? t('mcfRowDisabled') : (group.isFBA ? t('fbaRowDisabled') : '')}>
+                        <span>
                         <Button
                           variant="outlined"
                           color="secondary"
                           size="small"
+                          disabled={!!group.isFBA}
                           onClick={() => {
-                            const originalOrder = row.originalOrder as LocalUIOrder | undefined;
-                            const mngOrder = buildMngOrder(row, originalOrder, shipperPhoneNumber);
-                            setSelectedOrderForMNG(mngOrder);
+                            setSelectedOrderForMNG(buildMngOrderForRow(row));
                             setMngDrawerOpen(true);
                           }}
                           sx={{ textTransform: 'none', fontSize: '0.8rem', py: 0.75 }}
                         >
                           MNG
                         </Button>
+                        </span>
+                        </Tooltip>
+                        <Box sx={{ display: 'flex', gap: 1, ml: { sm: 'auto' }, flexWrap: 'wrap' }}>
+                          {latestLabel.shipmentId && (
+                            <Button
+                              variant="text"
+                              color="error"
+                              size="small"
+                              startIcon={<DeleteIcon sx={{ fontSize: 16 }} />}
+                              disabled={deletingShipmentId === latestLabel.shipmentId}
+                              onClick={() => setShipmentDeleteConfirmation(latestLabel.shipmentId)}
+                              sx={{ textTransform: 'none', fontSize: '0.78rem' }}
+                            >
+                              {t('deleteLabel')}
+                            </Button>
+                          )}
+                          <Button
+                            variant="text"
+                            color="error"
+                            size="small"
+                            disabled={deletingOrderId === row.orderId}
+                            startIcon={deletingOrderId === row.orderId ? <CircularProgress size={14} color="inherit" /> : <DeleteIcon sx={{ fontSize: 16 }} />}
+                            onClick={() => handleDeleteOrder(row.orderId, row.orderNumber)}
+                            sx={{ textTransform: 'none', fontSize: '0.78rem' }}
+                          >
+                            {t('deleteOrderAction')}
+                          </Button>
+                        </Box>
                       </Box>
                     </Box>
                   )}
@@ -3353,12 +3072,30 @@ function LabelsPage(props: { source?: string; channel?: string }) {
             })}
             {/* Pagination */}
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, py: 1 }}>
-              <Button size="small" disabled={paginationModel.page === 0} onClick={() => setPaginationModel(prev => ({ ...prev, page: prev.page - 1 }))}>{t('previous')}</Button>
+              <Button size="small" sx={{ minHeight: { xs: 44, md: 32 }, minWidth: { xs: 88 } }} disabled={paginationModel.page === 0} onClick={() => setPaginationModel(prev => ({ ...prev, page: prev.page - 1 }))}>{t('previous')}</Button>
               <Typography variant="caption">{paginationModel.page + 1} / {Math.ceil(total / paginationModel.pageSize) || 1}</Typography>
-              <Button size="small" disabled={(paginationModel.page + 1) * paginationModel.pageSize >= total} onClick={() => setPaginationModel(prev => ({ ...prev, page: prev.page + 1 }))}>{t('next')}</Button>
+              <Button size="small" sx={{ minHeight: { xs: 44, md: 32 }, minWidth: { xs: 88 } }} disabled={(paginationModel.page + 1) * paginationModel.pageSize >= total} onClick={() => setPaginationModel(prev => ({ ...prev, page: prev.page + 1 }))}>{t('next')}</Button>
             </Box>
           </Box>
         )}
+        <LabelsBulkBar
+          count={selectedOrderIds.length}
+          pageAllSelected={orderGroups.length > 0 && orderGroups.every(g => !!selectedOrders[g.orderId])}
+          pageSomeSelected={orderGroups.some(g => !!selectedOrders[g.orderId])}
+          onTogglePage={(checked) => setSelectedOrders(prev => {
+            const next = { ...prev };
+            for (const g of orderGroups) {
+              if (checked) next[g.orderId] = g.primaryRow;
+              else delete next[g.orderId];
+            }
+            return next;
+          })}
+          onClear={() => setSelectedOrders({})}
+          etgbEnabled={etgbEnabled}
+          processingEtgb={processingEtgb}
+          onEtgb={handleProcessEtgb}
+          getAddressesTsv={buildAddressesTsv}
+        />
       </Box>
 
       {drawerOrder && (
@@ -3595,7 +3332,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                   {t('orderLabel')}: {selectedOrderForTracking.orderNumber}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Market: {selectedOrderForTracking.marketplace}
+                  {t('store')}: {selectedOrderForTracking.marketplace}
                 </Typography>
               </Box>
             )}

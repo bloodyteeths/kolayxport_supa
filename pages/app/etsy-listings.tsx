@@ -2326,7 +2326,7 @@ function EtsyListingsPage() {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             {t('noShopConnectedDesc')}
           </Typography>
-          <Button variant="contained" size="small" href="/ayarlar">
+          <Button variant="contained" size="small" href="/ayarlar?tab=connections">
             {t('goToSettings')}
           </Button>
         </Paper>

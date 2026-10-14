@@ -95,7 +95,14 @@
     "noNotifications": "Yeni bildiriminiz yok.",
     "notifications": "Bildirimler",
     "messages": "Mesajlar",
-    "invoices": "Faturalar"
+    "invoices": "Faturalar",
+    "research": "Araştırma",
+    "connectStore": "Mağaza bağla",
+    "pinSidebar": "Menüyü sabitle",
+    "unpinSidebar": "Menü sabitlemesini kaldır",
+    "reauthNeeded": "Bir bağlantının yeniden yetkilendirilmesi gerekiyor",
+    "closeMenu": "Menüyü kapat",
+    "toggleMenu": "Gezinme menüsünü aç/kapat"
   },
   "manualOrder": {
     "addButton": "Manuel Sipariş Ekle",
@@ -758,7 +765,32 @@
     "integrationOptions": {
       "all": "Tümü"
     },
-    "shippingUpgradeTooltip": "Alıcı {upgrade} kargo yükseltmesi için ödeme yaptı"
+    "shippingUpgradeTooltip": "Alıcı {upgrade} kargo yükseltmesi için ödeme yaptı",
+    "buyerName": "Alıcı adı",
+    "etgbStarting": "{count} sipariş için ETGB başlatılıyor...",
+    "etgbSentTo": "ETGB dosyası {email} adresine gönderildi",
+    "deleteOrderTitle": "#{orderNumber} siparişi silinsin mi?",
+    "deleteOrderDescription": "Sipariş ve etiketleri yalnızca KolayXport'tan silinir. Pazaryerinde hiçbir şey değişmez; sonraki senkronizasyon siparişi geri getirebilir.",
+    "deleteOrderAction": "Siparişi sil",
+    "selectOrdersForEtgb": "Önce onay kutularıyla sipariş seçin",
+    "searchTypeLabel": "Arama alanı",
+    "filters": "Filtreler",
+    "showResults": "{count} siparişi göster",
+    "labelReadyTitle": "#{orderNumber} için etiket oluşturuldu",
+    "openPrintLabel": "Etiketi aç / yazdır",
+    "printLabel": "Etiketi yazdır",
+    "labelOpenFailed": "Etiket açılamadı",
+    "selectOrder": "{orderNumber} siparişini seç",
+    "copyAddress": "Adresi kopyala",
+    "addressCopied": "Adres kopyalandı",
+    "addressFormatMenu": "Adres formatını seç",
+    "addressFormatIntl": "Uluslararası format",
+    "addressFormatTr": "Türkiye formatı",
+    "selectPage": "Sayfayı seç",
+    "selectedCount": "{count} seçili",
+    "copyAddressesTsv": "Adresleri kopyala (TSV)",
+    "addressesCopied": "{count} adres kopyalandı",
+    "clearSelection": "Temizle"
   },
   "ups": {
     "drawerTitle": "UPS Etiketi Oluştur",
@@ -875,7 +907,9 @@
     "saving": "Kaydediliyor...",
     "downloadLabel": "Etiketi İndir",
     "save": "Kaydet",
-    "deleteExistingLabel": "Mevcut Etiketi Sil"
+    "deleteExistingLabel": "Mevcut Etiketi Sil",
+    "trackingNumber": "Takip numarası",
+    "openPrintLabel": "Etiketi aç / yazdır"
   },
   "settings": {
     "pageTitle": "Ayarlar",
@@ -1069,7 +1103,40 @@
     "etsyTrackingReconnect": "Takip numarası gönderimi için shop'u yeniden bağlayın",
     "etsyTrackingReconnectDesc": "Etsy takip numarası otomasyonu aktif! Ancak daha önce bağlanan shop'ların yeni izinleri alması için \"Yeni Shop Bağla\" butonuyla tekrar bağlanması gerekiyor.",
     "etsyApiLimited": "Etsy API Kısıtlaması",
-    "etsyApiLimitedDesc": "Etsy, yeni entegratörlere takip numarası ve adres bilgisi API erişimi vermiyor. Takip numarası girmek için KolayXport Chrome eklentisini veya Etsy seller dashboard kullanın."
+    "etsyApiLimitedDesc": "Etsy, yeni entegratörlere takip numarası ve adres bilgisi API erişimi vermiyor. Takip numarası girmek için KolayXport Chrome eklentisini veya Etsy seller dashboard kullanın.",
+    "connect": "Bağla",
+    "lastSyncAgo": "Son senkronizasyon {time}",
+    "shopIdLabel": "Mağaza ID: {id}",
+    "reauthNeeded": "Yeniden bağlanmalı",
+    "reauthHint": "{provider} erişiminin süresi doldu. Senkronizasyona devam etmek için yeniden bağlanın.",
+    "disconnectKeepsData": "Siparişler ve ilanlar KolayXport'ta kalır; istediğiniz zaman yeniden bağlanabilirsiniz.",
+    "connectionsLoadFailed": "Bağlantılarınız yüklenemedi",
+    "amazonDetailsLoadFailed": "Amazon pazar yerleri yüklenemedi",
+    "wixWaiting": "Wix kurulumunun tamamlanması bekleniyor…",
+    "wixPollTimedOut": "Wix kurulumu tamamlanmadı mı?",
+    "wixPollTimedOutDesc": "Kontrolü durdurduk. Wix sekmesinde kurulumu tamamlayın, ardından tekrar deneyin.",
+    "wixCheckAgain": "Tekrar dene",
+    "wixOpenInstallAgain": "Wix kurulumunu yeniden aç",
+    "oauth": {
+      "connectedGeneric": "{provider} başarıyla bağlandı!",
+      "failedGeneric": "{provider} bağlantısı başarısız oldu. Lütfen tekrar deneyin.",
+      "unknownSuccess": "Bağlantı tamamlandı.",
+      "unknownFailed": "Bağlantı tamamlanamadı. Lütfen tekrar deneyin.",
+      "securityCheckFailed": "{provider} bağlantısı doğrulanamadı. Lütfen bağlantıyı bu sayfadan yeniden başlatın.",
+      "missingParams": "{provider} gerekli bilgileri göndermedi. Lütfen tekrar bağlanmayı deneyin.",
+      "shopifyTokenType": "Shopify desteklenmeyen bir erişim anahtarı döndürdü. Lütfen tekrar bağlanmayı deneyin; sorun devam ederse destek ekibine ulaşın.",
+      "shopifyInstallComplete": "Shopify mağazanız kuruldu ve bağlandı. KolayXport'a hoş geldiniz!"
+    },
+    "defaultShippingChargesPayment": "Varsayılan Kargo Ücreti Ödeme Tipi",
+    "paymentParty": {
+      "SENDER": "Gönderici",
+      "RECIPIENT": "Alıcı",
+      "THIRD_PARTY": "Üçüncü Taraf"
+    },
+    "shippingChargesParty": {
+      "SENDER": "Gönderici (Varsayılan)",
+      "RECIPIENT": "Alıcı (Karşı ödemeli)"
+    }
   },
   "importer": {
     "title": "Importer of Record Bilgileri",
@@ -1147,7 +1214,11 @@
     "existingLabel": "Bu sipariş için zaten bir etiket mevcut.",
     "missingFields": "Ad, telefon, il, ilçe ve adres alanları zorunludur.",
     "trackingNumber": "Takip Numarası",
-    "mngLabel": "MNG"
+    "mngLabel": "MNG",
+    "openPrintLabel": "Etiketi aç / yazdır",
+    "barcode": "Barkod",
+    "downloadLabel": "Etiketi indir",
+    "labelNotReturned": "MNG henüz etiket dosyası döndürmedi. Daha sonra MNG portalından veya bu siparişten yazdırabilirsiniz."
   },
   "fedex": {
     "currencies": {
@@ -1537,7 +1608,25 @@
       "videoHeading": "Video",
       "scale": "Ölçek",
       "pendingName": "{name} (bekliyor)",
-      "pendingReturnPolicy": "Bekleyen iade politikası"
+      "pendingReturnPolicy": "Bekleyen iade politikası",
+      "closeConfirm": {
+        "descriptionLost": "Değişiklikleriniz bu cihaza kaydedilemedi; şimdi çıkarsanız kaybolacak.",
+        "title": "Taslağı kaydetmeden çıkılsın mı?",
+        "description": "Düzenlemeleriniz bu cihazda kalır ve bu ilanı yeniden açtığınızda geri gelir. Taslağı kaydedip senkronize edene kadar taslağınızda veya Etsy'de olmazlar.",
+        "leave": "Çık",
+        "keepEditing": "Düzenlemeye devam et",
+        "back": "Geri"
+      },
+      "saveStatus": {
+        "unsaved": "Henüz kaydedilmedi",
+        "unsavedHint": "Son düzenlemeleriniz birazdan bu cihaza kaydedilecek.",
+        "device": "Bu cihaza kaydedildi · Etsy'de değil",
+        "deviceHint": "Düzenlemeler yalnızca bu tarayıcıda saklanır. Etsy'ye göndermek için taslağı kaydedip senkronize edin.",
+        "draft": "Taslak kaydedildi · Etsy'de değil",
+        "draftHint": "Değişiklikleriniz bir KolayXport taslağında. Yayına almak için Etsy'ye Senkronize Et'i kullanın.",
+        "error": "Otomatik kayıt başarısız",
+        "errorHint": "Son düzenlemeleriniz bu cihaza kaydedilemedi. Saklamak için taslağı kaydedin."
+      }
     },
     "countries": {
       "TR": "Turkiye",
@@ -3185,7 +3274,22 @@
       "aiImageWhiteBg": "Düz beyaz arka plan (ana ürün fotoğrafı)",
       "syncingToEtsy": "İlanınız Etsy'de oluşturuluyor...",
       "publishedOnEtsy": "İlan Etsy'de oluşturuldu ve yayınlandı.",
-      "publishSyncFailed": "Taslak olarak kaydedildi ancak Etsy reddetti: {error} Düzeltip ilanlar sayfasından tekrar deneyin."
+      "publishSyncFailed": "Taslak olarak kaydedildi ancak Etsy reddetti: {error} Düzeltip ilanlar sayfasından tekrar deneyin.",
+      "restore": {
+        "replacedByEdit": "Yeni bir ilan başlattınız. Önceki kaydedilmemiş ilanın yerine bu kaydedilecek.",
+        "title": "Kaydedilmemiş ilan geri yüklensin mi?",
+        "body": "Bu cihazda tamamlamadığınız bir ilan var. Fotoğraflar saklanmaz, onları yeniden eklemeniz gerekir.",
+        "bodyWithTitle": "Bu cihazda \"{title}\" ilanını tamamlamadınız. Fotoğraflar saklanmaz, onları yeniden eklemeniz gerekir.",
+        "restore": "Geri yükle",
+        "discard": "Yeniden başla",
+        "restored": "Kaydedilmemiş ilan geri yüklendi"
+      },
+      "closeConfirm": {
+        "title": "Bu ilan kapatılsın mı?",
+        "description": "Metinleriniz ve ayarlarınız bu cihazda kalır, bir dahaki sefere geri yükleyebilirsiniz. Etsy'ye hiçbir şey gönderilmez.",
+        "descriptionWithPhotos": "Metinleriniz ve ayarlarınız bu cihazda kalır, bir dahaki sefere geri yükleyebilirsiniz. Eklediğiniz fotoğraflar saklanmaz. Etsy'ye hiçbir şey gönderilmez.",
+        "keepEditing": "Düzenlemeye devam et"
+      }
     },
     "video": {
       "add": "Video Ekle",
@@ -5340,7 +5444,14 @@
       "conditionUsedExcellent": "Kullanılmış",
       "conditionUsedVeryGood": "Kullanılmış — Çok İyi",
       "conditionUsedGood": "Kullanılmış — İyi",
-      "conditionUsedAcceptable": "Kullanılmış — Kabul Edilebilir"
+      "conditionUsedAcceptable": "Kullanılmış — Kabul Edilebilir",
+      "closeConfirm": {
+        "title": "Kaydedilmemiş değişiklikler silinsin mi?",
+        "description": "Düzenlemeleriniz henüz taslağa kaydedilmedi. Şimdi kapatırsanız kaybolacaklar.",
+        "discard": "Değişiklikleri sil",
+        "keepEditing": "Düzenlemeye devam et",
+        "close": "Kapat"
+      }
     },
     "financial": {
       "revenueCalculator": "Gelir Hesaplayıcı",
@@ -5929,7 +6040,30 @@
     "advancedPlan": "Gelişmiş: 3 pazaryeri + 2 kargo",
     "proPlan": "Profesyonel: Sınırsız",
     "payWithIyzico": "iyzico ile Öde",
-    "statusUnknown": "Durum Bilinmiyor"
+    "statusUnknown": "Durum Bilinmiyor",
+    "setup": {
+      "dismiss": "Kurulum listesini gizle",
+      "title": "KolayXport'a başlayın",
+      "subtitle": "Siparişleri ve etiketleri yönetmeye başlamak için üç kısa adım.",
+      "progress": "{total} adımdan {done} tamamlandı",
+      "done": "Tamamlandı",
+      "connect": {
+        "title": "Mağaza bağlayın",
+        "desc": "Siparişlerinizi ve ürünlerinizi almak için Etsy, eBay, Amazon, Shopify, Wix veya Trendyol bağlayın.",
+        "cta": "Bağla"
+      },
+      "sync": {
+        "title": "Siparişlerinizi senkronize edin",
+        "desc": "Kargo etiketi oluşturmak için son siparişlerinizi çekin.",
+        "cta": "Siparişlere git"
+      },
+      "sender": {
+        "title": "Gönderici adresinizi girin",
+        "desc": "Gönderici adresiniz her kargo etiketine basılır.",
+        "cta": "Adres ekle"
+      }
+    },
+    "subscriptionActivated": "Aboneliğiniz başarıyla aktif edildi!"
   },
   "sync": {
     "pageTitle": "Senkronizasyon",
@@ -6146,7 +6280,8 @@
     "ebayUrlPlaceholder": "https://www.ebay.com/itm/123456789 veya 123456789",
     "topRated": "Top Rated",
     "addDialogCancel": "İptal",
-    "addDialogAdd": "Ekle"
+    "addDialogAdd": "Ekle",
+    "chromeStoreComing": "Chrome Web Mağazası sayfası çok yakında. O zamana kadar en güncel sürüm için <support>destek</support> ekibine ulaşın; mağazalarınızı <settings>Ayarlar → Bağlantılar</settings> bölümünden yönetebilirsiniz."
   },
   "public": {
     "closeSidebar": "Kenar çubuğunu kapat",
@@ -8577,6 +8712,43 @@
         "text": "İhtiyaçlarınız doğrultusunda size özel çözümler üretebiliriz. Bizimle iletişime geçin.",
         "button": "İletişime Geç"
       }
+    }
+  },
+  "ui": {
+    "copy": {
+      "copy": "Kopyala",
+      "copyLabel": "{label} kopyala",
+      "copied": "Panoya kopyalandı",
+      "copiedLabel": "{label} kopyalandı",
+      "copiedShort": "Kopyalandı",
+      "failed": "Kopyalanamadı. Lütfen seçip elle kopyalayın.",
+      "nothingToCopy": "Kopyalanacak bir şey yok"
+    },
+    "confirm": {
+      "andMore": "ve {count} tane daha",
+      "typeToConfirm": "Onaylamak için <b>{text}</b> yazın",
+      "typeToConfirmAria": "Onay metni"
+    },
+    "errorState": {
+      "title": "Bu veriler yüklenemedi",
+      "message": "Yüklenirken bir sorun oluştu. Lütfen tekrar deneyin."
+    },
+    "notify": {
+      "network": "Bağlantı hatası. İnternet bağlantınızı kontrol edip tekrar deneyin."
+    },
+    "limit": {
+      "trialTitle": "Deneme limitine ulaşıldı",
+      "planTitle": "Paket limitine ulaşıldı",
+      "noSubscriptionTitle": "Aboneliğiniz aktif değil",
+      "invalidPlanTitle": "Abonelik sorunu",
+      "labelMessage": "Mevcut paketinizle daha fazla kargo etiketi oluşturamazsınız. Devam etmek için paketinizi yükseltin.",
+      "orderSyncMessage": "Mevcut paketinizle daha fazla sipariş senkronize edemezsiniz. Devam etmek için paketinizi yükseltin.",
+      "noSubscriptionMessage": "Sipariş senkronizasyonu ve etiket oluşturmaya devam etmek için bir paket seçin.",
+      "invalidPlanMessage": "Paketiniz bulunamadı. Lütfen destek ekibiyle iletişime geçin.",
+      "neutralMessage": "Bu işlem şu anda hesabınız için kullanılamıyor. Lütfen destek ekibiyle iletişime geçin.",
+      "usage": "{used} / {limit}",
+      "resetsOn": "Kullanım {date} tarihinde sıfırlanır",
+      "contactSupport": "Destekle iletişime geç"
     }
   }
 }

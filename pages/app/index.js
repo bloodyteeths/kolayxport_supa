@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/router';
 import AppLayout from '../../components/AppLayout';
@@ -16,11 +16,25 @@ import {
   Package,
   BarChart3,
   Truck,
-  CheckCircle,
+  CheckCircle2,
+  Circle,
+  Link2,
+  MapPin,
+  X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import useSWR from 'swr';
 import { useTranslations } from 'next-intl';
 import { useLocale } from '@/lib/i18n/useLocale';
+import { useConnections } from '@/lib/hooks/useConnections';
+
+// Same SWR key AppLayout uses, so this is served from the shared cache.
+const SETTINGS_KEY = '/api/user/settings';
+const settingsFetcher = (url) => fetch(url).then((r) => (r.ok ? r.json() : null));
+// One-row order probe: `total` tells us whether any order was ever synced
+// (the monthly orderSyncCount usage counter is reset by cron and checkout).
+const ORDERS_PROBE_KEY = '/api/orders?limit=1&page=1';
+const SETUP_DISMISS_KEY = 'kx.home.setupDismissed';
 
 const QuickActionCard = ({ href, icon: Icon, label, description, color }) => (
   <Link
@@ -43,26 +57,100 @@ const QuickActionCard = ({ href, icon: Icon, label, description, color }) => (
   </Link>
 );
 
-const TimelineItem = ({ text, done = true }) => (
-  <div className="flex items-start gap-3 py-2.5">
-    <div className="relative flex-shrink-0 mt-0.5">
-      <CheckCircle size={16} className={done ? 'text-emerald-500' : 'text-slate-300'} />
+const SetupStep = ({ index, icon: Icon, title, description, href, cta, done, doneLabel }) => (
+  <li className="flex items-start gap-3 py-3">
+    <div className="flex-shrink-0 mt-0.5">
+      {done ? (
+        <CheckCircle2 size={22} className="text-emerald-500" aria-hidden="true" />
+      ) : (
+        <div className="relative w-[22px] h-[22px]">
+          <Circle size={22} className="text-slate-300" aria-hidden="true" />
+          <span className="absolute inset-0 flex items-center justify-center text-[11px] font-semibold text-slate-500">
+            {index}
+          </span>
+        </div>
+      )}
     </div>
-    <span className={`text-sm ${done ? 'text-slate-700' : 'text-slate-400'}`}>{text}</span>
-  </div>
+    <div className="min-w-0 flex-1">
+      <div className="flex items-center gap-1.5">
+        <Icon size={14} className={done ? 'text-slate-400' : 'text-slate-500'} aria-hidden="true" />
+        <h3 className={`text-sm font-semibold ${done ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{title}</h3>
+      </div>
+      <p className="text-xs text-slate-500 mt-0.5">{description}</p>
+    </div>
+    {done ? (
+      <span className="flex-shrink-0 self-center text-xs font-medium text-emerald-600">{doneLabel}</span>
+    ) : (
+      <Link
+        href={href}
+        className="flex-shrink-0 self-center inline-flex items-center justify-center gap-1 min-h-[44px] px-3 rounded-lg text-sm font-semibold text-blue-600 hover:bg-blue-50 transition-colors"
+      >
+        {cta} <ArrowRight size={14} aria-hidden="true" />
+      </Link>
+    )}
+  </li>
 );
+
+const SetupChecklist = ({ steps, onDismiss }) => {
+  const t = useTranslations('dashboard');
+  const doneCount = steps.filter((s) => s.done).length;
+  return (
+    <div className="card-premium p-3 sm:p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold text-slate-900" style={{ letterSpacing: '-0.01em' }}>
+            {t('setup.title')}
+          </h2>
+          <p className="text-sm text-slate-500 mt-0.5">{t('setup.subtitle')}</p>
+        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <span className="text-xs font-semibold text-slate-500 bg-slate-100 rounded-full px-2.5 py-1">
+            {t('setup.progress', { done: doneCount, total: steps.length })}
+          </span>
+          {onDismiss && (
+            <button
+              type="button"
+              onClick={onDismiss}
+              className="w-11 h-11 -mr-2 -mt-2 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              aria-label={t('setup.dismiss')}
+              title={t('setup.dismiss')}
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="mt-3 h-1.5 rounded-full bg-slate-100 overflow-hidden" aria-hidden="true">
+        <div
+          className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+          style={{ width: `${Math.round((doneCount / steps.length) * 100)}%` }}
+        />
+      </div>
+      <ol className="mt-1 divide-y divide-slate-100">
+        {steps.map((step, i) => (
+          <SetupStep key={step.id} index={i + 1} doneLabel={t('setup.done')} {...step} />
+        ))}
+      </ol>
+    </div>
+  );
+};
 
 const DashboardLandingContent = ({ user }) => {
   const t = useTranslations('dashboard');
-  const tAuth = useTranslations('auth');
   const { formatDate } = useLocale();
+  const { anyMarketplace, has } = useConnections();
+  const { data: settingsData } = useSWR(SETTINGS_KEY, settingsFetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 300_000,
+  });
 
   const firstName = user?.user_metadata?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || t('defaultUser');
   const hour = new Date().getHours();
   const greeting = hour < 12 ? t('greeting.morning') : hour < 18 ? t('greeting.afternoon') : t('greeting.evening');
 
-  const quickActions = [
+  const allQuickActions = [
     {
+      requires: 'etsy',
       href: '/app/etsy-listings',
       icon: Store,
       label: t('features.etsyListingsLabel'),
@@ -70,6 +158,7 @@ const DashboardLandingContent = ({ user }) => {
       color: { bg: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)', icon: '#ea580c' },
     },
     {
+      requires: 'ebay',
       href: '/app/ebay-listings',
       icon: ShoppingBag,
       label: t('features.ebayListingsLabel'),
@@ -105,6 +194,80 @@ const DashboardLandingContent = ({ user }) => {
       color: { bg: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)', icon: '#059669' },
     },
   ];
+  // Hide store-specific shortcuts only once we know the store is not connected.
+  const quickActions = allQuickActions
+    .filter((a) => !a.requires || has(a.requires) !== false)
+    .map(({ requires, ...rest }) => rest);
+
+  // Setup checklist: stays until every step is done (or the user dismisses it).
+  const uid = user?.id || user?.email || 'anon';
+  const [dismissed, setDismissed] = useState(true); // assume dismissed until storage is read (no flash)
+  useEffect(() => {
+    let value = false;
+    try {
+      value = window.localStorage.getItem(`${SETUP_DISMISS_KEY}:${uid}`) === '1';
+    } catch {
+      // storage unavailable — show the checklist
+    }
+    setDismissed(value);
+  }, [uid]);
+  const dismissSetup = () => {
+    setDismissed(true);
+    try {
+      window.localStorage.setItem(`${SETUP_DISMISS_KEY}:${uid}`, '1');
+    } catch {
+      // ignore
+    }
+  };
+
+  const shipper = settingsData?.shipperProfile;
+  const senderDone = Boolean(shipper?.shipperStreet1 && shipper?.shipperCity);
+  const usageSynced = Number(settingsData?.subscription?.orderSyncCount || 0) > 0;
+  // Only probe orders when the cheap counter does not already answer it.
+  const needOrdersProbe = !dismissed && anyMarketplace === true && Boolean(settingsData) && !usageSynced;
+  const { data: ordersProbe, error: ordersProbeError } = useSWR(
+    needOrdersProbe ? ORDERS_PROBE_KEY : null,
+    settingsFetcher,
+    { revalidateOnFocus: false, dedupingInterval: 300_000 }
+  );
+  const ordersKnown = !needOrdersProbe || ordersProbe !== undefined || Boolean(ordersProbeError);
+  const syncDone = usageSynced || Number(ordersProbe?.total || 0) > 0;
+  const allDone = anyMarketplace === true && syncDone && senderDone;
+  // Wait for connections + settings (+ the order probe) so it never flashes in and out.
+  const showSetup = !dismissed
+    && anyMarketplace !== undefined
+    && Boolean(settingsData)
+    && ordersKnown
+    && !allDone;
+  const setupSteps = [
+    {
+      id: 'connect',
+      icon: Link2,
+      title: t('setup.connect.title'),
+      description: t('setup.connect.desc'),
+      cta: t('setup.connect.cta'),
+      href: '/ayarlar?tab=connections',
+      done: anyMarketplace === true,
+    },
+    {
+      id: 'sync',
+      icon: ShoppingCart,
+      title: t('setup.sync.title'),
+      description: t('setup.sync.desc'),
+      cta: t('setup.sync.cta'),
+      href: '/app/labels',
+      done: syncDone,
+    },
+    {
+      id: 'sender',
+      icon: MapPin,
+      title: t('setup.sender.title'),
+      description: t('setup.sender.desc'),
+      cta: t('setup.sender.cta'),
+      href: '/ayarlar?tab=senderProfile',
+      done: senderDone,
+    },
+  ];
 
   return (
     <div className="space-y-4 max-w-5xl">
@@ -118,7 +281,10 @@ const DashboardLandingContent = ({ user }) => {
         </p>
       </div>
 
+      {showSetup && <SetupChecklist steps={setupSteps} onDismiss={dismissSetup} />}
+
       {/* Announcement banner */}
+      {!showSetup && (
       <div
         className="relative overflow-hidden rounded-xl p-3 sm:p-4"
         style={{
@@ -147,6 +313,7 @@ const DashboardLandingContent = ({ user }) => {
           </div>
         </div>
       </div>
+      )}
 
       {/* Quick Actions */}
       <div>
@@ -158,20 +325,6 @@ const DashboardLandingContent = ({ user }) => {
         </div>
       </div>
 
-      {/* Updates timeline */}
-      <div className="card-premium p-3 sm:p-4">
-        <h2 className="text-base font-semibold text-slate-900 mb-3" style={{ letterSpacing: '-0.01em' }}>
-          {t('recentUpdates')}
-        </h2>
-        <div className="divide-y divide-slate-100">
-          <TimelineItem text={t('updates.aiListing')} />
-          <TimelineItem text={t('updates.marketResearch')} />
-          <TimelineItem text={t('updates.fullIntegration')} />
-          <TimelineItem text={t('updates.shippingLabels')} />
-          <TimelineItem text={t('updates.secureAuth')} />
-          <TimelineItem text={t('updates.platformLive')} />
-        </div>
-      </div>
     </div>
   );
 };
@@ -185,10 +338,11 @@ function AppIndexPage() {
 
   const status = authLoading ? 'loading' : (user ? 'authenticated' : 'unauthenticated');
 
+  // Stripe checkout return. _app clears ?session_id (router.replace('/app')),
+  // so this only shows the confirmation toast; the id dedupes double renders.
   useEffect(() => {
     if (router.query.session_id) {
-      toast.success('Aboneliğiniz başarıyla aktif edildi!');
-      router.replace('/app', undefined, { shallow: true });
+      toast.success(t('subscriptionActivated'), { id: 'stripe-session-activated' });
     }
   }, [router.query.session_id]);
 

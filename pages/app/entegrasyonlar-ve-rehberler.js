@@ -90,7 +90,7 @@ export default function EntegrasyonlarVeRehberlerPage() {
         </p>
         <p className="mt-3">
           {t.rich('generalApproachP4', {
-            settingsLink: (chunks) => <Link href="/app/settings" className="text-blue-600 hover:underline">{chunks}</Link>
+            settingsLink: (chunks) => <Link href="/ayarlar?tab=connections" className="text-blue-600 hover:underline">{chunks}</Link>
           })}
         </p>
       </Section>
@@ -291,7 +291,7 @@ export default function EntegrasyonlarVeRehberlerPage() {
                     <Step number="7" title={t('veeqoStep7Title')}>
                       <p>
                         {t.rich('veeqoStep7Desc', {
-                          settingsLink: (chunks) => <Link href="/app/settings" className="text-blue-600 hover:underline">{chunks}</Link>
+                          settingsLink: (chunks) => <Link href="/ayarlar?tab=apiKeys" className="text-blue-600 hover:underline">{chunks}</Link>
                         })}
                       </p>
                       <img
@@ -340,7 +340,7 @@ export default function EntegrasyonlarVeRehberlerPage() {
         <p>{t('shippingIntegrationDesc')}</p>
         <p className="mt-2 text-sm text-slate-500">
           {t.rich('shippingIntegrationNote', {
-            settingsLink: (chunks) => <Link href="/app/settings" className="text-blue-600 hover:underline">{chunks}</Link>
+            settingsLink: (chunks) => <Link href="/ayarlar?tab=apiKeys" className="text-blue-600 hover:underline">{chunks}</Link>
           })}
         </p>
       </Section>
@@ -390,35 +390,15 @@ export default function EntegrasyonlarVeRehberlerPage() {
 
                   <div className="space-y-6">
                     <Step number="1" title={t('chromeStep1Title')}>
-                      <p>
-                        {t('chromeStep1Desc')}
-                      </p>
-                      <div className="mt-3 space-y-3">
-                        <a
-                          href="/downloads/kolayxport-etsy-extension-v5.3-multistore.zip"
-                          download="kolayxport-etsy-extension-v5.3-multistore.zip"
-                          className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                        >
-                          <Download size={18} className="mr-2" />
-                          {t('chromeStep1Download')}
-                        </a>
-                        <p className="text-sm text-gray-600">
-                          <strong>{t('fileSize')}:</strong> {t('chromeStep1FileInfo')} | <strong>{t('version')}:</strong> {t('chromeStep1Version')} | <strong>{t('content')}:</strong> {t('chromeStep1Content')}
-                        </p>
-                      </div>
-                      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      {/* The old direct-download zip (v5.3) no longer exists on the server and the
+                          Chrome Web Store URL was a placeholder, so both links were removed.
+                          TODO: link the real Chrome Web Store listing here once it is published. */}
+                      <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                         <p className="text-sm text-blue-800">
-                          <strong>{t('alternative')}:</strong> {t('chromeStep1Alt')} <br />
-                          <a
-                            href="https://chrome.google.com/webstore/detail/kolayxport-etsy-sync"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline inline-flex items-center"
-                          >
-                            Chrome Web Store
-                            <ExternalLink size={12} className="ml-1" />
-                          </a>
-                          <span className="text-xs text-blue-600 ml-2">{t('chromeStep1NotAvailable')}</span>
+                          {t.rich('chromeStoreComing', {
+                            support: (chunks) => <Link href="/support" className="text-blue-600 hover:underline">{chunks}</Link>,
+                            settings: (chunks) => <Link href="/ayarlar?tab=connections" className="text-blue-600 hover:underline">{chunks}</Link>,
+                          })}
                         </p>
                       </div>
                     </Step>
@@ -546,7 +526,7 @@ export default function EntegrasyonlarVeRehberlerPage() {
         </Step>
         <Step number="3" title={t('trendyolStep3Title')}>
           <p>{t.rich('trendyolStep3Desc', {
-            settingsLink: (chunks) => <Link href="/app/settings" className="text-blue-600 hover:underline">{chunks}</Link>
+            settingsLink: (chunks) => <Link href="/ayarlar?tab=apiKeys" className="text-blue-600 hover:underline">{chunks}</Link>
           })}</p>
           <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-700">
             <p><Settings size={16} className="inline mr-1"/> {t('trendyolStep3Tip')}</p>
@@ -555,7 +535,7 @@ export default function EntegrasyonlarVeRehberlerPage() {
         <Step number="4" title={t('trendyolStep4Title')}>
           <p>{t('trendyolStep4Desc')}</p>
           <p className="mt-1 text-xs text-slate-500">{t.rich('trendyolStep4Note', {
-            supportLink: (chunks) => <Link href="/destek" className="text-blue-600 hover:underline">{chunks}</Link>
+            supportLink: (chunks) => <Link href="/support" className="text-blue-600 hover:underline">{chunks}</Link>
           })}</p>
         </Step>
       </Section>

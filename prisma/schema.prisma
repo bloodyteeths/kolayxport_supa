@@ -694,7 +694,7 @@ model EtsyListing {
 
   // ---- Listing intel (W3) ----
   hasVariations      Boolean   @default(false)
-  quantityOnProperty Int[]     @default([])
+  quantityOnProperty BigInt[]  @default([]) // custom variation property ids exceed INT4
   inventorySyncedAt  DateTime?
   contentHash        String?
   lastWebhookAt      DateTime?

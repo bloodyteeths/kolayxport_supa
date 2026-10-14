@@ -29,9 +29,10 @@ async function getTrendyolCredentials(userId: string): Promise<TrendyolCredentia
   if (!cred?.trendyolApiKey || !cred?.trendyolApiSecret || !cred?.trendyolSupplierId) {
     throw { status: 400, message: 'Trendyol credentials not configured. Please add your API key, secret, and supplier ID in settings.' };
   }
+  // Stored encrypted at rest; decryptIfNeeded is a no-op on plaintext and throws on an undecryptable envelope.
   return {
-    apiKey: cred.trendyolApiKey,
-    apiSecret: cred.trendyolApiSecret,
+    apiKey: decryptIfNeeded(cred.trendyolApiKey) as string,
+    apiSecret: decryptIfNeeded(cred.trendyolApiSecret) as string,
     supplierId: cred.trendyolSupplierId,
   };
 }

@@ -4,7 +4,6 @@ import {
   TextField, InputAdornment, Button, Tabs, Tab,
 } from '@mui/material';
 import { Search, BarChart2, Link, Store } from 'lucide-react';
-import { Toaster } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
 import withAuth from '@/components/withAuth';
 import { useAuth } from '@/lib/auth-context';
@@ -130,7 +129,6 @@ function EtsyResearchPage() {
 
   return (
     <AppLayout title={t('pageTitle')}>
-      <Toaster position="top-right" />
       <Box sx={{ maxWidth: 1400, mx: 'auto', width: '100%', p: { xs: 0.5, sm: 1, md: 1.5 } }}>
         {/* Horizontal pill tabs */}
         <Tabs value={tabIndex} onChange={handleTabChange} sx={pillTabsSx} variant="scrollable" scrollButtons="auto">

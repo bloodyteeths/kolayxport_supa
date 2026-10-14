@@ -16,7 +16,7 @@ import {
   Save, X, Copy, ShoppingBag, Globe, Filter, ArrowUpDown,
   Sparkles, Zap, Download, Layers, Lightbulb,
 } from 'lucide-react';
-import { toast, Toaster } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
 import withAuth from '@/components/withAuth';
 import { useAuth } from '@/lib/auth-context';
@@ -3037,7 +3037,6 @@ function EbayResearchPage() {
 
   return (
     <Box sx={{ maxWidth: 1800, mx: 'auto', px: isMobile ? 0.5 : 1, py: 1, width: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
-      <Toaster position="top-right" />
 
       {/* Header */}
       <Box sx={{ mb: 2, overflow: 'hidden', width: '100%', maxWidth: '100%' }}>

@@ -7,10 +7,13 @@
 
 import prisma from './lib/prisma';
 import { fetchTrendyolOrders } from './lib/integrations/trendyolClient';
+import { initEncryptionKey } from './lib/crypto/credentials';
+import { decryptIfPresent } from './lib/encryption';
 
 async function debugSpecificTrendyolOrder() {
   try {
     console.log('🔍 Fetching Trendyol credentials...');
+    await initEncryptionKey();
     
     // Get Trendyol credentials from database
     const credentials = await prisma.credential.findFirst({
@@ -46,8 +49,8 @@ async function debugSpecificTrendyolOrder() {
     // Fetch recent orders to find the specific one
     const orders = await fetchTrendyolOrders({
       supplierId: credentials.trendyolSupplierId,
-      apiKey: credentials.trendyolApiKey,
-      apiSecret: credentials.trendyolApiSecret,
+      apiKey: decryptIfPresent(credentials.trendyolApiKey) as string,
+      apiSecret: decryptIfPresent(credentials.trendyolApiSecret) as string,
       startDateMs: null,
       endDateMs: null,
       pageSize: 100

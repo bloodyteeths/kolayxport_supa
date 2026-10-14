@@ -11,7 +11,7 @@ import AmazonMessageDialog from '../../components/amazon/AmazonMessageDialog';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
-import { toast, Toaster, Toast } from 'react-hot-toast';
+import { toast, Toast } from 'react-hot-toast';
 import { useOrders } from '@/lib/hooks/useOrders';
 import { useMarketplaceOptions } from '@/lib/hooks/useMarketplaceOptions';
 // Layout import removed - using AppLayout only
@@ -2881,7 +2881,6 @@ function LabelsPage(props: { source?: string; channel?: string }) {
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 0, overflow: 'hidden', maxWidth: '100%' }}>
-      <Toaster position="top-right" reverseOrder={false} />
       <Paper elevation={0} sx={{ p: { xs: 0.5, sm: 0.75 }, display: 'flex', gap: 0.5, alignItems: 'center', flexWrap: 'wrap', maxWidth: '100%', flexShrink: 0, borderBottom: '1px solid', borderColor: 'divider', borderRadius: 0, bgcolor: 'background.paper' }}>
         {/* Row 1: Actions + Search + Filters */}
         <Button variant="contained" color="primary" startIcon={<SyncIcon />} onClick={handleSync} disabled={syncingOrders || isLoading} size="small" sx={{ textTransform: 'none', fontSize: { xs: '0.7rem', sm: '0.78rem' }, px: { xs: 1, sm: 1.5 }, minWidth: 0, whiteSpace: 'nowrap', height: 30 }}>

@@ -2,7 +2,7 @@ import React from 'react';
 import PublicLayout from '../components/PublicLayout';
 import { motion } from 'framer-motion';
 import { useForm, Controller } from 'react-hook-form';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { Mail, MapPin, Send, Building, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 
@@ -103,7 +103,6 @@ export default function IletisimPage() {
       title="İletişim - KolayXport" 
       description="KolayXport ile iletişime geçin. Sorularınız, önerileriniz veya demo talepleriniz için bize ulaşın."
     >
-      <Toaster position="top-right" />
       {/* Hero Section */}
       <motion.section
         className="relative py-20 md:py-32 text-center px-6 lg:px-8 overflow-hidden bg-gradient-to-br from-slate-50 to-sky-100"

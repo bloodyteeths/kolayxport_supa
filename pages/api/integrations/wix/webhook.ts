@@ -59,8 +59,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     let instanceId: string | undefined;
-    let siteId: string | undefined;
-    let userId: string | undefined;
 
     const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
     logger.info('Wix webhook received', {
@@ -173,11 +171,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    // Fallback: plain JSON body
-    if (!instanceId && req.body?.instanceId) {
+    // Fallback: plain JSON body. It is unauthenticated, so it can only ever
+    // create/refresh a 'pending' row — a `userId` in the body is ignored (it used
+    // to bind the site straight to that user, letting anyone who knew an
+    // instanceId attach that site's token to any account). A body `siteId` is
+    // ignored too so it can't redirect the upsert onto someone else's row; the
+    // real siteId comes from Wix's instance API below. Sites are attached to
+    // users only by the signed install callback (./callback GET).
+    if (!instanceId && typeof req.body?.instanceId === 'string') {
       instanceId = req.body.instanceId;
-      siteId = req.body.siteId;
-      userId = req.body.userId;
     }
 
     if (!instanceId) {
@@ -216,7 +218,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Get site info
     let siteName = 'Wix Site';
-    let resolvedSiteId = siteId || instanceId;
+    let resolvedSiteId = instanceId;
     try {
       const instanceRes = await fetch('https://www.wixapis.com/apps/v1/instance', {
         headers: { 'Authorization': tokenData.access_token },
@@ -228,11 +230,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     } catch {
       logger.warn('Could not fetch Wix site info from webhook');
-    }
-
-    if (userId) {
-      await saveWixConnection(userId, instanceId, resolvedSiteId, siteName, tokenData.access_token, tokenExpiresAt);
-      return res.status(200).json({ success: true, siteId: resolvedSiteId, siteName });
     }
 
     // Store pending connection keyed by siteId. Tokens encrypted at rest.
@@ -280,34 +277,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Always return 200 to prevent install from hanging
     return res.status(200).json({ success: false, reason: 'internal_error' });
   }
-}
-
-async function saveWixConnection(
-  userId: string, instanceId: string, siteId: string,
-  siteName: string, accessToken: string, tokenExpiresAt: Date
-) {
-  const encAccess = encryptIfNeeded(accessToken);
-  await prisma.wixSite.upsert({
-    where: { userId_siteId: { userId, siteId } },
-    update: { instanceId, siteName, accessToken: encAccess, tokenExpiresAt, isActive: true, updatedAt: new Date() },
-    create: { userId, siteId, instanceId, siteName, accessToken: encAccess, tokenExpiresAt, isActive: true },
-  });
-
-  await prisma.credential.upsert({
-    where: { userId },
-    update: {
-      wixAccessToken: encAccess,
-      wixSiteId: siteId,
-      wixInstanceId: instanceId,
-      wixTokenExpiresAt: tokenExpiresAt,
-      updatedAt: new Date(),
-    },
-    create: {
-      userId,
-      wixAccessToken: encAccess,
-      wixSiteId: siteId,
-      wixInstanceId: instanceId,
-      wixTokenExpiresAt: tokenExpiresAt,
-    },
-  });
 }

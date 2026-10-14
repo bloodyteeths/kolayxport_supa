@@ -8,6 +8,7 @@
 import { InvoiceService } from '../lib/services/invoiceService';
 import prisma from '../lib/prisma';
 import dotenv from 'dotenv';
+import { initEncryptionKey } from '../lib/crypto/credentials';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
@@ -15,6 +16,8 @@ dotenv.config({ path: '.env' });
 
 async function testParasutFlow() {
   console.log('🧪 Testing Paraşüt Invoice Flow...\n');
+  // Paraşüt creds are encrypted at rest; unwrap the DEK so InvoiceService can decrypt them.
+  await initEncryptionKey();
 
   try {
     // 1. Find a test user

@@ -33,7 +33,70 @@ async function getAuthAndClient(req: NextApiRequest, res: NextApiResponse) {
     shopDomain: shop.shopDomain,
   });
 
-  return { userId: user.id, shop, client };
+  return { userId: user.id, shop, client, accessToken };
+}
+
+/**
+ * Write a product's SEO title/description. The REST product endpoint has no
+ * readable SEO fields, so this goes through Admin GraphQL productUpdate.
+ */
+async function updateProductSeo(
+  shopDomain: string,
+  accessToken: string,
+  productId: string,
+  seo: { title?: string; description?: string }
+): Promise<{ title: string | null; description: string | null }> {
+  const res = await fetch(`https://${shopDomain}/admin/api/2024-10/graphql.json`, {
+    method: 'POST',
+    headers: { 'X-Shopify-Access-Token': accessToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      query: `mutation productSeoUpdate($input: ProductInput!) {
+        productUpdate(input: $input) {
+          product { id seo { title description } }
+          userErrors { field message }
+        }
+      }`,
+      variables: { input: { id: `gid://shopify/Product/${productId}`, seo } },
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`Shopify SEO update failed: ${res.status} - ${await res.text().catch(() => '')}`);
+  }
+  const json = await res.json();
+  const userErrors = json?.data?.productUpdate?.userErrors || [];
+  if (json?.errors?.length || userErrors.length) {
+    const msg = [...(json.errors || []), ...userErrors].map((e: any) => e.message).join('; ');
+    throw new Error(`Shopify SEO update failed: ${msg}`);
+  }
+  const saved = json?.data?.productUpdate?.product?.seo || {};
+  return { title: saved.title ?? null, description: saved.description ?? null };
+}
+
+/**
+ * Read a product's current SEO title/description through Admin GraphQL.
+ */
+async function getProductSeo(
+  shopDomain: string,
+  accessToken: string,
+  productId: string
+): Promise<{ title: string | null; description: string | null }> {
+  const res = await fetch(`https://${shopDomain}/admin/api/2024-10/graphql.json`, {
+    method: 'POST',
+    headers: { 'X-Shopify-Access-Token': accessToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      query: `query productSeo($id: ID!) { product(id: $id) { seo { title description } } }`,
+      variables: { id: `gid://shopify/Product/${productId}` },
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`Shopify SEO read failed: ${res.status} - ${await res.text().catch(() => '')}`);
+  }
+  const json = await res.json();
+  if (json?.errors?.length) {
+    throw new Error(`Shopify SEO read failed: ${json.errors.map((e: any) => e.message).join('; ')}`);
+  }
+  const seo = json?.data?.product?.seo || {};
+  return { title: seo.title ?? null, description: seo.description ?? null };
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -44,7 +107,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if ('error' in auth) {
       return res.status(auth.status || 401).json({ error: auth.error });
     }
-    const { userId, shop, client } = auth;
+    const { userId, shop, client, accessToken } = auth;
 
     // ================================================================
     // LIST PRODUCTS (from cache or API)
@@ -54,10 +117,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const size = parseInt(req.query.size as string) || 50;
       const fromCache = req.query.fromCache === 'true';
       const status = req.query.status as string | undefined;
+      const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
 
       if (fromCache) {
         const where: any = { userId, shopifyShopId: shop.id };
         if (status) where.status = status;
+        if (q) {
+          // Prisma has no case-insensitive substring filter for String[], so
+          // match tags in SQL and fold the matching ids into the OR.
+          const likeQ = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+          const tagMatches = await prisma.$queryRaw<{ id: string }[]>`
+            SELECT id FROM "ShopifyProduct"
+            WHERE "userId" = ${userId} AND "shopifyShopId" = ${shop.id}
+              AND EXISTS (SELECT 1 FROM unnest(tags) t WHERE t ILIKE ${likeQ})`;
+          where.OR = [
+            { title: { contains: q, mode: 'insensitive' } },
+            { vendor: { contains: q, mode: 'insensitive' } },
+            { id: { in: tagMatches.map((r) => r.id) } },
+          ];
+        }
 
         const [products, total] = await Promise.all([
           prisma.shopifyProduct.findMany({
@@ -100,6 +178,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // ================================================================
+    // GET PRODUCT SEO (live from Shopify; REST does not expose it)
+    // ================================================================
+    if (action === 'seo' && req.method === 'GET') {
+      const productId = req.query.id as string;
+      if (!productId) return res.status(400).json({ error: 'Missing product id' });
+
+      const seo = await getProductSeo(shop.shopDomain, accessToken, productId);
+      return res.status(200).json({ seo });
+    }
+
+    // ================================================================
     // CREATE PRODUCT
     // ================================================================
     if (action === 'create' && req.method === 'POST') {
@@ -118,10 +207,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const productId = req.query.id as string || req.body.id;
       if (!productId) return res.status(400).json({ error: 'Missing product id' });
 
-      const product = await client.updateProduct(String(productId), req.body);
+      // `seo` is not a REST product field; it is written separately via GraphQL.
+      const { seo, ...restUpdates } = req.body || {};
+      const product = await client.updateProduct(String(productId), restUpdates);
 
       // Update cache
       await upsertProductCache(userId, shop.id, product);
+
+      if (seo && typeof seo === 'object') {
+        const savedSeo = await updateProductSeo(shop.shopDomain, accessToken, String(product.id), {
+          title: typeof seo.title === 'string' ? seo.title : undefined,
+          description: typeof seo.description === 'string' ? seo.description : undefined,
+        });
+        await prisma.shopifyProduct.updateMany({
+          where: { userId, shopifyShopId: shop.id, shopifyProductId: String(product.id) },
+          data: { seoTitle: savedSeo.title, seoDescription: savedSeo.description },
+        });
+      }
 
       return res.status(200).json({ product });
     }

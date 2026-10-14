@@ -6,6 +6,7 @@ import { SyncType } from './types';
 import fetch from 'node-fetch';
 import { UIOrder, OrderSource, OrderChannel, NormalizedAddress, NormalizedLineItem } from './types';
 import { getIntegrationCreds } from './config';
+import { decryptIfNeeded } from './crypto/credentials';
 import { fetchVeeqoOrders, processOrdersInBatches } from './integrations/veeqo';
 import { fetchShippoOrders } from './integrations/shippo';
 import { fetchEtsyOrders } from './integrations/etsyOrderSync';
@@ -849,6 +850,10 @@ export async function syncAllOrders(userId: string, options: {
     if (!options.veeqoApiKey) options.veeqoApiKey = creds.veeqoApiKey ?? undefined;
     if (!options.shippoToken) options.shippoToken = creds.shippoToken ?? undefined;
   }
+  // Callers may pass raw Credential columns (stored encrypted). Decrypt here, at the
+  // single choke point; plaintext passes through unchanged.
+  options.veeqoApiKey = decryptIfNeeded(options.veeqoApiKey) ?? undefined;
+  options.shippoToken = decryptIfNeeded(options.shippoToken) ?? undefined;
   let syncId: string | undefined;
   let processed = 0;
   let successful = 0;

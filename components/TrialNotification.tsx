@@ -40,19 +40,45 @@ export default function TrialNotification({ userSubscription }: TrialNotificatio
   const locale = useLocaleStore((s) => s.locale);
   const dateFnsLocale = locale === 'tr' ? tr : enUS;
 
+  const trialExpiresAt = userSubscription?.trialExpiresAt ?? null;
+  const daysUntilExpiry = trialExpiresAt
+    ? differenceInDays(new Date(trialExpiresAt), new Date())
+    : null;
+  const isUrgent = daysUntilExpiry !== null && daysUntilExpiry <= 3;
+
+  // Check if notification was dismissed recently (within last 24 hours).
+  // Must run before any early return: userSubscription arrives async, and a
+  // hook that only runs once it's loaded changes the hook count (React #310).
+  // Kept separate from `dismissed` so an urgent trial still shows even if the
+  // subscription loads after this effect ran.
+  const [recentlyDismissed, setRecentlyDismissed] = useState(false);
+  useEffect(() => {
+    try {
+      const lastDismissed = localStorage.getItem('trialNotificationDismissed');
+      if (lastDismissed) {
+        const dismissedTime = parseInt(lastDismissed);
+        const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
+        if (dismissedTime > twentyFourHoursAgo) {
+          setRecentlyDismissed(true);
+        }
+      }
+    } catch {
+      // localStorage unavailable (private mode) — just show the notice
+    }
+  }, []);
+
   // Shopify-installed merchants are on the free tier — never show them
   // trial countdowns or Stripe upgrade prompts (App Store rule 1.2.1).
   if (!userSubscription ||
       userSubscription.billingProvider === 'shopify_free' ||
       userSubscription.subscriptionPlan === 'shopify_free' ||
       userSubscription.subscriptionStatus !== 'trialing' ||
-      !userSubscription.trialExpiresAt ||
-      dismissed) {
+      daysUntilExpiry === null ||
+      dismissed ||
+      (recentlyDismissed && !isUrgent)) {
     return null;
   }
 
-  const daysUntilExpiry = differenceInDays(new Date(userSubscription.trialExpiresAt), new Date());
-  const isUrgent = daysUntilExpiry <= 3;
   const hasExpired = daysUntilExpiry < 0;
 
   // Don't show if trial has more than 7 days left (unless urgent)
@@ -67,20 +93,12 @@ export default function TrialNotification({ userSubscription }: TrialNotificatio
   const handleDismiss = () => {
     setDismissed(true);
     // Store dismissal in localStorage to persist during session
-    localStorage.setItem('trialNotificationDismissed', Date.now().toString());
-  };
-
-  // Check if notification was dismissed recently (within last 24 hours)
-  useEffect(() => {
-    const lastDismissed = localStorage.getItem('trialNotificationDismissed');
-    if (lastDismissed) {
-      const dismissedTime = parseInt(lastDismissed);
-      const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
-      if (dismissedTime > twentyFourHoursAgo && !isUrgent) {
-        setDismissed(true);
-      }
+    try {
+      localStorage.setItem('trialNotificationDismissed', Date.now().toString());
+    } catch {
+      // ignore — dismissal still applies for this mount
     }
-  }, [isUrgent]);
+  };
 
   const getAlertSeverity = () => {
     if (hasExpired) return 'error';

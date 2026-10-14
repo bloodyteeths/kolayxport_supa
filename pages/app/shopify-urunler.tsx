@@ -21,9 +21,9 @@ import {
 import {
   DataGrid,
   GridColDef,
+  GridColumnVisibilityModel,
   GridPaginationModel,
   GridRenderCellParams,
-  GridRowSelectionModel,
 } from '@mui/x-data-grid';
 import {
   Refresh as RefreshIcon,
@@ -34,7 +34,7 @@ import {
   Delete as DeleteIcon,
   Save as SaveIcon,
 } from '@mui/icons-material';
-import { toast, Toaster } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
 import withAuth from '@/components/withAuth';
 import { useAuth } from '@/lib/auth-context';
@@ -115,8 +115,24 @@ function ShopifyProductsPage() {
   const [totalCount, setTotalCount] = useState(0);
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({ page: 0, pageSize: 25 });
   const [searchText, setSearchText] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [selectionModel, setSelectionModel] = useState<GridRowSelectionModel>({ type: 'include', ids: new Set() });
+
+  // Search runs on the server so results and pagination agree; debounce keystrokes
+  // and jump back to the first page whenever the query or status filter changes.
+  const resetToFirstPage = () =>
+    setPaginationModel(prev => (prev.page === 0 ? prev : { ...prev, page: 0 }));
+
+  useEffect(() => {
+    const next = searchText.trim();
+    if (next === debouncedSearch) return;
+    const handle = setTimeout(() => {
+      setDebouncedSearch(next);
+      resetToFirstPage();
+    }, 300);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchText]);
 
   // Editor drawer
   const [editorOpen, setEditorOpen] = useState(false);
@@ -136,6 +152,7 @@ function ShopifyProductsPage() {
         size: String(paginationModel.pageSize),
       });
       if (statusFilter !== 'all') params.set('status', statusFilter);
+      if (debouncedSearch) params.set('q', debouncedSearch);
 
       const res = await fetch(`/api/shopify/products?${params}`);
       if (!res.ok) throw new Error('Failed to fetch products');
@@ -148,7 +165,7 @@ function ShopifyProductsPage() {
     } finally {
       setLoading(false);
     }
-  }, [paginationModel, statusFilter, t]);
+  }, [paginationModel, statusFilter, debouncedSearch, t]);
 
   useEffect(() => {
     fetchProducts();
@@ -258,13 +275,11 @@ function ShopifyProductsPage() {
       field: 'vendor',
       headerName: t('shopifyListings.vendor'),
       width: 120,
-      hide: isMobile,
     },
     {
       field: 'productType',
       headerName: t('shopifyListings.productType'),
       width: 120,
-      hide: isMobile,
     },
     {
       field: 'actions',
@@ -293,22 +308,16 @@ function ShopifyProductsPage() {
         </Box>
       ),
     },
-  ], [t, isMobile]);
+  ], [t]);
 
-  // ---------------------------------------------------------------------------
-  // Filtered products
-  // ---------------------------------------------------------------------------
-
-  const filteredProducts = useMemo(() => {
-    if (!searchText) return products;
-    const q = searchText.toLowerCase();
-    return products.filter(
-      p =>
-        p.title?.toLowerCase().includes(q) ||
-        p.vendor?.toLowerCase().includes(q) ||
-        p.tags?.some(tag => tag.toLowerCase().includes(q))
-    );
-  }, [products, searchText]);
+  // Hide secondary columns on small screens; still user-adjustable via the column menu
+  const [columnVisibilityModel, setColumnVisibilityModel] = useState<GridColumnVisibilityModel>({
+    vendor: !isMobile,
+    productType: !isMobile,
+  });
+  useEffect(() => {
+    setColumnVisibilityModel((prev) => ({ ...prev, vendor: !isMobile, productType: !isMobile }));
+  }, [isMobile]);
 
   // ---------------------------------------------------------------------------
   // Render
@@ -316,8 +325,6 @@ function ShopifyProductsPage() {
 
   return (
     <AppLayout>
-      <Toaster position="top-right" />
-
       <Box sx={{ p: { xs: 1, md: 3 }, maxWidth: 1400, mx: 'auto' }}>
         {/* Header */}
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, mb: 2, gap: 1 }}>
@@ -359,7 +366,10 @@ function ShopifyProductsPage() {
               <Select
                 value={statusFilter}
                 label={t('shopifyListings.status')}
-                onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value as StatusFilter);
+                  resetToFirstPage();
+                }}
               >
                 <MenuItem value="all">{t('shopifyListings.all')}</MenuItem>
                 <MenuItem value="active">{t('shopifyListings.active')}</MenuItem>
@@ -376,18 +386,17 @@ function ShopifyProductsPage() {
         {/* DataGrid */}
         <Paper sx={{ height: 'calc(100vh - 280px)', minHeight: 400 }}>
           <DataGrid
-            rows={filteredProducts}
+            rows={products}
             columns={columns}
+            columnVisibilityModel={columnVisibilityModel}
+            onColumnVisibilityModelChange={setColumnVisibilityModel}
             loading={loading}
             paginationModel={paginationModel}
             onPaginationModelChange={setPaginationModel}
             pageSizeOptions={[25, 50, 100]}
             rowCount={totalCount}
             paginationMode="server"
-            checkboxSelection
             disableRowSelectionOnClick
-            rowSelectionModel={selectionModel}
-            onRowSelectionModelChange={setSelectionModel}
             rowHeight={60}
             sx={{
               border: 'none',
@@ -438,6 +447,8 @@ function ShopifyEditorDrawer({ open, product, onClose, onSaved, t }: EditorProps
   const [status, setStatus] = useState('active');
   const [seoTitle, setSeoTitle] = useState('');
   const [seoDescription, setSeoDescription] = useState('');
+  // SEO as last known on Shopify; only fields that differ from this are sent on save
+  const [seoBase, setSeoBase] = useState({ title: '', description: '' });
 
   useEffect(() => {
     if (product) {
@@ -449,13 +460,38 @@ function ShopifyEditorDrawer({ open, product, onClose, onSaved, t }: EditorProps
       setStatus(product.status || 'active');
       setSeoTitle(product.seoTitle || '');
       setSeoDescription(product.seoDescription || '');
+      setSeoBase({ title: product.seoTitle || '', description: product.seoDescription || '' });
     }
+  }, [product]);
+
+  // The cache rarely holds SEO (REST sync does not return it), so load the live values
+  useEffect(() => {
+    if (!product) return;
+    let cancelled = false;
+    const cachedTitle = product.seoTitle || '';
+    const cachedDescription = product.seoDescription || '';
+    fetch(`/api/shopify/products?action=seo&id=${product.shopifyProductId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.seo) return;
+        const liveTitle = data.seo.title || '';
+        const liveDescription = data.seo.description || '';
+        setSeoBase({ title: liveTitle, description: liveDescription });
+        // Don't clobber anything the user already typed
+        setSeoTitle((cur) => (cur === cachedTitle ? liveTitle : cur));
+        setSeoDescription((cur) => (cur === cachedDescription ? liveDescription : cur));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, [product]);
 
   const handleSave = async () => {
     if (!product) return;
     setSaving(true);
     try {
+      const seo: { title?: string; description?: string } = {};
+      if (seoTitle !== seoBase.title) seo.title = seoTitle;
+      if (seoDescription !== seoBase.description) seo.description = seoDescription;
       const res = await fetch(`/api/shopify/products?action=update&id=${product.shopifyProductId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -466,9 +502,13 @@ function ShopifyEditorDrawer({ open, product, onClose, onSaved, t }: EditorProps
           product_type: productType,
           tags: tags,
           status,
+          ...(Object.keys(seo).length ? { seo } : {}),
         }),
       });
-      if (!res.ok) throw new Error('Update failed');
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || t('shopifyListings.updateFailed'));
+      }
       toast.success(t('shopifyListings.updateSuccess'));
       onSaved();
     } catch (err: any) {

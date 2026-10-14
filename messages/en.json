@@ -974,7 +974,8 @@
     "credential": {
       "showValue": "Show",
       "hideValue": "Hide",
-      "secureHint": "Encrypted at rest"
+      "secureHint": "Encrypted at rest",
+      "savedReplaceHint": "Saved — type a new value to replace it"
     },
     "errorDialog": {
       "title": "Sync errors",
@@ -3181,7 +3182,10 @@
       "unsupportedFormatFile": "{name}: unsupported file format",
       "draftSavedPublish": "Listing draft saved locally. Sync to Etsy to create and publish it.",
       "draftSavedCreate": "Listing draft saved locally. Sync to Etsy to create it.",
-      "aiImageWhiteBg": "Plain white background (main product shot)"
+      "aiImageWhiteBg": "Plain white background (main product shot)",
+      "syncingToEtsy": "Creating your listing on Etsy...",
+      "publishedOnEtsy": "Listing created and published on Etsy.",
+      "publishSyncFailed": "Saved as a draft, but Etsy rejected it: {error} Fix it and retry from the listings page."
     },
     "seo": {
       "seoScore": "SEO Score",
@@ -6750,6 +6754,26 @@
       "conflictDialogBody": "These listings were edited on Etsy after your draft was saved, so they were not synced:",
       "conflictDialogWarning": "Applying anyway overwrites the newer Etsy version with your draft values.",
       "applyAnyway": "Apply anyway"
+    },
+    "newDrafts": {
+      "title": "New listings not on Etsy yet ({count})",
+      "notOnEtsyYet": "New — not on Etsy yet",
+      "partiallyCreated": "Created on Etsy as #{id}, sync not finished",
+      "statusDraft": "Draft",
+      "statusSyncing": "Syncing",
+      "statusFailed": "Sync failed",
+      "statusConflict": "Conflict",
+      "willPublish": "Publishes on sync",
+      "untitled": "Untitled listing",
+      "photoCount": "{count, plural, one {# photo} other {# photos}}",
+      "syncToEtsy": "Sync to Etsy",
+      "deleteQueued": "A delete is queued on this draft, so it can't be synced from here.",
+      "confirmSync": "Create this listing on Etsy now? It will be saved as a draft listing on Etsy.",
+      "confirmSyncPublish": "Create and publish this listing on Etsy now? It will go live in your shop.",
+      "syncSuccess": "\"{title}\" created on Etsy (#{id}).",
+      "confirmDiscard": "Discard this new listing draft? Its staged photos are deleted. Anything already created on Etsy is not removed.",
+      "discarded": "Draft discarded",
+      "discardFailed": "Could not discard draft: {error}"
     }
   },
   "ebayListings": {
@@ -7732,7 +7756,8 @@
     "cancel": "Cancel",
     "updateSuccess": "Product updated successfully",
     "deleteConfirm": "Are you sure you want to delete this product?",
-    "deleteSuccess": "Product deleted successfully"
+    "deleteSuccess": "Product deleted successfully",
+    "updateFailed": "Failed to update product"
   },
   "messages": {
     "title": "Messages",

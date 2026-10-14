@@ -145,6 +145,13 @@ function SenkronPage() {
     'senkronPage'
   );
 
+  // senkron-print.css is global (Pages Router), so its print rules are
+  // scoped to this class — only this page opts in to table-only printing.
+  useEffect(() => {
+    document.body.classList.add('senkron-print-mode');
+    return () => document.body.classList.remove('senkron-print-mode');
+  }, []);
+
   // Auto-populate marketplace options
   useEffect(() => {
     if (orders && orders.length > 0) {

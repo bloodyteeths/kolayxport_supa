@@ -9,6 +9,7 @@
  *   npx tsx scripts/verify-trendyol-finance.ts 875021 2026-07-20 2026-08-20
  */
 import { PrismaClient } from '@prisma/client';
+import { initEncryptionKey, decryptIfNeeded } from '../lib/crypto/credentials';
 
 const prisma = new PrismaClient();
 
@@ -41,9 +42,11 @@ async function main() {
   const [supplierId, startStr, endStr] = process.argv.slice(2);
   if (!supplierId || !startStr || !endStr) throw new Error('args: <supplierId> <start YYYY-MM-DD> <end YYYY-MM-DD>');
 
+  // Unwrap the DEK the same way the app does at boot so stored secrets decrypt.
+  await initEncryptionKey();
   const cred = await prisma.credential.findFirst({ where: { trendyolSupplierId: supplierId }, select: { trendyolApiKey: true, trendyolApiSecret: true } });
   if (!cred?.trendyolApiKey || !cred?.trendyolApiSecret) throw new Error('credentials not found for supplier ' + supplierId);
-  const auth = 'Basic ' + Buffer.from(`${cred.trendyolApiKey}:${cred.trendyolApiSecret}`).toString('base64');
+  const auth = 'Basic ' + Buffer.from(`${decryptIfNeeded(cred.trendyolApiKey)}:${decryptIfNeeded(cred.trendyolApiSecret)}`).toString('base64');
 
   const startMs = new Date(`${startStr}T00:00:00+03:00`).getTime();
   const endMs = new Date(`${endStr}T23:59:59+03:00`).getTime();

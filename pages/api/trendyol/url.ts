@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { getAuthUser } from '@/lib/auth';
+import { decryptIfNeeded } from '@/lib/crypto/credentials';
 
 // Resolve a Trendyol order line to its canonical public product URL and 302
 // redirect the browser there.
@@ -107,9 +108,11 @@ async function lookupViaIntegrationAPI(userId: string, barcode: string): Promise
   if (!cred?.trendyolApiKey || !cred?.trendyolApiSecret || !cred?.trendyolSupplierId) {
     return null;
   }
-  // Trendyol creds are plaintext today; if/when crypto envelopes get rolled
-  // out for them, swap this to decryptIfNeeded.
-  const auth = 'Basic ' + Buffer.from(`${cred.trendyolApiKey}:${cred.trendyolApiSecret}`).toString('base64');
+  // Trendyol creds are encrypted at rest (settings PATCH); decryptIfNeeded
+  // also passes legacy plaintext rows through unchanged.
+  const apiKey = decryptIfNeeded(cred.trendyolApiKey);
+  const apiSecret = decryptIfNeeded(cred.trendyolApiSecret);
+  const auth = 'Basic ' + Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
   const url = `https://apigw.trendyol.com/integration/product/sellers/${cred.trendyolSupplierId}/products?barcode=${encodeURIComponent(barcode)}`;
   const res = await fetch(url, {
     headers: {

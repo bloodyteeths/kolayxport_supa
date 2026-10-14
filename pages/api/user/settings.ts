@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import prisma from '../../../lib/prisma';
 import { withPrismaRetry } from '../../../lib/prismaWithRetry';
-import { encryptCredentials, decryptCredentials } from '@/lib/encryption';
+import { encryptCredentials, decryptCredentials, maskCredentials, stripMaskedSecrets } from '@/lib/encryption';
 
 export default async function handler(
   req: NextApiRequest,
@@ -57,11 +57,14 @@ export default async function handler(
         userWithSettings.billingProvider === 'shopify_free' || activeShopifyShops > 0
           ? 'shopify_free'
           : userWithSettings.billingProvider;
-      const decryptedCreds = userWithSettings.integrationSettings
-        ? decryptCredentials(userWithSettings.integrationSettings as Record<string, any>)
+      // This response reaches the browser on every page (AppLayout), so secrets
+      // go out masked ('••••' + last 4) — never in plaintext. Identifiers the
+      // form must show (supplier IDs, account numbers) are returned readable.
+      const maskedCreds = userWithSettings.integrationSettings
+        ? maskCredentials(decryptCredentials(userWithSettings.integrationSettings as Record<string, any>))
         : null;
       res.status(200).json({
-        integrationSettings: decryptedCreds,
+        integrationSettings: maskedCreds,
         shipperProfile: userWithSettings.shipperProfile,
         shippingSettings: userWithSettings.shippingSettings || {},
         subscription: {
@@ -85,7 +88,11 @@ export default async function handler(
     }
   } else if (req.method === 'PATCH') {
     try {
-      const { integrationSettings, shipperProfile, shippingSettings } = req.body;
+      const { shipperProfile, shippingSettings } = req.body;
+      // The GET returns secrets masked; a mask sent back means "unchanged".
+      const integrationSettings = req.body.integrationSettings
+        ? stripMaskedSecrets(req.body.integrationSettings as Record<string, any>)
+        : req.body.integrationSettings;
 
       // First ensure the User record exists
       await prisma.user.upsert({

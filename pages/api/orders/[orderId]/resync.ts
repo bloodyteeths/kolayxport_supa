@@ -3,6 +3,7 @@ import prisma from '../../../../lib/prisma';
 import { syncAllOrders } from '../../../../lib/orderSync';
 import { VEEQO_API_KEY as GLOBAL_VEEQO_API_KEY } from '../../../../lib/config';
 import { getAuthUser } from '@/lib/auth';
+import { decryptIfNeeded } from '@/lib/crypto/credentials';
 import { logger } from '../../../../lib/logger';
 
 export default async function handler(
@@ -30,7 +31,7 @@ export default async function handler(
     const userSettings = await prisma.credential.findUnique({
       where: { userId },
     });
-    const veeqoApiKey = userSettings?.veeqoApiKey || GLOBAL_VEEQO_API_KEY;
+    const veeqoApiKey = decryptIfNeeded(userSettings?.veeqoApiKey) || GLOBAL_VEEQO_API_KEY;
     if (!veeqoApiKey) {
       logger.error('Veeqo API Key missing for user', undefined, { userId, operation: 'order-resync', source: 'Veeqo' });
       return res.status(400).json({ error: 'Veeqo integration is not configured. Please check your settings.' });

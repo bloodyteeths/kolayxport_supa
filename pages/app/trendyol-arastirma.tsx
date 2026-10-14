@@ -7,7 +7,6 @@ import {
   LayoutDashboard, FolderTree, DollarSign, Store, Tag,
   Calculator, Sparkles, Menu, ChevronLeft,
 } from 'lucide-react';
-import { Toaster } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
 import withAuth from '@/components/withAuth';
 import { useAuth } from '@/lib/auth-context';
@@ -130,7 +129,6 @@ function TrendyolResearchPage() {
 
   return (
     <AppLayout title={t('title')}>
-      <Toaster position="top-right" />
       <Box sx={{ display: 'flex', minHeight: 'calc(100vh - 64px)' }}>
         {/* Desktop sidebar */}
         {!isMobile && (

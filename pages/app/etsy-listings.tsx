@@ -69,7 +69,7 @@ import {
   Store as StoreIcon,
   Sync as SyncIcon,
 } from '@mui/icons-material';
-import { toast, Toaster } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import { useRouter } from 'next/router';
 import AppLayout from '@/components/AppLayout';
 import withAuth from '@/components/withAuth';
@@ -86,7 +86,7 @@ import BulkEditor from '@/components/etsy/BulkEditor';
 import SmartPricing from '@/components/etsy/SmartPricing';
 import DuplicateDetector from '@/components/etsy/DuplicateDetector';
 import BackupManager from '@/components/etsy/BackupManager';
-import { fetchEtsyDrafts, stageEtsyDraft, syncEtsyDrafts } from '@/lib/etsy/draftClient';
+import { discardEtsyDraft, EtsyDraftClientError, fetchEtsyDrafts, stageEtsyDraft, syncEtsyDraft, syncEtsyDrafts } from '@/lib/etsy/draftClient';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -608,6 +608,164 @@ function MobileEtsyListingCard({
 }
 
 // ---------------------------------------------------------------------------
+// Pending new listings (staged create_listing drafts not yet in the Etsy cache)
+// ---------------------------------------------------------------------------
+
+const NEW_DRAFT_STATUS_COLORS: Record<string, 'default' | 'info' | 'error' | 'warning'> = {
+  draft: 'default',
+  syncing: 'info',
+  failed: 'error',
+  conflict: 'warning',
+};
+
+/** Display fields for a staged create_listing draft (payload, overridden by later field edits). */
+function describeNewListingDraft(draft: any, currencyCode: string | null) {
+  const actions: any[] = Array.isArray(draft?.queuedActions) ? draft.queuedActions : [];
+  const createAction = actions.find((a) => a?.type === 'create_listing');
+  const values = { ...(createAction?.payload || {}), ...(draft?.fieldPatch || {}) };
+  const priceNum = Number(values.price);
+  const price = Number.isFinite(priceNum) && priceNum > 0
+    ? formatPrice({ amount: Math.round(priceNum * 100), divisor: 100, currency_code: String(values.currency_code || currencyCode || '') })
+    : '—';
+  const images = (Array.isArray(draft?.media) ? draft.media : [])
+    .filter((m: any) => m?.kind === 'image' && ['upload', 'ai_upload'].includes(m?.operation))
+    .sort((a: any, b: any) => (a.rank ?? 99) - (b.rank ?? 99));
+  const first = images[0];
+  const thumbUrl = first
+    ? (first.localPath ? `/api/etsy-drafts/media-preview?id=${encodeURIComponent(first.id)}` : (first.sourceUrl || null))
+    : null;
+  const listingId = Number(draft?.etsyListingId);
+  return {
+    title: String(values.title || ''),
+    price,
+    thumbUrl,
+    imageCount: images.length,
+    willPublish: actions.some((a) => a?.type === 'publish' && !a?.completedAt),
+    hasQueuedDelete: actions.some((a) => a?.type === 'delete'),
+    // A previous sync created the Etsy listing but failed afterwards.
+    createdListingId: listingId > 0 ? listingId : null,
+  };
+}
+
+function PendingNewListingsPanel({
+  drafts,
+  currencyCode,
+  busyDraftId,
+  onSync,
+  onDiscard,
+}: {
+  drafts: any[];
+  currencyCode: string | null;
+  busyDraftId: string | null;
+  onSync: (draft: any) => void;
+  onDiscard: (draft: any) => void;
+}) {
+  const t = useTranslations('etsyListings');
+  const tEtsy = useTranslations('etsy');
+  if (drafts.length === 0) return null;
+
+  return (
+    <Paper variant="outlined" sx={{ mb: 1.5, borderRadius: 2, borderColor: 'primary.200', overflow: 'hidden' }}>
+      <Box sx={{ px: 1.5, py: 1, bgcolor: 'primary.50', borderBottom: '1px solid', borderColor: 'divider' }}>
+        <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.main' }}>
+          {t('newDrafts.title', { count: drafts.length })}
+        </Typography>
+      </Box>
+      {drafts.map((draft, idx) => {
+        const info = describeNewListingDraft(draft, currencyCode);
+        // Only our own in-flight request disables the row. A draft left in
+        // 'syncing' (e.g. server restart mid-sync) stays retryable: the server
+        // claims it once stale, or replies 409 if a sync is really running.
+        const busy = busyDraftId === draft.id;
+        const statusKey = draft.status === 'syncing' ? 'statusSyncing'
+          : draft.status === 'failed' ? 'statusFailed'
+            : draft.status === 'conflict' ? 'statusConflict' : 'statusDraft';
+        return (
+          <Box
+            key={draft.id}
+            sx={{
+              display: 'flex', gap: 1.25, p: 1.5, alignItems: { xs: 'flex-start', sm: 'center' },
+              flexDirection: { xs: 'column', sm: 'row' },
+              borderTop: idx > 0 ? '1px solid' : 'none', borderColor: 'divider',
+            }}
+          >
+            <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'center', flex: 1, minWidth: 0, width: '100%' }}>
+              {info.thumbUrl ? (
+                <Box component="img" src={info.thumbUrl} alt="" sx={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 1, flexShrink: 0 }} />
+              ) : (
+                <Box sx={{ width: 52, height: 52, borderRadius: 1, backgroundColor: '#e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Typography variant="caption" color="text.disabled">N/A</Typography>
+                </Box>
+              )}
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography
+                  variant="body2"
+                  sx={{ fontWeight: 600, fontSize: '0.82rem', lineHeight: 1.3, wordBreak: 'break-word', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
+                >
+                  {info.title || t('newDrafts.untitled')}
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center', mt: 0.25, flexWrap: 'wrap' }}>
+                  <Typography variant="body2" fontWeight={600} fontSize="0.82rem">{info.price}</Typography>
+                  <Typography variant="caption" color="text.secondary">{t('newDrafts.photoCount', { count: info.imageCount })}</Typography>
+                  <Chip
+                    label={info.createdListingId ? t('newDrafts.partiallyCreated', { id: info.createdListingId }) : t('newDrafts.notOnEtsyYet')}
+                    size="small"
+                    variant="outlined"
+                    color="primary"
+                    sx={{ height: 20, fontSize: '0.7rem' }}
+                  />
+                  <Chip
+                    label={t(`newDrafts.${statusKey}`)}
+                    size="small"
+                    color={NEW_DRAFT_STATUS_COLORS[draft.status] || 'default'}
+                    sx={{ height: 20, fontSize: '0.7rem' }}
+                  />
+                  {info.willPublish && (
+                    <Typography variant="caption" color="success.main">{t('newDrafts.willPublish')}</Typography>
+                  )}
+                </Box>
+                {draft.lastSyncError && draft.status !== 'draft' && (
+                  <Typography variant="caption" color="error.main" sx={{ display: 'block', mt: 0.5, wordBreak: 'break-word' }}>
+                    {draft.lastSyncError}
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 1, flexShrink: 0, width: { xs: '100%', sm: 'auto' } }}>
+              <Tooltip title={info.hasQueuedDelete ? t('newDrafts.deleteQueued') : ''}>
+                <span style={{ flex: 1, display: 'flex' }}>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    onClick={() => onSync(draft)}
+                    disabled={busy || info.hasQueuedDelete || Boolean(busyDraftId)}
+                    startIcon={busy ? <CircularProgress size={14} color="inherit" /> : <SyncIcon sx={{ fontSize: '16px !important' }} />}
+                    sx={{ minHeight: 36, textTransform: 'none', fontWeight: 700, borderRadius: '8px', whiteSpace: 'nowrap', flex: 1 }}
+                  >
+                    {busy ? t('syncing') : t('newDrafts.syncToEtsy')}
+                  </Button>
+                </span>
+              </Tooltip>
+              <Button
+                size="small"
+                variant="outlined"
+                color="error"
+                onClick={() => onDiscard(draft)}
+                disabled={busy || Boolean(busyDraftId)}
+                startIcon={<DeleteIcon sx={{ fontSize: '16px !important' }} />}
+                sx={{ minHeight: 36, textTransform: 'none', borderRadius: '8px', whiteSpace: 'nowrap', flex: { xs: 1, sm: 'none' } }}
+              >
+                {tEtsy('editor.discardDraft')}
+              </Button>
+            </Box>
+          </Box>
+        );
+      })}
+    </Paper>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Left Sidebar Component (desktop only)
 // ---------------------------------------------------------------------------
 
@@ -940,6 +1098,8 @@ function EtsyListingsPage() {
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [pendingDraftsByListing, setPendingDraftsByListing] = useState<Record<string, any>>({});
+  const [pendingDraftList, setPendingDraftList] = useState<any[]>([]);
+  const [newDraftBusyId, setNewDraftBusyId] = useState<string | null>(null);
 
   // Mobile card pagination
   const [mobileVisibleCount, setMobileVisibleCount] = useState(25);
@@ -1217,6 +1377,7 @@ function EtsyListingsPage() {
   const fetchPendingDrafts = useCallback(async () => {
     if (!selectedShopId) {
       setPendingDraftsByListing({});
+      setPendingDraftList([]);
       return;
     }
     try {
@@ -1226,6 +1387,7 @@ function EtsyListingsPage() {
         next[String(draft.etsyListingId)] = draft;
       }
       setPendingDraftsByListing(next);
+      setPendingDraftList(drafts);
     } catch (err) {
       console.error('Failed to fetch Etsy drafts:', err);
     }
@@ -1655,7 +1817,8 @@ function EtsyListingsPage() {
   const draftTitleById = useMemo(() => {
     const map: Record<string, string> = {};
     for (const [listingId, draft] of Object.entries(pendingDraftsByListing)) {
-      if (draft?.id) map[draft.id] = listings.find((l) => String(l.listing_id) === listingId)?.title || `#${listingId}`;
+      if (draft?.id) map[draft.id] = listings.find((l) => String(l.listing_id) === listingId)?.title
+        || describeNewListingDraft(draft, null).title || `#${listingId}`;
     }
     return map;
   }, [pendingDraftsByListing, listings]);
@@ -1665,6 +1828,15 @@ function EtsyListingsPage() {
     if (issue?.key && tEtsy.has(issue.key)) return tEtsy(issue.key, issue.params || {});
     return typeof issue?.message === 'string' ? issue.message : (typeof issue?.error === 'string' ? issue.error : '');
   }, [tEtsy]);
+
+  /** Drop this shop's 5-min listings cache + status counts so the next fetch sees Etsy writes. */
+  const invalidateShopListingsCache = useCallback(() => {
+    if (!selectedShopId) return;
+    Object.keys(listingsCacheRef.current).forEach((key) => {
+      if (key.startsWith(`${selectedShopId}:`)) delete listingsCacheRef.current[key];
+    });
+    statusCountsCacheRef.current[selectedShopId] = {};
+  }, [selectedShopId]);
 
   const runBulkDraftSync = useCallback(async (draftIds: string[], force: boolean) => {
     setBulkSyncingDrafts(true);
@@ -1702,13 +1874,14 @@ function EtsyListingsPage() {
         setSyncConflicts(conflictDrafts.map((c) => ({ draftId: c.draftId, title: draftTitleById[c.draftId] || c.draftId })));
       }
 
+      invalidateShopListingsCache();
       await Promise.all([fetchPendingDrafts(), fetchListings()]);
     } catch (err: any) {
       toast.error(translateDraftIssue(err) || t('draftSync.failedGeneric'), { id: toastId });
     } finally {
       setBulkSyncingDrafts(false);
     }
-  }, [t, draftTitleById, translateDraftIssue, fetchPendingDrafts, fetchListings]);
+  }, [t, draftTitleById, translateDraftIssue, fetchPendingDrafts, fetchListings, invalidateShopListingsCache]);
 
   const handleSyncSelectedDrafts = useCallback(async () => {
     if (selectedDraftIds.length === 0 || bulkSyncingDrafts) return;
@@ -1721,6 +1894,76 @@ function EtsyListingsPage() {
     setSyncConflicts(null);
     if (ids.length > 0) await runBulkDraftSync(ids, true);
   }, [syncConflicts, runBulkDraftSync]);
+
+  // --- Staged new listings (create_listing drafts) ---------------------------
+  // They have a negative local id until the first sync creates them on Etsy, so
+  // they never appear in the listings cache — pin them above the list instead.
+  // A draft whose create already ran (real id) but whose sync failed later stays
+  // pinned until its listing shows up in the current view.
+  const pendingNewListingDrafts = useMemo(() => {
+    const visibleIds = new Set(listings.map((l) => String(l.listing_id)));
+    return pendingDraftList.filter((draft) => {
+      const actions: any[] = Array.isArray(draft?.queuedActions) ? draft.queuedActions : [];
+      if (!actions.some((a) => a?.type === 'create_listing')) return false;
+      return Number(draft.etsyListingId) < 0 || !visibleIds.has(String(draft.etsyListingId));
+    });
+  }, [pendingDraftList, listings]);
+
+  const refreshAfterNewListingSync = useCallback(async () => {
+    invalidateShopListingsCache();
+    await Promise.all([
+      fetchPendingDrafts(),
+      fetchListings().then(() => fetchStatusCounts()),
+    ]);
+  }, [invalidateShopListingsCache, fetchPendingDrafts, fetchListings, fetchStatusCounts]);
+
+  const handleSyncNewListingDraft = useCallback(async (draft: any) => {
+    if (!draft?.id || newDraftBusyId) return;
+    const actions: any[] = Array.isArray(draft.queuedActions) ? draft.queuedActions : [];
+    // Never sync a draft carrying a queued delete from here.
+    if (actions.some((a) => a?.type === 'delete')) return;
+    const willPublish = actions.some((a) => a?.type === 'publish' && !a?.completedAt);
+    if (!window.confirm(t(willPublish ? 'newDrafts.confirmSyncPublish' : 'newDrafts.confirmSync'))) return;
+    const title = describeNewListingDraft(draft, null).title || t('newDrafts.untitled');
+    setNewDraftBusyId(draft.id);
+    const toastId = toast.loading(t('draftSync.syncing', { count: 1 }));
+    try {
+      const result = await syncEtsyDraft(draft.id);
+      toast.success(t('newDrafts.syncSuccess', { title, id: String(result?.etsyListingId || '') }), { id: toastId });
+      const warnings: any[] = Array.isArray(result?.warnings) ? result.warnings : [];
+      if (warnings.length > 0) {
+        const details = warnings.map(translateDraftIssue).filter(Boolean).join(' • ');
+        toast(t('draftSync.partialWarning', { title, details }), { icon: '⚠️', duration: 10000 });
+      }
+    } catch (err: any) {
+      if (err instanceof EtsyDraftClientError && err.isConflict) {
+        toast.dismiss(toastId);
+        setSyncConflicts([{ draftId: draft.id, title }]);
+      } else {
+        toast.error(`${title}: ${translateDraftIssue(err) || t('draftSync.failedGeneric')}`, { id: toastId, duration: 8000 });
+      }
+    } finally {
+      setNewDraftBusyId(null);
+      // Success: the real listing appears and the pinned row goes away.
+      // Failure: the row stays, now showing the failed status + error.
+      await refreshAfterNewListingSync();
+    }
+  }, [newDraftBusyId, t, translateDraftIssue, refreshAfterNewListingSync]);
+
+  const handleDiscardNewListingDraft = useCallback(async (draft: any) => {
+    if (!draft?.id || newDraftBusyId) return;
+    if (!window.confirm(t('newDrafts.confirmDiscard'))) return;
+    setNewDraftBusyId(draft.id);
+    try {
+      await discardEtsyDraft(draft.id);
+      toast.success(t('newDrafts.discarded'));
+    } catch (err: any) {
+      toast.error(t('newDrafts.discardFailed', { error: translateDraftIssue(err) || err?.message || '' }));
+    } finally {
+      setNewDraftBusyId(null);
+      await fetchPendingDrafts();
+    }
+  }, [newDraftBusyId, t, translateDraftIssue, fetchPendingDrafts]);
 
   // --- DataGrid Columns (Vela-style: image, title+hover actions, stock, price, expires, section, score) ---
   const columns: GridColDef[] = useMemo(
@@ -2074,8 +2317,6 @@ function EtsyListingsPage() {
 
   return (
     <Box sx={{ p: { xs: 0.5, sm: 1, md: 1.5 }, maxWidth: 1600, mx: 'auto', overflowX: 'hidden' }}>
-      <Toaster position="top-right" />
-
       {/* No shops message */}
       {shops.length === 0 && !(loading) && (
         <Paper sx={{ p: 3, mb: 2, textAlign: 'center' }}>
@@ -2451,6 +2692,15 @@ function EtsyListingsPage() {
             </Box>
           )}
 
+          {/* Staged new listings, pinned above both the mobile cards and the DataGrid */}
+          <PendingNewListingsPanel
+            drafts={pendingNewListingDrafts}
+            currencyCode={shopCurrency}
+            busyDraftId={newDraftBusyId}
+            onSync={handleSyncNewListingDraft}
+            onDiscard={handleDiscardNewListingDraft}
+          />
+
           {/* Mobile Card List */}
           <Box sx={{ display: { xs: 'block', md: 'none' }, overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
             {loading ? (
@@ -2743,14 +2993,15 @@ function EtsyListingsPage() {
         marketResearchData={null}
         currencyCode={shopCurrency}
         onCreated={(listingId) => {
+          // ListingCreatorDialog already toasted the outcome (local draft save,
+          // or the result of its immediate Create & Publish sync). A negative id
+          // means nothing reached Etsy yet: the draft shows as a pinned row.
           setCreateDialogOpen(false);
           if (listingId < 0) {
-            // ListingCreatorDialog already confirmed the local draft save.
             fetchPendingDrafts();
             return;
           }
-          toast.success(t('listingCreated', { id: listingId }));
-          fetchListings();
+          refreshAfterNewListingSync();
         }}
       />
 

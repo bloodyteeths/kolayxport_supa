@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { syncAllOrders } from '@/lib/orderSync';
 import { getAuthUser } from '@/lib/auth';
+import { decryptIfNeeded } from '@/lib/crypto/credentials';
 import { isTrendyolEnabled, isWixEnabled, isShopifyEnabled } from '@/lib/config';
 import { withUsageLimiter } from '@/lib/middleware/withUsageLimiter';
 import { syncWixRecentOrdersForUser } from '@/lib/sync/wix';
@@ -33,10 +34,11 @@ async function handler(
     const userSettings = await prisma.credential.findUnique({ where: { userId } });
 
     // Use provided credentials or fall back to user settings
-    const finalVeeqoApiKey = veeqoApiKey || userSettings?.veeqoApiKey;
-    const finalShippoToken = shippoToken || userSettings?.shippoToken;
-    const finalTrendyolApiKey = userSettings?.trendyolApiKey;
-    const finalTrendyolApiSecret = userSettings?.trendyolApiSecret;
+    // Stored secrets are encrypted at rest; decryptIfNeeded is a no-op on plaintext.
+    const finalVeeqoApiKey = decryptIfNeeded(veeqoApiKey || userSettings?.veeqoApiKey) ?? undefined;
+    const finalShippoToken = decryptIfNeeded(shippoToken || userSettings?.shippoToken) ?? undefined;
+    const finalTrendyolApiKey = decryptIfNeeded(userSettings?.trendyolApiKey);
+    const finalTrendyolApiSecret = decryptIfNeeded(userSettings?.trendyolApiSecret);
     const finalTrendyolSupplierId = userSettings?.trendyolSupplierId;
 
     const hasVeeqo = !!finalVeeqoApiKey;

@@ -11,12 +11,13 @@
  */
 import { PrismaClient } from '@prisma/client';
 import { EtsyClient } from '@/lib/integrations/etsyClient';
-import { decryptIfNeeded } from '@/lib/crypto/credentials';
+import { decryptIfNeeded, initEncryptionKey } from '@/lib/crypto/credentials';
 
 const prisma = new PrismaClient();
 const money = (m: any) => (m && typeof m.amount === 'number' ? m.amount / m.divisor : 0);
 
 async function main() {
+  await initEncryptionKey();
   const [startStr, endStr] = process.argv.slice(2);
   const startMs = new Date(`${startStr}T00:00:00Z`).getTime();
   const endMs = new Date(`${endStr}T23:59:59Z`).getTime();

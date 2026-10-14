@@ -34,7 +34,7 @@ import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import { toast } from 'react-hot-toast';
-import { stageEtsyDraft, stageEtsyDraftFile } from '@/lib/etsy/draftClient';
+import { stageEtsyDraft, stageEtsyDraftFile, syncEtsyDraft } from '@/lib/etsy/draftClient';
 import { useTranslations } from 'next-intl';
 import SEOIndicator from './SEOIndicator';
 import {
@@ -168,6 +168,8 @@ export default function ListingCreatorDialog({
   const [creating, setCreating] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadTotal, setUploadTotal] = useState(0);
+  // Create & Publish: the staged draft is synced to Etsy right away.
+  const [syncingToEtsy, setSyncingToEtsy] = useState(false);
 
   // Step 1 — Content
   const [title, setTitle] = useState('');
@@ -445,6 +447,7 @@ export default function ListingCreatorDialog({
     setItemDimensionsUnit('cm');
     setSelectedFiles([]);
     setCreating(false);
+    setSyncingToEtsy(false);
     setUploadProgress(0);
     setUploadTotal(0);
     setAiTagSuggestions([]);
@@ -722,6 +725,7 @@ export default function ListingCreatorDialog({
       });
 
       // Upload images
+      let stagedImages = 0;
       if (selectedFiles.length > 0) {
         setUploadTotal(selectedFiles.length);
         for (let i = 0; i < selectedFiles.length; i++) {
@@ -737,20 +741,50 @@ export default function ListingCreatorDialog({
               operation: 'upload',
               rank: i + 1,
             });
+            stagedImages++;
           } catch {
             toast.error(t('imageUploadFailed', { index: i + 1 }));
           }
         }
       }
 
-      // Publish if requested
-      if (publish) {
-        toast.success(t('draftSavedPublish'));
-      } else {
-        toast.success(t('draftSavedCreate'));
+      // "Save as Draft" only stages; the draft is listed on the listings page
+      // and goes to Etsy when the user syncs it there. If any picked photo
+      // failed to stage, don't go live with fewer photos than chosen: keep it
+      // a local draft the user can fix and sync from the pinned row.
+      if (!publish || !draft?.id || stagedImages === 0 || stagedImages < selectedFiles.length) {
+        toast.success(t(publish ? 'draftSavedPublish' : 'draftSavedCreate'));
+        onCreated(localDraftListingId, draft?.id);
+        resetForm();
+        onClose();
+        return;
       }
 
-      onCreated(localDraftListingId, draft?.id);
+      // "Create & Publish" is the explicit go-live action: sync this draft now.
+      setSyncingToEtsy(true);
+      let createdListingId = localDraftListingId;
+      try {
+        const result = await syncEtsyDraft(draft.id);
+        if (result?.etsyListingId) createdListingId = Number(result.etsyListingId);
+        toast.success(t('publishedOnEtsy'));
+        const warnings: any[] = Array.isArray(result?.warnings) ? result.warnings : [];
+        if (warnings.length > 0) {
+          const details = warnings
+            .map((w) => (w?.key && tEtsy.has(w.key) ? tEtsy(w.key, w.params || {}) : w?.message))
+            .filter(Boolean)
+            .join(' • ');
+          toast(tEtsy('draftSync.syncedWithWarnings', { details }), { icon: '⚠️', duration: 10000 });
+        }
+      } catch (syncErr: any) {
+        // The draft is kept (status failed) and shown as a pinned row on the
+        // listings page, where the user can fix it and retry.
+        const reason = syncErr?.key && tEtsy.has(syncErr.key)
+          ? tEtsy(syncErr.key, syncErr.params || {})
+          : (syncErr?.message || t('errorOccurred'));
+        toast.error(t('publishSyncFailed', { error: reason }), { duration: 10000 });
+      }
+
+      onCreated(createdListingId, draft.id);
       resetForm();
       onClose();
     } catch (err: any) {
@@ -1597,7 +1631,16 @@ export default function ListingCreatorDialog({
           <SEOIndicator tags={tags} title={title} description={description} />
         </Paper>
 
-        {creating && uploadTotal > 0 && (
+        {creating && syncingToEtsy && (
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+              {t('syncingToEtsy')}
+            </Typography>
+            <LinearProgress sx={{ height: 6, borderRadius: 3 }} />
+          </Box>
+        )}
+
+        {creating && !syncingToEtsy && uploadTotal > 0 && (
           <Box sx={{ mt: 1 }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
               {t('uploadingImages', { progress: uploadProgress, total: uploadTotal })}

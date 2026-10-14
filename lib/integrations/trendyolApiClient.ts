@@ -5,6 +5,7 @@
  */
 
 import { logger } from '../logger';
+import { decryptIfNeeded } from '../crypto/credentials';
 
 const TRENDYOL_API_BASE = 'https://apigw.trendyol.com/integration';
 
@@ -310,9 +311,11 @@ export function createTrendyolClient(credential: {
     throw new Error('Trendyol credentials not configured. Please add your API Key, API Secret, and Supplier ID in Settings.');
   }
 
+  // Callers may hand us the raw Credential row (secrets encrypted at rest).
+  // decryptIfNeeded is a no-op on plaintext, so pre-decrypted values are fine too.
   return new TrendyolApiClient({
     supplierId: credential.trendyolSupplierId,
-    apiKey: credential.trendyolApiKey,
-    apiSecret: credential.trendyolApiSecret,
+    apiKey: decryptIfNeeded(credential.trendyolApiKey) as string,
+    apiSecret: decryptIfNeeded(credential.trendyolApiSecret) as string,
   });
 }

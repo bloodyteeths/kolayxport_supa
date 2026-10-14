@@ -347,7 +347,7 @@ export default async function handler(
 
       try {
         await submitVeeqoTracking(
-          userSettings.veeqoApiKey,
+          decryptIfNeeded(userSettings.veeqoApiKey),
           order.marketplaceKey,
           trackingNumber,
           carrierId,

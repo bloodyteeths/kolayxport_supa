@@ -23,12 +23,29 @@ export interface UserSettingsResponse {
   shipperProfile?: Record<string, string | null | undefined> | null;
 }
 
+// GET /api/user/settings returns secret fields masked ('••••' + last 4).
+// Mirrors SECRET_MASK_CHAR / SECRET_FIELDS in lib/encryption.ts (server-only module).
+export const SECRET_MASK_CHAR = '•';
+
+export function isMaskedSecret(value: unknown): boolean {
+  return typeof value === 'string' && value.includes(SECRET_MASK_CHAR);
+}
+
+/** Never send a mask back as a new value: drop masked fields so the server keeps the stored secret. */
+function withoutMaskedSecrets(data: UserSettingsResponse): UserSettingsResponse {
+  if (!data.integrationSettings) return data;
+  const integrationSettings = Object.fromEntries(
+    Object.entries(data.integrationSettings).filter(([, v]) => !isMaskedSecret(v)),
+  );
+  return { ...data, integrationSettings };
+}
+
 export const initialFormData: UserSettingsResponse = {
   shippingSettings: { etgbRecipientEmail: '', etgbEnabled: false },
   integrationSettings: {
     veeqoApiKey: '', shippoToken: '', trendyolApiKey: '', trendyolApiSecret: '', trendyolSupplierId: '',
     fedexApiKey: '', fedexApiSecret: '', fedexAccountNumber: '', upsApiKey: '', upsApiSecret: '', upsAccountNumber: '',
-    mngCustomerNumber: '', mngPassword: '', mngAppId: '', mngAppSecret: '', mngApiEnvironment: 'test',
+    mngCustomerNumber: '', mngPassword: '', mngAppId: '', mngAppSecret: '',
     parasutClientId: '', parasutClientSecret: '', parasutUsername: '', parasutPassword: '', parasutCompanyId: '',
     parasutBaseUrl: '', parasutRedirectUri: '',
   },
@@ -100,7 +117,7 @@ export function useSettings() {
   const handleSave = async () => {
     setIsSubmitting(true);
     try {
-      await axios.patch('/api/user/settings', formData, { withCredentials: true });
+      await axios.patch('/api/user/settings', withoutMaskedSecrets(formData), { withCredentials: true });
       lastSavedRef.current = snapshot(formData);
       setIsDirty(false);
       toast.success(t('settingsSaved'));

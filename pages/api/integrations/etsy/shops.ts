@@ -81,7 +81,7 @@ export default async function handler(
   }
 
   if (req.method === 'POST') {
-    // Set default shop
+    // Shop actions (currently only 'delete' = disconnect)
     const { shopId, action } = req.body;
 
     if (!shopId || !action) {
@@ -92,11 +92,12 @@ export default async function handler(
 
       if (action === 'delete') {
         // Check if it's a legacy shop
-        if (shopId.startsWith('legacy-')) {
+        if (typeof shopId === 'string' && shopId.startsWith('legacy-')) {
           const actualShopId = shopId.replace('legacy-', '');
-          // Clear legacy credentials
-          await prisma.credential.update({
-            where: { userId: authUserId },
+          // Clear legacy credentials — scoped to the shop being disconnected so a
+          // stale legacy id can't wipe a different shop's fallback token.
+          const cleared = await prisma.credential.updateMany({
+            where: { userId: authUserId, etsyShopId: actualShopId },
             data: {
               etsyAccessToken: null,
               etsyRefreshToken: null,
@@ -104,16 +105,34 @@ export default async function handler(
               etsyTokenExpiresAt: null
             }
           });
+          if (cleared.count === 0) return res.status(404).json({ error: 'Shop not found' });
         } else {
+          // The settings UI sends the EtsyShop row id (what GET returns as `id`);
+          // older callers may send Etsy's numeric shop id. Accept either, always
+          // scoped to the authenticated user.
+          const shop = await prisma.etsyShop.findFirst({
+            where: { userId: authUserId, OR: [{ id: String(shopId) }, { shopId: String(shopId) }] },
+            select: { id: true, shopId: true },
+          });
+          if (!shop) return res.status(404).json({ error: 'Shop not found' });
+
           // Soft delete by setting isActive to false
           await prisma.etsyShop.update({
-            where: { 
-              userId_shopId: { 
-                userId: authUserId, 
-                shopId: shopId 
-              }
-            },
+            where: { id: shop.id },
             data: { isActive: false }
+          });
+
+          // The first connected shop is also mirrored into Credential (see etsy/callback).
+          // Clear that mirror too, otherwise GET re-surfaces the shop as "legacy-<id>"
+          // and the legacy token keeps being used by fallback code paths.
+          await prisma.credential.updateMany({
+            where: { userId: authUserId, etsyShopId: shop.shopId },
+            data: {
+              etsyAccessToken: null,
+              etsyRefreshToken: null,
+              etsyShopId: null,
+              etsyTokenExpiresAt: null
+            }
           });
         }
 

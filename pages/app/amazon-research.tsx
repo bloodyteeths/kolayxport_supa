@@ -5,7 +5,6 @@ import {
   FormControl, InputLabel,
 } from '@mui/material';
 import { Search, BarChart2, Key, TrendingUp } from 'lucide-react';
-import { Toaster } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
 import withAuth from '@/components/withAuth';
 import { useAmazonResearchStore } from '@/lib/stores/useAmazonResearchStore';
@@ -76,7 +75,6 @@ function AmazonResearchPage() {
 
   return (
     <AppLayout>
-      <Toaster position="top-center" />
 
       <Box sx={{ px: isMobile ? 1.5 : 3, py: 2, maxWidth: 1400, mx: 'auto' }}>
         {/* Header */}

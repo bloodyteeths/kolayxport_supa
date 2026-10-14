@@ -72,7 +72,7 @@ import {
   RemoveShoppingCart as RemoveShoppingCartIcon,
   Circle as CircleIcon,
 } from '@mui/icons-material';
-import { toast, Toaster } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
 import withAuth from '@/components/withAuth';
 import { useAuth } from '@/lib/auth-context';
@@ -1495,7 +1495,6 @@ function EbayListingsPage() {
 
   return (
     <Box sx={{ p: { xs: 0.5, sm: 1, md: 1.5 }, maxWidth: 1600, mx: 'auto', width: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
-      <Toaster position="top-right" />
 
       {/* ---------------------------------------------------------------
           Page header — identity, sync state and the primary action in one row

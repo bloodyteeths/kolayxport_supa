@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
+import { decryptIfNeeded } from '@/lib/crypto/credentials';
 import prisma from '../../../../lib/prisma';
 import { createFedexShipment } from '../../../../lib/fedex/fedex.service';
 import { OrderRow, ShipperProfileData, FedexShipmentResult, OrderRowItem } from '../../../../lib/fedex/fedex.types';
@@ -209,8 +210,9 @@ async function handler(
     }
 
     const shipperData: ShipperProfileData = {
-      fedexApiKey: integrationSettingsDb.fedexApiKey,
-      fedexApiSecret: integrationSettingsDb.fedexApiSecret,
+      // Stored encrypted at rest; plaintext passes through unchanged.
+      fedexApiKey: decryptIfNeeded(integrationSettingsDb.fedexApiKey) as string,
+      fedexApiSecret: decryptIfNeeded(integrationSettingsDb.fedexApiSecret) as string,
       fedexAccountNumber: integrationSettingsDb.fedexAccountNumber,
       shipperName: shipperProfileDb.shipperName || '',
       shipperPersonName: shipperProfileDb.shipperPersonName || '',

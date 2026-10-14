@@ -896,7 +896,8 @@
     "credential": {
       "showValue": "Göster",
       "hideValue": "Gizle",
-      "secureHint": "Şifreli saklanır"
+      "secureHint": "Şifreli saklanır",
+      "savedReplaceHint": "Kayıtlı — değiştirmek için yeni değer girin"
     },
     "errorDialog": {
       "title": "Senkron hataları",
@@ -3181,7 +3182,10 @@
       "unsupportedFormatFile": "{name}: desteklenmeyen dosya formatı",
       "draftSavedPublish": "İlan taslağı yerel olarak kaydedildi. Oluşturup yayınlamak için Etsy'ye senkronize edin.",
       "draftSavedCreate": "İlan taslağı yerel olarak kaydedildi. Oluşturmak için Etsy'ye senkronize edin.",
-      "aiImageWhiteBg": "Düz beyaz arka plan (ana ürün fotoğrafı)"
+      "aiImageWhiteBg": "Düz beyaz arka plan (ana ürün fotoğrafı)",
+      "syncingToEtsy": "İlanınız Etsy'de oluşturuluyor...",
+      "publishedOnEtsy": "İlan Etsy'de oluşturuldu ve yayınlandı.",
+      "publishSyncFailed": "Taslak olarak kaydedildi ancak Etsy reddetti: {error} Düzeltip ilanlar sayfasından tekrar deneyin."
     },
     "video": {
       "add": "Video Ekle",
@@ -6750,6 +6754,26 @@
       "conflictDialogBody": "Bu ilanlar taslağınız kaydedildikten sonra Etsy'de düzenlendi, bu yüzden senkronize edilmedi:",
       "conflictDialogWarning": "Yine de uygularsanız Etsy'deki daha yeni sürümün üzerine taslak değerleriniz yazılır.",
       "applyAnyway": "Yine de uygula"
+    },
+    "newDrafts": {
+      "title": "Henüz Etsy'de olmayan yeni ilanlar ({count})",
+      "notOnEtsyYet": "Yeni — henüz Etsy'de değil",
+      "partiallyCreated": "Etsy'de #{id} olarak oluşturuldu, senkronizasyon tamamlanmadı",
+      "statusDraft": "Taslak",
+      "statusSyncing": "Senkronize ediliyor",
+      "statusFailed": "Senkronizasyon başarısız",
+      "statusConflict": "Çakışma",
+      "willPublish": "Senkronizasyonda yayınlanır",
+      "untitled": "Başlıksız ilan",
+      "photoCount": "{count, plural, one {# fotoğraf} other {# fotoğraf}}",
+      "syncToEtsy": "Etsy'ye senkronize et",
+      "deleteQueued": "Bu taslakta sırada bir silme işlemi var, bu yüzden buradan senkronize edilemez.",
+      "confirmSync": "Bu ilan şimdi Etsy'de oluşturulsun mu? Etsy'de taslak ilan olarak kaydedilecek.",
+      "confirmSyncPublish": "Bu ilan şimdi Etsy'de oluşturulup yayınlansın mı? Mağazanızda yayına girecek.",
+      "syncSuccess": "\"{title}\" Etsy'de oluşturuldu (#{id}).",
+      "confirmDiscard": "Bu yeni ilan taslağı silinsin mi? Hazırlanan fotoğrafları silinir. Etsy'de zaten oluşturulmuş bir şey varsa kaldırılmaz.",
+      "discarded": "Taslak silindi",
+      "discardFailed": "Taslak silinemedi: {error}"
     }
   },
   "ebayListings": {
@@ -7732,7 +7756,8 @@
     "cancel": "İptal",
     "updateSuccess": "Ürün başarıyla güncellendi",
     "deleteConfirm": "Bu ürünü silmek istediğinizden emin misiniz?",
-    "deleteSuccess": "Ürün başarıyla silindi"
+    "deleteSuccess": "Ürün başarıyla silindi",
+    "updateFailed": "Ürün güncellenemedi"
   },
   "messages": {
     "title": "Mesajlar",

@@ -35,7 +35,7 @@ import {
   Globe2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import useSWR from 'swr';
+import useSWR, { mutate } from 'swr';
 import { useAuth } from '@/lib/auth-context';
 import useSidebar from '../hooks/useSidebar';
 import useScreenSize from '../hooks/useScreenSize';
@@ -153,70 +153,105 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
     };
   }, [isOpen, isMobile, closeSidebar]);
 
-  // Pull-to-refresh (mobile only)
+  // Pull-to-refresh (mobile only). The page scrolls inside <main>, not the
+  // window, so the gesture is bound to <main> and gated on its scrollTop.
+  // Refresh is soft (re-run route data + revalidate SWR + notify pages) —
+  // a hard reload here used to wipe unsaved edits on an accidental drag.
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const mainRef = useRef(null);
   const touchStartY = useRef(0);
+  const touchStartX = useRef(0);
   const isPulling = useRef(false);
+  const isRefreshingRef = useRef(false);
   const pullDistanceRef = useRef(0);
   const PULL_THRESHOLD = 80;
-
-  useEffect(() => { pullDistanceRef.current = pullDistance; }, [pullDistance]);
+  const routerRef = useRef(router);
+  routerRef.current = router;
 
   useEffect(() => {
-    if (!isMobile) return;
+    const main = mainRef.current;
+    if (!isMobile || !main) return;
 
-    const getScrollTop = () => {
-      return window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
+    const resetPull = () => {
+      isPulling.current = false;
+      pullDistanceRef.current = 0;
+      setPullDistance(0);
+    };
+
+    // True if the touch target sits in a nested scroller that is not at its
+    // top — scrolling that list up must never count as a pull.
+    const inScrolledChild = (target) => {
+      let el = target instanceof Element ? target : null;
+      while (el && el !== main) {
+        if (el.scrollTop > 0) return true;
+        el = el.parentElement;
+      }
+      return false;
     };
 
     const handleTouchStart = (e) => {
-      if (getScrollTop() <= 1 && !isRefreshing) {
-        touchStartY.current = e.touches[0].clientY;
-        isPulling.current = true;
-      }
+      isPulling.current = false;
+      if (isRefreshingRef.current || e.touches.length !== 1) return;
+      if (main.scrollTop > 0 || inScrolledChild(e.target)) return;
+      touchStartY.current = e.touches[0].clientY;
+      touchStartX.current = e.touches[0].clientX;
+      isPulling.current = true;
     };
 
     const handleTouchMove = (e) => {
-      if (!isPulling.current || isRefreshing) return;
-      const currentY = e.touches[0].clientY;
-      const diff = currentY - touchStartY.current;
-      if (diff > 10 && getScrollTop() <= 1) {
-        const dampened = Math.min((diff - 10) * 0.4, 120);
-        setPullDistance(dampened);
+      if (!isPulling.current || isRefreshingRef.current) return;
+      const dy = e.touches[0].clientY - touchStartY.current;
+      const dx = e.touches[0].clientX - touchStartX.current;
+      // Abort on upward / sideways movement or once main has scrolled at all
+      if (dy < 0 || main.scrollTop > 0 || (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10)) {
+        resetPull();
+        return;
+      }
+      if (dy > 10) {
+        const dampened = Math.min((dy - 10) * 0.4, 120);
         pullDistanceRef.current = dampened;
-      } else if (diff < 0) {
-        isPulling.current = false;
-        setPullDistance(0);
-        pullDistanceRef.current = 0;
+        setPullDistance(dampened);
       }
     };
 
-    const handleTouchEnd = () => {
+    const handleTouchEnd = async () => {
       if (!isPulling.current) return;
       isPulling.current = false;
-      if (pullDistanceRef.current >= PULL_THRESHOLD) {
-        setIsRefreshing(true);
-        setPullDistance(PULL_THRESHOLD * 0.5);
-        setTimeout(() => {
-          window.location.reload();
-        }, 300);
-      } else {
-        setPullDistance(0);
-        pullDistanceRef.current = 0;
+      if (pullDistanceRef.current < PULL_THRESHOLD) {
+        resetPull();
+        return;
+      }
+      isRefreshingRef.current = true;
+      setIsRefreshing(true);
+      setPullDistance(PULL_THRESHOLD * 0.5);
+      try {
+        window.dispatchEvent(new CustomEvent('kx:pull-refresh'));
+        await Promise.all([
+          routerRef.current.replace(routerRef.current.asPath, undefined, { scroll: false }),
+          mutate(() => true),
+        ]);
+      } catch {
+        // best-effort refresh
+      } finally {
+        isRefreshingRef.current = false;
+        setIsRefreshing(false);
+        resetPull();
       }
     };
 
-    document.addEventListener('touchstart', handleTouchStart, { passive: true });
-    document.addEventListener('touchmove', handleTouchMove, { passive: false });
-    document.addEventListener('touchend', handleTouchEnd, { passive: true });
+    main.addEventListener('touchstart', handleTouchStart, { passive: true });
+    main.addEventListener('touchmove', handleTouchMove, { passive: true });
+    main.addEventListener('touchend', handleTouchEnd, { passive: true });
+    main.addEventListener('touchcancel', resetPull, { passive: true });
 
     return () => {
-      document.removeEventListener('touchstart', handleTouchStart);
-      document.removeEventListener('touchmove', handleTouchMove);
-      document.removeEventListener('touchend', handleTouchEnd);
+      main.removeEventListener('touchstart', handleTouchStart);
+      main.removeEventListener('touchmove', handleTouchMove);
+      main.removeEventListener('touchend', handleTouchEnd);
+      main.removeEventListener('touchcancel', resetPull);
     };
-  }, [isMobile, isRefreshing]);
+  }, [isMobile]);
 
   const handleSignOut = async () => {
     await supabaseSignOut();
@@ -512,7 +547,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
           </header>
 
           {/* ─── Page Content ─────────────────────────────── */}
-          <main className={`flex-1 overflow-y-auto ${
+          <main ref={mainRef} className={`flex-1 overflow-y-auto ${
             isMobile ? 'p-1.5' : 'p-2 sm:p-3 lg:p-4'
           }`} style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', backgroundColor: '#f8fafc' }}>
             <TrialNotification userSubscription={userSubscription} />

@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../lib/prisma';
 import { getAuthUser } from '@/lib/auth';
+import { decryptCredentials } from '@/lib/encryption';
+import { decryptIfNeeded } from '@/lib/crypto/credentials';
 import { logger } from '../../../lib/logger';
 import { retryFailedSync } from '../../../lib/sync-status';
 import { SyncType } from '../../../lib/types';
@@ -124,7 +126,12 @@ export default async function handler(
     newSyncRetryRecordId = await retryFailedSync(originalSyncId); // This creates the new SyncOperation entry
     logger.info(`[Retry] Initiated retry for original sync ${originalSyncId}. New SyncOperation record ID for retry: ${newSyncRetryRecordId}. Type: ${originalSync.type}`);
     
-    const userDBSettings = await prisma.credential.findUnique({ where: { userId: authUser.id } });
+    const rawDBSettings = await prisma.credential.findUnique({ where: { userId: authUser.id } });
+    // Secrets are encrypted at rest; hand the sync functions plaintext. hepsiburadaApiKey
+    // is not in CREDENTIAL_FIELDS, so decrypt it explicitly (no-op on plaintext).
+    const userDBSettings = rawDBSettings
+      ? { ...decryptCredentials(rawDBSettings), hepsiburadaApiKey: decryptIfNeeded((rawDBSettings as any).hepsiburadaApiKey) }
+      : null;
     if (!userDBSettings) {
         throw new Error ('User integration settings not found for retry execution.');
     }

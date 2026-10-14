@@ -133,15 +133,18 @@ export default function ConnectionsPanel({ refreshKey }: ConnectionsPanelProps) 
       const res = await axios.get('/api/integrations/wix/connect');
       window.open(res.data.installUrl, '_blank');
       toast(t('wixInstallOpened'), { icon: 'ℹ️' });
+      // The install tab's redirect (signed to this user) stores the site; we only
+      // poll for a connection saved after this install started.
+      const since = res.data.since;
       let attempts = 0;
       const poll = setInterval(async () => {
         attempts++;
         try {
-          await axios.post('/api/integrations/wix/callback', {});
+          await axios.post('/api/integrations/wix/callback', { since });
           clearInterval(poll);
           toast.success(t('wixConnectedSuccess'));
           fetchWixStatus();
-        } catch { if (attempts >= 40) clearInterval(poll); }
+        } catch { if (attempts >= 100) clearInterval(poll); } // ~5 min: install + permission consent takes a while
       }, 3000);
     } catch { toast.error(t('wixConnectFailed')); }
   };

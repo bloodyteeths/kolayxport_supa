@@ -13,6 +13,7 @@
 
 import prisma from '../lib/prisma';
 import { ShopifyClient, getValidAccessToken } from '../lib/integrations/shopifyClient';
+import { initEncryptionKey } from '../lib/crypto/credentials';
 
 async function backfillForShop(userId: string, shopId: string, shopDomain: string) {
   const accessToken = await getValidAccessToken(shopId);
@@ -64,6 +65,7 @@ async function backfillForShop(userId: string, shopId: string, shopDomain: strin
 }
 
 async function main() {
+  await initEncryptionKey();
   const userArg = process.argv[2];
 
   const shops = await prisma.shopifyShop.findMany({

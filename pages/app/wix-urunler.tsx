@@ -17,7 +17,7 @@ import {
   MoreVert as MoreVertIcon, Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon, TextFields as TextFieldsIcon,
 } from '@mui/icons-material';
-import { toast, Toaster } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
 import withAuth from '@/components/withAuth';
 import { useTranslations } from 'next-intl';
@@ -725,7 +725,6 @@ function WixProductsPage() {
 
   return (
     <AppLayout title={t('pageTitle')}>
-      <Toaster position="top-right" />
       <Box sx={{ display: 'flex', maxWidth: 1500, mx: 'auto', width: '100%', p: { xs: 0.5, sm: 1, md: 1.5 } }}>
         {/* Left Sidebar (desktop only) */}
         {!isMobile && (

@@ -8,6 +8,7 @@
 import { EtsyClient } from '../lib/integrations/etsyClient';
 import prisma from '../lib/prisma';
 import dotenv from 'dotenv';
+import { initEncryptionKey, decryptIfNeeded } from '../lib/crypto/credentials';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
@@ -15,6 +16,9 @@ dotenv.config({ path: '.env' });
 
 async function testEtsyOAuth() {
   console.log('🧪 Testing Etsy OAuth Configuration with Token Refresh...\n');
+
+  // Stored tokens are encrypted at rest; unwrap the DEK as the app does at boot.
+  await initEncryptionKey();
 
   try {
     // 1. Check environment variables
@@ -130,8 +134,8 @@ async function testEtsyOAuth() {
         };
 
         const etsyClient = new EtsyClient({
-          accessToken: fullCredential.etsyAccessToken,
-          refreshToken: fullCredential.etsyRefreshToken || undefined,
+          accessToken: decryptIfNeeded(fullCredential.etsyAccessToken) as string,
+          refreshToken: decryptIfNeeded(fullCredential.etsyRefreshToken) || undefined,
           shopId: fullCredential.etsyShopId!,
           tokenExpiresAt: fullCredential.etsyTokenExpiresAt || undefined
         }, onTokenRefresh);

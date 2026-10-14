@@ -4,7 +4,7 @@ import {
   Typography, Paper, Tooltip,
 } from '@mui/material';
 import { RefreshCw, Calendar, Wallet, Store } from 'lucide-react';
-import { Toaster, toast } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
 import withAuth from '@/components/withAuth';
 import useFinanceStore from '@/lib/stores/useFinanceStore';
@@ -93,7 +93,6 @@ function FinancialsPage() {
 
   return (
     <AppLayout title={t('pageTitle')}>
-      <Toaster position="top-right" />
       <Box sx={{ p: { xs: 0.5, sm: 1, md: 1.5 }, maxWidth: 1400, mx: 'auto' }}>
         {/* Header */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>

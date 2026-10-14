@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { decryptIfNeeded } from '@/lib/crypto/credentials';
 
 type CachedProduct = { url: string; channel: string; remoteId?: string };
 
@@ -57,7 +58,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           select: { veeqoApiKey: true },
         });
 
-        if (cred?.veeqoApiKey) {
+        // Stored encrypted at rest; plaintext passes through unchanged.
+        const veeqoKey = decryptIfNeeded(cred?.veeqoApiKey);
+        if (veeqoKey) {
           const batchSize = 10;
           const newCacheEntries: { key: string; value: any; expiresAt: Date }[] = [];
 
@@ -66,7 +69,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             await Promise.all(batch.map(async (productId) => {
               try {
                 const resp = await fetch(`https://api.veeqo.com/products/${productId}`, {
-                  headers: { 'x-api-key': cred.veeqoApiKey! },
+                  headers: { 'x-api-key': veeqoKey },
                 });
                 if (!resp.ok) return;
                 const product = await resp.json();

@@ -332,15 +332,19 @@ export class InvoiceService {
       const c: any = credential as any;
       const clientSecret = decryptIfNeeded(c?.parasutClientSecret) as string | null;
       const password = decryptIfNeeded(c?.parasutPassword) as string | null;
-      if (!c || !c.parasutClientId || !clientSecret ||
-          !c.parasutUsername || !password || !c.parasutCompanyId) {
+      // Client ID and username are also in CREDENTIAL_FIELDS, so they are
+      // encrypted at rest too (plaintext legacy rows pass through unchanged).
+      const clientId = decryptIfNeeded(c?.parasutClientId) as string | null;
+      const username = decryptIfNeeded(c?.parasutUsername) as string | null;
+      if (!c || !clientId || !clientSecret ||
+          !username || !password || !c.parasutCompanyId) {
         return null;
       }
 
       return {
-        clientId: c.parasutClientId,
+        clientId,
         clientSecret,
-        username: c.parasutUsername,
+        username,
         password,
         companyId: c.parasutCompanyId
       };

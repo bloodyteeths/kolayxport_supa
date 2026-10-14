@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { logger } from "@/lib/logger";
+import { decryptIfNeeded } from "@/lib/crypto/credentials";
 import { isTrendyolEnabled } from "@/lib/config";
 import { startSync, updateSyncProgress, completeSync, cleanupStaleSyncs } from "@/lib/sync-status";
 import { fetchTrendyolOrders, fetchCreatedOrders } from "@/lib/integrations/trendyolClient";
@@ -25,7 +26,15 @@ export async function syncTrendyolRecentOrdersForUser(userId: string): Promise<S
     return null;
   }
 
-  const settings = await prisma.credential.findUnique({ where: { userId } });
+  const rawSettings = await prisma.credential.findUnique({ where: { userId } });
+  // Secrets are encrypted at rest; decrypt once here (no-op on plaintext).
+  const settings = rawSettings
+    ? {
+        ...rawSettings,
+        trendyolApiKey: decryptIfNeeded(rawSettings.trendyolApiKey) ?? null,
+        trendyolApiSecret: decryptIfNeeded(rawSettings.trendyolApiSecret) ?? null,
+      }
+    : null;
   if (!settings?.trendyolApiKey || !settings?.trendyolApiSecret || !settings?.trendyolSupplierId) {
     logger.info(`[TRENDYOL SYNC] Skipping user ${userId}: missing credentials`);
     return null;

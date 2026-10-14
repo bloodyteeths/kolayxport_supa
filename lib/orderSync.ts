@@ -1731,6 +1731,8 @@ async function createOrderItemsForBatch(
         const existingItems = await db.orderItem.findMany({
           where: { orderId: existingOrder.id },
           select: {
+            id: true,
+            marketplaceKey: true,
             remoteLineId: true,
             uniqueLineKey: true,
             weightKg: true,
@@ -1757,7 +1759,9 @@ async function createOrderItemsForBatch(
         // Always update OrderItems to reflect latest marketplace data (title, weight, hs_code, etc.)
         if (existingItems.length > 0) {
           await db.$transaction(async (tx) => {
-            await tx.orderItem.deleteMany({ where: { orderId } });
+            // Update items in place. Deleting and re-creating them cascaded to
+            // Shipment/LabelJob rows that reference OrderItem (onDelete:
+            // Cascade), wiping label records on every re-sync.
             const lineItems = order.line_items || [];
             console.log(`[OrderItems] Refreshing ${lineItems.length} items for order ${order.orderNumber} (marketplace=${order.marketplace}, source=${order.source}), images: ${lineItems.map((i: any) => i.image ? 'YES' : 'NO').join(',')}`);
             const freshItems = lineItems.map((item, i) => {
@@ -1799,8 +1803,26 @@ async function createOrderItemsForBatch(
                 shipBy: item.shipBy || order.shipByDate || null,
               };
             });
-            if (freshItems.length > 0) {
-              await tx.orderItem.createMany({ data: freshItems, skipDuplicates: true });
+            const byLineKey = new Map(existingItems.map((ex) => [ex.uniqueLineKey || ex.marketplaceKey || ex.id, ex]));
+            const keptIds = new Set<string>();
+            for (const item of freshItems) {
+              const match = byLineKey.get(item.uniqueLineKey);
+              if (match && !keptIds.has(match.id)) {
+                keptIds.add(match.id);
+                const { orderId: _o, ...data } = item;
+                await tx.orderItem.update({ where: { id: match.id }, data });
+              } else {
+                const created = await tx.orderItem.create({ data: item });
+                keptIds.add(created.id);
+              }
+            }
+            // Drop items the marketplace no longer lists — but never one a
+            // label or shipment points at.
+            const stale = existingItems.filter((ex) => !keptIds.has(ex.id)).map((ex) => ex.id);
+            if (stale.length > 0) {
+              await tx.orderItem.deleteMany({
+                where: { id: { in: stale }, shipments: { none: {} }, labelJobs: { none: {} } },
+              });
             }
           });
           continue; // Items already refreshed via transaction above

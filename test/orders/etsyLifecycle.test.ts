@@ -149,7 +149,7 @@ describe('upsertEtsyReceipt', () => {
     expect(h.state.orders[0].shippedAt).toBeInstanceOf(Date);
     expect(h.db.orderItem.update).not.toHaveBeenCalled();
     expect(r.effectsQueued.sort()).toEqual(['close_tracking_shipped', 'shipped_external']);
-    expect(h.hook).toHaveBeenCalledWith([h.state.orders[0].id], 'u1');
+    expect(h.hook).not.toHaveBeenCalled(); // custom-status hook retired
   });
 
   it('shipped before paid (coalesced) creates directly as SHIPPED without a new-order alert', async () => {

@@ -137,13 +137,15 @@ describe('timestamp-guarded upsert', () => {
 });
 
 describe('refreshListingFull', () => {
-  it('listing.updated costs exactly 1 Etsy call', async () => {
+  it('listing.updated costs one listing call (+ inventory when not embedded)', async () => {
     m.listingFindUnique.mockResolvedValue(existing(200));
     m.listingUpdateMany.mockResolvedValue({ count: 1 });
     m.etsyFetch.mockResolvedValue(ok(remote(300)));
     const r = await refreshListingFull({ userId: 'u', shopId: '7', listingId: BigInt(42), accessToken: 't', source: 'manual_refresh' });
-    expect(m.etsyFetch).toHaveBeenCalledTimes(1);
-    expect(String(m.etsyFetch.mock.calls[0][0])).toContain('/listings/42?includes=Images,Inventory,Videos');
+    expect(m.etsyFetch.mock.calls.length).toBeLessThanOrEqual(2);
+    // getListing's includes enum has no Inventory — Etsy 400s on it.
+    expect(String(m.etsyFetch.mock.calls[0][0])).toContain('/listings/42?includes=Images,Videos');
+    expect(String(m.etsyFetch.mock.calls[0][0])).not.toContain('Inventory');
     expect(r.offerings).toHaveLength(2);
     expect(r.remoteUpdatedTs).toBe(300);
   });

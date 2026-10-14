@@ -1246,15 +1246,17 @@ export async function refreshListingCache(shopId: string, listingId: bigint, acc
   return listing;
 }
 
-/** Fetches a listing with its inventory (falls back to the plain listing if includes is rejected). */
+/** Fetches a listing with its inventory attached as `.inventory`. getListing's
+ *  includes enum has no Inventory (Etsy 400s on it), so read it separately. */
 async function getListingWithInventory(listingId: bigint | number | string, accessToken: string) {
+  const listing = await callEtsyAPI(`/listings/${listingId}`, accessToken);
   try {
-    return await callEtsyAPI(`/listings/${listingId}?includes=Inventory`, accessToken);
+    const inventory = await callEtsyAPI(`/listings/${listingId}/inventory`, accessToken);
+    if (listing && inventory && Array.isArray(inventory.products)) listing.inventory = inventory;
   } catch (err: any) {
-    if (!/Etsy API error: 400/.test(String(err?.message || ''))) throw err;
-    logger.warn('Etsy getListing rejected includes=Inventory; using plain listing', { listingId: String(listingId) });
-    return callEtsyAPI(`/listings/${listingId}`, accessToken);
+    logger.warn('Etsy inventory fetch for draft snapshot failed', { listingId: String(listingId), error: err?.message });
   }
+  return listing;
 }
 
 /** Inventory products of a draft's base snapshot (present when the snapshot was taken with includes=Inventory). */

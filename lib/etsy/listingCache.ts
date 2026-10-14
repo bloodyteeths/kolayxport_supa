@@ -1,7 +1,7 @@
 /**
  * Always-fresh Etsy listing cache (owner W3).
  *
- *  refreshListingFull      one Etsy call (getListing includes=Images,Inventory,Videos;
+ *  refreshListingFull      two Etsy calls (getListing includes=Images,Videos + getListingInventory;
  *                          separate-endpoint fallback), timestamp-guarded upsert
  *                          (`WHERE etsyUpdatedTimestamp <= incoming`), offering
  *                          cache keyed by variantKey, versioning with attribution,
@@ -99,13 +99,15 @@ export type FetchedListing = { listing: any; images: any[] | null; inventory: an
 
 /** One call normally; separate endpoints when includes did not come back. null = 404. */
 export async function fetchListingFull(listingId: bigint | string, accessToken: string): Promise<FetchedListing | null> {
-  const listing = await etsyGet(`/listings/${listingId}?includes=Images,Inventory,Videos`, accessToken);
+  // getListing's includes enum has no Inventory (Etsy 400s on it); inventory
+  // always comes from its own endpoint below.
+  const listing = await etsyGet(`/listings/${listingId}?includes=Images,Videos`, accessToken);
   if (!listing) return null;
   let images = extractImages(listing);
   let inventory = extractInventory(listing);
   const videos = extractVideos(listing);
   if (images === null || inventory === null) {
-    if (!fallbackLogged) {
+    if (images === null && !fallbackLogged) {
       fallbackLogged = true;
       logger.warn('Etsy getListing includes missing; using separate image/inventory endpoints', {
         listingId: String(listingId),

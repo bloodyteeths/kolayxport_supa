@@ -3692,7 +3692,7 @@ Return JSON in Turkish (but keep all keywords/tags/titles in English):
                 state: l.state,
                 url: l.url,
                 taxonomy_id: l.taxonomyId,
-                shop_section_id: l.shopSectionId,
+                shop_section_id: l.shopSectionId != null ? Number(l.shopSectionId) : null,
                 who_made: l.whoMade,
                 when_made: l.whenMade,
                 is_supply: l.isSupply,

@@ -1766,6 +1766,9 @@ export async function handleAmazonSync(userId: string, body: any, res: NextApiRe
       let token2: string | null = null;
       let dayPages = 0;
       do {
+        // ListFinancialEvents allows ~0.5 req/s (burst 30); a 35-day window
+        // is 35+ calls, so pace them instead of tripping 429s mid-sync.
+        await new Promise((r) => setTimeout(r, 2100));
         const qs = token2
           ? `NextToken=${encodeURIComponent(token2)}`
           : `PostedAfter=${encodeURIComponent(new Date(dayStart).toISOString())}&PostedBefore=${encodeURIComponent(new Date(dayEnd).toISOString())}&MaxResultsPerPage=100`;

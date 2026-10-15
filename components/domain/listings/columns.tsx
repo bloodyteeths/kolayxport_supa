@@ -1,0 +1,476 @@
+// components/domain/listings/columns.tsx — listings-grid §4: one master column list, the config picks (G5).
+// Cell rules: the draft value overlays the live value (attention tint via `dirtyCells`, tooltip "On Etsy: $54.00");
+// read-only edit cells carry their reason; ScoreMeter null renders "—" with "Not scored yet"; at most one sync
+// pill; money only through Money and dates only through DateText.
+import * as React from 'react';
+import Box from '@mui/material/Box';
+import Tooltip from '@mui/material/Tooltip';
+import type { Column } from '@/components/ds/data';
+import { ScoreMeter } from '@/components/ds/data/ScoreMeter';
+import { StatusPill } from '@/components/ds/data/StatusPill';
+import { Money } from '@/components/ds/format/Money';
+import { DateText } from '@/components/ds/format/DateText';
+import { neutral, tone } from '@/lib/ds/tokens';
+import { LISTING_EDITABLE_REASON_I18N, type ListingColumnKey, type ListingDraftOverlay, type ListingRow, type ListingSyncKey } from '@/lib/listings/types';
+import type { ListingsConfig } from './config/types';
+
+/** Root-level translator (`useTranslations()`), full key paths. */
+export type ListingsT = {
+  (key: string, values?: Record<string, string | number | Date>): string;
+  has?: (key: string) => boolean;
+};
+
+export type ListingCellContext = {
+  config: Pick<ListingsConfig, 'marketplace' | 'inlineEdit' | 'validation' | 'columns' | 'hiddenByDefault'>;
+  /** Proper noun ("Etsy"). */
+  marketplaceName: string;
+  /** Local optimistic overlays per listing id (useStagedChanges). */
+  overlays: ReadonlyMap<string, ListingDraftOverlay>;
+  /** Listing ids being sent from this tab. */
+  sendingIds: ReadonlySet<string>;
+  /** Plain money text for tooltips (e.g. "$54.00"). */
+  formatMoney: (amount: number, currency: string) => string;
+  /** Translates a draft error key (draftErrorI18n contract), or null. */
+  errorText: (row: ListingRow) => string | null;
+  /** Store currency (validation messages, e.g. Etsy's $0.20 minimum). */
+  storeCurrency: string;
+  /**
+   * What a queued `ListingRowSync.queuedDelete` does on send: `archive` on marketplaces whose only removal is
+   * Archive (Trendyol), otherwise `delete`. Derived from the config's row actions by the page.
+   */
+  removalKind?: RemovalKind;
+  /** id → label for id-valued text columns (Etsy section, Wix collection), from the filter option sources. */
+  optionLabels?: Partial<Record<ListingColumnKey, ReadonlyMap<string, string>>>;
+};
+
+export type RemovalKind = 'delete' | 'archive';
+
+/** `archive` when the config can archive but not delete (Trendyol), else `delete` (pure). */
+export function removalKindOf(config: { rowActions: readonly string[] }): RemovalKind {
+  return config.rowActions.includes('archive') && !config.rowActions.includes('delete') ? 'archive' : 'delete';
+}
+
+/** True when the row's open draft holds changes besides a queued removal (a delete must be staged alone). */
+export function hasOpenChanges(row: ListingRow): boolean {
+  const s = row.sync;
+  return Boolean(s && s.status !== 'synced' && !s.queuedDelete && s.changedFields.length > 0);
+}
+
+// ─── Row value helpers (pure) ───────────────────────────────────────────────
+
+/** The draft overlay shown for a row: local optimistic values first, then the server draft. */
+export function overlayOf(row: ListingRow, overlays: ReadonlyMap<string, ListingDraftOverlay>): ListingDraftOverlay {
+  return { ...(row.sync?.draft ?? {}), ...(overlays.get(row.id) ?? {}) };
+}
+
+export function displayPrice(row: ListingRow, overlays: ReadonlyMap<string, ListingDraftOverlay>): number | null {
+  const o = overlayOf(row, overlays);
+  return o.price ?? row.price?.amount ?? null;
+}
+
+export function displayQty(row: ListingRow, overlays: ReadonlyMap<string, ListingDraftOverlay>): number | null {
+  const o = overlayOf(row, overlays);
+  return o.qty ?? row.qty;
+}
+
+export function displayTitle(row: ListingRow, overlays: ReadonlyMap<string, ListingDraftOverlay>): string {
+  return overlayOf(row, overlays).title ?? row.title;
+}
+
+/** Sync pill for the row: a send in progress from this tab reads as `syncing`. */
+export function rowSyncKey(row: ListingRow, sendingIds: ReadonlySet<string>, overlays?: ReadonlyMap<string, ListingDraftOverlay>): ListingSyncKey | null {
+  if (sendingIds.has(row.id)) return 'syncing';
+  if (row.sync) return row.sync.status;
+  if (overlays?.has(row.id)) return 'pending';
+  return null;
+}
+
+/** `${rowId}:${columnKey}` of cells whose draft value differs from the live value (DataTable `dirtyCells`). */
+export function dirtyCellKeys(rows: ListingRow[], overlays: ReadonlyMap<string, ListingDraftOverlay>): Set<string> {
+  const out = new Set<string>();
+  for (const r of rows) {
+    const o = overlayOf(r, overlays);
+    if (o.price !== undefined && o.price !== r.price?.amount) out.add(`${r.id}:price`);
+    if (o.qty !== undefined && o.qty !== r.qty) out.add(`${r.id}:qty`);
+    if (o.title !== undefined && o.title !== r.title) out.add(`${r.id}:listing`);
+  }
+  return out;
+}
+
+/** Inline edit validation (§8). Returns a translated error or null. */
+export function validatePrice(v: number | null, t: ListingsT, ctx: Pick<ListingCellContext, 'config' | 'marketplaceName' | 'formatMoney'>, currency: string): string | null {
+  if (v === null || !(v > 0) || Math.round(v * 100) / 100 !== v) return t('listings.validate.priceInvalid');
+  const min = ctx.config.validation.priceMin;
+  if (min !== undefined && v < min) return t('listings.validate.priceMin', { marketplace: ctx.marketplaceName, min: ctx.formatMoney(min, currency) });
+  return null;
+}
+
+export function validateQty(v: number | null, t: ListingsT, ctx: Pick<ListingCellContext, 'config'>): string | null {
+  const max = ctx.config.validation.qtyMax;
+  if (v === null || !Number.isInteger(v) || v < 0 || (max !== undefined && v > max)) {
+    return t('listings.validate.qtyInvalid', { min: 0, max: max ?? 999999 });
+  }
+  return null;
+}
+
+/**
+ * Why price/qty can't be edited here (grid cell, quick view, bulk modals), or null. A queued removal blocks
+ * every other change: the draft service rejects it (DELETE_NOT_EXCLUSIVE), so the cell says so up front.
+ */
+export function editReadOnlyReason(
+  row: ListingRow,
+  field: 'price' | 'qty',
+  t: ListingsT,
+  ctx: Pick<ListingCellContext, 'config' | 'sendingIds' | 'removalKind'>,
+): string | null {
+  if (ctx.sendingIds.has(row.id) || row.sync?.status === 'syncing') return t('listings.cell.sending', { to: t('listings.mp.to', { marketplace: ctx.config.marketplace }) });
+  if (row.sync?.queuedDelete && row.sync.status !== 'synced') return t('listings.cell.removalQueued', { kind: ctx.removalKind ?? 'delete' });
+  if (!ctx.config.inlineEdit[field]) return t('listings.cell.editInEditor');
+  if (!row.editable[field]) {
+    const reason = row.editable.reason;
+    return reason ? t(LISTING_EDITABLE_REASON_I18N[reason]) : t('listings.cell.editInEditor');
+  }
+  return null;
+}
+
+function readOnlyReason(row: ListingRow, field: 'price' | 'qty', t: ListingsT, ctx: ListingCellContext): string | null {
+  return editReadOnlyReason(row, field, t, ctx);
+}
+
+// ─── Cells ──────────────────────────────────────────────────────────────────
+
+const clamp2 = {
+  display: '-webkit-box',
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: 'vertical' as const,
+  overflow: 'hidden',
+  wordBreak: 'break-word' as const,
+};
+
+function MetaLine({ row }: { row: ListingRow }) {
+  if (!row.metaLine.length) return null;
+  return (
+    <Box component="span" className="mono" sx={{ display: 'block', fontSize: 12, color: neutral[500], fontFamily: 'var(--kx-font-mono, ui-monospace, monospace)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      {row.metaLine.join(' · ')}
+    </Box>
+  );
+}
+
+function WillDelete({ row, t, kind }: { row: ListingRow; t: ListingsT; kind: RemovalKind }) {
+  if (!row.sync?.queuedDelete) return null;
+  return (
+    <Box component="span" data-testid="listing-will-delete" sx={{ display: 'block', fontSize: 12, color: tone.danger.fg }}>
+      {kind === 'archive' ? t('listings.cell.willArchive') : t('listings.cell.willDelete')}
+    </Box>
+  );
+}
+
+function SyncCell({ row, t, ctx }: { row: ListingRow; t: ListingsT; ctx: ListingCellContext }) {
+  const key = rowSyncKey(row, ctx.sendingIds, ctx.overlays);
+  if (!key) return null;
+  const err = key === 'sync_failed' ? ctx.errorText(row) : null;
+  const pill = <StatusPill domain="sync" status={key} />;
+  if (!err) return pill;
+  return (
+    <Tooltip title={err}>
+      <Box component="span" sx={{ display: 'inline-flex' }} data-testid="listing-sync-error">
+        {pill}
+      </Box>
+    </Tooltip>
+  );
+}
+
+/** ScoreMeter carries its own tooltip (score · band · "Scored on N of M checks", or "Not scored yet"). */
+function HealthCell({ row }: { row: ListingRow }) {
+  const { score, used, total } = row.health;
+  return <ScoreMeter variant="cell" score={score} checksUsed={used} checksTotal={total} />;
+}
+
+function PriceText({ row, ctx, t }: { row: ListingRow; ctx: ListingCellContext; t: ListingsT }) {
+  const amount = displayPrice(row, ctx.overlays);
+  if (amount === null || !row.price) return <>{'—'}</>;
+  const money = <Money amount={amount} currency={row.price.currency} />;
+  if (!row.price.from) return money;
+  return <>{t('listings.cell.priceFrom', { price: ctx.formatMoney(amount, row.price.currency) })}</>;
+}
+
+function extraText(row: ListingRow, key: ListingColumnKey): string | number | null {
+  const v = row.extra[key];
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v === 'boolean') return v ? 1 : 0;
+  return v;
+}
+
+// ─── Builder ────────────────────────────────────────────────────────────────
+
+/**
+ * Columns for the config, in config order. `select` and `actions` are DataTable features, not columns.
+ * Card roles (§6.5): media = thumb · title = listing · subtitle = meta line (card-only) · trailing = price +
+ * stock · status = listing pill + sync pill · meta = health.
+ */
+export function listingColumns(t: ListingsT, ctx: ListingCellContext): Column<ListingRow>[] {
+  const onMp = (value: string) => t('listings.cell.onMarketplace', { marketplace: ctx.marketplaceName, value });
+  const hidden = new Set(ctx.config.hiddenByDefault);
+  const cols: Column<ListingRow>[] = [];
+
+  const hideable = (key: ListingColumnKey) => ({ hideable: true, defaultHidden: hidden.has(key) });
+
+  for (const key of ctx.config.columns) {
+    switch (key) {
+      case 'select':
+      case 'actions':
+        break;
+      case 'thumb':
+        cols.push({ key, header: '', type: 'thumb', width: 64, value: (r) => r.thumbUrl, thumbAlt: (r) => r.title, mobile: 'media' });
+        break;
+      case 'listing':
+        cols.push({
+          key,
+          header: t('listings.col.listing'),
+          minWidth: 320,
+          sortable: true,
+          mobile: 'title',
+          render: (r) => (
+            <Box sx={{ minWidth: 0 }}>
+              <Box component="span" sx={{ ...clamp2, fontWeight: 500 }} data-testid="listing-title">
+                {displayTitle(r, ctx.overlays)}
+              </Box>
+              <MetaLine row={r} />
+              <WillDelete row={r} t={t} kind={ctx.removalKind ?? 'delete'} />
+            </Box>
+          ),
+          mobileRender: (r) => (
+            <Box component="span" sx={clamp2}>
+              {displayTitle(r, ctx.overlays)}
+            </Box>
+          ),
+          cellTooltip: (r) => (r.sync?.draft.title !== undefined && r.sync.draft.title !== r.title ? onMp(r.title) : null),
+        });
+        // Card-only second line: "ID 1490012234 · BB-PINK" (+ "Will be deleted on send").
+        cols.push({
+          key: 'listingMeta',
+          header: t('listings.col.listing'),
+          desktop: false,
+          mobile: 'subtitle',
+          render: (r) => (
+            <>
+              <MetaLine row={r} />
+              <WillDelete row={r} t={t} kind={ctx.removalKind ?? 'delete'} />
+            </>
+          ),
+        });
+        break;
+      case 'price':
+        cols.push({
+          key,
+          header: t('listings.col.price'),
+          type: 'money-edit',
+          width: 112,
+          align: 'right',
+          sortable: true,
+          mobile: 'trailing',
+          value: (r) => displayPrice(r, ctx.overlays),
+          currency: (r) => r.price?.currency,
+          render: (r) => <PriceText row={r} ctx={ctx} t={t} />,
+          mobileRender: (r) => {
+            const qty = displayQty(r, ctx.overlays);
+            return (
+              <Box component="span">
+                <PriceText row={r} ctx={ctx} t={t} />
+                {qty !== null ? ` · ${t('listings.cell.inStock', { count: qty })}` : ''}
+              </Box>
+            );
+          },
+          readOnlyReason: (r) => readOnlyReason(r, 'price', t, ctx),
+          validate: (v) => validatePrice(v, t, ctx, ctx.storeCurrency),
+          cellTooltip: (r) => {
+            const d = overlayOf(r, ctx.overlays).price;
+            return d !== undefined && r.price && d !== r.price.amount ? onMp(ctx.formatMoney(r.price.amount, r.price.currency)) : null;
+          },
+        });
+        break;
+      case 'qty':
+        cols.push({
+          key,
+          header: t('listings.col.qty'),
+          type: 'int-edit',
+          width: 72,
+          align: 'right',
+          sortable: true,
+          mobile: 'hidden',
+          value: (r) => displayQty(r, ctx.overlays),
+          render: (r) => {
+            const q = displayQty(r, ctx.overlays);
+            return q === null ? t('listings.cell.notTracked') : String(q);
+          },
+          readOnlyReason: (r) => readOnlyReason(r, 'qty', t, ctx),
+          validate: (v) => validateQty(v, t, ctx),
+          cellTooltip: (r) => {
+            const d = overlayOf(r, ctx.overlays).qty;
+            return d !== undefined && d !== r.qty && r.qty !== null ? onMp(String(r.qty)) : null;
+          },
+        });
+        break;
+      case 'status':
+        cols.push({
+          key,
+          header: t('listings.col.status'),
+          type: 'status',
+          width: 112,
+          mobile: 'status',
+          value: (r) => ({ domain: 'listing', status: r.status, raw: r.statusNote ?? r.statusRaw }),
+          mobileRender: (r) => (
+            <Box component="span" sx={{ display: 'inline-flex', gap: '6px', flexWrap: 'wrap' }}>
+              <StatusPill domain="listing" status={r.status} raw={r.statusNote ?? r.statusRaw} />
+              <SyncCell row={r} t={t} ctx={ctx} />
+            </Box>
+          ),
+        });
+        break;
+      case 'changes':
+        cols.push({ key, header: t('listings.col.changes'), width: 120, mobile: 'hidden', render: (r) => <SyncCell row={r} t={t} ctx={ctx} /> });
+        break;
+      case 'health':
+        cols.push({
+          key,
+          header: t('listings.col.health'),
+          type: 'score',
+          width: 96,
+          align: 'right',
+          sortable: true,
+          mobile: 'meta',
+          value: (r) => r.health.score,
+          render: (r) => <HealthCell row={r} />,
+        });
+        break;
+      case 'updated':
+      case 'created':
+        cols.push({
+          key,
+          header: t(`listings.col.${key}`),
+          type: 'date',
+          dateMode: 'relative',
+          width: key === 'updated' ? 88 : 96,
+          align: 'right',
+          sortable: true,
+          mobile: 'hidden',
+          ...(key === 'created' ? hideable(key) : {}),
+          value: (r) => (key === 'updated' ? r.updatedAt : r.createdAt),
+          render: (r) => {
+            const v = key === 'updated' ? r.updatedAt : r.createdAt;
+            return v ? <DateText value={v} mode="relative" /> : '—';
+          },
+        });
+        break;
+      case 'views':
+      case 'favorites':
+      case 'variants':
+        cols.push({
+          key,
+          header: t(`listings.col.${key}`),
+          type: 'number',
+          width: key === 'variants' ? 80 : 96,
+          align: 'right',
+          sortable: key === 'views',
+          mobile: 'hidden',
+          ...hideable(key),
+          value: (r) => {
+            const v = extraText(r, key);
+            return typeof v === 'number' ? v : v === null ? null : Number(v);
+          },
+        });
+        break;
+      case 'listPrice':
+      case 'compareAt':
+        cols.push({
+          key,
+          header: t(`listings.col.${key}`),
+          type: 'money',
+          width: 110,
+          align: 'right',
+          mobile: 'hidden',
+          ...hideable(key),
+          value: (r) => {
+            const v = extraText(r, key);
+            return typeof v === 'number' ? v : v === null ? null : Number(v);
+          },
+          currency: (r) => r.price?.currency,
+        });
+        break;
+      case 'visible':
+        cols.push({
+          key,
+          header: t('listings.col.visible'),
+          width: 100,
+          mobile: 'hidden',
+          ...hideable(key),
+          render: (r) => {
+            const v = r.extra.visible;
+            return v === true ? t('listings.cell.yes') : v === false ? t('listings.cell.no') : '—';
+          },
+        });
+        break;
+      case 'condition':
+        cols.push({
+          key,
+          header: t('listings.col.condition'),
+          width: 120,
+          mobile: 'hidden',
+          ...hideable(key),
+          render: (r) => {
+            const v = r.extra.condition;
+            if (typeof v !== 'string' || !v) return '—';
+            const k = `listings.condition.${v}`;
+            return t.has?.(k) ? t(k) : v;
+          },
+        });
+        break;
+      case 'format':
+        cols.push({
+          key,
+          header: t('listings.col.format'),
+          width: 100,
+          mobile: 'hidden',
+          ...hideable(key),
+          render: (r) => {
+            const v = r.extra.format;
+            if (typeof v !== 'string' || !v) return '—';
+            const k = `listings.format.${v}`;
+            return t.has?.(k) ? t(k) : v;
+          },
+        });
+        break;
+      default:
+        // Text columns: section, category, brand, collection, vendor, productType, barcode, ribbon.
+        cols.push({
+          key,
+          header: t(`listings.col.${key}`),
+          width: key === 'category' || key === 'collection' ? 160 : 140,
+          mobile: 'hidden',
+          ...hideable(key),
+          render: (r) => {
+            const v = extraText(r, key);
+            if (v === null) return '—';
+            const label = ctx.optionLabels?.[key]?.get(String(v)) ?? String(v);
+            return (
+              <Box component="span" sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {label}
+              </Box>
+            );
+          },
+        });
+    }
+  }
+  return cols;
+}
+
+/** Sort keys the API understands, by column key. */
+export const COLUMN_SORT_FIELD: Partial<Record<string, 'updated' | 'title' | 'price' | 'qty' | 'health' | 'views' | 'created'>> = {
+  listing: 'title',
+  price: 'price',
+  qty: 'qty',
+  health: 'health',
+  updated: 'updated',
+  views: 'views',
+  created: 'created',
+};

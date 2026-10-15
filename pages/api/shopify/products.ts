@@ -4,6 +4,7 @@ import { getAuthUser } from '../../../lib/auth';
 import prisma from '../../../lib/prisma';
 import { ShopifyClient, getValidAccessToken } from '../../../lib/integrations/shopifyClient';
 import { logger } from '../../../lib/logger';
+import { refreshHealth } from '@/lib/listings/refreshHealth';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '4mb' } },
@@ -339,6 +340,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
 
       logger.info('Shopify products synced to cache', { userId, shop: shop.shopDomain, synced });
+
+      // Listing health (listings-grid §9.3); store key = ShopifyShop.id. Never fails the pull.
+      try {
+        const healthResult = await refreshHealth('shopify', { storeId: shop.id, userId });
+        if (healthResult.error || healthResult.skipped === 'bad_scope') {
+          logger.warn('Shopify sync: health refresh failed', { shop: shop.shopDomain, error: healthResult.error ?? null, skipped: healthResult.skipped });
+        } else if (healthResult.skipped) {
+          logger.debug('Shopify sync: health refresh skipped', { shop: shop.shopDomain, skipped: healthResult.skipped });
+        }
+      } catch (err: any) {
+        logger.warn('Shopify sync: health refresh failed', { shop: shop.shopDomain, error: String(err?.message || err).substring(0, 300) });
+      }
 
       return res.status(200).json({ synced, total: products.length });
     }

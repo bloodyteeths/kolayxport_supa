@@ -10664,6 +10664,450 @@
         "a": "Last-minute Christmas gifts: digital products and fast shipping stand out.",
         "b": "Get ready for new-year listings."
       }
+    },
+    "doc": {
+      "noSalesEbay": "Not measured yet: eBay orders don't carry the item number",
+      "collecting": "Collecting daily stats since {date}",
+      "noViewsEbay": "eBay doesn't share listing views",
+      "check": {
+        "priceVsPeers": "Price {price}, peers median {median} (p75 {p75})",
+        "titleVsPeers": "Title {len} characters, peers median {median}",
+        "photosVsPeers": "{count} photos, peers median {median}",
+        "tagsVsPeers": "{count} of your {total} tags are among peers' most used tags"
+      },
+      "fix": {
+        "setPrice": "Set price…",
+        "suggestTitle": "Suggest a title",
+        "tagIdeas": "Get tag ideas",
+        "openEditor": "Open editor"
+      },
+      "peersTooFew": "Fewer than 20 comparable listings",
+      "currencyMismatch": "Peers are priced in another currency",
+      "peerPhotosUnknown": "Etsy didn't share peer photo counts",
+      "peersEtsyOnly": "Peer comparison is available for Etsy listings for now",
+      "doneEmpty": "Nothing urgent: every listing scores 75 or more",
+      "openNotFound": "Couldn't find that listing in your shop",
+      "bulk": {
+        "checking": "Checking {done} of {total}…",
+        "stop": "Stop",
+        "pricesEtsyOnly": "Suggested prices use Etsy peers, so they are not available for eBay yet",
+        "notChecked": "{count, plural, one {# listing} other {# listings}} not checked · Try again",
+        "notCheckedRate": "{count, plural, one {# listing} other {# listings}} not checked · Try again in a minute",
+        "notCheckedLimit": "{count, plural, one {# listing} other {# listings}} not checked · Up to {max} per run, select them and run again",
+        "stageFixes": "Stage fixes",
+        "applyPrices": "Apply suggested prices",
+        "addTags": "Add suggested tags",
+        "addTagsSoon": "Tag suggestions arrive with the Keyword explorer",
+        "aiTitles": "Write titles with AI",
+        "gridUnavailable": "AI titles open in the bulk editor, which is not available here yet",
+        "nothingToStage": "No suggested price fits these listings",
+        "staged": "{count, plural, one {# listing} other {# listings}} staged · Not sent yet{skipped, plural, =0 {} other { · # skipped}}"
+      },
+      "col": {
+        "listing": "Listing",
+        "views30": "Views 30d",
+        "sales30": "Sales 30d",
+        "conversion": "Conversion",
+        "mainKw": "Main keyword rank",
+        "health": "Health",
+        "biggestIssue": "Biggest issue"
+      },
+      "sort": {
+        "opportunity": "Biggest opportunity",
+        "health": "Lowest health",
+        "views": "Most views",
+        "sales": "Most sales"
+      },
+      "sortLabel": "Sort",
+      "filter": {
+        "shop": "Shop",
+        "issue": "Issue",
+        "any": "Any",
+        "health": "Health",
+        "healthBand": {
+          "lt50": "Under 50",
+          "50-74": "50–74",
+          "75-89": "75–89",
+          "gte90": "90 and up"
+        }
+      },
+      "searchPlaceholder": "Search your listings",
+      "resultCount": "{count, plural, one {# listing} other {# listings}}",
+      "statsSource": "Views and sales: Etsy daily stats + your orders · last 30 days · updated {time}",
+      "measuredHint": "Etsy daily stats and your orders, last 30 days",
+      "rankTip": "Position for \"{keyword}\" in Etsy API search (not personalized, ads excluded)",
+      "card": {
+        "views": "{count, plural, one {{value} view} other {{value} views}}",
+        "sales": "{count, plural, one {{value} sale} other {{value} sales}}",
+        "stats": "{stats} (30 d)"
+      },
+      "issueCount": "({value})",
+      "issue": {
+        "photos_count": "Too few photos",
+        "photos_alt": "Photos without alt text",
+        "video": "No video",
+        "title_length": "Title length",
+        "title_format": "Title format",
+        "tags_count": "Tags missing",
+        "tags_quality": "Weak tags",
+        "description": "Description too short",
+        "attributes": "Required details missing",
+        "materials": "No materials",
+        "shipping_ready": "Shipping not set up",
+        "price_market": "Price outside the market range",
+        "title_keywords": "Title misses key details",
+        "aspects_required": "Required item specifics missing",
+        "aspects_recommended": "Recommended item specifics missing",
+        "condition": "Condition details missing",
+        "category": "Category",
+        "policies": "Business policies missing",
+        "package": "Package details missing",
+        "price_vs_peers": "Price far from peers",
+        "title_vs_peers": "Title shorter than peers",
+        "photos_vs_peers": "Fewer photos than peers",
+        "tags_vs_peers": "Tags differ from peers"
+      },
+      "last30": "Last 30 days",
+      "last30Source": "Measured · Etsy daily stats + your orders",
+      "unit": {
+        "views": "{count, plural, one {view} other {views}}",
+        "sales": "{count, plural, one {sale} other {sales}}",
+        "conversion": "conversion",
+        "favoritesAllTime": "{count, plural, one {{value} favorite} other {{value} favorites}} (all time)"
+      },
+      "mainKw": "Main keyword",
+      "mainKwSuggested": "Main keyword (suggested)",
+      "editKeyword": "Change main keyword",
+      "keywordRequired": "Type a keyword first",
+      "compare": "Compare",
+      "comparedWith": "compared with {n} listings for \"{keyword}\"",
+      "peers": "Compared with peers",
+      "peersLoading": "Comparing with similar listings…",
+      "peersNa": "n/a · {reason}",
+      "usePrice": "Use this price",
+      "priceRequired": "Enter a price above zero",
+      "aiCredits": "AI credits are used up for this month",
+      "stagedHere": "Staged here ({count})",
+      "proposal": {
+        "priceChange": "Price {from} → {to}",
+        "titleChange": "Title → \"{title}\"",
+        "tags": "{count, plural, one {# tag} other {# tags}}",
+        "remove": "Remove this fix"
+      },
+      "noProposals": "Accept a fix above first",
+      "staging": "Staging…",
+      "stageFailed": "Couldn't stage the fixes. Nothing was changed. Try again",
+      "unstaged": "{count, plural, one {# fix} other {# fixes}} not staged yet",
+      "notSent": "Saved · {count, plural, one {# edit} other {# edits}} not sent",
+      "goToListings": "Go to listings",
+      "viewOn": "View on {marketplace}",
+      "openDoctor": "Open listing doctor",
+      "firstUse": "Bring in your {marketplace} listings first",
+      "firstUseBody": "The doctor reads the listings, daily views and orders KolayXport already has",
+      "pull": "Refresh from {marketplace}",
+      "openListings": "Open {marketplace} listings",
+      "pullFailed": "Couldn't refresh from {marketplace}",
+      "noMatches": "No listings match these filters",
+      "clearFilters": "Clear filters",
+      "loadFailed": "Couldn't load your listings",
+      "connectBody": "Connect {marketplace} to see which listings need work and what to fix first",
+      "unavailableMkt": "Listing doctor works with Etsy and eBay listings",
+      "unavailableMktBody": "Pick Etsy or eBay in the marketplace switch",
+      "useEtsy": "Use Etsy"
+    },
+    "error": {
+      "budget": "Showing cached results: Etsy's daily limit is close",
+      "etsy": "Etsy didn't respond",
+      "ebay": "Couldn't reach eBay",
+      "stale": "Showing saved results: the latest check didn't finish",
+      "generic": "Couldn't load research results"
+    },
+    "mkt": {
+      "amazonIneligible": "Amazon research needs an eligible Amazon Associates account",
+      "label": "Marketplace",
+      "learnHow": "Learn how",
+      "switchTo": "Marketplace: {name}"
+    },
+    "products": {
+      "trendyolLater": "Trendyol product research arrives with the Price gap tool"
+    },
+    "empty": {
+      "products": "Search an idea to see prices, competition and buyer words",
+      "linkNoTitle": "Couldn't read a title from this link: type what it sells",
+      "notServed": "Product finder doesn't cover {marketplace} yet",
+      "noResults": "No {marketplace} listings match \"{q}\"",
+      "broader": "Try a broader phrase"
+    },
+    "guard": {
+      "small": "Small sample: {n} listings",
+      "insufficient": "Not enough data",
+      "noFx": "no FX rate",
+      "outliers": "unusual prices",
+      "notAvailableEbay": "eBay doesn't share this",
+      "implausible": "Check: unusual price range",
+      "notEnoughSignal": "Not enough signal"
+    },
+    "demand": {
+      "trendsUnavailable": "Google Trends didn't respond",
+      "autocompleteUnavailable": "Search suggestions didn't respond",
+      "engagementUnavailable": "Not enough listings older than 60 days",
+      "input": {
+        "googleTrends": "Google interest",
+        "autocomplete": "Autocomplete",
+        "engagement": "Engagement"
+      },
+      "value": {
+        "googleTrends": "{value} (12 months)",
+        "autocomplete": "in {value} of 3 suggestion lists",
+        "engagement": "{value} favorites per month (median)"
+      },
+      "inputMissing": "not available"
+    },
+    "evidence": {
+      "priceBand": "Most sell between {p25} and {p75} (median {median})",
+      "competing": "{count} competing listings",
+      "newcomers": "{pct} of top shops opened less than 1 year ago",
+      "demand": "Demand Signal {dots} ({inputs} of 3 inputs)",
+      "basis": "{n, plural, one {# listing} other {# listings}}",
+      "basisNoVolume": "{n, plural, one {# listing} other {# listings}}, Etsy shares no search volume",
+      "basisEbay": "{n, plural, one {# active eBay listing} other {# active eBay listings}}, eBay shares no sold history",
+      "title": "Evidence",
+      "noVolume": "Etsy shares no search volume"
+    },
+    "sourceName": {
+      "etsySearch": "Etsy search",
+      "ebayBrowse": "eBay search (active listings)",
+      "amazon": "Amazon",
+      "trendyol": "Trendyol",
+      "doctorEtsy": "Etsy daily stats + your orders · last 30 days",
+      "doctorEbay": "Your eBay orders · last 30 days",
+      "healthEtsy": "Etsy listings · health",
+      "healthEbay": "eBay listings · health",
+      "ownLabels": "Your {carrier} labels to {country}",
+      "rateCard": "{carrier} rate-card transit to {country}",
+      "ai": "AI suggestion"
+    },
+    "explain": {
+      "failed": "The explanation didn't come out right",
+      "cta": "Explain · 1 credit",
+      "noCredits": "No AI credits left this month"
+    },
+    "translate": {
+      "failed": "Couldn't translate that. Try English keywords",
+      "cta": "Translate to English keywords · 1 credit",
+      "label": "English keywords:",
+      "from": "from \"{text}\"",
+      "remove": "Remove {seed}"
+    },
+    "action": {
+      "openPhotoStudio": "Open photo studio",
+      "creatorUnavailable": "The new Listings page can't open the listing creator yet",
+      "draftListing": "Draft a listing",
+      "usePrice": "Use {price} in a listing",
+      "addTags": "Add {count, plural, one {# tag} other {# tags}} to…",
+      "addTagsThis": "Add {count, plural, one {# tag} other {# tags}} to this listing",
+      "compare": "Compare",
+      "export": "Export results",
+      "copyLink": "Copy link",
+      "stageFixes": "Stage {count, plural, one {# fix} other {# fixes}}",
+      "openBulkGrid": "Open in bulk editor"
+    },
+    "home": {
+      "rankChange": "rank {from} → {to}",
+      "rankLost": "rank {from} → not in top 500",
+      "rankFound": "now rank {to}",
+      "needsWork": "Your listings that need work",
+      "needsWorkMore": "{count} listings under 50 · Open Listing doctor",
+      "needsWorkConnect": "Connect Etsy to see which listings need work",
+      "needsWorkFailed": "Couldn't load your listings",
+      "openDoctor": "Open Listing doctor",
+      "issues": "{count, plural, one {# issue} other {# issues}}",
+      "viewsNoSales": "{views} views, 0 sales (30 days)",
+      "fix": "Fix",
+      "seasons": "Upcoming seasons (shipping from Türkiye)",
+      "seasonsEmpty": "No seasons in the next months",
+      "seasonsFailed": "Couldn't load upcoming seasons",
+      "listBy": "List by {date} · in {days, plural, one {# day} other {# days}}",
+      "listByPassed": "List-by date has passed · event on {date}",
+      "lastShip": "Last {carrier} from İstanbul {date}",
+      "productionDays": "Your production days: {days} · Edit",
+      "productionDaysLabel": "Production days",
+      "productionDaysHelp": "Days you need to make and pack an order",
+      "daysUnit": "days",
+      "recent": "Recent and watched"
+    },
+    "season": {
+      "christmas": "Christmas",
+      "valentines": "Valentine's Day",
+      "mothersDayUs": "Mother's Day (US)",
+      "mothersDayUk": "Mother's Day (UK)",
+      "mothersDayDe": "Mother's Day (Germany)",
+      "fathersDay": "Father's Day",
+      "halloween": "Halloween",
+      "blackFriday": "Black Friday",
+      "diwali": "Diwali",
+      "ramadan": "Ramadan",
+      "eidAlAdha": "Eid al-Adha",
+      "backToSchool": "Back to school",
+      "graduation": "Graduation"
+    },
+    "picker": {
+      "priceLocked": "Price can't be changed here: edit it in the listing",
+      "currencyMismatch": "Listed in {listed}: research prices are in {research}",
+      "syncing": "Being sent right now: try again in a minute",
+      "conflict": "Has a conflict: resolve it in Listings first",
+      "queuedDelete": "Queued for deletion",
+      "stagedTags": "Has unsent tag changes: edit them in the listing",
+      "label": "Your {marketplace} listing",
+      "placeholder": "Search your listings",
+      "none": "No listings match",
+      "note": "The change is staged as a draft. It goes live only when you send it from Listings.",
+      "ctaPrice": "Stage price",
+      "pickFirst": "Choose a listing first",
+      "variations": "Has variations: change prices in the editor"
+    },
+    "compare": {
+      "budgetColumn": "Not loaded: Etsy's daily limit is close",
+      "title": "Compare searches",
+      "addTitle": "Add a search to compare",
+      "inputLabel": "Idea or keyword",
+      "placeholder": "e.g. personalized memory box",
+      "add": "Add",
+      "max": "Compare up to {max} searches",
+      "needQuery": "Search something first",
+      "remove": "Remove \"{q}\"",
+      "col": {
+        "metric": "Metric"
+      },
+      "row": {
+        "evidence": "Evidence",
+        "median": "Median price",
+        "band": "Typical range (p25–p75)",
+        "sample": "Listings used",
+        "competition": "Competing listings",
+        "top5": "Top 5 shops share",
+        "demand": "Demand Signal",
+        "newcomers": "Newcomers"
+      }
+    },
+    "title": "Research",
+    "subtitle": "Find what to sell, how to price it, and which words buyers use",
+    "tabs": {
+      "home": "Home",
+      "products": "Product finder",
+      "keywords": "Keyword explorer",
+      "listings": "Listing doctor",
+      "shops": "Shop tracker"
+    },
+    "legacy": {
+      "title": "The new Research hub is turned off for you",
+      "open": "Open Research"
+    },
+    "search": {
+      "placeholder": "Idea, keyword, Etsy listing link, shop URL or Trendyol link…",
+      "placeholderShort": "Idea, keyword or link…",
+      "placeholderProducts": "Search a product idea or keyword",
+      "cta": "Research",
+      "loading": "Researching…"
+    },
+    "q": {
+      "label": "Questions",
+      "niche": "Is this niche worth it?",
+      "price": "What price should I charge?",
+      "tags": "Which tags?",
+      "notSelling": "Why is my listing not selling?",
+      "competitors": "What are my competitors doing?"
+    },
+    "qHint": {
+      "niche": "Type a product idea, e.g. wooden keepsake box",
+      "price": "Type the product you want to price",
+      "tags": "Type a keyword or paste your listing link",
+      "notSelling": "Type a listing title or paste its link",
+      "competitors": "Paste a competitor shop link or name"
+    },
+    "card": {
+      "price": "Price",
+      "competition": "Competition",
+      "demand": "Demand Signal",
+      "newcomers": "Newcomers",
+      "buyerWords": "Buyer words (tags used by top 48)",
+      "pctMedian": "p25 · median · p75",
+      "listings": "listings",
+      "activeListings": "active listings",
+      "top5Share": "Top 5 shops hold {pct} of the top 48",
+      "seeTopShops": "See top shops",
+      "demandNote": "Demand Signal is indirect: Etsy doesn't share search volume. Check real volume in Etsy Marketplace Insights",
+      "signalWhy": "{kind} · why?",
+      "newcomersValue": "of top-48 shops opened less than 1 year ago",
+      "soldOnce": "Sold at least once",
+      "soldOnceValue": "of the top {of} (all time)"
+    },
+    "signal": {
+      "tier1": "Very low",
+      "tier2": "Low",
+      "tier3": "Medium",
+      "tier4": "High",
+      "tier5": "Very high"
+    },
+    "tags": {
+      "overLimit": "Only {fit} of {count} fit (13-tag limit). Replace weaker tags?",
+      "replaceCta": "Replace {count, plural, one {# tag} other {# tags}}",
+      "pickMore": "Select at least {count} tags to replace"
+    },
+    "toast": {
+      "tagsAdded": "{count, plural, one {# tag} other {# tags}} added to \"{title}\" · Not sent yet",
+      "tagsNothingNew": "\"{title}\" already has these tags",
+      "priceStaged": "{price} staged for \"{title}\" · Not sent yet",
+      "open": "Open",
+      "stageFailed": "Couldn't stage the change. Try again",
+      "prefillFailed": "Couldn't open the listing creator. Try again",
+      "linkCopied": "Link copied",
+      "fixesStaged": "{count, plural, one {# fix} other {# fixes}} staged for \"{title}\" · Not sent yet"
+    },
+    "toolbar": {
+      "country": "Country"
+    },
+    "sort": {
+      "label": "Sort",
+      "relevance": "Relevance",
+      "price_asc": "Lowest price",
+      "price_desc": "Highest price",
+      "favorites": "Most favorites",
+      "newest": "Newest"
+    },
+    "top": {
+      "title": "Top listings ({count})",
+      "col": {
+        "listing": "Listing",
+        "price": "Price",
+        "favorites": "Favorites",
+        "age": "Age",
+        "shop": "Shop"
+      },
+      "favoritesAll": "{count} (all time)",
+      "favoritesCard": "{count} favorites (all time)",
+      "age": {
+        "days": "{count} d",
+        "months": "{count} mo",
+        "years": "{count} y"
+      },
+      "openOn": "Open on {marketplace}",
+      "startFrom": "Use as a starting point",
+      "tags": "Tags ({count})",
+      "shop": "Shop",
+      "shopName": "Name",
+      "shopSales": "Sales (all time)",
+      "shopReviews": "Reviews",
+      "shopReviewsValue": "★ {rating} ({count})",
+      "shopActive": "Active listings",
+      "shopSince": "Open since",
+      "shopFailed": "Couldn't load the shop"
+    },
+    "source": {
+      "searchApiOrder": "{marketplace} search (API order, not personalized)"
+    },
+    "kw": {
+      "notInTop500": "Not in top 500"
     }
   },
   "ds": {
@@ -11228,14 +11672,173 @@
       "fillDetails": "Fill details",
       "addMaterials": "Add materials",
       "setUpShipping": "Set up shipping",
-      "checkPrice": "Check price"
+      "checkPrice": "Check price",
+      "setCondition": "Set condition",
+      "pickCategory": "Pick category",
+      "setPolicies": "Set policies",
+      "setPackage": "Set package",
+      "editPrice": "Edit price",
+      "addStock": "Add stock",
+      "seeRejectReasons": "See reasons",
+      "editTitle": "Edit title",
+      "editDescription": "Edit description",
+      "addToCollection": "Add to collection",
+      "writeSeoTitle": "Write SEO title",
+      "writeSeoDescription": "Write SEO description",
+      "addTags": "Add tags"
     },
     "na": {
       "noData": "No data for this check yet",
       "noPhotos": "No photos yet",
       "noTags": "No tags yet",
       "noTaxonomy": "Pick a category to check its details",
-      "noResearch": "No research data"
+      "noResearch": "No research data",
+      "noAspects": "Add brand or type to check the title",
+      "noBrand": "No brand set",
+      "noCategory": "No category set"
+    },
+    "ebay": {
+      "photosCount": {
+        "pass": "Enough photos",
+        "low": "Only {count, plural, one {# photo} other {# photos}}: add {missing} more"
+      },
+      "titleLength": {
+        "ok": "Title length is good",
+        "short": "Title {length} / {max} characters: aim for {min} or more",
+        "long": "Title is over {max} characters ({length})"
+      },
+      "titleKeywords": {
+        "pass": "Title includes brand and type",
+        "missing": "Title is missing: {words}"
+      },
+      "aspectsRequired": {
+        "pass": "All required item specifics filled",
+        "missing": "{count, plural, one {# required item specific missing} other {# required item specifics missing}}"
+      },
+      "aspectsRecommended": {
+        "pass": "Recommended item specifics filled",
+        "low": "{filled} / {total} recommended item specifics filled"
+      },
+      "condition": {
+        "pass": "Condition is set",
+        "missing": "No condition set",
+        "noNote": "Used item without a condition note"
+      },
+      "description": {
+        "pass": "Description is detailed",
+        "short": "Description has {words} words: aim for {min} or more"
+      },
+      "category": {
+        "pass": "Category is set",
+        "missing": "No category",
+        "notLeaf": "Pick a more specific category"
+      },
+      "policies": {
+        "pass": "Shipping, payment and return policies set",
+        "missing": "{count, plural, one {# business policy missing} other {# business policies missing}}"
+      },
+      "package": {
+        "pass": "Package weight and size set",
+        "noWeight": "Package weight missing",
+        "noDimensions": "Package dimensions missing"
+      },
+      "priceMarket": {
+        "pass": "Price is inside the market range",
+        "outside": "Price is outside the market range"
+      }
+    },
+    "trendyol": {
+      "titleLength": {
+        "ok": "Title length is good",
+        "short": "Title {length} characters: aim for {min} to {max}",
+        "long": "Title is over {max} characters ({length})"
+      },
+      "titleBrand": {
+        "pass": "Title includes the brand",
+        "missing": "Title doesn't include the brand {brand}"
+      },
+      "titleCategory": {
+        "pass": "Title includes the category",
+        "missing": "Title doesn't mention the category {category}"
+      },
+      "photosCount": {
+        "pass": "Enough photos",
+        "low": "Only {count, plural, one {# photo} other {# photos}}: add {missing} more"
+      },
+      "description": {
+        "pass": "Description is detailed",
+        "short": "Description has {length} characters: aim for {min} or more"
+      },
+      "attributes": {
+        "pass": "Enough attributes filled",
+        "low": "{count, plural, one {# attribute} other {# attributes}} filled: aim for {min} or more"
+      },
+      "priceSanity": {
+        "pass": "Discount is shown on the price",
+        "noDiscount": "No discount: list price equals sale price",
+        "invalid": "Price looks wrong: check list and sale price"
+      },
+      "stock": {
+        "pass": "In stock",
+        "out": "Out of stock"
+      },
+      "approval": {
+        "pass": "Approved by Trendyol",
+        "pending": "Waiting for Trendyol approval",
+        "rejected": "Rejected or blocked by Trendyol"
+      },
+      "dimWeight": {
+        "pass": "Dimensional weight set",
+        "missing": "Dimensional weight missing"
+      }
+    },
+    "wix": {
+      "photosCount": {
+        "pass": "Enough photos",
+        "low": "Only {count, plural, one {# photo} other {# photos}}: add {missing} more"
+      },
+      "titleLength": {
+        "ok": "Title length is good",
+        "short": "Title {length} characters: aim for {min} or more",
+        "long": "Title is over {max} characters ({length})"
+      },
+      "description": {
+        "pass": "Description is detailed",
+        "short": "Description has {length} characters: aim for {min} or more"
+      },
+      "collections": {
+        "pass": "In a collection",
+        "none": "Not in any collection"
+      }
+    },
+    "shopify": {
+      "titleLength": {
+        "ok": "Title length is good",
+        "short": "Title {length} characters: aim for {min} or more",
+        "long": "Title is over {max} characters ({length})"
+      },
+      "description": {
+        "pass": "Description is detailed",
+        "short": "Description has {length} characters: aim for {min} or more"
+      },
+      "photosCount": {
+        "pass": "Enough photos",
+        "low": "Only {count, plural, one {# photo} other {# photos}}: add {missing} more"
+      },
+      "seoTitle": {
+        "pass": "SEO title is set",
+        "missing": "No SEO title",
+        "long": "SEO title is over {max} characters ({length})"
+      },
+      "seoDescription": {
+        "pass": "SEO description is set",
+        "missing": "No SEO description",
+        "length": "SEO description {length} characters: aim for {min} to {max}"
+      },
+      "tagsCount": {
+        "pass": "Enough tags",
+        "low": "{count, plural, one {# tag} other {# tags}}: aim for {min} or more"
+      }
     }
   },
   "shell": {
@@ -11974,6 +12577,482 @@
     "palette": {
       "manage": "Manage subscription",
       "invoices": "View invoices"
+    }
+  },
+  "listings": {
+    "cell": {
+      "stockManaged": "Stock is managed by stock sync",
+      "willArchive": "Will be archived on send",
+      "removalQueued": "{kind, select, archive {Will be archived on send. Discard that change to edit} other {Will be deleted on send. Discard that change to edit}}",
+      "priceFrom": "from {price}",
+      "onMarketplace": "On {marketplace}: {value}",
+      "variationsReadOnly": "Edit prices per variation in the editor",
+      "notTracked": "Not tracked",
+      "notScored": "Not scored yet · refresh to score",
+      "willDelete": "Will be deleted on send",
+      "inStock": "{count} in stock",
+      "sending": "Sending to {to}…",
+      "stageFailed": "Couldn't save this change",
+      "editInEditor": "Edit this in the editor",
+      "yes": "Yes",
+      "no": "No"
+    },
+    "sendError": {
+      "conflict": "Changed on the marketplace since your draft. Review before sending.",
+      "interrupted": "Sending was interrupted. Try again.",
+      "reconnect": "The store needs to be reconnected before this can be sent.",
+      "rateLimited": "The marketplace is busy. Try again in a few minutes.",
+      "notFound": "This listing no longer exists on the marketplace.",
+      "rejected": "The marketplace rejected a value. Open the listing to fix it.",
+      "generic": "Couldn't send this change. Try again."
+    },
+    "draftError": {
+      "wixDiscounted": "This product has a sale price in Wix. Change its price in Wix.",
+      "unavailable": "Staged changes for this store aren't available yet",
+      "scheduledSendUnavailable": "Scheduled sends aren't available yet",
+      "invalidInput": "This change couldn't be saved",
+      "storeNotFound": "Store not found. Check the connection in Settings",
+      "productNotFound": "This product isn't in KolayXport yet. Refresh the list first",
+      "draftNotFound": "These changes no longer exist",
+      "notEditable": "These changes can't be edited right now",
+      "fieldNotSupported": "\"{field}\" can't be changed here for this marketplace",
+      "actionNotSupported": "This action isn't available for this marketplace",
+      "invalidTitle": "Enter a title of up to {max} characters",
+      "invalidTags": "Check the tags: each tag needs text and no commas",
+      "notTracked": "Stock isn't tracked for this product",
+      "stockManaged": "Stock sync manages this quantity. Change it in Stock sync",
+      "deleteNotExclusive": "Send or discard the other changes before deleting this product",
+      "scheduleInvalid": "Pick a time in the next 12 months",
+      "scheduleDeleteRefused": "Deletions can't be scheduled. Send them yourself",
+      "tooMany": "Send at most {max} changes at a time",
+      "internal": "Something went wrong. Try again",
+      "notConnected": "The store needs to be reconnected before changes can be sent",
+      "remoteMissing": "This product no longer exists on the marketplace",
+      "rateLimited": "The marketplace is busy. Try again in a few minutes",
+      "remoteFailed": "The marketplace rejected this change",
+      "conflict": "This product changed on the marketplace after your edit. Review it before sending",
+      "batchFailed": "Trendyol rejected this change",
+      "batchFailedReason": "Trendyol rejected this change: {reason}",
+      "batchTimeout": "Trendyol didn't confirm this change. Refresh to check it",
+      "noLocation": "This product has no stock location on Shopify",
+      "multiLocation": "Stock is split across several Shopify locations. Change it on Shopify"
+    },
+    "send": {
+      "confirmExcluded": "Send {count, plural, one {# change} other {# changes}} to {to}? Waiting for you: {waiting}.",
+      "nothingSendable": "Nothing to send yet. Waiting for you: {waiting}.",
+      "nothingToSend": "Nothing to send yet.",
+      "excluded": {
+        "conflicts": "{count, plural, one {# listing changed on {on}} other {# listings changed on {on}}}",
+        "deletes": "{count, plural, one {# deletion} other {# deletions}}",
+        "newListings": "{count, plural, one {# new listing (send it from the editor)} other {# new listings (send them from the editor)}}",
+        "syncing": "{count, plural, one {# change already sending} other {# changes already sending}}"
+      },
+      "deletion": "{kind, select, archive {Send archive…} other {Send deletion…}}",
+      "deletionConfirm": "{kind, select, archive {Archive \"{title}\" on {on}? Type {shop} to confirm.} other {Delete \"{title}\" on {on}? Type {shop} to confirm.}}",
+      "deletionSent": "{kind, select, archive {Archive sent} other {Deletion sent}}",
+      "cta": "Send {count, plural, one {# change} other {# changes}} to {to}",
+      "loading": "Sending {count, plural, one {# change} other {# changes}}…",
+      "thisChange": "Send this change",
+      "selected": "Send selected changes",
+      "toastResult": "{sent} sent to {to}{failed, plural, =0 {} other { · # failed}}",
+      "retryFailed": "Retry failed",
+      "failedGeneric": "Couldn't send. Nothing was changed."
+    },
+    "action": {
+      "deleteNow": "{kind, select, archive {Archive now} other {Delete now}}",
+      "removalNeedsAlone": "{kind, select, archive {Send or discard the other changes on this listing before archiving it} other {Send or discard the other changes on this listing before deleting it}}",
+      "new": "New listing",
+      "bulkEdit": "Bulk edit",
+      "edit": "Edit",
+      "openQuick": "Open quick view",
+      "openEditor": "Open editor",
+      "viewOn": "View on {marketplace}",
+      "duplicate": "Copy listing",
+      "deactivate": "Deactivate",
+      "activate": "Activate",
+      "renew": "Renew",
+      "archive": "Archive",
+      "showInStore": "Show in store",
+      "hideInStore": "Hide from store",
+      "delete": "Delete listing…",
+      "deleteMany": "Delete {count} listings…",
+      "deleteConfirm": "Delete \"{title}\"?",
+      "deleteManyConfirm": "Delete {count} listings?",
+      "deleteStagedNote": "This is saved as a change. Nothing is deleted on {on} until you send the deletion.",
+      "discard": "Discard changes",
+      "discardConfirm": "Discard {count, plural, one {# unsent change} other {# unsent changes}} to \"{title}\"?",
+      "discarded": "Changes discarded",
+      "reviewDiff": "Review differences",
+      "schedule": "Schedule send…",
+      "archiveConfirm": "Archive…"
+    },
+    "bulk": {
+      "skippedRemovals": "{kind, select, archive {{count, plural, one {# listing} other {# listings}} skipped: they will be archived on send} other {{count, plural, one {# listing} other {# listings}} skipped: they will be deleted on send}}",
+      "skippedOpenChanges": "{kind, select, archive {{count, plural, one {# listing} other {# listings}} skipped: send or discard their other changes before archiving} other {{count, plural, one {# listing} other {# listings}} skipped: send or discard their other changes before deleting}}",
+      "editInGrid": "Edit in grid",
+      "changePrice": "Change price",
+      "changeStock": "Change stock",
+      "addTags": "Add tags",
+      "improveAi": "Improve with AI",
+      "exportSelected": "Export selected",
+      "selectAllInView": "Select all {count} in this view",
+      "discardSelected": "Discard selected changes",
+      "discardConfirm": "Discard unsent changes on {count, plural, one {# listing} other {# listings}}?",
+      "pageOnly": "Works on the listings on this page. Clear \"Select all\" first."
+    },
+    "tags": {
+      "unsentSkipped": "{count, plural, one {# listing has} other {# listings have}} unsent tag edits: change them in the editor",
+      "label": "Tags",
+      "mode": {
+        "add": "Add",
+        "remove": "Remove",
+        "replace": "Replace all"
+      },
+      "overLimit": "{count} listings would go over {max} tags, so extra tags are not added",
+      "stage": "Stage tag changes",
+      "unknownSkipped": "{count, plural, one {# listing} other {# listings}} skipped: current tags couldn't be loaded"
+    },
+    "legacySchedule": {
+      "kept": "{count, plural, one {# old scheduled update could not be moved here and was kept} other {# old scheduled updates could not be moved here and were kept}}",
+      "banner": "You have {count} scheduled updates from the old tool.",
+      "review": "Review them",
+      "confirm": "Move {count} scheduled updates into your drafts?",
+      "bodyScheduled": "Each one becomes a staged change scheduled for its time. Nothing is sent now.",
+      "bodyStaged": "Each one becomes a staged change you send yourself. Nothing is sent now.",
+      "cta": "Move {count} updates"
+    },
+    "title": "{marketplace, select, etsy {Etsy listings} ebay {eBay listings} trendyol {Trendyol products} wix {Wix products} shopify {Shopify products} other {Listings}}",
+    "mp": {
+      "to": "{marketplace, select, etsy {Etsy} ebay {eBay} trendyol {Trendyol} wix {Wix} shopify {Shopify} other {the store}}",
+      "from": "{marketplace, select, etsy {Etsy} ebay {eBay} trendyol {Trendyol} wix {Wix} shopify {Shopify} other {the store}}",
+      "on": "{marketplace, select, etsy {Etsy} ebay {eBay} trendyol {Trendyol} wix {Wix} shopify {Shopify} other {the store}}"
+    },
+    "pending": {
+      "bar": "{count, plural, one {# change not sent yet} other {# changes not sent yet}}"
+    },
+    "banner": {
+      "failed": "{failed, plural, =0 {} one {# listing couldn't be sent.} other {# listings couldn't be sent.}} {conflicts, plural, =0 {} one {# changed on {on} since your draft.} other {# changed on {on} since your draft.}}",
+      "showThem": "Show them",
+      "reconnect": "{marketplace} needs to be reconnected to refresh or send changes",
+      "reconnectCta": "Reconnect {marketplace}",
+      "couldntCheck": "Couldn't check {marketplace}",
+      "retry": "Retry"
+    },
+    "meta": {
+      "refreshed": "Refreshed from {from} {ago}",
+      "refreshing": "Refreshing from {from}…",
+      "refreshFailed": "Couldn't refresh from {from}",
+      "refresh": "Refresh from {from}",
+      "refreshToast": "{count} listings refreshed"
+    },
+    "price": {
+      "mode": {
+        "set": "Set to",
+        "incPct": "Increase by %",
+        "decPct": "Decrease by %",
+        "incAmt": "Increase by amount",
+        "decAmt": "Decrease by amount"
+      },
+      "modeLabel": "Change",
+      "valueLabel": "Value",
+      "round": "Round to",
+      "round99": ".99",
+      "round00": ".00",
+      "roundNone": "Don't round",
+      "stage": "Stage {count} price changes",
+      "preview": "{count, plural, one {# listing} other {# listings}} · {from} → {to} (example)",
+      "previewEmpty": "{count, plural, one {# listing} other {# listings}} selected",
+      "skippedVariations": "{count} listings with variations skipped: change them in the grid",
+      "skippedInvalid": "{count, plural, one {# listing} other {# listings}} skipped: the new price would be too low",
+      "nothingToStage": "Nothing would change"
+    },
+    "stock": {
+      "in": "In stock",
+      "out": "Out of stock",
+      "mode": {
+        "set": "Set to",
+        "inc": "Increase by",
+        "dec": "Decrease by"
+      },
+      "valueLabel": "Quantity",
+      "stage": "Stage {count} stock changes",
+      "skipped": "{count, plural, one {# listing} other {# listings}} skipped: quantity can't be changed here (variations or not tracked)"
+    },
+    "col": {
+      "listing": "Listing",
+      "price": "Price",
+      "qty": "Qty",
+      "status": "Status",
+      "changes": "Changes",
+      "health": "Health",
+      "updated": "Updated",
+      "section": "Section",
+      "condition": "Condition",
+      "category": "Category",
+      "format": "Format",
+      "brand": "Brand",
+      "listPrice": "List price",
+      "collection": "Collection",
+      "visible": "Visible in store",
+      "variants": "Variants",
+      "vendor": "Vendor",
+      "productType": "Product type",
+      "compareAt": "Compare-at price",
+      "views": "Views (all time)",
+      "favorites": "Favorites (all time)",
+      "created": "Created",
+      "barcode": "Barcode",
+      "ribbon": "Ribbon"
+    },
+    "field": {
+      "title": "Title",
+      "price": "Price",
+      "quantity": "Quantity",
+      "tags": "Tags",
+      "description": "Description",
+      "images": "Photos",
+      "variations": "Variations",
+      "visible": "Visibility",
+      "status": "Status"
+    },
+    "validate": {
+      "priceMin": "{marketplace}'s minimum price is {min}",
+      "priceInvalid": "Enter a price above 0",
+      "qtyInvalid": "Enter a whole number from {min} to {max}",
+      "titleRequired": "Enter a title"
+    },
+    "search": {
+      "placeholder": "Search title, tag, SKU or ID…"
+    },
+    "toolbar": {
+      "results": "{count, plural, one {# result} other {# results}}",
+      "updating": "Updating…"
+    },
+    "filter": {
+      "status": "Status",
+      "section": "Section",
+      "health": "Health",
+      "condition": "Condition",
+      "category": "Category",
+      "collection": "Collection",
+      "productType": "Product type",
+      "brand": "Brand",
+      "vendor": "Vendor",
+      "format": "Format",
+      "photos": "Photos",
+      "stock": "Stock",
+      "price": "Price",
+      "hasVideo": "Has video",
+      "personalizable": "Personalizable",
+      "visible": "Visible in store",
+      "approval": "Approval"
+    },
+    "approval": {
+      "approved": "Approved"
+    },
+    "format": {
+      "FIXED_PRICE": "Fixed price",
+      "AUCTION": "Auction"
+    },
+    "condition": {
+      "NEW": "New",
+      "LIKE_NEW": "Like new",
+      "NEW_OTHER": "New (other)",
+      "NEW_WITH_DEFECTS": "New with defects",
+      "CERTIFIED_REFURBISHED": "Certified refurbished",
+      "SELLER_REFURBISHED": "Seller refurbished",
+      "USED_EXCELLENT": "Used, excellent",
+      "USED_VERY_GOOD": "Used, very good",
+      "USED_GOOD": "Used, good",
+      "USED_ACCEPTABLE": "Used, acceptable",
+      "FOR_PARTS_OR_NOT_WORKING": "For parts or not working"
+    },
+    "health": {
+      "lt50": "Needs work (under 50)",
+      "fair": "Fair (50–74)",
+      "good": "Good (75–89)",
+      "great": "Great (90+)",
+      "missingPhotos": "Missing photos",
+      "missingTags": "Missing tags",
+      "noVideo": "No video",
+      "shortTitle": "Short title",
+      "tooltip": "Listing health {score} · {band} · Scored on {used} of {total} checks",
+      "unscored": "{count} listings not scored yet",
+      "band": {
+        "needs_work": "Needs work",
+        "fair": "Fair",
+        "good": "Good",
+        "great": "Great"
+      }
+    },
+    "view": {
+      "all": "All",
+      "active": "Active",
+      "notSent": "Changes not sent",
+      "sendFailed": "Send failed",
+      "needsWork": "Needs work",
+      "soldOut": "Sold out",
+      "inactive": "Inactive",
+      "review": "In review or rejected",
+      "label": "View",
+      "goTo": "Go to view: {view}"
+    },
+    "photos": {
+      "lt5": "Fewer than 5",
+      "5to9": "5–9",
+      "10plus": "10 or more"
+    },
+    "empty": {
+      "connectTitle": "Connect {marketplace} to see your listings",
+      "firstPullTitle": "Bring in your {marketplace} listings",
+      "firstPullBody": "We'll copy them so you can edit and score them. Nothing changes on {on}.",
+      "noListingsTitle": "No listings in {store} yet",
+      "noResults": "No listings match these filters",
+      "clearFilters": "Clear filters",
+      "doneNotSent": "Everything has been sent to {to}",
+      "doneFailed": "No failed sends",
+      "doneNeedsWork": "No listings need work"
+    },
+    "error": {
+      "load": "Couldn't load your {marketplace} listings",
+      "serverNoResponse": "KolayXport's server didn't respond",
+      "usageLimit": "You've reached this month's sync limit",
+      "seePlans": "See plans"
+    },
+    "panel": {
+      "priceStock": "Price & stock",
+      "notSent": "Edits not sent ({count})",
+      "saved": "Saved · {count, plural, one {# edit not sent} other {# edits not sent}}",
+      "conflict": "This listing changed on {on} after your draft started.",
+      "conflictNoSend": "Review the differences in the editor before sending",
+      "send": "Send changes to {to}",
+      "updated": "Updated",
+      "changeFromTo": "{field} {from} → {to}"
+    },
+    "sched": {
+      "pickTime": "Pick a date and time",
+      "note": "We send it at that time even if KolayXport is closed. A listing that changed on the marketplace waits for your review.",
+      "done": "{count, plural, one {# change scheduled} other {# changes scheduled}}",
+      "title": "Schedule send",
+      "date": "Date",
+      "cta": "Schedule {count, plural, one {# change} other {# changes}}",
+      "sendNow": "Send now",
+      "changeTime": "Change time…",
+      "unschedule": "Unschedule",
+      "none": "Nothing scheduled",
+      "when": "Scheduled for",
+      "timezone": "Times in {zone}",
+      "sendFailed": "Couldn't send this change. It stays in your drafts.",
+      "rescheduled": "Send time changed",
+      "unscheduled": "Schedule removed. The change stays staged.",
+      "deleteNeedsReview": "Deletions are sent from the listing's ⋯ menu after you confirm",
+      "pickFuture": "Pick a time in the future",
+      "moreEdits": "{count, plural, one {# other edit} other {# other edits}}"
+    },
+    "tools": {
+      "findReplaceUnavailable": "Only price and stock can be staged here, so there is no text to find and replace",
+      "menu": "Tools",
+      "findReplace": "Find & replace",
+      "duplicates": "Find duplicates",
+      "import": "Import CSV",
+      "export": "Export CSV",
+      "scheduled": "Scheduled sends",
+      "activity": "Activity",
+      "loadFailed": "Couldn't load this",
+      "staged": "{count, plural, one {# change staged} other {# changes staged}} · send when you're ready",
+      "stageFailed": "{count, plural, one {# change couldn't be saved} other {# changes couldn't be saved}}. Try again."
+    },
+    "fr": {
+      "tagSeparator": "A tag can't contain , | or ;",
+      "unsentChange": "Has an unsent change to this field. Send or discard it first.",
+      "sending": "Being sent right now. Try again when it finishes.",
+      "field": "Field",
+      "find": "Find",
+      "replace": "Replace with",
+      "matchCase": "Match case",
+      "scopeView": "Current view ({count})",
+      "scopeSelected": "Selected ({count})",
+      "andMore": "and {count} more",
+      "overLimit": "Over {max} characters",
+      "stage": "Stage {count} changes",
+      "scope": "Apply to",
+      "noneSelected": "Select listings in the table first",
+      "fields": {
+        "title": "Title",
+        "tags": "Tags",
+        "description": "Description"
+      },
+      "noMatches": "No listings contain this text",
+      "summary": "{count, plural, one {# listing will change} other {# listings will change}}{flagged, plural, =0 {} other { · # skipped}}",
+      "nothingToStage": "Nothing to change yet",
+      "tagTooLong": "A tag would be over {max} characters",
+      "emptyResult": "The title would be empty"
+    },
+    "dup": {
+      "hideStaged": "Hiding from the store is staged",
+      "archiveTitle": "Stage archiving of \"{title}\"?",
+      "archiveBody": "Nothing is archived on {on} until you send it and type your shop name to confirm.",
+      "archiveConfirm": "Stage archiving",
+      "archiveStaged": "Archiving staged. It waits for your review.",
+      "sameSku": "Same SKU {sku}",
+      "similarTitle": "Titles {pct} similar",
+      "none": "No duplicates found",
+      "summary": "{groups, plural, one {# group of possible duplicates} other {# groups of possible duplicates}}",
+      "truncated": "Showing the first {max} groups",
+      "deleteTitle": "Stage deletion of \"{title}\"?",
+      "deleteBody": "Nothing is deleted on {on} until you send the deletion and type your shop name to confirm.",
+      "deleteConfirm": "Stage deletion",
+      "deleteStaged": "Deletion staged. It waits for your review.",
+      "deactivateStaged": "Deactivation staged"
+    },
+    "csv": {
+      "editableUnknown": "Couldn't check whether price and quantity can be edited here. Edit this listing in the grid.",
+      "sending": "This listing is being sent right now. Import it again when it finishes.",
+      "replacesUnsent": "Replaces an unsent change ({field})",
+      "drop": "Drop a CSV file or choose one",
+      "mapping": "Match your columns",
+      "template": "Download template",
+      "summary": "{rows} rows · {change} listings will change · {missing} not found · {invalid} invalid",
+      "notFound": "Not found",
+      "invalid": "Invalid",
+      "staging": "Staging {done} / {total}…",
+      "stage": "Stage {count} changes",
+      "tooLarge": "File is larger than 5 MB",
+      "stepFile": "File",
+      "limit": "CSV, up to 5 MB",
+      "choose": "Choose file",
+      "chooseAnother": "Choose another file",
+      "notCsv": "Choose a .csv file",
+      "empty": "This file has no rows",
+      "unreadable": "Couldn't read this file",
+      "ignore": "Don't import",
+      "mapColumn": "Field for column {column}",
+      "fields": {
+        "title": "Title",
+        "price": "Price",
+        "quantity": "Quantity",
+        "tags": "Tags",
+        "description": "Description"
+      },
+      "idRequired": "Match one column to {column} so each row can be found",
+      "preview": "Preview",
+      "line": "Line",
+      "result": "Result",
+      "rowStaged": "Staged",
+      "noChanges": "Nothing in this file changes your listings",
+      "nothingToStage": "No changes left to stage",
+      "stagePartial": "{done} staged · {failed} couldn't be saved. Stage again to retry.",
+      "duplicateRow": "This listing is in the file more than once",
+      "tagsTooMany": "More than {max} tags",
+      "tagTooLong": "Tag \"{tag}\" is over {max} characters"
+    },
+    "export": {
+      "selectedTooMany": "Too many listings selected to export at once. Use Current view or All listings.",
+      "scopeAll": "All listings ({count})",
+      "includeDescription": "Include description",
+      "download": "Download CSV",
+      "preparing": "Preparing CSV…",
+      "failed": "Couldn't download the CSV. Try again."
     }
   }
 }

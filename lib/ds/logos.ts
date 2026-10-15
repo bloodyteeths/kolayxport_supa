@@ -8,6 +8,12 @@
  * - `color`   brand hex from `tokens.brand` (monogram fallback background only, never UI chrome).
  * - `kind`    `'mark'` = the owner's logo (simple-icons / existing official file);
  *             `'monogram'` = a KolayXport-drawn letter tile, NOT the owner's logo.
+ * - `src` must read at 16–20 px (sidebar, chips, table cells). Trendyol's owner file is a wide raster wordmark
+ *   that is illegible that small, so its `src` is a SQUARE tile and the wordmark is kept in `wordmarkSrc`.
+ * - `wordmarkSrc` / `fullBleed` / `logoSrc()` are registry data for a pending LogoTile change
+ *   (components/ds/data/LogoTile.tsx, M1-d owned): LogoTile does NOT read them yet. Today it always draws
+ *   `src` (or `monoSrc`) inside its white bordered frame at every size. Once LogoTile adopts them it should draw
+ *   `logoSrc(asset, size, tone)` and skip the frame (border, padding) when `fullBleed` is set.
  *
  * Sources and license notes: design/logos/SOURCES.md.
  */
@@ -43,7 +49,14 @@ export type LogoAsset = {
   initials: string;
   /** Whether `src` is the owner's mark or our own monogram tile. */
   kind: 'mark' | 'monogram';
+  /** Wide wordmark for large uses (>= 32 px). Absent when `src` already reads at every size. Not yet read by LogoTile. */
+  wordmarkSrc?: string;
+  /** `src` is a self-contained filled tile that should render full-bleed (no white frame). Not yet read by LogoTile. */
+  fullBleed?: boolean;
 };
+
+/** Smallest tile size at which a wide wordmark (`wordmarkSrc`) is legible. */
+export const WORDMARK_MIN_SIZE = 32;
 
 const L = (
   provider: LogoProvider,
@@ -51,6 +64,7 @@ const L = (
   initials: string,
   kind: LogoAsset['kind'],
   src = `/logos/${provider}.svg`,
+  extra: Partial<Pick<LogoAsset, 'monoSrc' | 'wordmarkSrc' | 'fullBleed'>> = {},
 ): LogoAsset => ({
   provider,
   src,
@@ -59,16 +73,26 @@ const L = (
   color: brand[provider],
   initials,
   kind,
+  ...extra,
 });
 
 export const LOGOS: Record<LogoProvider, LogoAsset> = {
   etsy: L('etsy', 'Etsy', 'E', 'mark'),
+  // The four-color "ebay" letters, as shell-nav §1 specifies. A red-"e"-only square was tried for 16 px
+  // legibility but needs a founder decision (it is not the spec'd mark), so it is not shipped.
   ebay: L('ebay', 'eBay', 'e', 'mark'),
   amazon: L('amazon', 'Amazon', 'A', 'mark'),
   shopify: L('shopify', 'Shopify', 'S', 'mark'),
   wix: L('wix', 'Wix', 'W', 'mark'),
-  // Existing official-looking raster files; mono variants are monograms.
-  trendyol: L('trendyol', 'Trendyol', 'T', 'mark', '/logos/trendyol.png'),
+  // The "trendyol .com" raster wordmark is unreadable below ~32 px: `src` is a square orange tile with a white
+  // "t" (shell-nav §1 "the orange t tile"; KolayXport-drawn in the brand color, hence `monogram`;
+  // design/logos/SOURCES.md). The raster wordmark is kept as `wordmarkSrc` for the pending LogoTile change.
+  trendyol: L('trendyol', 'Trendyol', 'T', 'monogram', '/logos/trendyol-square.svg', {
+    monoSrc: '/logos/trendyol-square-mono.svg',
+    wordmarkSrc: '/logos/trendyol.png',
+    fullBleed: true,
+  }),
+  // Existing official-looking raster file; the mono variant is a monogram.
   hepsiburada: L('hepsiburada', 'Hepsiburada', 'H', 'mark', '/logos/hepsiburada.png'),
   fedex: L('fedex', 'FedEx', 'F', 'mark'),
   ups: L('ups', 'UPS', 'U', 'mark'),
@@ -114,6 +138,16 @@ export function getLogo(provider: string | null | undefined): LogoAsset | null;
 export function getLogo(provider: string | null | undefined): LogoAsset | null {
   const key = toLogoProvider(provider);
   return key ? LOGOS[key] : null;
+}
+
+/**
+ * The asset path a tile of `size` px should draw: the mono file for `tone: 'mono'`, the wide wordmark at
+ * >= WORDMARK_MIN_SIZE when one exists, otherwise the square `src`. Not yet called by LogoTile (see header).
+ */
+export function logoSrc(asset: LogoAsset, size: number, tone: 'color' | 'mono' = 'color'): string {
+  if (tone === 'mono') return asset.monoSrc;
+  if (asset.wordmarkSrc && size >= WORDMARK_MIN_SIZE) return asset.wordmarkSrc;
+  return asset.src;
 }
 
 /** Glossary name for the domestic carrier integration (MNG Kargo is now DHL eCommerce). */

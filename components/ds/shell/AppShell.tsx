@@ -27,6 +27,7 @@ import Box from '@mui/material/Box';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTranslations } from 'next-intl';
 import LiveSoundToggle from '@/components/live/LiveSoundToggle';
+import { SoundToggleHost } from './SoundToggleHost';
 import { useAuth } from '@/lib/auth-context';
 import { useShortcuts } from '@/lib/ds/useShortcuts';
 import { focusRing, neutral as n, px, radius, zIndex } from '@/lib/ds/tokens';
@@ -298,7 +299,11 @@ function ShellFrame({ children, renderMobileTopBar, renderMobileTabBar, renderMo
     shopifyFree,
     billingProvider,
     mobileNotifications: signedIn ? <NotificationsButton enabled mobile size="lg" /> : null,
-    mobileSoundToggle: signedIn ? <LiveSoundToggle size="small" /> : null,
+    mobileSoundToggle: signedIn ? (
+      <SoundToggleHost size="touch" data-testid="mobile-sound-host">
+        <LiveSoundToggle size="small" />
+      </SoundToggleHost>
+    ) : null,
     signOut,
   };
 

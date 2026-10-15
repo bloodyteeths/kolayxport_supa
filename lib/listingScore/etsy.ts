@@ -282,3 +282,46 @@ export function etsyChecks(input: EtsyScoreInput): Check[] {
 export function scoreEtsyListing(input: EtsyScoreInput): ScoreResult {
   return finalizeScore(etsyChecks(input));
 }
+
+/**
+ * The `EtsyListing` cache columns the scorer reads (structural, no Prisma import so the client can use it).
+ * Select exactly these fields (`ETSY_CACHE_SELECT` in `lib/listings/refreshHealth.ts`).
+ */
+export interface EtsyCacheRow {
+  title: string;
+  description: string;
+  tags: string[];
+  materials: string[];
+  priceAmount: number;
+  priceDivisor: number;
+  imageCount: number;
+  hasVideo: boolean;
+  shippingProfileId: bigint | string | number | null;
+  processingMin: number | null;
+  itemWeight: number | null;
+}
+
+/**
+ * Maps a cache row to the scorer input. What the cache cannot know stays `undefined` → `na`:
+ * alt text (no per-image data cached), required category attributes (no taxonomy properties cached)
+ * and the market band (research only). Processing time now lives on the shipping profile on Etsy, so a
+ * listing with a profile counts as having processing set even when the legacy `processing_min` is empty.
+ */
+export function etsyInputFromCache(row: EtsyCacheRow): EtsyScoreInput {
+  const hasProfile = row.shippingProfileId !== null && row.shippingProfileId !== undefined && String(row.shippingProfileId) !== '';
+  const divisor = row.priceDivisor > 0 ? row.priceDivisor : 100;
+  return {
+    title: row.title,
+    description: row.description,
+    tags: row.tags,
+    materials: row.materials,
+    imageCount: row.imageCount,
+    hasVideo: row.hasVideo,
+    shipping: {
+      hasProfile,
+      hasProcessing: row.processingMin !== null || hasProfile,
+      hasWeight: typeof row.itemWeight === 'number' && row.itemWeight > 0,
+    },
+    price: row.priceAmount / divisor,
+  };
+}

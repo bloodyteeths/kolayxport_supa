@@ -6,6 +6,7 @@ import {
 import { Search, BarChart2, Link, Store } from 'lucide-react';
 import { Page, PageHeader } from '@/components/ds/page';
 import withAuth from '@/components/withAuth';
+import { legacyResearchGssp, withLegacyResearchRedirect } from '@/lib/research/legacyRedirects';
 import { useAuth } from '@/lib/auth-context';
 import { useEtsyResearchStore } from '@/lib/stores/useEtsyResearchStore';
 import { useTranslations } from 'next-intl';
@@ -237,4 +238,8 @@ function SearchBar() {
   );
 }
 
-export default withAuth(EtsyResearchPage);
+// research R1-E (research.md §2.3): with the `research` flag on, old URLs go to the Research hub;
+// tabs whose tool has not shipped yet keep this legacy page. Flag off → unchanged.
+export const getServerSideProps = legacyResearchGssp('etsy');
+
+export default withLegacyResearchRedirect('etsy', withAuth(EtsyResearchPage));

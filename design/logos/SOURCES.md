@@ -29,7 +29,7 @@ Brand hex data: https://cdn.jsdelivr.net/npm/simple-icons@16.35.0/data/simple-ic
 
 | Asset | Source | Note |
 |---|---|---|
-| `trendyol.png` | Already in the repo (600×600, source unknown) | Looks like the current official "trendyol .com" wordmark. Kept as `src`. Too small to read below about 32px, so `LogoTile` should use the monogram fallback at 16–24px. |
+| `trendyol.png` | Already in the repo (600×600, source unknown) | Looks like the current official "trendyol .com" wordmark. No longer `src`: too small to read below about 32px. Kept as `wordmarkSrc` in `lib/ds/logos.ts` for large tiles once `LogoTile` reads it (pending; today `LogoTile` draws `trendyol-square.svg` at every size). |
 | `hepsiburada.png` | Already in the repo (600×600, source unknown) | Looks like the official ring logo. Kept as `src`. |
 
 ## KolayXport monogram tiles (`kind: 'monogram'`, NOT the owners' logos)
@@ -41,7 +41,9 @@ We drew these ourselves: a rounded 24×24 tile with one stroked letter. They con
 | `veeqo.svg`, `veeqo-mono.svg` | V | `#2A2E3B` | Not in simple-icons; no repo asset |
 | `shippo.svg`, `shippo-mono.svg` | S | `#1B9C85` | Not in simple-icons; no repo asset |
 | `parasut.svg`, `parasut-mono.svg` | P | `#00A1E4` | Not in simple-icons; no repo asset |
-| `trendyol-mono.svg` | T | currentColor | Mono variant only; the color file is the PNG above |
+| `trendyol-square.svg` | t (lowercase, stroked) | `#F27A1A` (tokens.brand) on a rounded 24×24 tile, white letter | Trendyol's `src` since 2026-10 (shell-nav §1 "the orange t tile"). Drawn by KolayXport, not traced from Trendyol artwork, so the registry `kind` changed from `'mark'` to `'monogram'`. Registry flag `fullBleed: true` (the file is already a filled tile; `LogoTile` still frames it until it reads the flag) |
+| `trendyol-square-mono.svg` | t | currentColor | Mono variant of `trendyol-square.svg` (letter knocked out with a `<mask>`); Trendyol's `monoSrc` |
+| `trendyol-mono.svg` | T | currentColor | Older mono monogram; no longer referenced by the registry (superseded by `trendyol-square-mono.svg`) |
 | `hepsiburada-mono.svg` | H | currentColor | Mono variant only; the color file is the PNG above |
 
 The mono monograms use an SVG `<mask>` to knock the letter out of a `currentColor` tile.

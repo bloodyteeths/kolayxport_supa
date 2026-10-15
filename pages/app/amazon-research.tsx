@@ -7,6 +7,7 @@ import {
 import { Search, BarChart2, Key, TrendingUp } from 'lucide-react';
 import { Page, PageHeader } from '@/components/ds/page';
 import withAuth from '@/components/withAuth';
+import { legacyResearchGssp, withLegacyResearchRedirect } from '@/lib/research/legacyRedirects';
 import { useAmazonResearchStore } from '@/lib/stores/useAmazonResearchStore';
 import { useTranslations } from 'next-intl';
 
@@ -143,4 +144,8 @@ function AmazonResearchPage() {
   );
 }
 
-export default withAuth(AmazonResearchPage);
+// research R1-E (research.md §2.3): with the `research` flag on, old URLs go to the Research hub;
+// tabs whose tool has not shipped yet keep this legacy page. Flag off → unchanged.
+export const getServerSideProps = legacyResearchGssp('amazon');
+
+export default withLegacyResearchRedirect('amazon', withAuth(AmazonResearchPage));

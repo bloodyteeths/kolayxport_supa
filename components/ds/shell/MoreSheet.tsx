@@ -22,6 +22,7 @@ import { accent, neutral as n, tone, type as typeScale } from '@/lib/ds/tokens';
 import { useAuth } from '@/lib/auth-context';
 import useLocaleStore, { type AppLocale } from '@/lib/stores/useLocaleStore';
 import LiveSoundToggle from '@/components/live/LiveSoundToggle';
+import { SoundToggleHost } from './SoundToggleHost';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { MobileTab, NavGroup, NavItem } from '@/lib/nav/useNavModel';
 import { useShellStore } from '@/lib/nav/useShellStore';
@@ -209,7 +210,8 @@ export type MoreSheetConnectedProps = {
 /**
  * Rendered as JSX from AppShell `renderMoreSheet` (see the wiring contract in MobileTopBar.tsx). Owns its
  * hooks: `showBell` from the shared page meta, unread count + tone from the app-wide notifications key.
- * The account section carries `<LiveSoundToggle/>` (backend, import only), as the TopBar does on desktop.
+ * The account section carries `<LiveSoundToggle/>` (backend, import only) in the shared `SoundToggleHost`,
+ * as the TopBar does on desktop.
  */
 export function MoreSheetConnected({ ctx, usage }: MoreSheetConnectedProps) {
   const { showBell } = useMobileTopBarState();
@@ -222,7 +224,11 @@ export function MoreSheetConnected({ ctx, usage }: MoreSheetConnectedProps) {
       notificationsUnread={unreadCount}
       notificationsTone={notificationBadgeTone(items)}
       usage={usage}
-      accountExtras={<LiveSoundToggle />}
+      accountExtras={
+        <SoundToggleHost size="touch" data-testid="more-sheet-sound-host">
+          <LiveSoundToggle />
+        </SoundToggleHost>
+      }
       onSignOut={ctx.signOut}
     />
   );

@@ -20,6 +20,7 @@ import {
 import { toast } from 'react-hot-toast';
 import { Page, PageHeader } from '@/components/ds/page';
 import withAuth from '@/components/withAuth';
+import { legacyResearchGssp, withLegacyResearchRedirect } from '@/lib/research/legacyRedirects';
 import { useAuth } from '@/lib/auth-context';
 import { useTranslations } from 'next-intl';
 import { useLocale } from '@/lib/i18n/useLocale';
@@ -3289,4 +3290,8 @@ function EbayResearchPageWithLayout(props: any): JSX.Element {
   );
 }
 
-export default withAuth(EbayResearchPageWithLayout);
+// research R1-E (research.md §2.3): with the `research` flag on, old URLs go to the Research hub;
+// tabs whose tool has not shipped yet keep this legacy page. Flag off → unchanged.
+export const getServerSideProps = legacyResearchGssp('ebay');
+
+export default withLegacyResearchRedirect('ebay', withAuth(EbayResearchPageWithLayout));

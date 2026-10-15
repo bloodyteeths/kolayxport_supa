@@ -4,6 +4,7 @@ import prisma from '../../../lib/prisma';
 import { createTrendyolClient } from '../../../lib/integrations/trendyolApiClient';
 import { decryptIfNeeded } from '@/lib/crypto/credentials';
 import { logger } from '../../../lib/logger';
+import { refreshHealth } from '@/lib/listings/refreshHealth';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '4mb' } },
@@ -256,6 +257,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
           }
         }
+      }
+
+      // Listing health (listings-grid §9.3); store key = supplierId. Never fails the pull.
+      try {
+        const healthResult = await refreshHealth('trendyol', { storeId: supplierId, userId });
+        if (healthResult.error || healthResult.skipped === 'bad_scope') {
+          logger.warn('Trendyol sync: health refresh failed', { error: healthResult.error ?? null, skipped: healthResult.skipped });
+        } else if (healthResult.skipped) {
+          logger.debug('Trendyol sync: health refresh skipped', { skipped: healthResult.skipped });
+        }
+      } catch (err: any) {
+        logger.warn('Trendyol sync: health refresh failed', { error: String(err?.message || err).substring(0, 300) });
       }
 
       return res.status(200).json({

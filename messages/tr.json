@@ -10664,6 +10664,450 @@
         "a": "Son dakika Noel hediyeleri: dijital ürünler ve hızlı kargo öne çıkar.",
         "b": "Yeni yıl ilanlarına şimdiden hazırlanın."
       }
+    },
+    "doc": {
+      "noSalesEbay": "Henüz ölçülmüyor: eBay siparişleri ilan numarasını taşımıyor",
+      "collecting": "{date} tarihinden beri günlük istatistik toplanıyor",
+      "noViewsEbay": "eBay ilan görüntülenmelerini paylaşmıyor",
+      "check": {
+        "priceVsPeers": "Fiyat {price}, rakip medyanı {median} (p75 {p75})",
+        "titleVsPeers": "Başlık {len} karakter, rakip medyanı {median}",
+        "photosVsPeers": "{count} fotoğraf, rakip medyanı {median}",
+        "tagsVsPeers": "{total} etiketinizden {count} tanesi rakiplerin en çok kullandığı etiketler arasında"
+      },
+      "fix": {
+        "setPrice": "Fiyat belirle…",
+        "suggestTitle": "Başlık öner",
+        "tagIdeas": "Etiket fikirleri al",
+        "openEditor": "Düzenleyiciyi aç"
+      },
+      "peersTooFew": "20'den az karşılaştırılabilir ilan",
+      "currencyMismatch": "Rakipler başka bir para biriminde fiyatlandırılmış",
+      "peerPhotosUnknown": "Etsy rakiplerin fotoğraf sayısını paylaşmadı",
+      "peersEtsyOnly": "Rakip karşılaştırması şimdilik Etsy ilanları için kullanılabilir",
+      "doneEmpty": "Acil bir şey yok: her ilan 75 veya üzeri puanda",
+      "openNotFound": "Bu ilan mağazanızda bulunamadı",
+      "bulk": {
+        "checking": "{total} ilandan {done} tanesi kontrol edildi…",
+        "stop": "Durdur",
+        "pricesEtsyOnly": "Önerilen fiyatlar Etsy'deki benzer ilanlara dayanır; eBay için henüz kullanılamıyor",
+        "notChecked": "{count} ilan kontrol edilmedi · Tekrar deneyin",
+        "notCheckedRate": "{count} ilan kontrol edilmedi · Bir dakika sonra tekrar deneyin",
+        "notCheckedLimit": "{count} ilan kontrol edilmedi · Her seferde en fazla {max} ilan; onları seçip tekrar çalıştırın",
+        "stageFixes": "Düzeltmeleri hazırla",
+        "applyPrices": "Önerilen fiyatları uygula",
+        "addTags": "Önerilen etiketleri ekle",
+        "addTagsSoon": "Etiket önerileri Anahtar kelime gezgini ile gelecek",
+        "aiTitles": "Başlıkları yapay zekâ ile yaz",
+        "gridUnavailable": "Yapay zekâ başlıkları toplu düzenleyicide açılır; o henüz burada kullanılamıyor",
+        "nothingToStage": "Bu ilanlara uyan önerilen fiyat yok",
+        "staged": "{count} ilan hazırlandı · Henüz gönderilmedi{skipped, plural, =0 {} other { · # atlandı}}"
+      },
+      "col": {
+        "listing": "İlan",
+        "views30": "30 günlük görüntülenme",
+        "sales30": "30 günlük satış",
+        "conversion": "Dönüşüm",
+        "mainKw": "Ana kelime sırası",
+        "health": "Sağlık",
+        "biggestIssue": "En büyük sorun"
+      },
+      "sort": {
+        "opportunity": "En büyük fırsat",
+        "health": "En düşük sağlık",
+        "views": "En çok görüntülenen",
+        "sales": "En çok satan"
+      },
+      "sortLabel": "Sırala",
+      "filter": {
+        "shop": "Mağaza",
+        "issue": "Sorun",
+        "any": "Tümü",
+        "health": "Sağlık",
+        "healthBand": {
+          "lt50": "50 altı",
+          "50-74": "50–74",
+          "75-89": "75–89",
+          "gte90": "90 ve üzeri"
+        }
+      },
+      "searchPlaceholder": "İlanlarınızda arayın",
+      "resultCount": "{count} ilan",
+      "statsSource": "Görüntülenme ve satış: Etsy günlük istatistikleri + siparişleriniz · son 30 gün · {time} güncellendi",
+      "measuredHint": "Etsy günlük istatistikleri ve siparişleriniz, son 30 gün",
+      "rankTip": "\"{keyword}\" için Etsy API aramasındaki sıra (kişiselleştirilmemiş, reklamlar hariç)",
+      "card": {
+        "views": "{count, plural, other {{value} görüntülenme}}",
+        "sales": "{count, plural, other {{value} satış}}",
+        "stats": "{stats} (30 gün)"
+      },
+      "issueCount": "({value})",
+      "issue": {
+        "photos_count": "Fotoğraf az",
+        "photos_alt": "Alternatif metni olmayan fotoğraflar",
+        "video": "Video yok",
+        "title_length": "Başlık uzunluğu",
+        "title_format": "Başlık biçimi",
+        "tags_count": "Eksik etiketler",
+        "tags_quality": "Zayıf etiketler",
+        "description": "Açıklama çok kısa",
+        "attributes": "Zorunlu ayrıntılar eksik",
+        "materials": "Malzeme yok",
+        "shipping_ready": "Kargo ayarlanmamış",
+        "price_market": "Fiyat piyasa aralığının dışında",
+        "title_keywords": "Başlıkta önemli ayrıntılar eksik",
+        "aspects_required": "Zorunlu ürün özellikleri eksik",
+        "aspects_recommended": "Önerilen ürün özellikleri eksik",
+        "condition": "Durum bilgisi eksik",
+        "category": "Kategori",
+        "policies": "İşletme politikaları eksik",
+        "package": "Paket bilgileri eksik",
+        "price_vs_peers": "Fiyat rakiplerden çok farklı",
+        "title_vs_peers": "Başlık rakiplerden kısa",
+        "photos_vs_peers": "Rakiplerden az fotoğraf",
+        "tags_vs_peers": "Etiketler rakiplerden farklı"
+      },
+      "last30": "Son 30 gün",
+      "last30Source": "Ölçülen · Etsy günlük istatistikleri + siparişleriniz",
+      "unit": {
+        "views": "{count, plural, other {görüntülenme}}",
+        "sales": "{count, plural, other {satış}}",
+        "conversion": "dönüşüm",
+        "favoritesAllTime": "{count, plural, other {{value} favori}} (tüm zamanlar)"
+      },
+      "mainKw": "Ana anahtar kelime",
+      "mainKwSuggested": "Ana anahtar kelime (önerilen)",
+      "editKeyword": "Ana anahtar kelimeyi değiştir",
+      "keywordRequired": "Önce bir anahtar kelime yazın",
+      "compare": "Karşılaştır",
+      "comparedWith": "\"{keyword}\" için {n} ilanla karşılaştırıldı",
+      "peers": "Rakiplerle karşılaştırma",
+      "peersLoading": "Benzer ilanlarla karşılaştırılıyor…",
+      "peersNa": "yok · {reason}",
+      "usePrice": "Bu fiyatı kullan",
+      "priceRequired": "Sıfırdan büyük bir fiyat girin",
+      "aiCredits": "Bu ayki yapay zekâ kredileriniz bitti",
+      "stagedHere": "Burada hazırlanan ({count})",
+      "proposal": {
+        "priceChange": "Fiyat {from} → {to}",
+        "titleChange": "Başlık → \"{title}\"",
+        "tags": "{count} etiket",
+        "remove": "Bu düzeltmeyi kaldır"
+      },
+      "noProposals": "Önce yukarıdan bir düzeltmeyi kabul edin",
+      "staging": "Hazırlanıyor…",
+      "stageFailed": "Düzeltmeler hazırlanamadı. Hiçbir şey değişmedi. Tekrar deneyin",
+      "unstaged": "{count} düzeltme henüz hazırlanmadı",
+      "notSent": "Kaydedildi · {count} düzenleme gönderilmedi",
+      "goToListings": "İlanlara git",
+      "viewOn": "{marketplace}'de görüntüle",
+      "openDoctor": "İlan doktorunu aç",
+      "firstUse": "Önce {marketplace} ilanlarınızı getirin",
+      "firstUseBody": "Doktor, KolayXport'taki ilanlarınızı, günlük görüntülenmeleri ve siparişleri okur",
+      "pull": "{marketplace}'den yenile",
+      "openListings": "{marketplace} ilanlarını aç",
+      "pullFailed": "{marketplace}'den yenilenemedi",
+      "noMatches": "Bu filtrelere uyan ilan yok",
+      "clearFilters": "Filtreleri temizle",
+      "loadFailed": "İlanlarınız yüklenemedi",
+      "connectBody": "Hangi ilanların geliştirilmesi gerektiğini ve önce neyi düzelteceğinizi görmek için {marketplace} bağlayın",
+      "unavailableMkt": "İlan doktoru Etsy ve eBay ilanlarıyla çalışır",
+      "unavailableMktBody": "Pazaryeri seçiminden Etsy veya eBay seçin",
+      "useEtsy": "Etsy'yi kullan"
+    },
+    "error": {
+      "budget": "Önbellekteki sonuçlar gösteriliyor: Etsy'nin günlük sınırına yaklaşıldı",
+      "etsy": "Etsy yanıt vermedi",
+      "ebay": "eBay'e ulaşılamadı",
+      "stale": "Kayıtlı sonuçlar gösteriliyor: son kontrol tamamlanamadı",
+      "generic": "Araştırma sonuçları yüklenemedi"
+    },
+    "mkt": {
+      "amazonIneligible": "Amazon araştırması için uygun bir Amazon Associates hesabı gerekir",
+      "label": "Pazaryeri",
+      "learnHow": "Nasıl yapılır",
+      "switchTo": "Pazaryeri: {name}"
+    },
+    "products": {
+      "trendyolLater": "Trendyol ürün araştırması Fiyat farkı aracıyla gelecek"
+    },
+    "empty": {
+      "products": "Fiyatları, rekabeti ve alıcı kelimelerini görmek için bir fikir arayın",
+      "linkNoTitle": "Bu linkten bir başlık okunamadı: ne sattığını yazın",
+      "notServed": "Ürün bulucu {marketplace} için henüz kullanılamıyor",
+      "noResults": "\"{q}\" ile eşleşen {marketplace} ilanı yok",
+      "broader": "Daha genel bir ifade deneyin"
+    },
+    "guard": {
+      "small": "Küçük örnek: {n} ilan",
+      "insufficient": "Yeterli veri yok",
+      "noFx": "döviz kuru yok",
+      "outliers": "olağan dışı fiyatlar",
+      "notAvailableEbay": "eBay bu veriyi paylaşmıyor",
+      "implausible": "Kontrol edin: olağan dışı fiyat aralığı",
+      "notEnoughSignal": "Yeterli sinyal yok"
+    },
+    "demand": {
+      "trendsUnavailable": "Google Trends yanıt vermedi",
+      "autocompleteUnavailable": "Arama önerileri yanıt vermedi",
+      "engagementUnavailable": "60 günden eski yeterli ilan yok",
+      "input": {
+        "googleTrends": "Google ilgisi",
+        "autocomplete": "Otomatik tamamlama",
+        "engagement": "Etkileşim"
+      },
+      "value": {
+        "googleTrends": "{value} (12 ay)",
+        "autocomplete": "3 öneri listesinin {value} tanesinde",
+        "engagement": "ayda {value} favori (medyan)"
+      },
+      "inputMissing": "mevcut değil"
+    },
+    "evidence": {
+      "priceBand": "Çoğu {p25} ile {p75} arasında satılıyor (medyan {median})",
+      "competing": "{count} rakip ilan",
+      "newcomers": "En iyi mağazaların {pct} kadarı 1 yıldan kısa süre önce açıldı",
+      "demand": "Talep sinyali {dots} (3 girdiden {inputs})",
+      "basis": "{n} ilan",
+      "basisNoVolume": "{n} ilan, Etsy arama hacmi paylaşmıyor",
+      "basisEbay": "{n} aktif eBay ilanı, eBay satış geçmişi paylaşmıyor",
+      "title": "Kanıtlar",
+      "noVolume": "Etsy arama hacmi paylaşmıyor"
+    },
+    "sourceName": {
+      "etsySearch": "Etsy araması",
+      "ebayBrowse": "eBay araması (aktif ilanlar)",
+      "amazon": "Amazon",
+      "trendyol": "Trendyol",
+      "doctorEtsy": "Etsy günlük istatistikleri + siparişleriniz · son 30 gün",
+      "doctorEbay": "eBay siparişleriniz · son 30 gün",
+      "healthEtsy": "Etsy ilanları · sağlık",
+      "healthEbay": "eBay ilanları · sağlık",
+      "ownLabels": "{country} için {carrier} gönderileriniz",
+      "rateCard": "{country} için {carrier} tarife teslim süresi",
+      "ai": "Yapay zekâ önerisi"
+    },
+    "explain": {
+      "failed": "Açıklama düzgün oluşturulamadı",
+      "cta": "Açıkla · 1 kredi",
+      "noCredits": "Bu ay için AI krediniz kalmadı"
+    },
+    "translate": {
+      "failed": "Çevrilemedi. İngilizce anahtar kelimeler deneyin",
+      "cta": "İngilizce anahtar kelimelere çevir · 1 kredi",
+      "label": "İngilizce anahtar kelimeler:",
+      "from": "\"{text}\" ifadesinden",
+      "remove": "{seed} kaldır"
+    },
+    "action": {
+      "openPhotoStudio": "Fotoğraf stüdyosunu aç",
+      "creatorUnavailable": "Yeni İlanlar sayfası ilan oluşturucuyu henüz açamıyor",
+      "draftListing": "İlan taslağı oluştur",
+      "usePrice": "{price} fiyatını bir ilanda kullan",
+      "addTags": "{count} etiketi şuna ekle…",
+      "addTagsThis": "{count} etiketi bu ilana ekle",
+      "compare": "Karşılaştır",
+      "export": "Sonuçları dışa aktar",
+      "copyLink": "Linki kopyala",
+      "stageFixes": "{count} düzeltmeyi hazırla",
+      "openBulkGrid": "Toplu düzenleyicide aç"
+    },
+    "home": {
+      "rankChange": "sıra {from} → {to}",
+      "rankLost": "sıra {from} → ilk 500'de değil",
+      "rankFound": "şimdi {to}. sırada",
+      "needsWork": "Geliştirilmesi gereken ilanlarınız",
+      "needsWorkMore": "50 puanın altında {count} ilan · İlan doktorunu aç",
+      "needsWorkConnect": "Hangi ilanların geliştirilmesi gerektiğini görmek için Etsy'yi bağlayın",
+      "needsWorkFailed": "İlanlarınız yüklenemedi",
+      "openDoctor": "İlan doktorunu aç",
+      "issues": "{count} sorun",
+      "viewsNoSales": "{views} görüntülenme, 0 satış (30 gün)",
+      "fix": "Düzelt",
+      "seasons": "Yaklaşan sezonlar (Türkiye'den gönderim)",
+      "seasonsEmpty": "Önümüzdeki aylarda sezon yok",
+      "seasonsFailed": "Yaklaşan sezonlar yüklenemedi",
+      "listBy": "{date} tarihine kadar listeleyin · {days} gün kaldı",
+      "listByPassed": "Listeleme tarihi geçti · etkinlik {date}",
+      "lastShip": "İstanbul'dan son {carrier} gönderimi {date}",
+      "productionDays": "Üretim süreniz: {days} gün · Düzenle",
+      "productionDaysLabel": "Üretim süresi",
+      "productionDaysHelp": "Bir siparişi hazırlayıp paketlemek için gereken gün sayısı",
+      "daysUnit": "gün",
+      "recent": "Son aramalar ve takip edilenler"
+    },
+    "season": {
+      "christmas": "Noel",
+      "valentines": "Sevgililer Günü",
+      "mothersDayUs": "Anneler Günü (ABD)",
+      "mothersDayUk": "Anneler Günü (Birleşik Krallık)",
+      "mothersDayDe": "Anneler Günü (Almanya)",
+      "fathersDay": "Babalar Günü",
+      "halloween": "Cadılar Bayramı",
+      "blackFriday": "Black Friday",
+      "diwali": "Diwali",
+      "ramadan": "Ramazan",
+      "eidAlAdha": "Kurban Bayramı",
+      "backToSchool": "Okula dönüş",
+      "graduation": "Mezuniyet"
+    },
+    "picker": {
+      "priceLocked": "Fiyat burada değiştirilemez: ilanda düzenleyin",
+      "currencyMismatch": "{listed} ile listelenmiş: araştırma fiyatları {research} cinsinden",
+      "syncing": "Şu anda gönderiliyor: bir dakika sonra tekrar deneyin",
+      "conflict": "Çakışma var: önce İlanlar sayfasında çözün",
+      "queuedDelete": "Silinmek üzere sırada",
+      "stagedTags": "Gönderilmemiş etiket değişiklikleri var: ilanda düzenleyin",
+      "label": "{marketplace} ilanınız",
+      "placeholder": "İlanlarınızda arayın",
+      "none": "Eşleşen ilan yok",
+      "note": "Değişiklik taslak olarak hazırlanır. Yalnızca İlanlar sayfasından gönderdiğinizde yayına girer.",
+      "ctaPrice": "Fiyatı hazırla",
+      "pickFirst": "Önce bir ilan seçin",
+      "variations": "Varyasyonlu ilan: fiyatları düzenleyicide değiştirin"
+    },
+    "compare": {
+      "budgetColumn": "Yüklenmedi: Etsy'nin günlük sınırına yaklaşıldı",
+      "title": "Aramaları karşılaştır",
+      "addTitle": "Karşılaştırmak için arama ekle",
+      "inputLabel": "Fikir veya anahtar kelime",
+      "placeholder": "ör. personalized memory box",
+      "add": "Ekle",
+      "max": "En fazla {max} aramayı karşılaştırın",
+      "needQuery": "Önce bir arama yapın",
+      "remove": "\"{q}\" kaldır",
+      "col": {
+        "metric": "Ölçüt"
+      },
+      "row": {
+        "evidence": "Kanıt",
+        "median": "Medyan fiyat",
+        "band": "Tipik aralık (p25–p75)",
+        "sample": "Kullanılan ilan",
+        "competition": "Rakip ilan",
+        "top5": "İlk 5 mağazanın payı",
+        "demand": "Talep sinyali",
+        "newcomers": "Yeni gelenler"
+      }
+    },
+    "title": "Pazar araştırması",
+    "subtitle": "Ne satacağınızı, fiyatını ve alıcıların kullandığı kelimeleri bulun",
+    "tabs": {
+      "home": "Başlangıç",
+      "products": "Ürün bulucu",
+      "keywords": "Anahtar kelime gezgini",
+      "listings": "İlan doktoru",
+      "shops": "Mağaza takibi"
+    },
+    "legacy": {
+      "title": "Yeni araştırma merkezi sizin için kapalı",
+      "open": "Araştırmayı aç"
+    },
+    "search": {
+      "placeholder": "Fikir, anahtar kelime, Etsy ilan linki, mağaza adresi veya Trendyol linki…",
+      "placeholderShort": "Fikir, anahtar kelime veya link…",
+      "placeholderProducts": "Bir ürün fikri veya anahtar kelime arayın",
+      "cta": "Araştır",
+      "loading": "Araştırılıyor…"
+    },
+    "q": {
+      "label": "Sorular",
+      "niche": "Bu niş değer mi?",
+      "price": "Hangi fiyatı koymalıyım?",
+      "tags": "Hangi etiketler?",
+      "notSelling": "İlanım neden satmıyor?",
+      "competitors": "Rakiplerim ne yapıyor?"
+    },
+    "qHint": {
+      "niche": "Bir ürün fikri yazın, ör. wooden keepsake box",
+      "price": "Fiyatlandırmak istediğiniz ürünü yazın",
+      "tags": "Bir anahtar kelime yazın veya ilan linkinizi yapıştırın",
+      "notSelling": "Bir ilan başlığı yazın veya linkini yapıştırın",
+      "competitors": "Bir rakip mağazanın linkini veya adını yapıştırın"
+    },
+    "card": {
+      "price": "Fiyat",
+      "competition": "Rekabet",
+      "demand": "Talep sinyali",
+      "newcomers": "Yeni gelenler",
+      "buyerWords": "Alıcı kelimeleri (ilk 48'in etiketleri)",
+      "pctMedian": "p25 · medyan · p75",
+      "listings": "ilan",
+      "activeListings": "aktif ilan",
+      "top5Share": "İlk 5 mağaza ilk 48'in {pct} kadarını tutuyor",
+      "seeTopShops": "En iyi mağazaları gör",
+      "demandNote": "Talep sinyali dolaylıdır: Etsy arama hacmini paylaşmaz. Gerçek hacmi Etsy Marketplace Insights'ta kontrol edin",
+      "signalWhy": "{kind} · neden?",
+      "newcomersValue": "ilk 48 mağazadan 1 yıldan kısa süre önce açılanlar",
+      "soldOnce": "En az bir kez satılan",
+      "soldOnceValue": "ilk {of} içinde (tüm zamanlar)"
+    },
+    "signal": {
+      "tier1": "Çok düşük",
+      "tier2": "Düşük",
+      "tier3": "Orta",
+      "tier4": "Yüksek",
+      "tier5": "Çok yüksek"
+    },
+    "tags": {
+      "overLimit": "{count} etiketten yalnızca {fit} tanesi sığıyor (13 etiket sınırı). Zayıf etiketler değiştirilsin mi?",
+      "replaceCta": "{count} etiketi değiştir",
+      "pickMore": "Değiştirmek için en az {count} etiket seçin"
+    },
+    "toast": {
+      "tagsAdded": "{count} etiket \"{title}\" ilanına eklendi · Henüz gönderilmedi",
+      "tagsNothingNew": "\"{title}\" bu etiketlere zaten sahip",
+      "priceStaged": "\"{title}\" için {price} hazırlandı · Henüz gönderilmedi",
+      "open": "Aç",
+      "stageFailed": "Değişiklik hazırlanamadı. Tekrar deneyin",
+      "prefillFailed": "İlan oluşturucu açılamadı. Tekrar deneyin",
+      "linkCopied": "Link kopyalandı",
+      "fixesStaged": "\"{title}\" için {count} düzeltme hazırlandı · Henüz gönderilmedi"
+    },
+    "toolbar": {
+      "country": "Ülke"
+    },
+    "sort": {
+      "label": "Sırala",
+      "relevance": "Alaka",
+      "price_asc": "En düşük fiyat",
+      "price_desc": "En yüksek fiyat",
+      "favorites": "En çok favori",
+      "newest": "En yeni"
+    },
+    "top": {
+      "title": "Öne çıkan ilanlar ({count})",
+      "col": {
+        "listing": "İlan",
+        "price": "Fiyat",
+        "favorites": "Favoriler",
+        "age": "Yaş",
+        "shop": "Mağaza"
+      },
+      "favoritesAll": "{count} (tüm zamanlar)",
+      "favoritesCard": "{count} favori (tüm zamanlar)",
+      "age": {
+        "days": "{count} g",
+        "months": "{count} ay",
+        "years": "{count} y"
+      },
+      "openOn": "{marketplace}'de aç",
+      "startFrom": "Başlangıç noktası olarak kullan",
+      "tags": "Etiketler ({count})",
+      "shop": "Mağaza",
+      "shopName": "Ad",
+      "shopSales": "Satışlar (tüm zamanlar)",
+      "shopReviews": "Değerlendirmeler",
+      "shopReviewsValue": "★ {rating} ({count})",
+      "shopActive": "Aktif ilanlar",
+      "shopSince": "Açılış",
+      "shopFailed": "Mağaza yüklenemedi"
+    },
+    "source": {
+      "searchApiOrder": "{marketplace} araması (API sırası, kişiselleştirilmemiş)"
+    },
+    "kw": {
+      "notInTop500": "İlk 500'de değil"
     }
   },
   "ds": {
@@ -11228,14 +11672,173 @@
       "fillDetails": "Ayrıntıları doldur",
       "addMaterials": "Malzeme ekle",
       "setUpShipping": "Kargoyu ayarla",
-      "checkPrice": "Fiyatı kontrol et"
+      "checkPrice": "Fiyatı kontrol et",
+      "setCondition": "Durumu ayarla",
+      "pickCategory": "Kategori seç",
+      "setPolicies": "Politikaları ayarla",
+      "setPackage": "Paketi ayarla",
+      "editPrice": "Fiyatı düzenle",
+      "addStock": "Stok ekle",
+      "seeRejectReasons": "Nedenleri gör",
+      "editTitle": "Başlığı düzenle",
+      "editDescription": "Açıklamayı düzenle",
+      "addToCollection": "Koleksiyona ekle",
+      "writeSeoTitle": "SEO başlığı yaz",
+      "writeSeoDescription": "SEO açıklaması yaz",
+      "addTags": "Etiket ekle"
     },
     "na": {
       "noData": "Bu kontrol için henüz veri yok",
       "noPhotos": "Henüz fotoğraf yok",
       "noTags": "Henüz etiket yok",
       "noTaxonomy": "Ayrıntıları kontrol etmek için bir kategori seçin",
-      "noResearch": "Araştırma verisi yok"
+      "noResearch": "Araştırma verisi yok",
+      "noAspects": "Başlığı kontrol etmek için marka veya tür ekleyin",
+      "noBrand": "Marka belirtilmemiş",
+      "noCategory": "Kategori belirtilmemiş"
+    },
+    "ebay": {
+      "photosCount": {
+        "pass": "Yeterli fotoğraf var",
+        "low": "Yalnızca {count} fotoğraf: {missing} tane daha ekleyin"
+      },
+      "titleLength": {
+        "ok": "Başlık uzunluğu iyi",
+        "short": "Başlık {length} / {max} karakter: en az {min} hedefleyin",
+        "long": "Başlık {max} karakteri aşıyor ({length})"
+      },
+      "titleKeywords": {
+        "pass": "Başlıkta marka ve tür var",
+        "missing": "Başlıkta eksik: {words}"
+      },
+      "aspectsRequired": {
+        "pass": "Tüm zorunlu ürün özellikleri dolu",
+        "missing": "{count} zorunlu ürün özelliği eksik"
+      },
+      "aspectsRecommended": {
+        "pass": "Önerilen ürün özellikleri dolu",
+        "low": "Önerilen ürün özelliklerinden {filled} / {total} dolu"
+      },
+      "condition": {
+        "pass": "Ürün durumu belirtilmiş",
+        "missing": "Ürün durumu belirtilmemiş",
+        "noNote": "İkinci el ürün için durum notu yok"
+      },
+      "description": {
+        "pass": "Açıklama ayrıntılı",
+        "short": "Açıklama {words} kelime: en az {min} hedefleyin"
+      },
+      "category": {
+        "pass": "Kategori seçilmiş",
+        "missing": "Kategori yok",
+        "notLeaf": "Daha belirli bir kategori seçin"
+      },
+      "policies": {
+        "pass": "Kargo, ödeme ve iade politikaları ayarlı",
+        "missing": "{count} iş politikası eksik"
+      },
+      "package": {
+        "pass": "Paket ağırlığı ve ölçüleri ayarlı",
+        "noWeight": "Paket ağırlığı eksik",
+        "noDimensions": "Paket ölçüleri eksik"
+      },
+      "priceMarket": {
+        "pass": "Fiyat piyasa aralığının içinde",
+        "outside": "Fiyat piyasa aralığının dışında"
+      }
+    },
+    "trendyol": {
+      "titleLength": {
+        "ok": "Başlık uzunluğu iyi",
+        "short": "Başlık {length} karakter: {min}–{max} arası hedefleyin",
+        "long": "Başlık {max} karakteri aşıyor ({length})"
+      },
+      "titleBrand": {
+        "pass": "Başlıkta marka var",
+        "missing": "Başlıkta {brand} markası geçmiyor"
+      },
+      "titleCategory": {
+        "pass": "Başlıkta kategori var",
+        "missing": "Başlıkta {category} kategorisi geçmiyor"
+      },
+      "photosCount": {
+        "pass": "Yeterli fotoğraf var",
+        "low": "Yalnızca {count} fotoğraf: {missing} tane daha ekleyin"
+      },
+      "description": {
+        "pass": "Açıklama ayrıntılı",
+        "short": "Açıklama {length} karakter: en az {min} hedefleyin"
+      },
+      "attributes": {
+        "pass": "Yeterli özellik dolu",
+        "low": "{count} özellik dolu: en az {min} hedefleyin"
+      },
+      "priceSanity": {
+        "pass": "Fiyatta indirim görünüyor",
+        "noDiscount": "İndirim yok: liste fiyatı satış fiyatına eşit",
+        "invalid": "Fiyat hatalı görünüyor: liste ve satış fiyatını kontrol edin"
+      },
+      "stock": {
+        "pass": "Stokta var",
+        "out": "Stokta yok"
+      },
+      "approval": {
+        "pass": "Trendyol tarafından onaylandı",
+        "pending": "Trendyol onayı bekleniyor",
+        "rejected": "Trendyol tarafından reddedildi veya engellendi"
+      },
+      "dimWeight": {
+        "pass": "Desi ayarlı",
+        "missing": "Desi eksik"
+      }
+    },
+    "wix": {
+      "photosCount": {
+        "pass": "Yeterli fotoğraf var",
+        "low": "Yalnızca {count} fotoğraf: {missing} tane daha ekleyin"
+      },
+      "titleLength": {
+        "ok": "Başlık uzunluğu iyi",
+        "short": "Başlık {length} karakter: en az {min} hedefleyin",
+        "long": "Başlık {max} karakteri aşıyor ({length})"
+      },
+      "description": {
+        "pass": "Açıklama ayrıntılı",
+        "short": "Açıklama {length} karakter: en az {min} hedefleyin"
+      },
+      "collections": {
+        "pass": "Bir koleksiyonda",
+        "none": "Hiçbir koleksiyonda değil"
+      }
+    },
+    "shopify": {
+      "titleLength": {
+        "ok": "Başlık uzunluğu iyi",
+        "short": "Başlık {length} karakter: en az {min} hedefleyin",
+        "long": "Başlık {max} karakteri aşıyor ({length})"
+      },
+      "description": {
+        "pass": "Açıklama ayrıntılı",
+        "short": "Açıklama {length} karakter: en az {min} hedefleyin"
+      },
+      "photosCount": {
+        "pass": "Yeterli fotoğraf var",
+        "low": "Yalnızca {count} fotoğraf: {missing} tane daha ekleyin"
+      },
+      "seoTitle": {
+        "pass": "SEO başlığı ayarlı",
+        "missing": "SEO başlığı yok",
+        "long": "SEO başlığı {max} karakteri aşıyor ({length})"
+      },
+      "seoDescription": {
+        "pass": "SEO açıklaması ayarlı",
+        "missing": "SEO açıklaması yok",
+        "length": "SEO açıklaması {length} karakter: {min}–{max} arası hedefleyin"
+      },
+      "tagsCount": {
+        "pass": "Yeterli etiket var",
+        "low": "{count} etiket: en az {min} hedefleyin"
+      }
     }
   },
   "shell": {
@@ -11974,6 +12577,482 @@
     "palette": {
       "manage": "Aboneliği yönet",
       "invoices": "Faturaları gör"
+    }
+  },
+  "listings": {
+    "cell": {
+      "stockManaged": "Stok, stok senkronizasyonu tarafından yönetiliyor",
+      "willArchive": "Gönderildiğinde arşivlenecek",
+      "removalQueued": "{kind, select, archive {Gönderildiğinde arşivlenecek. Düzenlemek için bu değişikliği atın} other {Gönderildiğinde silinecek. Düzenlemek için bu değişikliği atın}}",
+      "priceFrom": "en az {price}",
+      "onMarketplace": "{marketplace} üzerinde: {value}",
+      "variationsReadOnly": "Fiyatları düzenleyicide varyasyon bazında değiştirin",
+      "notTracked": "Takip edilmiyor",
+      "notScored": "Henüz puanlanmadı · puanlamak için yenileyin",
+      "willDelete": "Gönderildiğinde silinecek",
+      "inStock": "Stokta {count}",
+      "sending": "{to} gönderiliyor…",
+      "stageFailed": "Bu değişiklik kaydedilemedi",
+      "editInEditor": "Bunu düzenleyicide değiştirin",
+      "yes": "Evet",
+      "no": "Hayır"
+    },
+    "sendError": {
+      "conflict": "Taslağınızdan sonra pazaryerinde değişti. Göndermeden önce gözden geçirin.",
+      "interrupted": "Gönderim yarıda kaldı. Tekrar deneyin.",
+      "reconnect": "Bunu göndermeden önce mağazanın yeniden bağlanması gerekiyor.",
+      "rateLimited": "Pazaryeri şu an yoğun. Birkaç dakika sonra tekrar deneyin.",
+      "notFound": "Bu ilan artık pazaryerinde yok.",
+      "rejected": "Pazaryeri bir değeri kabul etmedi. Düzeltmek için ilanı açın.",
+      "generic": "Bu değişiklik gönderilemedi. Tekrar deneyin."
+    },
+    "draftError": {
+      "wixDiscounted": "Bu ürünün Wix'te indirimli fiyatı var. Fiyatını Wix'te değiştirin.",
+      "unavailable": "Bu mağaza için hazırlanan değişiklikler henüz kullanılamıyor",
+      "scheduledSendUnavailable": "Zamanlanmış gönderim henüz kullanılamıyor",
+      "invalidInput": "Bu değişiklik kaydedilemedi",
+      "storeNotFound": "Mağaza bulunamadı. Ayarlar'dan bağlantıyı kontrol edin",
+      "productNotFound": "Bu ürün henüz KolayXport'ta yok. Önce listeyi yenileyin",
+      "draftNotFound": "Bu değişiklikler artık mevcut değil",
+      "notEditable": "Bu değişiklikler şu anda düzenlenemiyor",
+      "fieldNotSupported": "\"{field}\" bu pazaryeri için burada değiştirilemez",
+      "actionNotSupported": "Bu işlem bu pazaryerinde kullanılamıyor",
+      "invalidTitle": "En fazla {max} karakterlik bir başlık girin",
+      "invalidTags": "Etiketleri kontrol edin: her etiket boş olmamalı ve virgül içermemeli",
+      "notTracked": "Bu ürünün stoğu takip edilmiyor",
+      "stockManaged": "Bu miktarı stok senkronu yönetiyor. Stok senkronundan değiştirin",
+      "deleteNotExclusive": "Bu ürünü silmeden önce diğer değişiklikleri gönderin veya atın",
+      "scheduleInvalid": "Önümüzdeki 12 ay içinde bir zaman seçin",
+      "scheduleDeleteRefused": "Silme işlemleri zamanlanamaz. Kendiniz gönderin",
+      "tooMany": "Bir seferde en fazla {max} değişiklik gönderin",
+      "internal": "Bir sorun oluştu. Tekrar deneyin",
+      "notConnected": "Değişikliklerin gönderilebilmesi için mağaza yeniden bağlanmalı",
+      "remoteMissing": "Bu ürün artık pazaryerinde yok",
+      "rateLimited": "Pazaryeri şu anda yoğun. Birkaç dakika sonra tekrar deneyin",
+      "remoteFailed": "Pazaryeri bu değişikliği kabul etmedi",
+      "conflict": "Bu ürün, düzenlemenizden sonra pazaryerinde değişti. Göndermeden önce inceleyin",
+      "batchFailed": "Trendyol bu değişikliği kabul etmedi",
+      "batchFailedReason": "Trendyol bu değişikliği kabul etmedi: {reason}",
+      "batchTimeout": "Trendyol bu değişikliği onaylamadı. Kontrol etmek için yenileyin",
+      "noLocation": "Bu ürünün Shopify'da stok konumu yok",
+      "multiLocation": "Stok birden fazla Shopify konumuna dağılmış. Shopify'da değiştirin"
+    },
+    "send": {
+      "confirmExcluded": "{count} değişiklik {to} gönderilsin mi? Sizi bekleyenler: {waiting}.",
+      "nothingSendable": "Henüz gönderilecek bir şey yok. Sizi bekleyenler: {waiting}.",
+      "nothingToSend": "Henüz gönderilecek bir şey yok.",
+      "excluded": {
+        "conflicts": "{on} değişen {count} ilan",
+        "deletes": "{count} silme işlemi",
+        "newListings": "{count} yeni ilan (düzenleyiciden gönderin)",
+        "syncing": "gönderilmekte olan {count} değişiklik"
+      },
+      "deletion": "{kind, select, archive {Arşivleme işlemini gönder…} other {Silme işlemini gönder…}}",
+      "deletionConfirm": "{kind, select, archive {\"{title}\" {on} arşivlensin mi? Onaylamak için {shop} yazın.} other {\"{title}\" {on} silinsin mi? Onaylamak için {shop} yazın.}}",
+      "deletionSent": "{kind, select, archive {Arşivleme işlemi gönderildi} other {Silme işlemi gönderildi}}",
+      "cta": "{count} değişikliği {to} gönder",
+      "loading": "{count} değişiklik gönderiliyor…",
+      "thisChange": "Bu değişikliği gönder",
+      "selected": "Seçili değişiklikleri gönder",
+      "toastResult": "{sent} değişiklik {to} gönderildi{failed, plural, =0 {} other { · # tanesi gönderilemedi}}",
+      "retryFailed": "Gönderilemeyenleri yeniden dene",
+      "failedGeneric": "Gönderilemedi. Hiçbir şey değişmedi."
+    },
+    "action": {
+      "deleteNow": "{kind, select, archive {Şimdi arşivle} other {Şimdi sil}}",
+      "removalNeedsAlone": "{kind, select, archive {Arşivlemeden önce bu ilanın diğer değişikliklerini gönderin ya da atın} other {Silmeden önce bu ilanın diğer değişikliklerini gönderin ya da atın}}",
+      "new": "Yeni ilan",
+      "bulkEdit": "Toplu düzenle",
+      "edit": "Düzenle",
+      "openQuick": "Hızlı görünümü aç",
+      "openEditor": "Düzenleyiciyi aç",
+      "viewOn": "{marketplace} sayfasında gör",
+      "duplicate": "İlanı kopyala",
+      "deactivate": "Pasife al",
+      "activate": "Yayına al",
+      "renew": "Yenile (süresini uzat)",
+      "archive": "Arşivle",
+      "showInStore": "Mağazada göster",
+      "hideInStore": "Mağazada gizle",
+      "delete": "İlanı sil…",
+      "deleteMany": "{count} ilanı sil…",
+      "deleteConfirm": "\"{title}\" silinsin mi?",
+      "deleteManyConfirm": "{count} ilan silinsin mi?",
+      "deleteStagedNote": "Bu bir değişiklik olarak kaydedilir. Silme işlemini göndermediğiniz sürece {on} hiçbir şey silinmez.",
+      "discard": "Değişiklikleri at",
+      "discardConfirm": "\"{title}\" için gönderilmemiş {count} değişiklik atılsın mı?",
+      "discarded": "Değişiklikler atıldı",
+      "reviewDiff": "Farkları incele",
+      "schedule": "Gönderimi zamanla…",
+      "archiveConfirm": "Arşivle…"
+    },
+    "bulk": {
+      "skippedRemovals": "{kind, select, archive {{count} ilan atlandı: gönderildiğinde arşivlenecekler} other {{count} ilan atlandı: gönderildiğinde silinecekler}}",
+      "skippedOpenChanges": "{kind, select, archive {{count} ilan atlandı: arşivlemeden önce diğer değişikliklerini gönderin ya da atın} other {{count} ilan atlandı: silmeden önce diğer değişikliklerini gönderin ya da atın}}",
+      "editInGrid": "Tabloda düzenle",
+      "changePrice": "Fiyatı değiştir",
+      "changeStock": "Stoğu değiştir",
+      "addTags": "Etiket ekle",
+      "improveAi": "AI ile iyileştir",
+      "exportSelected": "Seçilenleri dışa aktar",
+      "selectAllInView": "Bu görünümdeki {count} ilanın tümünü seç",
+      "discardSelected": "Seçili değişiklikleri at",
+      "discardConfirm": "{count} ilandaki gönderilmemiş değişiklikler atılsın mı?",
+      "pageOnly": "Bu sayfadaki ilanlarda çalışır. Önce \"Tümünü seç\" seçimini kaldırın."
+    },
+    "tags": {
+      "unsentSkipped": "{count} ilanda gönderilmemiş etiket düzenlemesi var: bunları düzenleyicide değiştirin",
+      "label": "Etiketler",
+      "mode": {
+        "add": "Ekle",
+        "remove": "Kaldır",
+        "replace": "Tümünü değiştir"
+      },
+      "overLimit": "{count} ilan {max} etiket sınırını aşacağı için fazla etiketler eklenmez",
+      "stage": "Etiket değişikliklerini hazırla",
+      "unknownSkipped": "{count} ilan atlandı: mevcut etiketler yüklenemedi"
+    },
+    "legacySchedule": {
+      "kept": "{count} eski zamanlanmış güncelleme buraya taşınamadı ve saklandı",
+      "banner": "Eski araçtan kalan {count} zamanlanmış güncellemeniz var.",
+      "review": "İncele",
+      "confirm": "{count} zamanlanmış güncelleme taslaklarınıza taşınsın mı?",
+      "bodyScheduled": "Her biri kendi saatine zamanlanmış hazır bir değişiklik olur. Şimdi hiçbir şey gönderilmez.",
+      "bodyStaged": "Her biri sizin göndereceğiniz hazır bir değişiklik olur. Şimdi hiçbir şey gönderilmez.",
+      "cta": "{count} güncellemeyi taşı"
+    },
+    "title": "{marketplace, select, etsy {Etsy ilanları} ebay {eBay ilanları} trendyol {Trendyol ürünleri} wix {Wix ürünleri} shopify {Shopify ürünleri} other {İlanlar}}",
+    "mp": {
+      "to": "{marketplace, select, etsy {Etsy'ye} ebay {eBay'e} trendyol {Trendyol'a} wix {Wix'e} shopify {Shopify'a} other {mağazaya}}",
+      "from": "{marketplace, select, etsy {Etsy'den} ebay {eBay'den} trendyol {Trendyol'dan} wix {Wix'ten} shopify {Shopify'dan} other {mağazadan}}",
+      "on": "{marketplace, select, etsy {Etsy'de} ebay {eBay'de} trendyol {Trendyol'da} wix {Wix'te} shopify {Shopify'da} other {mağazada}}"
+    },
+    "pending": {
+      "bar": "{count} değişiklik henüz gönderilmedi"
+    },
+    "banner": {
+      "failed": "{failed, plural, =0 {} other {# ilan gönderilemedi.}} {conflicts, plural, =0 {} other {# ilan taslağınızdan sonra {on} değişti.}}",
+      "showThem": "Göster",
+      "reconnect": "Yenilemek ve değişiklik göndermek için {marketplace} yeniden bağlanmalı",
+      "reconnectCta": "{marketplace} hesabını yeniden bağla",
+      "couldntCheck": "{marketplace} bağlantısı kontrol edilemedi",
+      "retry": "Yeniden dene"
+    },
+    "meta": {
+      "refreshed": "{from} {ago} yenilendi",
+      "refreshing": "{from} yenileniyor…",
+      "refreshFailed": "{from} yenilenemedi",
+      "refresh": "{from} yenile",
+      "refreshToast": "{count} ilan yenilendi"
+    },
+    "price": {
+      "mode": {
+        "set": "Şu fiyata ayarla",
+        "incPct": "% artır",
+        "decPct": "% azalt",
+        "incAmt": "Tutar kadar artır",
+        "decAmt": "Tutar kadar azalt"
+      },
+      "modeLabel": "Değişiklik",
+      "valueLabel": "Değer",
+      "round": "Yuvarla",
+      "round99": ",99",
+      "round00": ",00",
+      "roundNone": "Yuvarlama",
+      "stage": "{count} fiyat değişikliğini hazırla",
+      "preview": "{count} ilan · {from} → {to} (örnek)",
+      "previewEmpty": "{count} ilan seçili",
+      "skippedVariations": "Varyasyonlu {count} ilan atlandı: bunları tabloda değiştirin",
+      "skippedInvalid": "{count} ilan atlandı: yeni fiyat çok düşük olurdu",
+      "nothingToStage": "Hiçbir şey değişmeyecek"
+    },
+    "stock": {
+      "in": "Stokta var",
+      "out": "Stokta yok",
+      "mode": {
+        "set": "Şuna ayarla",
+        "inc": "Şu kadar artır",
+        "dec": "Şu kadar azalt"
+      },
+      "valueLabel": "Adet",
+      "stage": "{count} stok değişikliğini hazırla",
+      "skipped": "{count} ilan atlandı: adet burada değiştirilemiyor (varyasyonlu veya takip edilmiyor)"
+    },
+    "col": {
+      "listing": "İlan",
+      "price": "Fiyat",
+      "qty": "Adet",
+      "status": "Durum",
+      "changes": "Değişiklik",
+      "health": "Sağlık",
+      "updated": "Güncellendi",
+      "section": "Bölüm",
+      "condition": "Durum (kondisyon)",
+      "category": "Kategori",
+      "format": "Satış türü",
+      "brand": "Marka",
+      "listPrice": "Liste fiyatı",
+      "collection": "Koleksiyon",
+      "visible": "Mağazada görünür",
+      "variants": "Varyasyon",
+      "vendor": "Satıcı",
+      "productType": "Ürün türü",
+      "compareAt": "Karşılaştırma fiyatı",
+      "views": "Görüntülenme (tümü)",
+      "favorites": "Favori (tümü)",
+      "created": "Oluşturuldu",
+      "barcode": "Barkod",
+      "ribbon": "Şerit"
+    },
+    "field": {
+      "title": "Başlık",
+      "price": "Fiyat",
+      "quantity": "Adet",
+      "tags": "Etiketler",
+      "description": "Açıklama",
+      "images": "Fotoğraflar",
+      "variations": "Varyasyonlar",
+      "visible": "Görünürlük",
+      "status": "Durum"
+    },
+    "validate": {
+      "priceMin": "{marketplace} için en düşük fiyat {min}",
+      "priceInvalid": "0'dan büyük bir fiyat girin",
+      "qtyInvalid": "{min} ile {max} arasında tam sayı girin",
+      "titleRequired": "Bir başlık girin"
+    },
+    "search": {
+      "placeholder": "Başlık, etiket, SKU veya ID ara…"
+    },
+    "toolbar": {
+      "results": "{count} sonuç",
+      "updating": "Güncelleniyor…"
+    },
+    "filter": {
+      "status": "Durum",
+      "section": "Bölüm",
+      "health": "Sağlık",
+      "condition": "Kondisyon",
+      "category": "Kategori",
+      "collection": "Koleksiyon",
+      "productType": "Ürün türü",
+      "brand": "Marka",
+      "vendor": "Satıcı",
+      "format": "Satış türü",
+      "photos": "Fotoğraf",
+      "stock": "Stok",
+      "price": "Fiyat",
+      "hasVideo": "Videolu",
+      "personalizable": "Kişiselleştirilebilir",
+      "visible": "Mağazada görünür",
+      "approval": "Onay"
+    },
+    "approval": {
+      "approved": "Onaylandı"
+    },
+    "format": {
+      "FIXED_PRICE": "Sabit fiyat",
+      "AUCTION": "Açık artırma"
+    },
+    "condition": {
+      "NEW": "Yeni",
+      "LIKE_NEW": "Yeni gibi",
+      "NEW_OTHER": "Yeni (diğer)",
+      "NEW_WITH_DEFECTS": "Kusurlu yeni",
+      "CERTIFIED_REFURBISHED": "Sertifikalı yenilenmiş",
+      "SELLER_REFURBISHED": "Satıcı tarafından yenilenmiş",
+      "USED_EXCELLENT": "İkinci el, mükemmel",
+      "USED_VERY_GOOD": "İkinci el, çok iyi",
+      "USED_GOOD": "İkinci el, iyi",
+      "USED_ACCEPTABLE": "İkinci el, kabul edilebilir",
+      "FOR_PARTS_OR_NOT_WORKING": "Parça için veya çalışmıyor"
+    },
+    "health": {
+      "lt50": "Geliştirilmeli (50 altı)",
+      "fair": "Orta (50–74)",
+      "good": "İyi (75–89)",
+      "great": "Mükemmel (90+)",
+      "missingPhotos": "Eksik fotoğraf",
+      "missingTags": "Eksik etiket",
+      "noVideo": "Video yok",
+      "shortTitle": "Kısa başlık",
+      "tooltip": "İlan sağlığı {score} · {band} · {total} kontrolün {used} tanesiyle puanlandı",
+      "unscored": "{count} ilan henüz puanlanmadı",
+      "band": {
+        "needs_work": "Geliştirilmeli",
+        "fair": "Orta",
+        "good": "İyi",
+        "great": "Mükemmel"
+      }
+    },
+    "view": {
+      "all": "Tümü",
+      "active": "Yayında",
+      "notSent": "Gönderilmeyenler",
+      "sendFailed": "Gönderilemeyenler",
+      "needsWork": "Geliştirilmeli",
+      "soldOut": "Tükenenler",
+      "inactive": "Pasif",
+      "review": "Onay ve red",
+      "label": "Görünüm",
+      "goTo": "Görünüme git: {view}"
+    },
+    "photos": {
+      "lt5": "5'ten az",
+      "5to9": "5–9",
+      "10plus": "10 veya daha fazla"
+    },
+    "empty": {
+      "connectTitle": "İlanlarınızı görmek için {marketplace} bağlayın",
+      "firstPullTitle": "{marketplace} ilanlarınızı getirin",
+      "firstPullBody": "Düzenleyip puanlayabilmeniz için kopyalarız. {on} hiçbir şey değişmez.",
+      "noListingsTitle": "{store} mağazasında henüz ilan yok",
+      "noResults": "Bu filtrelere uyan ilan yok",
+      "clearFilters": "Filtreleri temizle",
+      "doneNotSent": "Her şey {to} gönderildi",
+      "doneFailed": "Gönderilemeyen değişiklik yok",
+      "doneNeedsWork": "Geliştirilmesi gereken ilan yok"
+    },
+    "error": {
+      "load": "{marketplace} ilanlarınız yüklenemedi",
+      "serverNoResponse": "KolayXport sunucusu yanıt vermedi",
+      "usageLimit": "Bu ayki senkron sınırına ulaştınız",
+      "seePlans": "Planları gör"
+    },
+    "panel": {
+      "priceStock": "Fiyat ve stok",
+      "notSent": "Gönderilmemiş düzenlemeler ({count})",
+      "saved": "Kaydedildi · {count} düzenleme gönderilmedi",
+      "conflict": "Taslağınız başladıktan sonra bu ilan {on} değişti.",
+      "conflictNoSend": "Göndermeden önce farkları düzenleyicide inceleyin",
+      "send": "Değişiklikleri {to} gönder",
+      "updated": "Güncellendi",
+      "changeFromTo": "{field} {from} → {to}"
+    },
+    "sched": {
+      "pickTime": "Bir tarih ve saat seçin",
+      "note": "KolayXport kapalı olsa bile o saatte göndeririz. Pazaryerinde değişen bir ilan incelemeniz için bekler.",
+      "done": "{count} değişiklik zamanlandı",
+      "title": "Gönderimi zamanla",
+      "date": "Tarih",
+      "cta": "{count} değişikliği zamanla",
+      "sendNow": "Şimdi gönder",
+      "changeTime": "Saati değiştir…",
+      "unschedule": "Zamanlamayı kaldır",
+      "none": "Zamanlanmış gönderim yok",
+      "when": "Gönderim zamanı",
+      "timezone": "Saatler {zone} saat dilimine göre",
+      "sendFailed": "Bu değişiklik gönderilemedi. Taslaklarınızda duruyor.",
+      "rescheduled": "Gönderim zamanı değiştirildi",
+      "unscheduled": "Zamanlama kaldırıldı. Değişiklik hazır bekliyor.",
+      "deleteNeedsReview": "Silme işlemleri, onayınızdan sonra ilanın ⋯ menüsünden gönderilir",
+      "pickFuture": "İleri bir zaman seçin",
+      "moreEdits": "{count} diğer düzenleme"
+    },
+    "tools": {
+      "findReplaceUnavailable": "Burada yalnızca fiyat ve stok hazırlanabiliyor, bulup değiştirilecek metin yok",
+      "menu": "Araçlar",
+      "findReplace": "Bul ve değiştir",
+      "duplicates": "Kopyaları bul",
+      "import": "CSV içe aktar",
+      "export": "CSV dışa aktar",
+      "scheduled": "Zamanlanmış gönderimler",
+      "activity": "Etkinlik",
+      "loadFailed": "Bu yüklenemedi",
+      "staged": "{count} değişiklik hazırlandı · hazır olduğunuzda gönderin",
+      "stageFailed": "{count} değişiklik kaydedilemedi. Tekrar deneyin."
+    },
+    "fr": {
+      "tagSeparator": "Etiket , | veya ; içeremez",
+      "unsentChange": "Bu alanda gönderilmemiş bir değişiklik var. Önce gönderin veya vazgeçin.",
+      "sending": "Şu anda gönderiliyor. Bitince tekrar deneyin.",
+      "field": "Alan",
+      "find": "Bul",
+      "replace": "Şununla değiştir",
+      "matchCase": "Büyük/küçük harf duyarlı",
+      "scopeView": "Geçerli görünüm ({count})",
+      "scopeSelected": "Seçilenler ({count})",
+      "andMore": "ve {count} tane daha",
+      "overLimit": "{max} karakteri aşıyor",
+      "stage": "{count} değişikliği hazırla",
+      "scope": "Uygulanacak ilanlar",
+      "noneSelected": "Önce tablodan ilan seçin",
+      "fields": {
+        "title": "Başlık",
+        "tags": "Etiketler",
+        "description": "Açıklama"
+      },
+      "noMatches": "Bu metni içeren ilan yok",
+      "summary": "{count} ilan değişecek{flagged, plural, =0 {} other { · # tanesi atlandı}}",
+      "nothingToStage": "Henüz değişecek bir şey yok",
+      "tagTooLong": "Bir etiket {max} karakteri aşar",
+      "emptyResult": "Başlık boş kalır"
+    },
+    "dup": {
+      "hideStaged": "Mağazada gizleme hazırlandı",
+      "archiveTitle": "\"{title}\" arşivlenmek üzere hazırlansın mı?",
+      "archiveBody": "Gönderip mağaza adınızı yazarak onaylayana kadar {on} hiçbir şey arşivlenmez.",
+      "archiveConfirm": "Arşivlemeyi hazırla",
+      "archiveStaged": "Arşivleme hazırlandı. İncelemeniz için bekliyor.",
+      "sameSku": "Aynı SKU {sku}",
+      "similarTitle": "Başlıklar {pct} benzer",
+      "none": "Kopya bulunamadı",
+      "summary": "{groups} olası kopya grubu",
+      "truncated": "İlk {max} grup gösteriliyor",
+      "deleteTitle": "\"{title}\" silinmek üzere hazırlansın mı?",
+      "deleteBody": "Silme işlemini gönderip mağaza adınızı yazarak onaylayana kadar {on} hiçbir şey silinmez.",
+      "deleteConfirm": "Silmeyi hazırla",
+      "deleteStaged": "Silme hazırlandı. İncelemeniz için bekliyor.",
+      "deactivateStaged": "Pasife alma hazırlandı"
+    },
+    "csv": {
+      "editableUnknown": "Fiyat ve adedin burada düzenlenip düzenlenemeyeceği kontrol edilemedi. Bu ilanı tabloda düzenleyin.",
+      "sending": "Bu ilan şu anda gönderiliyor. Bitince tekrar içe aktarın.",
+      "replacesUnsent": "Gönderilmemiş bir değişikliğin yerine geçer ({field})",
+      "drop": "CSV dosyasını bırakın veya seçin",
+      "mapping": "Sütunlarınızı eşleştirin",
+      "template": "Şablonu indir",
+      "summary": "{rows} satır · {change} ilan değişecek · {missing} bulunamadı · {invalid} geçersiz",
+      "notFound": "Bulunamadı",
+      "invalid": "Geçersiz",
+      "staging": "Hazırlanıyor {done} / {total}…",
+      "stage": "{count} değişikliği hazırla",
+      "tooLarge": "Dosya 5 MB'tan büyük",
+      "stepFile": "Dosya",
+      "limit": "CSV, en fazla 5 MB",
+      "choose": "Dosya seç",
+      "chooseAnother": "Başka dosya seç",
+      "notCsv": "Uzantısı .csv olan bir dosya seçin",
+      "empty": "Bu dosyada satır yok",
+      "unreadable": "Bu dosya okunamadı",
+      "ignore": "İçe aktarma",
+      "mapColumn": "{column} sütunu için alan",
+      "fields": {
+        "title": "Başlık",
+        "price": "Fiyat",
+        "quantity": "Adet",
+        "tags": "Etiketler",
+        "description": "Açıklama"
+      },
+      "idRequired": "Her satırın bulunabilmesi için bir sütunu {column} ile eşleştirin",
+      "preview": "Önizleme",
+      "line": "Satır",
+      "result": "Sonuç",
+      "rowStaged": "Hazırlandı",
+      "noChanges": "Bu dosya ilanlarınızda bir şey değiştirmiyor",
+      "nothingToStage": "Hazırlanacak değişiklik kalmadı",
+      "stagePartial": "{done} hazırlandı · {failed} kaydedilemedi. Yeniden denemek için tekrar hazırlayın.",
+      "duplicateRow": "Bu ilan dosyada birden fazla kez var",
+      "tagsTooMany": "{max} etiketten fazla",
+      "tagTooLong": "\"{tag}\" etiketi {max} karakteri aşıyor"
+    },
+    "export": {
+      "selectedTooMany": "Tek seferde dışa aktarmak için çok fazla ilan seçili. Geçerli görünümü veya tüm ilanları kullanın.",
+      "scopeAll": "Tüm ilanlar ({count})",
+      "includeDescription": "Açıklamayı ekle",
+      "download": "CSV indir",
+      "preparing": "CSV hazırlanıyor…",
+      "failed": "CSV indirilemedi. Tekrar deneyin."
     }
   }
 }

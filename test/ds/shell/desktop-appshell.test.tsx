@@ -218,7 +218,7 @@ describe('AppShell', () => {
     mount(<DsPage />, 'mobile', { renderMobileTopBar });
     await waitFor(() => expect(screen.getByTestId('app-main').getAttribute('data-legacy')).toBeNull());
     expect(window.getComputedStyle(screen.getByTestId('app-main')).paddingBottom).toBe('0px');
-    expect(screen.getByTestId('m-top').querySelector('[data-testid="live-sound-toggle"]')).toBeTruthy();
+    expect(screen.getByTestId('m-top').querySelector('[data-testid="mobile-sound-host"][data-size="touch"] [data-testid="live-sound-toggle"]')).toBeTruthy();
   });
 
   it('blocked account: the danger banner renders above the page', async () => {

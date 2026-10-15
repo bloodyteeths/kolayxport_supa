@@ -11,20 +11,71 @@ import { currentEtsyPriority } from '@/lib/etsy/rateBudget';
 import { withListingInventoryLock } from '@/lib/etsy/inventoryLock';
 import { isListingStockManaged } from '@/lib/stock/hooks';
 import { reconcileShopListings, syncListingsFailure } from '@/lib/etsy/listingReconcile';
+import { refreshHealth } from '@/lib/listings/refreshHealth';
 import { markKolayxportDelete } from '@/lib/etsy/listingAlerts';
-import { summarizePrices, buildFxTable, decodeEntities, groupMedian, type PriceSummary } from '@/lib/research/stats';
-import { convertCurrency } from '@/lib/finance/fx';
+import { decodeEntities, groupMedian, type PriceSummary } from '@/lib/research/stats';
+import {
+    searchEtsy,
+    priceSummaryFor,
+    toLegacySearchMarket,
+    ResearchBudgetError,
+    EtsyUpstreamError,
+    MAX_SEARCH_LIMIT,
+    type EtsySearchParams,
+    type Served,
+    type EtsySearchResult,
+} from '@/lib/research/etsySearch';
 
 /**
- * Research price summary in USD (RESEARCH_REDESIGN §6.3): FX-normalized,
- * plausibility-bounded, Tukey-trimmed median + P25–P75. Never a mean.
- * `avg` is kept only for old readers and carries the median.
+ * Legacy research price summary in USD (RESEARCH_REDESIGN §6.3), through
+ * lib/research/etsySearch `priceSummaryFor`: FX-normalized, plausibility-bounded,
+ * Tukey-trimmed median + P25–P75. Never a mean. `avg` is kept only for legacy
+ * payload-shape compatibility and carries the median; no current UI reads it
+ * (editor/creator `fetchQuickResearch` compute their own client-side mean and
+ * ignore `priceStats`). The hub's new fields (`/api/research/*`) have no `avg`.
  */
-async function researchPriceSummary(items: Array<{ price: number; currency_code?: string }>): Promise<PriceSummary & { avg: number | null; count: number }> {
-    const points = items.map((i) => ({ amount: i.price, currency: i.currency_code || 'USD' }));
-    const fx = await buildFxTable(points.map((p) => p.currency), 'USD', convertCurrency).catch(() => ({}));
-    const s = summarizePrices(points, { currency: 'USD', fx });
+async function legacyPriceStats(items: Array<{ price: number | null; currency: string }>): Promise<PriceSummary & { avg: number | null; count: number }> {
+    const s = await priceSummaryFor(items, 'USD');
     return { ...s, avg: s.median, count: s.n };
+}
+
+/** Old `search_market` / `analyze_niche` query params → hub search params (R1-B). */
+function legacySearchParams(q: NextApiRequest['query'], defaultLimit: number, fixed: Partial<EtsySearchParams> = {}): EtsySearchParams {
+    const str = (v: unknown) => (typeof v === 'string' ? v.trim() : Array.isArray(v) && typeof v[0] === 'string' ? v[0].trim() : '');
+    const numOrNull = (v: unknown) => { const s = str(v); if (!s) return null; const n = Number(s); return Number.isFinite(n) && n >= 0 ? n : null; };
+    const sortOn = str(q.sort_on);
+    const sortOrder = str(q.sort_order);
+    const parsedLimit = parseInt(str(q.limit), 10);
+    const taxonomy = parseInt(str(q.taxonomy_id), 10);
+    return {
+        q: str(q.keywords),
+        sortOn: (['score', 'price', 'created', 'updated'] as const).find((s) => s === sortOn) ?? 'score',
+        sortOrder: sortOrder === 'asc' ? 'asc' : 'desc',
+        limit: Math.max(1, Math.min(Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : defaultLimit, MAX_SEARCH_LIMIT)),
+        minPrice: numOrNull(q.min_price),
+        maxPrice: numOrNull(q.max_price),
+        taxonomyId: Number.isFinite(taxonomy) && taxonomy > 0 ? taxonomy : null,
+        ...fixed,
+    };
+}
+
+/** Additive freshness fields on legacy payloads (served from the shared research cache). */
+function servedMeta(served: Served<unknown>) {
+    return { fetchedAt: served.fetchedAt, cached: served.cached, stale: served.stale, budgetLimited: served.budgetLimited };
+}
+
+/** Maps hub search errors to the legacy `{ error }` shape with a meaningful status. Returns true when handled. */
+function sendLegacySearchError(res: NextApiResponse, err: unknown): boolean {
+    if (err instanceof ResearchBudgetError) {
+        res.status(503).json({ error: err.message, code: 'research_budget' });
+        return true;
+    }
+    if (err instanceof EtsyUpstreamError) {
+        const status = err.status === 400 || err.status === 404 || err.status === 429 ? err.status : 502;
+        res.status(status).json({ error: err.message, code: 'etsy_upstream' });
+        return true;
+    }
+    return false;
 }
 
 // Raise body size limit for image uploads (base64 encoding inflates by ~33%,
@@ -240,118 +291,40 @@ async function rateLimitedPublicCall(endpoint: string): Promise<any> {
     return callEtsyPublicAPI(endpoint);
 }
 
-// Helper: extract keywords from titles
-function extractTitleKeywords(titles: string[]): { keyword: string; count: number; pct: number }[] {
-    const STOP = new Set([
-        'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-        'of', 'with', 'by', 'from', 'is', 'it', 'as', 'be', 'are', 'was',
-        'has', 'have', 'do', 'does', 'not', 'no', 'set', '&', '-', '/', '|', '+', 'x',
-        'her', 'him', 'his', 'she', 'he', 'they', 'this', 'that', 'these', 'those',
-        'will', 'would', 'could', 'should', 'can', 'may', 'might',
-    ]);
-    const freq: Record<string, number> = {};
-    titles.forEach(t => {
-        t.toLowerCase().split(/[\s,;:!?()[\]{}""''|\/\-]+/).filter(
-            w => w.length > 1 && !STOP.has(w) && !/^\d+$/.test(w)
-        ).forEach(w => { freq[w] = (freq[w] || 0) + 1; });
-    });
-    const total = Math.max(titles.length, 1);
-    return Object.entries(freq)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 80)
-        .map(([keyword, count]) => ({ keyword, count, pct: Math.round((count / total) * 100) }));
-}
-
 async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, action: string) {
     // --- search_market: Search all Etsy listings ---
+    // R1-B: delegates to lib/research/etsySearch (shared 24 h cache across users,
+    // 85 % Etsy budget breaker, entity decoding, robust USD price summary) and maps
+    // back to the legacy JSON. Legacy fields keep their names and types; additive:
+    // `priceStats.{p25,p75,n,excluded*,quality}` and `fetchedAt/cached/stale/budgetLimited`.
     if (action === 'search_market' && req.method === 'GET') {
-        const keywords = req.query.keywords as string;
-        if (!keywords) return res.status(400).json({ error: 'keywords is required' });
+        const params = legacySearchParams(req.query, 100);
+        if (!params.q) return res.status(400).json({ error: 'keywords is required' });
 
-        const minPrice = req.query.min_price as string;
-        const maxPrice = req.query.max_price as string;
-        const sortOn = (req.query.sort_on as string) || 'score';
-        const sortOrder = (req.query.sort_order as string) || 'desc';
-        const taxonomyId = req.query.taxonomy_id as string;
-        const requestedLimit = Math.min(parseInt((req.query.limit as string) || '100'), 300);
-
-        // Paginate up to 3 pages of 100
-        const pages = Math.ceil(requestedLimit / 100);
-        const allResults: any[] = [];
-        let totalCount = 0;
-
-        for (let page = 0; page < pages; page++) {
-            const params = new URLSearchParams({
-                keywords,
-                limit: '100',
-                offset: String(page * 100),
-                sort_on: sortOn,
-                sort_order: sortOrder,
-            });
-            if (minPrice) params.set('min_price', minPrice);
-            if (maxPrice) params.set('max_price', maxPrice);
-            if (taxonomyId) params.set('taxonomy_id', taxonomyId);
-
-            const data = page === 0
-                ? await callEtsyPublicAPI(`/listings/active?${params}`)
-                : await rateLimitedPublicCall(`/listings/active?${params}`);
-
-            if (page === 0) totalCount = data.count || 0;
-            const results = data.results || [];
-            allResults.push(...results);
-
-            if (results.length < 100) break; // no more pages
+        let served: Served<EtsySearchResult>;
+        try {
+            served = await searchEtsy(params);
+        } catch (err) {
+            if (sendLegacySearchError(res, err)) return;
+            throw err;
         }
 
-        // Process items (entities decoded on read; never written back)
-        const items = allResults.map((l: any) => ({
-            listing_id: l.listing_id,
-            title: decodeEntities(l.title || ''),
-            description: decodeEntities((l.description || '').slice(0, 300)),
-            price: l.price ? l.price.amount / l.price.divisor : 0,
-            currency_code: l.price?.currency_code || 'USD',
-            views: l.views || 0,
-            num_favorers: l.num_favorers || 0,
-            tags: l.tags || [],
-            shop_id: l.shop_id,
-            taxonomy_id: l.taxonomy_id,
-            url: l.url || '',
-            quantity: l.quantity || 0,
-            image_url: l.images?.[0]?.url_170x135 || '',
-            created_timestamp: l.created_timestamp || 0,
-            state: l.state || 'active',
-        }));
-
-        // Price stats: robust, FX-normalized to USD (no arithmetic means)
-        const priceSummary = items.length > 0 ? await researchPriceSummary(items) : null;
-        const priceStats = priceSummary && priceSummary.n > 0 ? priceSummary : null;
-
-        // Aggregate tag frequency
-        const tagMap: Record<string, number> = {};
-        items.forEach((item: any) => {
-            (item.tags || []).forEach((tag: string) => {
-                const t = tag.toLowerCase().trim();
-                if (t) tagMap[t] = (tagMap[t] || 0) + 1;
-            });
-        });
-        const tagFrequency = Object.entries(tagMap)
-            .sort(([, a], [, b]) => b - a)
-            .slice(0, 100)
-            .map(([tag, count]) => ({ tag, count, pct: Math.round((count / Math.max(items.length, 1)) * 100) }));
-
-        // Extract title keywords
-        const titleKeywords = extractTitleKeywords(items.map((i: any) => i.title));
-
-        // Unique shop IDs
-        const shopIds = [...new Set(items.map((i: any) => i.shop_id).filter(Boolean))];
+        const priceStats = served.data.items.length > 0 ? await legacyPriceStats(served.data.items) : null;
+        const legacy = toLegacySearchMarket(served.data, priceStats);
 
         return res.status(200).json({
-            total: totalCount,
-            items,
-            priceStats,
-            tagFrequency,
-            titleKeywords,
-            shopIds: shopIds.slice(0, 30),
+            total: legacy.total,
+            // Old payload sent Etsy's numeric ids; keep that type for old readers.
+            items: legacy.items.map((i) => ({
+                ...i,
+                listing_id: Number(i.listing_id),
+                shop_id: i.shop_id != null ? Number(i.shop_id) : null,
+            })),
+            priceStats: priceStats && priceStats.n > 0 ? priceStats : null,
+            tagFrequency: legacy.tagFrequency,
+            titleKeywords: legacy.titleKeywords,
+            shopIds: legacy.shopIds.map((id) => Number(id)),
+            ...servedMeta(served),
         });
     }
 
@@ -505,50 +478,41 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
     }
 
     // --- analyze_niche: Enhanced demand scoring with real metrics ---
+    // R1-B: the Etsy fetch goes through lib/research/etsySearch (same shared cache
+    // entry as `search_market` with the same params, so the old research page's
+    // search + niche pair costs one set of Etsy calls). Response shape unchanged.
     if (action === 'analyze_niche' && req.method === 'GET') {
-        const keywords = req.query.keywords as string;
-        if (!keywords) return res.status(400).json({ error: 'keywords is required' });
+        const params = legacySearchParams(req.query, 200, { limit: 200, sortOrder: 'desc', taxonomyId: null });
+        if (!params.q) return res.status(400).json({ error: 'keywords is required' });
+        const keywords = params.q;
 
-        const minPrice = req.query.min_price as string;
-        const maxPrice = req.query.max_price as string;
-        const sortOn = (req.query.sort_on as string) || 'score';
-
-        // Fetch 200 results (2 pages)
-        const allResults: any[] = [];
-        let totalCount = 0;
-
-        for (let page = 0; page < 2; page++) {
-            const params = new URLSearchParams({
-                keywords, limit: '100', offset: String(page * 100),
-                sort_on: sortOn, sort_order: 'desc',
-            });
-            if (minPrice) params.set('min_price', minPrice);
-            if (maxPrice) params.set('max_price', maxPrice);
-
-            const data = page === 0
-                ? await callEtsyPublicAPI(`/listings/active?${params}`)
-                : await rateLimitedPublicCall(`/listings/active?${params}`);
-
-            if (page === 0) totalCount = data.count || 0;
-            allResults.push(...(data.results || []));
-            if ((data.results || []).length < 100) break;
+        let served: Served<EtsySearchResult>;
+        try {
+            served = await searchEtsy(params);
+        } catch (err) {
+            if (sendLegacySearchError(res, err)) return;
+            throw err;
         }
+        const totalCount = served.data.total;
 
-        const items = allResults.map((l: any) => ({
-            listing_id: l.listing_id,
-            title: decodeEntities(l.title || ''),
-            price: l.price ? l.price.amount / l.price.divisor : 0,
-            currency_code: l.price?.currency_code || 'USD',
-            views: l.views || 0,
-            num_favorers: l.num_favorers || 0,
-            tags: l.tags || [],
-            shop_id: l.shop_id,
-            quantity: l.quantity || 0,
-            created_timestamp: l.created_timestamp || 0,
+        const items = served.data.items.map((i) => ({
+            listing_id: Number(i.listingId),
+            title: i.title,
+            price: i.price ?? 0,
+            currency_code: i.currency,
+            views: i.views,
+            num_favorers: i.favorites,
+            tags: i.tags,
+            shop_id: i.shopId != null ? Number(i.shopId) : null,
+            quantity: i.quantity,
+            created_timestamp: i.renewedAt ?? 0,
+            // Internal only: listing age comes from the original creation time, never
+            // `created_timestamp`, which Etsy resets on every renewal (RESEARCH_REDESIGN §6).
+            ageFrom: i.originalCreatedAt ?? i.renewedAt ?? 0,
         }));
 
         // Robust USD price summary (R0): FX-normalized, trimmed, median + P25–P75.
-        const priceSummary = await researchPriceSummary(items);
+        const priceSummary = await legacyPriceStats(served.data.items);
         const medianPrice = priceSummary.median ?? 0;
 
         // Unique shops
@@ -563,7 +527,7 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
         // Sales velocity estimation per listing
         const now = Math.floor(Date.now() / 1000);
         const velocities = items.map((i: any) => {
-            const ageMonths = Math.max(1, (now - (i.created_timestamp || now)) / (30 * 24 * 3600));
+            const ageMonths = Math.max(1, (now - (i.ageFrom || now)) / (30 * 24 * 3600));
             const estMonthlySales = (i.num_favorers / ageMonths) * 0.03; // ~3% conversion from favorites
             return { listing_id: i.listing_id, estMonthlySales: Math.round(estMonthlySales * 10) / 10, ageMonths: Math.round(ageMonths) };
         });
@@ -620,6 +584,7 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
                 avgViews: Math.round(avgViews),
                 avgEngagementRate: Math.round(avgEngagement * 10000) / 100,
             },
+            ...servedMeta(served),
         });
     }
 
@@ -3655,6 +3620,20 @@ Return JSON in Turkish (but keep all keywords/tags/titles in English):
                     removed: result.removed,
                     lastSyncAt: result.lastSyncAt,
                 });
+            }
+            // Listing health (listings-grid §9.3) is recomputed from the cache after
+            // every pull that read data. `hasVariations` and the offering SKUs are
+            // already written by the reconcile (includes=Images,Inventory). Scoring
+            // never fails the pull: the rows are in the DB either way.
+            try {
+                const healthResult = await refreshHealth('etsy', { storeId: shopId, userId });
+                if (healthResult.error || healthResult.skipped === 'bad_scope') {
+                  logger.warn('sync_listings: health refresh failed', { shopId, error: healthResult.error ?? null, skipped: healthResult.skipped });
+                } else if (healthResult.skipped) {
+                  logger.debug('sync_listings: health refresh skipped', { shopId, skipped: healthResult.skipped });
+                }
+            } catch (err: any) {
+                logger.warn('sync_listings: health refresh failed', { shopId, error: String(err?.message || err).substring(0, 300) });
             }
             return res.status(200).json({
                 success: result.success,

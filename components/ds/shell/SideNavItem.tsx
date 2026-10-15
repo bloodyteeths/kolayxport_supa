@@ -5,7 +5,9 @@
 // Rail: a 40 × 40 hit area centred in the 64 px column, 20 px icon or LogoTile, the count becomes a 6 px
 // dot, and a Tooltip carries the label, the count/dot sentence and the `g` shortcut.
 // Active: neutral-0 background, neutral-900 text/icon, e1 shadow + 1 px neutral-200 border; `aria-current`.
-// A dot is never the only signal: the aria-label carries the sentence (shell-nav §3.1, §13).
+// A dot is never the only signal: the aria-label carries the sentence (shell-nav §3.1, §13), and in the
+// expanded sidebar the dot itself has a 16 px hover target with a quick Tooltip naming the reason
+// ("7 changes not sent yet" / "Etsy needs reconnecting", from the nav model's `dotLabel`).
 import * as React from 'react';
 import NextLink from 'next/link';
 import Box from '@mui/material/Box';
@@ -56,6 +58,25 @@ function Dot({ color, testId }: { color: string; testId?: string }) {
   );
 }
 
+/** Hover delay for the dot's own tooltip: the dot is small, so the reason shows almost at once. */
+export const DOT_TOOLTIP_DELAY = 100;
+
+/** Expanded-row dot with a 16 × 16 hover target whose Tooltip names the reason (`dotLabel`). */
+function ExplainedDot({ color, title, testId }: { color: string; title: string; testId: string }) {
+  return (
+    <Tooltip title={title} placement="right" enterDelay={DOT_TOOLTIP_DELAY}>
+      <Box
+        component="span"
+        data-testid={`${testId}-hint`}
+        data-reason={title}
+        sx={{ ml: 'auto', width: 16, height: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'help' }}
+      >
+        <Dot color={color} testId={testId} />
+      </Box>
+    </Tooltip>
+  );
+}
+
 export function SideNavItem({ item, rail, onNavigate }: SideNavItemProps) {
   const detail = itemDetail(item);
   const ariaLabel = detail ? `${item.ariaLabel}, ${detail}` : item.ariaLabel;
@@ -70,7 +91,11 @@ export function SideNavItem({ item, rail, onNavigate }: SideNavItemProps) {
 
   // Dot wins over the count (shell-nav §3.1: "When a row has both, the warning dot wins").
   const badge = item.dot ? (
-    <Dot color={DOT_COLOR[item.dot]} testId={`nav-dot-${item.id}`} />
+    !rail && item.dotLabel ? (
+      <ExplainedDot color={DOT_COLOR[item.dot]} title={detail} testId={`nav-dot-${item.id}`} />
+    ) : (
+      <Dot color={DOT_COLOR[item.dot]} testId={`nav-dot-${item.id}`} />
+    )
   ) : item.count ? (
     rail ? (
       <Dot color={item.countTone === 'danger' ? tone.danger.solid : n[500]} testId={`nav-dot-${item.id}`} />
@@ -150,9 +175,11 @@ export function SideNavItem({ item, rail, onNavigate }: SideNavItemProps) {
     </Box>
   );
 
+  // Expanded rows whose dot carries its own Tooltip do not also wrap the row (two tooltips would stack).
+  const rowTooltip = rail || (Boolean(detail) && !(item.dot && item.dotLabel));
   const row = (
     <Box component="li" sx={{ listStyle: 'none', display: 'flex', flexDirection: 'column' }} data-nav-id={item.id}>
-      {rail || detail ? (
+      {rowTooltip ? (
         <Tooltip
           title={rail ? (detail ? `${item.ariaLabel} · ${detail}` : item.ariaLabel) : detail}
           shortcut={rail ? itemShortcut(item) : undefined}

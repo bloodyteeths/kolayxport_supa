@@ -3,6 +3,7 @@ import { getAuthUser } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { createWixClient } from '@/lib/integrations/wixClient';
 import { logger } from '@/lib/logger';
+import { refreshHealth } from '@/lib/listings/refreshHealth';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '4mb' } },
@@ -116,6 +117,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
         offset += limit;
         if (offset >= totalResults || products.length === 0) break;
+      }
+
+      // Listing health (listings-grid §9.3); store key = WixProduct.wixSiteId
+      // (WixSite.id). Never fails the pull.
+      try {
+        const healthResult = await refreshHealth('wix', { storeId: wixSiteDbId, userId });
+        if (healthResult.error || healthResult.skipped === 'bad_scope') {
+          logger.warn('[WIX PRODUCTS] Sync health refresh failed', { error: healthResult.error ?? null, skipped: healthResult.skipped });
+        } else if (healthResult.skipped) {
+          logger.debug('[WIX PRODUCTS] Sync health refresh skipped', { skipped: healthResult.skipped });
+        }
+      } catch (err: any) {
+        logger.warn('[WIX PRODUCTS] Sync health refresh failed', { error: String(err?.message || err).substring(0, 300) });
       }
 
       return res.status(200).json({ success: true, synced });

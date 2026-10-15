@@ -252,7 +252,7 @@ describe('g-shortcuts and palette destinations', () => {
       h: '/app/analytics',
       o: '/app/labels',
       m: '/app/mesajlar',
-      r: '/app/etsy-research',
+      r: '/app/research',
       f: '/app/financials',
       s: '/ayarlar',
       l: '/app/etsy-listings',

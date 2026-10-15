@@ -56,3 +56,25 @@ Exit codes:
 - 4 — build "succeeded" but `BUILD_ID` missing (backup restored)
 - 5 — `restart` mode requested but `.next/BUILD_ID` missing
 - 6 — health check failed (backup restored if available)
+
+## Cron: scheduled draft sends (`send-scheduled-drafts`, every 5 min)
+
+Sends staged listing drafts whose `scheduledSendAt` is due (Etsy, eBay,
+Trendyol, Wix, Shopify) and resolves pending Trendyol batches. It never forces
+a conflict and never sends a draft with a queued delete. Code:
+`lib/drafts/scheduledSend.ts`, route `pages/api/cron/send-scheduled-drafts.ts`.
+
+Primary trigger: the in-process scheduler job `scheduledSendJob` once it is
+registered in `lib/scheduler/jobs.ts` (backend request BR-8). HTTP fallback,
+next to the other cron jobs in the `deploy` user's crontab on the VPS
+(`CRON_SECRET` read from the app's `.env`, never typed on the command line):
+
+```cron
+*/5 * * * * cd /home/deploy/kolayxport && curl -fsS --max-time 290 -X POST -H "Authorization: Bearer $(grep -E '^CRON_SECRET=' .env | cut -d= -f2- | tr -d '"')" https://kolayxport.com/api/cron/send-scheduled-drafts >/dev/null 2>&1
+```
+
+Duplicate triggers in the same 5-minute bucket are skipped by `CronLock`, and
+each draft is claimed by clearing its `scheduledSendAt`, so the scheduler job
+and the crontab line can both run. Until migration BR-1a (`scheduledSendAt`,
+`CatalogDraft`) is deployed the run is a no-op (`supported: false` in the
+response).

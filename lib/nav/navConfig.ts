@@ -21,8 +21,8 @@
 import type { IconKey } from '@/lib/ds/icons';
 import type { MarketplaceKey } from '@/components/ds/data/types';
 
-/** Research hub landing. R1 PR flips this to '/app/research' (shell-nav §2.1 notes). */
-export const RESEARCH_HOME = '/app/etsy-research';
+/** Research hub landing (flipped by the R1 PR, shell-nav §2.1). With the `research` flag off, /app/research forwards to the legacy page (ResearchRouteGate). */
+export const RESEARCH_HOME = '/app/research';
 
 /** Reports hub landing. `null` = no Reports row (founder: analytics is Home). M9 sets '/app/reports'. */
 export const REPORTS_HOME: string | null = null;

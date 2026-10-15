@@ -12,6 +12,7 @@ import { callEbayRateLimited } from '../../../lib/integrations/ebayRateLimiter';
 import { sanitizeInventoryItemPayload } from '../../../lib/ebay/payloadRules';
 import { summarizePrices, buildFxTable, decodeEntities, type PriceSummary } from '../../../lib/research/stats';
 import { convertCurrency } from '../../../lib/finance/fx';
+import { refreshHealth } from '@/lib/listings/refreshHealth';
 
 /**
  * R0 honesty patch: robust price summary for Browse API results in their
@@ -2634,6 +2635,20 @@ export default async function handler(
         } catch { /* ok */ }
       } else {
         logger.warn('sync_listings: inventory phase incomplete, skipping stale cleanup', { userId });
+      }
+
+      // Listing health (listings-grid §9.3) from the cache rows written above.
+      // eBay has one account per user, so the store key is the user id.
+      // Scoring never fails the pull.
+      try {
+        const healthResult = await refreshHealth('ebay', { storeId: userId, userId });
+        if (healthResult.error || healthResult.skipped === 'bad_scope') {
+          logger.warn('sync_listings: health refresh failed', { userId, error: healthResult.error ?? null, skipped: healthResult.skipped });
+        } else if (healthResult.skipped) {
+          logger.debug('sync_listings: health refresh skipped', { userId, skipped: healthResult.skipped });
+        }
+      } catch (err: any) {
+        logger.warn('sync_listings: health refresh failed', { userId, error: String(err?.message || err).substring(0, 300) });
       }
 
       return res.status(200).json({

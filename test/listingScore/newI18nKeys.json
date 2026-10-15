@@ -1,0 +1,128 @@
+{
+  "en": {
+    "listingScore": {
+      "ebay": {
+        "photosCount": { "pass": "Enough photos", "low": "Only {count, plural, one {# photo} other {# photos}}: add {missing} more" },
+        "titleLength": { "ok": "Title length is good", "short": "Title {length} / {max} characters: aim for {min} or more", "long": "Title is over {max} characters ({length})" },
+        "titleKeywords": { "pass": "Title includes brand and type", "missing": "Title is missing: {words}" },
+        "aspectsRequired": { "pass": "All required item specifics filled", "missing": "{count, plural, one {# required item specific missing} other {# required item specifics missing}}" },
+        "aspectsRecommended": { "pass": "Recommended item specifics filled", "low": "{filled} / {total} recommended item specifics filled" },
+        "condition": { "pass": "Condition is set", "missing": "No condition set", "noNote": "Used item without a condition note" },
+        "description": { "pass": "Description is detailed", "short": "Description has {words} words: aim for {min} or more" },
+        "category": { "pass": "Category is set", "missing": "No category", "notLeaf": "Pick a more specific category" },
+        "policies": { "pass": "Shipping, payment and return policies set", "missing": "{count, plural, one {# business policy missing} other {# business policies missing}}" },
+        "package": { "pass": "Package weight and size set", "noWeight": "Package weight missing", "noDimensions": "Package dimensions missing" },
+        "priceMarket": { "pass": "Price is inside the market range", "outside": "Price is outside the market range" }
+      },
+      "trendyol": {
+        "titleLength": { "ok": "Title length is good", "short": "Title {length} characters: aim for {min} to {max}", "long": "Title is over {max} characters ({length})" },
+        "titleBrand": { "pass": "Title includes the brand", "missing": "Title doesn't include the brand {brand}" },
+        "titleCategory": { "pass": "Title includes the category", "missing": "Title doesn't mention the category {category}" },
+        "photosCount": { "pass": "Enough photos", "low": "Only {count, plural, one {# photo} other {# photos}}: add {missing} more" },
+        "description": { "pass": "Description is detailed", "short": "Description has {length} characters: aim for {min} or more" },
+        "attributes": { "pass": "Enough attributes filled", "low": "{count, plural, one {# attribute} other {# attributes}} filled: aim for {min} or more" },
+        "priceSanity": { "pass": "Discount is shown on the price", "noDiscount": "No discount: list price equals sale price", "invalid": "Price looks wrong: check list and sale price" },
+        "stock": { "pass": "In stock", "out": "Out of stock" },
+        "approval": { "pass": "Approved by Trendyol", "pending": "Waiting for Trendyol approval", "rejected": "Rejected or blocked by Trendyol" },
+        "dimWeight": { "pass": "Dimensional weight set", "missing": "Dimensional weight missing" }
+      },
+      "wix": {
+        "photosCount": { "pass": "Enough photos", "low": "Only {count, plural, one {# photo} other {# photos}}: add {missing} more" },
+        "titleLength": { "ok": "Title length is good", "short": "Title {length} characters: aim for {min} or more", "long": "Title is over {max} characters ({length})" },
+        "description": { "pass": "Description is detailed", "short": "Description has {length} characters: aim for {min} or more" },
+        "collections": { "pass": "In a collection", "none": "Not in any collection" }
+      },
+      "shopify": {
+        "titleLength": { "ok": "Title length is good", "short": "Title {length} characters: aim for {min} or more", "long": "Title is over {max} characters ({length})" },
+        "description": { "pass": "Description is detailed", "short": "Description has {length} characters: aim for {min} or more" },
+        "photosCount": { "pass": "Enough photos", "low": "Only {count, plural, one {# photo} other {# photos}}: add {missing} more" },
+        "seoTitle": { "pass": "SEO title is set", "missing": "No SEO title", "long": "SEO title is over {max} characters ({length})" },
+        "seoDescription": { "pass": "SEO description is set", "missing": "No SEO description", "length": "SEO description {length} characters: aim for {min} to {max}" },
+        "tagsCount": { "pass": "Enough tags", "low": "{count, plural, one {# tag} other {# tags}}: aim for {min} or more" }
+      },
+      "fix": {
+        "setCondition": "Set condition",
+        "pickCategory": "Pick category",
+        "setPolicies": "Set policies",
+        "setPackage": "Set package",
+        "editPrice": "Edit price",
+        "addStock": "Add stock",
+        "seeRejectReasons": "See reasons",
+        "editTitle": "Edit title",
+        "editDescription": "Edit description",
+        "addToCollection": "Add to collection",
+        "writeSeoTitle": "Write SEO title",
+        "writeSeoDescription": "Write SEO description",
+        "addTags": "Add tags"
+      },
+      "na": {
+        "noAspects": "Add brand or type to check the title",
+        "noBrand": "No brand set",
+        "noCategory": "No category set"
+      }
+    }
+  },
+  "tr": {
+    "listingScore": {
+      "ebay": {
+        "photosCount": { "pass": "Yeterli fotoğraf var", "low": "Yalnızca {count} fotoğraf: {missing} tane daha ekleyin" },
+        "titleLength": { "ok": "Başlık uzunluğu iyi", "short": "Başlık {length} / {max} karakter: en az {min} hedefleyin", "long": "Başlık {max} karakteri aşıyor ({length})" },
+        "titleKeywords": { "pass": "Başlıkta marka ve tür var", "missing": "Başlıkta eksik: {words}" },
+        "aspectsRequired": { "pass": "Tüm zorunlu ürün özellikleri dolu", "missing": "{count} zorunlu ürün özelliği eksik" },
+        "aspectsRecommended": { "pass": "Önerilen ürün özellikleri dolu", "low": "Önerilen ürün özelliklerinden {filled} / {total} dolu" },
+        "condition": { "pass": "Ürün durumu belirtilmiş", "missing": "Ürün durumu belirtilmemiş", "noNote": "İkinci el ürün için durum notu yok" },
+        "description": { "pass": "Açıklama ayrıntılı", "short": "Açıklama {words} kelime: en az {min} hedefleyin" },
+        "category": { "pass": "Kategori seçilmiş", "missing": "Kategori yok", "notLeaf": "Daha belirli bir kategori seçin" },
+        "policies": { "pass": "Kargo, ödeme ve iade politikaları ayarlı", "missing": "{count} iş politikası eksik" },
+        "package": { "pass": "Paket ağırlığı ve ölçüleri ayarlı", "noWeight": "Paket ağırlığı eksik", "noDimensions": "Paket ölçüleri eksik" },
+        "priceMarket": { "pass": "Fiyat piyasa aralığının içinde", "outside": "Fiyat piyasa aralığının dışında" }
+      },
+      "trendyol": {
+        "titleLength": { "ok": "Başlık uzunluğu iyi", "short": "Başlık {length} karakter: {min}–{max} arası hedefleyin", "long": "Başlık {max} karakteri aşıyor ({length})" },
+        "titleBrand": { "pass": "Başlıkta marka var", "missing": "Başlıkta {brand} markası geçmiyor" },
+        "titleCategory": { "pass": "Başlıkta kategori var", "missing": "Başlıkta {category} kategorisi geçmiyor" },
+        "photosCount": { "pass": "Yeterli fotoğraf var", "low": "Yalnızca {count} fotoğraf: {missing} tane daha ekleyin" },
+        "description": { "pass": "Açıklama ayrıntılı", "short": "Açıklama {length} karakter: en az {min} hedefleyin" },
+        "attributes": { "pass": "Yeterli özellik dolu", "low": "{count} özellik dolu: en az {min} hedefleyin" },
+        "priceSanity": { "pass": "Fiyatta indirim görünüyor", "noDiscount": "İndirim yok: liste fiyatı satış fiyatına eşit", "invalid": "Fiyat hatalı görünüyor: liste ve satış fiyatını kontrol edin" },
+        "stock": { "pass": "Stokta var", "out": "Stokta yok" },
+        "approval": { "pass": "Trendyol tarafından onaylandı", "pending": "Trendyol onayı bekleniyor", "rejected": "Trendyol tarafından reddedildi veya engellendi" },
+        "dimWeight": { "pass": "Desi ayarlı", "missing": "Desi eksik" }
+      },
+      "wix": {
+        "photosCount": { "pass": "Yeterli fotoğraf var", "low": "Yalnızca {count} fotoğraf: {missing} tane daha ekleyin" },
+        "titleLength": { "ok": "Başlık uzunluğu iyi", "short": "Başlık {length} karakter: en az {min} hedefleyin", "long": "Başlık {max} karakteri aşıyor ({length})" },
+        "description": { "pass": "Açıklama ayrıntılı", "short": "Açıklama {length} karakter: en az {min} hedefleyin" },
+        "collections": { "pass": "Bir koleksiyonda", "none": "Hiçbir koleksiyonda değil" }
+      },
+      "shopify": {
+        "titleLength": { "ok": "Başlık uzunluğu iyi", "short": "Başlık {length} karakter: en az {min} hedefleyin", "long": "Başlık {max} karakteri aşıyor ({length})" },
+        "description": { "pass": "Açıklama ayrıntılı", "short": "Açıklama {length} karakter: en az {min} hedefleyin" },
+        "photosCount": { "pass": "Yeterli fotoğraf var", "low": "Yalnızca {count} fotoğraf: {missing} tane daha ekleyin" },
+        "seoTitle": { "pass": "SEO başlığı ayarlı", "missing": "SEO başlığı yok", "long": "SEO başlığı {max} karakteri aşıyor ({length})" },
+        "seoDescription": { "pass": "SEO açıklaması ayarlı", "missing": "SEO açıklaması yok", "length": "SEO açıklaması {length} karakter: {min}–{max} arası hedefleyin" },
+        "tagsCount": { "pass": "Yeterli etiket var", "low": "{count} etiket: en az {min} hedefleyin" }
+      },
+      "fix": {
+        "setCondition": "Durumu ayarla",
+        "pickCategory": "Kategori seç",
+        "setPolicies": "Politikaları ayarla",
+        "setPackage": "Paketi ayarla",
+        "editPrice": "Fiyatı düzenle",
+        "addStock": "Stok ekle",
+        "seeRejectReasons": "Nedenleri gör",
+        "editTitle": "Başlığı düzenle",
+        "editDescription": "Açıklamayı düzenle",
+        "addToCollection": "Koleksiyona ekle",
+        "writeSeoTitle": "SEO başlığı yaz",
+        "writeSeoDescription": "SEO açıklaması yaz",
+        "addTags": "Etiket ekle"
+      },
+      "na": {
+        "noAspects": "Başlığı kontrol etmek için marka veya tür ekleyin",
+        "noBrand": "Marka belirtilmemiş",
+        "noCategory": "Kategori belirtilmemiş"
+      }
+    }
+  }
+}

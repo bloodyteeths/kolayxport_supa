@@ -1,0 +1,3744 @@
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import {
+  Box,
+  Button,
+  CircularProgress,
+  Collapse,
+  Tooltip,
+  TextField,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  IconButton,
+  Typography,
+  Paper,
+  Chip,
+  InputAdornment,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  LinearProgress,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  useMediaQuery,
+  useTheme,
+  Menu,
+  ListItemIcon,
+  ListItemText,
+  SwipeableDrawer,
+  Badge,
+  Checkbox,
+  Divider,
+} from '@mui/material';
+import {
+  DataGrid,
+  GridColDef,
+  GridPaginationModel,
+  GridRenderCellParams,
+  GridRowSelectionModel,
+  GridRowId,
+} from '@mui/x-data-grid';
+import {
+  Refresh as RefreshIcon,
+  Search as SearchIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  FavoriteBorder as FavoriteBorderIcon,
+  RemoveCircleOutline as RemoveCircleOutlineIcon,
+  ContentCopy as ContentCopyIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+  Visibility as VisibilityIcon,
+  Add as AddIcon,
+  MoreVert as MoreVertIcon,
+  FindReplace as FindReplaceIcon,
+  ContentPasteSearch as ContentPasteSearchIcon,
+  PriceChange as PriceChangeIcon,
+  FileDownload as FileDownloadIcon,
+  FileUpload as FileUploadIcon,
+  Inventory as InventoryIcon,
+  FilterList as FilterListIcon,
+  Close as CloseIcon,
+  Circle as CircleIcon,
+  Store as StoreIcon,
+  Sync as SyncIcon,
+  SwapHoriz as SwapHorizIcon,
+  EditNote as EditNoteIcon,
+} from '@mui/icons-material';
+import { toast } from 'react-hot-toast';
+import { useRouter } from 'next/router';
+import AppLayout from '@/components/AppLayout';
+import withAuth from '@/components/withAuth';
+import { useAuth } from '@/lib/auth-context';
+import { useTranslations } from 'next-intl';
+
+import SEOIndicator from '@/components/etsy/SEOIndicator';
+import { checkTags, checkTitle, TAG_MAX_COUNT, TITLE_MIN, TITLE_MAX } from '@/lib/etsy/seoRules';
+import ListingEditorDrawer from '@/components/etsy/ListingEditorDrawer';
+import ListingCreatorDialog, { type CopySourceData } from '@/components/etsy/ListingCreatorDialog';
+import type { MarketResearchData } from '@/components/etsy/research/shared/types';
+import { consumeListingPrefill, toMarketResearchData } from '@/components/etsy/research/shared/listingPrefill';
+import { useConnections } from '@/lib/hooks/useConnections';
+import ConnectEmptyState, { RequireConnection } from '@/components/ui/ConnectEmptyState';
+import { useConfirm } from '@/lib/hooks/useConfirm';
+import { notify } from '@/lib/notify';
+import FindReplaceDialog from '@/components/etsy/FindReplaceDialog';
+import BulkOperationsBar from '@/components/etsy/BulkOperationsBar';
+import BulkEditor from '@/components/etsy/BulkEditor';
+import SmartPricing from '@/components/etsy/SmartPricing';
+import DuplicateDetector from '@/components/etsy/DuplicateDetector';
+import BackupManager from '@/components/etsy/BackupManager';
+import { useLiveEvent } from '@/components/live/useLiveEvent';
+import CacheFreshnessChip from '@/components/etsy-history/CacheFreshnessChip';
+import { discardEtsyDraft, EtsyDraftClientError, fetchEtsyDrafts, stageEtsyDraft, syncEtsyDraft, syncEtsyDrafts } from '@/lib/etsy/draftClient';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface EtsyListingRow {
+  id: number;
+  listing_id: number;
+  title: string;
+  description: string;
+  tags: string[];
+  materials: string[];
+  price: { amount: number; divisor: number; currency_code: string } | null;
+  views: number;
+  num_favorers: number;
+  quantity: number;
+  state: string;
+  url: string;
+  taxonomy_id: number | null;
+  shop_section_id: number | null;
+  who_made: string;
+  when_made: string;
+  is_supply: boolean;
+  processing_min?: number;
+  processing_max?: number;
+  shipping_profile_id?: number;
+  return_policy_id?: number;
+  item_weight?: number;
+  item_weight_unit?: string;
+  item_length?: number;
+  item_width?: number;
+  item_height?: number;
+  item_dimensions_unit?: string;
+  is_personalizable?: boolean;
+  created_timestamp: number;
+  updated_timestamp: number;
+  thumbnail: {
+    listing_image_id: number;
+    url_75x75: string;
+    url_170x135: string;
+    url_570xN: string;
+  } | null;
+  image_count: number;
+  has_video: boolean;
+}
+
+interface ShopInfo {
+  shopId: string;
+  shopName: string;
+  isActive: boolean;
+}
+
+interface ShopSection {
+  shop_section_id: number;
+  title: string;
+}
+
+interface ShippingProfile {
+  shipping_profile_id: number;
+  title: string;
+}
+
+interface ReturnPolicy {
+  return_policy_id: number;
+  description?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function formatTimestamp(ts: number): string {
+  if (!ts) return '\u2014';
+  try {
+    const d = new Date(ts * 1000);
+    if (isNaN(d.getTime())) return '\u2014';
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear().toString().slice(-2)}`;
+  } catch {
+    return '\u2014';
+  }
+}
+
+function formatPrice(price: EtsyListingRow['price']): string {
+  if (!price) return '\u2014';
+  const value = price.amount / price.divisor;
+  const symbol =
+    price.currency_code === 'USD'
+      ? '$'
+      : price.currency_code === 'EUR'
+        ? '\u20ac'
+        : price.currency_code === 'GBP'
+          ? '\u00a3'
+          : price.currency_code === 'TRY'
+            ? '\u20ba'
+            : price.currency_code + ' ';
+  return `${symbol}${value.toFixed(2)}`;
+}
+
+const STATE_COLORS: Record<string, 'success' | 'default' | 'error' | 'warning'> = {
+  active: 'success',
+  draft: 'default',
+  inactive: 'error',
+  expired: 'warning',
+};
+
+const STATE_LABELS: Record<string, string> = {
+  active: 'Active',
+  draft: 'Draft',
+  inactive: 'Inactive',
+  expired: 'Expired',
+};
+
+// ---------------------------------------------------------------------------
+// Health Score + Letter Grade
+// ---------------------------------------------------------------------------
+
+interface HealthBreakdown {
+  tags: { score: number; color: string; label: string };
+  images: { score: number; color: string; label: string };
+  title: { score: number; color: string; label: string };
+  description: { score: number; color: string; label: string };
+  overall: number;
+  color: string;
+  grade: string;
+}
+
+function scoreToGrade(score: number): string {
+  if (score >= 95) return 'A+';
+  if (score >= 90) return 'A';
+  if (score >= 85) return 'A-';
+  if (score >= 80) return 'B+';
+  if (score >= 75) return 'B';
+  if (score >= 70) return 'B-';
+  if (score >= 65) return 'C+';
+  if (score >= 60) return 'C';
+  if (score >= 55) return 'C-';
+  if (score >= 50) return 'D+';
+  if (score >= 45) return 'D';
+  if (score >= 40) return 'D-';
+  return 'F';
+}
+
+function gradeColor(grade: string): string {
+  if (grade.startsWith('A')) return '#4caf50';
+  if (grade.startsWith('B')) return '#8bc34a';
+  if (grade.startsWith('C')) return '#ff9800';
+  if (grade.startsWith('D')) return '#ff5722';
+  return '#f44336';
+}
+
+function calculateHealth(listing: EtsyListingRow): HealthBreakdown {
+  // Tags: 0-13 → 0-25 (proportional)
+  // Only tags that follow the rules count: ≤20 chars, no title-word overlap, no near-duplicates.
+  const tagCount = listing.tags?.length || 0;
+  const tagCheck = checkTags(listing.tags || [], listing.title || '');
+  const badTags = new Set<string>([
+    ...tagCheck.tooLong,
+    ...tagCheck.overlapping.map((o) => o.tag),
+    ...tagCheck.duplicates.map(([, b]) => b),
+  ]);
+  const validTagCount = Math.max(0, Math.min(tagCount, TAG_MAX_COUNT) - badTags.size);
+  const tagsScore = Math.round(Math.min(validTagCount / TAG_MAX_COUNT, 1) * 25);
+  const tagsColor = tagsScore >= 20 ? '#4caf50' : tagsScore >= 12 ? '#ff9800' : '#f44336';
+  const tagsLabel = `${tagCount}/13`;
+
+  // Images: 0-10 → 0-25 (proportional)
+  const imgCount = listing.image_count || 0;
+  const imagesScore = Math.round(Math.min(imgCount / 10, 1) * 25);
+  const imagesColor = imagesScore >= 20 ? '#4caf50' : imagesScore >= 12 ? '#ff9800' : '#f44336';
+  const imagesLabel = `${imgCount}`;
+
+  // Title: 0-140 → 0-25 (proportional, target 140 chars)
+  const titleLen = listing.title?.length || 0;
+  const titleCheck = checkTitle(listing.title || '');
+  let titleScore = titleLen >= TITLE_MIN && titleLen <= TITLE_MAX ? 25
+    : titleLen > TITLE_MAX ? 10
+    : Math.round(Math.min(titleLen / TITLE_MIN, 1) * 20);
+  if (titleCheck.issues.some((i) => i === 'repeated_words' || i === 'keyword_stacking' || i === 'disallowed_separator' || i === 'all_caps')) {
+    titleScore = Math.max(0, titleScore - 8);
+  }
+  const titleColor = titleScore >= 20 ? '#4caf50' : titleScore >= 12 ? '#ff9800' : '#f44336';
+  const titleLabel = `${titleLen}`;
+
+  // Description: 0-500 → 0-25 (proportional, target 500 chars)
+  const descLen = listing.description?.length || 0;
+  const descScore = Math.round(Math.min(descLen / 500, 1) * 25);
+  const descColor = descScore >= 20 ? '#4caf50' : descScore >= 12 ? '#ff9800' : '#f44336';
+  const descLabel = `${descLen}`;
+
+  const overall = tagsScore + imagesScore + titleScore + descScore;
+  const color = overall >= 75 ? '#4caf50' : overall >= 50 ? '#ff9800' : '#f44336';
+  const grade = scoreToGrade(overall);
+
+  return {
+    tags: { score: tagsScore, color: tagsColor, label: tagsLabel },
+    images: { score: imagesScore, color: imagesColor, label: imagesLabel },
+    title: { score: titleScore, color: titleColor, label: titleLabel },
+    description: { score: descScore, color: descColor, label: descLabel },
+    overall,
+    color,
+    grade,
+  };
+}
+
+/** eBay descriptions are often HTML; Etsy wants plain text. */
+function htmlToPlainText(html: string): string {
+  if (!html) return '';
+  const withBreaks = html
+    .replace(/<\s*br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|h[1-6]|tr)\s*>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '• ');
+  let text = withBreaks.replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, '').replace(/<[^>]+>/g, '');
+  if (typeof window !== 'undefined' && typeof DOMParser !== 'undefined') {
+    // Decode entities (&amp; etc.) without executing anything: text nodes only.
+    try { text = new DOMParser().parseFromString(text, 'text/html').documentElement.textContent || text; } catch { /* keep raw */ }
+  }
+  return text.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/** Map a cached eBay listing (GET /api/clawd/ebay?action=cached_listings row) to the Etsy creator prefill. */
+function ebayItemToCopySource(item: any, shopCurrency: string | null): CopySourceData {
+  const priceNum = Number.parseFloat(String(item?.priceValue ?? ''));
+  const currency = typeof item?.priceCurrency === 'string' ? item.priceCurrency : '';
+  // Etsy prices in the shop currency: only carry the number over when it matches
+  // (an unknown shop currency never matches — better empty than a wrong price).
+  const priceOk = Number.isFinite(priceNum) && priceNum > 0 && Boolean(shopCurrency) && (!currency || currency === shopCurrency);
+  const qty = Number(item?.quantity);
+  const aspects = item?.aspects && typeof item.aspects === 'object' && !Array.isArray(item.aspects) ? item.aspects : {};
+  const materialKey = Object.keys(aspects).find((k) => /^materials?$/i.test(k));
+  const materialValues: unknown[] = materialKey && Array.isArray(aspects[materialKey]) ? aspects[materialKey] : [];
+  const materials = materialValues
+    .filter((m): m is string => typeof m === 'string' && m.trim().length > 0)
+    .map((m) => m.trim().slice(0, 45))
+    .slice(0, 13);
+  const imageUrls: string[] = [
+    ...(Array.isArray(item?.imageUrls) ? item.imageUrls : []),
+    ...(typeof item?.imageUrl === 'string' ? [item.imageUrl] : []),
+  ].filter((u: unknown): u is string => typeof u === 'string' && /^https:\/\//i.test(u));
+  return {
+    source: 'ebay',
+    title: typeof item?.title === 'string' ? item.title : '',
+    description: htmlToPlainText(typeof item?.description === 'string' ? item.description : ''),
+    // eBay has no tags; the creator's AI fills them from the title/description.
+    tags: [],
+    materials,
+    price: priceOk ? Number(priceNum.toFixed(2)) : undefined,
+    quantity: Number.isInteger(qty) && qty > 0 ? qty : undefined,
+    imageUrls: Array.from(new Set(imageUrls)),
+  };
+}
+
+/** Compute Etsy expiration: created + 4 months */
+function getExpiresDate(createdTs: number): string {
+  if (!createdTs) return '\u2014';
+  try {
+    const d = new Date(createdTs * 1000);
+    d.setMonth(d.getMonth() + 4);
+    if (isNaN(d.getTime())) return '\u2014';
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear().toString().slice(-2)}`;
+  } catch {
+    return '\u2014';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Staged-draft status (shared by the desktop grid and the mobile cards)
+// ---------------------------------------------------------------------------
+
+type TranslateFn = (key: string, values?: Record<string, any>) => string;
+
+/** True when a staged draft carries a queued delete: never bulk-synced from this page. */
+function draftHasQueuedDelete(draft: any): boolean {
+  const actions: any[] = Array.isArray(draft?.queuedActions) ? draft.queuedActions : [];
+  return actions.some((a) => a?.type === 'delete');
+}
+
+/** True for a staged create_listing draft (has its own pinned panel + sync button). */
+function draftIsNewListing(draft: any): boolean {
+  const actions: any[] = Array.isArray(draft?.queuedActions) ? draft.queuedActions : [];
+  return actions.some((a) => a?.type === 'create_listing');
+}
+
+/** Turn a raw Etsy sync error into a short, actionable sentence. */
+function friendlyDraftError(raw: string | null | undefined, t: TranslateFn): string {
+  if (!raw) return '';
+  if (/who_made|when_made|is_supply/i.test(raw)) return t('draftChip.errWhoMade');
+  if (/shop section not found/i.test(raw)) return t('draftChip.errSection');
+  if (/Invalid access token|not a Bearer token/i.test(raw)) return t('draftChip.errToken');
+  if (/shipping_profile/i.test(raw)) return t('draftChip.errShipping');
+  return raw.replace(/^Etsy API error:\s*\d+\s*-\s*/, '').slice(0, 280);
+}
+
+function draftChipMeta(draft: any, t: TranslateFn) {
+  const status = String(draft?.status || 'draft');
+  const isFailed = status === 'failed';
+  const isConflict = status === 'conflict';
+  const label = isFailed
+    ? t('draftChip.failed')
+    : isConflict
+      ? t('draftChip.conflict')
+      : status === 'syncing'
+        ? t('draftChip.syncing')
+        : t('draftChip.pending');
+  const tip = isFailed
+    ? t('draftChip.tipFailed', { reason: friendlyDraftError(draft?.lastSyncError, t) })
+    : isConflict
+      ? t('draftChip.tipConflict')
+      : status === 'syncing'
+        ? t('draftChip.tipSyncing')
+        : t('draftChip.tipDraft');
+  const color: 'warning' | 'error' | 'primary' = isConflict ? 'warning' : isFailed ? 'error' : 'primary';
+  return { isFailed, isConflict, label, tip, color };
+}
+
+function DraftStatusChip({ draft, onClick, sx }: { draft: any; onClick?: () => void; sx?: any }) {
+  const t = useTranslations('etsyListings');
+  const meta = draftChipMeta(draft, t as unknown as TranslateFn);
+  return (
+    <Tooltip title={<span style={{ whiteSpace: 'pre-line' }}>{meta.tip}</span>} arrow placement="top">
+      <Chip
+        size="small"
+        color={meta.color}
+        variant="outlined"
+        label={meta.label}
+        onClick={onClick ? (e) => { e.stopPropagation(); onClick(); } : undefined}
+        sx={{
+          height: 20, fontSize: 11, cursor: onClick ? 'pointer' : 'default',
+          // Tappable chips get an invisible 44px hit area (visual size unchanged).
+          ...(onClick ? { position: 'relative', overflow: 'visible', '&::after': { content: '""', position: 'absolute', top: -12, bottom: -12, left: -4, right: -4 } } : {}),
+          ...sx,
+        }}
+      />
+    </Tooltip>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mobile Card Component
+// ---------------------------------------------------------------------------
+
+function MobileEtsyListingCard({
+  listing,
+  onEdit,
+  onCopy,
+  onDelete,
+  onRenew,
+  onDeactivate,
+  selected,
+  onToggleSelect,
+  sectionName,
+  pendingDraft,
+  onListOnEbay,
+  duplicating,
+}: {
+  listing: EtsyListingRow;
+  onEdit: (listingId: number) => void;
+  onCopy: (listingId: number, row?: EtsyListingRow) => void;
+  onDelete: (listingId: number) => void;
+  onRenew: (listingId: number) => void;
+  onDeactivate: (listingId: number) => void;
+  selected?: boolean;
+  onToggleSelect?: (listingId: number) => void;
+  sectionName?: string;
+  /** Staged local draft for this listing (same data the desktop grid uses). */
+  pendingDraft?: any;
+  /** Shown only when eBay is connected. */
+  onListOnEbay?: (listingId: number) => void;
+  /** null = idle; this card's id = loading photos for its duplicate; other id = busy elsewhere. */
+  duplicating?: number | null;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const health = calculateHealth(listing);
+  const t = useTranslations('etsyListings');
+  const draftMeta = pendingDraft ? draftChipMeta(pendingDraft, t as unknown as TranslateFn) : null;
+  const draftedTitle = pendingDraft?.fieldPatch?.title;
+
+  return (
+    <Paper sx={{ mb: 1, overflow: 'hidden', borderRadius: 2, maxWidth: '100%', width: '100%', border: selected ? '2px solid' : '1px solid', borderColor: selected ? 'primary.main' : 'divider' }}>
+      {/* Always-visible header: checkbox + thumbnail + title + price row */}
+      <Box
+        sx={{
+          display: 'flex',
+          gap: 1,
+          p: 1.5,
+          cursor: 'pointer',
+          alignItems: 'center',
+          minHeight: 44,
+          overflow: 'hidden',
+          maxWidth: '100%',
+        }}
+        onClick={() => setExpanded(!expanded)}
+      >
+        {/* Checkbox for bulk select */}
+        {onToggleSelect && (
+          <Checkbox
+            checked={!!selected}
+            onChange={(e) => { e.stopPropagation(); onToggleSelect(listing.listing_id); }}
+            onClick={(e) => e.stopPropagation()}
+            size="small"
+            sx={{ p: 0.5, flexShrink: 0 }}
+          />
+        )}
+
+        {/* Thumbnail */}
+        {listing.thumbnail ? (
+          <Box
+            component="img"
+            src={listing.thumbnail.url_170x135}
+            alt=""
+            sx={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 1, flexShrink: 0 }}
+          />
+        ) : (
+          <Box
+            sx={{
+              width: 52,
+              height: 52,
+              borderRadius: 1,
+              backgroundColor: '#e0e0e0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <Typography variant="caption" color="text.disabled">N/A</Typography>
+          </Box>
+        )}
+
+        {/* Main info */}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography
+            variant="body2"
+            sx={{
+              fontWeight: 600,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              lineHeight: 1.3,
+              wordBreak: 'break-word',
+              maxWidth: '100%',
+              fontSize: '0.82rem',
+              fontStyle: draftedTitle ? 'italic' : 'normal',
+            }}
+          >
+            {draftedTitle || listing.title}
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center', mt: 0.25, flexWrap: 'wrap' }}>
+            <Typography variant="body2" fontWeight={600} fontSize="0.82rem">
+              {formatPrice(listing.price)}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {t('stockLabel')}: {listing.quantity}
+            </Typography>
+            <Chip
+              label={listing.state === 'active' ? t('stateActive') : listing.state === 'draft' ? t('stateDraft') : listing.state === 'inactive' ? t('stateInactive') : listing.state === 'expired' ? t('stateExpired') : listing.state}
+              size="small"
+              color={STATE_COLORS[listing.state] || 'default'}
+              variant="outlined"
+              sx={{ height: 24, '& .MuiChip-label': { px: 0.75 } }}
+            />
+            {/* Score badge */}
+            <Chip
+              label={health.overall}
+              size="small"
+              sx={{
+                height: 20,
+                fontSize: 10,
+                fontWeight: 700,
+                bgcolor: `${health.color}15`,
+                color: health.color,
+                border: `1px solid ${health.color}`,
+                '& .MuiChip-label': { px: 0.5 },
+              }}
+            />
+            {pendingDraft && (
+              <DraftStatusChip draft={pendingDraft} onClick={() => onEdit(listing.listing_id)} />
+            )}
+          </Box>
+        </Box>
+
+        {/* Expand icon */}
+        <IconButton size="small" sx={{ flexShrink: 0, minWidth: 40, minHeight: 40 }}>
+          {expanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+        </IconButton>
+      </Box>
+
+      {/* Expandable details */}
+      <Collapse in={expanded}>
+        <Box sx={{ px: 1.5, pb: 1.5, borderTop: '1px solid', borderColor: 'divider', overflow: 'hidden', maxWidth: '100%' }}>
+          {/* Staged draft status — tooltips don't work on touch, so spell it out */}
+          {draftMeta && (
+            <Typography
+              variant="caption"
+              sx={{ display: 'block', mt: 1.5, whiteSpace: 'pre-line', wordBreak: 'break-word', color: draftMeta.isFailed ? 'error.main' : draftMeta.isConflict ? 'warning.main' : 'text.secondary' }}
+            >
+              {draftMeta.tip}
+            </Typography>
+          )}
+          {/* Tags */}
+          {listing.tags && listing.tags.length > 0 && (
+            <Box sx={{ mt: 1.5 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                {t('tagsCount', { count: listing.tags.length })}
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {listing.tags.map((tag, i) => (
+                  <Chip key={i} label={tag} size="small" sx={{ height: 22, fontSize: 11 }} />
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {/* Stats row */}
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
+            <Box sx={{ flex: '1 1 45%' }}>
+              <Typography variant="caption" color="text.secondary">{t('viewsLabel')}</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <VisibilityIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                <Typography variant="body2">{listing.views.toLocaleString()}</Typography>
+              </Box>
+            </Box>
+            <Box sx={{ flex: '1 1 45%' }}>
+              <Typography variant="caption" color="text.secondary">{t('favoritesLabel')}</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <FavoriteBorderIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                <Typography variant="body2">{listing.num_favorers.toLocaleString()}</Typography>
+              </Box>
+            </Box>
+            <Box sx={{ flex: '1 1 45%' }}>
+              <Typography variant="caption" color="text.secondary">{t('imagesLabel')}</Typography>
+              <Typography variant="body2">{listing.has_video ? t('imagesWithVideo', { count: listing.image_count }) : t('imagesCount', { count: listing.image_count })}</Typography>
+            </Box>
+            <Box sx={{ flex: '1 1 45%' }}>
+              <Typography variant="caption" color="text.secondary">{t('lastUpdate')}</Typography>
+              <Typography variant="body2">{formatTimestamp(listing.updated_timestamp)}</Typography>
+            </Box>
+            {sectionName && (
+              <Box sx={{ flex: '1 1 45%' }}>
+                <Typography variant="caption" color="text.secondary">{t('sectionLabel')}</Typography>
+                <Typography variant="body2">{sectionName}</Typography>
+              </Box>
+            )}
+          </Box>
+
+          {/* Health breakdown chips */}
+          <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+            {([
+              { ...health.tags, label: t('tagsCount', { count: health.tags.label }) },
+              { ...health.images, label: t('imagesCount', { count: health.images.label }) },
+              { ...health.title, label: t('titleChars', { count: health.title.label }) },
+              { ...health.description, label: t('descChars', { count: health.description.label }) },
+            ]).map((item, i) => (
+              <Chip
+                key={i}
+                label={item.label}
+                size="small"
+                sx={{
+                  height: 20,
+                  fontSize: 10,
+                  bgcolor: `${item.color}15`,
+                  color: item.color,
+                  borderColor: item.color,
+                }}
+                variant="outlined"
+              />
+            ))}
+          </Box>
+
+          {/* Actions — wrap to rows of three so every button keeps a 44px target */}
+          <Box
+            sx={{
+              display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap',
+              '& > .MuiButton-root': { flex: '1 1 calc(33.33% - 8px)', minWidth: 0, minHeight: 44 },
+            }}
+          >
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={<EditIcon sx={{ fontSize: '16px !important' }} />}
+              onClick={(e) => { e.stopPropagation(); onEdit(listing.listing_id); }}
+              sx={{
+                flex: 1, minHeight: 42, borderRadius: '10px', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem',
+                background: 'linear-gradient(135deg, #3b82f6, #2563eb)', boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
+                '&:hover': { background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' },
+              }}
+            >
+              {t('edit')}
+            </Button>
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={duplicating === listing.listing_id
+                ? <CircularProgress size={14} color="inherit" />
+                : <ContentCopyIcon sx={{ fontSize: '16px !important' }} />}
+              disabled={duplicating != null}
+              onClick={(e) => { e.stopPropagation(); onCopy(listing.listing_id, listing); }}
+              sx={{
+                flex: 1, minHeight: 42, borderRadius: '10px', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem',
+                background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', boxShadow: '0 2px 8px rgba(124,58,237,0.25)',
+                '&:hover': { background: 'linear-gradient(135deg, #7c3aed, #6d28d9)' },
+              }}
+            >
+              {t('duplicate.action')}
+            </Button>
+            {onListOnEbay && (
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<SwapHorizIcon sx={{ fontSize: '16px !important' }} />}
+                onClick={(e) => { e.stopPropagation(); onListOnEbay(listing.listing_id); }}
+                sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem' }}
+              >
+                {t('crosslist.listOnEbay')}
+              </Button>
+            )}
+            {(listing.state === 'active' || listing.state === 'expired' || listing.state === 'inactive') && (
+              <Button
+                size="small"
+                variant="contained"
+                startIcon={<RefreshIcon sx={{ fontSize: '16px !important' }} />}
+                onClick={(e) => { e.stopPropagation(); onRenew(listing.listing_id); }}
+                sx={{
+                  flex: 1, minHeight: 42, borderRadius: '10px', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem',
+                  background: 'linear-gradient(135deg, #22c55e, #16a34a)', boxShadow: '0 2px 8px rgba(22,163,74,0.25)',
+                  '&:hover': { background: 'linear-gradient(135deg, #16a34a, #15803d)' },
+                }}
+              >
+                {t('renew')}
+              </Button>
+            )}
+            {listing.state === 'active' && (
+              <Button
+                size="small"
+                variant="contained"
+                startIcon={<RemoveCircleOutlineIcon sx={{ fontSize: '16px !important' }} />}
+                onClick={(e) => { e.stopPropagation(); onDeactivate(listing.listing_id); }}
+                sx={{
+                  flex: 1, minHeight: 42, borderRadius: '10px', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem',
+                  background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 2px 8px rgba(217,119,6,0.25)',
+                  '&:hover': { background: 'linear-gradient(135deg, #d97706, #b45309)' },
+                }}
+              >
+                {t('deactivate')}
+              </Button>
+            )}
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={<DeleteIcon sx={{ fontSize: '16px !important' }} />}
+              onClick={(e) => { e.stopPropagation(); onDelete(listing.listing_id); }}
+              sx={{
+                flex: 1, minHeight: 42, borderRadius: '10px', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem',
+                background: 'linear-gradient(135deg, #ef4444, #dc2626)', boxShadow: '0 2px 8px rgba(220,38,38,0.25)',
+                '&:hover': { background: 'linear-gradient(135deg, #dc2626, #b91c1c)' },
+              }}
+            >
+              {t('delete')}
+            </Button>
+          </Box>
+
+          {listing.url && (
+            <Button
+              size="small"
+              variant="text"
+              href={listing.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{ mt: 0.5, fontSize: 11 }}
+            >
+              {t('viewOnEtsy')}
+            </Button>
+          )}
+        </Box>
+      </Collapse>
+    </Paper>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Pending new listings (staged create_listing drafts not yet in the Etsy cache)
+// ---------------------------------------------------------------------------
+
+const NEW_DRAFT_STATUS_COLORS: Record<string, 'default' | 'info' | 'error' | 'warning'> = {
+  draft: 'default',
+  syncing: 'info',
+  failed: 'error',
+  conflict: 'warning',
+};
+
+/** Display fields for a staged create_listing draft (payload, overridden by later field edits). */
+function describeNewListingDraft(draft: any, currencyCode: string | null) {
+  const actions: any[] = Array.isArray(draft?.queuedActions) ? draft.queuedActions : [];
+  const createAction = actions.find((a) => a?.type === 'create_listing');
+  const values = { ...(createAction?.payload || {}), ...(draft?.fieldPatch || {}) };
+  const priceNum = Number(values.price);
+  const price = Number.isFinite(priceNum) && priceNum > 0
+    ? formatPrice({ amount: Math.round(priceNum * 100), divisor: 100, currency_code: String(values.currency_code || currencyCode || '') })
+    : '—';
+  const images = (Array.isArray(draft?.media) ? draft.media : [])
+    .filter((m: any) => m?.kind === 'image' && ['upload', 'ai_upload'].includes(m?.operation))
+    .sort((a: any, b: any) => (a.rank ?? 99) - (b.rank ?? 99));
+  const first = images[0];
+  const thumbUrl = first
+    ? (first.localPath ? `/api/etsy-drafts/media-preview?id=${encodeURIComponent(first.id)}` : (first.sourceUrl || null))
+    : null;
+  const listingId = Number(draft?.etsyListingId);
+  return {
+    title: String(values.title || ''),
+    price,
+    thumbUrl,
+    imageCount: images.length,
+    willPublish: actions.some((a) => a?.type === 'publish' && !a?.completedAt),
+    hasQueuedDelete: actions.some((a) => a?.type === 'delete'),
+    // A previous sync created the Etsy listing but failed afterwards.
+    createdListingId: listingId > 0 ? listingId : null,
+  };
+}
+
+function PendingNewListingsPanel({
+  drafts,
+  currencyCode,
+  busyDraftId,
+  onSync,
+  onDiscard,
+}: {
+  drafts: any[];
+  currencyCode: string | null;
+  busyDraftId: string | null;
+  onSync: (draft: any) => void;
+  onDiscard: (draft: any) => void;
+}) {
+  const t = useTranslations('etsyListings');
+  const tEtsy = useTranslations('etsy');
+  if (drafts.length === 0) return null;
+
+  return (
+    <Paper variant="outlined" sx={{ mb: 1.5, borderRadius: 2, borderColor: 'primary.200', overflow: 'hidden' }}>
+      <Box sx={{ px: 1.5, py: 1, bgcolor: 'primary.50', borderBottom: '1px solid', borderColor: 'divider' }}>
+        <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.main' }}>
+          {t('newDrafts.title', { count: drafts.length })}
+        </Typography>
+      </Box>
+      {drafts.map((draft, idx) => {
+        const info = describeNewListingDraft(draft, currencyCode);
+        // Only our own in-flight request disables the row. A draft left in
+        // 'syncing' (e.g. server restart mid-sync) stays retryable: the server
+        // claims it once stale, or replies 409 if a sync is really running.
+        const busy = busyDraftId === draft.id;
+        const statusKey = draft.status === 'syncing' ? 'statusSyncing'
+          : draft.status === 'failed' ? 'statusFailed'
+            : draft.status === 'conflict' ? 'statusConflict' : 'statusDraft';
+        return (
+          <Box
+            key={draft.id}
+            sx={{
+              display: 'flex', gap: 1.25, p: 1.5, alignItems: { xs: 'flex-start', sm: 'center' },
+              flexDirection: { xs: 'column', sm: 'row' },
+              borderTop: idx > 0 ? '1px solid' : 'none', borderColor: 'divider',
+            }}
+          >
+            <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'center', flex: 1, minWidth: 0, width: '100%' }}>
+              {info.thumbUrl ? (
+                <Box component="img" src={info.thumbUrl} alt="" sx={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 1, flexShrink: 0 }} />
+              ) : (
+                <Box sx={{ width: 52, height: 52, borderRadius: 1, backgroundColor: '#e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Typography variant="caption" color="text.disabled">N/A</Typography>
+                </Box>
+              )}
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography
+                  variant="body2"
+                  sx={{ fontWeight: 600, fontSize: '0.82rem', lineHeight: 1.3, wordBreak: 'break-word', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
+                >
+                  {info.title || t('newDrafts.untitled')}
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center', mt: 0.25, flexWrap: 'wrap' }}>
+                  <Typography variant="body2" fontWeight={600} fontSize="0.82rem">{info.price}</Typography>
+                  <Typography variant="caption" color="text.secondary">{t('newDrafts.photoCount', { count: info.imageCount })}</Typography>
+                  <Chip
+                    label={info.createdListingId ? t('newDrafts.partiallyCreated', { id: info.createdListingId }) : t('newDrafts.notOnEtsyYet')}
+                    size="small"
+                    variant="outlined"
+                    color="primary"
+                    sx={{ height: 20, fontSize: '0.7rem' }}
+                  />
+                  <Chip
+                    label={t(`newDrafts.${statusKey}`)}
+                    size="small"
+                    color={NEW_DRAFT_STATUS_COLORS[draft.status] || 'default'}
+                    sx={{ height: 20, fontSize: '0.7rem' }}
+                  />
+                  {info.willPublish && (
+                    <Typography variant="caption" color="success.main">{t('newDrafts.willPublish')}</Typography>
+                  )}
+                </Box>
+                {draft.lastSyncError && draft.status !== 'draft' && (
+                  <Typography variant="caption" color="error.main" sx={{ display: 'block', mt: 0.5, wordBreak: 'break-word' }}>
+                    {draft.lastSyncError}
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 1, flexShrink: 0, width: { xs: '100%', sm: 'auto' } }}>
+              <Tooltip title={info.hasQueuedDelete ? t('newDrafts.deleteQueued') : ''}>
+                <span style={{ flex: 1, display: 'flex' }}>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    onClick={() => onSync(draft)}
+                    disabled={busy || info.hasQueuedDelete || Boolean(busyDraftId)}
+                    startIcon={busy ? <CircularProgress size={14} color="inherit" /> : <SyncIcon sx={{ fontSize: '16px !important' }} />}
+                    sx={{ minHeight: 36, textTransform: 'none', fontWeight: 700, borderRadius: '8px', whiteSpace: 'nowrap', flex: 1 }}
+                  >
+                    {busy ? t('syncing') : t('newDrafts.syncToEtsy')}
+                  </Button>
+                </span>
+              </Tooltip>
+              <Button
+                size="small"
+                variant="outlined"
+                color="error"
+                onClick={() => onDiscard(draft)}
+                disabled={busy || Boolean(busyDraftId)}
+                startIcon={<DeleteIcon sx={{ fontSize: '16px !important' }} />}
+                sx={{ minHeight: 36, textTransform: 'none', borderRadius: '8px', whiteSpace: 'nowrap', flex: { xs: 1, sm: 'none' } }}
+              >
+                {tEtsy('editor.discardDraft')}
+              </Button>
+            </Box>
+          </Box>
+        );
+      })}
+    </Paper>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Left Sidebar Component (desktop only)
+// ---------------------------------------------------------------------------
+
+function LeftSidebar({
+  shops,
+  selectedShopId,
+  onSelectShop,
+  statusFilter,
+  onStatusChange,
+  statusCounts,
+  shopSections,
+  sectionCounts,
+  sectionFilter,
+  onSectionChange,
+  healthFilter,
+  onHealthChange,
+  excludeTerm,
+  onExcludeTermChange,
+}: {
+  shops: ShopInfo[];
+  selectedShopId: string;
+  onSelectShop: (id: string) => void;
+  statusFilter: string;
+  onStatusChange: (s: 'active' | 'draft' | 'inactive' | 'expired') => void;
+  statusCounts: Record<string, number>;
+  shopSections: ShopSection[];
+  sectionCounts: Record<number, number>;
+  sectionFilter: string;
+  onSectionChange: (id: string) => void;
+  healthFilter: string;
+  onHealthChange: (f: string) => void;
+  excludeTerm: string;
+  onExcludeTermChange: (t: string) => void;
+}) {
+  const [sectionsExpanded, setSectionsExpanded] = useState(true);
+  const t = useTranslations('etsyListings');
+
+  return (
+    <Box
+      sx={{
+        width: 220,
+        minWidth: 220,
+        flexShrink: 0,
+        position: 'sticky',
+        top: 80,
+        alignSelf: 'flex-start',
+        maxHeight: 'calc(100vh - 100px)',
+        overflowY: 'auto',
+        pr: 1.5,
+        '&::-webkit-scrollbar': { width: 4 },
+        '&::-webkit-scrollbar-thumb': { bgcolor: '#d0d0d0', borderRadius: 2 },
+      }}
+    >
+      {/* Shop Selector */}
+      {shops.length > 1 && (
+        <Paper sx={{ p: 1.5, mb: 1.5, borderRadius: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+            <StoreIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+            <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ fontSize: 11 }}>
+              {t('shopLabel')}
+            </Typography>
+          </Box>
+          {shops.map((s) => (
+            <Box
+              key={s.shopId}
+              onClick={() => onSelectShop(s.shopId)}
+              sx={{
+                px: 1,
+                py: 0.5,
+                borderRadius: 1,
+                cursor: 'pointer',
+                bgcolor: selectedShopId === s.shopId ? 'primary.50' : 'transparent',
+                color: selectedShopId === s.shopId ? 'primary.main' : 'text.primary',
+                fontWeight: selectedShopId === s.shopId ? 700 : 400,
+                fontSize: '0.82rem',
+                '&:hover': { bgcolor: selectedShopId === s.shopId ? 'primary.50' : 'action.hover' },
+              }}
+            >
+              {s.shopName}
+            </Box>
+          ))}
+        </Paper>
+      )}
+
+      {/* Etsy - Status Filters */}
+      <Paper sx={{ p: 1.5, mb: 1.5, borderRadius: 2 }}>
+        <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+          Etsy
+        </Typography>
+        {(['active', 'draft', 'inactive', 'expired'] as const).map((state) => {
+          const count = statusCounts[state] || 0;
+          const isSelected = statusFilter === state;
+          return (
+            <Box
+              key={state}
+              onClick={() => onStatusChange(state)}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                px: 1,
+                py: 0.5,
+                borderRadius: 1,
+                cursor: 'pointer',
+                bgcolor: isSelected ? 'primary.50' : 'transparent',
+                color: isSelected ? 'primary.main' : 'text.primary',
+                fontWeight: isSelected ? 700 : 400,
+                fontSize: '0.82rem',
+                '&:hover': { bgcolor: isSelected ? 'primary.50' : 'action.hover' },
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                <CircleIcon sx={{
+                  fontSize: 8,
+                  color: state === 'active' ? '#4caf50' : state === 'draft' ? '#9e9e9e' : state === 'inactive' ? '#f44336' : '#ff9800',
+                }} />
+                <span>{state === 'active' ? t('stateActive') : state === 'draft' ? t('stateDraft') : state === 'inactive' ? t('stateInactive') : t('stateExpired')}</span>
+              </Box>
+              <Typography variant="caption" sx={{ color: isSelected ? 'primary.main' : 'text.secondary', fontWeight: isSelected ? 700 : 400 }}>
+                {count}
+              </Typography>
+            </Box>
+          );
+        })}
+      </Paper>
+
+      {/* Score Filter */}
+      <Paper sx={{ p: 1.5, mb: 1.5, borderRadius: 2 }}>
+        <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ fontSize: 11, mb: 1, display: 'block' }}>
+          {t('listingScore')}
+        </Typography>
+        <FormControl size="small" fullWidth>
+          <Select
+            value={healthFilter}
+            onChange={(e) => onHealthChange(e.target.value)}
+            displayEmpty
+            sx={{ fontSize: '0.82rem', '& .MuiSelect-select': { py: 0.75 } }}
+          >
+            <MenuItem value="">{t('healthAll')}</MenuItem>
+            <MenuItem value="issues">{t('healthIssues')}</MenuItem>
+            <MenuItem value="missing_images">{t('healthMissingImages')}</MenuItem>
+            <MenuItem value="missing_tags">{t('healthMissingTags')}</MenuItem>
+            <MenuItem value="short_title">{t('healthShortTitle')}</MenuItem>
+            <MenuItem value="no_description">{t('healthNoDescription')}</MenuItem>
+            <MenuItem value="no_video">{t('healthNoVideo')}</MenuItem>
+            <MenuItem value="no_stock">{t('healthNoStock')}</MenuItem>
+          </Select>
+        </FormControl>
+      </Paper>
+
+      {/* Section Filter */}
+      {shopSections.length > 0 && (
+        <Paper sx={{ p: 1.5, mb: 1.5, borderRadius: 2 }}>
+          <Box
+            sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', mb: 0.5 }}
+            onClick={() => setSectionsExpanded(!sectionsExpanded)}
+          >
+            <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ fontSize: 11 }}>
+              {t('sectionLabel')}
+            </Typography>
+            {sectionsExpanded ? <ExpandLessIcon sx={{ fontSize: 16, color: 'text.secondary' }} /> : <ExpandMoreIcon sx={{ fontSize: 16, color: 'text.secondary' }} />}
+          </Box>
+          <Collapse in={sectionsExpanded}>
+            {/* All sections */}
+            <Box
+              onClick={() => onSectionChange('')}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                px: 1,
+                py: 0.4,
+                borderRadius: 1,
+                cursor: 'pointer',
+                bgcolor: !sectionFilter ? 'primary.50' : 'transparent',
+                color: !sectionFilter ? 'primary.main' : 'text.primary',
+                fontWeight: !sectionFilter ? 700 : 400,
+                fontSize: '0.8rem',
+                '&:hover': { bgcolor: !sectionFilter ? 'primary.50' : 'action.hover' },
+              }}
+            >
+              <span>{t('allSections')}</span>
+            </Box>
+            {shopSections.map((sec) => {
+              const count = sectionCounts[sec.shop_section_id] || 0;
+              const isSelected = sectionFilter === String(sec.shop_section_id);
+              return (
+                <Box
+                  key={sec.shop_section_id}
+                  onClick={() => onSectionChange(String(sec.shop_section_id))}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    px: 1,
+                    py: 0.4,
+                    borderRadius: 1,
+                    cursor: 'pointer',
+                    bgcolor: isSelected ? 'primary.50' : 'transparent',
+                    color: isSelected ? 'primary.main' : 'text.primary',
+                    fontWeight: isSelected ? 700 : 400,
+                    fontSize: '0.8rem',
+                    '&:hover': { bgcolor: isSelected ? 'primary.50' : 'action.hover' },
+                    overflow: 'hidden',
+                  }}
+                >
+                  <Typography noWrap sx={{ fontSize: 'inherit', fontWeight: 'inherit', color: 'inherit', flex: 1, minWidth: 0 }}>
+                    {sec.title}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: isSelected ? 'primary.main' : 'text.secondary', fontWeight: isSelected ? 700 : 400, ml: 0.5, flexShrink: 0 }}>
+                    {count}
+                  </Typography>
+                </Box>
+              );
+            })}
+          </Collapse>
+        </Paper>
+      )}
+
+      {/* Exclude term */}
+      <Paper sx={{ p: 1.5, mb: 1.5, borderRadius: 2 }}>
+        <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ fontSize: 11, mb: 1, display: 'block' }}>
+          {t('excludeLabel')}
+        </Typography>
+        <TextField
+          size="small"
+          fullWidth
+          placeholder={t('excludePlaceholder')}
+          value={excludeTerm}
+          onChange={(e) => onExcludeTermChange(e.target.value)}
+          sx={{ '& .MuiInputBase-input': { fontSize: '0.82rem', py: 0.75 } }}
+          InputProps={{
+            startAdornment: <InputAdornment position="start"><RemoveCircleOutlineIcon sx={{ fontSize: 16, color: 'error.main' }} /></InputAdornment>,
+          }}
+        />
+      </Paper>
+    </Box>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page Component
+// ---------------------------------------------------------------------------
+
+function EtsyListingsPage() {
+  const { user } = useAuth();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const t = useTranslations('etsyListings');
+  const tEtsy = useTranslations('etsy');
+
+  // --- State ---
+  const [listings, setListings] = useState<EtsyListingRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+
+  // In-memory cache: avoid re-fetching when switching back to same shop+status
+  const listingsCacheRef = useRef<Record<string, { listings: EtsyListingRow[]; total: number; ts: number }>>({});
+
+  // We cache status counts per shop to show in sidebar without re-fetching
+  const statusCountsCacheRef = useRef<Record<string, Record<string, number>>>({});
+  const [statusCountsVersion, setStatusCountsVersion] = useState(0);
+
+  const [selectedIds, setSelectedIds] = useState<GridRowSelectionModel>({ type: 'include' as const, ids: new Set<GridRowId>() });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'draft' | 'inactive' | 'expired'>('active');
+  const [sectionFilter, setSectionFilter] = useState<string>('');
+  const [healthFilter, setHealthFilter] = useState<string>('');
+  const [excludeTerm, setExcludeTerm] = useState('');
+
+  const [drawerListingId, setDrawerListingId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerRefreshKey, setDrawerRefreshKey] = useState(0);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  // Prefill for the creator: "Duplicate as new" or an incoming eBay cross-list.
+  const [creatorCopySource, setCreatorCopySource] = useState<CopySourceData | null>(null);
+  // Market research handed over by a research page (?prefill=session).
+  const [creatorResearch, setCreatorResearch] = useState<MarketResearchData | null>(null);
+  const [findReplaceOpen, setFindReplaceOpen] = useState(false);
+  const [smartPricingOpen, setSmartPricingOpen] = useState(false);
+  const [duplicateDetectorOpen, setDuplicateDetectorOpen] = useState(false);
+  const [backupManagerOpen, setBackupManagerOpen] = useState(false);
+  const [bulkEditorOpen, setBulkEditorOpen] = useState(false);
+  const router = useRouter();
+  const confirm = useConfirm();
+  const { has: hasConnection } = useConnections();
+  const ebayConnected = hasConnection('ebay') === true;
+  const [hasDraftFilter, setHasDraftFilter] = useState(false);
+  const [shopsLoaded, setShopsLoaded] = useState(false);
+
+  // The bulk editor is a fullscreen dialog with no route of its own, so the
+  // browser Back button used to navigate away from this page entirely instead
+  // of closing it. Opening pushes a shallow ?bulkEditor=1 history entry; Back
+  // (or İptal, which consumes that entry) returns to this exact view.
+  const openBulkEditor = useCallback(() => {
+    setBulkEditorOpen(true);
+    router.push(
+      { pathname: router.pathname, query: { ...router.query, bulkEditor: '1' } },
+      undefined,
+      { shallow: true },
+    );
+  }, [router]);
+
+  const closeBulkEditor = useCallback(() => {
+    setBulkEditorOpen(false);
+    if (router.query.bulkEditor === '1') router.back();
+  }, [router]);
+
+  // Browser Back while the editor is open → the query param disappears → close.
+  useEffect(() => {
+    if (router.query.bulkEditor !== '1' && bulkEditorOpen) setBulkEditorOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.query.bulkEditor]);
+
+  // Stale ?bulkEditor=1 after a refresh/direct load: strip it so a later
+  // closeBulkEditor doesn't router.back() out of the app.
+  useEffect(() => {
+    if (router.isReady && router.query.bulkEditor === '1') {
+      const { bulkEditor, ...rest } = router.query;
+      router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady]);
+
+  const [shops, setShops] = useState<ShopInfo[]>([]);
+  const [selectedShopId, setSelectedShopId] = useState<string>('');
+  const selectedShopIdRef = useRef<string>('');
+  selectedShopIdRef.current = selectedShopId;
+  const [shopSections, setShopSections] = useState<ShopSection[]>([]);
+  const [shippingProfiles, setShippingProfiles] = useState<ShippingProfile[]>([]);
+  const [returnPolicies, setReturnPolicies] = useState<ReturnPolicy[]>([]);
+
+  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
+    page: 0,
+    pageSize: 25,
+  });
+
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [pendingDraftsByListing, setPendingDraftsByListing] = useState<Record<string, any>>({});
+  const [pendingDraftList, setPendingDraftList] = useState<any[]>([]);
+  const [newDraftBusyId, setNewDraftBusyId] = useState<string | null>(null);
+
+  // Mobile card pagination
+  const [mobileVisibleCount, setMobileVisibleCount] = useState(25);
+
+  // Toolbar menus
+  const [toolsMenuAnchor, setToolsMenuAnchor] = useState<null | HTMLElement>(null);
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+
+  // Mobile selection state (for mobile cards)
+  const mobileSelectedIds = useMemo(() => {
+    if ('ids' in selectedIds) return selectedIds.ids;
+    return new Set<GridRowId>();
+  }, [selectedIds]);
+
+  const handleMobileToggleSelect = useCallback((listingId: number) => {
+    setSelectedIds((prev) => {
+      const ids = new Set('ids' in prev ? prev.ids : []);
+      if (ids.has(listingId)) {
+        ids.delete(listingId);
+      } else {
+        ids.add(listingId);
+      }
+      return { type: 'include' as const, ids };
+    });
+  }, []);
+
+  // CSV Import state
+  const [csvImportDialogOpen, setCsvImportDialogOpen] = useState(false);
+  const [csvImportRows, setCsvImportRows] = useState<Record<string, string>[]>([]);
+  const [csvImporting, setCsvImporting] = useState(false);
+  const [csvImportProgress, setCsvImportProgress] = useState(0);
+
+  // --- Fetch shops via API ---
+  useEffect(() => {
+    if (!(user as any)?.id) return;
+    (async () => {
+      try {
+        const res = await fetch('/api/integrations/etsy/shops');
+        if (!res.ok) {
+          console.error('Failed to fetch Etsy shops:', res.status);
+          setShopsLoaded(true);
+          return;
+        }
+        const data = await res.json();
+        const shopList: ShopInfo[] = (data.shops || []).map((s: any) => ({
+          shopId: s.shopId,
+          shopName: s.shopName || s.shopId,
+          isActive: s.isActive,
+        }));
+        setShops(shopList);
+        if (shopList.length > 0 && !selectedShopId) {
+          setSelectedShopId(shopList[0].shopId);
+        }
+      } catch (err) {
+        console.error('Failed to fetch Etsy shops:', err);
+      } finally {
+        setShopsLoaded(true);
+      }
+    })();
+  }, [(user as any)?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // --- Fetch listings ---
+  const mapListing = (l: any): EtsyListingRow => {
+    const thumb = l.thumbnail || (l.images?.[0] ? {
+      listing_image_id: l.images[0].listing_image_id,
+      url_75x75: l.images[0].url_75x75,
+      url_170x135: l.images[0].url_170x135,
+      url_570xN: l.images[0].url_570xN,
+    } : null);
+    return {
+      id: l.listing_id,
+      listing_id: l.listing_id,
+      title: l.title || '',
+      description: l.description || '',
+      tags: l.tags || [],
+      materials: l.materials || [],
+      price: l.price || null,
+      views: l.views || 0,
+      num_favorers: l.num_favorers || 0,
+      quantity: l.quantity || 0,
+      state: l.state || 'draft',
+      url: l.url || '',
+      taxonomy_id: l.taxonomy_id || null,
+      shop_section_id: l.shop_section_id || null,
+      who_made: l.who_made || '',
+      when_made: l.when_made || '',
+      is_supply: l.is_supply || false,
+      processing_min: l.processing_min,
+      processing_max: l.processing_max,
+      shipping_profile_id: l.shipping_profile_id,
+      return_policy_id: l.return_policy_id,
+      item_weight: l.item_weight,
+      item_weight_unit: l.item_weight_unit,
+      item_length: l.item_length,
+      item_width: l.item_width,
+      item_height: l.item_height,
+      item_dimensions_unit: l.item_dimensions_unit,
+      is_personalizable: l.is_personalizable,
+      created_timestamp: l.created_timestamp || 0,
+      updated_timestamp: l.updated_timestamp || 0,
+      thumbnail: thumb,
+      image_count: l.image_count || (l.images ? l.images.length : 0),
+      has_video: l.has_video || false,
+    };
+  };
+
+  // Sync state
+  const [syncing, setSyncing] = useState(false);
+  const [bulkSyncingDrafts, setBulkSyncingDrafts] = useState(false);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+
+  // Which shop the current `listings` belong to (set once the first page, a
+  // cache hit, or a failure settles). The eBay cross-list waits on it so the
+  // shop currency is known before an eBay price is copied.
+  const [listingsLoadedFor, setListingsLoadedFor] = useState('');
+
+  // Load listings from Etsy API (with in-memory cache)
+  const fetchListings = useCallback(async () => {
+    if (!selectedShopId) return;
+
+    // Check in-memory cache (5 min TTL)
+    const cacheKey = `${selectedShopId}:${statusFilter}`;
+    const cached = listingsCacheRef.current[cacheKey];
+    if (cached && Date.now() - cached.ts < 300_000) {
+      setListings(cached.listings);
+      setTotalCount(cached.total);
+      setListingsLoadedFor(selectedShopId);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const state = statusFilter || 'active';
+      const LIMIT = 100;
+      let allRows: EtsyListingRow[] = [];
+      let totalFromApi = 0;
+      let offset = 0;
+
+      // Fetch first page
+      const apiRes = await fetch(
+        `/api/clawd/etsy?action=listings_with_images&shop_id=${selectedShopId}&state=${state}&limit=${LIMIT}&offset=0`
+      );
+      if (!apiRes.ok) throw new Error(`HTTP ${apiRes.status}`);
+      const apiData = await apiRes.json();
+      allRows = (apiData.listings || []).map(mapListing);
+      totalFromApi = apiData.count || allRows.length;
+
+      // Show first page immediately while fetching rest
+      setListings(allRows);
+      setTotalCount(totalFromApi);
+      setListingsLoadedFor(selectedShopId);
+
+      // Fetch remaining pages if more exist
+      if (totalFromApi > LIMIT) {
+        offset = LIMIT;
+        while (offset < totalFromApi) {
+          const nextRes = await fetch(
+            `/api/clawd/etsy?action=listings_with_images&shop_id=${selectedShopId}&state=${state}&limit=${LIMIT}&offset=${offset}`
+          );
+          if (!nextRes.ok) break;
+          const nextData = await nextRes.json();
+          const nextRows = (nextData.listings || []).map(mapListing);
+          if (nextRows.length === 0) break;
+          allRows = [...allRows, ...nextRows];
+          setListings(allRows);
+          offset += LIMIT;
+        }
+      }
+
+      setTotalCount(allRows.length);
+      listingsCacheRef.current[cacheKey] = { listings: allRows, total: allRows.length, ts: Date.now() };
+
+      // Update current state count immediately
+      const existingCounts = statusCountsCacheRef.current[selectedShopId] || {};
+      existingCounts[state] = allRows.length;
+      statusCountsCacheRef.current[selectedShopId] = existingCounts;
+    } catch (err: any) {
+      console.error('Failed to fetch listings:', err);
+      toast.error(t('loadFailed', { error: err.message }));
+      setListingsLoadedFor(selectedShopId);
+    }
+    setLoading(false);
+  }, [selectedShopId, statusFilter]);
+
+  // Fetch sidebar counts for other states (non-blocking, after listings load)
+  const fetchStatusCounts = useCallback(async () => {
+    if (!selectedShopId) return;
+    if (statusCountsCacheRef.current[selectedShopId]?._fetched) return;
+
+    const allStates = ['active', 'draft', 'inactive', 'expired'] as const;
+    const countPromises = allStates.map(async (s) => {
+      // Reuse already-known count from listings fetch
+      const known = statusCountsCacheRef.current[selectedShopId]?.[s];
+      if (known !== undefined) return { state: s, count: known };
+      try {
+        const r = await fetch(
+          `/api/clawd/etsy?action=listing_count&shop_id=${selectedShopId}&state=${s}`
+        );
+        if (r.ok) {
+          const d = await r.json();
+          return { state: s, count: d.count || 0 };
+        }
+      } catch {}
+      return { state: s, count: 0 };
+    });
+    const results = await Promise.all(countPromises);
+    const counts: Record<string, number> = { _fetched: 1 };
+    for (const c of results) counts[c.state] = c.count;
+    statusCountsCacheRef.current[selectedShopId] = counts;
+    setStatusCountsVersion(v => v + 1);
+  }, [selectedShopId]);
+
+  // Sync listings from Etsy API → DB (manual, like Vela)
+  const syncListings = useCallback(async () => {
+    if (!selectedShopId || syncing) return;
+    setSyncing(true);
+    const toastId = toast.loading(t('syncInProgress'));
+    try {
+      const res = await fetch(
+        `/api/clawd/etsy?action=sync_listings&shop_id=${selectedShopId}`,
+        { method: 'POST' }
+      );
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setLastSyncAt(data.lastSyncAt);
+      // A partial run (some Etsy pages failed) still answers 200: warn instead of success (W3 §2d).
+      if (data.partial) toast(t('syncPartial', { count: data.synced }), { id: toastId, icon: '⚠️', duration: 8000 });
+      else toast.success(t('syncSuccess', { count: data.synced }), { id: toastId });
+
+      // Clear in-memory cache and refetch from DB inline (no circular call)
+      Object.keys(listingsCacheRef.current).forEach(key => {
+        if (key.startsWith(selectedShopId)) delete listingsCacheRef.current[key];
+      });
+      statusCountsCacheRef.current[selectedShopId] = {};
+
+      // Inline DB refetch
+      const refetchRes = await fetch(
+        `/api/clawd/etsy?action=cached_listings&shop_id=${selectedShopId}&state=${statusFilter}`
+      );
+      if (refetchRes.ok) {
+        const refetchData = await refetchRes.json();
+        const rows: EtsyListingRow[] = (refetchData.listings || []).map(mapListing);
+        setListings(rows);
+        setTotalCount(refetchData.count || rows.length);
+        if (refetchData.stateCounts) {
+          statusCountsCacheRef.current[selectedShopId] = refetchData.stateCounts;
+        }
+        const cacheKey = `${selectedShopId}:${statusFilter}`;
+        listingsCacheRef.current[cacheKey] = { listings: rows, total: refetchData.count || rows.length, ts: Date.now() };
+      }
+    } catch (err: any) {
+      console.error('Sync failed:', err);
+      toast.error(t('syncFailed', { error: err.message }), { id: toastId });
+    }
+    setSyncing(false);
+  }, [selectedShopId, syncing, statusFilter]);
+
+  // --- Fetch shop metadata (sections, shipping profiles, return policies) ---
+  const fetchShopMeta = useCallback(async () => {
+    if (!selectedShopId) return;
+    try {
+      const [sectionsRes, shippingRes, returnRes] = await Promise.all([
+        fetch(`/api/clawd/etsy?action=get_shop_sections&shop_id=${selectedShopId}`),
+        fetch(`/api/clawd/etsy?action=get_shipping_profiles&shop_id=${selectedShopId}`),
+        fetch(`/api/clawd/etsy?action=get_return_policies&shop_id=${selectedShopId}`),
+      ]);
+
+      if (sectionsRes.ok) {
+        const d = await sectionsRes.json();
+        setShopSections(d.shop_sections || d.results || []);
+      }
+      if (shippingRes.ok) {
+        const d = await shippingRes.json();
+        setShippingProfiles(d.shipping_profiles || d.results || []);
+      }
+      if (returnRes.ok) {
+        const d = await returnRes.json();
+        setReturnPolicies(d.return_policies || d.results || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch shop metadata:', err);
+    }
+  }, [selectedShopId]);
+
+  const fetchPendingDrafts = useCallback(async () => {
+    if (!selectedShopId) {
+      setPendingDraftsByListing({});
+      setPendingDraftList([]);
+      return;
+    }
+    try {
+      const drafts = await fetchEtsyDrafts(selectedShopId);
+      const next: Record<string, any> = {};
+      for (const draft of drafts) {
+        next[String(draft.etsyListingId)] = draft;
+      }
+      setPendingDraftsByListing(next);
+      setPendingDraftList(drafts);
+    } catch (err) {
+      console.error('Failed to fetch Etsy drafts:', err);
+    }
+  }, [selectedShopId]);
+
+  // DB-only refetch (no Etsy call): same steps as syncListings after a sync.
+  // Live events must never call fetchListings(): its 5-min cache would hide the
+  // change and a cache miss pages listings_with_images, a LIVE Etsy call (W3 §2b).
+  const refetchListingsFromDb = useCallback(async () => {
+    if (!selectedShopId) return;
+    const shopId = selectedShopId;
+    const state = statusFilter || 'active';
+    Object.keys(listingsCacheRef.current).forEach((key) => {
+      if (key.startsWith(shopId)) delete listingsCacheRef.current[key];
+    });
+    statusCountsCacheRef.current[shopId] = {};
+    try {
+      const r = await fetch(`/api/clawd/etsy?action=cached_listings&shop_id=${shopId}&state=${state}`);
+      if (r.ok) {
+        const d = await r.json();
+        const rows: EtsyListingRow[] = (d.listings || []).map(mapListing);
+        setListings(rows);
+        setTotalCount(d.count || rows.length);
+        setListingsLoadedFor(shopId);
+        if (d.stateCounts) statusCountsCacheRef.current[shopId] = d.stateCounts;
+        setStatusCountsVersion((v) => v + 1);
+        listingsCacheRef.current[`${shopId}:${state}`] = { listings: rows, total: d.count || rows.length, ts: Date.now() };
+        if (d.lastSyncAt) setLastSyncAt(d.lastSyncAt);
+      }
+    } catch {
+      /* the next live event or the reconnect revalidate retries */
+    }
+    await fetchPendingDrafts();
+  }, [selectedShopId, statusFilter, fetchPendingDrafts]);
+
+  // Coalesce bursts (a bulk sync emits one event per listing): at most one
+  // DB refetch per 2 s, trailing.
+  const liveRefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refetchFromDbRef = useRef(refetchListingsFromDb);
+  refetchFromDbRef.current = refetchListingsFromDb;
+  useEffect(() => () => { if (liveRefetchTimerRef.current) clearTimeout(liveRefetchTimerRef.current); }, []);
+
+  useLiveEvent(
+    ['listing.changed', 'listing.removed', 'sync.progress', 'sync.finished', 'sync.status'],
+    (ev) => {
+      if (ev.type === 'sync') {
+        if (ev.kind === 'status') {
+          // only after a reconnect / while polling (events may have been missed)
+          const phase = (ev as any).phase;
+          if (phase !== 'reconnected' && phase !== 'polling') return;
+        } else if ((ev as any).scope !== 'listings:etsy') {
+          return; // order syncs etc.
+        }
+      } else if ('shopId' in ev && (ev as any).shopId && String((ev as any).shopId) !== selectedShopId) {
+        return; // another shop's listing / draft
+      }
+      if (syncing) return; // the manual Sync handler refetches itself when done
+      if (liveRefetchTimerRef.current) return;
+      liveRefetchTimerRef.current = setTimeout(() => {
+        liveRefetchTimerRef.current = null;
+        void refetchFromDbRef.current();
+      }, 2000);
+    },
+  );
+
+  useEffect(() => {
+    if (selectedShopId) {
+      fetchListings().then(() => fetchStatusCounts());
+      fetchShopMeta();
+      fetchPendingDrafts();
+    }
+  }, [selectedShopId, statusFilter, fetchListings, fetchShopMeta, fetchStatusCounts, fetchPendingDrafts]);
+
+  // NOTE: Auto-sync removed — sync is manual only (Sync button)
+
+  // Reset pagination to page 0 when filters change
+  useEffect(() => {
+    setPaginationModel((prev) => (prev.page !== 0 ? { ...prev, page: 0 } : prev));
+    setMobileVisibleCount(25);
+  }, [searchTerm, sectionFilter, excludeTerm, healthFilter, hasDraftFilter]);
+
+  // Pre-compute health scores to avoid recalculating per filter toggle
+  const healthMap = useMemo(() => {
+    const map = new Map<number, ReturnType<typeof calculateHealth>>();
+    listings.forEach((l) => map.set(l.listing_id, calculateHealth(l)));
+    return map;
+  }, [listings]);
+
+  // --- Status counts for sidebar ---
+  const statusCounts = useMemo(() => {
+    // Use cached counts from API responses, fall back to current listing count for current filter
+    const cached = statusCountsCacheRef.current[selectedShopId] || {};
+    return {
+      active: cached.active ?? (statusFilter === 'active' ? totalCount : 0),
+      draft: cached.draft ?? (statusFilter === 'draft' ? totalCount : 0),
+      inactive: cached.inactive ?? (statusFilter === 'inactive' ? totalCount : 0),
+      expired: cached.expired ?? (statusFilter === 'expired' ? totalCount : 0),
+    };
+  }, [selectedShopId, totalCount, statusFilter, statusCountsVersion]);
+
+  // --- Section counts from current listings ---
+  const sectionCounts = useMemo(() => {
+    const counts: Record<number, number> = {};
+    listings.forEach((l) => {
+      if (l.shop_section_id) {
+        counts[l.shop_section_id] = (counts[l.shop_section_id] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [listings]);
+
+  // Section name lookup
+  const sectionNameMap = useMemo(() => {
+    const map: Record<number, string> = {};
+    shopSections.forEach((s) => { map[s.shop_section_id] = s.title; });
+    return map;
+  }, [shopSections]);
+
+  // --- Client-side filtering ---
+  const filteredListings = useMemo(() => {
+    let result = listings;
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter((l) => l.title.toLowerCase().includes(term));
+    }
+    if (sectionFilter) {
+      const secId = Number(sectionFilter);
+      result = result.filter((l) => l.shop_section_id === secId);
+    }
+    if (excludeTerm.trim()) {
+      const exc = excludeTerm.toLowerCase();
+      result = result.filter((l) => {
+        const title = (l.title || '').toLowerCase();
+        const desc = (l.description || '').toLowerCase();
+        const tags = (l.tags || []).join(' ').toLowerCase();
+        return !title.includes(exc) && !desc.includes(exc) && !tags.includes(exc);
+      });
+    }
+    if (hasDraftFilter) {
+      result = result.filter((l) => Boolean(pendingDraftsByListing[String(l.listing_id)]));
+    }
+    if (healthFilter) {
+      result = result.filter((l) => {
+        const h = healthMap.get(l.listing_id) || calculateHealth(l);
+        switch (healthFilter) {
+          case 'issues': return h.overall < 70;
+          case 'missing_images': return l.image_count < 10;
+          case 'missing_tags': return (l.tags?.length || 0) < 13;
+          case 'short_title': return (l.title?.length || 0) < 100;
+          case 'no_description': return (l.description?.length || 0) < 200;
+          case 'no_video': return !l.has_video;
+          case 'no_stock': return l.quantity === 0;
+          default: return true;
+        }
+      });
+    }
+    return result;
+  }, [listings, searchTerm, sectionFilter, excludeTerm, healthFilter, healthMap, hasDraftFilter, pendingDraftsByListing]);
+
+  // --- Quick stats ---
+  const quickStats = useMemo(() => {
+    const totalViews = listings.reduce((s, l) => s + (l.views || 0), 0);
+    const totalFavs = listings.reduce((s, l) => s + (l.num_favorers || 0), 0);
+    const outOfStock = listings.filter(l => l.quantity === 0).length;
+    const withIssues = listings.filter(l => {
+      const h = healthMap.get(l.listing_id) || calculateHealth(l);
+      return h.overall < 70;
+    }).length;
+    return { totalViews, totalFavs, outOfStock, withIssues };
+  }, [listings, healthMap]);
+
+  // --- Delete listing ---
+  const handleDeleteListing = useCallback(
+    async (listingId: number) => {
+      try {
+        await stageEtsyDraft({ shopId: selectedShopId, listingId, queuedActions: [{ type: 'delete' }] });
+        await fetchPendingDrafts();
+        toast.success(t('draftQueued.delete'));
+        setDeleteConfirmId(null);
+      } catch (err: any) {
+        notify.error(err, t('deleteFailed', { error: '' }).replace(/[:\s]+$/, ''));
+      }
+    },
+    [selectedShopId, fetchPendingDrafts]
+  );
+
+  // --- Renew listing ---
+  const handleRenewListing = useCallback(
+    async (listingId: number) => {
+      try {
+        await stageEtsyDraft({ shopId: selectedShopId, listingId, queuedActions: [{ type: 'renew' }] });
+        await fetchPendingDrafts();
+        toast.success(t('draftQueued.renew'));
+      } catch (err: any) {
+        notify.error(err, t('renewFailed'));
+      }
+    },
+    [selectedShopId, fetchPendingDrafts]
+  );
+
+  // --- Deactivate listing ---
+  const handleDeactivateListing = useCallback(
+    async (listingId: number) => {
+      try {
+        await stageEtsyDraft({ shopId: selectedShopId, listingId, queuedActions: [{ type: 'deactivate' }] });
+        await fetchPendingDrafts();
+        toast.success(t('draftQueued.deactivate'));
+      } catch (err: any) {
+        notify.error(err, t('deactivateFailed'));
+      }
+    },
+    [selectedShopId, fetchPendingDrafts]
+  );
+
+  // --- CSV Export ---
+  const handleExportCSV = () => {
+    if (filteredListings.length === 0) {
+      toast.error(t('noListingsToExport'));
+      return;
+    }
+    const rows = filteredListings.map((l) => ({
+      listing_id: l.listing_id,
+      title: l.title,
+      description: (l.description || '').substring(0, 200),
+      tags: l.tags.join('|'),
+      price: l.price ? (l.price.amount / l.price.divisor).toFixed(2) : '',
+      quantity: l.quantity,
+      views: l.views,
+      favorites: l.num_favorers,
+      state: l.state,
+      url: l.url,
+    }));
+    const headers = Object.keys(rows[0] || {}).join(',');
+    const csv = [
+      headers,
+      ...rows.map((r) =>
+        Object.values(r)
+          .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+          .join(',')
+      ),
+    ].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `etsy-listings-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // --- CSV Import ---
+  const parseCSV = (text: string): Record<string, string>[] => {
+    const lines = text.split('\n').filter((line) => line.trim().length > 0);
+    if (lines.length < 2) return [];
+
+    const parseCSVLine = (line: string): string[] => {
+      const result: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (inQuotes) {
+          if (ch === '"' && line[i + 1] === '"') {
+            current += '"';
+            i++;
+          } else if (ch === '"') {
+            inQuotes = false;
+          } else {
+            current += ch;
+          }
+        } else {
+          if (ch === '"') {
+            inQuotes = true;
+          } else if (ch === ',') {
+            result.push(current);
+            current = '';
+          } else {
+            current += ch;
+          }
+        }
+      }
+      result.push(current);
+      return result;
+    };
+
+    const headers = parseCSVLine(lines[0]);
+    const rows: Record<string, string>[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const values = parseCSVLine(lines[i]);
+      const row: Record<string, string> = {};
+      headers.forEach((h, idx) => {
+        row[h.trim()] = (values[idx] || '').trim();
+      });
+      rows.push(row);
+    }
+    return rows;
+  };
+
+  const handleCSVFileSelect = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const text = ev.target?.result as string;
+        const rows = parseCSV(text);
+        if (rows.length === 0) {
+          toast.error(t('csvEmptyOrInvalid'));
+          return;
+        }
+        const validRows = rows.filter((r) => r.listing_id && r.listing_id.trim() !== '');
+        if (validRows.length === 0) {
+          toast.error(t('csvNoListingIdColumn'));
+          return;
+        }
+        setCsvImportRows(validRows);
+        setCsvImportDialogOpen(true);
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
+
+  const handleCSVImportConfirm = async () => {
+    setCsvImporting(true);
+    setCsvImportProgress(0);
+
+    let succeeded = 0;
+    let failed = 0;
+
+    for (let i = 0; i < csvImportRows.length; i++) {
+      const row = csvImportRows[i];
+      const listingId = parseInt(row.listing_id, 10);
+      if (isNaN(listingId)) {
+        failed++;
+        continue;
+      }
+
+      const body: Record<string, any> = {};
+      if (row.title !== undefined && row.title !== '') body.title = row.title;
+      if (row.description !== undefined && row.description !== '') body.description = row.description;
+      if (row.tags !== undefined && row.tags !== '') body.tags = row.tags.split('|').map((t: string) => t.trim()).filter(Boolean);
+      if (row.materials !== undefined && row.materials !== '') body.materials = row.materials.split('|').map((m: string) => m.trim()).filter(Boolean);
+      if (row.price !== undefined && row.price !== '') { const p = parseFloat(row.price); if (!isNaN(p)) body.price = p; }
+      if (row.quantity !== undefined && row.quantity !== '') { const q = parseInt(row.quantity, 10); if (!isNaN(q)) body.quantity = q; }
+      if (row.state !== undefined && row.state !== '') body.state = row.state;
+
+      if (Object.keys(body).length === 0) {
+        failed++;
+        setCsvImportProgress(((i + 1) / csvImportRows.length) * 100);
+        continue;
+      }
+
+      try {
+        await stageEtsyDraft({ shopId: selectedShopId, listingId, fields: body });
+        succeeded++;
+      } catch {
+        failed++;
+      }
+
+      setCsvImportProgress(((i + 1) / csvImportRows.length) * 100);
+
+      if (i < csvImportRows.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    }
+
+    setCsvImporting(false);
+    setCsvImportProgress(0);
+    setCsvImportDialogOpen(false);
+    setCsvImportRows([]);
+
+    if (failed === 0) {
+      toast.success(t('csvImportComplete', { count: succeeded }));
+    } else {
+      toast.error(t('csvImportPartial', { succeeded, failed }));
+    }
+
+    fetchPendingDrafts();
+  };
+
+  // --- Inline edit handler (double-click title/price in DataGrid) ---
+  const handleProcessRowUpdate = useCallback(
+    async (newRow: EtsyListingRow, oldRow: EtsyListingRow) => {
+      const body: Record<string, any> = {};
+      if (newRow.title !== oldRow.title) body.title = newRow.title;
+      if (newRow.price !== oldRow.price) {
+        const newPrice = parseFloat((newRow as any).price);
+        if (!isNaN(newPrice)) body.price = newPrice;
+      }
+      if (Object.keys(body).length === 0) return oldRow;
+
+      try {
+        await stageEtsyDraft({ shopId: selectedShopId, listingId: newRow.listing_id, fields: body });
+        await fetchPendingDrafts();
+        toast.success(t('draftQueued.saved'));
+        return oldRow;
+      } catch (err: any) {
+        notify.error(err, t('updateFailed', { error: '' }).replace(/[:\s]+$/, ''));
+        return oldRow;
+      }
+    },
+    [selectedShopId, fetchPendingDrafts]
+  );
+
+  // --- Open editor drawer ---
+  const handleOpenEditor = (listingId: number) => {
+    setDrawerListingId(String(listingId));
+    setDrawerOpen(true);
+  };
+
+  // --- Creator open helpers ---
+  const openCreator = useCallback((source: CopySourceData | null, research: MarketResearchData | null = null) => {
+    setCreatorCopySource(source);
+    setCreatorResearch(research);
+    setCreateDialogOpen(true);
+  }, []);
+
+  const closeCreator = useCallback(() => {
+    setCreateDialogOpen(false);
+    setCreatorCopySource(null);
+    setCreatorResearch(null);
+  }, []);
+
+  // --- Duplicate as new: open the creator prefilled from the row. Nothing is
+  // staged until the user saves in the creator; nothing reaches Etsy until they
+  // press Create & Publish there (or sync the saved draft).
+  const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
+  const duplicatingRef = useRef<number | null>(null);
+  // Always read the latest rows: the DataGrid columns memo keeps an older
+  // closure of this handler, so never rely on `listings` captured at render.
+  const listingsRef = useRef<EtsyListingRow[]>(listings);
+  listingsRef.current = listings;
+  const handleCopyListing = async (listingId: number, rowArg?: EtsyListingRow) => {
+    const shopId = selectedShopIdRef.current;
+    if (!shopId || duplicatingRef.current !== null) return;
+    const row = listingsRef.current.find((l) => l.listing_id === listingId) || rowArg;
+    if (!row) {
+      notify.error(null, t('duplicate.notFound'));
+      return;
+    }
+    duplicatingRef.current = listingId;
+    setDuplicatingId(listingId);
+    // Read-only: every photo of the source listing (full size), in Etsy order.
+    let imageUrls: string[] = [];
+    try {
+      const res = await fetch(`/api/clawd/etsy?action=get_listing_images&listing_id=${listingId}&shop_id=${shopId}`);
+      if (res.ok) {
+        const data = await res.json();
+        const imgs: any[] = Array.isArray(data?.images) ? data.images : [];
+        imageUrls = imgs
+          .slice()
+          .sort((a, b) => (Number(a?.rank) || 99) - (Number(b?.rank) || 99))
+          .map((img) => img?.url_fullxfull || img?.url_570xN)
+          .filter((u): u is string => typeof u === 'string' && u.length > 0);
+      }
+    } catch {
+      // Fall back to the cover photo below.
+    }
+    if (imageUrls.length === 0 && row.thumbnail?.url_570xN) imageUrls = [row.thumbnail.url_570xN];
+    duplicatingRef.current = null;
+    setDuplicatingId(null);
+
+    const priceValue = row.price && row.price.divisor ? row.price.amount / row.price.divisor : undefined;
+    // Same convention as the creator's copySource: no "COPY - " prefix (dashes
+    // break the commas-only title rule); the user edits the title in the creator.
+    openCreator({
+      source: 'etsy',
+      title: row.title,
+      description: row.description,
+      tags: row.tags || [],
+      materials: row.materials || [],
+      price: priceValue && priceValue > 0 ? Number(priceValue.toFixed(2)) : undefined,
+      quantity: row.quantity || undefined,
+      who_made: row.who_made || undefined,
+      when_made: row.when_made || undefined,
+      is_supply: row.is_supply,
+      shipping_profile_id: row.shipping_profile_id || undefined,
+      return_policy_id: row.return_policy_id || undefined,
+      shop_section_id: row.shop_section_id ? row.shop_section_id : null,
+      taxonomy_id: row.taxonomy_id || undefined,
+      processing_min: row.processing_min,
+      processing_max: row.processing_max,
+      item_weight: row.item_weight,
+      item_weight_unit: row.item_weight_unit,
+      item_length: row.item_length,
+      item_width: row.item_width,
+      item_height: row.item_height,
+      item_dimensions_unit: row.item_dimensions_unit,
+      imageUrls,
+    });
+  };
+
+  // --- Cross-list: Etsy -> eBay (the eBay page reads ?crosslist=etsy:<id>) ---
+  const handleListOnEbay = useCallback((listingId: number) => {
+    router.push(`/app/ebay-listings?crosslist=etsy:${listingId}`);
+  }, [router]);
+
+  // --- Shop currency: Etsy prices every listing in the shop's currency, so the
+  // most common currency among this shop's listings is the shop currency.
+  const shopCurrency = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const l of listings) {
+      const c = l.price?.currency_code;
+      if (c) counts.set(c, (counts.get(c) || 0) + 1);
+    }
+    let best: string | null = null;
+    let bestN = 0;
+    counts.forEach((n, c) => { if (n > bestN) { best = c; bestN = n; } });
+    return best;
+  }, [listings]);
+
+  // --- Selected listing objects for bulk operations ---
+  const selectedListings = useMemo(() => {
+    const idSet = 'ids' in selectedIds ? selectedIds.ids : new Set<GridRowId>();
+    return filteredListings
+      .filter((l) => idSet.has(l.id))
+      .map((l) => ({
+        listing_id: l.listing_id,
+        title: l.title,
+        description: l.description,
+        price: l.price,
+        tags: l.tags,
+        materials: l.materials,
+        state: l.state,
+        shop_section_id: l.shop_section_id,
+        thumbnail: l.thumbnail,
+        quantity: l.quantity,
+        who_made: l.who_made,
+        when_made: l.when_made,
+        is_supply: l.is_supply,
+        processing_min: l.processing_min,
+        processing_max: l.processing_max,
+        shipping_profile_id: l.shipping_profile_id,
+        return_policy_id: l.return_policy_id,
+        item_weight: l.item_weight,
+        item_weight_unit: l.item_weight_unit,
+        item_length: l.item_length,
+        item_width: l.item_width,
+        item_height: l.item_height,
+        item_dimensions_unit: l.item_dimensions_unit,
+        is_personalizable: l.is_personalizable,
+        taxonomy_id: l.taxonomy_id,
+        has_video: l.has_video,
+      }));
+  }, [selectedIds, filteredListings]);
+
+  const selectedCount = useMemo(() => ('ids' in selectedIds ? selectedIds.ids.size : 0), [selectedIds]);
+  const selectedDraftIds = useMemo(
+    () =>
+      selectedListings
+        .map((listing) => pendingDraftsByListing[String(listing.listing_id)]?.id)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0),
+    [selectedListings, pendingDraftsByListing]
+  );
+
+  // Drafts blocked because the listing changed on Etsy since they were staged.
+  const [syncConflicts, setSyncConflicts] = useState<Array<{ draftId: string; title: string }> | null>(null);
+
+  const draftTitleById = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const [listingId, draft] of Object.entries(pendingDraftsByListing)) {
+      if (draft?.id) map[draft.id] = listings.find((l) => String(l.listing_id) === listingId)?.title
+        || describeNewListingDraft(draft, null).title || `#${listingId}`;
+    }
+    return map;
+  }, [pendingDraftsByListing, listings]);
+
+  /** Translate a server warning/error carrying {key, params}; fall back to its message. */
+  const translateDraftIssue = useCallback((issue: any): string => {
+    if (issue?.key && tEtsy.has(issue.key)) return tEtsy(issue.key, issue.params || {});
+    return typeof issue?.message === 'string' ? issue.message : (typeof issue?.error === 'string' ? issue.error : '');
+  }, [tEtsy]);
+
+  /** Drop this shop's 5-min listings cache + status counts so the next fetch sees Etsy writes. */
+  const invalidateShopListingsCache = useCallback(() => {
+    if (!selectedShopId) return;
+    Object.keys(listingsCacheRef.current).forEach((key) => {
+      if (key.startsWith(`${selectedShopId}:`)) delete listingsCacheRef.current[key];
+    });
+    statusCountsCacheRef.current[selectedShopId] = {};
+  }, [selectedShopId]);
+
+  const runBulkDraftSync = useCallback(async (draftIds: string[], force: boolean) => {
+    setBulkSyncingDrafts(true);
+    const toastId = toast.loading(t('draftSync.syncing', { count: draftIds.length }));
+    try {
+      const result = await syncEtsyDrafts(draftIds, { force });
+      const success = result.success ?? 0;
+      const failed = result.failed ?? 0;
+      const conflicts = result.conflicts ?? 0;
+
+      if (failed > 0 || conflicts > 0) {
+        toast.error(t('draftSync.summaryWithProblems', { success, failed, conflicts }), { id: toastId });
+      } else {
+        toast.success(t('draftSync.summarySuccess', { count: success }), { id: toastId });
+      }
+
+      // Failures: name the listing and the (translated) reason.
+      const failedDrafts: any[] = Array.isArray(result.failedDrafts) ? result.failedDrafts : [];
+      const failedResults: any[] = Array.isArray(result.results) ? result.results.filter((r: any) => r?.status === 'failed') : [];
+      failedDrafts.slice(0, 3).forEach((f) => {
+        const full = failedResults.find((r) => r.draftId === f.draftId) || f;
+        toast.error(`${draftTitleById[f.draftId] || f.draftId}: ${translateDraftIssue(full) || t('draftSync.failedGeneric')}`, { duration: 8000 });
+      });
+
+      // Partial success: synced, but some parts were skipped (e.g. a category detail).
+      const partialDrafts: any[] = Array.isArray(result.partialDrafts) ? result.partialDrafts : [];
+      partialDrafts.slice(0, 3).forEach((pd) => {
+        const details = (Array.isArray(pd.warnings) ? pd.warnings : []).map(translateDraftIssue).filter(Boolean).join(' • ');
+        toast(t('draftSync.partialWarning', { title: draftTitleById[pd.draftId] || pd.draftId, details }), { icon: '⚠️', duration: 10000 });
+      });
+
+      // Conflicts: let the user decide whether to overwrite Etsy's newer version.
+      const conflictDrafts: any[] = Array.isArray(result.conflictDrafts) ? result.conflictDrafts : [];
+      if (!force && conflictDrafts.length > 0) {
+        setSyncConflicts(conflictDrafts.map((c) => ({ draftId: c.draftId, title: draftTitleById[c.draftId] || c.draftId })));
+      }
+
+      invalidateShopListingsCache();
+      await Promise.all([fetchPendingDrafts(), fetchListings()]);
+    } catch (err: any) {
+      toast.error(translateDraftIssue(err) || t('draftSync.failedGeneric'), { id: toastId });
+    } finally {
+      setBulkSyncingDrafts(false);
+    }
+  }, [t, draftTitleById, translateDraftIssue, fetchPendingDrafts, fetchListings, invalidateShopListingsCache]);
+
+  const handleSyncSelectedDrafts = useCallback(async () => {
+    if (selectedDraftIds.length === 0 || bulkSyncingDrafts) return;
+    // Never sync a queued delete from a bulk action — those are applied from the editor.
+    const draftsById = new Map<string, any>(pendingDraftList.map((d) => [String(d?.id), d]));
+    const syncIds = selectedDraftIds.filter((id) => !draftHasQueuedDelete(draftsById.get(id)));
+    const skipped = selectedDraftIds.length - syncIds.length;
+    if (syncIds.length === 0) {
+      notify.info(t('draftBanner.skippedDeletes', { count: skipped }));
+      return;
+    }
+    const ok = await confirm({
+      title: t('draftBanner.confirmTitle', { count: syncIds.length }),
+      description: [
+        t('draftBanner.confirmBody'),
+        skipped > 0 ? t('draftBanner.skippedDeletes', { count: skipped }) : '',
+      ].filter(Boolean).join(' '),
+      items: syncIds.map((id) => draftTitleById[id] || id),
+      confirmLabel: t('draftBanner.syncAll'),
+    });
+    if (!ok) return;
+    await runBulkDraftSync(syncIds, false);
+  }, [selectedDraftIds, bulkSyncingDrafts, pendingDraftList, draftTitleById, confirm, runBulkDraftSync, t]);
+
+  const handleForceSyncConflicts = useCallback(async () => {
+    const ids = (syncConflicts || []).map((c) => c.draftId);
+    setSyncConflicts(null);
+    if (ids.length > 0) await runBulkDraftSync(ids, true);
+  }, [syncConflicts, runBulkDraftSync]);
+
+  // --- Page-level draft summary ("N unsynced changes · M failed") -----------
+  const draftSummary = useMemo(() => {
+    let pending = 0;
+    let failed = 0;
+    let conflicts = 0;
+    const syncable: Array<{ id: string; title: string }> = [];
+    let skippedDeletes = 0;
+    let skippedNew = 0;
+    for (const draft of pendingDraftList) {
+      const status = String(draft?.status || '');
+      if (status === 'draft') pending++;
+      else if (status === 'failed') failed++;
+      else if (status === 'conflict') conflicts++;
+      else continue; // syncing / synced / cancelled are not "unsynced"
+      if (!draft?.id) continue;
+      // Never bulk-sync a queued delete; new listings sync from their own panel.
+      if (draftHasQueuedDelete(draft)) { skippedDeletes++; continue; }
+      if (draftIsNewListing(draft)) { skippedNew++; continue; }
+      syncable.push({ id: String(draft.id), title: draftTitleById[draft.id] || `#${draft.etsyListingId}` });
+    }
+    return { pending, failed, conflicts, total: pending + failed + conflicts, syncable, skippedDeletes, skippedNew };
+  }, [pendingDraftList, draftTitleById]);
+
+  const handleSyncAllDrafts = useCallback(async () => {
+    if (bulkSyncingDrafts) return;
+    const { syncable, skippedDeletes, skippedNew } = draftSummary;
+    if (syncable.length === 0) {
+      notify.info(t('draftBanner.nothingToSync'));
+      return;
+    }
+    const notes = [
+      skippedDeletes > 0 ? t('draftBanner.skippedDeletes', { count: skippedDeletes }) : '',
+      skippedNew > 0 ? t('draftBanner.skippedNew', { count: skippedNew }) : '',
+    ].filter(Boolean);
+    const ok = await confirm({
+      title: t('draftBanner.confirmTitle', { count: syncable.length }),
+      description: [t('draftBanner.confirmBody'), ...notes].join(' '),
+      items: syncable.map((d) => d.title),
+      confirmLabel: t('draftBanner.syncAll'),
+    });
+    if (!ok) return;
+    await runBulkDraftSync(syncable.map((d) => d.id), false);
+  }, [bulkSyncingDrafts, draftSummary, confirm, runBulkDraftSync, t]);
+
+  // --- Cross-list: eBay -> Etsy (?crosslist=ebay:<sku|itemId>) ---------------
+  // Read-only lookup in the eBay listing cache; opens the creator prefilled.
+  // Waits for the shop so the creator has its shop id / profiles.
+  const crosslistParam = typeof router.query.crosslist === 'string' ? router.query.crosslist : '';
+  const crosslistHandledRef = useRef<string | null>(null);
+  const [crosslistLoading, setCrosslistLoading] = useState(false);
+  const shopCurrencyRef = useRef<string | null>(null);
+  shopCurrencyRef.current = shopCurrency;
+  useEffect(() => {
+    if (!router.isReady || !crosslistParam || !selectedShopId) return;
+    // Wait for this shop's listings so the shop currency is known.
+    if (listingsLoadedFor !== selectedShopId) return;
+    if (crosslistHandledRef.current === crosslistParam) return;
+    crosslistHandledRef.current = crosslistParam;
+
+    // Drop the param first so refresh/back doesn't re-open the creator.
+    const { crosslist: _drop, ...rest } = router.query;
+    router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+
+    const match = /^ebay:(.{1,200})$/.exec(crosslistParam);
+    if (!match) return;
+    // router.query is already decoded; only fall back to a second decode when
+    // the raw value matches nothing (e.g. a double-encoded link).
+    const rawRef = match[1];
+    let decodedRef = rawRef;
+    try { decodedRef = decodeURIComponent(rawRef); } catch { /* keep raw */ }
+
+    setCrosslistLoading(true);
+    (async () => {
+      try {
+        const res = await fetch('/api/clawd/ebay?action=cached_listings');
+        if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
+        const data = await res.json();
+        const items: any[] = Array.isArray(data?.listings) ? data.listings : [];
+        const matches = (ref: string) => (l: any) =>
+          [l?.sku, l?.listingId, l?.offerId, l?.id].some((v) => v != null && String(v) === ref);
+        const item = items.find(matches(rawRef)) || (decodedRef !== rawRef ? items.find(matches(decodedRef)) : undefined);
+        if (!item) {
+          notify.error(null, t('crosslist.notFound'));
+          return;
+        }
+        const currentShopCurrency = shopCurrencyRef.current;
+        const copy = ebayItemToCopySource(item, currentShopCurrency);
+        openCreator(copy);
+        const ebayCurrency = typeof item.priceCurrency === 'string' ? item.priceCurrency : '';
+        const hadPrice = Number.parseFloat(String(item?.priceValue ?? '')) > 0;
+        if (hadPrice && copy.price == null) {
+          if (currentShopCurrency && ebayCurrency && ebayCurrency !== currentShopCurrency) {
+            notify.info(t('crosslist.priceCurrencyMismatch', { from: ebayCurrency, to: currentShopCurrency }));
+          } else if (!currentShopCurrency) {
+            notify.info(t('crosslist.priceCurrencyUnknown'));
+          }
+        }
+      } catch (err) {
+        notify.error(err, t('crosslist.loadFailed'));
+      } finally {
+        setCrosslistLoading(false);
+      }
+    })();
+  }, [router.isReady, crosslistParam, selectedShopId, listingsLoadedFor]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // --- Prefill from a research page (?prefill=session) -----------------------
+  // Contract: sessionStorage 'kx:listingPrefill' (see listingPrefill.ts). Opens
+  // the creator prefilled; nothing is staged or published until the user saves
+  // / publishes in the creator.
+  const prefillParam = typeof router.query.prefill === 'string' ? router.query.prefill : '';
+  const prefillHandledRef = useRef(false);
+  useEffect(() => {
+    if (!router.isReady || prefillParam !== 'session' || prefillHandledRef.current) return;
+    // No Etsy shop: say so instead of waiting forever. The entry stays in
+    // sessionStorage so the hand-off still works after connecting in this tab.
+    if (shopsLoaded && shops.length === 0) {
+      prefillHandledRef.current = true;
+      const { prefill: _drop, ...rest } = router.query;
+      router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+      notify.info(t('prefill.connectEtsy'));
+      return;
+    }
+    if (!selectedShopId) return;
+    // Wait for this shop's listings so the shop currency is known.
+    if (listingsLoadedFor !== selectedShopId) return;
+    prefillHandledRef.current = true;
+
+    const { prefill: _drop, ...rest } = router.query;
+    router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+
+    const p = consumeListingPrefill('etsy');
+    if (!p) {
+      notify.info(t('prefill.notFound'));
+      return;
+    }
+    const currentShopCurrency = shopCurrencyRef.current;
+    // Etsy prices are in the shop currency: carry numbers only on a known match.
+    const currencyOk = Boolean(currentShopCurrency) && (!p.currency || p.currency === currentShopCurrency);
+    const priceOk = p.price != null && currencyOk;
+    // Research payload; when absent, keywords / category hint still become a
+    // minimal market context so the creator's AI uses them.
+    const rawResearch = p.research ?? ((p.keywords && p.keywords.length) || p.categoryHint ? {
+      query: p.categoryHint || p.title || '',
+      topTags: [],
+      topKeywords: (p.keywords || []).map((keyword) => ({ keyword, count: 0, pct: 0 })),
+      priceStats: null,
+    } : undefined);
+    let research = toMarketResearchData(rawResearch);
+    if (research) {
+      // Fold contract keywords in when the payload had none of its own.
+      if (research.topKeywords.length === 0 && p.keywords && p.keywords.length) {
+        research = { ...research, topKeywords: p.keywords.map((keyword) => ({ keyword, count: 0, pct: 0 })) };
+      }
+      // Price stats in another / unknown currency would mislead the user and the AI.
+      if (!currencyOk) research = { ...research, priceStats: null };
+    }
+    openCreator({
+      source: 'research',
+      title: p.title || '',
+      description: p.description || '',
+      tags: p.tags || [],
+      price: priceOk ? p.price : undefined,
+      imageUrls: p.imageUrls || [],
+    }, research);
+    if (p.price != null && !priceOk) {
+      if (!currentShopCurrency) {
+        notify.info(t('crosslist.priceCurrencyUnknown'));
+      } else if (p.currency) {
+        notify.info(t('prefill.priceCurrencyMismatch', { from: p.currency, to: currentShopCurrency }));
+      }
+    }
+  }, [router.isReady, prefillParam, selectedShopId, listingsLoadedFor, shopsLoaded, shops.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // --- Staged new listings (create_listing drafts) ---------------------------
+  // They have a negative local id until the first sync creates them on Etsy, so
+  // they never appear in the listings cache — pin them above the list instead.
+  // A draft whose create already ran (real id) but whose sync failed later stays
+  // pinned until its listing shows up in the current view.
+  const pendingNewListingDrafts = useMemo(() => {
+    const visibleIds = new Set(listings.map((l) => String(l.listing_id)));
+    return pendingDraftList.filter((draft) => {
+      const actions: any[] = Array.isArray(draft?.queuedActions) ? draft.queuedActions : [];
+      if (!actions.some((a) => a?.type === 'create_listing')) return false;
+      return Number(draft.etsyListingId) < 0 || !visibleIds.has(String(draft.etsyListingId));
+    });
+  }, [pendingDraftList, listings]);
+
+  const refreshAfterNewListingSync = useCallback(async () => {
+    invalidateShopListingsCache();
+    await Promise.all([
+      fetchPendingDrafts(),
+      fetchListings().then(() => fetchStatusCounts()),
+    ]);
+  }, [invalidateShopListingsCache, fetchPendingDrafts, fetchListings, fetchStatusCounts]);
+
+  const handleSyncNewListingDraft = useCallback(async (draft: any) => {
+    if (!draft?.id || newDraftBusyId) return;
+    const actions: any[] = Array.isArray(draft.queuedActions) ? draft.queuedActions : [];
+    // Never sync a draft carrying a queued delete from here.
+    if (actions.some((a) => a?.type === 'delete')) return;
+    const willPublish = actions.some((a) => a?.type === 'publish' && !a?.completedAt);
+    const title = describeNewListingDraft(draft, null).title || t('newDrafts.untitled');
+    const ok = await confirm({
+      title: t('newDrafts.syncToEtsy'),
+      description: t(willPublish ? 'newDrafts.confirmSyncPublish' : 'newDrafts.confirmSync'),
+      items: [title],
+      confirmLabel: t('newDrafts.syncToEtsy'),
+    });
+    if (!ok) return;
+    setNewDraftBusyId(draft.id);
+    const toastId = toast.loading(t('draftSync.syncing', { count: 1 }));
+    try {
+      const result = await syncEtsyDraft(draft.id);
+      toast.success(t('newDrafts.syncSuccess', { title, id: String(result?.etsyListingId || '') }), { id: toastId });
+      const warnings: any[] = Array.isArray(result?.warnings) ? result.warnings : [];
+      if (warnings.length > 0) {
+        const details = warnings.map(translateDraftIssue).filter(Boolean).join(' • ');
+        toast(t('draftSync.partialWarning', { title, details }), { icon: '⚠️', duration: 10000 });
+      }
+    } catch (err: any) {
+      if (err instanceof EtsyDraftClientError && err.isConflict) {
+        toast.dismiss(toastId);
+        setSyncConflicts([{ draftId: draft.id, title }]);
+      } else {
+        toast.error(`${title}: ${translateDraftIssue(err) || t('draftSync.failedGeneric')}`, { id: toastId, duration: 8000 });
+      }
+    } finally {
+      setNewDraftBusyId(null);
+      // Success: the real listing appears and the pinned row goes away.
+      // Failure: the row stays, now showing the failed status + error.
+      await refreshAfterNewListingSync();
+    }
+  }, [newDraftBusyId, t, translateDraftIssue, refreshAfterNewListingSync, confirm]);
+
+  const handleDiscardNewListingDraft = useCallback(async (draft: any) => {
+    if (!draft?.id || newDraftBusyId) return;
+    const ok = await confirm({
+      title: t('newDrafts.discardTitle'),
+      description: t('newDrafts.confirmDiscard'),
+      items: [describeNewListingDraft(draft, null).title || t('newDrafts.untitled')],
+      destructive: true,
+    });
+    if (!ok) return;
+    setNewDraftBusyId(draft.id);
+    try {
+      await discardEtsyDraft(draft.id);
+      toast.success(t('newDrafts.discarded'));
+    } catch (err: any) {
+      notify.error(translateDraftIssue(err) || err, t('newDrafts.discardFailed', { error: '' }).replace(/[:\s]+$/, ''));
+    } finally {
+      setNewDraftBusyId(null);
+      await fetchPendingDrafts();
+    }
+  }, [newDraftBusyId, t, translateDraftIssue, fetchPendingDrafts, confirm]);
+
+  // --- DataGrid Columns (Vela-style: image, title+hover actions, stock, price, expires, section, score) ---
+  const columns: GridColDef[] = useMemo(
+    () => [
+      {
+        field: 'thumbnail',
+        headerName: '',
+        width: 68,
+        sortable: false,
+        filterable: false,
+        renderCell: (params: GridRenderCellParams<EtsyListingRow>) => {
+          const thumb = params.row.thumbnail;
+          return thumb ? (
+            <Box
+              component="img"
+              src={thumb.url_170x135}
+              alt=""
+              loading="lazy"
+              sx={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 1 }}
+            />
+          ) : (
+            <Box
+              sx={{
+                width: 52,
+                height: 52,
+                borderRadius: 1,
+                backgroundColor: '#f5f5f5',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Typography variant="caption" color="text.disabled">
+                N/A
+              </Typography>
+            </Box>
+          );
+        },
+      },
+      {
+        field: 'title',
+        headerName: t('titleCol'),
+        flex: 1,
+        minWidth: 280,
+        editable: true,
+        renderCell: (params: GridRenderCellParams<EtsyListingRow>) => {
+          const pendingDraft = pendingDraftsByListing[String(params.row.listing_id)];
+          const draftedTitle = pendingDraft?.fieldPatch?.title;
+          return (
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                width: '100%',
+                position: 'relative',
+                '& .row-actions': {
+                  opacity: 0,
+                  transition: 'opacity 0.15s ease',
+                  position: 'absolute',
+                  right: 0,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  display: 'flex',
+                  gap: 0.25,
+                  bgcolor: 'background.paper',
+                  borderRadius: 1,
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
+                  px: 0.5,
+                  py: 0.25,
+                },
+                '&:hover .row-actions': {
+                  opacity: 1,
+                },
+              }}
+            >
+              <Tooltip title={draftedTitle ? `${params.row.title} → ${draftedTitle}` : params.row.title} arrow>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    cursor: 'pointer',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    pr: pendingDraft ? 18 : 10,
+                    fontStyle: draftedTitle ? 'italic' : 'normal',
+                    '&:hover': { color: 'primary.main', textDecoration: 'underline' },
+                  }}
+                  onClick={() => handleOpenEditor(params.row.listing_id)}
+                >
+                  {draftedTitle || params.row.title}
+                </Typography>
+              </Tooltip>
+              {pendingDraft && (
+                <DraftStatusChip
+                  draft={pendingDraft}
+                  onClick={() => handleOpenEditor(params.row.listing_id)}
+                  // Keep the chip above the absolutely-positioned hover
+                  // action buttons so its tooltip stays reachable.
+                  sx={{ ml: 1, position: 'relative', zIndex: 2 }}
+                />
+              )}
+              {/*
+                When a draft is in failed/conflict state, suppress the on-hover
+                quick-action buttons so they don't cover the status chip — the
+                chip itself opens the editor on click, which is the path the
+                user actually needs.
+              */}
+              <Box
+                className="row-actions"
+                sx={pendingDraft && (pendingDraft.status === 'failed' || pendingDraft.status === 'conflict')
+                  ? { display: 'none !important' }
+                  : undefined}
+              >
+                <Tooltip title={t('edit')} arrow>
+                  <IconButton size="small" onClick={() => handleOpenEditor(params.row.listing_id)} sx={{ p: 0.5 }}>
+                    <EditIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title={t('duplicate.tooltip')} arrow>
+                  <IconButton size="small" aria-label={t('duplicate.tooltip')} onClick={() => handleCopyListing(params.row.listing_id, params.row as EtsyListingRow)} disabled={duplicatingId !== null} sx={{ p: 0.5 }}>
+                    {duplicatingId === params.row.listing_id ? <CircularProgress size={14} /> : <ContentCopyIcon sx={{ fontSize: 16 }} />}
+                  </IconButton>
+                </Tooltip>
+                {ebayConnected && (
+                  <Tooltip title={t('crosslist.listOnEbay')} arrow>
+                    <IconButton size="small" aria-label={t('crosslist.listOnEbay')} onClick={() => handleListOnEbay(params.row.listing_id)} sx={{ p: 0.5 }}>
+                      <SwapHorizIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
+                )}
+                {(params.row.state === 'active' || params.row.state === 'expired' || params.row.state === 'inactive') && (
+                  <Tooltip title={t('renew')} arrow>
+                    <IconButton size="small" color="success" onClick={() => handleRenewListing(params.row.listing_id)} sx={{ p: 0.5 }}>
+                      <RefreshIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
+                )}
+                {params.row.state === 'active' && (
+                  <Tooltip title={t('deactivate')} arrow>
+                    <IconButton size="small" color="warning" onClick={() => handleDeactivateListing(params.row.listing_id)} sx={{ p: 0.5 }}>
+                      <RemoveCircleOutlineIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
+                )}
+                <Tooltip title={t('delete')} arrow>
+                  <IconButton size="small" color="error" onClick={() => setDeleteConfirmId(params.row.listing_id)} sx={{ p: 0.5 }}>
+                    <DeleteIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            </Box>
+          );
+        },
+      },
+      {
+        field: 'quantity',
+        headerName: t('stockCol'),
+        width: 80,
+        renderCell: (params: GridRenderCellParams<EtsyListingRow>) => {
+          const qty = params.row.quantity;
+          return (
+            <Typography variant="body2" sx={{ color: qty === 0 ? 'error.main' : qty < 5 ? 'warning.main' : 'text.primary', fontWeight: qty === 0 ? 700 : 400 }}>
+              {qty}
+            </Typography>
+          );
+        },
+      },
+      {
+        field: 'price',
+        headerName: t('priceCol'),
+        width: 110,
+        editable: true,
+        valueGetter: (value: any, row: EtsyListingRow) => {
+          return row.price ? (row.price.amount / row.price.divisor).toFixed(2) : '0.00';
+        },
+        renderCell: (params: GridRenderCellParams<EtsyListingRow>) => (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Typography variant="body2" sx={{ cursor: 'text', fontWeight: 500 }}>{formatPrice(params.row.price)}</Typography>
+            {params.row.num_favorers > 0 && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, opacity: 0.6 }}>
+                <FavoriteBorderIcon sx={{ fontSize: 12 }} />
+                <Typography variant="caption" sx={{ fontSize: 11 }}>{params.row.num_favorers}</Typography>
+              </Box>
+            )}
+          </Box>
+        ),
+        sortComparator: (v1: any, v2: any, p1: any, p2: any) => {
+          const a = p1.api.getRow(p1.id)?.price;
+          const b = p2.api.getRow(p2.id)?.price;
+          const av = a ? a.amount / a.divisor : 0;
+          const bv = b ? b.amount / b.divisor : 0;
+          return av - bv;
+        },
+      },
+      {
+        field: 'expires',
+        headerName: t('expiresCol'),
+        width: 95,
+        sortable: true,
+        filterable: false,
+        renderCell: (params: GridRenderCellParams<EtsyListingRow>) => (
+          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.82rem' }}>
+            {getExpiresDate(params.row.created_timestamp)}
+          </Typography>
+        ),
+        sortComparator: (v1: any, v2: any, p1: any, p2: any) => {
+          const a = p1.api.getRow(p1.id)?.created_timestamp || 0;
+          const b = p2.api.getRow(p2.id)?.created_timestamp || 0;
+          return a - b;
+        },
+      },
+      {
+        field: 'section',
+        headerName: t('sectionCol'),
+        width: 130,
+        sortable: true,
+        renderCell: (params: GridRenderCellParams<EtsyListingRow>) => {
+          const name = params.row.shop_section_id ? sectionNameMap[params.row.shop_section_id] || '' : '';
+          return (
+            <Typography variant="body2" color="text.secondary" noWrap sx={{ fontSize: '0.82rem' }}>
+              {name || '\u2014'}
+            </Typography>
+          );
+        },
+        sortComparator: (v1: any, v2: any, p1: any, p2: any) => {
+          const a = p1.api.getRow(p1.id)?.shop_section_id;
+          const b = p2.api.getRow(p2.id)?.shop_section_id;
+          const aName = a ? sectionNameMap[a] || '' : '';
+          const bName = b ? sectionNameMap[b] || '' : '';
+          return aName.localeCompare(bName);
+        },
+      },
+      {
+        field: 'skor',
+        headerName: t('scoreCol'),
+        width: 70,
+        sortable: true,
+        filterable: false,
+        renderCell: (params: GridRenderCellParams<EtsyListingRow>) => {
+          const h = calculateHealth(params.row);
+          const gc = h.color;
+          return (
+            <Tooltip
+              arrow
+              title={
+                <Box sx={{ fontSize: 12 }}>
+                  <Box sx={{ fontWeight: 700, mb: 0.5 }}>{t('scoreLabel', { score: h.overall })}</Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: h.tags.color }} />
+                    {t('tagsCount', { count: h.tags.label })}
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: h.images.color }} />
+                    {t('imagesCount', { count: h.images.label })}
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: h.title.color }} />
+                    {t('titleChars', { count: h.title.label })}
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: h.description.color }} />
+                    {t('descChars', { count: h.description.label })}
+                  </Box>
+                </Box>
+              }
+            >
+              <Chip
+                label={h.overall}
+                size="small"
+                sx={{
+                  fontWeight: 700,
+                  fontSize: 12,
+                  height: 26,
+                  minWidth: 38,
+                  bgcolor: `${gc}15`,
+                  color: gc,
+                  border: `1.5px solid ${gc}`,
+                  cursor: 'default',
+                }}
+              />
+            </Tooltip>
+          );
+        },
+        sortComparator: (v1: any, v2: any, p1: any, p2: any) => {
+          const a = calculateHealth(p1.api.getRow(p1.id) as EtsyListingRow);
+          const b = calculateHealth(p2.api.getRow(p2.id) as EtsyListingRow);
+          return a.overall - b.overall;
+        },
+      },
+    ],
+    [pendingDraftsByListing, sectionNameMap, t, ebayConnected, duplicatingId] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  // --- Column visibility for mobile ---
+  const [columnVisibilityModel, setColumnVisibilityModel] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    const handleResize = () => {
+      const w = window.innerWidth;
+      if (w < 768) {
+        setColumnVisibilityModel({ expires: false, section: false, skor: false });
+      } else if (w < 1440) {
+        setColumnVisibilityModel({ expires: false });
+      } else {
+        setColumnVisibilityModel({});
+      }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Active filter count for badge
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (sectionFilter) count++;
+    if (healthFilter) count++;
+    if (excludeTerm.trim()) count++;
+    if (hasDraftFilter) count++;
+    return count;
+  }, [sectionFilter, healthFilter, excludeTerm, hasDraftFilter]);
+
+  return (
+    // overflowX 'clip' (not 'hidden'): no scroll container, so the sticky draft banner can stick.
+    <Box sx={{ p: { xs: 0.5, sm: 1, md: 1.5 }, maxWidth: 1600, mx: 'auto', overflowX: 'clip' }}>
+      {/* Connected per /api/integrations/status, but no shop row came back */}
+      {shopsLoaded && shops.length === 0 && !loading && (
+        <Paper sx={{ mb: 2 }}>
+          <ConnectEmptyState provider="etsy" description={t('noShopConnectedDesc')} />
+        </Paper>
+      )}
+
+      {crosslistLoading && (
+        <Paper sx={{ px: 1.5, py: 1, mb: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <CircularProgress size={16} />
+          <Typography variant="body2" color="text.secondary">{t('crosslist.loading')}</Typography>
+        </Paper>
+      )}
+
+      {/* Main Layout: Sidebar + Content */}
+      <Box sx={{ display: 'flex', gap: 0 }}>
+
+        {/* Left Sidebar (desktop only) */}
+        {!isMobile && (
+          <LeftSidebar
+            shops={shops}
+            selectedShopId={selectedShopId}
+            onSelectShop={setSelectedShopId}
+            statusFilter={statusFilter}
+            onStatusChange={(s) => {
+              setStatusFilter(s);
+              setListings([]);
+              setTotalCount(0);
+            }}
+            statusCounts={statusCounts}
+            shopSections={shopSections}
+            sectionCounts={sectionCounts}
+            sectionFilter={sectionFilter}
+            onSectionChange={setSectionFilter}
+            healthFilter={healthFilter}
+            onHealthChange={setHealthFilter}
+            excludeTerm={excludeTerm}
+            onExcludeTermChange={setExcludeTerm}
+          />
+        )}
+
+        {/* Main Content */}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+
+          {/* Compact Stats Row */}
+          {listings.length > 0 && (
+            <Paper sx={{ px: 1.5, py: 0.5, mb: 0.5, display: 'flex', alignItems: 'center', gap: { xs: 1.5, sm: 2 }, flexWrap: 'wrap', minHeight: 32 }}>
+              <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                {t('listingCount', { count: totalCount })}
+              </Typography>
+              {!isMobile && (
+                <>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
+                    ·&nbsp;&nbsp;{quickStats.totalViews.toLocaleString()} {t('views')}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
+                    ·&nbsp;&nbsp;{quickStats.totalFavs.toLocaleString()} {t('favorites')}
+                  </Typography>
+                </>
+              )}
+              {quickStats.outOfStock > 0 && (
+                <Typography
+                  variant="body2"
+                  sx={{ fontSize: '0.875rem', color: 'error.main', fontWeight: 600, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                  onClick={() => setHealthFilter('no_stock')}
+                >
+                  ·&nbsp;&nbsp;{t('outOfStockCount', { count: quickStats.outOfStock })}
+                </Typography>
+              )}
+              {quickStats.withIssues > 0 && (
+                <Typography
+                  variant="body2"
+                  sx={{ fontSize: '0.875rem', color: 'warning.main', fontWeight: 600, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                  onClick={() => setHealthFilter('issues')}
+                >
+                  ·&nbsp;&nbsp;{t('issuesCount', { count: quickStats.withIssues })}
+                </Typography>
+              )}
+            </Paper>
+          )}
+
+          {/* Top Toolbar */}
+          <Paper sx={{ px: 1.5, py: 0.75, mb: 0.5, overflow: 'hidden', width: '100%', boxSizing: 'border-box' }}>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+
+              {/* Mobile: shop selector */}
+              {isMobile && shops.length > 0 && (
+                <FormControl size="small" sx={{ minWidth: 100 }}>
+                  <Select
+                    value={selectedShopId}
+                    onChange={(e) => setSelectedShopId(e.target.value)}
+                    displayEmpty
+                    sx={{ fontSize: '0.82rem' }}
+                  >
+                    {shops.map((s) => (
+                      <MenuItem key={s.shopId} value={s.shopId}>{s.shopName}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
+
+              {/* Page title */}
+              <Typography variant="subtitle1" fontWeight={700} sx={{ display: { xs: 'none', sm: 'block' } }}>
+                {statusFilter === 'active' ? t('stateActive') : statusFilter === 'draft' ? t('stateDraft') : statusFilter === 'inactive' ? t('stateInactive') : t('stateExpired')}
+              </Typography>
+
+              {/* Mobile: status filter */}
+              {isMobile && (
+                <FormControl size="small" sx={{ minWidth: 85 }}>
+                  <Select
+                    value={statusFilter}
+                    onChange={(e) => {
+                      const val = e.target.value as 'active' | 'draft' | 'inactive' | 'expired';
+                      setStatusFilter(val);
+                      setListings([]);
+                      setTotalCount(0);
+                    }}
+                    sx={{ fontSize: '0.82rem' }}
+                  >
+                    <MenuItem value="active">{t('stateActive')}</MenuItem>
+                    <MenuItem value="draft">{t('stateDraft')}</MenuItem>
+                    <MenuItem value="inactive">{t('stateInactive')}</MenuItem>
+                    <MenuItem value="expired">{t('stateExpired')}</MenuItem>
+                  </Select>
+                </FormControl>
+              )}
+
+              {/* Sync from Etsy */}
+              <Tooltip title={lastSyncAt ? t('lastSyncAt', { time: new Date(lastSyncAt).toLocaleString() }) : t('neverSynced')}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={syncing ? <CircularProgress size={14} /> : <RefreshIcon fontSize="small" />}
+                  onClick={syncListings}
+                  disabled={syncing || loading}
+                  sx={{
+                    minHeight: 36, px: 1.5, borderRadius: '8px', textTransform: 'none',
+                    fontWeight: 600, fontSize: '0.8rem', whiteSpace: 'nowrap',
+                    border: '1px solid #e2e8f0', color: '#475569',
+                    '&:hover': { bgcolor: '#f8fafc', borderColor: '#cbd5e1' },
+                  }}
+                >
+                  {syncing ? t('syncing') : t('syncBtn')}
+                </Button>
+              </Tooltip>
+              {/* Cache freshness (W3 §2a): "Etsy live · last change …" / "Delayed · checked daily …". */}
+              {selectedShopId && <CacheFreshnessChip shopId={selectedShopId} />}
+
+              {/* Spacer */}
+              <Box sx={{ flex: '1 0 0' }} />
+
+              {/* Search */}
+              <TextField
+                size="small"
+                placeholder={t('searchPlaceholder')}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                sx={{ minWidth: { xs: 80, sm: 160 }, maxWidth: 240 }}
+                InputProps={{
+                  startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18 }} /></InputAdornment>,
+                }}
+              />
+
+              {/* Mobile: Filters button */}
+              {isMobile && (
+                <Badge badgeContent={activeFilterCount} color="primary" sx={{ '& .MuiBadge-badge': { fontSize: 10, minWidth: 16, height: 16 } }}>
+                  <IconButton
+                    size="small"
+                    onClick={() => setFilterDrawerOpen(true)}
+                    sx={{
+                      minWidth: 36, minHeight: 36, borderRadius: '8px', border: '1px solid',
+                      borderColor: activeFilterCount > 0 ? 'primary.main' : '#e2e8f0',
+                      color: activeFilterCount > 0 ? 'primary.main' : '#475569',
+                    }}
+                  >
+                    <FilterListIcon fontSize="small" />
+                  </IconButton>
+                </Badge>
+              )}
+
+              {/* Tools menu */}
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={(e) => setToolsMenuAnchor(e.currentTarget)}
+                sx={{
+                  minHeight: 36, whiteSpace: 'nowrap', minWidth: 0, borderRadius: '8px', textTransform: 'none', fontWeight: 600,
+                  borderColor: '#e2e8f0', color: '#475569', px: 1.5, fontSize: '0.82rem',
+                  '&:hover': { borderColor: '#cbd5e1', bgcolor: '#f8fafc' },
+                }}
+              >
+                <MoreVertIcon sx={{ mr: { xs: 0, sm: 0.5 }, fontSize: 18 }} />
+                <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>{t('tools')}</Box>
+              </Button>
+
+              {/* + New Listing */}
+              <Button
+                variant="contained"
+                size="small"
+                onClick={() => openCreator(null)}
+                sx={{
+                  minHeight: 36, whiteSpace: 'nowrap', borderRadius: '8px', textTransform: 'none', fontWeight: 600,
+                  background: 'linear-gradient(135deg, #10b981, #059669)', boxShadow: '0 2px 8px rgba(5,150,105,0.3)',
+                  px: 2, fontSize: '0.82rem',
+                  '&:hover': { background: 'linear-gradient(135deg, #059669, #047857)' },
+                }}
+              >
+                <AddIcon sx={{ mr: 0.5, fontSize: 18 }} />
+                <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>{t('newListing')}</Box>
+              </Button>
+            </Box>
+          </Paper>
+
+          {/* Tools Menu */}
+          <Menu
+            anchorEl={toolsMenuAnchor}
+            open={Boolean(toolsMenuAnchor)}
+            onClose={() => setToolsMenuAnchor(null)}
+            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+          >
+            <MenuItem onClick={() => { setToolsMenuAnchor(null); setFindReplaceOpen(true); }}>
+              <ListItemIcon><FindReplaceIcon fontSize="small" /></ListItemIcon>
+              <ListItemText>{t('findReplace')}</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => { setToolsMenuAnchor(null); setDuplicateDetectorOpen(true); }}>
+              <ListItemIcon><ContentPasteSearchIcon fontSize="small" /></ListItemIcon>
+              <ListItemText>{t('duplicateDetection')}</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => { setToolsMenuAnchor(null); setSmartPricingOpen(true); }}>
+              <ListItemIcon><PriceChangeIcon fontSize="small" /></ListItemIcon>
+              <ListItemText>{t('smartPricing')}</ListItemText>
+            </MenuItem>
+            <Divider />
+            <MenuItem onClick={() => { setToolsMenuAnchor(null); handleExportCSV(); }}>
+              <ListItemIcon><FileDownloadIcon fontSize="small" /></ListItemIcon>
+              <ListItemText>{t('csvDownload')}</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => { setToolsMenuAnchor(null); handleCSVFileSelect(); }}>
+              <ListItemIcon><FileUploadIcon fontSize="small" /></ListItemIcon>
+              <ListItemText>{t('csvUpload')}</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => { setToolsMenuAnchor(null); setBackupManagerOpen(true); }}>
+              <ListItemIcon><InventoryIcon fontSize="small" /></ListItemIcon>
+              <ListItemText>{t('backups')}</ListItemText>
+            </MenuItem>
+          </Menu>
+
+          {/* Page-level staged-draft summary: nothing here is on Etsy until synced */}
+          {draftSummary.total > 0 && (
+            <Paper
+              role="status"
+              sx={{
+                position: 'sticky', top: 0, zIndex: 6,
+                px: 1.5, py: 0.75, mb: 0.5,
+                display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap',
+                border: '1px solid',
+                borderColor: draftSummary.failed + draftSummary.conflicts > 0 ? 'warning.light' : 'primary.light',
+                bgcolor: 'background.paper',
+              }}
+            >
+              <EditNoteIcon fontSize="small" color={draftSummary.failed + draftSummary.conflicts > 0 ? 'warning' : 'primary'} />
+              <Typography variant="body2" sx={{ fontWeight: 600, flex: '1 1 auto', minWidth: 0 }}>
+                {t('draftBanner.unsynced', { count: draftSummary.pending })}
+                {draftSummary.failed > 0 && <>{' · '}<Box component="span" sx={{ color: 'error.main' }}>{t('draftBanner.failed', { count: draftSummary.failed })}</Box></>}
+                {draftSummary.conflicts > 0 && <>{' · '}<Box component="span" sx={{ color: 'warning.main' }}>{t('draftBanner.conflicts', { count: draftSummary.conflicts })}</Box></>}
+              </Typography>
+              <Chip
+                icon={<FilterListIcon sx={{ fontSize: 16 }} />}
+                label={t('draftBanner.hasDraftFilter')}
+                color={hasDraftFilter ? 'primary' : 'default'}
+                variant={hasDraftFilter ? 'filled' : 'outlined'}
+                onClick={() => setHasDraftFilter((v) => !v)}
+                sx={{ minHeight: { xs: 44, sm: 36 }, cursor: 'pointer' }}
+              />
+              <Button
+                variant="contained"
+                size="small"
+                onClick={handleSyncAllDrafts}
+                disabled={bulkSyncingDrafts || draftSummary.syncable.length === 0}
+                startIcon={bulkSyncingDrafts ? <CircularProgress size={16} color="inherit" /> : <SyncIcon sx={{ fontSize: '16px !important' }} />}
+                sx={{ minHeight: 44, textTransform: 'none', fontWeight: 700, borderRadius: '8px', whiteSpace: 'nowrap' }}
+              >
+                {t('draftBanner.syncAllCount', { count: draftSummary.syncable.length })}
+              </Button>
+            </Paper>
+          )}
+
+          {/* Selection toolbar: Vela-style — N selected + Delete, Export, Copy, Edit */}
+          {selectedCount > 0 && selectedShopId && (
+            <Paper
+              sx={{
+                px: 1.5, py: 1, mb: 1.5,
+                display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap',
+                bgcolor: 'primary.50',
+                border: '1px solid', borderColor: 'primary.200',
+                borderRadius: 2,
+              }}
+            >
+              <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.main', mr: 0.5, whiteSpace: 'nowrap' }}>
+                {t('selected', { count: selectedCount })}
+              </Typography>
+              <BulkOperationsBar
+                selectedCount={selectedCount}
+                selectedListings={selectedListings}
+                shopSections={shopSections}
+                shopId={selectedShopId}
+                allShops={shops}
+                onOpenBulkEditor={openBulkEditor}
+                onCompleted={() => {
+                  fetchPendingDrafts();
+                  fetchListings();
+                }}
+              />
+              {selectedDraftIds.length > 0 && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleSyncSelectedDrafts}
+                  disabled={bulkSyncingDrafts}
+                  startIcon={
+                    bulkSyncingDrafts
+                      ? <CircularProgress size={16} />
+                      : <SyncIcon sx={{ fontSize: '16px !important' }} />
+                  }
+                  sx={{
+                    minHeight: 36,
+                    textTransform: 'none',
+                    fontWeight: 700,
+                    borderRadius: '8px',
+                    whiteSpace: 'nowrap',
+                    bgcolor: 'background.paper',
+                  }}
+                >
+                  {isMobile
+                    ? t('syncDraftsShort', { count: selectedDraftIds.length })
+                    : t('syncDraftsToEtsy', { count: selectedDraftIds.length })}
+                </Button>
+              )}
+              <Button
+                variant="contained"
+                size="small"
+                onClick={openBulkEditor}
+                startIcon={<EditIcon sx={{ fontSize: '16px !important' }} />}
+                sx={{
+                  minHeight: 36, textTransform: 'none', fontWeight: 700, borderRadius: '8px', ml: 'auto',
+                  background: 'linear-gradient(135deg, #2563eb, #4f46e5)',
+                  '&:hover': { background: 'linear-gradient(135deg, #1d4ed8, #4338ca)' },
+                }}
+              >
+                {isMobile ? t('editShort') : t('bulkEdit')}
+              </Button>
+            </Paper>
+          )}
+
+          {/* Active Filter Chips (desktop, when sidebar filters are active) */}
+          {!isMobile && activeFilterCount > 0 && (
+            <Box sx={{ display: 'flex', gap: 0.5, mb: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+              {sectionFilter && (
+                <Chip
+                  label={t('sectionChip', { name: shopSections.find(s => String(s.shop_section_id) === sectionFilter)?.title || sectionFilter })}
+                  size="small"
+                  onDelete={() => setSectionFilter('')}
+                  sx={{ height: 28 }}
+                />
+              )}
+              {healthFilter && (
+                <Chip
+                  label={t('healthChip', { filter: healthFilter === 'issues' ? t('healthChipIssues') : healthFilter === 'missing_images' ? t('healthChipMissingImages') : healthFilter === 'missing_tags' ? t('healthChipMissingTags') : healthFilter === 'short_title' ? t('healthChipShortTitle') : healthFilter === 'no_description' ? t('healthChipNoDescription') : healthFilter === 'no_video' ? t('healthChipNoVideo') : t('healthChipNoStock') })}
+                  size="small"
+                  onDelete={() => setHealthFilter('')}
+                  color="warning"
+                  sx={{ height: 28 }}
+                />
+              )}
+              {hasDraftFilter && (
+                <Chip
+                  label={t('draftBanner.hasDraftFilter')}
+                  size="small"
+                  onDelete={() => setHasDraftFilter(false)}
+                  color="primary"
+                  sx={{ height: 28 }}
+                />
+              )}
+              {excludeTerm.trim() && (
+                <Chip
+                  label={t('excludeChip', { term: excludeTerm })}
+                  size="small"
+                  onDelete={() => setExcludeTerm('')}
+                  color="error"
+                  variant="outlined"
+                  sx={{ height: 28 }}
+                />
+              )}
+              <Chip
+                label={t('clearAll')}
+                size="small"
+                variant="outlined"
+                onClick={() => { setSectionFilter(''); setHealthFilter(''); setExcludeTerm(''); setHasDraftFilter(false); }}
+                sx={{ height: 28, cursor: 'pointer' }}
+              />
+            </Box>
+          )}
+
+          {/* Loading more indicator */}
+          {loadingMore && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, px: 1 }}>
+              <LinearProgress sx={{ flex: 1, height: 4, borderRadius: 2 }} />
+              <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                {t('loadingProgress', { loaded: listings.length, total: totalCount })}
+              </Typography>
+            </Box>
+          )}
+
+          {/* Staged new listings, pinned above both the mobile cards and the DataGrid */}
+          <PendingNewListingsPanel
+            drafts={pendingNewListingDrafts}
+            currencyCode={shopCurrency}
+            busyDraftId={newDraftBusyId}
+            onSync={handleSyncNewListingDraft}
+            onDiscard={handleDiscardNewListingDraft}
+          />
+
+          {/* Mobile Card List */}
+          <Box sx={{ display: { xs: 'block', md: 'none' }, overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+            {loading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : filteredListings.length === 0 ? (
+              <Paper sx={{ p: 3, textAlign: 'center' }}>
+                <Typography color="text.secondary">
+                  {!selectedShopId ? t('selectShop') : hasDraftFilter && draftSummary.total > 0 ? t('draftBanner.draftsInOtherTabs') : t('noListingsFound')}
+                </Typography>
+              </Paper>
+            ) : (
+              <>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, px: 0.5 }}>
+                  {filteredListings.length !== totalCount ? t('resultCountWithTotal', { count: filteredListings.length, total: totalCount }) : t('resultCount', { count: filteredListings.length })}
+                </Typography>
+                {filteredListings.slice(0, mobileVisibleCount).map((listing) => (
+                  <MobileEtsyListingCard
+                    key={listing.listing_id}
+                    listing={listing}
+                    onEdit={handleOpenEditor}
+                    onCopy={handleCopyListing}
+                    onDelete={(id) => setDeleteConfirmId(id)}
+                    onRenew={handleRenewListing}
+                    onDeactivate={handleDeactivateListing}
+                    selected={mobileSelectedIds.has(listing.listing_id)}
+                    onToggleSelect={handleMobileToggleSelect}
+                    sectionName={listing.shop_section_id ? sectionNameMap[listing.shop_section_id] : undefined}
+                    pendingDraft={pendingDraftsByListing[String(listing.listing_id)]}
+                    onListOnEbay={ebayConnected ? handleListOnEbay : undefined}
+                    duplicating={duplicatingId}
+                  />
+                ))}
+                {mobileVisibleCount < filteredListings.length && (
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    onClick={() => setMobileVisibleCount((prev) => prev + 25)}
+                    sx={{ mt: 1, mb: 2, minHeight: 44 }}
+                  >
+                    {t('loadMore', { count: Math.min(25, filteredListings.length - mobileVisibleCount) })}
+                  </Button>
+                )}
+              </>
+            )}
+          </Box>
+
+          {/* Column Preset Toggle + DataGrid (desktop only — not mounted on mobile,
+              where the expandable MobileEtsyListingCard list above is used) */}
+          {!isMobile && (
+          <Paper sx={{ width: '100%', display: { xs: 'none', md: 'block' } }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', px: 1.5, pt: 0.5, gap: 0.5 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>{t('viewPreset')}</Typography>
+              {([
+                { label: t('compact'), model: { expires: false, section: false } as Record<string, boolean> },
+                { label: t('detailed'), model: { expires: false } as Record<string, boolean> },
+                { label: t('all'), model: {} as Record<string, boolean> },
+              ]).map((preset) => {
+                const isActive = JSON.stringify(columnVisibilityModel) === JSON.stringify(preset.model);
+                return (
+                  <Chip
+                    key={preset.label}
+                    label={preset.label}
+                    size="small"
+                    onClick={() => setColumnVisibilityModel(preset.model)}
+                    sx={{
+                      height: 24, fontSize: '0.8rem', fontWeight: isActive ? 700 : 400,
+                      bgcolor: isActive ? 'primary.main' : 'transparent',
+                      color: isActive ? 'white' : 'text.secondary',
+                      border: '1px solid', borderColor: isActive ? 'primary.main' : 'divider',
+                      cursor: 'pointer',
+                      '&:hover': { bgcolor: isActive ? 'primary.dark' : 'action.hover' },
+                    }}
+                  />
+                );
+              })}
+            </Box>
+            <DataGrid
+              rows={filteredListings}
+              columns={columns}
+              loading={loading}
+              checkboxSelection
+              disableRowSelectionOnClick
+              processRowUpdate={handleProcessRowUpdate}
+              onProcessRowUpdateError={(error) => notify.error(error, t('updateError', { error: '' }).replace(/[:\s]+$/, ''))}
+              rowHeight={52}
+              rowSelectionModel={selectedIds}
+              onRowSelectionModelChange={(newSelection) => setSelectedIds(newSelection)}
+              paginationModel={paginationModel}
+              onPaginationModelChange={setPaginationModel}
+              pageSizeOptions={[25, 50, 100]}
+              columnVisibilityModel={columnVisibilityModel}
+              onColumnVisibilityModelChange={(model) => setColumnVisibilityModel(model)}
+              autoHeight
+              sx={{
+                border: 'none',
+                '& .MuiDataGrid-cell': {
+                  display: 'flex',
+                  alignItems: 'center',
+                },
+                '& .MuiDataGrid-row:hover': {
+                  backgroundColor: 'action.hover',
+                },
+                // Footer showing count like Vela
+                '& .MuiTablePagination-displayedRows': {
+                  fontSize: '0.82rem',
+                },
+              }}
+              slots={{
+                noRowsOverlay: () => (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      height: '100%',
+                      py: 4,
+                    }}
+                  >
+                    <Typography color="text.secondary">
+                      {!selectedShopId ? t('selectShop') : hasDraftFilter && draftSummary.total > 0 ? t('draftBanner.draftsInOtherTabs') : t('noListingsFound')}
+                    </Typography>
+                  </Box>
+                ),
+                loadingOverlay: () => (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      height: '100%',
+                    }}
+                  >
+                    <CircularProgress />
+                  </Box>
+                ),
+              }}
+            />
+          </Paper>
+          )}
+        </Box>
+      </Box>
+
+      {/* Bulk sync conflicts: listing changed on Etsy after the draft was staged */}
+      <Dialog open={!!syncConflicts} onClose={() => setSyncConflicts(null)} maxWidth="sm" fullWidth fullScreen={isMobile}>
+        <DialogTitle>{t('draftSync.conflictDialogTitle', { count: syncConflicts?.length || 0 })}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 1.5 }}>{t('draftSync.conflictDialogBody')}</Typography>
+          <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
+            {(syncConflicts || []).slice(0, 20).map((c) => (
+              <li key={c.draftId}><Typography variant="body2" sx={{ wordBreak: 'break-word' }}>{c.title}</Typography></li>
+            ))}
+          </Box>
+          <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 1.5 }}>
+            {t('draftSync.conflictDialogWarning')}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSyncConflicts(null)}>{t('cancel')}</Button>
+          <Button variant="contained" color="warning" onClick={handleForceSyncConflicts} disabled={bulkSyncingDrafts}>
+            {t('draftSync.applyAnyway')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      {deleteConfirmId !== null && (
+        <Box
+          sx={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1300,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            bgcolor: 'rgba(0,0,0,0.5)',
+          }}
+          onClick={() => setDeleteConfirmId(null)}
+        >
+          <Paper
+            sx={{ p: 3, maxWidth: 400, mx: 2 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Typography variant="h6" gutterBottom>
+              {t('deleteListingTitle')}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              {t('deleteListingConfirm')}
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+              <Button size="small" onClick={() => setDeleteConfirmId(null)}>
+                {t('cancel')}
+              </Button>
+              <Button
+                size="small"
+                variant="contained"
+                color="error"
+                onClick={() => handleDeleteListing(deleteConfirmId)}
+              >
+                {t('delete')}
+              </Button>
+            </Box>
+          </Paper>
+        </Box>
+      )}
+
+      {/* Mobile Filter Drawer */}
+      {isMobile && (
+        <SwipeableDrawer
+          anchor="bottom"
+          open={filterDrawerOpen}
+          onClose={() => setFilterDrawerOpen(false)}
+          onOpen={() => setFilterDrawerOpen(true)}
+          PaperProps={{ sx: { borderTopLeftRadius: 16, borderTopRightRadius: 16, px: 2, pb: 3, pt: 1 } }}
+        >
+          <Box sx={{ width: 40, height: 4, bgcolor: 'divider', borderRadius: 2, mx: 'auto', mb: 2 }} />
+          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2 }}>{t('filters')}</Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <FormControl size="small" fullWidth>
+              <InputLabel>{t('sectionLabel')}</InputLabel>
+              <Select value={sectionFilter} onChange={(e) => setSectionFilter(e.target.value)} label={t('sectionLabel')}>
+                <MenuItem value="">{t('allSections')}</MenuItem>
+                {shopSections.map((s) => <MenuItem key={s.shop_section_id} value={String(s.shop_section_id)}>{s.title}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <FormControl size="small" fullWidth>
+              <InputLabel>{t('healthLabel')}</InputLabel>
+              <Select value={healthFilter} onChange={(e) => setHealthFilter(e.target.value)} label={t('healthLabel')}>
+                <MenuItem value="">{t('allHealth')}</MenuItem>
+                <MenuItem value="issues">{t('healthChipIssues')}</MenuItem>
+                <MenuItem value="missing_images">{t('healthMissingImages')}</MenuItem>
+                <MenuItem value="missing_tags">{t('healthMissingTags')}</MenuItem>
+                <MenuItem value="short_title">{t('healthShortTitle')}</MenuItem>
+                <MenuItem value="no_description">{t('healthNoDescription')}</MenuItem>
+                <MenuItem value="no_video">{t('healthNoVideo')}</MenuItem>
+                <MenuItem value="no_stock">{t('healthNoStock')}</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField
+              size="small"
+              fullWidth
+              label={t('excludeLabel')}
+              placeholder={t('excludeWordPlaceholder')}
+              value={excludeTerm}
+              onChange={(e) => setExcludeTerm(e.target.value)}
+            />
+            <Button
+              variant={hasDraftFilter ? 'contained' : 'outlined'}
+              startIcon={<EditNoteIcon />}
+              onClick={() => setHasDraftFilter((v) => !v)}
+              sx={{ minHeight: 44, textTransform: 'none', justifyContent: 'flex-start' }}
+            >
+              {t('draftBanner.hasDraftFilter')}
+            </Button>
+            {activeFilterCount > 0 && (
+              <Button size="small" color="error" onClick={() => { setSectionFilter(''); setHealthFilter(''); setExcludeTerm(''); setHasDraftFilter(false); }}>
+                {t('clearFilters')}
+              </Button>
+            )}
+          </Box>
+        </SwipeableDrawer>
+      )}
+
+      {/* Editor Drawer */}
+      <ListingEditorDrawer
+        open={drawerOpen}
+        onClose={() => {
+          setDrawerOpen(false);
+          setDrawerListingId(null);
+        }}
+        listingId={drawerListingId}
+        shopId={selectedShopId}
+        refreshKey={drawerRefreshKey}
+        shopSections={shopSections}
+        shippingProfiles={shippingProfiles}
+        returnPolicies={returnPolicies}
+        onSaved={() => {
+          Object.keys(listingsCacheRef.current).forEach(key => {
+            if (key.startsWith(selectedShopId)) delete listingsCacheRef.current[key];
+          });
+          fetchPendingDrafts();
+          fetchListings();
+        }}
+        onOpenListing={(newId) => {
+          setStatusFilter('draft');
+          setDrawerListingId(newId);
+        }}
+        marketResearchData={null}
+      />
+
+      {/* Creator Dialog */}
+      <ListingCreatorDialog
+        open={createDialogOpen}
+        onClose={closeCreator}
+        copySource={creatorCopySource}
+        shopId={selectedShopId}
+        shopSections={shopSections}
+        shippingProfiles={shippingProfiles}
+        returnPolicies={returnPolicies}
+        marketResearchData={creatorResearch}
+        currencyCode={shopCurrency}
+        onCreated={(listingId) => {
+          // ListingCreatorDialog already toasted the outcome (local draft save,
+          // or the result of its immediate Create & Publish sync). A negative id
+          // means nothing reached Etsy yet: the draft shows as a pinned row.
+          closeCreator();
+          if (listingId < 0) {
+            fetchPendingDrafts();
+            return;
+          }
+          refreshAfterNewListingSync();
+        }}
+      />
+
+      {/* Find & Replace Dialog */}
+      <FindReplaceDialog
+        open={findReplaceOpen}
+        onClose={() => setFindReplaceOpen(false)}
+        listings={filteredListings.map((l) => ({
+          listing_id: l.listing_id,
+          title: l.title,
+          description: l.description,
+          tags: l.tags,
+          materials: l.materials,
+        }))}
+        shopId={selectedShopId}
+        onCompleted={() => {
+          setFindReplaceOpen(false);
+          fetchPendingDrafts();
+          fetchListings();
+        }}
+      />
+
+      {/* Smart Pricing Dialog */}
+      <SmartPricing
+        open={smartPricingOpen}
+        onClose={() => setSmartPricingOpen(false)}
+        listings={filteredListings.map((l) => ({
+          listing_id: l.listing_id,
+          title: l.title,
+          price: l.price,
+          views: l.views,
+          quantity: l.quantity,
+        }))}
+      />
+
+      {/* Duplicate Detector Dialog */}
+      <DuplicateDetector
+        open={duplicateDetectorOpen}
+        onClose={() => setDuplicateDetectorOpen(false)}
+        listings={filteredListings.map((l) => ({
+          listing_id: l.listing_id,
+          title: l.title,
+          description: l.description,
+          tags: l.tags,
+          price: l.price,
+          quantity: l.quantity,
+          views: l.views,
+          num_favorers: l.num_favorers,
+          state: l.state,
+        }))}
+        shopId={selectedShopId}
+        onEdit={(listingId) => handleOpenEditor(listingId)}
+        onCompleted={() => {
+          setDuplicateDetectorOpen(false);
+          fetchPendingDrafts();
+          fetchListings();
+        }}
+      />
+
+      {/* Backup Manager Dialog */}
+      <BackupManager
+        open={backupManagerOpen}
+        onClose={() => setBackupManagerOpen(false)}
+        shopId={selectedShopId}
+        onRestored={() => {
+          setBackupManagerOpen(false);
+          fetchPendingDrafts();
+          fetchListings();
+        }}
+      />
+
+      {/* Bulk Editor (Vela-style full-page) */}
+      <BulkEditor
+        open={bulkEditorOpen}
+        onClose={closeBulkEditor}
+        listings={selectedListings}
+        shopId={selectedShopId}
+        shopName={shops.find(s => s.shopId === selectedShopId)?.shopName}
+        shopSections={shopSections}
+        shippingProfiles={shippingProfiles}
+        returnPolicies={returnPolicies}
+        onCompleted={() => {
+          closeBulkEditor();
+          fetchPendingDrafts();
+          fetchListings();
+        }}
+        onChanged={() => {
+          // Incremental photo/video edit staged — refresh drafts, keep editor open.
+          fetchPendingDrafts();
+        }}
+      />
+
+      {/* CSV Import Preview Dialog */}
+      <Dialog
+        open={csvImportDialogOpen}
+        onClose={() => {
+          if (!csvImporting) {
+            setCsvImportDialogOpen(false);
+            setCsvImportRows([]);
+          }
+        }}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>{t('csvImportPreview')}</DialogTitle>
+        <DialogContent>
+          {csvImporting ? (
+            <Box sx={{ py: 3 }}>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                {t('csvImportInProgress')}
+              </Typography>
+              <LinearProgress variant="determinate" value={csvImportProgress} />
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                {t('csvImportPercent', { percent: Math.round(csvImportProgress) })}
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                {t('csvImportWillUpdate', { count: csvImportRows.length })}
+              </Typography>
+              <TableContainer sx={{ maxHeight: 400 }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>{t('csvListingId')}</TableCell>
+                      <TableCell>{t('csvTitle')}</TableCell>
+                      <TableCell>{t('csvPrice')}</TableCell>
+                      <TableCell>{t('csvStock')}</TableCell>
+                      <TableCell>{t('csvTags')}</TableCell>
+                      <TableCell>{t('csvStatus')}</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {csvImportRows.slice(0, 50).map((row, i) => (
+                      <TableRow key={i}>
+                        <TableCell>{row.listing_id}</TableCell>
+                        <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {row.title || '\u2014'}
+                        </TableCell>
+                        <TableCell>{row.price || '\u2014'}</TableCell>
+                        <TableCell>{row.quantity || '\u2014'}</TableCell>
+                        <TableCell sx={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {row.tags || '\u2014'}
+                        </TableCell>
+                        <TableCell>{row.state || '\u2014'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              {csvImportRows.length > 50 && (
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                  {t('csvAndMoreRows', { count: csvImportRows.length - 50 })}
+                </Typography>
+              )}
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setCsvImportDialogOpen(false); setCsvImportRows([]); }} disabled={csvImporting}>
+            {t('cancel')}
+          </Button>
+          <Button variant="contained" onClick={handleCSVImportConfirm} disabled={csvImporting || csvImportRows.length === 0}>
+            {csvImporting ? t('csvImporting') : t('csvUpdateListings', { count: csvImportRows.length })}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}
+
+// --- Layout wrapper (follows labels.tsx pattern) ---
+function EtsyListingsPageWithLayout(props: any): JSX.Element {
+  return (
+    <AppLayout title="Etsy Listings - KolayXport">
+      {/* Everything on this page needs a connected Etsy shop (market research lives on its own pages). */}
+      <RequireConnection provider="etsy">
+        <EtsyListingsPage {...props} />
+      </RequireConnection>
+    </AppLayout>
+  );
+}
+
+export default withAuth(EtsyListingsPageWithLayout);

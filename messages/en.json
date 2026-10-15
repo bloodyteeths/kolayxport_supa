@@ -13211,7 +13211,17 @@
       "next": "Next order",
       "openFailed": "Couldn't open the label. Allow pop-ups for KolayXport."
     },
-    "useSenderPhone": "Use my phone ({phone})"
+    "useSenderPhone": "Use my phone ({phone})",
+    "otherCarriers": "{count, plural, one {Other carrier (#)} other {Other carriers (#)}}",
+    "masked": {
+      "reason": "The recipient address is hidden by {mp, select, trendyol {Trendyol} amazon {Amazon} hepsiburada {Hepsiburada} other {the marketplace}} until shipment. Just enter the package details."
+    },
+    "shipToMissing": "{count, plural, one {# field is missing} other {# fields are missing}}",
+    "optionsSummary": {
+      "paidBy": "{who, select, sender {Paid by sender} other {Paid by recipient}}",
+      "cod": "Cash on delivery {amount}",
+      "sms": "{state, select, both {SMS: shipped + delivered} shipped {SMS: shipped} delivered {SMS: delivered} other {No SMS}}"
+    }
   },
   "billing": {
     "banner": {

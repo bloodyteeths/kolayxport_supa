@@ -13,6 +13,11 @@
  * while a created Shipment exists (UPS/DHL: any; FedEx: a FedEx one), so the way there is "Delete label" first.
  * The recipient phone is the order's as stored; it is normalised to E.164 only for the phone input, and the
  * typed value is sent only when the user edits it (the legacy drawers sent the stored phone).
+ * Usability wave 2026-10-15: Ship to is a read-only card (`ShipToSummary`); a missing required field renders
+ * alone under it, highlighted; the full form opens only from "Edit" or Fix address. Carriers: the route's
+ * carriers up front (TR → TR: DHL eCommerce), the rest behind "Other carriers"; the last service per route
+ * is remembered. A masked marketplace address (Trendyol "***") shows an info line with the marketplace cargo
+ * code instead of a form of stars, and the stars are never sent to a carrier.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Box } from '@mui/material';
@@ -29,6 +34,7 @@ import { EmptyState } from '@/components/ds/state/EmptyState';
 import { PanelSkeleton } from '@/components/ds/state/Skeletons';
 import { StatusPill } from '@/components/ds/data/StatusPill';
 import { LogoTile } from '@/components/ds/data/LogoTile';
+import { CopyText } from '@/components/ds/format/CopyText';
 import { icons } from '@/lib/ds/icons';
 import { neutral as n, tone } from '@/lib/ds/tokens';
 import { useFormatters } from '@/lib/format';
@@ -38,7 +44,7 @@ import CancelledOrderLabelDialog, { type LabelGuardCode } from '@/components/ord
 import { ShipToForm, phoneToE164, senderPhoneE164, type ShipToFieldKey } from '@/components/domain/orders/panel/ShipToForm';
 import type { OrderRow, TrackingSubmissionSummary } from '@/lib/orders/types';
 import {
-  canPushTracking, draftFromOrder, isInternational, withCarrier, applyPreset,
+  canPushTracking, draftFromOrder, isInternational, withCarrier, applyPreset, marketplaceSelectKey,
   type CarrierKey, type LabelDraft, type LabelOrderInput, type PackagePreset, type ShipTo,
 } from '@/lib/shipping/labelDraft';
 import {
@@ -61,6 +67,10 @@ import { CarrierServiceSection } from './CarrierServiceSection';
 import { CustomsSection } from './CustomsSection';
 import { OptionsSection } from './OptionsSection';
 import { LabelSuccess, type PushState } from './LabelSuccess';
+import { ShipToSummary } from './ShipToSummary';
+import {
+  isMaskedShipTo, primaryCarriersFor, rememberRouteRate, rememberedRate, routeOf, stripMasked,
+} from './labelUx';
 
 export type { CarrierKey } from '@/lib/shipping/labelDraft';
 
@@ -152,6 +162,10 @@ export function CreateLabelPanel({ order, open, onClose, onBack, defaultCarrier,
   const [openFailed, setOpenFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [autoFocusField, setAutoFocusField] = useState<ShipToFieldKey | undefined>(undefined);
+  /** Ship-to fields asked under the summary card. Only grows while the panel is open (no field vanishes mid-typing). */
+  const [askFields, setAskFields] = useState<ShipToFieldKey[]>([]);
+  /** The order's address came masked ("***"): info line instead of a form. */
+  const [masked, setMasked] = useState(false);
 
   const ready = open && !!order && settings.state !== 'loading' && !conns.isLoading;
   const senderCountry = settings.senderCountry;
@@ -169,12 +183,20 @@ export function CreateLabelPanel({ order, open, onClose, onBack, defaultCarrier,
     const base = draftFromOrder(input, {
       sender: settings.sender, presets, baseCurrency: settings.baseCurrency, sendTracking: readSendTracking(),
     });
-    const domestic = senderCountry === 'TR' && base.shipTo.country === 'TR';
-    const elig = eligibilityAll(snapshots, { senderCountry, recipientCountry: base.shipTo.country });
-    const carrier = pickDefaultCarrier(elig, { domestic, lastCarrier: readLastCarrier(), preferred: defaultCarrier });
-    const next = draftFromOrder(input, {
+    const isMasked = isMaskedShipTo(base.shipTo);
+    // Trendyol masks only its own (Turkish) addresses, and drops the country with them.
+    const recipientCountry = base.shipTo.country || (isMasked && marketplaceSelectKey(base.marketplace) === 'trendyol' ? 'TR' : '');
+    const domestic = senderCountry === 'TR' && recipientCountry === 'TR';
+    const route = routeOf(senderCountry, recipientCountry);
+    const elig = eligibilityAll(snapshots, { senderCountry, recipientCountry });
+    const remembered = defaultCarrier ? null : rememberedRate(route, elig);
+    const carrier = remembered?.carrier ?? pickDefaultCarrier(elig, { domestic, lastCarrier: readLastCarrier(), preferred: defaultCarrier });
+    let next = draftFromOrder(input, {
       sender: settings.sender, presets, baseCurrency: settings.baseCurrency, carrier, sendTracking: readSendTracking(),
     }, { validServices: serviceCodes, validPackaging: packagingCodes });
+    if (remembered && remembered.service !== next.service) next = { ...next, service: remembered.service };
+    if (isMasked) next = { ...next, shipTo: { ...stripMasked(next.shipTo), country: recipientCountry } };
+    setMasked(isMasked);
     setDraft(next);
     setDraftFor(order.id);
     initialJson.current = JSON.stringify(next);
@@ -196,10 +218,11 @@ export function CreateLabelPanel({ order, open, onClose, onBack, defaultCarrier,
       setView('form');
       setCreated(null);
     }
-    const missing = requiredShipTo(next.carrier, next.shipTo.country).filter((f) => !next.shipTo[f]);
-    const fix = mode === 'fixAddress' || missing.length > 0;
-    setEditingShipTo(fix);
-    setAutoFocusField(mode === 'fixAddress' ? (missing[0] as ShipToFieldKey | undefined) : undefined);
+    const missing = requiredShipTo(next.carrier, next.shipTo.country).filter((f) => !next.shipTo[f]) as ShipToFieldKey[];
+    // Fix address opens the full form; otherwise only the missing fields render under the summary card.
+    setEditingShipTo(mode === 'fixAddress');
+    setAskFields(isMasked ? [] : missing);
+    setAutoFocusField(mode === 'fixAddress' ? missing[0] : undefined);
   }, [open, order, ready, draftFor, settings.sender, settings.baseCurrency, presets, snapshots, senderCountry, defaultCarrier, mode]);
 
   const international = draft ? isInternational(draft, settings.sender) : false;
@@ -227,6 +250,16 @@ export function CreateLabelPanel({ order, open, onClose, onBack, defaultCarrier,
       return next;
     });
   }, [draft, vctx, showSummary]);
+
+  // A carrier switch can make more fields required (DHL: phone, district): ask for those too.
+  const missingKey = draft && !masked
+    ? (requiredShipTo(draft.carrier, draft.shipTo.country).filter((f) => !draft.shipTo[f]) as ShipToFieldKey[]).join(',')
+    : '';
+  useEffect(() => {
+    if (!missingKey) return;
+    const add = missingKey.split(',') as ShipToFieldKey[];
+    setAskFields((prev) => (add.every((f) => prev.includes(f)) ? prev : [...prev, ...add.filter((f) => !prev.includes(f))]));
+  }, [missingKey]);
 
   const blur = (path: FieldPath) => {
     if (!draft) return;
@@ -262,7 +295,12 @@ export function CreateLabelPanel({ order, open, onClose, onBack, defaultCarrier,
   }, [errors, t]);
 
   const focusPath = (path: FieldPath) => {
-    if (path.startsWith('shipTo.')) setEditingShipTo(true);
+    if (path.startsWith('shipTo.')) {
+      const f = path.slice(7) as ShipToFieldKey;
+      // Masked address: the stars were cleared, so typing it in needs the full form.
+      if (masked) setEditingShipTo(true);
+      else if (!editingShipTo) setAskFields((prev) => (prev.includes(f) ? prev : [...prev, f]));
+    }
     window.setTimeout(() => {
       const el = document.getElementById(fieldDomId(path));
       (el?.querySelector('input,textarea,[role="combobox"],button') as HTMLElement | null ?? el)?.focus?.();
@@ -275,6 +313,7 @@ export function CreateLabelPanel({ order, open, onClose, onBack, defaultCarrier,
     setCreated({ carrier: d.carrier, serviceName, trackingNumber: r.trackingNumber || null, labelHref: r.labelHref, alerts: r.alerts ?? [], existing: false, shipmentId: null });
     setView('success');
     rememberCarrier(d.carrier);
+    rememberRouteRate(routeOf(senderCountry, d.shipTo.country), d.carrier, d.service);
     rememberSendTracking(d.options.sendTracking);
     initialJson.current = JSON.stringify(d);
     onCreated({ orderId: d.orderId, trackingNumber: r.trackingNumber, labelHref: r.labelHref });
@@ -423,10 +462,15 @@ export function CreateLabelPanel({ order, open, onClose, onBack, defaultCarrier,
       : selectedElig.reason === 'incomplete' ? t('unavailable.incomplete', { carrier: CARRIER_NAME[selectedElig.carrier] })
         : t('unavailable.notConnected', { carrier: CARRIER_NAME[selectedElig.carrier] })
   ) : undefined;
+  // A masked address stays unsendable until the seller types the real one (Edit): never "***" to a carrier.
+  const maskedReason = masked && draft && requiredShipTo(draft.carrier, draft.shipTo.country).some((f) => !draft.shipTo[f])
+    ? t('masked.reason', { mp: marketplaceSelectKey(draft.marketplace) })
+    : undefined;
   const disabledReason = settingsFailed ? t('settingsFailed')
     : senderReason
       ?? (failure?.kind === 'limit' ? t('limit.reason') : undefined)
-      ?? carrierReason;
+      ?? carrierReason
+      ?? maskedReason;
 
   const formMode = view === 'form' && !!draft && !noCarrier;
   const primary = view === 'success'
@@ -487,7 +531,12 @@ export function CreateLabelPanel({ order, open, onClose, onBack, defaultCarrier,
     const fields = shipToFieldsFor(draft.carrier, draft.shipTo.country);
     const required = Object.fromEntries(requiredShipTo(draft.carrier, draft.shipTo.country).map((f) => [f, true])) as Partial<Record<ShipToFieldKey, boolean>>;
     const shipToLine = summaryLine(draft.shipTo, fmt.intlLocale);
-    const shipToProblem = Object.keys(errors).some((k) => k.startsWith('shipTo.'));
+    // Only the fields that need input render under the summary card: the ones focused from an error, plus any
+    // with a validation error now. The full form stays behind "Edit".
+    const shipToMissing = Array.from(new Set([
+      ...askFields,
+      ...Object.keys(errors).filter((k) => k.startsWith('shipTo.')).map((k) => k.slice(7) as ShipToFieldKey),
+    ]));
     const showCustoms = international && draft.carrier !== 'dhl';
     // FedEx and UPS have no option their routes read; only "Send tracking" (when the marketplace takes it).
     const optionsEmpty = draft.carrier !== 'dhl' && !canPushTracking(draft.marketplace);
@@ -529,7 +578,7 @@ export function CreateLabelPanel({ order, open, onClose, onBack, defaultCarrier,
             : { id: 'shipto-edit', label: t('edit'), icon: icons.edit, onClick: () => setEditingShipTo(true) }}
           data-testid="label-shipto"
         >
-          {editingShipTo || shipToProblem ? (
+          {editingShipTo || masked ? (
             <ShipToForm
               value={{ ...draft.shipTo, phone: phoneToE164(draft.shipTo.phone, draft.shipTo.country) }}
               onChange={(v) => update((d) => {
@@ -546,9 +595,16 @@ export function CreateLabelPanel({ order, open, onClose, onBack, defaultCarrier,
               idPrefix="label-shipto"
             />
           ) : (
-            <Box sx={{ fontSize: 13, lineHeight: '20px', color: shipToLine ? n[700] : tone.danger.fg }} data-testid="shipto-summary">
-              {shipToLine || t('validation.required')}
-            </Box>
+            <ShipToSummary
+              value={draft.shipTo}
+              intlLocale={fmt.intlLocale}
+              missing={shipToMissing}
+              onChange={(v) => update((d) => ({ ...d, shipTo: v }))}
+              errors={shipToErrors}
+              onBlurField={(f) => blur(`shipTo.${f}` as FieldPath)}
+              phoneFallback={draft.carrier === 'dhl' ? senderPhoneE164(settings.sender) || undefined : undefined}
+              idPrefix="label-shipto"
+            />
           )}
         </SidePanelSection>
         <PackageSection

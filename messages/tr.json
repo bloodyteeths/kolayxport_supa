@@ -13211,7 +13211,17 @@
       "next": "Sonraki sipariş",
       "openFailed": "Etiket açılamadı. KolayXport için açılır pencerelere izin verin."
     },
-    "useSenderPhone": "Telefonumu kullan ({phone})"
+    "useSenderPhone": "Telefonumu kullan ({phone})",
+    "otherCarriers": "{count, plural, one {Diğer kargo firması (#)} other {Diğer kargo firmaları (#)}}",
+    "masked": {
+      "reason": "Alıcı adresi kargoya verilene kadar {mp, select, trendyol {Trendyol} amazon {Amazon} hepsiburada {Hepsiburada} other {pazaryeri}} tarafından gizleniyor. Sadece paket bilgilerini girin."
+    },
+    "shipToMissing": "{count, plural, one {# alan eksik} other {# alan eksik}}",
+    "optionsSummary": {
+      "paidBy": "{who, select, sender {Ücreti gönderici öder} other {Ücreti alıcı öder}}",
+      "cod": "Kapıda ödeme {amount}",
+      "sms": "{state, select, both {SMS: kargoda + teslim} shipped {SMS: kargoda} delivered {SMS: teslim} other {SMS yok}}"
+    }
   },
   "billing": {
     "banner": {

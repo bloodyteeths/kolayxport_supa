@@ -167,11 +167,12 @@ describe('CreateLabelPanel', () => {
     expect(calls.some((c) => c.url === '/api/labels/ups')).toBe(false);
   });
 
-  it('validation on submit: summary Banner, Ship to opens in edit mode', async () => {
+  it('validation on submit: summary Banner, only the missing Ship to field is asked', async () => {
     const r = row();
     wrap(<CreateLabelPanel order={{ ...r, shipTo: { ...r.shipTo, postal: '' } }} open onClose={vi.fn()} onCreated={vi.fn()} />);
-    // Missing postal opens the editor right away.
-    expect(await screen.findByTestId('ship-to-form')).toBeTruthy();
+    // Missing postal: the summary card stays, and only the postal field renders under it.
+    expect(await screen.findByTestId('shipto-postal')).toBeTruthy();
+    expect(screen.queryByTestId('ship-to-form')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Create label' }));
     expect(await screen.findByText('Fix 1 field to continue')).toBeTruthy();
     expect(calls.some((c) => c.url === '/api/labels/ups')).toBe(false);

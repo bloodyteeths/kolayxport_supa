@@ -164,7 +164,24 @@ describe('Research Home', () => {
 });
 
 describe('ResearchRouteGate (flag `research`)', () => {
-  it('flag off (build default off) → replaces with the legacy page for ?mkt', async () => {
+  it('flag off (NEXT_PUBLIC_UI_V2=none) → replaces with the legacy page for ?mkt', async () => {
+    vi.stubEnv('NEXT_PUBLIC_UI_V2', 'none');
+    try {
+      wrap(
+        <ResearchRouteGate mkt="ebay">
+          <div data-testid="hub" />
+        </ResearchRouteGate>,
+      );
+      await act(async () => {});
+      expect(screen.queryByTestId('hub')).toBeNull();
+      expect(router.replace).toHaveBeenCalledWith('/app/ebay-research');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('flag off by ?ui=1 stored override over the all-on default → a link to the legacy page, no redirect', async () => {
+    window.localStorage.setItem(UI_OVERRIDE_STORAGE_KEY, '1');
     wrap(
       <ResearchRouteGate mkt="ebay">
         <div data-testid="hub" />
@@ -172,7 +189,25 @@ describe('ResearchRouteGate (flag `research`)', () => {
     );
     await act(async () => {});
     expect(screen.queryByTestId('hub')).toBeNull();
-    expect(router.replace).toHaveBeenCalledWith('/app/ebay-research');
+    expect(screen.getByTestId('research-legacy-link')).toBeTruthy();
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it('build default (NEXT_PUBLIC_UI_V2 unset → all on), no override → renders the hub', async () => {
+    const prev = process.env.NEXT_PUBLIC_UI_V2;
+    delete process.env.NEXT_PUBLIC_UI_V2;
+    try {
+      wrap(
+        <ResearchRouteGate mkt="ebay">
+          <div data-testid="hub" />
+        </ResearchRouteGate>,
+      );
+      await act(async () => {});
+      expect(screen.getByTestId('hub')).toBeTruthy();
+      expect(router.replace).not.toHaveBeenCalled();
+    } finally {
+      if (prev !== undefined) process.env.NEXT_PUBLIC_UI_V2 = prev;
+    }
   });
 
   it('flag on (?ui override) → renders the hub', async () => {

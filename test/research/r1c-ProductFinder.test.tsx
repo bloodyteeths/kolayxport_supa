@@ -170,16 +170,31 @@ describe('Product finder states', () => {
 });
 
 describe('Draft a listing (primary) writes a prefill, never a marketplace', () => {
-  it('desktop header primary → sessionStorage prefill + creator route', async () => {
+  it('desktop header primary → sessionStorage prefill + creator route (editor-etsy on by default → new editor)', async () => {
     router.query = { q: 'halloween decor' };
     renderPage();
     await waitFor(() => expect(screen.getByTestId('research-cards')).toBeTruthy());
     fireEvent.click(screen.getByText('Draft a listing'));
-    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/app/etsy-listings?prefill=session'));
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/app/etsy-listings/new?prefill=session'));
     const prefill = JSON.parse(window.sessionStorage.getItem(LISTING_PREFILL_KEY) ?? '{}');
     expect(prefill).toMatchObject({ v: 1, target: 'etsy', source: 'etsy-research', price: 38, currency: 'USD', tags: ['halloween decor', 'spooky decor', 'fall decor'] });
     expect(prefill.title).toBeUndefined();
     expect(marketplaceWrites()).toEqual([]);
+  });
+
+  it('all flags off (NEXT_PUBLIC_UI_V2=none) → the legacy listings route keeps the creator', async () => {
+    vi.stubEnv('NEXT_PUBLIC_UI_V2', 'none');
+    try {
+      router.query = { q: 'halloween decor' };
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('research-cards')).toBeTruthy());
+      fireEvent.click(screen.getByText('Draft a listing'));
+      await waitFor(() => expect(router.push).toHaveBeenCalledWith('/app/etsy-listings?prefill=session'));
+      expect(window.sessionStorage.getItem(LISTING_PREFILL_KEY)).not.toBeNull();
+      expect(marketplaceWrites()).toEqual([]);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('mobile: the primary is a sticky action bar once results exist', async () => {
@@ -208,13 +223,18 @@ describe('compare mode', () => {
 
 describe('review fixes', () => {
   it('listings-etsy flag on (editor off): Draft a listing hands off to the listings route, which keeps the legacy creator', async () => {
-    window.localStorage.setItem('kx-ui-override', 'listings-etsy');
-    router.query = { q: 'halloween decor' };
-    renderPage();
-    await waitFor(() => expect(screen.getByTestId('research-cards')).toBeTruthy());
-    fireEvent.click(screen.getAllByText('Draft a listing')[0]);
-    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/app/etsy-listings?prefill=session'));
-    expect(window.sessionStorage.getItem(LISTING_PREFILL_KEY)).not.toBeNull();
+    vi.stubEnv('NEXT_PUBLIC_UI_V2', 'none'); // build default off, so the list override turns on listings-etsy only
+    try {
+      window.localStorage.setItem('kx-ui-override', 'listings-etsy');
+      router.query = { q: 'halloween decor' };
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId('research-cards')).toBeTruthy());
+      fireEvent.click(screen.getAllByText('Draft a listing')[0]);
+      await waitFor(() => expect(router.push).toHaveBeenCalledWith('/app/etsy-listings?prefill=session'));
+      expect(window.sessionStorage.getItem(LISTING_PREFILL_KEY)).not.toBeNull();
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('Trendyol (not served yet) is an info state, never an error page', async () => {

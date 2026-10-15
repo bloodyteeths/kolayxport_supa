@@ -51,9 +51,15 @@ function parseList(raw: string | undefined | null): UiFlagKey[] {
   return parts.filter(isFlagKey);
 }
 
-/** Build-time default from NEXT_PUBLIC_UI_V2 (must be referenced literally so Next inlines it). */
+/**
+ * Build-time default from NEXT_PUBLIC_UI_V2 (must be referenced literally so Next inlines it).
+ * Since the M10 switch-over (2026-10-15) every new surface is on by default: unset means `all`.
+ * Set NEXT_PUBLIC_UI_V2=none (or a key list) to roll back at build time; `?ui=1` turns them off
+ * per browser for one release while the legacy screens still exist.
+ */
 export function defaultUiFlags(env: string | undefined = process.env.NEXT_PUBLIC_UI_V2): Set<UiFlagKey> {
-  return new Set(parseList(env));
+  const value = env === undefined || env.trim() === '' ? 'all' : env;
+  return new Set(value.trim().toLowerCase() === 'none' ? [] : parseList(value));
 }
 
 /** Parses a `?ui=` value. `null` = forget the override; `undefined` = value not understood. */

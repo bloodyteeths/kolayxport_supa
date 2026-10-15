@@ -9,8 +9,19 @@ describe('uiFlags', () => {
 
   it('parses NEXT_PUBLIC_UI_V2 comma lists, ignoring unknown keys', () => {
     expect([...defaultUiFlags('orders, Settings,nope')]).toEqual(['orders', 'settings']);
-    expect(defaultUiFlags(undefined).size).toBe(0);
     expect(defaultUiFlags('all').size).toBe(UI_FLAG_KEYS.length);
+    expect(defaultUiFlags('nope').size).toBe(0);
+  });
+
+  it('defaults to every surface on when NEXT_PUBLIC_UI_V2 is unset or empty (M10 switch-over)', () => {
+    expect(defaultUiFlags(undefined).size).toBe(UI_FLAG_KEYS.length);
+    expect(defaultUiFlags('').size).toBe(UI_FLAG_KEYS.length);
+    expect(defaultUiFlags('   ').size).toBe(UI_FLAG_KEYS.length);
+  });
+
+  it("'none' turns every surface off (build-time rollback)", () => {
+    expect(defaultUiFlags('none').size).toBe(0);
+    expect(defaultUiFlags(' NONE ').size).toBe(0);
   });
 
   it('parses ?ui= overrides', () => {
@@ -28,5 +39,14 @@ describe('uiFlags', () => {
     expect(resolveUiFlag('orders', defaults, { mode: 'all-on' })).toBe(true);
     expect(resolveUiFlag('settings', defaults, { mode: 'all-off' })).toBe(false);
     expect(resolveUiFlag('orders', defaults, { mode: 'list', keys: ['orders'] })).toBe(true);
+  });
+
+  it('?ui=1 still turns everything off over the new all-on default; ?ui=2 turns it all on over none', () => {
+    const onByDefault = defaultUiFlags(undefined);
+    for (const k of UI_FLAG_KEYS) {
+      expect(resolveUiFlag(k, onByDefault, null)).toBe(true);
+      expect(resolveUiFlag(k, onByDefault, parseUiOverride('1') ?? null)).toBe(false);
+      expect(resolveUiFlag(k, defaultUiFlags('none'), parseUiOverride('2') ?? null)).toBe(true);
+    }
   });
 });

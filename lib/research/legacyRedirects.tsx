@@ -36,6 +36,9 @@ export const SHIPPED_RESEARCH_TARGETS: ReadonlySet<ShippedResearchKey> = new Set
   'products:ebay',
   'listings:etsy',
   'listings:ebay',
+  // R2 Keyword explorer and R3 Shop tracker (backend ResearchWatch/ResearchSnapshot live since 1bf1e40).
+  'keywords:etsy',
+  'shops:etsy',
   'financials',
 ]);
 

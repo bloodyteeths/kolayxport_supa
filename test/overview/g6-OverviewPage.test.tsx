@@ -188,13 +188,27 @@ describe('OverviewPage states', () => {
     renderPage();
     await act(async () => {});
     const header = screen.getByTestId('page-header');
-    expect(within(header).getByRole('link', { name: 'Go to orders' }).getAttribute('href')).toBe('/app/labels?label=unlabeled&status=onaylandi&sort=shipBy&from=all');
+    // Default build (M10: every surface on) → the new Orders "To ship" view.
+    expect(within(header).getByRole('link', { name: 'Go to orders' }).getAttribute('href')).toBe('/app/labels?view=to_ship');
     expect(screen.getByTestId('attention-row-labelsFailed').textContent).toContain('#3891 Baby Blanket');
     expect(screen.getByTestId('attention-row-labelsFailed').textContent).toContain('+1 more');
     expect(screen.getByTestId('attention-cta-overdue').textContent).toBe('Create label');
     expect(screen.getByTestId('attention-row-notSent:etsy').textContent).toContain('7 listings with changes not sent to Etsy');
     expect(screen.queryByTestId('attention-done')).toBeNull();
     expect(screen.getByTestId('kpi-overdue').textContent).toContain('#114-0098');
+  });
+
+  it('busy with the orders flag off (NEXT_PUBLIC_UI_V2=none): Go to orders keeps the legacy labels filter', async () => {
+    vi.stubEnv('NEXT_PUBLIC_UI_V2', 'none');
+    try {
+      ov.summary = withReceived(busySummary());
+      renderPage();
+      await act(async () => {});
+      const header = screen.getByTestId('page-header');
+      expect(within(header).getByRole('link', { name: 'Go to orders' }).getAttribute('href')).toBe('/app/labels?label=unlabeled&status=onaylandi&sort=shipBy&from=all');
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('partial: a failed section adds one "Couldn\'t check" row with the error id, never "All caught up"', async () => {

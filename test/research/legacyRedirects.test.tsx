@@ -42,7 +42,15 @@ describe('shipped targets exist', () => {
   });
 });
 
-describe('legacyResearchTarget — R1 (Product finder + Listing doctor shipped)', () => {
+const R1_ONLY: ReadonlySet<ShippedResearchKey> = new Set<ShippedResearchKey>([
+  'products:etsy',
+  'products:ebay',
+  'listings:etsy',
+  'listings:ebay',
+  'financials',
+]);
+
+describe('legacyResearchTarget — shipped set (R1 + R2 Keyword explorer + R3 Shop tracker for Etsy)', () => {
   it.each([
     [{}, '/app/research/products?mkt=etsy'],
     [{ tab: 'research' }, '/app/research/products?mkt=etsy'],
@@ -54,8 +62,26 @@ describe('legacyResearchTarget — R1 (Product finder + Listing doctor shipped)'
     expect(legacyResearchTarget('etsy', query)).toBe(expected);
   });
 
-  it.each(['shopIntel', 'competitors', 'keywords', 'ranks'])('etsy ?tab=%s stays legacy until its tool ships', (tab) => {
-    expect(legacyResearchTarget('etsy', { tab })).toBeNull();
+  it('ships keywords:etsy and shops:etsy, but not the eBay / Trendyol / Amazon keyword & shop tools or price-gap', () => {
+    expect(SHIPPED_RESEARCH_TARGETS.has('keywords:etsy')).toBe(true);
+    expect(SHIPPED_RESEARCH_TARGETS.has('shops:etsy')).toBe(true);
+    for (const key of ['keywords:ebay', 'shops:ebay', 'products:trendyol', 'products:amazon', 'price-gap'] as const) {
+      expect(SHIPPED_RESEARCH_TARGETS.has(key)).toBe(false);
+    }
+  });
+
+  it.each([
+    [{ tab: 'shopIntel' }, '/app/research/shops?mkt=etsy'],
+    [{ tab: 'competitors' }, '/app/research/shops?mkt=etsy'],
+    [{ tab: 'keywords' }, '/app/research/keywords?mkt=etsy'],
+    [{ tab: 'keywords', q: 'oak box' }, '/app/research/keywords?mkt=etsy&q=oak+box'],
+    [{ tab: 'ranks' }, '/app/research/keywords?mkt=etsy&view=tracked'],
+  ])('etsy %o → %s now that Keyword explorer and Shop tracker shipped', (query, expected) => {
+    expect(legacyResearchTarget('etsy', query)).toBe(expected);
+  });
+
+  it.each(['shopIntel', 'competitors', 'keywords', 'ranks'])('etsy ?tab=%s stays legacy when its tool is not shipped', (tab) => {
+    expect(legacyResearchTarget('etsy', { tab }, R1_ONLY)).toBeNull();
   });
 
   it.each([
@@ -122,17 +148,25 @@ describe('legacyResearchTarget — later releases (mapping already encoded)', ()
 describe('researchFlagOnServer', () => {
   it('never redirects on the build default alone (the stored opt-out is invisible to the server)', () => {
     expect(researchFlagOnServer({}, undefined)).toBe(false);
+    expect(researchFlagOnServer({}, '')).toBe(false);
     expect(researchFlagOnServer({}, 'orders,research')).toBe(false);
     expect(researchFlagOnServer({}, 'all')).toBe(false);
     expect(researchFlagOnServer({ ui: 'garbage!' }, 'research')).toBe(false);
   });
   it('honours a ?ui= override on the request', () => {
-    expect(researchFlagOnServer({ ui: 'research' }, undefined)).toBe(true);
-    expect(researchFlagOnServer({ ui: '2' }, undefined)).toBe(true);
+    expect(researchFlagOnServer({ ui: 'research' }, 'none')).toBe(true);
+    expect(researchFlagOnServer({ ui: '2' }, 'none')).toBe(true);
     expect(researchFlagOnServer({ ui: 'orders' }, 'research')).toBe(true);
     expect(researchFlagOnServer({ ui: 'reset' }, 'research')).toBe(true);
     expect(researchFlagOnServer({ ui: '1' }, 'research')).toBe(false);
-    expect(researchFlagOnServer({ ui: 'orders' }, undefined)).toBe(false);
+    expect(researchFlagOnServer({ ui: 'orders' }, 'none')).toBe(false);
+    expect(researchFlagOnServer({ ui: 'reset' }, 'none')).toBe(false);
+  });
+  it('with NEXT_PUBLIC_UI_V2 unset (default all) a ?ui= list or reset keeps research on; ?ui=1 turns it off', () => {
+    expect(researchFlagOnServer({ ui: 'orders' }, undefined)).toBe(true);
+    expect(researchFlagOnServer({ ui: 'reset' }, undefined)).toBe(true);
+    expect(researchFlagOnServer({ ui: '2' }, undefined)).toBe(true);
+    expect(researchFlagOnServer({ ui: '1' }, undefined)).toBe(false);
   });
 });
 
@@ -145,21 +179,35 @@ describe('legacyResearchGssp', () => {
   });
 
   it('flag off → renders the legacy page', async () => {
-    delete process.env.NEXT_PUBLIC_UI_V2;
+    process.env.NEXT_PUBLIC_UI_V2 = 'none';
     expect(await legacyResearchGssp('etsy')(ctx({ tab: 'grader' }))).toEqual({ props: {} });
+    expect(await legacyResearchGssp('etsy')(ctx({ tab: 'grader', ui: 'orders' }))).toEqual({ props: {} });
+  });
+  it('?ui=1 → legacy page even with the all-on default', async () => {
+    delete process.env.NEXT_PUBLIC_UI_V2;
+    expect(await legacyResearchGssp('etsy')(ctx({ tab: 'grader', ui: '1' }))).toEqual({ props: {} });
   });
   it('build default on, no ?ui= → legacy page (the client decides with the stored override)', async () => {
     process.env.NEXT_PUBLIC_UI_V2 = 'research';
     expect(await legacyResearchGssp('etsy')(ctx({ tab: 'grader' }))).toEqual({ props: {} });
   });
   it('?ui= turns it on → temporary redirect with the mapped tab and the override carried', async () => {
-    delete process.env.NEXT_PUBLIC_UI_V2;
+    process.env.NEXT_PUBLIC_UI_V2 = 'none';
     expect(await legacyResearchGssp('etsy')(ctx({ tab: 'grader', ui: 'research' }))).toEqual({
       redirect: { destination: '/app/research/listings?mkt=etsy&ui=research', permanent: false },
     });
   });
   it('flag on but the tool has not shipped → legacy page', async () => {
     expect(await legacyResearchGssp('ebay')(ctx({ sub: 'arbitrage', ui: '2' }))).toEqual({ props: {} });
+    expect(await legacyResearchGssp('ebay')(ctx({ sub: 'seller_tracker', ui: '2' }))).toEqual({ props: {} });
+  });
+  it('etsy Keyword explorer / Shop tracker tabs redirect once ?ui= turns the flag on', async () => {
+    expect(await legacyResearchGssp('etsy')(ctx({ tab: 'shopIntel', ui: '2' }))).toEqual({
+      redirect: { destination: '/app/research/shops?mkt=etsy&ui=2', permanent: false },
+    });
+    expect(await legacyResearchGssp('etsy')(ctx({ tab: 'ranks', ui: 'research' }))).toEqual({
+      redirect: { destination: '/app/research/keywords?mkt=etsy&view=tracked&ui=research', permanent: false },
+    });
   });
   it('trendyol / amazon keep the legacy page in R1', async () => {
     expect(await legacyResearchGssp('amazon')(ctx({ ui: 'research' }))).toEqual({ props: {} });
@@ -170,6 +218,7 @@ describe('legacyResearchGssp', () => {
 describe('withLegacyResearchRedirect (client fallback for the stored override)', () => {
   const Legacy = () => <div data-testid="legacy" />;
   const Wrapped = withLegacyResearchRedirect('etsy', Legacy);
+  const WrappedEbay = withLegacyResearchRedirect('ebay', Legacy);
 
   beforeEach(() => {
     routerState.query = {};
@@ -180,10 +229,39 @@ describe('withLegacyResearchRedirect (client fallback for the stored override)',
   });
   afterEach(() => cleanup());
 
-  it('no override, flag off → legacy page, no navigation', () => {
-    render(<Wrapped />);
-    expect(screen.getByTestId('legacy')).toBeTruthy();
-    expect(routerState.replace).not.toHaveBeenCalled();
+  it('no override, flag off (NEXT_PUBLIC_UI_V2=none) → legacy page, no navigation', () => {
+    vi.stubEnv('NEXT_PUBLIC_UI_V2', 'none');
+    try {
+      render(<Wrapped />);
+      expect(screen.getByTestId('legacy')).toBeTruthy();
+      expect(routerState.replace).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('no override, NEXT_PUBLIC_UI_V2 unset (default all) → redirects on load', () => {
+    const prev = process.env.NEXT_PUBLIC_UI_V2;
+    delete process.env.NEXT_PUBLIC_UI_V2; // vitest 1.x stubEnv(undefined) would set the string "undefined"
+    try {
+      routerState.query = { tab: 'shopIntel' };
+      render(<Wrapped />);
+      expect(routerState.replace).toHaveBeenCalledWith('/app/research/shops?mkt=etsy');
+    } finally {
+      if (prev !== undefined) process.env.NEXT_PUBLIC_UI_V2 = prev;
+    }
+  });
+
+  it('NEXT_PUBLIC_UI_V2=none + stored override on → redirects', () => {
+    vi.stubEnv('NEXT_PUBLIC_UI_V2', 'none');
+    try {
+      window.localStorage.setItem(UI_OVERRIDE_STORAGE_KEY, 'research');
+      routerState.query = { tab: 'keywords' };
+      render(<Wrapped />);
+      expect(routerState.replace).toHaveBeenCalledWith('/app/research/keywords?mkt=etsy');
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('stored override on → replaces the URL with the hub target', () => {
@@ -196,8 +274,8 @@ describe('withLegacyResearchRedirect (client fallback for the stored override)',
 
   it('stored override on but the tab has no shipped tool → legacy stays', () => {
     window.localStorage.setItem(UI_OVERRIDE_STORAGE_KEY, 'research');
-    routerState.query = { tab: 'shopIntel' };
-    render(<Wrapped />);
+    routerState.query = { sub: 'arbitrage' };
+    render(<WrappedEbay />);
     expect(screen.getByTestId('legacy')).toBeTruthy();
     expect(routerState.replace).not.toHaveBeenCalled();
   });
@@ -226,11 +304,11 @@ describe('withLegacyResearchRedirect (client fallback for the stored override)',
 
   it('checks once: a later shallow tab change on a non-shipped tab does not redirect', () => {
     window.localStorage.setItem(UI_OVERRIDE_STORAGE_KEY, 'research');
-    routerState.query = { tab: 'shopIntel' };
-    const view = render(<Wrapped />);
+    routerState.query = { sub: 'seller_tracker' };
+    const view = render(<WrappedEbay />);
     expect(routerState.replace).not.toHaveBeenCalled();
-    routerState.query = { tab: 'grader' }; // the legacy page's own shallow router.replace
-    view.rerender(<Wrapped />);
+    routerState.query = { sub: 'listing_optimizer' }; // the legacy page's own shallow router.replace
+    view.rerender(<WrappedEbay />);
     expect(routerState.replace).not.toHaveBeenCalled();
     expect(screen.getByTestId('legacy')).toBeTruthy();
   });

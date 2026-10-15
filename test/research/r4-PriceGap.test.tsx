@@ -262,12 +262,28 @@ describe('PriceGap table (Pro)', () => {
     await screen.findByTestId('price-gap-marginbox');
     const btn = screen.getAllByText('List on eBay').find((el) => el.closest('button, a'))!;
     fireEvent.click(btn.closest('button, a') as HTMLElement);
-    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/app/ebay-listings?prefill=session'));
+    // editor-ebay is on by default (M10) → the new full-page creator.
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/app/ebay-listings/new?prefill=session'));
     const prefill = JSON.parse(window.sessionStorage.getItem(LISTING_PREFILL_KEY) ?? '{}');
     expect(prefill).toMatchObject({ v: 1, target: 'ebay', source: 'arbitrage', price: 47, currency: 'USD' });
     expect(prefill.title).toBeUndefined();
     expect(prefill.keywords).toContain('copper');
     expect(writes()).toHaveLength(0);
+  });
+
+  it('"List on eBay" with the editor flag off (NEXT_PUBLIC_UI_V2=none) opens the legacy eBay listings creator', async () => {
+    vi.stubEnv('NEXT_PUBLIC_UI_V2', 'none');
+    try {
+      router.query = { source: 'trendyol', open: '1' };
+      renderUi(<PriceGap />);
+      await screen.findByTestId('price-gap-marginbox');
+      const btn = screen.getAllByText('List on eBay').find((el) => el.closest('button, a'))!;
+      fireEvent.click(btn.closest('button, a') as HTMLElement);
+      await waitFor(() => expect(router.push).toHaveBeenCalledWith('/app/ebay-listings?prefill=session'));
+      expect(writes()).toHaveLength(0);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('category source: other sellers\' photos never become listing images (reference only)', async () => {

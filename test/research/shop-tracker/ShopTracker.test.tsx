@@ -341,6 +341,21 @@ describe('Watch a shop: quota / availability apply to Etsy only (review R3-B)', 
 });
 
 describe('Shop panel', () => {
+  it('with the editor flag off (NEXT_PUBLIC_UI_V2=none) "Draft similar" opens the legacy listings creator', async () => {
+    vi.stubEnv('NEXT_PUBLIC_UI_V2', 'none');
+    try {
+      router.query = { mkt: 'etsy', open: 'w1' };
+      const { navigate } = renderTracker();
+      const panel = await screen.findByTestId('shop-panel');
+      await within(panel).findByText('Personalized Recipe Box, Wooden Kitchen Gift');
+      fireEvent.click(within(panel).getByTestId('shop-draft-similar'));
+      expect(navigate).toHaveBeenCalledWith('/app/etsy-listings?prefill=session', undefined);
+      noMarketplaceWrites();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('shows the detail, drafts a similar listing without their title, saves alerts', async () => {
     router.query = { mkt: 'etsy', open: 'w1' };
     const { navigate } = renderTracker();
@@ -352,7 +367,8 @@ describe('Shop panel', () => {
     expect(within(panel).getByText('kitchen keepsake')).toBeTruthy();
 
     fireEvent.click(within(panel).getByTestId('shop-draft-similar'));
-    expect(navigate).toHaveBeenCalledWith('/app/etsy-listings?prefill=session', undefined);
+    // editor-etsy is on by default (M10) → the new full-page creator.
+    expect(navigate).toHaveBeenCalledWith('/app/etsy-listings/new?prefill=session', undefined);
     const prefill = JSON.parse(window.sessionStorage.getItem(LISTING_PREFILL_KEY) ?? '{}');
     expect(prefill.title).toBeUndefined();
     expect(prefill.tags).toEqual(['recipe box']);

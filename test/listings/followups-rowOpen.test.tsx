@@ -189,9 +189,31 @@ const titleCell = (title = 'Wooden Keepsake Box') => screen.getAllByTestId('list
 const rowOf = (el: HTMLElement) => el.closest('[data-row-id]') as HTMLElement;
 
 describe('listings row open (founder follow-up)', { timeout: 30_000 }, () => {
+  // Build default pinned off so flagOn()/flagOff() (a ?ui= list override / none) decide the editor flag.
+  // Since M10 an unset NEXT_PUBLIC_UI_V2 means every surface on; that default is covered below.
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_UI_V2', 'none');
+  });
   afterEach(() => {
     flagOff();
     window.sessionStorage.removeItem('kx:editorNav');
+    vi.unstubAllEnvs();
+  });
+
+  it('build default (NEXT_PUBLIC_UI_V2 unset → all on), no override: clicking the title opens the editor route', async () => {
+    delete process.env.NEXT_PUBLIC_UI_V2; // restored by unstubAllEnvs
+    await renderPage();
+    fireEvent.click(titleCell());
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith(expect.stringMatching(/^\/app\/etsy-listings\/1(\?|$)/)));
+  });
+
+  it('?ui=1 stored over the all-on default: clicking the title opens the quick view', async () => {
+    delete process.env.NEXT_PUBLIC_UI_V2;
+    window.localStorage.setItem('kx-ui-override', '1');
+    await renderPage();
+    fireEvent.click(titleCell());
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith(expect.objectContaining({ query: expect.objectContaining({ open: '1' }) }), undefined, expect.anything()));
+    expect(router.push).not.toHaveBeenCalledWith(expect.stringMatching(/^\/app\/etsy-listings\/1/));
   });
 
   it('editor flag off: clicking the title opens the quick view (no editor navigation)', async () => {

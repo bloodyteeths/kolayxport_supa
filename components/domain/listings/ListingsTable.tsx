@@ -4,6 +4,8 @@
 // "done" views, partial-score caption, refetch at 60% opacity).
 import * as React from 'react';
 import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import { control, neutral } from '@/lib/ds/tokens';
 import { DataTable, type DataTableState } from '@/components/ds/data';
 import type { ActionSpec } from '@/components/ds/page';
 import { EmptyState } from '@/components/ds/state/EmptyState';
@@ -75,6 +77,8 @@ export type ListingsTableProps = {
   unscored?: number;
   activeRowId?: string | null;
   ariaLabel: string;
+  /** Cards: "205 results" / "Updating…", shown at the start of the "Select" row (one row instead of two). */
+  mobileCountLabel?: string;
 };
 
 export function ListingsTable(p: ListingsTableProps) {
@@ -174,12 +178,37 @@ export function ListingsTable(p: ListingsTableProps) {
         }
       : undefined;
 
+  // Cards: the count shares the DataTable "Select" row (it is right-aligned there). Zero-height so it takes no row
+  // of its own; hidden while select mode shows "N selected" in the same spot.
+  const mobileCount =
+    p.mobile && state === 'ready' && p.mobileCountLabel && p.selection.ids.length === 0 ? (
+      <Box sx={{ position: 'relative', height: 0 }}>
+        <Typography
+          variant="caption"
+          component="span"
+          className="tnum"
+          aria-live="polite"
+          data-testid="listings-mobile-count"
+          sx={{ position: 'absolute', left: 0, top: 0, height: control.lg, display: 'flex', alignItems: 'center', color: neutral[600], whiteSpace: 'nowrap', zIndex: 1 }}
+        >
+          {p.mobileCountLabel}
+        </Typography>
+      </Box>
+    ) : null;
+
   return (
     <Box
-      sx={{ opacity: p.refetching ? 0.6 : 1, transition: 'opacity 120ms', pointerEvents: p.refetching ? 'none' : undefined }}
+      sx={{
+        opacity: p.refetching ? 0.6 : 1,
+        transition: 'opacity 120ms',
+        pointerEvents: p.refetching ? 'none' : undefined,
+        // Select mode prints "N selected" at the start of the same row.
+        '&:has([data-layout="cards"] > :first-child > .MuiTypography-root) [data-testid="listings-mobile-count"]': { visibility: 'hidden' },
+      }}
       aria-busy={p.refetching || undefined}
       data-testid="listings-table-wrap"
     >
+      {mobileCount}
       <DataTable<ListingRow>
         rows={p.rows}
         columns={p.columns}

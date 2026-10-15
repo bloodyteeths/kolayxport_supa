@@ -5,7 +5,7 @@
 // `/app/reports` both render this component (founder decision; ReportsPage `REPORT_TAB_PATH.sales = HOME_HREF`).
 //
 // Data: `useSalesReport` (GET /api/analytics, §6.1) with the shared range (`useReportRange`), the Store filter
-// (`stores`, canonical keys), "Show in" (`cur`, TRY/USD/EUR; default = the seller's base currency) and the product
+// (`stores`, canonical keys), "Show in" (`cur`, TRY/USD/EUR; default TRY or the remembered choice, ₺ / $ / € in the header) and the product
 // search (`q`). Everything read-only: nothing here writes to a marketplace.
 //
 // States (§3): connections unknown → skeleton (never the connect screen) · no store → connect empty state · first
@@ -16,13 +16,13 @@
 import * as React from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { SyncMeta, type ActionSpec, type SyncMetaState } from '@/components/ds/page';
 import { useIsMobile } from '@/components/ds/page/useViewport';
 import { Banner } from '@/components/ds/feedback/Banner';
 import { useToast } from '@/components/ds/feedback/toast';
 import { Tooltip } from '@/components/ds/overlay/Tooltip';
-import { Select } from '@/components/ds/inputs/Select';
+import { SegmentedControl } from '@/components/ds/inputs/SegmentedControl';
 import { LogoTile } from '@/components/ds/data/LogoTile';
 import { EmptyState } from '@/components/ds/state/EmptyState';
 import { ErrorState } from '@/components/ds/state/ErrorState';
@@ -35,12 +35,10 @@ import { neutral, px, space } from '@/lib/ds/tokens';
 import { useAsyncRegion } from '@/lib/ds/useAsyncState';
 import { urlField, useUrlState } from '@/lib/ds/useUrlState';
 import { useFormatters, type Formatters } from '@/lib/format';
-import { getLocaleConfig } from '@/lib/i18n/localeConfig';
 import { useConnections, type ConnectionsMap } from '@/lib/hooks/useConnections';
 import { canonicalStore } from '@/lib/marketplaces/canonical';
 import { useNavLinks } from '@/lib/nav/links';
 import { csvNumber, exportReportCsv, type CsvBlock } from '@/lib/reports/exportCsv';
-import { useSenderProfile } from '@/lib/shipping/useSenderProfile';
 import { dayKeyToDate, rangeDays, salesCompareWindow } from '@/lib/reports/dateRange';
 import {
   SALES_CURRENCIES,
@@ -49,7 +47,8 @@ import {
   type SalesReport as SalesReportData,
   type SalesStoreMarketplace,
 } from '@/lib/reports/useSalesReport';
-import { ReportsPage, useReportRange } from '../ReportsPage';
+import { ReportsPage, useComparisonLabel, useReportRange } from '../ReportsPage';
+import { DEFAULT_DISPLAY_CURRENCY, resolveDisplayCurrency, useStoredDisplayCurrency } from '../useDisplayCurrency';
 import { SalesKpis } from './SalesKpis';
 import { SalesTrendChart, type SalesMetric } from './SalesTrendChart';
 import { StoreTable, currencySymbol, reportOrdersHref, storeDisplayName } from './StoreTable';
@@ -64,27 +63,12 @@ export const SALES_URL_SCHEMA = {
 
 const STORE_PROVIDERS = ['etsy', 'ebay', 'amazon', 'shopify', 'wix', 'trendyol', 'hepsiburada'] as const;
 
-const asSalesCurrency = (c: string | null | undefined): SalesCurrency | null => {
-  const u = (c ?? '').trim().toUpperCase();
-  return (SALES_CURRENCIES as readonly string[]).includes(u) ? (u as SalesCurrency) : null;
-};
-
-/** Pure: the UI locale's default currency, narrowed to Show in options (fallback only: no account base known). */
-export function baseSalesCurrency(locale: string): SalesCurrency {
-  return asSalesCurrency(getLocaleConfig(locale === 'en' ? 'en' : 'tr').defaultCurrency) ?? 'TRY';
-}
-
 /**
- * Pure: the default "Show in" currency (§4.4, DS §3.7) = the seller's account base currency (`baseCurrencyOf` of the
- * sender profile: its currency, else TRY for a TR sender), narrowed to TRY/USD/EUR. The UI locale is the fallback
- * only when there is no sender profile, the settings failed to load, or the base is not a Show in option.
+ * Pure: the default "Show in" currency = TRY (USABILITY_FINDINGS: "Home defaults to USD — must default to TL").
+ * A URL `cur` (shared link) or the seller's remembered choice wins; see `resolveDisplayCurrency`.
  */
-export function defaultSalesCurrency(
-  profile: { state: 'loading' | 'ready' | 'error'; hasSender: boolean; baseCurrency: string },
-  locale: string,
-): SalesCurrency {
-  if (profile.state === 'ready' && profile.hasSender) return asSalesCurrency(profile.baseCurrency) ?? baseSalesCurrency(locale);
-  return baseSalesCurrency(locale);
+export function defaultSalesCurrency(): SalesCurrency {
+  return DEFAULT_DISPLAY_CURRENCY;
 }
 
 export interface StoreChoice {
@@ -183,7 +167,6 @@ export interface SalesReportProps {
 
 export function SalesReport({ now }: SalesReportProps = {}) {
   const t = useTranslations('reports');
-  const locale = useLocale();
   const fmt = useFormatters();
   const toast = useToast();
   const mobile = useIsMobile();
@@ -193,17 +176,19 @@ export function SalesReport({ now }: SalesReportProps = {}) {
   const [url, setUrl] = useUrlState(SALES_URL_SCHEMA);
   const [metric, setMetric] = React.useState<SalesMetric>('revenue');
 
-  // Default "Show in" = the account base currency (not the UI locale). The request waits for the profile, so the
-  // KPIs never flip from the locale default to the base currency once it arrives.
-  const profile = useSenderProfile();
-  const base = defaultSalesCurrency({ state: profile.state, hasSender: Boolean(profile.sender), baseCurrency: profile.baseCurrency }, locale);
-  const baseKnown = profile.state !== 'loading' || Boolean(url.cur);
-  const currency: SalesCurrency = url.cur ?? base;
+  // Show in: URL `cur` → the remembered choice → TRY. No wait on the settings call (the old sender-profile default
+  // showed USD to sellers with a US sender address and delayed the first request).
+  const [storedCur, setStoredCur] = useStoredDisplayCurrency();
+  const currency: SalesCurrency = resolveDisplayCurrency(url.cur, storedCur);
+  const setCurrency = (c: SalesCurrency) => {
+    setStoredCur(c);
+    if (url.cur) setUrl({ cur: undefined });
+  };
   const manualLabel = t('sales.stores.manual');
 
   // Connections unknown → wait (tri-state rule); errored without data → let the report decide.
   const connKnown = conn.anyMarketplace !== undefined || Boolean(conn.error);
-  const enabled = range.ready && connKnown && baseKnown && conn.anyMarketplace !== false;
+  const enabled = range.ready && connKnown && conn.anyMarketplace !== false;
   const params = React.useMemo(
     () => ({
       from: range.from,
@@ -252,7 +237,7 @@ export function SalesReport({ now }: SalesReportProps = {}) {
   // The API's comparison window wins (it is what the deltas used); the client rule is the same before data arrives.
   const prevRange = data?.previousRange ?? range.previous;
   const previousLabel = fmt.dateRange(dayKeyToDate(prevRange.from), dayKeyToDate(prevRange.to));
-  const periodLabel = t('delta.vsRange', { range: previousLabel });
+  const comparison = useComparisonLabel(prevRange);
 
   // ── filters ──
   const storeOptions: FilterOption[] = choices.map((c) => ({
@@ -269,31 +254,21 @@ export function SalesReport({ now }: SalesReportProps = {}) {
     options: storeOptions,
     searchable: storeOptions.length > 8,
   };
-  const currencyOptions = SALES_CURRENCIES.map((c) => ({ value: c, label: `${currencySymbol(c, fmt.intlLocale)} ${c}` }));
-  const currencyFilter: FilterDef = {
-    key: 'cur',
-    label: t('toolbar.showIn'),
-    type: 'select',
-    options: currencyOptions,
-    allLabel: `${currencySymbol(base, fmt.intlLocale)} ${base}`,
-    render: ({ placement }) => (
-      <Box sx={{ minWidth: placement === 'toolbar' ? 132 : undefined, width: placement === 'sheet' ? '100%' : undefined }}>
-        <Select<SalesCurrency>
-          value={currency}
-          onChange={(v) => setUrl({ cur: v === base ? undefined : v })}
-          options={currencyOptions}
-          size="sm"
-          aria-label={t('toolbar.showIn')}
-          data-testid="sales-currency"
-        />
-      </Box>
-    ),
-  };
-  const filterValues: FilterValues = { stores: url.stores, cur: url.cur && url.cur !== base ? url.cur : undefined };
+  // ₺ / $ / € — one tap in the header row (desktop) / meta line (mobile), never inside the Filters drawer.
+  const currencySwitch = (
+    <SegmentedControl<SalesCurrency>
+      value={currency}
+      onChange={setCurrency}
+      options={SALES_CURRENCIES.map((c) => ({ value: c, label: currencySymbol(c, fmt.intlLocale) }))}
+      size="sm"
+      aria-label={t('toolbar.showIn')}
+      data-testid="sales-currency"
+    />
+  );
+  const filterValues: FilterValues = { stores: url.stores };
   const onFiltersChange = (v: FilterValues) => {
     const stores = Array.isArray(v.stores) ? (v.stores as string[]) : [];
-    const cur = typeof v.cur === 'string' && (SALES_CURRENCIES as readonly string[]).includes(v.cur) ? (v.cur as SalesCurrency) : undefined;
-    setUrl({ stores, cur: cur === base ? undefined : cur });
+    setUrl({ stores });
   };
   const clearFilters = () => setUrl({ stores: [] });
 
@@ -323,6 +298,7 @@ export function SalesReport({ now }: SalesReportProps = {}) {
   // ── meta ──
   const syncState: SyncMetaState = report.isValidating ? 'pulling' : report.error && data ? 'failed' : 'idle';
   const fxMeta = fxMetaText(data, converted, fmt, t);
+  const storeCount = data ? data.storesIncluded.length || data.stores.length : 0;
   const meta = (
     <Box sx={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', columnGap: px(space[2]), minWidth: 0 }} data-testid="sales-meta">
       <SyncMeta
@@ -338,6 +314,11 @@ export function SalesReport({ now }: SalesReportProps = {}) {
           pullLabel: t('meta.refresh'),
         }}
       />
+      {storeCount > 0 ? (
+        <Typography variant="caption" component="span" sx={{ color: neutral[500] }} data-testid="sales-store-count">
+          {t('meta.storeCount', { count: storeCount })}
+        </Typography>
+      ) : null}
       {fxMeta ? (
         <Tooltip title={fxNote ?? fxMeta}>
           <Typography variant="caption" component="span" sx={{ color: neutral[500] }} tabIndex={0} data-testid="sales-fx-meta">
@@ -383,7 +364,7 @@ export function SalesReport({ now }: SalesReportProps = {}) {
   );
 
   let body: React.ReactNode;
-  if (!connKnown || !range.ready || !baseKnown) {
+  if (!connKnown || !range.ready) {
     body = firstLoadSkeleton;
   } else if (conn.anyMarketplace === false) {
     body = (
@@ -466,7 +447,7 @@ export function SalesReport({ now }: SalesReportProps = {}) {
           sx={{ display: 'flex', flexDirection: 'column', gap: { xs: px(space[6]), md: px(space[8]) }, opacity: updating ? 0.6 : 1, transition: 'opacity 120ms linear' }}
         >
           {stale}
-          <SalesKpis report={data} loading={false} currency={currency} approx={approx} fxNote={fxNote} periodLabel={periodLabel} />
+          <SalesKpis report={data} loading={false} currency={currency} approx={approx} fxNote={fxNote} periodLabel={comparison.short} periodDetail={comparison.detail} />
           <SalesTrendChart
             series={data.series}
             previousSeries={data.previousSeries}
@@ -529,7 +510,7 @@ export function SalesReport({ now }: SalesReportProps = {}) {
       overflow={noStore ? [] : overflow}
       meta={noStore ? undefined : meta}
       storeFilter={storeFilter}
-      toolbarExtra={[currencyFilter]}
+      headerControl={noStore ? undefined : currencySwitch}
       filterValues={filterValues}
       onFiltersChange={onFiltersChange}
       hideToolbar={noStore}

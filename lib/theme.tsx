@@ -259,6 +259,11 @@ const theme = createTheme({
         paper: { boxShadow: e.e2, border: `1px solid ${n[200]}`, borderRadius: radius.md },
         option: { fontSize: 14, minHeight: 36 },
         tag: { height: 24, borderRadius: 9999 },
+        // The popup/clear indicators are IconButtons: without this the global IconButton sizeMedium (40×40) applied
+        // inside the field, so a narrow combobox (phone "+90", currency "₺ TRY") wrapped its
+        // chevron onto a second line and grew to ~80px. Keep them 24px glyph buttons; the field is the hit area.
+        popupIndicator: { width: 24, height: 24, padding: 4, marginRight: 0 },
+        clearIndicator: { width: 24, height: 24, padding: 4, marginRight: 0 },
       },
     },
     // x-date-pickers v6 default is zIndex.modal; lift it into the popover layer so it opens above dialogs.

@@ -171,7 +171,7 @@ export function SidePanel({
           </Box>
         )}
         {/* header (sticky by layout: only the body scrolls) */}
-        <Box sx={{ flexShrink: 0, borderBottom: `1px solid ${n[200]}`, px: '20px', py: '10px', minHeight: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <Box sx={{ flexShrink: 0, borderBottom: `1px solid ${n[200]}`, px: '16px', py: '10px', minHeight: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
             {leading && <Box sx={{ flexShrink: 0, display: 'inline-flex' }}>{leading}</Box>}
             <Box
@@ -196,7 +196,7 @@ export function SidePanel({
           {meta && <Box sx={{ mt: '2px', fontSize: 12, lineHeight: '16px', color: n[500], whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{meta}</Box>}
         </Box>
         {sectionNav && sectionNav.length > 5 && (
-          <Box sx={{ px: '20px', bgcolor: n[25], borderBottom: `1px solid ${n[100]}`, '& > nav': { bgcolor: 'transparent', borderBottom: 0 } }}>
+          <Box sx={{ px: '16px', bgcolor: n[25], borderBottom: `1px solid ${n[100]}`, '& > nav': { bgcolor: 'transparent', borderBottom: 0 } }}>
             <SectionNav sections={sectionNav} sticky={false} scrollRoot={bodyRef} aria-label={t('sections')} data-testid="panel-section-nav" />
           </Box>
         )}
@@ -207,9 +207,9 @@ export function SidePanel({
         {hasFooter && (
           <Box
             sx={{
-              flexShrink: 0, borderTop: `1px solid ${n[200]}`, bgcolor: n[25], minHeight: 64, px: '20px', py: '12px',
+              flexShrink: 0, borderTop: `1px solid ${n[200]}`, bgcolor: n[25], minHeight: 56, px: '16px', py: '10px',
               display: 'flex', alignItems: 'center', gap: '8px',
-              ...(isPhone && { flexWrap: 'wrap', pb: 'calc(12px + env(safe-area-inset-bottom, 0px))' }),
+              ...(isPhone && { flexWrap: 'wrap', pb: 'calc(10px + env(safe-area-inset-bottom, 0px))' }),
             }}
           >
             {overflow && overflow.length > 0 && <OverflowMenu items={overflow} size="md" />}

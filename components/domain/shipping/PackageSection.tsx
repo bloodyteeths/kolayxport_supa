@@ -101,16 +101,39 @@ export function PackageSection({
     </Box>
   );
 
+  const packaging = hasPackagingChoice(carrier) ? (
+    <FormField label={t('field.packaging')} htmlFor="label-packaging">
+      <Select<string>
+        id="label-packaging"
+        value={pkg.packaging}
+        onChange={(v) => set({ packaging: v })}
+        options={packagingOptions}
+        disabled={disabled}
+        data-testid="package-packaging"
+      />
+    </FormField>
+  ) : null;
+
+  // Usability wave 2026-10-15: no "Presets: none yet" row; weight, L × W × H and packaging share one row on
+  // desktop (2 columns on mobile); the preset picker and "Save as preset…" sit together under it.
   return (
     <SidePanelSection id="label-package" title={t('package')} data-testid="label-package">
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <Box component="span" sx={{ fontSize: 13, fontWeight: 500, color: n[700] }}>{t('presets')}</Box>
-          {presetPicker}
-        </Box>
-        {!presetOnly ? (
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {presetOnly ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <Box component="span" sx={{ fontSize: 13, fontWeight: 500, color: n[700] }}>{t('presets')}</Box>
+            {presetPicker}
+          </Box>
+        ) : (
           <>
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: '140px repeat(3, 96px)' }, gap: '12px', alignItems: 'start' }}>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr 1fr', sm: packaging ? '112px repeat(3, 84px) minmax(140px, 1fr)' : '112px repeat(3, 84px)' },
+                gap: '12px',
+                alignItems: 'start',
+              }}
+            >
               <FormField label={t('field.weight')} htmlFor="label-weight" error={weightError} required>
                 <NumberField
                   id="label-weight"
@@ -145,31 +168,21 @@ export function PackageSection({
                   />
                 </FormField>
               ))}
+              {packaging ? <Box sx={{ gridColumn: { xs: '1 / -1', sm: 'auto' } }}>{packaging}</Box> : null}
             </Box>
-            {optionalDims ? <Box sx={{ mt: '-8px', fontSize: 12, color: n[500] }}>{t('dimsHint')}</Box> : null}
-            <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: '12px', flexWrap: 'wrap' }}>
-              {hasPackagingChoice(carrier) ? (
-                <Box sx={{ minWidth: 240 }}>
-                  <FormField label={t('field.packaging')} htmlFor="label-packaging">
-                    <Select<string>
-                      id="label-packaging"
-                      value={pkg.packaging}
-                      onChange={(v) => set({ packaging: v })}
-                      options={packagingOptions}
-                      disabled={disabled}
-                      data-testid="package-packaging"
-                    />
-                  </FormField>
-                </Box>
-              ) : null}
-              {onSavePreset ? (
-                <Button variant="ghost" size="sm" onClick={() => setSaveOpen(true)} disabled={disabled} data-testid="save-preset">
-                  {t('savePreset')}
-                </Button>
-              ) : null}
-            </Box>
+            {optionalDims ? <Box sx={{ mt: '-4px', fontSize: 12, color: n[500] }}>{t('dimsHint')}</Box> : null}
+            {presets.length > 0 || onSavePreset ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                {presets.length > 0 ? presetPicker : null}
+                {onSavePreset ? (
+                  <Button variant="ghost" size="sm" onClick={() => setSaveOpen(true)} disabled={disabled} data-testid="save-preset">
+                    {t('savePreset')}
+                  </Button>
+                ) : null}
+              </Box>
+            ) : null}
           </>
-        ) : null}
+        )}
       </Box>
       <Modal
         open={saveOpen}

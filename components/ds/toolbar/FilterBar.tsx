@@ -2,7 +2,8 @@
 // search · ≤ 3 visible FilterButtons · "Filters • n" (FiltersSheet) · active chips + "Clear all".
 // CRITIQUE X4 overflow rule: below 1200px the visible FilterButtons fold right-to-left into
 // "Filters • n" (one fewer), the search shrinks to ≥ 200px and the result count moves to the right end
-// of the chips row (always rendered). Below 900px every filter lives in the bottom sheet.
+// of the chips row. Below 900px every filter lives in the bottom sheet, and with no active chips the count
+// sits at the end of the saved-views chip row (no lone "25 results" row).
 import * as React from 'react';
 import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
@@ -180,7 +181,9 @@ export function FilterBar({
     />
   ) : null;
 
-  const chipsRow = !hideChips ? (
+  // Mobile density: with no active chips the count joins the saved-views row instead of taking a lone row.
+  const countInSecondRow = isMobile && Boolean(mobileSecondRow) && chips.length === 0 && Boolean(countText);
+  const chipsRow = countInSecondRow ? null : !hideChips ? (
     <ActiveFilterChips chips={chips} onClearAll={clearAll} trailing={countInChipsRow ? countText : undefined} />
   ) : countInChipsRow && countText ? (
     <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: '8px' }}>{countText}</Box>
@@ -194,7 +197,16 @@ export function FilterBar({
           {search ? <SearchField size="md" {...search} shortcut={null} fullWidth /> : null}
           {filtersButton}
         </Box>
-        {mobileSecondRow ? <Box sx={{ mt: '8px' }}>{mobileSecondRow}</Box> : null}
+        {mobileSecondRow ? (
+          countInSecondRow ? (
+            <Box sx={{ mt: '8px', display: 'flex', alignItems: 'center', gap: '8px' }} data-testid="filter-bar-second-row">
+              <Box sx={{ flex: 1, minWidth: 0 }}>{mobileSecondRow}</Box>
+              <Box sx={{ flexShrink: 0 }}>{countText}</Box>
+            </Box>
+          ) : (
+            <Box sx={{ mt: '8px' }} data-testid="filter-bar-second-row">{mobileSecondRow}</Box>
+          )
+        ) : null}
         {chipsRow}
         {sheet}
       </Box>

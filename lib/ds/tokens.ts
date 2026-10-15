@@ -53,7 +53,8 @@ export const type = {
 export const space = { 0: 0, 0.5: 2, 1: 4, 1.5: 6, 2: 8, 3: 12, 4: 16, 5: 20, 6: 24, 8: 32, 10: 40, 12: 48, 16: 64 } as const;
 export const px = (n: number) => `${n}px`;
 
-export const control = { sm: 32, md: 40, lg: 44, xl: 48 } as const;
+/** xs 28 = dense-row control (table/card trailing actions); stays 28 visually on touch and gets a 44 hit slop. */
+export const control = { xs: 28, sm: 32, md: 40, lg: 44, xl: 48 } as const;
 export const radius = { xs: 4, sm: 6, md: 8, lg: 12, full: 9999 } as const;
 
 export const elevation = {
@@ -82,7 +83,14 @@ export const layout = {
   sidebar: 240, sidebarRail: 64, topBar: 52, topBarMobile: 48, tabBar: 56,
   maxList: 1600, maxDetail: 1280, maxForm: 880, maxReading: 720, fieldMax: 480, longFieldMax: 720,
   gutter: 24, gutterMobile: 16, rowH: 44, rowHCompact: 36,
+  /** Vertical gap between page sections / cards (USABILITY_FINDINGS density: ≤24 desktop, 16 mobile). */
+  sectionGap: 24, sectionGapMobile: 16,
+  /** Inner padding of a card / panel section. */
+  panelPad: 16,
 } as const;
+
+/** Responsive sx value for the section gap: `mb: sectionGapSx` / `gap: sectionGapSx`. 16 below md, 24 from md. */
+export const sectionGapSx = { xs: `${layout.sectionGapMobile}px`, md: `${layout.sectionGap}px` } as const;
 
 export const panelWidth = { sm: 440, md: 560, lg: 720, xl: 960 } as const;
 export const breakpoints = { xs: 0, sm: 600, md: 900, lg: 1200, xl: 1536 } as const;

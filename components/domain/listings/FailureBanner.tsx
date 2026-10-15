@@ -1,5 +1,5 @@
 // components/domain/listings/FailureBanner.tsx — listings-grid §2/§6.2: at most one danger Banner, only when
-// failed + conflict > 0: "2 listings couldn't be sent. 1 changed on Etsy since your draft." [Show them].
+// failed + conflict > 0: "3 listings weren't sent to Etsy. Fix them and send again." [Show them] → send_failed view.
 import * as React from 'react';
 import Box from '@mui/material/Box';
 import { Banner } from '@/components/ds/feedback/Banner';
@@ -18,12 +18,11 @@ export type FailureBannerProps = {
 export function FailureBanner({ marketplace, sync, onShow, t, ...rest }: FailureBannerProps) {
   const failed = sync?.failed ?? 0;
   const conflicts = sync?.conflict ?? 0;
-  if (failed + conflicts <= 0) return null;
-  const title = t('listings.banner.failed', {
-    failed,
-    conflicts,
-    on: t('listings.mp.on', { marketplace }),
-  }).trim();
+  const count = failed + conflicts;
+  if (count <= 0) return null;
+  // One line that says what to do ("5 listings weren't sent. Fix them and send again.") and one action that opens
+  // the filtered view. Conflicts are counted in: they are fixed in the same view ("Review differences").
+  const title = t('listings.banner.failedFix', { count, to: t('listings.mp.to', { marketplace }) });
   return (
     <Box sx={{ mb: '8px' }}>
       <Banner

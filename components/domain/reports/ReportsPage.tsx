@@ -37,6 +37,7 @@ import { useFormatters } from '@/lib/format';
 import { control, neutral, px, space } from '@/lib/ds/tokens';
 import { HOME_HREF } from '@/lib/nav/navConfig';
 import { useConnections } from '@/lib/hooks/useConnections';
+import { useIsMobile } from '@/components/ds/page/useViewport';
 import {
   DEFAULT_REPORT_PRESET,
   GRANULARITIES,
@@ -45,6 +46,7 @@ import {
   effectiveGranularity,
   pickerDateToDay,
   previousWindow,
+  dayKeyToDate,
   rangeDays,
   resolveReportRange,
   validGranularities,
@@ -239,11 +241,26 @@ export function useReportMarketplace(): ReportMarketplace {
   };
 }
 
+// ── comparison label (KPI tiles) ────────────────────────────────────────────────────────────────────
+
+/**
+ * Short comparison for KPI tiles ("önceki 30 güne göre") + the exact window for the tooltip ("18 Ağu – 16 Eyl
+ * 2026"). The long "{range} dönemine göre" wrapped into 3 lines on a 2-column mobile grid.
+ */
+export function useComparisonLabel(previous: DayRange): { short: string; detail: string } {
+  const t = useTranslations('reports');
+  const fmt = useFormatters();
+  return {
+    short: t('delta.vsPreviousDays', { days: rangeDays(previous.from, previous.to) }),
+    detail: fmt.dateRange(dayKeyToDate(previous.from), dayKeyToDate(previous.to)),
+  };
+}
+
 // ── the frame ───────────────────────────────────────────────────────────────────────────────────────────
 
 export interface ReportsPageProps {
   tab: ReportTab;
-  /** Default "Reports" (the nav label, §0.3). */
+  /** Default "Home" / "Ana sayfa" (the nav label: Home *is* the Reports overview). */
   title?: string;
   /** The tab's one primary (§4.1). */
   primary?: ActionSpec;
@@ -270,6 +287,11 @@ export interface ReportsPageProps {
   mobilePrimary?: 'sticky' | 'menu' | 'none';
   /** Hide the toolbar (e.g. a never-synced empty state). */
   hideToolbar?: boolean;
+  /**
+   * One compact control that must stay one tap away (Home's ₺ / $ / € switch): in the header title row on desktop,
+   * at the end of the meta line on mobile (the shell owns the mobile title row). Never inside the Filters drawer.
+   */
+  headerControl?: React.ReactNode;
   children: React.ReactNode;
   'data-testid'?: string;
 }
@@ -291,11 +313,13 @@ export function ReportsPage({
   banners,
   mobilePrimary = 'menu',
   hideToolbar = false,
+  headerControl,
   children,
   'data-testid': testId = 'reports-page',
 }: ReportsPageProps) {
   const t = useTranslations('reports');
   const range = useReportRange();
+  const mobile = useIsMobile();
   const { access } = useFeatureAccess('financials');
   const feature = isTabGated(tab);
   const blocked = Boolean(feature) && (access === 'locked' || access === 'paused' || access === 'neutral');
@@ -318,12 +342,22 @@ export function ReportsPage({
     <Page title={title ?? t('page.title')} width="detail" data-testid={testId}>
       <PageHeader
         title={title ?? t('page.title')}
-        meta={blocked ? undefined : meta}
+        meta={blocked || (mobile && headerControl) ? undefined : meta}
+        actionsSlot={!blocked && !mobile && headerControl ? headerControl : undefined}
         primaryAction={blocked ? undefined : primary}
         secondaryActions={blocked ? [] : secondary}
         overflowActions={blocked ? [] : overflow}
         mobilePrimary={mobilePrimary}
       />
+      {!blocked && mobile && headerControl ? (
+        <Box
+          data-testid="reports-mobile-meta"
+          sx={{ display: 'flex', alignItems: 'center', gap: px(space[2]), mb: px(space[3]), mt: px(-space[2]) }}
+        >
+          <Box sx={{ flex: 1, minWidth: 0, fontSize: 12, lineHeight: '16px' }}>{meta}</Box>
+          <Box sx={{ flexShrink: 0 }}>{headerControl}</Box>
+        </Box>
+      ) : null}
       {showTabs ? (
         <Box sx={{ mb: px(space[4]) }}>
           <Tabs<ReportTab> value={tab} tabs={tabDefs} aria-label={t('page.title')} data-testid="reports-tabs" />

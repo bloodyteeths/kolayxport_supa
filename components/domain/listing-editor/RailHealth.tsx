@@ -3,16 +3,20 @@
 // header shows the last *sent* score with "78 → 86 after you send" when they differ (the list page shows the
 // same sent-state number). Every fix goes back to the editor through `onFix`, which only focuses a field or
 // opens an AI proposal: nothing is staged silently and nothing is sent (P6, §3.10).
+// Usability pass (2026-10-15, founder: "I feel lost"): the rail shows the score and only the top 3 fixes in plain
+// language, each with one small text "Fix" link (no wall of bordered buttons, "+9 pts" instead of a cryptic "+9");
+// the other open checks and the n/a ones sit behind "Show all", passed checks stay collapsed.
 // The same `useListingHealth` result feeds the header `ScoreMeter variant="cell"` at 900–1199 and on mobile.
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Box from '@mui/material/Box';
+import ButtonBase from '@mui/material/ButtonBase';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
-import { neutral as n, px, space } from '@/lib/ds/tokens';
+import { accent, focusRing, neutral as n, px, space, tone as toneTokens } from '@/lib/ds/tokens';
 import { ScoreMeter } from '@/components/ds/data/ScoreMeter';
-import { ScorePanel } from '@/components/ds/data/ScorePanel';
+import { icons } from '@/lib/ds/icons';
 import { scoreListing, type EbayScoreInput, type EtsyScoreInput } from '@/lib/listingScore';
-import type { Check, ScoreResult } from '@/lib/listingScore/types';
+import { sortChecks, type Check, type ScoreResult } from '@/lib/listingScore/types';
 import { decodeEntities, decodeEntityList } from '@/lib/text/decodeEntities';
 
 export type HealthMarketplace = 'etsy' | 'ebay';
@@ -155,22 +159,116 @@ export function etsyScoreInputFromSource(src: EtsyHealthSource): EtsyScoreInput 
   };
 }
 
+/** Open checks shown before "Show all". */
+export const TOP_FIXES = 3;
+
 export interface RailHealthProps {
   health: ListingHealth;
   /** Focus the field / open the AI proposal for this check (see `fixTarget`). Never stages or sends by itself. */
   onFix: (check: Check) => void;
-  /** Check ids whose fix is running (AI writing): their button shows the DS "Working…" label. */
+  /** Check ids whose fix is running (AI writing): their link shows the DS "Working…" label. */
   busyFixIds?: string[];
   'data-testid'?: string;
 }
 
-export function RailHealth({ health, onFix, busyFixIds, 'data-testid': testId }: RailHealthProps) {
+const linkSx = {
+  font: 'inherit',
+  fontSize: 13,
+  lineHeight: '18px',
+  fontWeight: 500,
+  color: accent[600],
+  borderRadius: '4px',
+  px: '2px',
+  whiteSpace: 'nowrap',
+  '&:hover': { color: accent[700], textDecoration: 'underline', textUnderlineOffset: '3px' },
+  '&:focus-visible': { outline: 'none', boxShadow: focusRing },
+  '&.Mui-disabled': { color: n[500] },
+  '@media (pointer: coarse)': { minHeight: 44, px: '6px' },
+} as const;
+
+function Glyph({ status }: { status: Check['status'] }) {
+  const ts = useTranslations('ds.score');
+  const common = { size: 16, strokeWidth: 1.75, 'aria-hidden': true } as const;
+  if (status === 'fail') return <icons.fail {...common} color={toneTokens.danger.fg} />;
+  if (status === 'warn') return <icons.warning {...common} color={toneTokens.warning.fg} />;
+  if (status === 'pass') return <icons.check {...common} color={toneTokens.success.fg} />;
+  return <Typography component="span" variant="micro" sx={{ color: n[500], whiteSpace: 'nowrap' }}>{ts('na')}</Typography>;
+}
+
+/** One check: glyph · plain-language label (+N pts, subtle) · one text link. */
+function FixRow({ check, onFix, busy }: { check: Check; onFix: (c: Check) => void; busy: boolean }) {
+  const tRoot = useTranslations();
+  const t = useTranslations('listingEditor.health');
+  const ts = useTranslations('ds.score');
+  const label = tRoot(check.label, check.params ?? {});
+  const fixLabel = check.fix ? tRoot(check.fix.label) : null;
+  const open = check.status === 'fail' || check.status === 'warn';
+  // Open checks say "Fix"; an n/a check's link names what it does ("Check price") since nothing is wrong yet.
+  const linkText = busy ? ts('fixRunning') : open ? t('fix') : fixLabel;
+  const gain = check.gain ?? 0;
+  return (
+    <Box
+      component="li"
+      data-check-id={check.id}
+      data-status={check.status}
+      sx={{ display: 'grid', gridTemplateColumns: '16px minmax(0, 1fr) auto', columnGap: '8px', alignItems: 'start', py: '6px' }}
+    >
+      <Box sx={{ display: 'inline-flex', pt: '1px' }} title={ts(`status.${check.status}`)}>
+        <Glyph status={check.status} />
+      </Box>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography variant="dense" component="span" sx={{ color: check.status === 'na' ? n[500] : n[800] }}>
+          <Box component="span" sx={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
+            {ts(`status.${check.status}`)}
+          </Box>
+          {label}
+        </Typography>
+        {open && gain > 0 ? (
+          <Typography variant="caption" component="span" sx={{ display: 'block', color: n[500], fontVariantNumeric: 'tabular-nums' }}>
+            {t('gain', { points: gain })}
+          </Typography>
+        ) : null}
+        {check.status === 'na' && check.naReason ? (
+          <Typography variant="caption" component="span" sx={{ display: 'block', color: n[500] }}>
+            {tRoot(check.naReason)}
+          </Typography>
+        ) : null}
+      </Box>
+      {check.fix && check.status !== 'pass' && linkText ? (
+        <ButtonBase
+          onClick={() => onFix(check)}
+          disabled={busy}
+          title={open && fixLabel ? fixLabel : undefined}
+          aria-label={open && fixLabel && !busy ? t('fixAria', { fix: fixLabel }) : undefined}
+          data-testid={`rail-fix-${check.id}`}
+          sx={linkSx}
+        >
+          {linkText}
+        </ButtonBase>
+      ) : <span />}
+    </Box>
+  );
+}
+
+const listSx = { listStyle: 'none', m: 0, p: 0 } as const;
+
+export function RailHealth({ health, onFix, busyFixIds = [], 'data-testid': testId }: RailHealthProps) {
   const t = useTranslations('listingEditor.health');
   const ts = useTranslations('ds.score');
   const { result, score, afterScore } = health;
+  const [showAll, setShowAll] = useState(false);
+  const [showPasses, setShowPasses] = useState(false);
+
+  const listing = sortChecks(result.checks).filter((c) => (c.group ?? 'listing') === 'listing');
+  const open = listing.filter((c) => c.status === 'fail' || c.status === 'warn');
+  const passes = listing.filter((c) => c.status === 'pass');
+  const nas = listing.filter((c) => c.status === 'na');
+  const top = open.slice(0, TOP_FIXES);
+  const rest = [...open.slice(TOP_FIXES), ...nas];
+  const row = (c: Check) => <FixRow key={c.id} check={c} onFix={onFix} busy={busyFixIds.includes(c.id)} />;
 
   return (
-    <Box data-testid={testId ?? 'rail-health'} sx={{ display: 'flex', flexDirection: 'column', gap: px(space[3]) }}>
+    <Box data-testid={testId ?? 'rail-health'} sx={{ display: 'flex', flexDirection: 'column', gap: px(space[2]) }}>
       {score === null ? (
         <Box>
           <Typography component="h3" variant="titleSm" sx={{ m: 0, color: n[800] }}>{ts('title')}</Typography>
@@ -190,7 +288,38 @@ export function RailHealth({ health, onFix, busyFixIds, 'data-testid': testId }:
           checksTotal={result.checksTotal}
         />
       )}
-      {score !== null && <ScorePanel result={result} onFix={onFix} busyFixIds={busyFixIds} hideHeader />}
+      {score !== null ? (
+        <>
+          {top.length ? (
+            <Box component="ul" sx={listSx} aria-label={t('topFixes')} data-testid="rail-health-top">
+              {top.map(row)}
+            </Box>
+          ) : null}
+          {showAll && rest.length ? (
+            <Box component="ul" sx={listSx} data-testid="rail-health-rest">
+              {rest.map(row)}
+            </Box>
+          ) : null}
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '12px', rowGap: '4px' }}>
+            {rest.length ? (
+              <ButtonBase onClick={() => setShowAll((v) => !v)} aria-expanded={showAll} data-testid="rail-health-showall" sx={{ ...linkSx, color: n[700] }}>
+                {showAll ? t('showLess') : t('showAll', { count: rest.length })}
+              </ButtonBase>
+            ) : null}
+            {passes.length && !showPasses ? (
+              <ButtonBase onClick={() => setShowPasses(true)} data-testid="rail-health-passes" sx={{ ...linkSx, color: n[600], fontWeight: 400, gap: '4px' }}>
+                <icons.check size={14} strokeWidth={1.75} aria-hidden color={toneTokens.success.fg} />
+                {ts('passesCollapsed', { count: passes.length })}
+              </ButtonBase>
+            ) : null}
+          </Box>
+          {showPasses && passes.length ? (
+            <Box component="ul" sx={listSx} data-testid="rail-health-passed">
+              {passes.map(row)}
+            </Box>
+          ) : null}
+        </>
+      ) : null}
     </Box>
   );
 }

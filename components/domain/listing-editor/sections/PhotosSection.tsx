@@ -10,6 +10,9 @@ import Box from '@mui/material/Box';
 import { useTranslations } from 'next-intl';
 import { Section } from '@/components/ds/page/Section';
 import { Button } from '@/components/ds/inputs/Button';
+import { ActionMenu } from '@/components/ds/page/ActionMenu';
+import { useIsMobile } from '@/components/ds/page/useViewport';
+import type { ActionSpec } from '@/components/ds/types/actions';
 import type { StripVideo } from '@/components/ds/inputs/ImageGrid';
 import { ErrorState } from '@/components/ds/state/ErrorState';
 import { icons } from '@/lib/ds/icons';
@@ -52,6 +55,52 @@ export interface PhotosSectionProps extends Partial<ListingSectionProps> {
 export function mediaVersion(draft: Pick<DraftRow, 'id' | 'status' | 'media'> | null | undefined): string {
   if (!draft) return 'none';
   return `${draft.id}:${draft.status}:${(draft.media ?? []).map((m) => `${m.id}${m.operation}${m.rank ?? ''}${m.altText ?? ''}`).join(',')}`;
+}
+
+interface PhotoAction {
+  id: string;
+  label: string;
+  icon?: ActionSpec['icon'];
+  onClick: () => void;
+  /** Field anchor id (score fixes focus it: `#field-photos`). */
+  anchor?: string;
+}
+
+/**
+ * One compact row of small icon + label buttons, the rest behind ⋯ (usability pass 2026-10-15: four or five
+ * buttons wrapped into two rows, on a phone a "wrap mess"). Never wraps: on a very narrow screen it scrolls
+ * sideways inside the row instead of growing a second line.
+ */
+function PhotoActions({ primary, more, videoAnchor }: { primary: PhotoAction[]; more: PhotoAction[]; videoAnchor?: boolean }) {
+  const t = useTranslations('listingEditor');
+  if (!primary.length && !more.length) return null;
+  return (
+    <Box
+      data-testid="le-photo-actions"
+      sx={{
+        display: 'flex', flexWrap: 'nowrap', gap: '4px', alignItems: 'center', overflowX: 'auto', minWidth: 0,
+        scrollbarWidth: 'none', '&::-webkit-scrollbar': { display: 'none' }, '& > *': { flexShrink: 0 },
+      }}
+    >
+      {primary.map((a) => {
+        const button = (
+          <Button key={a.id} variant="ghost" size="sm" icon={a.icon} onClick={a.onClick}>{a.label}</Button>
+        );
+        return a.anchor ? (
+          <Box component="span" key={a.id} id={fieldAnchorId(a.anchor)} tabIndex={-1} sx={{ outline: 'none' }}>{button}</Box>
+        ) : button;
+      })}
+      {more.length ? (
+        <ActionMenu
+          items={more.map((a) => ({ id: a.id, label: a.label, icon: a.icon, onClick: a.onClick }))}
+          label={t('photos.moreActions')}
+          data-testid="le-photo-more"
+        />
+      ) : null}
+      {/* `#field-video` (score fix "Add video") lands next to the ⋯ that holds "Add video". */}
+      {videoAnchor ? <Box component="span" id={fieldAnchorId('video')} tabIndex={-1} sx={{ outline: 'none', width: 0 }} /> : null}
+    </Box>
+  );
 }
 
 export function PhotosSection(props: PhotosSectionProps) {
@@ -169,6 +218,7 @@ function EtsyPhotos({ id = 'photos', writeAltText, removeStagedMedia, handleRef 
   const full = slots >= PHOTO_MAX.etsy;
   const fullUntilSent = full && count < slots;
   const hasVideo = Boolean(videoTile);
+  const isMobile = useIsMobile();
 
   React.useImperativeHandle(handleRef, () => ({
     openUpload: () => imagesRef.current?.openUpload(),
@@ -257,29 +307,26 @@ function EtsyPhotos({ id = 'photos', writeAltText, removeStagedMedia, handleRef 
           <Box sx={{ fontSize: 12, color: neutral[500] }}>{t('photos.fullUntilSent', { max: PHOTO_MAX.etsy, marketplace: marketplaceName })}</Box>
         ) : null}
         {!readOnly ? (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
-            {!full ? (
-              <Box component="span" id={fieldAnchorId('photos')} tabIndex={-1} sx={{ outline: 'none' }}>
-                <Button variant="ghost" size="sm" icon={icons.upload} onClick={() => imagesRef.current?.openUpload()}>{t('photos.choose')}</Button>
-              </Box>
-            ) : null}
-            {!full ? (
-              <Button variant="ghost" size="sm" icon={icons.ai} onClick={() => imagesRef.current?.openGenerate()}>{t('ai.generatePhoto')}</Button>
-            ) : null}
-            {!full ? (
-              <Button variant="ghost" size="sm" onClick={() => imagesRef.current?.openPasteLinks()}>{t('photos.pasteLinks')}</Button>
-            ) : null}
-            {altEnabled && missingAlt > 0 ? (
-              <Button variant="ghost" size="sm" icon={icons.ai} onClick={() => imagesRef.current?.writeMissingAlt()}>
-                {t('ai.writeAlt', { count: missingAlt })}
-              </Button>
-            ) : null}
-            {!hasVideo && videoLoad.status === 'ready' ? (
-              <Box component="span" id={fieldAnchorId('video')} tabIndex={-1} sx={{ outline: 'none' }}>
-                <Button variant="ghost" size="sm" icon={icons.video} onClick={() => videoRef.current?.pick()}>{t('video.add')}</Button>
-              </Box>
-            ) : null}
-          </Box>
+          <PhotoActions
+            primary={[
+              ...(!full ? [{ id: 'choose', anchor: 'photos', label: t('photos.choose'), icon: icons.upload, onClick: () => imagesRef.current?.openUpload() }] : []),
+              ...(!full ? [{ id: 'generate', label: t('ai.generatePhoto'), icon: icons.ai, onClick: () => imagesRef.current?.openGenerate() }] : []),
+              // Desktop keeps the alt-text fix in the row; on a phone it joins ⋯ (the heading still says how many miss it).
+              ...(altEnabled && missingAlt > 0 && !isMobile
+                ? [{ id: 'alt', label: t('ai.writeAlt', { count: missingAlt }), icon: icons.ai, onClick: () => imagesRef.current?.writeMissingAlt() }]
+                : []),
+            ]}
+            more={[
+              ...(altEnabled && missingAlt > 0 && isMobile
+                ? [{ id: 'alt', label: t('ai.writeAlt', { count: missingAlt }), icon: icons.ai, onClick: () => imagesRef.current?.writeMissingAlt() }]
+                : []),
+              ...(!full ? [{ id: 'pasteLinks', label: t('photos.pasteLinks'), onClick: () => imagesRef.current?.openPasteLinks() }] : []),
+              ...(!hasVideo && videoLoad.status === 'ready'
+                ? [{ id: 'video', label: t('video.add'), icon: icons.video, onClick: () => videoRef.current?.pick() }]
+                : []),
+            ]}
+            videoAnchor={!hasVideo && videoLoad.status === 'ready'}
+          />
         ) : null}
       </Box>
     </Section>
@@ -353,12 +400,13 @@ function EbayPhotos({ id = 'photos', handleRef }: PhotosSectionProps) {
           <Box sx={{ fontSize: 12, color: neutral[500] }}>{t('photos.hintEbay', { max: PHOTO_MAX.ebay })}</Box>
         ) : null}
         {!readOnly && !full ? (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
-            <Box component="span" id={fieldAnchorId('photos')} tabIndex={-1} sx={{ outline: 'none' }}>
-              <Button variant="ghost" size="sm" icon={icons.upload} onClick={() => ref.current?.openUpload()}>{t('photos.choose')}</Button>
-            </Box>
-            <Button variant="ghost" size="sm" icon={icons.ai} onClick={() => ref.current?.openGenerate()}>{t('ai.generatePhoto')}</Button>
-          </Box>
+          <PhotoActions
+            primary={[
+              { id: 'choose', anchor: 'photos', label: t('photos.choose'), icon: icons.upload, onClick: () => ref.current?.openUpload() },
+              { id: 'generate', label: t('ai.generatePhoto'), icon: icons.ai, onClick: () => ref.current?.openGenerate() },
+            ]}
+            more={[]}
+          />
         ) : null}
       </Box>
     </Section>

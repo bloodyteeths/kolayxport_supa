@@ -119,7 +119,7 @@ export function OrdersPage({ now }: OrdersPageProps = {}) {
 
   const [url, setUrl] = useUrlState(ORDERS_URL_SCHEMA, { migrate: migrateOrdersQuery });
   const baseView = baseViewOf(url);
-  const activeView = url.view ?? 'to_ship';
+  const activeView = url.view ?? 'all';
   const query = React.useMemo(() => toOrdersQuery(url, now), [url, now]);
   const list = useOrdersList(query);
   const rows = list.rows;

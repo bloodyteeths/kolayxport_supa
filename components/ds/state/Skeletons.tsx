@@ -114,12 +114,12 @@ export interface PanelSkeletonProps extends BaseProps {
   sections?: number;
 }
 
-/** Matches SidePanel body sections (20px padding, title + 3 lines). */
+/** Matches SidePanel body sections (16px padding, title + 3 lines). */
 export function PanelSkeleton({ sections = 3, ...rest }: PanelSkeletonProps) {
   return (
     <Region delayMs={rest.delayMs} className={rest.className} testId={rest['data-testid'] ?? 'skeleton-panel'}>
       {Array.from({ length: sections }, (_, i) => (
-        <Box key={i} data-testid="skeleton-section" sx={{ p: '20px', display: 'flex', flexDirection: 'column', gap: '10px', '& + &': { borderTop: `1px solid ${n[100]}` } }}>
+        <Box key={i} data-testid="skeleton-section" sx={{ p: '16px', display: 'flex', flexDirection: 'column', gap: '10px', '& + &': { borderTop: `1px solid ${n[100]}` } }}>
           <Bone w={120} h={14} />
           <Bone w="90%" h={12} />
           <Bone w="70%" h={12} />

@@ -298,9 +298,53 @@ export type UseListingsResult = {
   lastGoodAt: Date | null;
 };
 
-export function useListings(query: ListingsQuery | null, opts: { live?: boolean } = {}): UseListingsResult {
+// ─── Last-visit seed (per viewer, per query) ────────────────────────────────
+
+/** localStorage key of the last-visit seed. Per-viewer convenience only: the server list always replaces it. */
+export const LISTINGS_SEED_STORAGE_KEY = 'kx.listings.seed.v1';
+/** Queries remembered (most recent first) and how long a seed may be shown. */
+export const LISTINGS_SEED_MAX = 4;
+export const LISTINGS_SEED_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+type SeedEntry = { scope: string; key: string; at: number; data: ListingsResponse };
+
+function readSeeds(): SeedEntry[] {
+  try {
+    const raw = window.localStorage.getItem(LISTINGS_SEED_STORAGE_KEY);
+    const list = raw ? (JSON.parse(raw) as unknown) : [];
+    return Array.isArray(list) ? (list as SeedEntry[]).filter((e) => e && typeof e.key === 'string' && typeof e.scope === 'string' && e.data && Array.isArray(e.data.rows)) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** The remembered response for this viewer + query, or undefined (pure over storage; never throws). */
+export function readListingsSeed(scope: string | null | undefined, key: string | null, now = Date.now()): ListingsResponse | undefined {
+  if (!scope || !key || typeof window === 'undefined') return undefined;
+  const hit = readSeeds().find((e) => e.scope === scope && e.key === key);
+  return hit && now - hit.at <= LISTINGS_SEED_MAX_AGE_MS ? hit.data : undefined;
+}
+
+/** Remembers the latest response (other viewers' entries are dropped: one browser, one seller at a time). */
+export function writeListingsSeed(scope: string | null | undefined, key: string | null, data: ListingsResponse, now = Date.now()): void {
+  if (!scope || !key || typeof window === 'undefined') return;
+  try {
+    const rest = readSeeds().filter((e) => e.scope === scope && e.key !== key);
+    const next = [{ scope, key, at: now, data }, ...rest].slice(0, LISTINGS_SEED_MAX);
+    window.localStorage.setItem(LISTINGS_SEED_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    /* storage full or blocked: the page works without the seed */
+  }
+}
+
+export function useListings(query: ListingsQuery | null, opts: { live?: boolean; cacheScope?: string | null } = {}): UseListingsResult {
   const key = query ? listingsKey(query) : null;
+  const scope = opts.cacheScope ?? null;
+  // Rows from the viewer's last visit (same query) render instantly; SWR still fetches and replaces them, and
+  // `refetching` dims them meanwhile. The skeleton shows only on a true first load.
+  const seed = React.useMemo(() => readListingsSeed(scope, key), [scope, key]);
   const swr = useSWR<ListingsResponse, ListingsFetchError>(key, listingsFetcher, {
+    fallbackData: seed,
     keepPreviousData: true,
     revalidateOnFocus: false,
     dedupingInterval: 2000,
@@ -312,6 +356,10 @@ export function useListings(query: ListingsQuery | null, opts: { live?: boolean 
   React.useEffect(() => {
     if (swr.data && !swr.error) setLastGoodAt(new Date());
   }, [swr.data, swr.error]);
+  // Remember only server responses (not the seed itself) for the next visit.
+  React.useEffect(() => {
+    if (swr.data && swr.data !== seed && !swr.isLoading && !swr.error) writeListingsSeed(scope, key, swr.data);
+  }, [swr.data, swr.isLoading, swr.error, seed, scope, key]);
 
   const mutate = React.useCallback(() => swr.mutate(), [swr]);
   useLiveRevalidate(LISTINGS_LIVE_EVENTS, mutate, { throttleMs: 2000, enabled: opts.live !== false && Boolean(key) });

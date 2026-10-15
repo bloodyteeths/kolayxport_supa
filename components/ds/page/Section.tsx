@@ -4,7 +4,7 @@ import * as React from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import type { SxProps, Theme } from '@mui/material/styles';
-import { neutral, radius } from '@/lib/ds/tokens';
+import { neutral, radius, sectionGapSx } from '@/lib/ds/tokens';
 import { ActionButton } from './ActionButton';
 import type { ActionSpec, DsBaseProps } from './types';
 
@@ -54,7 +54,8 @@ export function Section({
       data-variant={variant}
       sx={[
         {
-          mb: '24px',
+          // density: 16 below md, 24 from md (USABILITY_FINDINGS).
+          mb: sectionGapSx,
           minWidth: 0,
           ...(card ? { bgcolor: neutral[0], border: `1px solid ${neutral[200]}`, borderRadius: `${radius.md}px`, overflow: 'hidden' } : {}),
         },

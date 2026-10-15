@@ -94,6 +94,7 @@ export function PhoneInput({
           size={size}
           disabled={disabled}
           invalid={invalid}
+          disableClearable
           aria-label={t('country')}
         />
       </Box>

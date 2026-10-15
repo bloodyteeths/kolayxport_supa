@@ -334,7 +334,7 @@ export const ORDER_VIEWS: Readonly<Record<OrderViewKey, OrderViewDef>> = {
   all: { key: 'all', defaultPreset: 'last30', sort: 'orderedAt', dir: 'desc', counted: false },
 };
 
-export const DEFAULT_ORDER_VIEW: OrderViewKey = 'to_ship';
+export const DEFAULT_ORDER_VIEW: OrderViewKey = 'all';
 
 export function isOrderViewKey(v: unknown): v is OrderViewKey {
   return typeof v === 'string' && (ORDER_VIEW_KEYS as readonly string[]).includes(v);

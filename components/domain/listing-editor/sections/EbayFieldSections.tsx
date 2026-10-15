@@ -32,6 +32,7 @@ import { useListingEditor } from '../useListingDraft';
 import { useFieldError } from './useEtsySection';
 import { wordCount } from './etsyShared';
 import type { FieldAiState } from './sectionTypes';
+import { DESCRIPTION_MAX_ROWS, DESCRIPTION_MIN_ROWS, TitleInput } from './TitleInput';
 import {
   EBAY_CURRENCIES, EBAY_SUBTITLE_MAX, decodeAspects, ebayCreateStarted, encodeAspects, toPriceString, ebayScoreInput, normalizeEbayFields, type EbayEditorFields, type EbayFieldKey,
 } from '../adapters/ebay';
@@ -172,10 +173,10 @@ export function EbayTitleSection({ id = 'title', aiTitle: aiTitleProp, aiDescrip
             labelAction={aiButton(aiTitle, t('ai.suggestTitle'))}
             required
           >
-            <TextField
+            <TitleInput
               id={fieldAnchorId('title')}
               value={f.title}
-              onChange={(v) => set('title', v.replace(/[\r\n]+/g, ' '))}
+              onChange={(v) => set('title', v)}
               readOnly={ro}
               data-testid="le-ebay-title-input"
             />
@@ -212,8 +213,8 @@ export function EbayTitleSection({ id = 'title', aiTitle: aiTitleProp, aiDescrip
               id={fieldAnchorId('description')}
               value={f.description}
               onChange={(v) => set('description', v)}
-              minRows={6}
-              maxRows={24}
+              minRows={DESCRIPTION_MIN_ROWS}
+              maxRows={DESCRIPTION_MAX_ROWS}
               maxLength={EBAY_DESCRIPTION_MAX}
               readOnly={ro}
               data-testid="le-ebay-description-input"

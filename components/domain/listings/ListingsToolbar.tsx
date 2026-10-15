@@ -3,7 +3,9 @@
 // selection the DS BulkActionBar replaces the row in place (desktop) or becomes the StickyActionBar (mobile).
 import * as React from 'react';
 import useSWR from 'swr';
+import Box from '@mui/material/Box';
 import { Toolbar, type Density } from '@/components/ds/toolbar';
+import { useIsMobile, useIsNarrow } from '@/components/ds/page/useViewport';
 import type { BulkActionBarProps } from '@/components/ds/toolbar/BulkActionBar';
 import type { FilterDef, FilterOption, FilterValues, SavedView } from '@/components/ds/toolbar/types';
 import type { ListingRow } from '@/lib/listings/types';
@@ -96,6 +98,62 @@ export function useFetchedFilterOptions(config: Pick<ListingsConfig, 'filters'>,
   return { key: filter?.key ?? null, source, options };
 }
 
+// ─── Fit the row to its width (no horizontal overflow at 1024–1440px in Turkish) ───────────────────────
+
+/** Widths (px) of the toolbar parts in Turkish, the longest locale: measured on production at 1332px. */
+export const TOOLBAR_WIDTHS = {
+  search: 220,
+  filtersButton: 100,
+  /** "Görünüm: Gönderilemeyenler 7 ▾". */
+  views: 230,
+  density: 36,
+  pinned: 124,
+  count: 90,
+  gap: 8,
+} as const;
+
+/**
+ * How many pinned FilterButtons fit, and whether the result count fits on the row (pure, unit-tested). The rest
+ * fold into "Filters". The count is redundant with the view's own count until a search or filter narrows the
+ * list, so the filters win the space then; with a search or filter active the count is kept first.
+ */
+export function fitToolbar(width: number, pinnedWanted: number, filtered: boolean): { pinned: number; showCount: boolean } {
+  const w = TOOLBAR_WIDTHS;
+  if (!(width > 0)) return { pinned: pinnedWanted, showCount: true };
+  const base = w.search + w.filtersButton + w.views + w.density + 4 * w.gap;
+  const countCost = w.count + w.gap;
+  const slot = w.pinned + w.gap;
+  let free = width - base;
+  let showCount = false;
+  if (filtered && free >= countCost) {
+    showCount = true;
+    free -= countCost;
+  }
+  const pinned = Math.max(0, Math.min(pinnedWanted, Math.floor(free / slot)));
+  free -= pinned * slot;
+  if (!showCount && free >= countCost) showCount = true;
+  return { pinned, showCount };
+}
+
+/** Width of the toolbar's container (ResizeObserver on a zero-height probe, so the sticky row is not wrapped). */
+const useIsoLayoutEffect = typeof window !== 'undefined' ? React.useLayoutEffect : React.useEffect;
+
+function useContainerWidth(): [React.RefObject<HTMLDivElement>, number] {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const [width, setWidth] = React.useState(0);
+  useIsoLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const read = () => setWidth(Math.round(el.getBoundingClientRect().width));
+    read();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, width];
+}
+
 export type ListingsToolbarProps = {
   config: ListingsConfig;
   t: ListingsT;
@@ -109,6 +167,8 @@ export type ListingsToolbarProps = {
   onClearAll: () => void;
   resultCount?: number;
   updating?: boolean;
+  /** A search or filter narrows the list (the count is then worth its room on the row). */
+  filtered?: boolean;
   views: SavedView[];
   activeView: string;
   onSelectView: (id: string) => void;
@@ -157,16 +217,30 @@ export function ListingsToolbar(props: ListingsToolbarProps) {
     [config.filters, t, optionsFor, storeCurrency],
   );
 
+  // Desktop: fold pinned filters into "Filters" and drop the duplicate count before the row would overflow. The DS
+  // FilterBar already subtracts one pinned filter below 1200px, so add it back to land on the measured number.
+  // Mobile: the count sits on the cards' "Select" row (ListingsTable), not on a row of its own.
+  const mobile = useIsMobile();
+  const narrow = useIsNarrow();
+  const [probe, width] = useContainerWidth();
+  const pinnedWanted = config.filters.filter((f) => f.pinned).length || 3;
+  const fit = fitToolbar(width, Math.min(3, pinnedWanted), Boolean(props.filtered));
+  const maxVisible = narrow ? fit.pinned + 1 : fit.pinned;
+  const countOnRow = !mobile && fit.showCount;
+
   return (
+    <>
+    <Box ref={probe} aria-hidden sx={{ height: 0, width: '100%' }} data-testid="listings-toolbar-probe" />
     <Toolbar
+      maxVisible={maxVisible}
       search={{ value: props.search, onChange: props.onSearch, placeholder: t('listings.search.placeholder') }}
       filters={filterDefs}
       values={props.values}
       onChange={props.onChange}
       onClearAll={props.onClearAll}
-      resultCount={props.resultCount}
+      resultCount={countOnRow ? props.resultCount : undefined}
       resultLabel={
-        props.updating ? t('listings.toolbar.updating') : props.resultCount !== undefined ? t('listings.toolbar.results', { count: props.resultCount }) : undefined
+        countOnRow ? (props.updating ? t('listings.toolbar.updating') : props.resultCount !== undefined ? t('listings.toolbar.results', { count: props.resultCount }) : undefined) : undefined
       }
       views={{
         views: props.views,
@@ -180,6 +254,7 @@ export function ListingsToolbar(props: ListingsToolbarProps) {
       selection={props.selection}
       data-testid={props['data-testid'] ?? 'listings-toolbar'}
     />
+    </>
   );
 }
 

@@ -1,12 +1,12 @@
 // components/domain/listing-editor/sections/TitleSection.tsx — listing-editor §2.1 #2 "Title & description" (Etsy).
 // Title (140, Title Case / commas helper, "'blanket' repeats in 2 tags"), description with Edit | Preview that
-// auto-grows 4 → 24 rows (no tiny inner-scrolling box), word count, inline AI proposals (never silent; Use writes
+// auto-grows with its text (the page scrolls, never a box inside it); the title is a 2-line auto-growing box, word count, inline AI proposals (never silent; Use writes
 // the field, a 6s toast offers Undo; nothing is sent to Etsy). Text is shown entity-decoded ("one's", never
 // "one&#39;s"), so every edit stages decoded text.
 import Box from '@mui/material/Box';
 import { useTranslations } from 'next-intl';
 import { Section } from '@/components/ds/page/Section';
-import { Button, FieldSuggestion, FormField, TextArea, TextField } from '@/components/ds/inputs';
+import { Button, FieldSuggestion, FormField, TextArea } from '@/components/ds/inputs';
 import { useToast } from '@/components/ds/feedback/toast';
 import { icons } from '@/lib/ds/icons';
 import { neutral } from '@/lib/ds/tokens';
@@ -16,6 +16,7 @@ import type { ListingSectionProps } from '@/lib/listingEditor/types';
 import { DESCRIPTION_MAX, displayText, displayList, fieldDomId, titleTagRepeats, wordCount } from './etsyShared';
 import { useEtsySection, useFieldError } from './useEtsySection';
 import type { FieldAiState } from './sectionTypes';
+import { DESCRIPTION_MAX_ROWS, DESCRIPTION_MIN_ROWS, TitleInput } from './TitleInput';
 
 export interface TitleSectionProps extends Partial<ListingSectionProps> {
   /** "✦ Suggest a title" (useListingAI `optimize_title`, already `normalizeTitle`d). Omit to hide the action. */
@@ -64,7 +65,7 @@ export function TitleSection({ id = 'title', aiTitle, aiDescription }: TitleSect
 
   return (
     <Section id={sectionAnchorId(id)} title={t('section.title')} variant="plain" data-testid="le-section-title">
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: 720 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: 720 }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <FormField
             label={t('field.title')}
@@ -77,10 +78,10 @@ export function TitleSection({ id = 'title', aiTitle, aiDescription }: TitleSect
             labelAction={aiButton(aiTitle, t('ai.suggestTitle'))}
             required
           >
-            <TextField
+            <TitleInput
               id={fieldDomId('title')}
               value={title}
-              onChange={(v) => api.setField('title', v.replace(/[\r\n]+/g, ' '))}
+              onChange={(v) => api.setField('title', v)}
               readOnly={api.readOnly}
               data-testid="le-title-input"
             />
@@ -117,8 +118,8 @@ export function TitleSection({ id = 'title', aiTitle, aiDescription }: TitleSect
               id={fieldDomId('description')}
               value={description}
               onChange={(v) => api.setField('description', v)}
-              minRows={6}
-              maxRows={24}
+              minRows={DESCRIPTION_MIN_ROWS}
+              maxRows={DESCRIPTION_MAX_ROWS}
               maxLength={DESCRIPTION_MAX}
               preview={renderPlain}
               readOnly={api.readOnly}

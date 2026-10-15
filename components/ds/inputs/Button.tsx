@@ -1,4 +1,4 @@
-// components/ds/inputs/Button.tsx — DS §3.8. Five variants, four sizes, never a gradient or a hover transform.
+// components/ds/inputs/Button.tsx — DS §3.8. Five variants, five sizes (xs = dense rows), never a gradient or a hover transform.
 // A disabled button always explains itself (`disabledReason` tooltip, P1). `loading` keeps the width.
 import { forwardRef, useLayoutEffect, useRef, useState, type MouseEvent, type Ref } from 'react';
 import MuiButton, { type ButtonProps as MuiButtonProps } from '@mui/material/Button';
@@ -7,7 +7,7 @@ import Tooltip from '@mui/material/Tooltip';
 import NextLink from 'next/link';
 import { accent, control, neutral, tone } from '@/lib/ds/tokens';
 import { ICON_STROKE, type LucideIcon } from './_icons';
-import { COARSE } from './_shared';
+import { COARSE, hitSlopAfter } from './_shared';
 import type { ControlSize, DsBaseProps } from './types';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'danger-ghost';
@@ -39,7 +39,7 @@ export interface ButtonProps extends DsBaseProps {
   children: string;
 }
 
-const MUI_SIZE: Record<ControlSize, MuiButtonProps['size']> = { sm: 'small', md: 'medium', lg: 'large', xl: 'large' };
+const MUI_SIZE: Record<ControlSize, MuiButtonProps['size']> = { xs: 'small', sm: 'small', md: 'medium', lg: 'large', xl: 'large' };
 
 /** Variant → MUI props. Shared with SplitButton so both halves look identical. */
 export function muiVariantProps(variant: ButtonVariant): Pick<MuiButtonProps, 'variant' | 'color'> {
@@ -54,6 +54,16 @@ export function muiVariantProps(variant: ButtonVariant): Pick<MuiButtonProps, 'v
 }
 
 export function buttonSizeSx(size: ControlSize) {
+  if (size === 'xs') {
+    // Dense rows: 28px visual on every pointer; touch gets a 44×44 hit slop instead of a taller button.
+    return {
+      minHeight: control.xs,
+      padding: '0 8px',
+      fontSize: 12,
+      gap: '4px',
+      [COARSE]: { minHeight: control.xs, ...hitSlopAfter },
+    };
+  }
   return {
     minHeight: control[size],
     ...(size === 'xl' ? { padding: '0 20px', fontSize: 14 } : null),
@@ -94,7 +104,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     else if (ref) (ref as { current: HTMLButtonElement | null }).current = el;
   };
 
-  const iconSize = 16;
+  const iconSize = size === 'xs' ? 14 : 16;
   const spinnerColor = variant === 'primary' || variant === 'danger' ? neutral[0] : neutral[500];
   const linkProps = href && !disabled
     ? external
@@ -123,10 +133,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       aria-label={ariaLabel}
       startIcon={
         loading
-          ? <CircularProgress size={14} thickness={5} sx={{ color: spinnerColor }} aria-hidden />
+          ? <CircularProgress size={size === 'xs' ? 12 : 14} thickness={5} sx={{ color: spinnerColor }} aria-hidden />
           : Icon ? <Icon size={iconSize} strokeWidth={ICON_STROKE} aria-hidden /> : undefined
       }
-      endIcon={Trailing && !loading ? <Trailing size={16} strokeWidth={ICON_STROKE} aria-hidden /> : undefined}
+      endIcon={Trailing && !loading ? <Trailing size={iconSize} strokeWidth={ICON_STROKE} aria-hidden /> : undefined}
       sx={{
         ...buttonSizeSx(size),
         ...variantColorSx(variant),

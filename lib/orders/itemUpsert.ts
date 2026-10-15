@@ -200,3 +200,17 @@ export async function upsertOrderItems(db: Db, orderId: string, lines: UpsertLin
   }
   return result;
 }
+
+/**
+ * Order-level ship-by: the earliest valid line ship-by (same precedence as
+ * EFFECTIVE_SHIP_BY_SQL in lib/orders/views.ts, which reads Order.shipByAt
+ * first). null when no line has one.
+ */
+export function earliestLineShipBy(lines: ReadonlyArray<{ shipBy?: Date | null }>): Date | null {
+  let min: Date | null = null;
+  for (const l of lines) {
+    const d = l.shipBy;
+    if (d instanceof Date && Number.isFinite(d.getTime()) && (!min || d < min)) min = d;
+  }
+  return min;
+}

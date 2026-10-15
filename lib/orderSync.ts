@@ -15,7 +15,7 @@ import { notify, resolveNotification, notificationKeys, NOTIFICATION_LINKS } fro
 import { publishOrderWrites } from './orders/marketplaceOrderWrite';
 import type { LiveOrderKind } from './live/types';
 import { computeItemsHash, computeOrderHash, itemsHashFromDbRows } from './orders/orderHash';
-import { linesFromUIOrder, upsertOrderItems, type UpsertLine } from './orders/itemUpsert';
+import { earliestLineShipBy, linesFromUIOrder, upsertOrderItems, type UpsertLine } from './orders/itemUpsert';
 import { hasStreet, mergeAddressPreferNonEmpty, mergeNamePreferNonEmpty, parseStoredAddress, sameAddress } from './orders/addressMerge';
 import { classifyOrderStatus, isRecentOrderDate, liveKindForOrderWrite } from './orders/orderStatus';
 import { deriveOrderEffects, hasOrderEffects, insertOrderEffects, kickOrderEffects, quietForExistingWrite } from './orders/orderEffects';
@@ -1489,7 +1489,7 @@ export async function syncAllOrders(userId: string, options: {
       const direct = !existing && AGGREGATOR_SOURCES.has(String(order.source)) ? directEtsyByNumber.get(String(order.orderNumber)) || null : null;
       const lines = linesFromUIOrder(order as any);
       const itemsHash = computeItemsHash(lines.map((l) => ({ lineKey: l.lineKey, quantity: l.quantity, unitPrice: l.unitPrice, sku: l.sku, image: l.image })));
-      const shipByAt = toDateOrNull(order.shipByDate);
+      const shipByAt = earliestLineShipBy(lines) ?? toDateOrNull(order.shipByDate);
       const target = existing || direct;
       const orderHash = computeOrderHash({
         status: order.status,

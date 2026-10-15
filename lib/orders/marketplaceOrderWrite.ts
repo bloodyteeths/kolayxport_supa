@@ -21,7 +21,7 @@ import { logger } from '@/lib/logger';
 import { publishLive, publishOrderEvent } from '@/lib/live/publish';
 import type { LiveOrderKind } from '@/lib/live/types';
 import { computeItemsHash, computeOrderHash, itemsHashFromDbRows } from './orderHash';
-import { linesFromUIOrder, upsertOrderItems } from './itemUpsert';
+import { earliestLineShipBy, linesFromUIOrder, upsertOrderItems } from './itemUpsert';
 import { mergeAddressPreferNonEmpty, mergeNamePreferNonEmpty, parseStoredAddress, sameAddress } from './addressMerge';
 import { classifyOrderStatus, isRecentOrderDate, liveKindForOrderWrite } from './orderStatus';
 import { deriveOrderEffects, hasOrderEffects, insertOrderEffects, kickOrderEffects, quietForExistingWrite } from './orderEffects';
@@ -46,7 +46,7 @@ export async function upsertMarketplaceOrder(
     recipientEmail: opts.recipientEmail ?? null,
   }));
   const itemsHash = computeItemsHash(lines.map((l) => ({ lineKey: l.lineKey, quantity: l.quantity, unitPrice: l.unitPrice, sku: l.sku, image: l.image })));
-  const shipByAt = opts.shipByDate ? new Date(opts.shipByDate as any) : lines.find((l) => l.shipBy)?.shipBy ?? null;
+  const shipByAt = earliestLineShipBy(lines) ?? (opts.shipByDate ? new Date(opts.shipByDate as any) : null);
   const validShipBy = shipByAt && Number.isFinite(shipByAt.getTime()) ? shipByAt : null;
   const nextClass = classifyOrderStatus(orderData.status, orderData.externalStatus);
   const itemCount = lines.reduce((n, l) => n + l.quantity, 0);

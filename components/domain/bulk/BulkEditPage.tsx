@@ -78,6 +78,7 @@ import { BulkBanner, pickBulkBanner, type PasteSummary } from './BulkBanner';
 import { BulkToolbar, filterGridRows, type BulkShow } from './BulkToolbar';
 import { useBulkAi } from './useBulkAi';
 import { withAiMarker } from './AiProposalCell';
+import { useStockManagedRows } from '@/components/domain/listings/stockManaged';
 
 // ─── URL ────────────────────────────────────────────────────────────────────
 
@@ -410,10 +411,13 @@ export function BulkEditPage({ marketplace, transport: injectedTransport, stagin
   const sections = useFetchedFilterOptions(lc, storeId);
   const sectionOptions = React.useMemo(() => (sections.key === 'section' ? sections.options.map((o) => ({ value: String(o.value), label: o.label })) : []), [sections.key, sections.options]);
   const sectionIds = React.useMemo(() => (sectionOptions.length ? new Set(sectionOptions.map((o) => o.value)) : undefined), [sectionOptions]);
+  // Stock-managed quantities: one batch request for the loaded rows (BR-11); empty in dry run / off Etsy.
+  const stockManagedIds = useStockManagedRows(rows, marketplace, storeId);
   const ruleCtx: FieldRuleContext = React.useMemo(
-    () => ({ config, t, formatMoney, sendingIds: staged.sendingIds, sectionIds }),
-    [config, t, formatMoney, staged.sendingIds, sectionIds],
+    () => ({ config, t, formatMoney, sendingIds: staged.sendingIds, sectionIds, stockManagedIds }),
+    [config, t, formatMoney, staged.sendingIds, sectionIds, stockManagedIds],
   );
+  const formatNumber = React.useCallback((n: number) => format.number(n), [format]);
 
   // ── grid state ──
   const values = React.useMemo(() => overlayValues(rows, config.fields, queue, localInvalid), [rows, config.fields, queue, localInvalid]);
@@ -909,7 +913,7 @@ export function BulkEditPage({ marketplace, transport: injectedTransport, stagin
   // ── columns ──
   const syncKeyOf = React.useCallback((r: ListingRow) => rowSyncKey(r, queue, staged.sendingIds), [queue, staged.sendingIds]);
   const columns = React.useMemo(() => {
-    const cols = bulkColumns(t, { ...ruleCtx, config, sectionOptions, syncKeyOf });
+    const cols = bulkColumns(t, { ...ruleCtx, config, sectionOptions, syncKeyOf, formatNumber });
     if (!ai.supported) return cols;
     // AI proposals carry the Sparkles marker (with its tooltip) until the seller edits, reverts or sends the cell (M7-D).
     return cols.map((c) =>
@@ -917,7 +921,7 @@ export function BulkEditPage({ marketplace, transport: injectedTransport, stagin
         ? withAiMarker(c, { isProposal: ai.isProposal, getRowId: (r: ListingRow) => r.id, isDirty: (rowId, field) => dirty.has(cellKeyOf(rowId, field)) })
         : c,
     );
-  }, [t, ruleCtx, config, sectionOptions, syncKeyOf, ai, dirty]);
+  }, [t, ruleCtx, config, sectionOptions, syncKeyOf, formatNumber, ai, dirty]);
   const rowMeta = React.useCallback(
     (r: ListingRow): React.ReactNode =>
       r.sync?.queuedDelete && r.sync.status !== 'synced' ? (

@@ -140,8 +140,8 @@ describe('Research Home', () => {
     router.query = { q: 'https://www.etsy.com/shop/WoodAndWords' };
     wrap(<ResearchHome now={NOW} />);
     await waitFor(() => expect(router.push).toHaveBeenCalledTimes(1));
-    // Shop tracker (R3) is not on the hub yet → its legacy page.
-    expect(router.push).toHaveBeenCalledWith('/app/etsy-research?tab=shopIntel');
+    // Shop tracker (R3) is on the hub: the shop link opens "Watch a shop" prefilled.
+    expect(router.push).toHaveBeenCalledWith('/app/research/shops?mkt=etsy&add=WoodAndWords');
   });
 
   it('a chip with an empty query focuses the search with that question as the hint', async () => {

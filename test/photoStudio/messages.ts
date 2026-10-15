@@ -266,3 +266,27 @@ export const psTr = {
     },
   },
 };
+
+// Staged-media undo (wiring-editor-media). Returned as newI18nKeys; not merged into messages/*.json yet, so the
+// i18n test checks them for EN/TR parity and use but not for "merged" (move them into psEn / psTr once merged).
+export const psPendingEn = {
+  photoStudio: {
+    undo: {
+      done: 'Change taken out of your draft',
+      failed: "Couldn't undo the change. Try again.",
+      nothing: 'Nothing to undo: this change was already replaced or taken out of your draft',
+    },
+    row: { undoOrder: 'Undo order' },
+  },
+};
+
+export const psPendingTr = {
+  photoStudio: {
+    undo: {
+      done: 'Değişiklik taslağınızdan çıkarıldı',
+      failed: 'Değişiklik geri alınamadı. Tekrar deneyin.',
+      nothing: 'Geri alınacak bir şey yok: bu değişiklik zaten değiştirildi ya da taslağınızdan çıkarıldı',
+    },
+    row: { undoOrder: 'Sıralamayı geri al' },
+  },
+};

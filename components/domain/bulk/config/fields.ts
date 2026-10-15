@@ -98,6 +98,11 @@ export type FieldRuleContext = {
   sendingIds: ReadonlySet<string>;
   /** Known section ids (Etsy); undefined = not loaded, any id accepted. */
   sectionIds?: ReadonlySet<string>;
+  /**
+   * Listing ids whose quantity live stock sync manages (`useStockManagedRows`, BR-11): their qty cell is read-only
+   * (edit, paste, fill, AI and bulk changes skip it). Empty / undefined in dry run, while loading and off Etsy.
+   */
+  stockManagedIds?: ReadonlySet<string>;
 };
 
 /**
@@ -110,13 +115,15 @@ export function cellReadOnlyReason(row: ListingRow, field: BulkField, ctx: Field
   if (ctx.sendingIds.has(row.id) || row.sync?.status === 'syncing') return t('bulk.readOnly.sending', { to });
   if (row.sync?.queuedDelete && row.sync.status !== 'synced') return t('listings.cell.willDelete');
   if (!config.fields.includes(field)) return t('bulk.readOnly.notEditable', { marketplace: MARKETPLACE_NAME[config.marketplace] });
+  // No number here: `row.qty` is the cached marketplace quantity, not the canonical one stock sync owns.
+  if (field === 'qty' && ctx.stockManagedIds?.has(row.id)) return t('listings.cell.stockManaged');
   if (field === 'price' || field === 'qty') {
     if (row.editable[field]) return null;
     switch (row.editable.reason) {
       case 'variations':
         return t('bulk.readOnly.variations');
       case 'stock_managed':
-        return t('bulk.readOnly.stockManaged', { qty: row.qty ?? 0 });
+        return t('listings.cell.stockManaged');
       case 'not_tracked':
         return t('listings.cell.notTracked');
       default:

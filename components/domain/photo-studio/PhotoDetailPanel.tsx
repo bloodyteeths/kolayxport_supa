@@ -1,6 +1,6 @@
 // components/domain/photo-studio/PhotoDetailPanel.tsx — M7-E PhotoStudio tile panel (pro-gating §4.2):
 // `SidePanel lg` "Photo 3 of 6 · Wooden Keepsake Box": large preview, alt text, Replace / Remove / Make primary,
-// AI alt text. It IS the listing editor's Photo detail (`PhotoPanel`, imported, not copied) fed with a studio
+// AI alt text, Undo of a staged removal. It IS the listing editor's Photo detail (`PhotoPanel`, imported, not copied) fed with a studio
 // tile; every action stages through the studio hook at once. ‹ › walk the photos of the same listing.
 import * as React from 'react';
 import { PhotoPanel, type PanelMedia } from '@/components/domain/listing-editor/sections/PhotoPanel';
@@ -16,12 +16,15 @@ export interface PhotoDetailPanelProps {
   onWriteAlt: () => Promise<string>;
   onMakePrimary: () => void;
   onReplace: (file: File) => Promise<void>;
+  /** Photo on Etsy: stages its removal. New (staged) photo: un-stages its upload. */
   onRemove: () => void;
+  /** Takes back a staged removal (PATCH removeMediaIds). */
+  onUndoRemove?: () => void;
   readOnly?: boolean;
 }
 
 export function PhotoDetailPanel({
-  open, onClose, view, tileId, onNavigate, onSaveAlt, onWriteAlt, onMakePrimary, onReplace, onRemove, readOnly,
+  open, onClose, view, tileId, onNavigate, onSaveAlt, onWriteAlt, onMakePrimary, onReplace, onRemove, onUndoRemove, readOnly,
 }: PhotoDetailPanelProps) {
   const tiles = view?.tiles ?? [];
   const index = tileId ? tiles.findIndex((t) => t.id === tileId) : -1;
@@ -51,7 +54,9 @@ export function PhotoDetailPanel({
       alt={tile ? { editable: etsyPhoto && !readOnly, onSave: onSaveAlt, write: etsyPhoto ? onWriteAlt : undefined } : undefined}
       onMakePrimary={etsyPhoto && !readOnly ? onMakePrimary : undefined}
       onReplace={etsyPhoto && !readOnly ? onReplace : undefined}
-      onRemove={etsyPhoto && !readOnly && (view?.liveCount ?? 0) > 1 ? onRemove : undefined}
+      // A new (staged) photo can always be taken out of the draft; a photo on Etsy keeps the last-photo rule.
+      onRemove={!readOnly && (tile?.pending || (etsyPhoto && (view?.liveCount ?? 0) > 1)) ? onRemove : undefined}
+      onUndoRemove={tile?.staged === 'delete' && !readOnly ? onUndoRemove : undefined}
       readOnly={readOnly}
       data-testid="photo-studio-panel"
     />

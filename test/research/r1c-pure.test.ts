@@ -123,9 +123,10 @@ describe('marketplace eligibility (§3.2) and defaults', () => {
   it('hrefs: shipped tools on the hub, unshipped tools on their legacy page', () => {
     expect(researchToolHref('products', 'ebay', { q: 'a b' })).toBe('/app/research/products?mkt=ebay&q=a+b');
     expect(researchToolHref('keywords', 'etsy')).toBe('/app/research/keywords?mkt=etsy');
-    expect(researchToolHref('shops', 'ebay')).toBe('/app/ebay-research?sub=seller_tracker');
+    expect(researchToolHref('shops', 'ebay')).toBe('/app/research/shops?mkt=ebay');
     expect(legacyResearchHref('trendyol')).toBe('/app/trendyol-arastirma');
-    expect(toShippedHref('/app/research/shops?mkt=etsy&add=WoodAndWords', 'ebay')).toBe('/app/etsy-research?tab=shopIntel');
+    // Shop tracker shipped with R3: a shop link stays on the hub.
+    expect(toShippedHref('/app/research/shops?mkt=etsy&add=WoodAndWords', 'ebay')).toBe('/app/research/shops?mkt=etsy&add=WoodAndWords');
     expect(toShippedHref('/app/research/products?mkt=etsy&q=x#price', 'etsy')).toBe('/app/research/products?mkt=etsy&q=x#price');
   });
 });

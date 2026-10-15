@@ -9984,7 +9984,10 @@
       "stockUnmatchedSale": "{count} satış bir stok kalemiyle eşleştirilemedi",
       "seoExperimentReady": "\"{title}\" için SEO testi sonuçları hazır",
       "scheduledSendResult": "{sent} zamanlanmış değişiklik {marketplace, select, etsy {Etsy'ye} ebay {eBay'e} trendyol {Trendyol'a} wix {Wix'e} shopify {Shopify'a} other {mağazaya}} gönderildi{failed, plural, =0 {} other { · # tanesi gönderilemedi}}{conflicts, plural, =0 {} other { · # ilan pazaryerinde değişmiş}}{skipped, plural, =0 {} other { · # tanesi atlandı}}",
-      "webhookBacklog": "Etsy olay kuyruğu birikiyor"
+      "webhookBacklog": "Etsy olay kuyruğu birikiyor",
+      "researchShopNewListings": "{shop} {count} yeni ilan ekledi",
+      "researchShopPriceDrop": "{shop} medyan fiyatını %{pct} düşürdü",
+      "researchShopSalesSpike": "{shop} günde {sales} satış yaptı: normalinin {ratio} katı"
     }
   },
   "commandPalette": {
@@ -11101,7 +11104,8 @@
       "broader": "Daha genel bir ifade deneyin",
       "keywords": "Bir anahtar kelime yazın veya ilanlarınızdan birini seçin",
       "tracked": "İlanınızın sırasını her gün görmek için bir anahtar kelimeyi takip edin",
-      "notServedKw": "Anahtar kelime gezgini henüz {marketplace} için çalışmıyor"
+      "notServedKw": "Anahtar kelime gezgini henüz {marketplace} için çalışmıyor",
+      "shops": "Günlük satışlarını, yeni ilanlarını ve fiyat değişimlerini görmek için bir rakibi izleyin"
     },
     "guard": {
       "small": "Küçük örnek: {n} ilan",
@@ -11154,7 +11158,9 @@
       "autocomplete": "Arama önerileri",
       "etsyKeywords": "Etsy araması ve etiketleri",
       "myShopTags": "Mağazanızın etiketleri",
-      "rankTracker": "KolayXport sıralama takibi"
+      "rankTracker": "KolayXport sıralama takibi",
+      "shopCounters": "Etsy mağaza sayaçları, her gün 06:00 UTC",
+      "priceGap": "Trendyol + eBay ABD fiyat endeksi"
     },
     "explain": {
       "failed": "Açıklama düzgün oluşturulamadı",
@@ -11181,7 +11187,9 @@
       "stageFixes": "{count} düzeltmeyi hazırla",
       "openBulkGrid": "Toplu düzenleyicide aç",
       "addToTitle": "Başlığa ekle",
-      "track": "Takip et"
+      "track": "Takip et",
+      "watch": "İzle",
+      "watchShop": "Mağaza izle"
     },
     "home": {
       "rankChange": "sıra {from} → {to}",
@@ -11205,7 +11213,9 @@
       "productionDaysLabel": "Üretim süresi",
       "productionDaysHelp": "Bir siparişi hazırlayıp paketlemek için gereken gün sayısı",
       "daysUnit": "gün",
-      "recent": "Son aramalar ve takip edilenler"
+      "recent": "Son aramalar ve takip edilenler",
+      "shopSalesUp": "Günlük satış %{pct} arttı",
+      "shopSalesDown": "Günlük satış %{pct} azaldı"
     },
     "season": {
       "christmas": "Noel",
@@ -11376,7 +11386,9 @@
       "shopFailed": "Mağaza yüklenemedi"
     },
     "source": {
-      "searchApiOrder": "{marketplace} araması (API sırası, kişiselleştirilmemiş)"
+      "searchApiOrder": "{marketplace} araması (API sırası, kişiselleştirilmemiş)",
+      "search": "Arama",
+      "trendyol": "Trendyol'dan"
     },
     "kw": {
       "notInTop500": "İlk 500'de değil",
@@ -11513,6 +11525,254 @@
       "panelAria": "Anahtar kelime fikirleri",
       "openFull": "Anahtar kelime gezginini tam aç",
       "showMore": "Daha fazla göster"
+    },
+    "watch": {
+      "ebayQueryUnsupported": "Kayıtlı eBay aramaları henüz izlenemiyor. Bunun yerine bir Etsy aramasını veya eBay satıcısını izleyin.",
+      "notApplicable": "Bu takip türü için kullanılamıyor",
+      "noReadingsYet": "Bu takip için henüz ölçüm yok",
+      "shopNotFound": "Bu mağaza bulunamadı. Bağlantıyı veya adı kontrol edin",
+      "notFound": "Bu takip artık yok",
+      "inputInvalid": "Bir mağaza bağlantısı veya mağaza adı yapıştırın",
+      "rulesInvalid": "Bu uyarı ayarları geçerli değil",
+      "labelInvalid": "Bir ad girin",
+      "useDelete": "Kaldırmak için Takibi bırak'ı kullanın",
+      "legacyReadOnly": "Bu satıcı eski eBay takipçisinde izleniyor. Uyarılar kullanılamıyor",
+      "asinUnsupported": "Amazon ürünleri henüz burada takip edilemiyor"
+    },
+    "shops": {
+      "overQuota": "Duraklatıldı: planınızın izleme sınırı aşıldı. Günlük ölçümlerin devam etmesi için bir izlemeyi kaldırın.",
+      "unavailable": "Mağaza takibi henüz kullanılamıyor",
+      "firstReading": "İlk ölçüm bugün alındı. Günlük satışlar yarın görünür.",
+      "noReading": "Henüz ölçüm yok",
+      "noRecentReading": "Son 7 günde ölçüm yok",
+      "anomaly": "Mağazanın satış sayacı olağan dışı değişti, bu günler hesaba katılmadı",
+      "pointsDropped": "{count, plural, one {# olağan dışı ölçüm hesaba katılmadı} other {# olağan dışı ölçüm hesaba katılmadı}}",
+      "needTwoWeeks": "Karşılaştırma için 2 haftalık ölçüm gerekir",
+      "prevZero": "Karşılaştırılacak önceki 7 günde satış yok",
+      "needWeek": "Bir hafta önceki ölçüm gerekir",
+      "currencyChanged": "Mağaza para birimini değiştirdi, fiyatlar karşılaştırılamıyor",
+      "priceSample": "Karşılaştırmak için yeterli fiyat yok",
+      "atLeast": "En az bu kadar: yalnızca en yeni 500 ilan okundu",
+      "noListings": "İlanlar okunamadı",
+      "shareFromFavorites": "Bu ilanın mağazanın yeni favorilerindeki payından tahmin edildi",
+      "favoritesOverDays": "{days} günde kazanılan favoriler",
+      "ebayTrackedItems": "Bu satıcının takip edilen {items} ürününden",
+      "ebayCollecting": "Ölçümler toplanıyor · {items} ürün en az bir kez satıldı (tüm zamanlar)",
+      "ebayActiveUnknown": "eBay bu satıcının aktif ilan sayısını paylaşmıyor",
+      "quotaFull": "{limit} mağazanın {used} tanesini takip ediyorsunuz. Yeni eklemek için birini kaldırın",
+      "readingFailed": "İlk ölçüm alınamadı. Yarın 06:00 UTC'de yeniden denenecek",
+      "quota": "Planınızda {limit} mağazadan {used} tanesini izliyorsunuz",
+      "comparePlans": "Planları karşılaştır",
+      "col": {
+        "shop": "Mağaza",
+        "mkt": "Pazaryeri",
+        "salesDay": "Satış / gün",
+        "salesDay7": "Satış / gün (7 gün)",
+        "vsPrev": "önceki 7 güne göre",
+        "active": "Aktif",
+        "new7": "7 günde yeni",
+        "priceDelta": "Fiyat değişimi (medyan)"
+      },
+      "card": {
+        "sales": "günde {value} satış",
+        "active": "{value} aktif",
+        "new": "+{value} yeni",
+        "newAtLeast": "≥ +{value} yeni"
+      },
+      "noSales": "Henüz satış hızı yok",
+      "salesHint": "Mağazanın satış sayacından, en az 2 günlük ölçüm",
+      "droppedPoints": "{count} günlük ölçüm hariç tutuldu (sayaç sıfırlandı veya olağan dışı sıçrama)",
+      "ebaySoldAllTime": "{count} ürün en az bir kez satıldı (tüm zamanlar)",
+      "footer": "{marketplace} mağaza sayaçları, her gün 06:00'da okunur · 2 veya daha fazla ölçümden hesaplanır",
+      "linkLabel": "Mağaza linki veya adı",
+      "linkPlaceholder": "etsy.com/shop/WoodAndWords veya WoodAndWords",
+      "linkHelper": "Bir mağaza linki yapıştırın veya bir {marketplace} mağaza adı yazın",
+      "linkRequired": "Bir mağaza linki veya adı girin",
+      "detected": "{marketplace} mağazası · {shop}",
+      "alreadyWatching": "{shop} mağazasını zaten izliyorsunuz",
+      "openWatched": "Aç",
+      "modalBody": "Mağazayı günde bir kez okuruz. Günlük satışlar ikinci ölçümden sonra görünür.",
+      "adding": "Ekleniyor…",
+      "added": "{shop} izleniyor · İlk ölçüm bugün",
+      "error": {
+        "quota": "Planınızın mağaza sınırına ulaşıldı. Yenisini eklemek için bir mağazayı kaldırın",
+        "duplicate": "Bu mağazayı zaten izliyorsunuz",
+        "notFound": "Bu mağaza bulunamadı. Linki veya adı kontrol edin",
+        "invalid": "Bu bir mağaza linki veya adı gibi görünmüyor",
+        "unsupported": "Bu link bir mağazaya ait değil. Bir Etsy mağazası veya eBay satıcı linki yapıştırın",
+        "unavailable": "Mağaza takibi henüz kullanılamıyor. Daha sonra tekrar deneyin",
+        "failed": "Mağaza eklenemedi. Tekrar deneyin",
+        "gone": "Bu mağaza zaten kaldırılmış",
+        "rateLimited": "Kısa sürede çok fazla mağaza eklendi. Bir dakika bekleyip tekrar deneyin"
+      },
+      "loadFailed": "İzlediğiniz mağazalar yüklenemedi",
+      "emptyBody": "Bir {marketplace} mağaza linki yapıştırın veya mağaza adını yazın. Günlük satışlar ikinci günlük ölçümden sonra görünür.",
+      "unavailableMkt": "Mağaza takibi henüz {marketplace} için çalışmıyor",
+      "unavailableMktBody": "Burada Etsy mağazalarını ve eBay satıcılarını izleyebilirsiniz. Diğer pazaryerleri şimdilik kendi araştırma sayfalarında kalıyor.",
+      "useEtsy": "Etsy kullan",
+      "open": "Aç",
+      "viewOn": "{marketplace} üzerinde görüntüle",
+      "remove": "İzlemeyi bırak",
+      "removeTitle": "{shop} izlenmesin mi?",
+      "removeBody": "Uyarıları durur. İstediğiniz zaman yeniden izleyebilirsiniz.",
+      "removed": "{shop} artık izlenmiyor",
+      "removeFailed": "Mağazayı izlemeyi bırakma başarısız oldu. Tekrar deneyin",
+      "since": "{year} yılından beri",
+      "rating": "★ {rating} ({count} değerlendirme)",
+      "watchingSince": "{date} tarihinden beri izleniyor",
+      "compareCta": "İlanımla karşılaştır",
+      "compareTitle": "İlanımla karşılaştır",
+      "compareBody": "Ürün bulucu, ilanınızın ana anahtar kelimesindeki aramayı ilanınızla karşılaştırır.",
+      "myListing": "İlanım",
+      "searchMyListings": "İlanlarınızda arayın",
+      "noOwnListings": "İlan bulunamadı",
+      "pickListing": "İlanlarınızdan birini seçin",
+      "salesChart": "Günlük satış, 30 gün",
+      "salesChartNote": "Mağazanın satış sayacından ölçülür · boşluklar kullanılabilir ölçüm olmayan günlerdir",
+      "chartAria": "{shop} için günlük satış, son 30 gün",
+      "chartNotYet": "Grafik birkaç günlük ölçümden sonra görünür.",
+      "detailFailed": "Bu mağazanın ayrıntıları yüklenemedi",
+      "newListingsTitle": "Bu haftaki yeni ilanlar",
+      "newListings": "Bu haftaki yeni ilanlar ({count})",
+      "newNotYet": "Yeni ilanlar ikinci günlük ölçümden sonra görünür.",
+      "noNewListings": "Son 7 günde yeni ilan yok",
+      "firstSeen": "ilk görülme {date}",
+      "researchIdea": "Bu fikri araştır",
+      "draftSimilar": "Benzer bir ilan taslağı oluştur",
+      "prefillFailed": "İlan oluşturucu açılamadı. Tekrar deneyin",
+      "fastest": "En hızlı yükselen ilanlar",
+      "fastestNote": "7 günde kazanılan favoriler (ölçülen) · mağaza satışındaki pay bir tahmindir",
+      "fastestNotYet": "Bir haftalık günlük ölçümden sonra görünür.",
+      "favoritesDelta": "+{value} favori",
+      "shareOfSales": "mağaza satışlarının {value} kadarı",
+      "shareModel": "Her ilanın mağazanın yeni favorilerindeki payından tahmin edilir",
+      "tagGap": "Onların kullanıp sizin kullanmadığınız etiketler",
+      "tagGapNote": "Anahtar kelime gezgininde açmak için bir etiket seçin",
+      "tagGapConnect": "Etiketleri karşılaştırmak için Etsy mağazanızı bağlayın.",
+      "tagGapNone": "Bu mağazanın kullandığı her etiketi zaten kullanıyorsunuz.",
+      "addToKeywords": "\"{tag}\" etiketini anahtar kelime gezginine ekle",
+      "alerts": "Uyarılar",
+      "alert": {
+        "newListings": "Yeni ilanlar",
+        "priceDrop": "%10'dan fazla fiyat düşüşü",
+        "salesSpike": "2 katı aşan satış artışı"
+      },
+      "alertsNote": "Uyarılar bildirimlerinize gelir.",
+      "alertsPending": "Uyarı tercihleriniz kaydedildi. Bildirimler yakında başlayacak.",
+      "alertsLegacy": "Bu satıcının uyarıları eBay araştırma sayfasında ayarlanır.",
+      "alertsFailed": "Uyarı kaydedilemedi. Tekrar deneyin",
+      "addedLater": "{shop} izleniyor · İlk ölçüm bir sonraki günlük kontrolde",
+      "fromTrackedItems": "bu satıcının takip ettiğiniz {count} ürününden"
+    },
+    "gap": {
+      "title": "Fiyat farkı: Türkiye → yurtdışı",
+      "sourceAria": "Ürün kaynağı",
+      "from": {
+        "label": "Kaynak",
+        "category": "Trendyol kategori çok satanları",
+        "mine": "Trendyol ürünlerim",
+        "link": "Bir Trendyol linki"
+      },
+      "category": {
+        "label": "Kategori"
+      },
+      "link": {
+        "placeholder": "Trendyol ürün linkini yapıştırın",
+        "cta": "Karşılaştır"
+      },
+      "col": {
+        "product": "Ürün (TR)",
+        "trPrice": "TR fiyatı",
+        "ebayMedian": "eBay ABD medyanı",
+        "etsyMedian": "Etsy medyanı",
+        "amazonMedian": "Amazon ABD medyanı",
+        "confidence": "Eşleşme güveni",
+        "landed": "Toplam maliyet",
+        "margin": "Kâr marjı"
+      },
+      "confidence": {
+        "high": "Yüksek",
+        "medium": "Orta",
+        "low": "Düşük",
+        "none": "Henüz eşleşme yok"
+      },
+      "sample": "n = {n}",
+      "marginValue": "{amount} · {pct}",
+      "listOnEbay": "eBay'de listele",
+      "lowConfidence": "Düşük güvenli {count} eşleşmeyi göster",
+      "hideLowConfidence": "Düşük güvenli eşleşmeleri gizle",
+      "showUnmatched": "{count, plural, one {Eşleşmesi olmayan # ürünü göster} other {Eşleşmesi olmayan # ürünü göster}}",
+      "hideUnmatched": "Eşleşmesi olmayan ürünleri gizle",
+      "unmatched": "{count, plural, one {Bu kategorideki # ürünün henüz eBay eşleşmesi yok} other {Bu kategorideki # ürünün henüz eBay eşleşmesi yok}}",
+      "unresolved": "{count} ürününüz henüz Trendyol sayfasıyla eşleşmediği için karşılaştırılamıyor",
+      "openOnTrendyol": "Trendyol'da aç",
+      "researchEtsy": "Etsy'de araştır",
+      "watch": "Fiyatı izle",
+      "fx": "1 USD = {rate} TRY · exchangerate-api.com, {date}",
+      "fxMissing": "Bugün TRY → USD kuru yok: toplam maliyet ve kâr marjı gizlendi",
+      "ship": {
+        "label": "Türkiye'den kargo",
+        "carrier": "Kargo firması",
+        "band": "Ağırlık",
+        "bandValue": "{min}–{max} kg",
+        "bandOpen": "{min} kg üzeri",
+        "measured": "Medyanınız {amount} · {count} etiket",
+        "measuredTip": "Son 12 ayda yurtdışına gönderdiğiniz siparişlere girdiğiniz kargo maliyeti",
+        "none": "Henüz yeterli etiket maliyeti yok ({min} gerekli): gönderilen siparişlere kargo maliyetini ekleyin veya kendi tutarınızı yazın",
+        "own": "Kendi kargo maliyetiniz",
+        "excluded": "{count} etiket hariç tutuldu (firma veya kur yok)",
+        "excludedDefaultWeight": "{count} etiket hariç tutuldu: siparişte paket ağırlığı girilmemiş"
+      },
+      "guard": {
+        "noTrPrice": "Trendyol fiyatı yok",
+        "noFx": "Bugün TRY → USD kuru yok",
+        "noShipping": "Maliyetli {min} etiket ya da kendi kargo maliyetiniz gerekli",
+        "ebaySample": "Yeterli eBay eşleşmesi yok ({n} / {min})",
+        "etsySample": "Yeterli Etsy ilanı yok ({n} / {min})",
+        "amazonSample": "Yeterli Amazon ilanı yok ({n} / {min})",
+        "noMatch": "Henüz eBay eşleşmesi yok",
+        "notChecked": "Henüz Etsy'de kontrol edilmedi"
+      },
+      "error": {
+        "generic": "Fiyat farkı yüklenemedi",
+        "notIndexed": "Bu ürün henüz Trendyol endeksinde yok",
+        "categoryNotIndexed": "Bu kategori endekslenmedi: en büyük kategori gösteriliyor",
+        "badLink": "Bu bir Trendyol ürün linki değil",
+        "badSource": "Bilinmeyen ürün kaynağı",
+        "shipping": "Etiket maliyetleriniz okunamadı"
+      },
+      "empty": {
+        "link": "Yurtdışında kaça satıldığını görmek için bir Trendyol ürün linki yapıştırın",
+        "mine": "Trendyol ürünlerinizin hiçbirinin henüz eBay eşleşmesi yok",
+        "mineNone": "Henüz senkronize edilmiş Trendyol ürünü yok",
+        "mineUnresolved": "{count} ürününüz henüz Trendyol sayfasıyla eşleşmedi",
+        "linkNoMatch": "Bu ürün için henüz eBay eşleşmesi yok",
+        "noCategories": "Henüz endekslenmiş Trendyol kategorisi yok",
+        "noMatches": "Bu kategoride henüz eBay eşleşmesi yok"
+      },
+      "connect": "Kendi ürünlerinizi karşılaştırmak için Trendyol bağlayın",
+      "panel": {
+        "margin": "eBay ABD kâr marjı",
+        "cost": "Ürün maliyeti",
+        "costValue": "{try} → {usd}",
+        "shipping": "Kargo",
+        "shipMeasured": "{count} etiketinizin medyanı",
+        "landed": "Toplam maliyet",
+        "sell": "Satış fiyatı (eBay medyanı)",
+        "fees": "eBay ücretleri",
+        "feesValue": "%{rate} + ödeme + uluslararası = {amount}",
+        "profit": "Kâr marjı",
+        "feeNote": "eBay ABD ücret tablosu. Gerçek ücretleriniz farklı olabilir.",
+        "matches": "{count, plural, =0 {eBay eşleşmeleri} other {# eBay eşleşmesi}}",
+        "sold": "{count} satıldı (tüm zamanlar)",
+        "etsy": "Etsy ABD",
+        "etsyValue": "Medyan {median} · n = {n} · {date} tarihinde arandı",
+        "etsyNot": "Henüz Etsy'de kontrol edilmedi"
+      },
+      "toast": {
+        "watched": "'{title}' izleniyor",
+        "watchFailed": "İzleme eklenemedi"
+      }
     }
   },
   "ds": {
@@ -13026,7 +13286,8 @@
       "stageFailed": "Bu değişiklik kaydedilemedi",
       "editInEditor": "Bunu düzenleyicide değiştirin",
       "yes": "Evet",
-      "no": "Hayır"
+      "no": "Hayır",
+      "stockManagedLink": "Stok senkronu yönetiyor · Stok Senkronu’nu aç"
     },
     "sendError": {
       "conflict": "Taslağınızdan sonra pazaryerinde değişti. Göndermeden önce gözden geçirin.",
@@ -14669,7 +14930,8 @@
       "noPhotos": "Henüz fotoğraf yok",
       "loadFailed": "Fotoğraflar yüklenemedi",
       "queuedDelete": "İlan silme sırada: fotoğraflar olduğu gibi kalır",
-      "sending": "Etsy'ye gönderiliyor…"
+      "sending": "Etsy'ye gönderiliyor…",
+      "undoOrder": "Sıralamayı geri al"
     },
     "empty": {
       "title": "Düzenlenecek ilan yok",
@@ -14695,6 +14957,11 @@
       "addOne": "Video ekle",
       "removeOne": "Videoyu kaldır",
       "confirmRemove": "{count} ilandan video kaldırılsın mı?"
+    },
+    "undo": {
+      "nothing": "Geri alınacak bir şey yok: bu değişiklik zaten değiştirildi ya da taslağınızdan çıkarıldı",
+      "done": "Değişiklik taslağınızdan çıkarıldı",
+      "failed": "Değişiklik geri alınamadı. Tekrar deneyin."
     }
   },
   "overview": {

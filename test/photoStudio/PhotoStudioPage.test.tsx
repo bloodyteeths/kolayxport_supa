@@ -17,7 +17,7 @@ import en from '@/messages/en.json';
 import tr from '@/messages/tr.json';
 import { PhotoStudioPage } from '@/components/domain/photo-studio/PhotoStudioPage';
 import { F } from '../billing/d-fixtures';
-import { psEn, psTr } from './messages';
+import { psEn, psPendingEn, psPendingTr, psTr } from './messages';
 
 const h = vi.hoisted(() => ({
   router: { pathname: '/app/etsy-listings/photos', query: {}, isReady: true, push: vi.fn(() => Promise.resolve(true)), replace: vi.fn(), events: { on: () => undefined, off: () => undefined } },
@@ -32,7 +32,10 @@ const merge = (a: Obj, b: Obj): Obj => {
   for (const [k, v] of Object.entries(b)) out[k] = v && typeof v === 'object' && !Array.isArray(v) && out[k] && typeof out[k] === 'object' ? merge(out[k] as Obj, v as Obj) : v;
   return out;
 };
-const MESSAGES = { en: merge(en as Obj, psEn as Obj), tr: merge(tr as Obj, psTr as Obj) };
+const MESSAGES = {
+  en: merge(merge(en as Obj, psEn as Obj), psPendingEn as Obj),
+  tr: merge(merge(tr as Obj, psTr as Obj), psPendingTr as Obj),
+};
 
 function renderPage(ui: ReactElement, locale: 'en' | 'tr' = 'en') {
   return render(

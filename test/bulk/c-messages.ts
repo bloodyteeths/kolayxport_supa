@@ -83,6 +83,8 @@ export const C_EN: Tree = {
     empty: { title: 'No listings to edit' },
     ai: { suggestion: 'AI suggestion · Revert to keep yours' },
   },
+  // Stock-managed qty cell link (wiring-grid-stock; shared with the listings grid).
+  listings: { cell: { stockManagedLink: 'Managed by stock sync · Open Stock Sync' } },
 };
 
 export const C_TR: Tree = {
@@ -165,18 +167,22 @@ export const C_TR: Tree = {
     empty: { title: 'Düzenlenecek ilan yok' },
     ai: { suggestion: 'AI önerisi · Sizinkini korumak için geri alın' },
   },
+  listings: { cell: { stockManagedLink: 'Stok senkronu yönetiyor · Stok Senkronu’nu aç' } },
 };
 
-/** Flattened `{ namespace: 'bulk', key, en, tr }` rows (the newI18nKeys list). */
-export function flatKeys(): Array<{ key: string; en: string; tr: string }> {
-  const out: Array<{ key: string; en: string; tr: string }> = [];
-  const walk = (en: Tree, tr: Tree, path: string[]) => {
+/**
+ * Flattened `{ namespace, key, en, tr }` rows (the newI18nKeys list) for EVERY top-level namespace of the fragment
+ * (`bulk` plus the shared `listings.cell.stockManagedLink`), so parity / ICU / collision checks cover all of them.
+ */
+export function flatKeys(): Array<{ namespace: string; key: string; en: string; tr: string }> {
+  const out: Array<{ namespace: string; key: string; en: string; tr: string }> = [];
+  const walk = (ns: string, en: Tree, tr: Tree, path: string[]) => {
     for (const [k, v] of Object.entries(en)) {
       const t = tr[k];
-      if (typeof v === 'string') out.push({ key: [...path, k].join('.'), en: v, tr: typeof t === 'string' ? t : '' });
-      else walk(v, (t as Tree) ?? {}, [...path, k]);
+      if (typeof v === 'string') out.push({ namespace: ns, key: [...path, k].join('.'), en: v, tr: typeof t === 'string' ? t : '' });
+      else walk(ns, v, (t as Tree) ?? {}, [...path, k]);
     }
   };
-  walk(C_EN.bulk as Tree, C_TR.bulk as Tree, []);
+  for (const ns of Object.keys(C_EN)) walk(ns, C_EN[ns] as Tree, (C_TR[ns] as Tree) ?? {}, []);
   return out;
 }

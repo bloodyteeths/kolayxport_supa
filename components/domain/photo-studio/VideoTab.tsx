@@ -104,11 +104,14 @@ export interface VideoRowProps {
   onCheck: (checked: boolean) => void;
   onRemove: () => void;
   onAddFile: (file: File) => void;
+  /** Takes back the staged video upload / removal (un-stage only). */
+  onUndo?: () => void;
   busy?: boolean;
 }
 
-export function VideoRow({ listing, view, status, checked, onCheck, onRemove, onAddFile, busy }: VideoRowProps) {
+export function VideoRow({ listing, view, status, checked, onCheck, onRemove, onAddFile, onUndo, busy }: VideoRowProps) {
   const t = useTranslations('photoStudio');
+  const tEditor = useTranslations('listingEditor');
   const fileRef = React.useRef<HTMLInputElement | null>(null);
   const locked = Boolean(listing.queuedDelete || listing.syncing);
   const readOnly = locked || Boolean(busy);
@@ -121,8 +124,10 @@ export function VideoRow({ listing, view, status, checked, onCheck, onRemove, on
       : <Bone w={120} h={20} />;
   } else if (view.stagedUpload) {
     state = <Box component="span" sx={{ color: tone.attention.fg }}>{t('video.willAdd')}</Box>;
+    if (!readOnly && onUndo) action = <Button variant="ghost" size="sm" onClick={onUndo}>{tEditor('banner.undo')}</Button>;
   } else if (view.remote && view.removing) {
     state = <Box component="span" sx={{ color: tone.danger.fg }}>{t('video.willRemove')}</Box>;
+    if (!readOnly && onUndo) action = <Button variant="ghost" size="sm" onClick={onUndo}>{tEditor('banner.undo')}</Button>;
   } else if (view.remote) {
     state = <Box component="span">{view.remote.state === 'processing' ? t('video.processing') : t('video.onEtsy')}</Box>;
     if (!readOnly) action = <Button variant="danger-ghost" size="sm" onClick={onRemove}>{t('video.removeOne')}</Button>;

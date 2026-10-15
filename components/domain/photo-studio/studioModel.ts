@@ -732,3 +732,53 @@ export function groupByListing<T extends { listingId: string }>(items: ReadonlyA
   }
   return Array.from(groups.values());
 }
+
+// ─── Undo (un-stage rows with PATCH removeMediaIds) ──────────────────────────────────────────────────
+
+/**
+ * Rows that undo one tile's staged state: a staged upload (its own row), or a staged removal (the delete row).
+ * Empty when the tile has nothing staged that a tap can take back (reorders / alt text undo from their toast).
+ */
+export function tileUndoIds(view: ListingPhotoView | null | undefined, tileId: string): string[] {
+  const tile = view?.tiles.find((t) => t.id === tileId);
+  if (!tile) return [];
+  if (tile.pending) return tile.mediaId ? [tile.mediaId] : [];
+  if (tile.staged === 'delete' && tile.imageId != null) {
+    const row = view?.ops.imageDeletes.get(tile.imageId);
+    return row ? [row] : [];
+  }
+  return [];
+}
+
+/** Every staged reorder row of the listing ("Undo order": photos go back to Etsy's order). */
+export function orderUndoIds(draft: Pick<StudioDraft, 'media'> | null | undefined): string[] {
+  return (draft?.media ?? []).filter((m) => m.kind === 'image' && m.operation === 'reorder').map((m) => m.id);
+}
+
+/** The staged video upload, or the staged removal of the Etsy video. */
+export function videoUndoIds(view: ListingVideoView | null | undefined, draft: Pick<StudioDraft, 'media'> | null | undefined): string[] {
+  if (!view) return [];
+  if (view.stagedUpload) return [view.stagedUpload.id];
+  if (view.remote && view.removing) {
+    const row = (draft?.media ?? []).find((m) => m.kind === 'video' && m.operation === 'delete' && Number(m.etsyMediaId) === view.remote?.videoId);
+    return row ? [row.id] : [];
+  }
+  return [];
+}
+
+/**
+ * True when un-staging `removeIds` would leave the listing with no photo after send while an Etsy photo is
+ * still staged for removal (e.g. removing the new photo of a Replace without its paired delete). Etsy needs at
+ * least one photo, and the send would delete every remaining one. A listing with no staged removal is never
+ * blocked (taking back a lone new photo leaves Etsy as it is).
+ */
+export function undoLeavesNoPhoto(
+  images: ReadonlyArray<EtsyImageLike> | null | undefined,
+  draft: StudioDraft | null | undefined,
+  removeIds: ReadonlyArray<string>,
+): boolean {
+  if (!draft || !removeIds.length) return false;
+  const gone = new Set(removeIds);
+  const after = buildListingPhotoView(images ?? [], { ...draft, media: draft.media.filter((m) => !gone.has(m.id)) });
+  return after.liveCount <= 0 && after.removing > 0;
+}

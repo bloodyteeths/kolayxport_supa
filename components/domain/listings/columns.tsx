@@ -13,6 +13,7 @@ import { DateText } from '@/components/ds/format/DateText';
 import { neutral, tone } from '@/lib/ds/tokens';
 import { LISTING_EDITABLE_REASON_I18N, type ListingColumnKey, type ListingDraftOverlay, type ListingRow, type ListingSyncKey } from '@/lib/listings/types';
 import type { ListingsConfig } from './config/types';
+import { StockManagedQty } from './stockManaged';
 
 /** Root-level translator (`useTranslations()`), full key paths. */
 export type ListingsT = {
@@ -41,7 +42,18 @@ export type ListingCellContext = {
   removalKind?: RemovalKind;
   /** id → label for id-valued text columns (Etsy section, Wix collection), from the filter option sources. */
   optionLabels?: Partial<Record<ListingColumnKey, ReadonlyMap<string, string>>>;
+  /**
+   * Listing ids whose quantity live stock sync manages (`useStockManagedRows`, BR-11). Their qty cell is read-only
+   * ("Stock is managed by stock sync") with a link to the stock sync page; price is unaffected. Empty / undefined
+   * while loading, on error, in dry run (`live=false`) and off Etsy.
+   */
+  stockManagedIds?: ReadonlySet<string>;
 };
+
+/** True when the row's quantity is owned by live stock sync (pure). */
+export function isStockManaged(row: ListingRow, ctx: Pick<ListingCellContext, 'stockManagedIds'>): boolean {
+  return Boolean(ctx.stockManagedIds?.has(row.id));
+}
 
 export type RemovalKind = 'delete' | 'archive';
 
@@ -121,10 +133,11 @@ export function editReadOnlyReason(
   row: ListingRow,
   field: 'price' | 'qty',
   t: ListingsT,
-  ctx: Pick<ListingCellContext, 'config' | 'sendingIds' | 'removalKind'>,
+  ctx: Pick<ListingCellContext, 'config' | 'sendingIds' | 'removalKind' | 'stockManagedIds'>,
 ): string | null {
   if (ctx.sendingIds.has(row.id) || row.sync?.status === 'syncing') return t('listings.cell.sending', { to: t('listings.mp.to', { marketplace: ctx.config.marketplace }) });
   if (row.sync?.queuedDelete && row.sync.status !== 'synced') return t('listings.cell.removalQueued', { kind: ctx.removalKind ?? 'delete' });
+  if (field === 'qty' && isStockManaged(row, ctx)) return t(LISTING_EDITABLE_REASON_I18N.stock_managed);
   if (!ctx.config.inlineEdit[field]) return t('listings.cell.editInEditor');
   if (!row.editable[field]) {
     const reason = row.editable.reason;
@@ -278,6 +291,7 @@ export function listingColumns(t: ListingsT, ctx: ListingCellContext): Column<Li
               <Box component="span">
                 <PriceText row={r} ctx={ctx} t={t} />
                 {qty !== null ? ` · ${t('listings.cell.inStock', { count: qty })}` : ''}
+                {qty !== null && isStockManaged(r, ctx) ? <StockManagedQty text="" label={t('listings.cell.stockManagedLink')} /> : null}
               </Box>
             );
           },
@@ -301,7 +315,8 @@ export function listingColumns(t: ListingsT, ctx: ListingCellContext): Column<Li
           value: (r) => displayQty(r, ctx.overlays),
           render: (r) => {
             const q = displayQty(r, ctx.overlays);
-            return q === null ? t('listings.cell.notTracked') : String(q);
+            const text = q === null ? t('listings.cell.notTracked') : String(q);
+            return isStockManaged(r, ctx) ? <StockManagedQty text={text} label={t('listings.cell.stockManagedLink')} /> : text;
           },
           readOnlyReason: (r) => readOnlyReason(r, 'qty', t, ctx),
           validate: (v) => validateQty(v, t, ctx),

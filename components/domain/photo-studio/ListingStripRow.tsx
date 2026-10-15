@@ -1,12 +1,14 @@
 // components/domain/photo-studio/ListingStripRow.tsx — M7-E PhotoStudio: one listing row (pro-gating §4.2)
 //   ☑ │ [48] Wooden Keepsake Box │ [1★][2][3][⊕ new][4]            5 / 20 · will remove 1
 // The strip is the DS `ImageGrid variant="strip"` with the editor's staged states (add / delete / reorder).
-// Single-tile edits (drag reorder, remove, add files, open the photo panel) stage at once through the hook.
+// Single-tile edits (drag reorder, remove, add files, open the photo panel) stage at once through the hook;
+// a staged removal has its Undo on the tile, staged reorders an "Undo order" under the caption (un-stage only).
 // Read-only while the listing's draft is being sent or has a queued listing delete (never staged onto).
 import * as React from 'react';
 import Box from '@mui/material/Box';
 import { useTranslations } from 'next-intl';
 import { Checkbox } from '@/components/ds/inputs/Checkbox';
+import { Button } from '@/components/ds/inputs/Button';
 import { ImageGrid } from '@/components/ds/inputs/ImageGrid';
 import { Thumb } from '@/components/ds/data/Thumb';
 import { Bone } from '@/components/ds/state/Skeletons';
@@ -24,12 +26,16 @@ export interface ListingStripRowProps {
   onReorder: (ids: string[]) => void;
   onUpload: (files: File[]) => void;
   onDelete: (tileId: string) => void;
+  /** Takes back a staged removal (the tile's Undo). */
+  onUndoDelete?: (tileId: string) => void;
+  /** Drops the listing's staged reorders (shown while the draft holds any). */
+  onUndoOrder?: () => void;
   onOpen: (tileId: string) => void;
   /** A run is in progress: strips are read-only until it ends. */
   busy?: boolean;
 }
 
-export function ListingStripRow({ listing, view, status, checked, onCheck, onReorder, onUpload, onDelete, onOpen, busy }: ListingStripRowProps) {
+export function ListingStripRow({ listing, view, status, checked, onCheck, onReorder, onUpload, onDelete, onUndoDelete, onUndoOrder, onOpen, busy }: ListingStripRowProps) {
   const t = useTranslations('photoStudio');
   const locked = Boolean(listing.queuedDelete || listing.syncing);
   const readOnly = locked || Boolean(busy);
@@ -91,6 +97,7 @@ export function ListingStripRow({ listing, view, status, checked, onCheck, onReo
             onReorder={onReorder}
             onUpload={onUpload}
             onDelete={onDelete}
+            onUndoDelete={onUndoDelete && !readOnly ? onUndoDelete : undefined}
             onOpen={onOpen}
             disabled={readOnly}
             emptyMessage={t('row.noPhotos')}
@@ -104,7 +111,14 @@ export function ListingStripRow({ listing, view, status, checked, onCheck, onReo
         ) : listing.syncing ? (
           <Box component="span">{t('row.sending')}</Box>
         ) : (
-          caption.join(' · ')
+          <>
+            {caption.join(' · ')}
+            {onUndoOrder && !readOnly && view && view.ops.imageReorders.size > 0 ? (
+              <Box sx={{ mt: '4px' }}>
+                <Button variant="ghost" size="sm" onClick={onUndoOrder} data-testid={`photo-studio-undo-order-${listing.id}`}>{t('row.undoOrder')}</Button>
+              </Box>
+            ) : null}
+          </>
         )}
       </Box>
     </Box>

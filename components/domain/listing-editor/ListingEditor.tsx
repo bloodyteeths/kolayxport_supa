@@ -83,6 +83,8 @@ import { useEtsyShopMeta } from './sections/etsyShared';
 import { ProfilesModal } from './ProfilesModal';
 import { AiFillCard } from './AiFillCard';
 import { storedDraftSendError, storedDraftSendErrorParams } from './draftSendError';
+import { useStagedMediaUndo } from './useStagedMediaUndo';
+import { isRefusalKey } from './stagedMedia';
 import { renderSendError, type SendErrorTranslator } from '@/lib/listings/sendError';
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -241,10 +243,16 @@ function aiInputFrom(view: ListingView<FieldMap>) {
 }
 
 /** Etsy per-section props: inline AI proposals (H) and the shop lists loaded once for Details + Shipping (B). */
-function useEtsySectionProps(ai: UseListingAI, shopId: string | null): Partial<Record<SectionId, Record<string, unknown>>> {
+function useEtsySectionProps(
+  ai: UseListingAI,
+  shopId: string | null,
+  removeStagedMedia?: (draftMediaId: string) => Promise<void>,
+): Partial<Record<SectionId, Record<string, unknown>>> {
   const shopMeta = useEtsyShopMeta(shopId);
   const price = ai.priceSectionProps();
   return {
+    // Undo of one staged photo / video change (PATCH removeMediaIds); never sends.
+    photos: { removeStagedMedia },
     title: { aiTitle: ai.fieldState('title'), aiDescription: ai.fieldState('description') },
     tags: { aiTags: ai.fieldState<string[]>('tags') },
     price: { ...price },
@@ -353,7 +361,8 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
     getField: (key) => (engine.view.fields as FieldMap)[key],
     setField: (key, value) => engine.setField(key as keyof F & string, value as F[keyof F]),
   });
-  const etsySectionProps = useEtsySectionProps(ai, marketplace === 'etsy' && engine.loadState === 'ready' ? shopId : null);
+  const mediaUndo = useStagedMediaUndo({ enabled: marketplace === 'etsy' && !props.sectionProps, draft: engine.draft, reloadDraft: engine.reloadDraft });
+  const etsySectionProps = useEtsySectionProps(ai, marketplace === 'etsy' && engine.loadState === 'ready' ? shopId : null, mediaUndo.removeStagedMedia);
   const aiMarket = ai.priceSectionProps().market;
   const reportFacts = engine.reportFacts;
   React.useEffect(() => {
@@ -363,6 +372,7 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
   }, [aiMarket, reportFacts]);
 
   const [panel, setPanel] = React.useState<EditorPanel | null>(null);
+  const [revertingIds, setRevertingIds] = React.useState<string[]>([]);
   const [profileMode, setProfileMode] = React.useState<'apply' | 'save'>('apply');
   const openProfiles = React.useCallback((m: 'apply' | 'save') => {
     setProfileMode(m);
@@ -652,7 +662,9 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
   } else if (saveState === 'saving') {
     statusText = t('save.saving');
   } else if (saveState === 'error') {
-    statusText = t('save.failed');
+    // A send in progress / a draft that can't be edited: say so (etsy|ebay.draftSync.*), Retry stays.
+    const refusal = engine.saveError?.key && isRefusalKey(engine.saveError.key) && tRoot.has(engine.saveError.key) ? engine.saveError : null;
+    statusText = refusal ? tRoot(refusal.key as string, (refusal.params ?? {}) as Record<string, string | number>) : t('save.failed');
     statusDot = toneTokens.danger.solid;
     statusRetry = true;
   } else if (saveState === 'offline') {
@@ -1088,7 +1100,11 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
   const extraProps = props.sectionProps ?? (marketplace === 'etsy' ? etsySectionProps : {});
 
   // ── rail ──────────────────────────────────────────────────────────────────────────────────────────────
-  const railChanges = toRailChanges(changes);
+  // Staged media groups (photos / order / alt / video) revert by un-staging their rows (Etsy, edit mode).
+  const railChanges = toRailChanges(changes).map((r) => {
+    const c = changes.find((x) => x.id === r.id);
+    return c && mode === 'edit' && mediaUndo.canRevert(c) ? { ...r, revertable: true } : r;
+  });
   const noPhotos = (view.facts.images ?? []).filter((i) => i.staged !== 'delete').length === 0 && draftMediaUploads(draft) === 0;
   const neededItems =
     mode === 'create'
@@ -1103,10 +1119,17 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
       : undefined;
   const onRevert = (item: RailChangeItem) => {
     const c = changes.find((x) => x.id === item.id);
+    if (c && mediaUndo.canRevert(c)) {
+      setRevertingIds((ids) => [...ids, c.id]);
+      void mediaUndo.revert(c)
+        .catch((err) => { toast.error(errorText(err, 'photos.stageFailed'), { persist: false }); })
+        .finally(() => setRevertingIds((ids) => ids.filter((id) => id !== c.id)));
+      return;
+    }
     if (c?.revertable && c.fields.length) engine.revert(c.fields);
   };
   const changesList = (hideTitle?: boolean) => (
-    <RailChanges marketplace={marketplace} changes={railChanges} onRevert={mode === 'edit' ? onRevert : undefined} needed={neededItems} hideTitle={hideTitle} />
+    <RailChanges marketplace={marketplace} changes={railChanges} onRevert={mode === 'edit' ? onRevert : undefined} revertingIds={revertingIds} needed={neededItems} hideTitle={hideTitle} />
   );
 
   const rail = (

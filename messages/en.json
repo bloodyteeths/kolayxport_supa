@@ -9984,7 +9984,10 @@
       "stockUnmatchedSale": "{count, plural, one {# sale} other {# sales}} could not be matched to a stock item",
       "seoExperimentReady": "SEO test results are ready for \"{title}\"",
       "scheduledSendResult": "{sent, plural, one {# scheduled change} other {# scheduled changes}} sent to {marketplace, select, etsy {Etsy} ebay {eBay} trendyol {Trendyol} wix {Wix} shopify {Shopify} other {the store}}{failed, plural, =0 {} other { · # failed}}{conflicts, plural, =0 {} other { · # changed on the marketplace}}{skipped, plural, =0 {} other { · # skipped}}",
-      "webhookBacklog": "The Etsy event queue is backing up"
+      "webhookBacklog": "The Etsy event queue is backing up",
+      "researchShopNewListings": "{shop} added {count, plural, one {# new listing} other {# new listings}}",
+      "researchShopPriceDrop": "{shop} cut its median price by {pct}%",
+      "researchShopSalesSpike": "{shop} sold {sales} a day: {ratio}× its usual"
     }
   },
   "commandPalette": {
@@ -11101,7 +11104,8 @@
       "broader": "Try a broader phrase",
       "keywords": "Type a keyword or pick one of your listings",
       "tracked": "Track a keyword to see your listing's position every day",
-      "notServedKw": "Keyword explorer doesn't cover {marketplace} yet"
+      "notServedKw": "Keyword explorer doesn't cover {marketplace} yet",
+      "shops": "Watch a competitor to see their daily sales, new listings and price changes"
     },
     "guard": {
       "small": "Small sample: {n} listings",
@@ -11154,7 +11158,9 @@
       "autocomplete": "Search suggestions",
       "etsyKeywords": "Etsy search and tags",
       "myShopTags": "Your shop's tags",
-      "rankTracker": "KolayXport rank tracker"
+      "rankTracker": "KolayXport rank tracker",
+      "shopCounters": "Etsy shop counters, daily at 06:00 UTC",
+      "priceGap": "Trendyol + eBay US price index"
     },
     "explain": {
       "failed": "The explanation didn't come out right",
@@ -11181,7 +11187,9 @@
       "stageFixes": "Stage {count, plural, one {# fix} other {# fixes}}",
       "openBulkGrid": "Open in bulk editor",
       "addToTitle": "Add to title",
-      "track": "Track"
+      "track": "Track",
+      "watch": "Watch",
+      "watchShop": "Watch a shop"
     },
     "home": {
       "rankChange": "rank {from} → {to}",
@@ -11205,7 +11213,9 @@
       "productionDaysLabel": "Production days",
       "productionDaysHelp": "Days you need to make and pack an order",
       "daysUnit": "days",
-      "recent": "Recent and watched"
+      "recent": "Recent and watched",
+      "shopSalesUp": "Sales/day up {pct}%",
+      "shopSalesDown": "Sales/day down {pct}%"
     },
     "season": {
       "christmas": "Christmas",
@@ -11376,7 +11386,9 @@
       "shopFailed": "Couldn't load the shop"
     },
     "source": {
-      "searchApiOrder": "{marketplace} search (API order, not personalized)"
+      "searchApiOrder": "{marketplace} search (API order, not personalized)",
+      "search": "Search",
+      "trendyol": "From Trendyol"
     },
     "kw": {
       "notInTop500": "Not in top 500",
@@ -11513,6 +11525,254 @@
       "panelAria": "Keyword ideas",
       "openFull": "Open full Keyword explorer",
       "showMore": "Show more"
+    },
+    "watch": {
+      "ebayQueryUnsupported": "Saved eBay searches can't be tracked yet. Track an Etsy search or an eBay seller instead.",
+      "notApplicable": "Not available for this kind of watch",
+      "noReadingsYet": "No readings for this watch yet",
+      "shopNotFound": "We couldn't find that shop. Check the link or name",
+      "notFound": "This watch no longer exists",
+      "inputInvalid": "Paste a shop link or a shop name",
+      "rulesInvalid": "These alert settings aren't valid",
+      "labelInvalid": "Enter a name",
+      "useDelete": "Use Stop watching to remove it",
+      "legacyReadOnly": "This seller is tracked in the old eBay tracker. Alerts aren't available for it",
+      "asinUnsupported": "Amazon products can't be watched here yet"
+    },
+    "shops": {
+      "overQuota": "Paused: over your plan's watch limit. Remove a watch to resume daily readings.",
+      "unavailable": "Shop tracking isn't available yet",
+      "firstReading": "First reading taken today. Daily sales appear tomorrow.",
+      "noReading": "No reading yet",
+      "noRecentReading": "No reading in the last 7 days",
+      "anomaly": "The shop's sales counter jumped unusually, so these days were left out",
+      "pointsDropped": "{count, plural, one {# unusual reading left out} other {# unusual readings left out}}",
+      "needTwoWeeks": "Needs 2 weeks of readings to compare",
+      "prevZero": "No sales in the previous 7 days to compare with",
+      "needWeek": "Needs a reading from a week ago",
+      "currencyChanged": "The shop changed its currency, so prices can't be compared",
+      "priceSample": "Not enough prices to compare",
+      "atLeast": "At least this many: only the newest 500 listings were read",
+      "noListings": "Listings weren't read",
+      "shareFromFavorites": "Estimated from this listing's share of the shop's new favorites",
+      "favoritesOverDays": "Favorites gained over {days} days",
+      "ebayTrackedItems": "From {items, plural, one {# tracked item} other {# tracked items}} of this seller",
+      "ebayCollecting": "Collecting readings · {items, plural, one {# item} other {# items}} sold at least once (all time)",
+      "ebayActiveUnknown": "eBay doesn't share this seller's active listing count",
+      "quotaFull": "You're watching {used} of {limit} shops. Remove one to add another",
+      "readingFailed": "Couldn't take the first reading. It runs again tomorrow at 06:00 UTC",
+      "quota": "Watching {used} of {limit} shops on your plan",
+      "comparePlans": "Compare plans",
+      "col": {
+        "shop": "Shop",
+        "mkt": "Marketplace",
+        "salesDay": "Sales / day",
+        "salesDay7": "Sales / day (7 days)",
+        "vsPrev": "vs previous 7 days",
+        "active": "Active",
+        "new7": "New in 7 days",
+        "priceDelta": "Price change (median)"
+      },
+      "card": {
+        "sales": "{value} sales/day",
+        "active": "{value} active",
+        "new": "+{value} new",
+        "newAtLeast": "≥ +{value} new"
+      },
+      "noSales": "No sales rate yet",
+      "salesHint": "From the shop's sales counter, at least 2 daily readings",
+      "droppedPoints": "{count, plural, one {# daily reading} other {# daily readings}} left out (counter reset or unusual jump)",
+      "ebaySoldAllTime": "{count, plural, one {# item} other {# items}} sold at least once (all time)",
+      "footer": "{marketplace} shop counters, read daily at 06:00 · Measured from 2 readings or more",
+      "linkLabel": "Shop link or name",
+      "linkPlaceholder": "etsy.com/shop/WoodAndWords or WoodAndWords",
+      "linkHelper": "Paste a shop link, or type a {marketplace} shop name",
+      "linkRequired": "Enter a shop link or name",
+      "detected": "{marketplace} shop · {shop}",
+      "alreadyWatching": "You're already watching {shop}",
+      "openWatched": "Open",
+      "modalBody": "We read the shop once a day. Daily sales appear after the second reading.",
+      "adding": "Adding…",
+      "added": "Watching {shop} · First reading today",
+      "error": {
+        "quota": "Your plan's shop limit is reached. Remove a shop to add another",
+        "duplicate": "You're already watching this shop",
+        "notFound": "Couldn't find this shop. Check the link or name",
+        "invalid": "This doesn't look like a shop link or name",
+        "unsupported": "This link isn't a shop. Paste an Etsy shop or eBay seller link",
+        "unavailable": "Shop tracking isn't available yet. Try again later",
+        "failed": "Couldn't add the shop. Try again",
+        "gone": "This shop was already removed",
+        "rateLimited": "Too many shops added at once. Wait a minute and try again"
+      },
+      "loadFailed": "Couldn't load your watched shops",
+      "emptyBody": "Paste a {marketplace} shop link or type a shop name. Daily sales appear after the second daily reading.",
+      "unavailableMkt": "Shop tracker doesn't cover {marketplace} yet",
+      "unavailableMktBody": "Watch Etsy shops and eBay sellers here. Other marketplaces stay on their research pages for now.",
+      "useEtsy": "Use Etsy",
+      "open": "Open",
+      "viewOn": "View on {marketplace}",
+      "remove": "Stop watching",
+      "removeTitle": "Stop watching {shop}?",
+      "removeBody": "Its alerts stop. You can watch it again any time.",
+      "removed": "Stopped watching {shop}",
+      "removeFailed": "Couldn't stop watching this shop. Try again",
+      "since": "Since {year}",
+      "rating": "★ {rating} ({count} reviews)",
+      "watchingSince": "Watching since {date}",
+      "compareCta": "Compare with my listing",
+      "compareTitle": "Compare with my listing",
+      "compareBody": "Product finder compares the search for your listing's main keyword with your listing.",
+      "myListing": "My listing",
+      "searchMyListings": "Search your listings",
+      "noOwnListings": "No listings found",
+      "pickListing": "Pick one of your listings",
+      "salesChart": "Sales per day, 30 days",
+      "salesChartNote": "Measured from the shop's sales counter · gaps are days without a usable reading",
+      "chartAria": "Sales per day for {shop}, last 30 days",
+      "chartNotYet": "The chart appears after a few daily readings.",
+      "detailFailed": "Couldn't load this shop's details",
+      "newListingsTitle": "New listings this week",
+      "newListings": "New listings this week ({count})",
+      "newNotYet": "New listings show after the second daily reading.",
+      "noNewListings": "No new listings in the last 7 days",
+      "firstSeen": "first seen {date}",
+      "researchIdea": "Research this idea",
+      "draftSimilar": "Draft a similar listing",
+      "prefillFailed": "Couldn't open the listing creator. Try again",
+      "fastest": "Fastest-gaining listings",
+      "fastestNote": "Favorites gained in 7 days (measured) · share of shop sales is an estimate",
+      "fastestNotYet": "Appears after a week of daily readings.",
+      "favoritesDelta": "+{value} favorites",
+      "shareOfSales": "{value} of shop sales",
+      "shareModel": "Estimated from each listing's share of the shop's new favorites",
+      "tagGap": "Tags they use that you don't",
+      "tagGapNote": "Pick a tag to open it in Keyword explorer",
+      "tagGapConnect": "Connect your Etsy shop to compare tags.",
+      "tagGapNone": "You already use every tag this shop uses.",
+      "addToKeywords": "Add \"{tag}\" to Keyword explorer",
+      "alerts": "Alerts",
+      "alert": {
+        "newListings": "New listings",
+        "priceDrop": "Price drop over 10%",
+        "salesSpike": "Sales spike over 2×"
+      },
+      "alertsNote": "Alerts arrive in your notifications.",
+      "alertsPending": "Your alert choices are saved. Notifications start soon.",
+      "alertsLegacy": "Alerts for this seller are set on the eBay research page.",
+      "alertsFailed": "Couldn't save the alert. Try again",
+      "addedLater": "Watching {shop} · First reading at the next daily check",
+      "fromTrackedItems": "from {count, plural, one {# tracked item} other {# tracked items}} of this seller"
+    },
+    "gap": {
+      "title": "Price gap: Türkiye → abroad",
+      "sourceAria": "Product source",
+      "from": {
+        "label": "From",
+        "category": "Trendyol category bestsellers",
+        "mine": "My Trendyol products",
+        "link": "A Trendyol link"
+      },
+      "category": {
+        "label": "Category"
+      },
+      "link": {
+        "placeholder": "Paste a Trendyol product link",
+        "cta": "Compare"
+      },
+      "col": {
+        "product": "Product (TR)",
+        "trPrice": "TR price",
+        "ebayMedian": "eBay US median",
+        "etsyMedian": "Etsy median",
+        "amazonMedian": "Amazon US median",
+        "confidence": "Match confidence",
+        "landed": "Landed cost",
+        "margin": "Margin"
+      },
+      "confidence": {
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low",
+        "none": "No match yet"
+      },
+      "sample": "n = {n}",
+      "marginValue": "{amount} · {pct}",
+      "listOnEbay": "List on eBay",
+      "lowConfidence": "Show {count} low-confidence matches",
+      "hideLowConfidence": "Hide low-confidence matches",
+      "showUnmatched": "{count, plural, one {Show # product without a match} other {Show # products without a match}}",
+      "hideUnmatched": "Hide products without a match",
+      "unmatched": "{count, plural, one {# product in this category has no eBay match yet} other {# products in this category have no eBay match yet}}",
+      "unresolved": "{count, plural, one {# of your products isn't linked to its Trendyol page yet, so it can't be compared} other {# of your products aren't linked to their Trendyol pages yet, so they can't be compared}}",
+      "openOnTrendyol": "Open on Trendyol",
+      "researchEtsy": "Research on Etsy",
+      "watch": "Watch price",
+      "fx": "1 USD = {rate} TRY · exchangerate-api.com, {date}",
+      "fxMissing": "No TRY → USD rate today: landed cost and margin are hidden",
+      "ship": {
+        "label": "Shipping from Türkiye",
+        "carrier": "Carrier",
+        "band": "Weight",
+        "bandValue": "{min}–{max} kg",
+        "bandOpen": "Over {min} kg",
+        "measured": "Your median {amount} · {count, plural, one {# label} other {# labels}}",
+        "measuredTip": "Carrier cost you entered on your shipped orders abroad, last 12 months",
+        "none": "Not enough label costs yet (needs {min}): add the carrier cost to shipped orders, or type your own",
+        "own": "Your shipping cost",
+        "excluded": "{count, plural, one {# label left out (no carrier or rate)} other {# labels left out (no carrier or rate)}}",
+        "excludedDefaultWeight": "{count, plural, one {# label left out: the order has no package weight entered} other {# labels left out: those orders have no package weight entered}}"
+      },
+      "guard": {
+        "noTrPrice": "No Trendyol price",
+        "noFx": "No TRY → USD rate today",
+        "noShipping": "Needs {min} labels with a cost, or your own shipping cost",
+        "ebaySample": "Not enough eBay matches ({n} of {min})",
+        "etsySample": "Not enough Etsy listings ({n} of {min})",
+        "amazonSample": "Not enough Amazon listings ({n} of {min})",
+        "noMatch": "No eBay match yet",
+        "notChecked": "Not checked on Etsy yet"
+      },
+      "error": {
+        "generic": "Couldn't load the price gap",
+        "notIndexed": "This product isn't in the Trendyol index yet",
+        "categoryNotIndexed": "That category isn't indexed: showing the largest one",
+        "badLink": "That isn't a Trendyol product link",
+        "badSource": "Unknown product source",
+        "shipping": "Couldn't read your label costs"
+      },
+      "empty": {
+        "link": "Paste a Trendyol product link to see what it sells for abroad",
+        "mine": "None of your Trendyol products has an eBay match yet",
+        "mineNone": "No Trendyol products synced yet",
+        "mineUnresolved": "{count, plural, one {# of your products isn't linked to its Trendyol page yet} other {# of your products aren't linked to their Trendyol pages yet}}",
+        "linkNoMatch": "No eBay match for this product yet",
+        "noCategories": "No Trendyol category is indexed yet",
+        "noMatches": "No eBay matches in this category yet"
+      },
+      "connect": "Connect Trendyol to compare your own products",
+      "panel": {
+        "margin": "Margin on eBay US",
+        "cost": "Product cost",
+        "costValue": "{try} → {usd}",
+        "shipping": "Shipping",
+        "shipMeasured": "{count, plural, one {Median of # of your labels} other {Median of # of your labels}}",
+        "landed": "Landed cost",
+        "sell": "Sell price (eBay median)",
+        "fees": "eBay fees",
+        "feesValue": "{rate}% + payment + international = {amount}",
+        "profit": "Margin",
+        "feeNote": "eBay US fee table. Your real fees can differ.",
+        "matches": "{count, plural, =0 {eBay matches} one {# eBay match} other {# eBay matches}}",
+        "sold": "{count} sold (all time)",
+        "etsy": "Etsy US",
+        "etsyValue": "Median {median} · n = {n} · searched {date}",
+        "etsyNot": "Not checked on Etsy yet"
+      },
+      "toast": {
+        "watched": "Watching '{title}'",
+        "watchFailed": "Couldn't add the watch"
+      }
     }
   },
   "ds": {
@@ -13026,7 +13286,8 @@
       "stageFailed": "Couldn't save this change",
       "editInEditor": "Edit this in the editor",
       "yes": "Yes",
-      "no": "No"
+      "no": "No",
+      "stockManagedLink": "Managed by stock sync · Open Stock Sync"
     },
     "sendError": {
       "conflict": "Changed on the marketplace since your draft. Review before sending.",
@@ -14669,7 +14930,8 @@
       "noPhotos": "No photos yet",
       "loadFailed": "Couldn't load photos",
       "queuedDelete": "Listing delete queued: photos stay as they are",
-      "sending": "Sending to Etsy…"
+      "sending": "Sending to Etsy…",
+      "undoOrder": "Undo order"
     },
     "empty": {
       "title": "No listings to edit",
@@ -14695,6 +14957,11 @@
       "addOne": "Add video",
       "removeOne": "Remove video",
       "confirmRemove": "Remove the video from {count, plural, one {# listing} other {# listings}}?"
+    },
+    "undo": {
+      "nothing": "Nothing to undo: this change was already replaced or taken out of your draft",
+      "done": "Change taken out of your draft",
+      "failed": "Couldn't undo the change. Try again."
     }
   },
   "overview": {

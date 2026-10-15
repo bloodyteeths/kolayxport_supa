@@ -22,8 +22,9 @@ import { DateText } from '@/components/ds/format/DateText';
 import type { ActionSpec } from '@/components/ds/page';
 import { icons } from '@/lib/ds/icons';
 import { neutral, tone } from '@/lib/ds/tokens';
-import type { ListingDraftOverlay, ListingRow, StagePatch } from '@/lib/listings/types';
-import { displayPrice, displayQty, displayTitle, editReadOnlyReason, overlayOf, rowSyncKey, validatePrice, validateQty, type ListingCellContext, type ListingsT } from './columns';
+import { LISTING_EDITABLE_REASON_I18N, type ListingDraftOverlay, type ListingRow, type StagePatch } from '@/lib/listings/types';
+import { StockManagedQty } from './stockManaged';
+import { displayPrice, displayQty, displayTitle, editReadOnlyReason, isStockManaged, overlayOf, rowSyncKey, validatePrice, validateQty, type ListingCellContext, type ListingsT } from './columns';
 
 export type QuickViewPanelProps = {
   row: ListingRow | null;
@@ -296,7 +297,7 @@ export function QuickViewPanel({
             label={t('listings.col.qty')}
             width="short"
             error={errors.qty ?? null}
-            helper={qtyRo ?? undefined}
+            helper={qtyRo && isStockManaged(row, ctx) && qtyRo === t(LISTING_EDITABLE_REASON_I18N.stock_managed) ? <StockManagedQty text={qtyRo} label={t('listings.cell.stockManagedLink')} /> : qtyRo ?? undefined}
             dirty={overlay.qty !== undefined && overlay.qty !== row.qty}
           >
             <Box

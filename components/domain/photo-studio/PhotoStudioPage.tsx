@@ -42,7 +42,8 @@ import { OperationBar } from './OperationBar';
 import { ListingStripRow } from './ListingStripRow';
 import { PhotoDetailPanel } from './PhotoDetailPanel';
 import { VideoOperationBar, VideoRow } from './VideoTab';
-import { usePhotoStudio, type RunResult, type StudioFailure } from './usePhotoStudio';
+import { usePhotoStudio, type RunResult, type StudioFailure, type UndoResult } from './usePhotoStudio';
+import { stagingErrorKey, type MediaUndoPlan } from '@/components/domain/listing-editor/stagedMedia';
 import {
   AI_BATCH_CAP,
   DEFAULT_PLAN_INPUT,
@@ -167,10 +168,25 @@ function StudioBody({ studio, ids, tab, onTabChange, backHref, onHeader }: Studi
   const changes = tab === 'photos' ? plan.changes : videoPlan.changes;
   const skipped = tab === 'photos' ? plan.skipped : videoPlan.skipped;
 
-  const failureText = React.useCallback((f: StudioFailure | undefined) => {
-    if (f?.key && tEtsy.has(f.key as never)) return tEtsy(f.key as never, f.params as never);
-    return t('failure.generic');
-  }, [t, tEtsy]);
+  // Server keys are `etsy`-relative (batch-stage sends them with the `etsy.` prefix); a refusal without a key
+  // (DRAFT_SENDING / DRAFT_SYNCING / DRAFT_NOT_EDITABLE) still names its translated cause.
+  const keyText = React.useCallback((f: StudioFailure | undefined): string | null => {
+    const key = stagingErrorKey(f);
+    return key && tEtsy.has(key as never) ? tEtsy(key as never, f?.params as never) : null;
+  }, [tEtsy]);
+  const failureText = React.useCallback((f: StudioFailure | undefined) => keyText(f) ?? t('failure.generic'), [keyText, t]);
+
+  const undoReport = React.useCallback((r: UndoResult) => {
+    if (r.ok) toast.success(t('undo.done'));
+    else if (r.skipped === 'lastPhoto') toast.info(t('skip.lastPhoto'));
+    else if (r.skipped === 'nothing') toast.info(t('undo.nothing'));
+    else toast.error(keyText(r.failure) ?? t('undo.failed'), { persist: false });
+  }, [toast, t, keyText]);
+  /** Every undo ends in a toast: a thrown undo (network) is the "couldn't undo" one, never an unhandled rejection. */
+  const reportUndo = React.useCallback((p: Promise<UndoResult>): Promise<void> => (
+    p.then(undoReport, () => undoReport({ ok: false }))
+  ), [undoReport]);
+  const runUndo = React.useCallback((u: { listingId: string; plan: MediaUndoPlan }) => reportUndo(studio.undo(u.listingId, u.plan)), [studio, reportUndo]);
 
   const report = React.useCallback((res: RunResult, single = false) => {
     if (res.stopped === 'locked') return; // the gate swaps the page to its locked state
@@ -178,12 +194,16 @@ function StudioBody({ studio, ids, tab, onTabChange, backHref, onHeader }: Studi
       setFailures(res.failures);
       toast.error(single ? failureText(res.failures[0]) : t('result.partial', { staged: res.staged, failed: res.failed }), { persist: false });
     } else if (res.staged > 0) {
-      toast.success(single ? t('tile.staged') : t('result.staged', { count: res.staged }));
+      // A single-tile edit can be taken back from its toast (PATCH removeMediaIds; nothing was sent).
+      const undo = single ? res.undo : undefined;
+      const message = single ? t('tile.staged') : t('result.staged', { count: res.staged });
+      if (undo) toast.success(message, { undo: () => { void runUndo(undo); } });
+      else toast.success(message);
     } else if (!single && res.stopped !== 'aiCredits') {
       toast.info(t('result.none'));
     }
     if (res.aiUnusable) toast.info(t('result.aiUnusable', { count: res.aiUnusable }));
-  }, [toast, t, failureText]);
+  }, [toast, t, failureText, runUndo]);
 
   const run = React.useCallback(async () => {
     if (running) return;
@@ -301,7 +321,8 @@ function StudioBody({ studio, ids, tab, onTabChange, backHref, onHeader }: Studi
     const index = view ? view.tiles.findIndex((x) => x.id === tileId) : -1;
     const tile = index >= 0 && view ? view.tiles[index] : null;
     if (!tile || !view) return;
-    if (tile.pending) { toast.info(tEditor('photos.pendingRemoveViaDiscard')); return; }
+    // A new photo only lives in the draft: removing it un-stages its upload (no confirm, nothing on Etsy changes).
+    if (tile.pending) { await reportUndo(studio.undoTile(listingId, tileId)); return; }
     if (view.liveCount <= 1) { toast.info(t('skip.lastPhoto')); return; }
     const ok = await confirm({ title: tEditor('photos.confirmRemoveTitle', { position: index + 1 }), body: tEditor('photos.confirmRemoveBody', { marketplace: 'Etsy' }), tone: 'danger' });
     if (!ok) return;
@@ -401,6 +422,8 @@ function StudioBody({ studio, ids, tab, onTabChange, backHref, onHeader }: Studi
               onReorder={(next) => { void onReorder(l.id, next); }}
               onUpload={(list) => { void studio.addFiles(l.id, list).then((r) => report(r, true)); }}
               onDelete={(tileId) => { void onDeleteTile(l.id, tileId); }}
+              onUndoDelete={(tileId) => { void reportUndo(studio.undoTile(l.id, tileId)); }}
+              onUndoOrder={() => { void reportUndo(studio.undoOrder(l.id)); }}
               onOpen={(tileId) => setPanel({ listingId: l.id, tileId })}
               busy={running}
             />
@@ -421,6 +444,7 @@ function StudioBody({ studio, ids, tab, onTabChange, backHref, onHeader }: Studi
                 })();
               }}
               onAddFile={(file) => { void studio.addVideoFile(l.id, file).then((r) => report(r, true)); }}
+              onUndo={() => { void reportUndo(studio.undoVideo(l.id)); }}
               busy={running}
             />
           ))
@@ -461,6 +485,10 @@ function StudioBody({ studio, ids, tab, onTabChange, backHref, onHeader }: Studi
           const { listingId, tileId } = panel;
           setPanel(null);
           void onDeleteTile(listingId, tileId);
+        }}
+        onUndoRemove={() => {
+          if (!panel) return;
+          void reportUndo(studio.undoTile(panel.listingId, panel.tileId));
         }}
       />
     </Box>

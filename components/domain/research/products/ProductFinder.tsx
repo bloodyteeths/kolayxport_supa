@@ -7,6 +7,11 @@
 // or the button (each search costs Etsy calls), never per keystroke. Turkish input offers "Translate to English
 // keywords · 1 credit" (§3.3); the seeds become removable chips. Nothing here writes to a marketplace: "Use $49"
 // and "Add 5 tags" stage drafts; "Draft a listing" writes a session prefill.
+//
+// R4 seam (research.md §9): `?source=search|trendyol` (PriceGapTable's `usePriceGapSource`). The toolbar leads with
+// the "Source: Search | From Trendyol" segment (Pro `arbitrage`; PlanTag for trial/locked; not rendered for
+// shopify_free). `source=trendyol` swaps the body for `<PriceGap>` (its own FeatureGate region: locked / neutral
+// locked state instead of the table) and runs no Etsy search.
 import * as React from 'react';
 import { useRouter } from 'next/router';
 import Box from '@mui/material/Box';
@@ -60,6 +65,7 @@ import { TopListingPanel } from './TopListingPanel';
 import { ComparePanel } from './ComparePanel';
 import { SeedChips } from './SeedChips';
 import { StageToListingModal, type StageMode } from './StageToListingModal';
+import { PriceGap, PriceGapSourceSegment, usePriceGapSource } from './PriceGapTable';
 
 export const COUNTRIES = ['US', 'GB', 'DE', 'CA', 'AU', 'FR'] as const;
 export const COMPARE_MAX = 3;
@@ -170,6 +176,8 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
   const market = useResearchMkt('products', { amazonEligible });
   const { mkt } = market;
   const [url, setUrl] = useUrlState(PRODUCTS_SCHEMA);
+  const [source, setSource] = usePriceGapSource();
+  const priceGap = source === 'trendyol';
   const q = url.q?.trim() ?? '';
   const compareList = parseCompare(url.compare);
   const comparing = compareList.length >= 2;
@@ -190,9 +198,9 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
     ebay: { listingsOn: useUiFlag('listings-ebay'), editorOn: useUiFlag('editor-ebay') },
   };
 
-  const params = !comparing && q && !amazonBlocked ? { q, mkt, country: url.country, sort: url.sort as ProductSort } : null;
+  const params = !priceGap && !comparing && q && !amazonBlocked ? { q, mkt, country: url.country, sort: url.sort as ProductSort } : null;
   const result = useResearchProducts(params);
-  const compare = useResearchCompare(comparing && !amazonBlocked ? compareList : [], { mkt, country: url.country });
+  const compare = useResearchCompare(!priceGap && comparing && !amazonBlocked ? compareList : [], { mkt, country: url.country });
   const data = result.data;
   const ready = Boolean(data) && (result.region.state === 'ready' || result.region.state === 'stale');
 
@@ -314,7 +322,7 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
 
   // ── header actions ─────────────────────────────────────────────────────────────────────────────────
   const primaryAction: ActionSpec | undefined =
-    ready && data && !comparing
+    !priceGap && ready && data && !comparing
       ? {
           id: 'draft',
           label: t('action.draftListing'),
@@ -323,7 +331,7 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
         }
       : undefined;
   const overflowActions: ActionSpec[] =
-    ready && data && !comparing
+    !priceGap && ready && data && !comparing
       ? [
           { id: 'export', label: t('action.export'), icon: icons.download, onClick: exportCsv, disabled: !data.top.length, disabledReason: data.top.length ? undefined : t('empty.products') },
           { id: 'copy', label: t('action.copyLink'), icon: icons.copy, onClick: () => void copyLink() },
@@ -333,8 +341,12 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
   // ── toolbar ────────────────────────────────────────────────────────────────────────────────────────
   const countryOptions = COUNTRIES.map((c) => ({ value: c, label: c }));
   const searchPrimary = !ready || comparing;
-  const toolbar = (
+  const sourceSegment = <PriceGapSourceSegment value={source} onChange={setSource} size={mobile ? 'md' : 'sm'} />;
+  const toolbar = priceGap ? (
+    <Box sx={{ mb: '12px' }}>{sourceSegment}</Box>
+  ) : (
     <Box sx={{ mb: '12px' }}>
+      <Box sx={{ mb: '8px', '&:empty': { display: 'none' } }}>{sourceSegment}</Box>
       <Box
         component="form"
         role="search"
@@ -423,7 +435,9 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
 
   // ── body ───────────────────────────────────────────────────────────────────────────────────────────
   let body: React.ReactNode;
-  if (amazonBlocked) {
+  if (priceGap) {
+    body = <PriceGap amazonEligible={amazonEligible} />;
+  } else if (amazonBlocked) {
     body = (
       <EmptyState
         kind="locked"
@@ -562,7 +576,7 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
 
   return (
     <ResearchLayout tab="products" market={market} primaryAction={primaryAction} overflowActions={overflowActions} mobilePrimary="none" toolbar={toolbar}>
-      {result.budget && !result.notice ? (
+      {!priceGap && result.budget && !result.notice ? (
         <Box sx={{ mb: '12px' }}>
           <Banner tone="info" title={t('error.budget')} data-testid="research-budget" />
         </Box>

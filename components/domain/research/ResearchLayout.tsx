@@ -8,8 +8,8 @@
 // (hidden options never render; a disabled option carries its reason). Mobile: the shell TopBar owns the title,
 // so the switch moves into ⋯ ("Marketplace: eBay") and the tabs scroll horizontally (the allowed h-scroll).
 //
-// Tools that have not shipped yet (Keyword explorer R2, Shop tracker R3) link to their legacy routes until their
-// PR flips `RESEARCH_TOOL_SHIPPED` (one line, owned by that PR).
+// A tool that has not shipped yet links to its legacy route until its PR flips `RESEARCH_TOOL_SHIPPED` (all five
+// tools are on the hub since R3).
 import * as React from 'react';
 import { useRouter } from 'next/router';
 import Box from '@mui/material/Box';
@@ -41,13 +41,13 @@ export const RESEARCH_TOOL_PATH: Record<ResearchTab, string> = {
   shops: '/app/research/shops',
 };
 
-/** Which tools have their hub route live. R2 integrator flipped `keywords` (pages/app/research/keywords.tsx); R3-B flips `shops`. */
+/** Which tools have their hub route live. R2 integrator flipped `keywords`; R3 integrator flipped `shops` (pages/app/research/shops.tsx). */
 export const RESEARCH_TOOL_SHIPPED: Record<ResearchTab, boolean> = {
   home: true,
   products: true,
   keywords: true,
   listings: true,
-  shops: false,
+  shops: true,
 };
 
 /** Legacy routes for tools that are not on the hub yet (verified against the legacy route files). */

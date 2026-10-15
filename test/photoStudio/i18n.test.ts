@@ -5,7 +5,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import en from '@/messages/en.json';
-import { psEn, psTr } from './messages';
+import { psEn, psPendingEn, psPendingTr, psTr } from './messages';
 import { STUDIO_FILTERS, STUDIO_OPS } from '@/components/domain/photo-studio/studioModel';
 
 type Obj = Record<string, unknown>;
@@ -13,8 +13,9 @@ const flat = (o: Obj, pre = ''): string[] => Object.entries(o).flatMap(([k, v]) 
 const DIR = path.resolve(__dirname, '../../components/domain/photo-studio');
 
 describe('photoStudio i18n keys', () => {
-  const enKeys = new Set(flat(psEn.photoStudio));
-  const trKeys = new Set(flat(psTr.photoStudio));
+  const mergedKeys = flat(psEn.photoStudio);
+  const enKeys = new Set([...mergedKeys, ...flat(psPendingEn.photoStudio)]);
+  const trKeys = new Set([...flat(psTr.photoStudio), ...flat(psPendingTr.photoStudio)]);
 
   it('EN and TR have the same keys', () => {
     expect([...enKeys].sort()).toEqual([...trKeys].sort());
@@ -22,7 +23,7 @@ describe('photoStudio i18n keys', () => {
 
   it('is merged into messages/en.json', () => {
     const merged = new Set(flat(((en as Obj).photoStudio ?? {}) as Obj));
-    for (const k of enKeys) expect(merged.has(k), k).toBe(true);
+    for (const k of mergedKeys) expect(merged.has(k), k).toBe(true);
   });
 
   it('every literal key used in the components exists', () => {
@@ -48,7 +49,7 @@ describe('photoStudio i18n keys', () => {
   });
 
   it('Turkish copy has no ASCII-Turkish', () => {
-    const text = JSON.stringify(psTr);
+    const text = JSON.stringify([psTr, psPendingTr]);
     expect(text).not.toMatch(/Olustur|Gonder|Siparis|Iptal|Odeme|Fotograf|Yukle|Secili|Duzenle/);
   });
 });

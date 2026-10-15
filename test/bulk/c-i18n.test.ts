@@ -62,7 +62,10 @@ describe('M7-C i18n', () => {
     expect(bad).toEqual([]);
   });
   it('fragment keys do not collide with existing base messages', () => {
-    const clash = flatKeys().filter(({ key }) => get(en as Obj, `bulk.${key}`) !== undefined && get(en as Obj, `bulk.${key}`) !== get(C_EN, `bulk.${key}`));
+    const clash = flatKeys().filter(({ namespace, key }) => get(en as Obj, `${namespace}.${key}`) !== undefined && get(en as Obj, `${namespace}.${key}`) !== get(C_EN, `${namespace}.${key}`));
     expect(clash).toEqual([]);
+  });
+  it('covers the shared listings key (not only the bulk subtree)', () => {
+    expect(flatKeys().find((r) => r.namespace === 'listings' && r.key === 'cell.stockManagedLink')).toBeTruthy();
   });
 });

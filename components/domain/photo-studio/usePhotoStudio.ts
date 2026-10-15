@@ -16,6 +16,7 @@ import {
   generateStudioImage,
   stageBatchMedia,
   stageFile,
+  removeStudioMedia,
   writeStudioAlt,
   type AiImageMode,
   type BatchItemResult,
@@ -28,7 +29,11 @@ import {
   buildListingVideoView,
   groupByListing,
   makePrimaryOps,
+  orderUndoIds,
   reorderTileOps,
+  tileUndoIds,
+  undoLeavesNoPhoto,
+  videoUndoIds,
   runPool,
   type EtsyVideoLike,
   type ListingPhotoView,
@@ -41,6 +46,7 @@ import {
   type StudioPlan,
   type VideoPlan,
 } from './studioModel';
+import { currentUndoPlan, isEmptyUndo, isSendingRefusal, mediaUndoPlan, type MediaUndoPlan } from '@/components/domain/listing-editor/stagedMedia';
 
 export type LoadStatus = 'loading' | 'ready' | 'error';
 export type StudioLoadState = 'loading' | 'ready' | 'error' | 'notConnected' | 'storeNotFound';
@@ -72,6 +78,19 @@ export interface RunResult {
   aiUnusable: number;
   /** The run stopped: the plan is not included (server 402) or AI credits ran out. */
   stopped: 'locked' | 'aiCredits' | null;
+  /** Single-tile edits that staged cleanly: how to take exactly that change back (the toast's Undo). */
+  undo?: { listingId: string; plan: MediaUndoPlan };
+}
+
+export interface UndoResult {
+  ok: boolean;
+  /** Set when the undo was refused or failed (409 DRAFT_SENDING / DRAFT_NOT_EDITABLE carry their key). */
+  failure?: StudioFailure;
+  /**
+   * Nothing was changed on purpose: `nothing` (the change is no longer in the draft, or a later edit of the same
+   * photo replaced it) or `lastPhoto` (taking it back would leave no photo while an Etsy photo is staged for removal).
+   */
+  skipped?: 'nothing' | 'lastPhoto';
 }
 
 export interface RunContext {
@@ -125,6 +144,14 @@ export interface UsePhotoStudio {
   removeVideo: (listingId: string) => Promise<RunResult>;
   addVideoFile: (listingId: string, file: File) => Promise<RunResult>;
   writeAlt: (listingId: string, tileId: string) => Promise<string>;
+  /** Undo (PATCH removeMediaIds, then re-stage replaced reorder / alt rows). Never sends. */
+  undo: (listingId: string, plan: MediaUndoPlan) => Promise<UndoResult>;
+  /** Takes back one tile's staged upload or staged removal. */
+  undoTile: (listingId: string, tileId: string) => Promise<UndoResult>;
+  /** Drops the listing's staged reorders (Etsy order again). */
+  undoOrder: (listingId: string) => Promise<UndoResult>;
+  /** Takes back the staged video upload or video removal. */
+  undoVideo: (listingId: string) => Promise<UndoResult>;
 }
 
 export function usePhotoStudio({ shopId, ids }: { shopId: string | null; ids: string[] }): UsePhotoStudio {
@@ -141,7 +168,13 @@ export function usePhotoStudio({ shopId, ids }: { shopId: string | null; ids: st
   const [videos, setVideos] = React.useState<Map<string, EtsyVideoLike[]>>(new Map());
   const [videoStatus, setVideoStatus] = React.useState<Map<string, LoadStatus>>(new Map());
   const [videosWanted, setVideosWanted] = React.useState(false);
-  const [drafts, setDrafts] = React.useState<Map<string, StudioDraft>>(new Map());
+  const [drafts, setDraftsState] = React.useState<Map<string, StudioDraft>>(new Map());
+  // Synchronous mirror: an undo plan compares a listing's rows before / after one staging call.
+  const draftsRef = React.useRef<Map<string, StudioDraft>>(drafts);
+  const setDrafts = React.useCallback((next: Map<string, StudioDraft> | ((m: Map<string, StudioDraft>) => Map<string, StudioDraft>)) => {
+    draftsRef.current = typeof next === 'function' ? next(draftsRef.current) : next;
+    setDraftsState(draftsRef.current);
+  }, []);
   const [selected, setSelected] = React.useState<ReadonlySet<string>>(new Set());
   const [stagedHere, setStagedHere] = React.useState(0);
   const [progress, setProgress] = React.useState<RunProgress | null>(null);
@@ -252,6 +285,8 @@ export function usePhotoStudio({ shopId, ids }: { shopId: string | null; ids: st
   // Latest views for the async runners (closures would otherwise see the views of the render that started them).
   const viewsRef = React.useRef(photoViews);
   viewsRef.current = photoViews;
+  const imagesRef = React.useRef(images);
+  imagesRef.current = images;
   const videoViewsRef = React.useRef(videoViews);
   videoViewsRef.current = videoViews;
   const listingsRef = React.useRef(listings);
@@ -264,7 +299,7 @@ export function usePhotoStudio({ shopId, ids }: { shopId: string | null; ids: st
       const prev = m.get(r.listingId);
       return new Map(m).set(r.listingId, { id: r.draftId, listingId: r.listingId, status: r.status, media: r.media, queuedDelete: prev?.queuedDelete ?? false });
     });
-  }, []);
+  }, [setDrafts]);
 
   const appendMedia = React.useCallback((listingId: string, draftId: string, row: StudioMediaRow | null) => {
     if (!row) return;
@@ -272,6 +307,19 @@ export function usePhotoStudio({ shopId, ids }: { shopId: string | null; ids: st
       const prev = m.get(listingId);
       const media = [...(prev?.media ?? []).filter((x) => x.id !== row.id), row];
       return new Map(m).set(listingId, { id: prev?.id ?? draftId, listingId, status: prev?.status === 'conflict' ? 'conflict' : 'draft', media, queuedDelete: prev?.queuedDelete ?? false });
+    });
+  }, [setDrafts]);
+
+  /** A listing whose draft is being sent: read-only and out of the selection until the page reloads. */
+  const markSending = React.useCallback((failures: ReadonlyArray<StudioFailure>) => {
+    const ids = new Set(failures.filter((f) => isSendingRefusal(f)).map((f) => f.listingId));
+    if (!ids.size) return;
+    setListings((ls) => ls.map((l) => (ids.has(l.id) ? { ...l, syncing: true } : l)));
+    setSelected((sel) => {
+      if (![...ids].some((id) => sel.has(id))) return sel;
+      const next = new Set(sel);
+      for (const id of ids) next.delete(id);
+      return next;
     });
   }, []);
 
@@ -308,10 +356,11 @@ export function usePhotoStudio({ shopId, ids }: { shopId: string | null; ids: st
 
   const finish = React.useCallback((res: RunResult): RunResult => {
     setProgress(null);
+    markSending(res.failures);
     if (res.staged) setStagedHere((n) => n + res.staged);
     if (res.stopped === 'aiCredits') setAiCreditsOut(true);
     return res;
-  }, []);
+  }, [markSending]);
 
   // ── Per-listing write order ─────────────────────────────────────────────────────────────────────
   // Two writes to one listing's draft must never run at the same time (a listing without a draft would get two).
@@ -490,33 +539,44 @@ export function usePhotoStudio({ shopId, ids }: { shopId: string | null; ids: st
 
   const tileOf = (listingId: string, tileId: string) => viewsRef.current.get(listingId)?.tiles.find((t) => t.id === tileId) ?? null;
 
+  /** Runs one single-tile staging call and attaches the plan that takes exactly that change back. */
+  const withUndo = React.useCallback(async (listingId: string, fn: () => Promise<RunResult>): Promise<RunResult> => {
+    const before = draftsRef.current.get(listingId)?.media ?? [];
+    const res = await fn();
+    if (res.staged <= 0 || res.failures.length || res.stopped) return res;
+    const plan = mediaUndoPlan(before, draftsRef.current.get(listingId)?.media ?? []);
+    return isEmptyUndo(plan) ? res : { ...res, undo: { listingId, plan } };
+  }, []);
+
   const reorder = React.useCallback((listingId: string, nextIds: string[]) => serial(listingId, async () => {
     const view = viewsRef.current.get(listingId);
     if (!view) return EMPTY_RESULT;
     const ops = reorderTileOps(view, nextIds);
     if (ops === null) return 'pending' as const;
-    return stageOne(listingId, ops);
-  }), [serial, stageOne]);
+    return withUndo(listingId, () => stageOne(listingId, ops));
+  }), [serial, stageOne, withUndo]);
 
   const makePrimary = React.useCallback((listingId: string, tileId: string) => serial(listingId, async () => {
     const view = viewsRef.current.get(listingId);
     if (!view) return EMPTY_RESULT;
     const ops = makePrimaryOps(view, tileId);
     if (ops === null) return 'pending' as const;
-    return stageOne(listingId, ops);
-  }), [serial, stageOne]);
+    return withUndo(listingId, () => stageOne(listingId, ops));
+  }), [serial, stageOne, withUndo]);
 
   const removeTile = React.useCallback((listingId: string, tileId: string) => serial(listingId, async () => {
     const tile = tileOf(listingId, tileId);
     if (!tile || tile.imageId == null || tile.staged === 'delete') return EMPTY_RESULT;
-    return stageOne(listingId, [{ kind: 'image', operation: 'delete', etsyMediaId: tile.imageId }]);
-  }), [serial, stageOne]);
+    const imageId = tile.imageId;
+    return withUndo(listingId, () => stageOne(listingId, [{ kind: 'image', operation: 'delete', etsyMediaId: imageId }]));
+  }), [serial, stageOne, withUndo]);
 
   const saveAlt = React.useCallback((listingId: string, tileId: string, alt: string) => serial(listingId, async () => {
     const tile = tileOf(listingId, tileId);
     if (!tile || tile.imageId == null) return EMPTY_RESULT;
-    return stageOne(listingId, [{ kind: 'image', operation: 'update_alt', etsyMediaId: tile.imageId, altText: alt }]);
-  }), [serial, stageOne]);
+    const imageId = tile.imageId;
+    return withUndo(listingId, () => stageOne(listingId, [{ kind: 'image', operation: 'update_alt', etsyMediaId: imageId, altText: alt }]));
+  }), [serial, stageOne, withUndo]);
 
   const uploadOne = React.useCallback(async (listingId: string, file: File, rank: number, kind: 'image' | 'video'): Promise<RunResult> => {
     if (!shop) return EMPTY_RESULT;
@@ -531,7 +591,7 @@ export function usePhotoStudio({ shopId, ids }: { shopId: string | null; ids: st
 
   // Replace: the new photo is staged first and the old one's delete only after it (the send uploads before it
   // deletes), so a failed upload never leaves a delete without a replacement. Counts as one change.
-  const replaceTile = React.useCallback((listingId: string, tileId: string, file: File) => serial(listingId, async (): Promise<RunResult> => {
+  const replaceTile = React.useCallback((listingId: string, tileId: string, file: File) => serial(listingId, () => withUndo(listingId, async (): Promise<RunResult> => {
     const view = viewsRef.current.get(listingId);
     const tile = tileOf(listingId, tileId);
     if (!view || !tile || tile.imageId == null) return EMPTY_RESULT;
@@ -541,10 +601,11 @@ export function usePhotoStudio({ shopId, ids }: { shopId: string | null; ids: st
     if (up.failed) return up;
     const del = await stageOps([{ listingId, media: [{ kind: 'image', operation: 'delete', etsyMediaId: imageId }] }], () => undefined);
     if (!del.failures.length && !del.locked) return up;
+    markSending(del.failures);
     return { ...up, failed: 1, failures: del.failures, stopped: del.locked ? 'locked' : null };
-  }), [serial, uploadOne, stageOps]);
+  })), [serial, uploadOne, stageOps, withUndo, markSending]);
 
-  const addFiles = React.useCallback((listingId: string, files: File[]) => serial(listingId, async (): Promise<RunResult> => {
+  const addFiles = React.useCallback((listingId: string, files: File[]) => serial(listingId, () => withUndo(listingId, async (): Promise<RunResult> => {
     const view = viewsRef.current.get(listingId);
     if (!view) return EMPTY_RESULT;
     let staged = 0;
@@ -557,15 +618,68 @@ export function usePhotoStudio({ shopId, ids }: { shopId: string | null; ids: st
       rank += 1;
     }
     return { staged, failed: failures.length ? 1 : 0, failures, aiUnusable: 0, stopped: null };
-  }), [serial, uploadOne]);
+  })), [serial, uploadOne, withUndo]);
 
   const removeVideo = React.useCallback((listingId: string) => serial(listingId, async () => {
     const v = videoViewsRef.current.get(listingId);
     if (!v?.remote || v.removing) return EMPTY_RESULT;
-    return stageOne(listingId, [{ kind: 'video', operation: 'delete', etsyMediaId: v.remote.videoId }]);
-  }), [serial, stageOne]);
+    const videoId = v.remote.videoId;
+    return withUndo(listingId, () => stageOne(listingId, [{ kind: 'video', operation: 'delete', etsyMediaId: videoId }]));
+  }), [serial, stageOne, withUndo]);
 
-  const addVideoFile = React.useCallback((listingId: string, file: File) => serial(listingId, () => uploadOne(listingId, file, 0, 'video')), [serial, uploadOne]);
+  const addVideoFile = React.useCallback(
+    (listingId: string, file: File) => serial(listingId, () => withUndo(listingId, () => uploadOne(listingId, file, 0, 'video'))),
+    [serial, uploadOne, withUndo],
+  );
+
+  // ── Undo (un-stage; queued per listing like every write) ─────────────────────────────────────────
+  const undoNow = React.useCallback(async (listingId: string, stored: MediaUndoPlan): Promise<UndoResult> => {
+    const draft = draftsRef.current.get(listingId);
+    // The plan was computed when the edit was staged: run it only while the rows it removes are still the draft's.
+    const plan = draft ? currentUndoPlan(stored, draft.media) : null;
+    if (!draft || !plan || isEmptyUndo(plan)) return { ok: false, skipped: 'nothing' };
+    if (undoLeavesNoPhoto(imagesRef.current.get(listingId), draft, plan.removeIds)) return { ok: false, skipped: 'lastPhoto' };
+    if (plan.removeIds.length) {
+      try {
+        const next = await removeStudioMedia(draft.id, plan.removeIds);
+        const gone = new Set(plan.removeIds);
+        setDrafts((m) => {
+          const prev = m.get(listingId);
+          if (!prev) return m;
+          const media = next && next.id === prev.id ? next.media : prev.media.filter((x) => !gone.has(x.id));
+          return new Map(m).set(listingId, { ...prev, status: next?.status ?? prev.status, media });
+        });
+      } catch (err) {
+        const failure = clientFailure(listingId, err);
+        markSending([failure]);
+        return { ok: false, failure };
+      }
+    }
+    if (plan.restore.length) {
+      try {
+        const r = await stageOps([{ listingId, media: plan.restore }], () => undefined);
+        markSending(r.failures);
+        if (r.failures.length || r.locked) return { ok: false, failure: r.failures[0] ?? { listingId, code: 'STAGE_FAILED' } };
+      } catch (err) {
+        return { ok: false, failure: clientFailure(listingId, err) };
+      }
+    }
+    return { ok: true };
+  }, [setDrafts, stageOps, markSending]);
+
+  const undo = React.useCallback((listingId: string, plan: MediaUndoPlan) => serial(listingId, () => undoNow(listingId, plan)), [serial, undoNow]);
+
+  const undoTile = React.useCallback((listingId: string, tileId: string) => serial(listingId, () => (
+    undoNow(listingId, { removeIds: tileUndoIds(viewsRef.current.get(listingId), tileId), restore: [] })
+  )), [serial, undoNow]);
+
+  const undoOrder = React.useCallback((listingId: string) => serial(listingId, () => (
+    undoNow(listingId, { removeIds: orderUndoIds(draftsRef.current.get(listingId)), restore: [] })
+  )), [serial, undoNow]);
+
+  const undoVideo = React.useCallback((listingId: string) => serial(listingId, () => (
+    undoNow(listingId, { removeIds: videoUndoIds(videoViewsRef.current.get(listingId), draftsRef.current.get(listingId)), restore: [] })
+  )), [serial, undoNow]);
 
   const writeAlt = React.useCallback(async (listingId: string, tileId: string) => {
     const tile = tileOf(listingId, tileId);
@@ -586,6 +700,7 @@ export function usePhotoStudio({ shopId, ids }: { shopId: string | null; ids: st
     retry, shop, listings, imageStatus, photoViews, videoStatus, videoViews, loadVideos,
     selected, setSelected, stagedHere, progress, aiCreditsOut,
     runPlan, runVideoPlan, reorder, makePrimary, removeTile, saveAlt, replaceTile, addFiles, removeVideo, addVideoFile, writeAlt,
+    undo, undoTile, undoOrder, undoVideo,
   };
 }
 

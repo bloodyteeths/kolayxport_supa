@@ -79,6 +79,7 @@ import {
   viewPatch,
 } from './useListings';
 import { useStagedChanges, type ExtendedStagePatch, type UseStagedChanges } from './useStagedChanges';
+import { useStockManagedRows, withStockManaged } from './stockManaged';
 import { useSendChanges, SendChangesBar } from './SendChangesAction';
 import { FailureBanner } from './FailureBanner';
 import { ListingsToolbar, useFetchedFilterOptions } from './ListingsToolbar';
@@ -347,6 +348,8 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
     [fetchedOptions.key, fetchedOptions.options],
   );
   const removalKind = removalKindOf(config);
+  // Stock-managed quantities: one batch request for the loaded rows (BR-11); empty in dry run / off Etsy.
+  const stockManagedIds = useStockManagedRows(rows, marketplace, storeId);
 
   const cellCtx: ListingCellContext = React.useMemo(
     () => ({
@@ -359,8 +362,9 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
       storeCurrency,
       removalKind,
       optionLabels,
+      stockManagedIds,
     }),
-    [config, mpName, staged.overlays, staged.sendingIds, formatMoney, errorText, storeCurrency, removalKind, optionLabels],
+    [config, mpName, staged.overlays, staged.sendingIds, formatMoney, errorText, storeCurrency, removalKind, optionLabels, stockManagedIds],
   );
   const columns = React.useMemo(() => listingColumns(t, cellCtx), [t, cellCtx]);
   const dirtyCells = React.useMemo(() => dirtyCellKeys(rows, staged.overlays), [rows, staged.overlays]);
@@ -414,6 +418,8 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
   // ── panels / modals ──────────────────────────────────────────────────────────────────────────────────
   const [modal, setModal] = React.useState<null | 'price' | 'stock' | 'tags' | 'schedule'>(null);
   const [modalRows, setModalRows] = React.useState<ListingRow[]>([]);
+  // "Change stock" skips stock-managed rows (counted as skipped, like variation rows).
+  const stockModalRows = React.useMemo(() => modalRows.map((r) => withStockManaged(r, stockManagedIds)), [modalRows, stockManagedIds]);
   const [scheduleDrafts, setScheduleDrafts] = React.useState<string[]>([]);
   const [tagLookup, setTagLookup] = React.useState<Map<string, string[] | null>>(new Map());
   const [exportScope, setExportScope] = React.useState<ExportScope | undefined>(undefined);
@@ -1284,7 +1290,7 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
       <ChangeStockModal
         open={modal === 'stock'}
         onClose={() => setModal(null)}
-        rows={modalRows}
+        rows={stockModalRows}
         qtyMax={config.validation.qtyMax}
         currentQty={(r) => displayQty(r, staged.overlays)}
         onStage={async (patches) => {

@@ -1,14 +1,16 @@
 // components/domain/photo-studio/studioApi.ts — M7-E PhotoStudio: the client calls (no React).
 // Reads: `GET /api/listings` (DB only, the selected ids), `GET /api/clawd/etsy?action=get_listing_images|videos`
 // (one per listing, cached by the hook), `GET /api/etsy-drafts?shop_id=` (staged media of the shop's drafts).
-// Writes (stage only, never Etsy): `POST /api/etsy-drafts/batch-media` (≤ 50 listings, 2 in flight) and
-// `POST /api/etsy-drafts/media` through `stageEtsyDraftFile` (one file per call, fanned out by the hook).
+// Writes (stage only, never Etsy): `POST /api/etsy-drafts/batch-media` (≤ 50 listings, 2 in flight),
+// `POST /api/etsy-drafts/media` through `stageEtsyDraftFile` (one file per call, fanned out by the hook) and the
+// undo `PATCH /api/etsy-drafts/[id] { removeMediaIds }` (un-stage rows).
 // AI: `POST /api/ai/generate-image` (images, 10 credits) and `POST /api/ai/etsy {action:'generate_alt_text'}`
 // (1 credit), both through the seoRules guards for text.
 import { stageEtsyDraftFile, EtsyDraftClientError } from '@/lib/etsy/draftClient';
 import { AiRequestError, aiErrorCode, coerceAiString, looksGarbled } from '@/lib/etsy/seoRules';
 import { LIMIT_UI_HEADER } from '@/lib/http/limitInterceptor';
 import { cleanAltText } from '@/components/domain/listing-editor/sections/photosModel';
+import { removeDraftMedia } from '@/components/domain/listing-editor/stagedMedia';
 import type { ListingRow, ListingsResponse } from '@/lib/listings/types';
 import {
   BATCH_IN_FLIGHT,
@@ -155,6 +157,16 @@ export async function stageFile(input: { shopId: string; listingId: string; file
 }
 
 export { EtsyDraftClientError };
+
+/**
+ * Undo: un-stages media rows of one listing's draft (`PATCH /api/etsy-drafts/[id] { removeMediaIds }`, ≤ 100 per
+ * call, chunked). Returns the draft as the server now holds it (null when it is no longer a live draft). Throws
+ * `EtsyDraftClientError` (409 DRAFT_SENDING / DRAFT_NOT_EDITABLE carry `key` draftSync.draftSyncing /
+ * draftSync.draftNotEditable, relative to `etsy`).
+ */
+export async function removeStudioMedia(draftId: string, mediaIds: ReadonlyArray<string>): Promise<StudioDraft | null> {
+  return toStudioDraft(await removeDraftMedia(draftId, mediaIds));
+}
 
 // ─── AI ──────────────────────────────────────────────────────────────────────────────────────────────
 

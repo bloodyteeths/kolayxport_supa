@@ -105,7 +105,7 @@ describe('field rules', () => {
     expect(cellReadOnlyReason(row({ editable: { price: false, qty: false, reason: 'variations' } }), 'price', ctx())).toBe(
       'Has variations: use Change price, or edit per variation in the editor',
     );
-    expect(cellReadOnlyReason(row({ qty: 7, editable: { price: true, qty: false, reason: 'stock_managed' } }), 'qty', ctx())).toBe('Stock sync manages this quantity (7)');
+    expect(cellReadOnlyReason(row({ qty: 7, editable: { price: true, qty: false, reason: 'stock_managed' } }), 'qty', ctx())).toBe('Stock is managed by stock sync');
     expect(cellReadOnlyReason(row({ sync: sync({ queuedDelete: true }) }), 'title', ctx())).toBe('Will be deleted on send');
     expect(cellReadOnlyReason(row(), 'title', ctx({ sendingIds: new Set(['1']) }))).toBe('Sending to Etsy…');
     expect(cellReadOnlyReason(row(), 'section', ctx({ config: ebayBulkConfig }))).toBe('Not editable for eBay yet');

@@ -6,6 +6,7 @@ import { StatusPill } from '@/components/ds/data/StatusPill';
 import type { GridColumn } from '@/components/ds/data/BulkGrid';
 import type { ListingRow, ListingSyncKey } from '@/lib/listings/types';
 import type { ListingsT } from '@/components/domain/listings/columns';
+import { StockManagedQty } from '@/components/domain/listings/stockManaged';
 import type { BulkColumnKey, BulkConfig, BulkField } from './types';
 import { cellReadOnlyReason, liveValue, parseText, validateField, type FieldRuleContext } from './fields';
 
@@ -15,6 +16,8 @@ export type BulkColumnsContext = FieldRuleContext & {
   sectionOptions: { value: string; label: string }[];
   /** The row's change pill (`pending` while edits are queued in this session, `syncing` while sending). */
   syncKeyOf(row: ListingRow): ListingSyncKey | null;
+  /** Plain number text for a stock-managed qty cell (the grid's own `fmt.num`); default `String`. */
+  formatNumber?(n: number): string;
 };
 
 function editable(field: BulkField, ctx: BulkColumnsContext) {
@@ -101,6 +104,15 @@ export function bulkColumns(t: ListingsT, ctx: BulkColumnsContext): GridColumn<L
           value: (r) => liveValue(r, 'qty'),
           editable: editable('qty', ctx),
           validate: validator('qty', ctx),
+          // Stock-managed rows: the quantity + a lock linking to the stock sync page (read-only via `editable`).
+          ...(ctx.stockManagedIds?.size
+            ? {
+                renderValue: (v: unknown, r: ListingRow) => {
+                  const text = typeof v === 'number' && Number.isFinite(v) ? (ctx.formatNumber ?? String)(v) : '—';
+                  return ctx.stockManagedIds?.has(r.id) ? <StockManagedQty text={text} label={t('listings.cell.stockManagedLink')} /> : text;
+                },
+              }
+            : {}),
         });
         break;
       case 'section':

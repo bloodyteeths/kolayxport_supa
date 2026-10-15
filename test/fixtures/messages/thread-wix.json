@@ -1,0 +1,9 @@
+{
+  "id": "c-wix-1",
+  "platform": "wix",
+  "messages": [
+    { "id": "m1", "sender": "customer", "text": "Hello, I ordered the keepsake box.", "date": "2026-10-14T16:00:00.000Z" },
+    { "id": "m2", "sender": "seller", "text": "Thank you! It ships tomorrow.", "date": "2026-10-14T16:20:00.000Z" },
+    { "id": "m3", "sender": "customer", "text": "Hi, when will my order ship?", "date": "2026-10-15T09:56:00.000Z" }
+  ]
+}

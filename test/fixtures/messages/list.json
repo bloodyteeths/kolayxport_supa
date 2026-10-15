@@ -1,0 +1,50 @@
+{
+  "conversations": [
+    {
+      "id": "c-wix-1", "platform": "wix", "status": "unanswered", "needsReply": true, "unread": true, "platformStatus": "open",
+      "customerName": "Mehmet Yılmaz", "customerEmail": "mehmet@example.com", "subject": "Mehmet Yılmaz",
+      "lastMessageText": "Hi, when will my order ship?", "lastMessageAt": "2026-10-15T09:56:00.000Z", "lastMessageDate": "2026-10-15T09:56:00.000Z",
+      "lastFromCustomer": true, "orderRef": "10482", "contactId": "contact-1", "unreadCount": 1, "messages": []
+    },
+    {
+      "id": "881234", "platform": "trendyol", "status": "unanswered", "needsReply": true, "unread": false, "platformStatus": "WAITING_FOR_ANSWER",
+      "answeredAt": null, "rejectReason": null, "rejectedAnswerText": null,
+      "customerName": "Ayşe", "subject": "Ahşap anı kutusu", "lastMessageText": "Kutunun iç ölçüleri nedir?",
+      "lastMessageAt": "2026-10-15T08:10:00.000Z", "lastMessageDate": "2026-10-15T08:10:00.000Z", "lastFromCustomer": true,
+      "productInfo": { "id": "PMI-77", "title": "Ahşap anı kutusu", "imageUrl": "https://cdn.example.com/p.jpg", "webUrl": "https://www.trendyol.com/x" },
+      "unreadCount": 1,
+      "messages": [{ "id": "881234-q", "sender": "customer", "text": "Kutunun iç ölçüleri nedir?", "date": "2026-10-15T08:10:00.000Z" }]
+    },
+    {
+      "id": "881200", "platform": "trendyol", "status": "unanswered", "needsReply": true, "unread": true, "platformStatus": "REJECTED",
+      "answeredAt": null, "rejectReason": "Contains contact details", "rejectedAnswerText": "Bize www.example.com üzerinden yazın",
+      "customerName": "", "subject": "Bebek battaniyesi", "lastMessageText": "Yıkanabilir mi?",
+      "lastMessageAt": "2026-10-14T18:00:00.000Z", "lastMessageDate": "2026-10-14T18:00:00.000Z", "lastFromCustomer": true,
+      "productInfo": { "id": "PMI-12", "title": "Bebek battaniyesi" }, "unreadCount": 1,
+      "messages": [{ "id": "881200-q", "sender": "customer", "text": "Yıkanabilir mi?", "date": "2026-10-14T18:00:00.000Z" }]
+    },
+    {
+      "id": "881100", "platform": "trendyol", "status": "answered", "needsReply": false, "unread": false, "platformStatus": "WAITING_FOR_APPROVE",
+      "answeredAt": "2026-10-14T12:30:00.000Z", "rejectReason": null, "rejectedAnswerText": null,
+      "customerName": "Can", "subject": "Ahşap anı kutusu", "lastMessageText": "Hediye paketi var mı?",
+      "lastMessageAt": "2026-10-14T12:00:00.000Z", "lastMessageDate": "2026-10-14T12:00:00.000Z", "lastFromCustomer": true,
+      "productInfo": { "id": "PMI-77", "title": "Ahşap anı kutusu" }, "unreadCount": 0,
+      "messages": [{ "id": "881100-q", "sender": "customer", "text": "Hediye paketi var mı?", "date": "2026-10-14T12:00:00.000Z" }]
+    },
+    {
+      "id": "c-wix-2", "platform": "wix", "status": "answered", "needsReply": false, "unread": false, "platformStatus": "open",
+      "customerName": "Jane Doe", "subject": "Jane Doe", "lastMessageText": "Thanks, shipped today.",
+      "lastMessageAt": null, "lastMessageDate": "", "lastFromCustomer": false, "contactId": "contact-2", "unreadCount": 0, "messages": []
+    }
+  ],
+  "totalCount": 5,
+  "unansweredCount": 3,
+  "page": 0,
+  "pageSize": 30,
+  "nextCursor": "eyJ0IjoxLCJ3IjoiYWJjIn0",
+  "enabledPlatforms": ["trendyol", "wix"],
+  "errors": [],
+  "platformErrors": [],
+  "fetchedAt": "2026-10-15T10:00:00.000Z",
+  "readStateStore": "memory"
+}

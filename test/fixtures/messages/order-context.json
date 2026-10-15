@@ -1,0 +1,19 @@
+{
+  "orders": [
+    {
+      "orderNumber": "10482", "status": "APPROVED", "createdDate": "2026-10-13T11:00:00.000Z",
+      "totalAmount": 64.5, "currency": "USD", "total": "$64.50",
+      "items": [
+        { "name": "Engraved keepsake box", "imageUrl": "https://static.wixstatic.com/a.jpg", "quantity": 1, "amount": 54.5, "price": "$54.50" },
+        { "name": "Gift wrap", "quantity": 1, "amount": 10, "price": "$10.00" }
+      ],
+      "kxOrderId": "ckx_order_1", "trackingNumber": null, "shipByDate": "2026-10-16T00:00:00.000Z"
+    },
+    {
+      "orderNumber": "10311", "status": "FULFILLED", "createdDate": "2026-09-02T09:00:00.000Z",
+      "totalAmount": 38, "currency": "USD", "total": "$38.00",
+      "items": [{ "name": "Wooden jewelry box", "quantity": 1, "amount": 38, "price": "$38.00" }],
+      "kxOrderId": "ckx_order_0", "trackingNumber": "9400111899223344556677", "shipByDate": null
+    }
+  ]
+}

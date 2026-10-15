@@ -1,3 +1,6 @@
+// pages/api/messages/index.ts — messages §6.1. One route for the legacy page (flag off) and the new inbox.
+// Normalizers live in lib/messages/normalize.ts; Wix enrichment + read state in lib/messages/inboxCache.ts
+// (in-memory until BR-4's `InboxThread` table lands, see the guard there).
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import prisma from '@/lib/prisma';
@@ -5,111 +8,59 @@ import { createWixClient } from '@/lib/integrations/wixClient';
 import { createTrendyolClient } from '@/lib/integrations/trendyolApiClient';
 import { isWixEnabled, isTrendyolEnabled } from '@/lib/config';
 import { logger } from '@/lib/logger';
-import type { UnifiedConversation, UnifiedMessage, MessagesListResponse, MessageCountsResponse } from '@/types/messages';
+import { createInboxStore, enrichWixContacts } from '@/lib/messages/inboxCache';
+import { decodeCursor, encodeCursor, nextTrendyolPage, type InboxCursor } from '@/lib/messages/cursor';
+import {
+  classifyPlatformError,
+  classifyReplyError,
+  compareConversations,
+  joinLocalOrders,
+  matchesFilter,
+  normalizeTrendyolQuestion,
+  normalizeWixMessage,
+  normalizeWixOrder,
+  normalizeWixThread,
+  newestWixMessage,
+  parseListFilter,
+  replyErrorStatus,
+  sortOrdersNewestFirst,
+  trendyolStatusForFilter,
+  validateReplyText,
+  type LocalOrderRow,
+} from '@/lib/messages/normalize';
+import {
+  LIST_SIZE_DEFAULT,
+  LIST_SIZE_MAX,
+  ORDER_CONTEXT_LIMIT,
+  TRENDYOL_ANSWER_MAX,
+  TRENDYOL_ANSWER_MIN,
+  TRENDYOL_STATUS,
+  WIX_REPLY_MAX,
+} from '@/lib/messages/limits';
+import type {
+  InboxListResponse,
+  MessageCountsResponse,
+  MessagePlatform,
+  PlatformError,
+  ProductContext,
+  UnifiedConversation,
+} from '@/types/messages';
 
-// ─── Normalizers ────────────────────────────────────────
+/** Process-wide store (DB once BR-4 is deployed, memory until then). Exported for tests. */
+export const inboxStore = createInboxStore(prisma, logger);
 
-function normalizeTrendyolQuestion(q: any): UnifiedConversation {
-  const isAnswered = q.status === 'ANSWERED';
-  const messages: UnifiedMessage[] = [
-    {
-      id: `${q.id}-q`,
-      sender: 'customer',
-      text: q.text || '',
-      date: q.creationDate ? new Date(q.creationDate).toISOString() : new Date().toISOString(),
-    },
-  ];
+const PLATFORMS: readonly MessagePlatform[] = ['wix', 'trendyol'];
 
-  // Trendyol Q&A API returns answer as singular object (q.answer), not array
-  const answer = q.answer || q.answers?.[0];
-  if (isAnswered && answer) {
-    messages.push({
-      id: `${q.id}-a`,
-      sender: 'seller',
-      text: answer.text || '',
-      date: answer.creationDate ? new Date(answer.creationDate).toISOString() : new Date().toISOString(),
-    });
-  }
-
-  return {
-    id: String(q.id),
-    platform: 'trendyol',
-    status: isAnswered ? 'answered' : 'unanswered',
-    // Empty fallback: the UI renders a localized "Customer" label.
-    customerName: q.customerFirstName || q.userName || '',
-    subject: q.productName || '',
-    lastMessageText: q.text || '',
-    lastMessageDate: q.creationDate ? new Date(q.creationDate).toISOString() : new Date().toISOString(),
-    productInfo: q.productMainId ? {
-      id: q.productMainId,
-      title: q.productName || '',
-      imageUrl: q.imageUrl,
-      webUrl: q.webUrl,
-    } : undefined,
-    unreadCount: isAnswered ? 0 : 1,
-    messages,
-  };
+function str(v: string | string[] | undefined): string {
+  return Array.isArray(v) ? v[0] ?? '' : v ?? '';
 }
 
-function normalizeWixConversation(conv: any): UnifiedConversation {
-  const lastMessage = conv.latestMessage || conv.lastMessage || {};
-
-  // A conversation is unanswered if the last message was from the customer
-  const lastDirection = lastMessage.direction || lastMessage.sender?.role;
-  const isUnanswered = lastDirection === 'PARTICIPANT_TO_BUSINESS' || lastDirection === 'CUSTOMER_TO_BUSINESS' || lastDirection === 'VISITOR';
-
-  // _contactName is injected by our listConversations workaround
-  const customerName = conv._contactName || conv.participantDisplayData?.name || conv.displayName || '';
-
-  return {
-    id: conv.id,
-    platform: 'wix',
-    status: isUnanswered ? 'unanswered' : 'answered',
-    customerName,
-    contactId: conv._contactId,
-    subject: customerName,
-    lastMessageText: lastMessage.content?.previewText || lastMessage.content?.basic?.items?.[0]?.text || lastMessage.text || lastMessage.preview || lastMessage.content?.text || '',
-    lastMessageDate: lastMessage.createdDate || lastMessage.date || conv.lastActivityDate || conv.createdDate || new Date().toISOString(),
-    unreadCount: conv.unreadCount || 0,
-    messages: [],
-  };
+function errDetail(e: any): string {
+  return String(e?.body?.errors?.[0]?.message || e?.body?.rawError || e?.message || (e?.body ? JSON.stringify(e.body) : e) || '');
 }
-
-function normalizeWixMessage(msg: any): UnifiedMessage {
-  const isSeller = msg.direction === 'BUSINESS_TO_PARTICIPANT' || msg.direction === 'BUSINESS_TO_CUSTOMER' || msg.sender?.role === 'BUSINESS';
-  const text = msg.content?.previewText
-    || msg.content?.basic?.items?.[0]?.text
-    || msg.content?.text
-    || msg.text
-    || '';
-  return {
-    id: msg.id || msg.sequence?.toString() || '',
-    sender: isSeller ? 'seller' : 'customer',
-    text,
-    date: msg.createdDate || msg.date || new Date().toISOString(),
-  };
-}
-
-// ─── Platform error classification ──────────────────────
-// The UI maps `code` to user-facing i18n copy; `detail` stays developer-facing (logs/tooltips).
-
-type MessagePlatform = 'wix' | 'trendyol';
-type PlatformErrorCode = 'permission' | 'auth' | 'credentials' | 'rateLimited' | 'unavailable';
-interface PlatformError { platform: MessagePlatform; code: PlatformErrorCode; detail: string }
-
-function classifyPlatformError(e: any): PlatformErrorCode {
-  const status = Number(e?.status || e?.response?.status || 0);
-  const msg = String(e?.message || '');
-  if (status === 403 || /\b403\b/.test(msg)) return 'permission';
-  if (status === 401 || /\b401\b/.test(msg)) return 'auth';
-  if (status === 429 || /\b429\b/.test(msg)) return 'rateLimited';
-  return 'unavailable';
-}
-
-// ─── Handler ────────────────────────────────────────────
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const action = req.query.action as string;
+  const action = str(req.query.action);
 
   try {
     const user = await getAuthUser(req, res);
@@ -118,8 +69,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const credential = await prisma.credential.findUnique({ where: { userId: user.id } });
     const wixSite = await prisma.wixSite.findFirst({ where: { userId: user.id, isActive: true } });
 
-    const hasWix = isWixEnabled(user.id) && (wixSite || credential?.wixInstanceId);
-    const hasTrendyol = isTrendyolEnabled(user.id) && credential?.trendyolSupplierId;
+    const hasWix = !!(isWixEnabled(user.id) && (wixSite || credential?.wixInstanceId));
+    const hasTrendyol = !!(isTrendyolEnabled(user.id) && credential?.trendyolSupplierId);
 
     const userId = user.id;
 
@@ -139,44 +90,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // ── COUNTS (lightweight, for badge) ─────────────────
+    // ── COUNTS (badge: needs-reply totals) ──────────────
     if (action === 'counts') {
       const counts: MessageCountsResponse = { wix: 0, trendyol: 0, total: 0 };
-
       const promises: Promise<void>[] = [];
 
       if (hasTrendyol && credential) {
-        promises.push(
-          (async () => {
-            try {
-              const client = createTrendyolClient(credential);
-              const data = await client.getQuestions({ status: 'WAITING_FOR_ANSWER', size: 1 });
-              counts.trendyol = data.totalElements || 0;
-            } catch (e: any) {
-              logger.warn(`[MESSAGES] Trendyol count failed: ${e?.message || e}`);
-            }
-          })()
-        );
+        promises.push((async () => {
+          try {
+            const client = createTrendyolClient(credential);
+            // Same set as the Needs reply view: waiting questions + rejected answers (§5.2). Rejected is best effort.
+            const [waiting, rejected] = await Promise.allSettled([
+              client.getQuestions({ status: TRENDYOL_STATUS.waiting, size: 1 }),
+              client.getQuestions({ status: TRENDYOL_STATUS.rejected, size: 1 }),
+            ]);
+            if (waiting.status === 'rejected') throw waiting.reason;
+            counts.trendyol = (waiting.value?.totalElements || 0)
+              + (rejected.status === 'fulfilled' ? rejected.value?.totalElements || 0 : 0);
+            if (rejected.status === 'rejected') logger.warn(`[MESSAGES] Trendyol rejected count failed: ${rejected.reason?.message || rejected.reason}`);
+          } catch (e: any) {
+            logger.warn(`[MESSAGES] Trendyol count failed: ${e?.message || e}`);
+          }
+        })());
       }
 
+      // Wix: read the inbox cache (filled by `list`), never the Wix API on a badge poll (§9).
       if (hasWix) {
-        promises.push(
-          (async () => {
-            try {
-              const client = buildWixClient();
-              if (!client) return;
-              const data = await client.listConversations({ limit: 50 });
-              const conversations = data.conversations || [];
-              counts.wix = conversations.filter((c: any) => {
-                const dir = c.latestMessage?.direction || c.latestMessage?.sender?.role;
-                return dir === 'PARTICIPANT_TO_BUSINESS' || dir === 'CUSTOMER_TO_BUSINESS' || dir === 'VISITOR';
-              }).length;
-            } catch (e: any) {
-              logger.warn(`[MESSAGES] Wix count failed: ${e?.message || e}`);
-              // Silently skip — counts badge shouldn't show errors
-            }
-          })()
-        );
+        promises.push((async () => {
+          try {
+            counts.wix = await inboxStore.countNeedsReply(userId, 'wix');
+          } catch (e: any) {
+            logger.warn(`[MESSAGES] Wix count failed: ${e?.message || e}`);
+          }
+        })());
       }
 
       await Promise.allSettled(promises);
@@ -186,42 +132,76 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // ── LIST CONVERSATIONS ──────────────────────────────
     if (action === 'list' && req.method === 'GET') {
-      const platform = req.query.platform as string || 'all';
-      const status = req.query.status as string || 'all';
-      const page = parseInt(req.query.page as string) || 0;
-      const size = parseInt(req.query.size as string) || 20;
+      const platform = str(req.query.platform) || 'all';
+      const filter = parseListFilter(str(req.query.view) || undefined, str(req.query.status) || undefined);
+      const size = Math.min(LIST_SIZE_MAX, Math.max(1, parseInt(str(req.query.size), 10) || LIST_SIZE_DEFAULT));
 
-      let allConversations: UnifiedConversation[] = [];
-      const errors: string[] = [];
-      const platformErrors: PlatformError[] = [];
-      const enabledPlatforms: string[] = [];
-      const promises: Promise<void>[] = [];
-
-      if (hasTrendyol && credential && (platform === 'all' || platform === 'trendyol')) {
-        enabledPlatforms.push('trendyol');
-        promises.push(
-          (async () => {
-            try {
-              const client = createTrendyolClient(credential);
-              const trendyolStatus = status === 'unanswered' ? 'WAITING_FOR_ANSWER' : status === 'answered' ? 'ANSWERED' : undefined;
-              const data = await client.getQuestions({ status: trendyolStatus, page, size });
-              const normalized = (data.content || []).map(normalizeTrendyolQuestion);
-              allConversations.push(...normalized);
-            } catch (e: any) {
-              const msg = e?.message || (e?.body ? JSON.stringify(e.body) : String(e));
-              logger.warn(`[MESSAGES] Trendyol list failed: ${msg}`);
-              const detail = `Trendyol: ${e?.status || ''} ${e?.body?.errors?.[0]?.message || e?.body?.rawError || msg}`.trim();
-              errors.push(detail);
-              platformErrors.push({ platform: 'trendyol', code: classifyPlatformError(e), detail });
-            }
-          })()
-        );
+      let cursor: InboxCursor;
+      if (str(req.query.cursor)) {
+        const decoded = decodeCursor(str(req.query.cursor));
+        if (!decoded) return res.status(400).json({ error: 'Invalid cursor', code: 'badCursor' });
+        cursor = decoded;
+      } else {
+        // Legacy `page` (Trendyol page number) still works; Wix starts at its first contacts page.
+        cursor = { t: Math.max(0, parseInt(str(req.query.page), 10) || 0), w: '' };
       }
 
-      if (hasWix && (platform === 'all' || platform === 'wix')) {
+      const wantTrendyol = hasTrendyol && !!credential && (platform === 'all' || platform === 'trendyol');
+      const wantWix = hasWix && (platform === 'all' || platform === 'wix');
+
+      const conversations: UnifiedConversation[] = [];
+      const errors: string[] = [];
+      const platformErrors: PlatformError[] = [];
+      const enabledPlatforms: MessagePlatform[] = [];
+      const next: InboxCursor = { t: null, w: null };
+      const promises: Promise<void>[] = [];
+
+      if (wantTrendyol) {
+        enabledPlatforms.push('trendyol');
+        const page = cursor.t;
+        if (page !== null) {
+          promises.push((async () => {
+            try {
+              const client = createTrendyolClient(credential!);
+              const data = await client.getQuestions({ status: trendyolStatusForFilter(filter), page, size });
+              const content: any[] = [...(data.content || [])];
+              next.t = nextTrendyolPage(page, data.totalPages, (data.content || []).length, size);
+
+              // Needs-reply views also list rejected answers (they need a new answer). First page only, best effort.
+              if (page === 0 && (filter === 'needs_reply' || filter === 'unread' || filter === 'unanswered')) {
+                try {
+                  const rejected = await client.getQuestions({ status: TRENDYOL_STATUS.rejected, page: 0, size });
+                  content.push(...(rejected.content || []));
+                } catch (e: any) {
+                  logger.warn(`[MESSAGES] Trendyol rejected list failed: ${e?.status || ''} ${e?.message || ''}`.trim());
+                }
+              }
+
+              const seen = new Set<string>();
+              const unique = content.filter((q) => { const id = String(q?.id ?? ''); if (!id || seen.has(id)) return false; seen.add(id); return true; });
+              const readRows = await inboxStore.findByExternalIds(userId, 'trendyol', unique.map((q) => String(q.id)));
+              const lastSeen = new Map(readRows.map((r) => [r.externalId, r.lastSeenAt]));
+              conversations.push(...unique.map((q) => normalizeTrendyolQuestion(q, lastSeen.get(String(q.id)) ?? null)));
+            } catch (e: any) {
+              const msg = errDetail(e);
+              logger.warn(`[MESSAGES] Trendyol list failed: ${e?.status || ''} ${msg}`.trim());
+              const detail = `Trendyol: ${e?.status || ''} ${msg}`.trim();
+              const code = classifyPlatformError(e);
+              errors.push(detail);
+              platformErrors.push({ platform: 'trendyol', code, detail });
+              // Transient failure: keep this page in the cursor so "Load more" retries it instead of
+              // treating Trendyol as exhausted. Auth/permission errors end pagination (retrying can't help).
+              if (code === 'rateLimited' || code === 'unavailable') next.t = page;
+            }
+          })());
+        }
+      }
+
+      if (wantWix) {
         enabledPlatforms.push('wix');
-        promises.push(
-          (async () => {
+        const wixCursor = cursor.w;
+        if (wixCursor !== null) {
+          promises.push((async () => {
             try {
               const client = buildWixClient();
               if (!client) {
@@ -230,9 +210,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 platformErrors.push({ platform: 'wix', code: 'credentials', detail });
                 return;
               }
-              const data = await client.listConversations({ limit: size });
-              const normalized = (data.conversations || []).map(normalizeWixConversation);
-              allConversations.push(...normalized);
+              const contactsData = await client.queryContacts({ limit: size, cursor: wixCursor || undefined });
+              const contacts: any[] = contactsData?.contacts || [];
+              const nextW = contactsData?.pagingMetadata?.cursors?.next;
+              next.w = typeof nextW === 'string' && nextW && contactsData?.pagingMetadata?.hasNext !== false ? nextW : null;
+
+              const { rows, failures, failureCode } = await enrichWixContacts({ client, store: inboxStore, userId, contacts });
+              conversations.push(...rows.map(({ row, contact }) => normalizeWixThread(row, contact)));
+              if (failures > 0 && failureCode) {
+                // Non-fatal: some contacts were skipped (or shown from a stale cache row). Surfacing it keeps
+                // the platform's previous rows listed on the client and shows the retry banner.
+                const detail = `Wix: ${failures} of ${contacts.length} conversations could not be loaded`;
+                logger.warn(`[MESSAGES] ${detail}`, { code: failureCode });
+                errors.push(detail);
+                platformErrors.push({ platform: 'wix', code: failureCode, detail, partial: true });
+              }
             } catch (e: any) {
               const msg = e?.message || String(e);
               logger.warn(`[MESSAGES] Wix list failed: ${msg}`);
@@ -243,38 +235,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 : `Wix: ${msg}`;
               errors.push(detail);
               platformErrors.push({ platform: 'wix', code, detail });
+              // Transient failure: retry the same Wix page on "Load more" (see Trendyol above).
+              if (code === 'rateLimited' || code === 'unavailable') next.w = wixCursor;
             }
-          })()
-        );
+          })());
+        }
       }
 
       await Promise.allSettled(promises);
 
-      // Filter by status if platform=all (individual platform calls already filter)
-      if (status !== 'all' && platform === 'all') {
-        allConversations = allConversations.filter(c => c.status === status);
-      }
-
-      // Sort by date descending
-      allConversations.sort((a, b) => new Date(b.lastMessageDate).getTime() - new Date(a.lastMessageDate).getTime());
-
-      const unansweredCount = allConversations.filter(c => c.status === 'unanswered').length;
+      const list = conversations.filter((c) => matchesFilter(c, filter)).sort(compareConversations);
 
       // Per-platform errors are always returned (not only when the list is empty), so a
       // failing platform is visible even while the other one still shows conversations.
-      const response: MessagesListResponse & {
-        errors: string[];
-        platformErrors: PlatformError[];
-        enabledPlatforms: string[];
-      } = {
-        conversations: allConversations,
-        totalCount: allConversations.length,
-        unansweredCount,
-        page,
+      const response: InboxListResponse = {
+        conversations: list,
+        totalCount: list.length,
+        unansweredCount: list.filter((c) => c.needsReply).length,
+        page: cursor.t ?? 0,
         pageSize: size,
+        nextCursor: encodeCursor(next),
         enabledPlatforms,
         errors,
         platformErrors,
+        fetchedAt: new Date().toISOString(),
+        readStateStore: inboxStore.kind,
       };
 
       return res.status(200).json(response);
@@ -282,8 +267,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // ── GET THREAD ──────────────────────────────────────
     if (action === 'thread' && req.method === 'GET') {
-      const platform = req.query.platform as string;
-      const conversationId = req.query.conversationId as string;
+      const platform = str(req.query.platform);
+      const conversationId = str(req.query.conversationId);
       if (!platform || !conversationId) {
         return res.status(400).json({ error: 'platform and conversationId are required' });
       }
@@ -294,20 +279,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const data = await client.getQuestions({ size: 50 });
         const question = (data.content || []).find((q: any) => String(q.id) === conversationId);
         if (!question) return res.status(404).json({ error: 'Question not found' });
-        return res.status(200).json(normalizeTrendyolQuestion(question));
+        const [row] = await inboxStore.findByExternalIds(userId, 'trendyol', [conversationId]);
+        return res.status(200).json(normalizeTrendyolQuestion(question, row?.lastSeenAt ?? null));
       }
 
       if (platform === 'wix') {
         const client = buildWixClient();
         if (!client) return res.status(400).json({ error: 'Wix credentials not configured' });
 
-        const msgData = await client.getConversationMessages(conversationId, { limit: 100 });
-        logger.info('[MESSAGES] Wix thread raw', { conversationId, msgCount: msgData?.messages?.length, keys: Object.keys(msgData || {}) });
-        const messages = (msgData.messages || []).map(normalizeWixMessage);
+        const msgData = await client.getConversationMessages(conversationId);
+        const raw: any[] = msgData?.messages || [];
+        const messages = raw.map(normalizeWixMessage);
+
+        // Keep the cache row in step with what the seller just saw (never creates a partial row).
+        const newest = newestWixMessage(raw);
+        if (newest.count > 0) {
+          await inboxStore.updateExisting(userId, 'wix', conversationId, {
+            lastMessageAt: newest.at ? new Date(newest.at) : null,
+            lastMessageText: newest.text,
+            lastFromCustomer: newest.fromCustomer,
+            needsReply: newest.fromCustomer === true,
+            messageCount: newest.count,
+          });
+        }
 
         return res.status(200).json({
           id: conversationId,
           platform: 'wix',
+          // The API returns newest first; the thread renders oldest first.
           messages: messages.reverse(),
         });
       }
@@ -317,58 +316,122 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // ── REPLY ───────────────────────────────────────────
     if (action === 'reply' && req.method === 'POST') {
-      const { platform, conversationId, questionId, text } = req.body;
-      if (!platform || !text) {
+      const { platform, conversationId, questionId } = req.body || {};
+      const text = typeof req.body?.text === 'string' ? req.body.text : '';
+      if (!platform || !text.trim()) {
         return res.status(400).json({ error: 'platform and text are required' });
       }
+      if (platform !== 'trendyol' && platform !== 'wix') return res.status(400).json({ error: 'Invalid platform' });
 
-      if (platform === 'trendyol') {
-        if (!questionId) return res.status(400).json({ error: 'questionId is required for Trendyol' });
-        if (!credential?.trendyolSupplierId) return res.status(400).json({ error: 'Trendyol credentials not configured' });
-        const client = createTrendyolClient(credential);
-        const data = await client.answerQuestion(questionId, text);
-        return res.status(200).json(data);
+      const invalid = validateReplyText(platform, text) || (platform === 'wix' && text.length > WIX_REPLY_MAX ? 'tooLong' : null);
+      if (invalid) {
+        return res.status(400).json({
+          error: invalid === 'tooShort' ? 'Answer is too short' : 'Answer is too long',
+          code: invalid,
+          min: platform === 'trendyol' ? TRENDYOL_ANSWER_MIN : 1,
+          max: platform === 'trendyol' ? TRENDYOL_ANSWER_MAX : WIX_REPLY_MAX,
+        });
       }
 
-      if (platform === 'wix') {
+      const now = new Date();
+      try {
+        if (platform === 'trendyol') {
+          if (!questionId) return res.status(400).json({ error: 'questionId is required for Trendyol' });
+          if (!credential?.trendyolSupplierId) return res.status(400).json({ error: 'Trendyol credentials not configured', code: 'auth' });
+          const client = createTrendyolClient(credential);
+          const data = await client.answerQuestion(String(questionId), text);
+          await inboxStore.upsert(userId, 'trendyol', String(questionId), {
+            needsReply: false, lastFromCustomer: false, lastMessageAt: now, lastSeenAt: now,
+          }).catch(() => undefined);
+          return res.status(200).json(data);
+        }
+
         if (!conversationId) return res.status(400).json({ error: 'conversationId is required for Wix' });
         const client = buildWixClient();
-        if (!client) return res.status(400).json({ error: 'Wix credentials not configured' });
-        const data = await client.sendMessage(conversationId, { text });
+        if (!client) return res.status(400).json({ error: 'Wix credentials not configured', code: 'auth' });
+        const data = await client.sendMessage(String(conversationId), { text });
+        await inboxStore.upsert(userId, 'wix', String(conversationId), {
+          needsReply: false, lastFromCustomer: false, lastMessageAt: now, lastSeenAt: now, lastMessageText: text,
+        }).catch(() => undefined);
         return res.status(200).json(data);
+      } catch (e: any) {
+        const code = classifyReplyError(e);
+        // No message text in logs (PII).
+        logger.warn(`[MESSAGES] ${platform} reply failed`, { code, status: e?.status });
+        return res.status(replyErrorStatus(code)).json({ error: errDetail(e) || 'Reply failed', code });
       }
+    }
 
-      return res.status(400).json({ error: 'Invalid platform' });
+    // ── MARK SEEN (read state) ──────────────────────────
+    if (action === 'markSeen' && req.method === 'POST') {
+      const { platform, id } = req.body || {};
+      const seen = req.body?.seen !== false;
+      if (!PLATFORMS.includes(platform) || typeof id !== 'string' || !id) {
+        return res.status(400).json({ error: 'platform and id are required' });
+      }
+      await inboxStore.upsert(userId, platform, id, { lastSeenAt: seen ? new Date() : null });
+      return res.status(204).end();
+    }
+
+    // ── PRODUCT CONTEXT (Trendyol, local DB only) ───────
+    if (action === 'productContext' && req.method === 'GET') {
+      const productMainId = str(req.query.productMainId);
+      if (!productMainId) return res.status(400).json({ error: 'productMainId is required' });
+      const p = await prisma.trendyolProduct.findFirst({
+        where: { userId, productMainId },
+        select: { title: true, barcode: true, salePrice: true, currencyType: true, quantity: true, onSale: true, thumbnailUrl: true },
+      });
+      const body: ProductContext = p
+        ? {
+          productMainId,
+          inCatalog: true,
+          title: p.title,
+          barcode: p.barcode,
+          salePrice: p.salePrice == null ? null : Number(p.salePrice),
+          currency: p.currencyType,
+          quantity: p.quantity ?? null,
+          onSale: p.onSale,
+          thumbnailUrl: p.thumbnailUrl ?? null,
+        }
+        : { productMainId, inCatalog: false };
+      return res.status(200).json(body);
     }
 
     // ── ORDER CONTEXT (Wix: customer's recent orders) ──
     if (action === 'orderContext' && req.method === 'GET') {
-      const contactId = req.query.contactId as string;
+      const contactId = str(req.query.contactId);
       if (!contactId) return res.status(400).json({ error: 'contactId is required' });
 
       const client = buildWixClient();
-      if (!client) return res.status(400).json({ error: 'Wix credentials not configured' });
+      if (!client) return res.status(400).json({ error: 'Wix credentials not configured', code: 'credentials' });
 
+      let orders;
       try {
-        const data = await client.searchOrders({ contactId, limit: 5 });
-        const orders = (data.orders || []).map((order: any) => ({
-          orderNumber: order.number || order._id,
-          status: order.status || order.fulfillmentStatus || 'UNKNOWN',
-          createdDate: order._createdDate || order.createdDate || '',
-          items: (order.lineItems || []).map((item: any) => ({
-            name: item.name || item.productName?.original || '',
-            imageUrl: item.image?.url || item.mediaItem?.url,
-            price: item.price?.formattedAmount || item.priceData?.price?.toString() || '0',
-            quantity: item.quantity || 1,
-          })),
-          total: order.priceSummary?.total?.formattedAmount || order.totals?.total?.toString() || '0',
-          currency: order.currency || order.priceSummary?.total?.currency || 'USD',
-        }));
-        return res.status(200).json({ orders });
+        const data = await client.searchOrders({ contactId, limit: ORDER_CONTEXT_LIMIT });
+        orders = sortOrdersNewestFirst((data.orders || []).map(normalizeWixOrder));
       } catch (e: any) {
-        logger.warn(`[MESSAGES] Order context failed: ${e?.message || e}`);
-        return res.status(200).json({ orders: [] });
+        const code = classifyPlatformError(e);
+        logger.warn(`[MESSAGES] Order context failed: ${e?.message || e}`, { code });
+        // D9: an error is not "no orders".
+        return res.status(502).json({ error: 'Could not load Wix orders', code });
       }
+
+      // Local join (kxOrderId, tracking, ship-by). VERIFY: Wix order.number === Order.orderNumber (lib/mappers/wix.ts).
+      const numbers = orders.map((o) => o.orderNumber).filter(Boolean);
+      if (numbers.length > 0) {
+        try {
+          const local = await prisma.order.findMany({
+            where: { userId, marketplace: 'Wix', orderNumber: { in: numbers } },
+            select: { id: true, orderNumber: true, trackingNumber: true, shipByAt: true, items: { select: { shipBy: true } } },
+          });
+          orders = joinLocalOrders(orders, local as LocalOrderRow[]);
+        } catch (e: any) {
+          logger.warn(`[MESSAGES] Order context local join failed: ${e?.message || e}`);
+        }
+        await inboxStore.updateByContact(userId, 'wix', contactId, { lastOrderNumber: orders[0].orderNumber }).catch(() => undefined);
+      }
+
+      return res.status(200).json({ orders });
     }
 
     return res.status(400).json({ error: `Unknown action: ${action}` });

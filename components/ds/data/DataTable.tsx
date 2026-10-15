@@ -2,8 +2,9 @@
 // Headless over MUI Table. ≥ 900px: table with sticky header, selection, sorting, typed/edit cells,
 // one inline action + ⋯, Columns menu, optional server pagination, caption. < 900px: the same rows and
 // columns render as cards through each column's `mobile` role. No virtualization (v1, max 250 rows).
-// M7-A adds `mode="grid"` on top of this file (BUILD_PLAN §3).
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+// `mode="grid"` (M7-A, bulk-grid.md §5.1) is the BulkGrid base: forced table layout, the host renders every
+// cell and adds the grid roles/handlers/frozen offsets through `grid`; list-mode keyboard and row-open are off.
+import { useEffect, useMemo, useRef, useState, type HTMLAttributes, type KeyboardEvent, type ReactNode } from 'react';
 import {
   Box, Button, Checkbox, Skeleton, Table, TableBody, TableCell, TableHead, TableRow, Typography, useMediaQuery,
 } from '@mui/material';
@@ -24,6 +25,37 @@ import type { ActionSpec, DsBaseProps } from './types';
 export type { Column, ColumnType, DataTablePagination, MobileRole, PageSize, Sort } from './dataTableParts';
 
 export type DataTableState = 'loading' | 'ready' | 'empty' | 'error';
+
+/** Context passed to the grid-mode cell hooks. `colIndex` counts visible data columns (no checkbox column). */
+export type DataTableGridCellCtx = { rowId: string; rowIndex: number; colIndex: number; selected: boolean };
+
+/** Attributes + `sx` merged onto a grid-mode cell (`sx` is spread after the base cell style). */
+export type DataTableGridCellProps = HTMLAttributes<HTMLTableCellElement> & { sx?: Record<string, unknown> } & Record<`data-${string}`, string | number | undefined>;
+
+/**
+ * `mode="grid"` hooks (BulkGrid only). DataTable keeps header, selection column, Columns menu, pagination,
+ * skeleton and the horizontal scroller; the host owns cell content, focus and keyboard.
+ */
+export interface DataTableGridMode<T> {
+  renderCell(col: Column<T>, row: T, ctx: DataTableGridCellCtx): ReactNode;
+  cellProps?(col: Column<T>, row: T, ctx: DataTableGridCellCtx): DataTableGridCellProps;
+  /** Extra sx for a header cell (frozen offset). */
+  headCellSx?(col: Column<T>, colIndex: number): Record<string, unknown> | undefined;
+  /** Extra sx for the checkbox column cells (header + body), e.g. sticky `left: 0`. */
+  selectCellSx?: Record<string, unknown>;
+  /** Spread on the `<table>` (role="grid", aria-rowcount, aria-colcount, ref-free attributes). */
+  tableProps?: HTMLAttributes<HTMLTableElement> & Record<`aria-${string}` | `data-${string}`, string | number | undefined>;
+  /** Spread on each body row (aria-rowindex…). */
+  rowProps?(row: T, rowIndex: number): HTMLAttributes<HTMLTableRowElement> & Record<`aria-${string}` | `data-${string}`, string | number | boolean | undefined>;
+  /** Handlers on the scroll container (keydown, paste, copy, focus, contextmenu). */
+  containerProps?: HTMLAttributes<HTMLDivElement>;
+  /** The scroll container element (BulkGrid queries its cells to move DOM focus). */
+  containerRef?: React.MutableRefObject<HTMLDivElement | null>;
+  /** Controlled column visibility, shared with the host so paste targets match what is on screen. */
+  visibility?: { hidden: Set<string>; toggle(key: string): void };
+  /** Called when the table scrolls horizontally away from / back to the left edge (frozen-column shadow). */
+  onHorizontalScroll?(scrolled: boolean): void;
+}
 
 export type DataTableProps<T> = DsBaseProps & {
   rows: T[];
@@ -69,6 +101,9 @@ export type DataTableProps<T> = DsBaseProps & {
   maxHeight?: number | string;
   /** Row whose panel is open (subtle highlight). */
   activeRowId?: string | null;
+  /** `grid` = BulkGrid base (requires `grid`). Default `list`. */
+  mode?: 'list' | 'grid';
+  grid?: DataTableGridMode<T>;
 };
 
 const SKELETON_DELAY = 200;
@@ -105,14 +140,16 @@ export function DataTable<T>(props: DataTableProps<T>) {
     rows, columns, getRowId, state, empty, error, loading, selection, isRowSelectable, onRowOpen, onRowEdit,
     inlineAction, rowActions, density = 'standard', sort, onSortChange, pagination, onCellCommit, dirtyCells,
     columnStateKey, caption, ariaLabel, layout: layoutMode = 'auto', stickyHeader = true, maxHeight, activeRowId,
-    className, 'data-testid': testId,
+    mode = 'list', grid: gridMode, className, 'data-testid': testId,
   } = props;
+  const grid = mode === 'grid' ? gridMode : undefined;
   const t = useTranslations('ds.table');
   const fmt = useDsFormat();
   const theme = useTheme();
   const isNarrow = useMediaQuery(theme.breakpoints.down('md'));
-  const cards = layoutMode === 'cards' || (layoutMode === 'auto' && isNarrow);
-  const { hidden, toggle } = useColumnVisibility(columnStateKey, columns);
+  const cards = !grid && (layoutMode === 'cards' || (layoutMode === 'auto' && isNarrow));
+  const ownVisibility = useColumnVisibility(columnStateKey, columns);
+  const { hidden, toggle } = grid?.visibility ?? ownVisibility;
   const showSkeleton = useDelayed(state === 'loading', SKELETON_DELAY);
 
   const desktopCols = useMemo(() => columns.filter(isDesktopColumn), [columns]);
@@ -163,6 +200,16 @@ export function DataTable<T>(props: DataTableProps<T>) {
     return () => ro.disconnect();
   }, [cards, maxHeight, visibleCols.length]);
 
+  const onHScroll = grid?.onHorizontalScroll;
+  useEffect(() => {
+    const el = scroller.current;
+    if (!onHScroll || !el) return;
+    let last = false;
+    const onScroll = () => { const now = el.scrollLeft > 0; if (now !== last) { last = now; onHScroll(now); } };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [onHScroll, cards, state]);
+
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     if (cards || !stickyHeader) return;
@@ -183,6 +230,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
 
   // Keyboard: j/k/↑/↓ move, x toggles, Enter opens, e edits, ⌘/Ctrl+A selects the page, Esc clears.
   const onBodyKeyDown = (e: KeyboardEvent<HTMLElement>) => {
+    if (grid) return; // the grid host owns the keyboard
     const target = e.target as HTMLElement;
     if (isTypingTarget(target)) return;
     const rowEl = target.closest<HTMLElement>('[data-row-id]');
@@ -210,6 +258,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
   useEffect(() => { if (anySelected) setSelectMode(true); }, [anySelected]);
 
   const onRowClick = (e: React.MouseEvent<HTMLElement>, row: T) => {
+    if (grid) return;
     const el = e.target as HTMLElement;
     if (el.closest('[data-row-stop],button,a,input,label')) return;
     if (cards && selection && selectMode) { toggleRow(getRowId(row)); return; }
@@ -449,7 +498,8 @@ export function DataTable<T>(props: DataTableProps<T>) {
     >
       {pageScrollSticky && <div ref={sentinel} aria-hidden style={{ height: 0 }} />}
       <Box
-        ref={scroller}
+        ref={(el: HTMLDivElement | null) => { scroller.current = el; if (grid?.containerRef) grid.containerRef.current = el; }}
+        {...(grid?.containerProps ?? {})}
         sx={{
           overflowX: scrollsX ? 'auto' : 'clip',
           ...(maxHeight !== undefined ? { maxHeight, overflowY: 'auto' } : {}),
@@ -458,6 +508,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
         <Table
           ref={tableRef}
           aria-label={ariaLabel}
+          {...(grid?.tableProps ?? {})}
           size="small"
           sx={{ borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'auto', width: '100%', '& caption': { captionSide: 'bottom' } }}
         >
@@ -467,7 +518,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
           <TableHead>
             <TableRow>
               {selection && (
-                <TableCell padding="checkbox" sx={{ ...headCellSx, width: px(40), px: px(space[1]) }}>
+                <TableCell padding="checkbox" sx={{ ...headCellSx, width: px(40), px: px(space[1]), ...(grid?.selectCellSx ?? {}), ...(grid && stickyHeader ? { zIndex: zIndex.stickyHeader + 1 } : {}) }}>
                   <Checkbox
                     size="small"
                     checked={allSelected}
@@ -478,7 +529,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
                   />
                 </TableCell>
               )}
-              {visibleCols.map((c) => {
+              {visibleCols.map((c, hi) => {
                 const active = sort?.key === c.key;
                 const dir = active ? sort?.dir : undefined;
                 const align = colAlign(c);
@@ -488,7 +539,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
                     key={c.key}
                     align={align}
                     aria-sort={c.sortable ? (dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : 'none') : undefined}
-                    sx={{ ...headCellSx, width: c.width, minWidth: c.minWidth }}
+                    sx={{ ...headCellSx, width: c.width, minWidth: c.minWidth, ...(grid?.headCellSx?.(c, hi) ?? {}) }}
                   >
                     {c.sortable && onSortChange ? (
                       <Box
@@ -540,7 +591,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
                 : (
                   <TableRow><TableCell colSpan={colCount} sx={{ ...bodyCellSx, borderBottom: 'none' }} /></TableRow>
                 ))
-              : rows.map((r) => {
+              : rows.map((r, ri) => {
                 const id = getRowId(r);
                 const selected = selectedSet.has(id);
                 const selectable = !isRowSelectable || isRowSelectable(r);
@@ -550,11 +601,12 @@ export function DataTable<T>(props: DataTableProps<T>) {
                   <TableRow
                     key={id}
                     data-row-id={id}
-                    tabIndex={onRowOpen || selection ? 0 : undefined}
+                    {...(grid?.rowProps?.(r, ri) ?? {})}
+                    tabIndex={!grid && (onRowOpen || selection) ? 0 : undefined}
                     aria-selected={selection ? selected : undefined}
                     onClick={(e) => onRowClick(e, r)}
                     sx={{
-                      cursor: onRowOpen ? 'pointer' : 'default',
+                      cursor: onRowOpen && !grid ? 'pointer' : 'default',
                       bgcolor: selected ? accent[50] : activeRowId === id ? n[50] : n[0],
                       transition: 'background-color 80ms linear',
                       '&:hover': { bgcolor: selected ? accent[100] : n[50] },
@@ -570,7 +622,11 @@ export function DataTable<T>(props: DataTableProps<T>) {
                       <TableCell
                         padding="checkbox"
                         data-row-stop="true"
-                        sx={{ ...bodyCellSx, px: px(space[1]), ...(selected ? { boxShadow: `inset 2px 0 0 ${accent[600]}` } : {}) }}
+                        sx={{
+                          ...bodyCellSx, px: px(space[1]),
+                          ...(grid ? { ...(grid.selectCellSx ?? {}), bgcolor: selected ? accent[50] : n[0] } : {}),
+                          ...(selected ? { boxShadow: `inset 2px 0 0 ${accent[600]}` } : {}),
+                        }}
                       >
                         <Checkbox
                           className="kx-sel"
@@ -583,6 +639,20 @@ export function DataTable<T>(props: DataTableProps<T>) {
                       </TableCell>
                     )}
                     {visibleCols.map((c, ci) => {
+                      if (grid) {
+                        const ctx = { rowId: id, rowIndex: ri, colIndex: ci, selected };
+                        const { sx: gridSx, ...attrs } = grid.cellProps?.(c, r, ctx) ?? {};
+                        return (
+                          <TableCell
+                            key={c.key}
+                            align={colAlign(c)}
+                            {...attrs}
+                            sx={{ ...bodyCellSx, ...(colAlign(c) === 'right' ? { fontVariantNumeric: 'tabular-nums' } : {}), ...(gridSx ?? {}) }}
+                          >
+                            {grid.renderCell(c, r, ctx)}
+                          </TableCell>
+                        );
+                      }
                       const dirty = !!dirtyCells?.has(cellKey(id, c.key));
                       const isEdit = c.type === 'money-edit' || c.type === 'int-edit';
                       const tip = !isEdit ? c.cellTooltip?.(r) : null;

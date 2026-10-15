@@ -3,9 +3,12 @@ import { getAuthUser } from '@/lib/auth';
 import prisma from '../../../lib/prisma';
 import { safeIsoDate, safeDate } from '../../../lib/utils/safeDate';
 import {
+  FAILED_LABEL_SQL,
   VIEW_COUNTS_FINGERPRINT_SQL,
   VIEW_COUNTS_SQL,
   effectiveShipBySortSql,
+  expandStatusFilter,
+  STATUS_FILTER_GROUPS,
   isOrderStatusFilterKey,
   isOrderViewKey,
   statusKeysWhereSql,
@@ -119,44 +122,10 @@ export function queryValues(value: string | string[] | undefined, splitComma = f
 }
 
 /**
- * Unified status-filter groups, matched against LOWER(o."status"). Statuses
- * are stored in whatever casing each mapper emits (Trendyol AWAITING_FULFILLMENT,
- * Amazon awaiting_shipment / pending, Shopify awaiting_shipment, Wix PAID,
- * eBay PAID, Etsy PAID …), so matching is case-insensitive.
- *
- * 'onaylandi' = live orders that still need fulfilment. Amazon 'pending' is a
- * live order (payment authorising; see commit a4acab0) and belongs here.
- * Genuinely unpaid states (awaiting_payment / pending_payment) are excluded
- * from /api/orders entirely and are deliberately NOT listed.
+ * Unified status-filter groups and their expansion live in lib/orders/views.ts (one list for
+ * Orders and Overview, CRITIQUE C4); re-exported here for existing importers (export.ts, tests).
  */
-export const STATUS_FILTER_GROUPS: Record<string, string[]> = {
-  onaylandi: [
-    'paid', 'created', 'approved', 'pending', 'new', 'open', 'processing',
-    'awaiting_fulfillment', 'awaiting_shipment', 'unshipped', 'unfulfilled',
-    'not_fulfilled', 'not_started', 'in_progress', 'picking', 'invoiced',
-    'ready_to_ship',
-    // Shopify financial_status values the mapper stores verbatim: an
-    // authorized payment (captured later) or a partial refund is still a live
-    // order that needs a label.
-    'authorized', 'partially_refunded',
-  ],
-  kargolandi: ['shipped', 'partially_shipped', 'shipping', 'in_transit', 'fulfilled'],
-  iptal: ['cancelled', 'canceled', 'refunded', 'returned', 'unfulfillable', 'voided'],
-  delivered: ['delivered', 'completed'],
-};
-
-/** Expand UI status filter values to the lowercase DB statuses they cover. */
-export function expandStatusFilter(values: string[]): string[] {
-  const out = new Set<string>();
-  for (const v of values) {
-    const key = v.trim().toLowerCase();
-    if (!key) continue;
-    const group = STATUS_FILTER_GROUPS[key];
-    if (group) group.forEach(s => out.add(s));
-    else out.add(key);
-  }
-  return Array.from(out);
-}
+export { STATUS_FILTER_GROUPS, expandStatusFilter };
 
 /** First value of a scalar query param (guards against `?x=a&x=b` arrays). */
 function firstQueryValue(value: string | string[] | undefined): string | undefined {
@@ -470,7 +439,10 @@ export default async function handler(
           )
         )`;
       } else if (labelStatus === 'failed') {
-        whereClause += ` AND o."labelStatus" = 'failed'`;
+        // Overview §4.3.2: nothing writes Order.labelStatus='failed', so the old clause matched no
+        // rows. A failed LabelJob in the last 14 days on a still-unlabeled order is the shared rule
+        // the Overview "label failed" count uses (lib/orders/views.ts FAILED_LABEL_SQL).
+        whereClause += ` AND ${FAILED_LABEL_SQL}`;
       }
     }
     if (serviceType) {

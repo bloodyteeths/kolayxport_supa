@@ -9,6 +9,16 @@ interface MessageCountFetchOptions {
 interface MessageCountState {
   counts: MessageCountsResponse;
   loading: boolean;
+  /**
+   * Client time (ms) of the last successful counts response; null until one arrives. Overview's "Needs reply"
+   * KPI shows it as `asOf` and renders only once it is set (overview §3.1, §4.4).
+   */
+  fetchedAt: number | null;
+  /**
+   * True when the latest settled request failed (network error, non-2xx or a malformed body). `counts` keeps the
+   * last good values for the badge, but a KPI must show `—`, never `0` (P6). Reset by the next success.
+   */
+  failed: boolean;
   fetch: (opts?: MessageCountFetchOptions) => Promise<void>;
   /** Optimistically decrement one platform's unread count (e.g. after answering). */
   decrement: (platform: 'wix' | 'trendyol') => void;
@@ -21,6 +31,8 @@ let latestRequestId = 0;
 const useMessageCountStore = create<MessageCountState>((set, get) => ({
   counts: { wix: 0, trendyol: 0, total: 0 },
   loading: false,
+  fetchedAt: null,
+  failed: false,
   fetch: async (opts) => {
     // setInterval may pass a non-object arg in some runtimes; only honour a real options object.
     const force = !!(opts && typeof opts === 'object' && opts.force);
@@ -29,12 +41,18 @@ const useMessageCountStore = create<MessageCountState>((set, get) => ({
     set({ loading: true });
     try {
       const res = await fetch('/api/messages?action=counts');
-      if (res.ok && requestId === latestRequestId) {
-        const data = await res.json();
-        if (data && typeof data.total === 'number') set({ counts: data });
+      if (requestId !== latestRequestId) return;
+      if (!res.ok) {
+        set({ failed: true });
+        return;
       }
+      const data = await res.json();
+      if (requestId !== latestRequestId) return;
+      if (data && typeof data.total === 'number') set({ counts: data, fetchedAt: Date.now(), failed: false });
+      else set({ failed: true });
     } catch {
-      // silently fail — badge just won't update
+      // The badge keeps its last value; consumers that show a number read `failed` (never a fake 0).
+      if (requestId === latestRequestId) set({ failed: true });
     } finally {
       if (requestId === latestRequestId) set({ loading: false });
     }

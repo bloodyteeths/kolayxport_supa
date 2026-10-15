@@ -8737,6 +8737,205 @@
       "credentials": "{name}: bağlantı bilgileri eksik. Ayarlar'ı kontrol edin.",
       "rateLimited": "{name}: şu anda çok fazla istek var. Birazdan tekrar deneyin.",
       "unavailable": "{name}: mesajlar şu anda yüklenemedi."
+    },
+    "saved": {
+      "button": "Hazır yanıtlar",
+      "search": "Hazır yanıtlarda ara",
+      "empty": "Henüz hazır yanıt yok",
+      "emptyBody": "Sık gönderdiğiniz yanıtları kaydedin, tek tıkla ekleyin.",
+      "noMatches": "Eşleşen hazır yanıt yok",
+      "loading": "Hazır yanıtlar yükleniyor…",
+      "loadError": "Hazır yanıtlar yüklenemedi",
+      "used": "{count} kez kullanıldı",
+      "saveCurrent": "Bu metni hazır yanıt olarak kaydet",
+      "manage": "Hazır yanıtları yönet",
+      "panelTitle": "Hazır yanıtlar",
+      "new": "Yeni yanıt",
+      "editTitle": "Düzenle: {name}",
+      "modalTitle": "Hazır yanıt olarak kaydet",
+      "fields": {
+        "title": "Ad",
+        "body": "Metin",
+        "platform": "Kullanım yeri",
+        "allStores": "Tüm mağazalar"
+      },
+      "insert": "Ekle:",
+      "var": {
+        "customer": "Müşteri adı",
+        "product": "Ürün",
+        "order": "Sipariş numarası"
+      },
+      "save": "Kaydet",
+      "saved": "Kaydedildi",
+      "delete": "Hazır yanıtı sil…",
+      "deleteTitle": "\"{name}\" hazır yanıtı silinsin mi?",
+      "errors": {
+        "duplicate": "Bu adla bir hazır yanıt zaten var",
+        "limit": "En fazla {max} hazır yanıt saklayabilirsiniz",
+        "tooLong": "Metin en fazla {max} karakter olabilir",
+        "titleTooLong": "Ad en fazla {max} karakter olabilir",
+        "titleRequired": "Bu yanıta bir ad verin",
+        "bodyRequired": "Yanıt metnini yazın",
+        "generic": "Yanıt kaydedilemedi. Tekrar deneyin.",
+        "deleteFailed": "Yanıt silinemedi. Tekrar deneyin."
+      },
+      "imported": "{count} hazır yanıt hesabınıza taşındı",
+      "notReady": "Bu tarayıcıdaki hazır yanıtlar gösteriliyor. Hesabınız güncellenirken düzenleme duraklatıldı.",
+      "notReadyShort": "Hesabınız güncellenirken düzenleme duraklatıldı"
+    },
+    "overflow": {
+      "manageSaved": "Hazır yanıtları yönet"
+    },
+    "cmd": {
+      "nextNeedsReply": "Yanıt bekleyen sonraki mesaja git"
+    },
+    "views": {
+      "needsReply": "Yanıt bekleyenler",
+      "unread": "Okunmamış",
+      "all": "Tümü"
+    },
+    "filters": {
+      "store": "Mağaza",
+      "storeAll": "Tümü"
+    },
+    "search": {
+      "placeholder": "İsim, mesaj veya ürün ara",
+      "loadedOnly": "Yüklenen {count} konuşmada aranıyor · Eskileri aramak için daha fazla yükleyin"
+    },
+    "list": {
+      "count": "{count} konuşma",
+      "loadMore": "Daha fazla yükle",
+      "customerFallback": "Müşteri",
+      "youPrefix": "Siz:",
+      "noText": "Mesaj metni yok",
+      "timeUnknown": "Zaman bilinmiyor",
+      "unreadLabel": "Okunmadı",
+      "regionLabel": "Konuşmalar"
+    },
+    "thread": {
+      "prev": "Önceki konuşma",
+      "next": "Sonraki konuşma",
+      "lastMessage": "Son mesaj {time}",
+      "asked": "{time} soruldu · herkese açık soru",
+      "nextUp": "Sıradaki: {name}",
+      "customer": "Müşteri",
+      "you": "Siz",
+      "markUnread": "Okunmadı olarak işaretle",
+      "viewOnTrendyol": "Trendyol'da görüntüle",
+      "empty": {
+        "title": "Henüz mesaj yok",
+        "body": "Bu müşteri size henüz yazmadı."
+      },
+      "error": {
+        "title": "Bu konuşma yüklenemedi"
+      },
+      "publicNote": "Trendyol yanıtları ürün sayfasında herkese açık gösterir. Yalnızca bir kez yanıt verebilirsiniz.",
+      "answered": "{date} tarihinde yanıtlandı. Trendyol her soruya tek yanıt verilmesine izin verir.",
+      "answeredNoDate": "Yanıtlandı. Trendyol her soruya tek yanıt verilmesine izin verir.",
+      "inReview": "Yanıtınız Trendyol onayını bekliyor.",
+      "rejected": "Trendyol yanıtınızı reddetti: {reason}. Yeniden yanıt verebilirsiniz.",
+      "rejectedNoReason": "Trendyol yanıtınızı reddetti. Yeniden yanıt verebilirsiniz.",
+      "cannotAnswer": "Bu soru buradan yanıtlanamaz."
+    },
+    "empty": {
+      "connect": {
+        "title": "Wix ve Trendyol müşterilerinizi tek yerden yanıtlayın",
+        "body": "Mesajları ve ürün sorularını burada görmek için bir mağaza bağlayın.",
+        "action": "Mağaza bağla"
+      },
+      "done": {
+        "title": "Tüm mesajlar yanıtlandı",
+        "body": "Yeni mesajlar 2 dakika içinde burada görünür."
+      },
+      "none": {
+        "title": "Henüz mesaj yok"
+      },
+      "noResults": {
+        "title": "Eşleşen konuşma yok",
+        "action": "Filtreleri temizle"
+      }
+    },
+    "error": {
+      "list": {
+        "title": "Mesajlar yüklenemedi"
+      }
+    },
+    "platformBanners": {
+      "permission": "Wix gelen kutusu erişimi eksik. Mesajlara izin vermek için Wix'i yeniden bağlayın.",
+      "auth": "{name} bağlantısının süresi doldu.",
+      "credentials": "{name} kurulumu eksik.",
+      "rateLimited": "{name} şu an yoğun. Önceki mesajlar gösteriliyor.",
+      "unavailable": "{name} mesajları yüklenemedi.",
+      "reconnect": "{name} hesabını yeniden bağla",
+      "finishSetup": "Kurulumu tamamla",
+      "retry": "Tekrar dene"
+    },
+    "composer": {
+      "errors": {
+        "tooLongReply": "Yanıt en fazla {max} karakter olabilir",
+        "empty": "Önce bir yanıt yazın",
+        "tooShort": "Cevap en az {min} karakter olmalı",
+        "tooLong": "Cevap en fazla {max} karakter olabilir",
+        "unfilled": "Göndermeden önce {tokens} alanını doldurun",
+        "alreadyAnswered": "Bu soru Trendyol'da zaten yanıtlanmış",
+        "auth": "{name} bağlantısının süresi doldu. Metniniz korundu.",
+        "generic": "Gönderilemedi. Metniniz korundu."
+      },
+      "labelReply": "Yanıt",
+      "labelAnswer": "Cevap",
+      "placeholderWix": "{name} için bir yanıt yazın",
+      "placeholderTrendyol": "Cevabınızı yazın",
+      "sendReply": "Yanıtı gönder",
+      "sendAnswer": "Cevabı gönder",
+      "sending": "Gönderiliyor…",
+      "shortcut": "Göndermek için {keys}",
+      "focusShortcut": "Yanıt yaz",
+      "reconnect": "{name} hesabını yeniden bağla",
+      "discard": {
+        "title": "Gönderilmemiş yanıtınız silinsin mi?",
+        "confirm": "Sil",
+        "keep": "Düzenlemeye devam et"
+      }
+    },
+    "ai": {
+      "draft": "AI ile taslak yaz",
+      "redo": "Başka bir taslak dene",
+      "drafting": "Taslak yazılıyor…",
+      "note": "AI taslağı · göndermeden önce bilgileri kontrol edin",
+      "missing": "AI'da olmayan bilgi: {items}",
+      "missingItem": {
+        "tracking": "takip numarası",
+        "order": "sipariş bilgisi",
+        "stock": "stok durumu",
+        "delivery": "teslim tarihi",
+        "size": "ürün ölçüsü",
+        "policy": "mağaza politikası"
+      },
+      "failed": "Yanıt taslağı oluşturulamadı. Tekrar deneyin.",
+      "replace": {
+        "title": "Metniniz AI taslağıyla değiştirilsin mi?",
+        "confirm": "Değiştir"
+      }
+    },
+    "context": {
+      "title": "Müşteri ve siparişler",
+      "customer": "Müşteri",
+      "email": "E-posta",
+      "orders": "Siparişler",
+      "summary": "{count} sipariş · {latest}",
+      "noOrders": "Bu müşteriden sipariş yok",
+      "ordersError": "Wix siparişleri yüklenemedi",
+      "openOrder": "Siparişi aç",
+      "tracking": "Takip numarası",
+      "moreItems": "+{count} ürün daha",
+      "product": "Ürün",
+      "price": "Fiyat",
+      "stock": "Stok",
+      "barcode": "Barkod",
+      "openListing": "İlanı aç",
+      "notInCatalog": "Bu ürün henüz KolayXport'ta yok. Fiyat ve stok için Trendyol ürünlerini yenileyin.",
+      "productError": "Ürün bilgileri yüklenemedi",
+      "otherQuestions": "Bu ürünle ilgili {count} soru daha"
     }
   },
   "errors": {
@@ -11564,6 +11763,15 @@
       "clearWithKey": "Temizle (Esc)",
       "selectAllInView": "Bu görünümdeki {count, number} öğenin tümünü seç",
       "selectOnlyPage": "Yalnızca bu {count, number} öğeyi seç"
+    },
+    "grid": {
+      "counter": "{value}/{max}",
+      "tooLong": "En fazla {max} karakter kullanın (şu an {length})",
+      "noOption": "“{value}” seçeneklerden biri değil",
+      "revert": "Geri al",
+      "readOnly": "Salt okunur: {reason}",
+      "invalid": "Kaydedilemiyor: {reason}",
+      "edited": "Düzenlendi, gönderilmedi"
     }
   },
   "status": {
@@ -13838,6 +14046,485 @@
       "emptyBody": "Bir ilanın etiketlerini, detaylarını veya kargo bilgisini profil olarak kaydedin, yeni ilanları tek tıkla doldurun",
       "draftOnly": "Uygulamak yalnızca taslağı doldurur. Hemen ardından geri alabilirsiniz",
       "storageFailed": "Bu cihaza kaydedilemedi. Tarayıcının site depolamasına izin verdiğini kontrol edin"
+    }
+  },
+  "bulk": {
+    "paste": {
+      "colOverflow": "{count} sütun sığmadı ve yapıştırılmadı",
+      "skippedReason": "{count} hücre atlandı: {reason}",
+      "unchanged": "{count} hücre zaten bu değere sahipti",
+      "result": "{rows} satır × {cols} sütun yapıştırıldı · {edits} düzenleme{invalid, plural, =0 {} other { · # geçersiz}}{skipped, plural, =0 {} other { · # atlandı}}",
+      "notRect": "Kopyalanan hücreler dikdörtgen değil (satır uzunlukları farklı). Bir hücre bloğu kopyalayıp tekrar yapıştırın.",
+      "readOnlyColumn": "{column} sütununa yapıştırılamaz. Yapıştırmaya düzenlenebilir bir sütundan başlayın.",
+      "overflow": "{count} satır bu sayfaya sığmadı",
+      "saved": "Kaydedildi · {listings} ilan, {edits} düzenleme gönderilmedi"
+    },
+    "invalid": {
+      "currency": "Para birimi bu mağazayla eşleşmiyor ({currency})",
+      "enterValue": "Bir değer girin",
+      "banner": "{count} düzenleme kaydedilemiyor: {reason}",
+      "show": "Göster"
+    },
+    "fill": {
+      "done": "{count} hücre dolduruldu",
+      "confirmTags": "{count} ilandaki etiketler bu {tags} etiketle değiştirilsin mi?"
+    },
+    "revert": {
+      "cell": "Hücreyi geri al",
+      "row": "Satırı geri al",
+      "selected": "Seçili satırları geri al",
+      "failed": "{count} ilan geri alınamadı"
+    },
+    "shortcuts": {
+      "noUndo": "Geri alma yok. {on} değerine dönmek için Hücreyi geri al’ı (⌥⌫) kullanın.",
+      "save": "Düzenlemeleri şimdi kaydet"
+    },
+    "stage": {
+      "invalidRequest": "Bu değişiklik kaydedilemedi. Sayfayı yenileyip tekrar deneyin.",
+      "tooMany": "Tek seferde en fazla {max} ilan kaydedilebilir.",
+      "fieldNotEditable": "\"{field}\" toplu tabloda düzenlenemez.",
+      "duplicate": "Bu ilan aynı kayıtta iki kez var. Yalnızca ilki kaydedildi.",
+      "empty": "Bu ilan için kaydedilecek bir değişiklik yok.",
+      "budget": "Etsy günlük limitine yaklaşıldı. {minutes} dk sonra tekrar deneyin.",
+      "invalidItem": "Bu ilan okunamadı. Sayfayı yenileyip tekrar deneyin.",
+      "deleteQueued": "Bu ilan silinmek üzere bekliyor. Düzenlemeden önce sıradaki silme işlemini kaldırın.",
+      "priceFormat": "Fiyatı 12.50 gibi girin (en fazla 2 ondalık).",
+      "quantityRange": "{min} ile {max} arasında bir tam sayı girin.",
+      "idInvalid": "\"{field}\" için geçerli bir seçenek gerekli. Listeden seçin."
+    },
+    "title": "Toplu düzenleme",
+    "back": "{marketplace} ilanları",
+    "meta": {
+      "counts": "{listings} ilan · {edits} düzenleme gönderilmedi",
+      "saving": "Kaydediliyor {done} / {total}…",
+      "saved": "{time} kaydedildi",
+      "allSent": "Her şey {to} gönderildi"
+    },
+    "discardAll": {
+      "cta": "Tüm düzenlemeleri at",
+      "confirm": "{listings} ilandaki {edits} düzenleme atılsın mı? Toplu düzenleyici dışında yapılan düzenlemeler kalır.",
+      "done": "{count} düzenleme atıldı",
+      "kept": "{count} düzenleme korundu: alanda daha önceden gönderilmemiş bir değişiklik vardı. Kaldırmak için hücreyi geri alın."
+    },
+    "section": {
+      "set": "Bölüm ata…",
+      "title": "Bölüm ata",
+      "pick": "Bir bölüm seçin",
+      "stage": "{count} değişikliği hazırla"
+    },
+    "tools": {
+      "exportRows": "Bu satırları dışa aktar (CSV)",
+      "findReplaceIds": "Bul ve değiştir filtrelenmiş bir görünümde çalışır. Kullanmak için toplu düzenleyiciyi bir görünümden açın."
+    },
+    "filter": {
+      "placeholder": "Bu tablodaki satırları filtrele"
+    },
+    "show": {
+      "label": "Göster",
+      "all": "Tümü",
+      "edited": "Düzenlenen",
+      "invalid": "Kaydedilemeyen"
+    },
+    "rows": "{count} satır · sayfa {page} / {pages}",
+    "col": {
+      "title": "Başlık",
+      "price": "Fiyat",
+      "qty": "Adet",
+      "section": "Bölüm",
+      "health": "Sağlık",
+      "photos": "Fotoğraflar",
+      "status": "Durum",
+      "changes": "Değişiklik"
+    },
+    "readOnly": {
+      "variations": "Varyasyonlu: Fiyatı değiştir'i kullanın veya düzenleyicide varyasyon bazında düzenleyin",
+      "stockManaged": "Bu adedi stok senkronu yönetiyor ({qty})",
+      "notEditable": "{marketplace} için henüz düzenlenemiyor",
+      "sending": "{to} gönderiliyor…"
+    },
+    "stageFailed": {
+      "banner": "{count} ilan kaydedilemedi"
+    },
+    "conflict": {
+      "banner": "{count} ilan, taslağınızdan sonra {on} üzerinde değişti. Farkları inceleyene kadar gönderimde atlanır."
+    },
+    "send": {
+      "confirm": "{count} değişiklik {to} gönderilsin mi? Canlı ilanlar güncellenir."
+    },
+    "photos": {
+      "edit": "Fotoğrafları düzenle…",
+      "editPro": "Fotoğrafları düzenle… (Pro)"
+    },
+    "delete": {
+      "cta": "{count} ilanı sil…",
+      "skippedEdited": "Gönderilmemiş düzenlemesi olan {count} ilan atlandı. Önce bu düzenlemeleri gönderin veya atın."
+    },
+    "leaveSaving": "Bazı düzenlemeler hâlâ kaydediliyor. Yine de çıkılsın mı?",
+    "mobile": {
+      "title": "Toplu düzenleyici daha büyük bir ekranda çalışır",
+      "body": "Telefonunuzda ilan seçim çubuğundaki Fiyatı değiştir ve Etiket ekle'yi kullanın."
+    },
+    "error": {
+      "load": "Bu ilanlar yüklenemedi"
+    },
+    "empty": {
+      "title": "Düzenlenecek ilan yok"
+    },
+    "ai": {
+      "suggestion": "AI önerisi · Sizinkini korumak için geri alın",
+      "action": "AI ile iyileştir",
+      "progress": "İyileştiriliyor {done} / {total}…",
+      "unusable": "{count} ilan için kullanılabilir öneri gelmedi",
+      "cost": "{count} kredi",
+      "cancel": "Durdur",
+      "cancelled": "Durduruldu · {count} ilan iyileştirildi",
+      "done": "{count} ilan iyileştirildi · henüz gönderilmedi",
+      "nothingNew": "AI yeni bir öneri bulamadı",
+      "failed": "AI bu ilanları iyileştiremedi. Tekrar deneyin.",
+      "failedCount": "{count} ilan iyileştirilemedi",
+      "limitReached": "Planınızdaki tüm AI kredilerini kullandınız"
+    }
+  },
+  "photoStudio": {
+    "stageWithCredits": "{stage} · {credits}",
+    "full": "{count} ilanda zaten 20 fotoğraf var",
+    "title": "Fotoğraf stüdyosu",
+    "back": "Geri",
+    "tabs": {
+      "photos": "Fotoğraflar",
+      "video": "Video"
+    },
+    "meta": "{listings} ilan · burada {count} fotoğraf değişikliği hazırlandı · henüz gönderilmedi",
+    "progress": "Hazırlanıyor {done} / {total}…",
+    "stage": "{count} fotoğraf değişikliğini hazırla",
+    "appliesTo": "Seçili {count} ilana uygulanır",
+    "summary": "{listings} ilanda {changes} değişiklik",
+    "credits": "{count} kredi",
+    "skipped": "{count} ilan atlandı: {reason}",
+    "capped": "Yalnızca ilk {cap} AI değişikliği çalıştı. Kalanlar için tekrar çalıştırın.",
+    "aiCredits": "Bu dönem için AI krediniz bitti. AI kullanmayan değişiklikler çalışmaya devam eder.",
+    "mobileTitle": "Fotoğraf stüdyosu daha büyük bir ekranda çalışır",
+    "mobile": "Fotoğrafları düzenleyicide ilan ilan ekleyin",
+    "noMatch": "Bu filtreye uyan ilan yok",
+    "selectAll": "Tümünü seç",
+    "footer": "{from}–{to} / {total}",
+    "op": {
+      "label": "İşlem",
+      "position": "konum",
+      "from": "şu konumdan",
+      "moveTo": "şu konuma",
+      "source": "kaynak",
+      "add": "Ekle",
+      "replace": "Değiştir",
+      "delete": "Sil",
+      "move": "Taşı",
+      "alt": "Alt metin",
+      "enhance": "Kaliteyi iyileştir",
+      "removeBg": "Arka planı kaldır",
+      "copy": "Şuradan kopyala…",
+      "chooseFiles": "Dosya seç…",
+      "filesChosen": "{count} dosya",
+      "clearFiles": "Temizle",
+      "urlPlaceholder": "https://… görsel linki",
+      "prompt": "Oluşturulacak fotoğrafı tarif edin",
+      "promptTweak": "Ek talimat (isteğe bağlı)",
+      "altAi": "AI ile yaz",
+      "altManual": "Kendim yazayım",
+      "altAll": "Tüm fotoğraflar",
+      "altPlaceholder": "Bu fotoğraflar için alt metin",
+      "copyFrom": "Fotoğrafları şuradan kopyala",
+      "copyFromPlaceholder": "Bir ilan seçin"
+    },
+    "source": {
+      "upload": "Yükle",
+      "ai": "AI ile oluştur",
+      "url": "Görsel linki"
+    },
+    "position": {
+      "end": "Sona"
+    },
+    "filter": {
+      "label": "Göster",
+      "placeholder": "İlanları filtrele",
+      "all": "Tümü",
+      "noPhotos": "Fotoğrafsız",
+      "lt5": "5'ten az",
+      "missingAlt": "Alt metni eksik"
+    },
+    "blocker": {
+      "noSelection": "Önce ilan seçin",
+      "chooseFiles": "Önce dosya seçin",
+      "chooseVideo": "Önce bir video seçin",
+      "enterUrl": "Önce bir https linki girin",
+      "enterAlt": "Önce alt metni yazın",
+      "pickCopySource": "Kopyalanacak ilanı seçin",
+      "nothing": "Seçili ilanlarda değişecek bir şey yok",
+      "running": "Mevcut değişikliklerin bitmesini bekleyin"
+    },
+    "skip": {
+      "notLoaded": "fotoğraflar hâlâ yükleniyor",
+      "queuedDelete": "ilan silme işlemi sırada",
+      "sending": "Etsy'ye gönderiliyor",
+      "full": "zaten 20 fotoğraf var",
+      "noPhotoAtPosition": "bu konumda fotoğraf yok",
+      "lastPhoto": "Etsy en az 1 fotoğraf ister",
+      "pendingPhoto": "yeni fotoğraflar Etsy'ye gidene kadar yerinde kalır",
+      "samePosition": "zaten bu konumda",
+      "noVideo": "video yok",
+      "hasVideo": "zaten bir videosu var",
+      "isSource": "kopyalanan ilanın kendisi",
+      "nothingToCopy": "kaynak ilanda fotoğraf yok",
+      "noAltNeeded": "alt metin zaten aynı"
+    },
+    "result": {
+      "staged": "{count} değişiklik taslaklarınıza kaydedildi · henüz gönderilmedi",
+      "partial": "{staged} kaydedildi · {failed} ilan başarısız",
+      "none": "Hiçbir şey değişmedi",
+      "aiUnusable": "{count} AI sonucu kullanılamadı"
+    },
+    "tile": {
+      "staged": "Taslağınıza kaydedildi · henüz gönderilmedi"
+    },
+    "failures": {
+      "banner": "{count} ilan güncellenemedi"
+    },
+    "failure": {
+      "generic": "Değişiklik kaydedilemedi. Tekrar deneyin."
+    },
+    "confirmDelete": {
+      "title": "{count} ilanda {position}. fotoğraf silinsin mi?",
+      "body": "Değişiklikleri gönderene kadar Etsy'de hiçbir şey değişmez."
+    },
+    "row": {
+      "select": "{title} seç",
+      "count": "{count} / {max}",
+      "needAlt": "{count} fotoğrafın alt metni eksik",
+      "willRemove": "{count} kaldırılacak",
+      "ai": "{count} AI",
+      "noPhotos": "Henüz fotoğraf yok",
+      "loadFailed": "Fotoğraflar yüklenemedi",
+      "queuedDelete": "İlan silme sırada: fotoğraflar olduğu gibi kalır",
+      "sending": "Etsy'ye gönderiliyor…"
+    },
+    "empty": {
+      "title": "Düzenlenecek ilan yok",
+      "body": "İlanlar sayfasında ilan seçip fotoğraf stüdyosunu açın.",
+      "back": "İlanlara dön"
+    },
+    "error": {
+      "load": "Bu ilanlar yüklenemedi"
+    },
+    "video": {
+      "add": "Seçililere video ekle",
+      "remove": "Seçililerden videoyu kaldır",
+      "stage": "{count} video değişikliğini hazırla",
+      "sourceUrl": "Video linki",
+      "urlPlaceholder": "https://… video linki",
+      "chooseFile": "Video seç…",
+      "rejected": "100 MB'a kadar MP4, WebM veya MOV video seçin",
+      "none": "Video yok",
+      "onEtsy": "Etsy'de video var",
+      "processing": "Etsy videoyu işliyor",
+      "willAdd": "Değişiklikleri gönderdiğinizde video eklenir",
+      "willRemove": "Değişiklikleri gönderdiğinizde kaldırılır",
+      "addOne": "Video ekle",
+      "removeOne": "Videoyu kaldır",
+      "confirmRemove": "{count} ilandan video kaldırılsın mı?"
+    }
+  },
+  "overview": {
+    "toast": {
+      "refreshed": "Siparişler yenilendi",
+      "refreshFailed": "Siparişler yenilenemedi",
+      "refreshTooSoon": "Siparişler az önce yenilendi, bir dakika sonra tekrar deneyin",
+      "refreshNothingToSync": "Bağlı kaynaklarınızdan yenilenecek bir şey yok",
+      "openConnections": "Bağlantıları aç",
+      "refreshNoStores": "Siparişleri yenilemek için bir mağaza bağlayın"
+    },
+    "actions": {
+      "goToOrdersCount": "Siparişlere git ({count})",
+      "addManualOrder": "Manuel sipariş ekle",
+      "connectStore": "Mağaza bağla",
+      "goToOrders": "Siparişlere git",
+      "newListing": "Yeni ilan",
+      "refreshOrders": "Siparişleri yenile",
+      "reports": "Raporlar",
+      "research": "Pazar araştırması"
+    },
+    "attention": {
+      "count": "{count} öğe ilgi bekliyor",
+      "paused": {
+        "titleOrderSync": "Sipariş senkronu durduruldu",
+        "titleLabels": "Etiket oluşturma durduruldu",
+        "limitReason": "{reason, select, trial {Deneme limitlerine ulaşıldı} other {Plan limitlerine ulaşıldı}}",
+        "cta": "Planları gör",
+        "reason": "{reason, select, trial {Deneme süreniz bitti} noSubscription {Aktif plan yok} planLimit {Plan limitine ulaşıldı} invalidPlan {Planınızla ilgili bir sorun var} other {Plan sorunu}}",
+        "supportCta": "Destekle iletişime geç",
+        "title": "Sipariş senkronu ve etiketler durduruldu"
+      },
+      "checkFailed": "{sections} kontrol edilemedi",
+      "conflict": {
+        "cta": "İncele",
+        "detail": "Taslağınızdan sonra {marketplace}'de değişti",
+        "title": "{count} ilan taslağınızdan sonra {marketplace}'de değişti"
+      },
+      "doneBody": "Şu anda ilgilenmeniz gereken bir şey yok.",
+      "doneTitle": "Her şey yolunda",
+      "doneWithErrors": "Başka bir şey yok · {count} kontrol başarısız oldu",
+      "health": {
+        "cta": "İlan doktorunu aç",
+        "ctaLegacy": "İlanları göster",
+        "title": "50'nin altında {count} ilan"
+      },
+      "labelsFailed": {
+        "cta": "İncele",
+        "title": "{count} etiket oluşturulamadı"
+      },
+      "loadFailed": "Genel bakış yüklenemedi",
+      "more": "+{count} tane daha",
+      "noOrdersBody": "Bağlı mağazalarınızdaki siparişleri getirin.",
+      "noOrdersTitle": "Henüz sipariş yok",
+      "notConnectedTitle": "Neyle ilgilenmeniz gerektiğini görmek için bir mağaza bağlayın",
+      "notSent": {
+        "cta": "İncele ve gönder",
+        "title": "{count} ilanda {marketplace}'e gönderilmemiş değişiklik var"
+      },
+      "overdue": {
+        "cta": "Etiket oluştur",
+        "title": "{count} sipariş gecikti"
+      },
+      "reconnect": {
+        "cta": "{provider} bağlantısını yenile"
+      },
+      "refreshOrders": "Siparişleri yenile",
+      "sendFailed": {
+        "cta": "Aç",
+        "title": "{count} ilan {marketplace}'e gönderilemedi"
+      },
+      "showLess": "Daha az göster",
+      "showMore": "{count} tane daha göster",
+      "syncFailing": {
+        "cta": "Görüntüle"
+      },
+      "title": "İlgilenmeniz gerekenler",
+      "tracking": {
+        "cta": "İncele",
+        "detail": "Etiket oluşturuldu, takip numarası Etsy'ye gönderilmedi",
+        "setupCta": "Eklentiyi kur",
+        "title": "{count} Etsy siparişi"
+      },
+      "trialEnds": "Deneme süresi {days} gün içinde bitiyor",
+      "usage": {
+        "cta": "Planları gör",
+        "detail": "{kind, select, orderSync {Sipariş senkronu} other {Etiket}}: {limit} hakkın {used} tanesi kullanıldı"
+      }
+    },
+    "best": {
+      "colProduct": "Ürün",
+      "colUnits": "Adet",
+      "empty": "Son 7 günde satış yok",
+      "loadFailed": "En çok satanlar yüklenemedi",
+      "source": "Siparişler · SKU'ya göre · siparişteki adet, ilan satışı değil",
+      "title": "En çok satanlar (7 gün)",
+      "units": "{count} adet"
+    },
+    "chart": {
+      "empty": "Son 14 günde sipariş yok",
+      "loadFailed": "Sipariş grafiği yüklenemedi",
+      "source": "Siparişler · sipariş tarihine göre · {tz}",
+      "title": "Siparişler, son 14 gün",
+      "total": "{count} sipariş",
+      "vsPrev14": "önceki 14 güne göre"
+    },
+    "greeting": {
+      "afternoon": "İyi günler, {name}",
+      "afternoonNoName": "İyi günler",
+      "evening": "İyi akşamlar, {name}",
+      "eveningNoName": "İyi akşamlar",
+      "morning": "Günaydın, {name}",
+      "morningNoName": "Günaydın"
+    },
+    "kpi": {
+      "dueToday": "{count} tanesi bugün gönderilmeli",
+      "fxExcluded": "Dahil edilmedi: {list}",
+      "fxExcludedItem": "{currency} ({count} sipariş)",
+      "fxNote": "exchangerate-api.com kurlarıyla çevrildi, {date}",
+      "fxStale": "Kurlar güncel olmayabilir",
+      "loadFailed": "Yüklenemedi · Tekrar dene",
+      "messagesFailed": "Mesajlar kontrol edilemedi",
+      "needsReply": "Yanıt bekleyen",
+      "new": "Yeni",
+      "noneOverdue": "Yok",
+      "orders7d": "Siparişler (7 gün)",
+      "overdue": "Geciken",
+      "revenue7d": "Ciro (7 gün)",
+      "sourceMessages": "Mesajlar",
+      "sourceOrders": "Siparişler",
+      "sourceOrdersFx": "Siparişler · Kur",
+      "toShip": "Gönderilecek",
+      "vsPrev7": "önceki 7 güne göre",
+      "withoutShipBy": "{count} tanesinin son gönderim tarihi yok"
+    },
+    "meta": {
+      "ordersNeverRefreshed": "Siparişler henüz yenilenmedi",
+      "ordersRefreshed": "Siparişler {time} yenilendi",
+      "refreshPaused": "Sipariş senkronu durduruldu: planlara göz atın",
+      "refreshPausedSupport": "Sipariş senkronu durduruldu: destekle iletişime geçin",
+      "refreshQuota": "{limit} sipariş senkronu hakkınızdan 1 tanesini kullanır ({used} kullanıldı)",
+      "refreshing": "Siparişler yenileniyor…",
+      "updated": "{time} güncellendi"
+    },
+    "pageTitle": "Genel bakış",
+    "reason": {
+      "incomplete_credentials": "Bilgiler eksik",
+      "missing_refresh_token": "Yetkilendirme eksik",
+      "reauth_required": "Erişim iptal edildi",
+      "refresh_token_expired": "Yetki süresi doldu",
+      "token_expired_no_refresh": "Erişim süresi doldu"
+    },
+    "section": {
+      "sources": {
+        "drafts": "ilan taslakları",
+        "labels": "etiket hataları",
+        "listingHealth": "ilan sağlığı",
+        "toShip": "gönderilecek siparişler",
+        "tracking": "takip numaraları",
+        "usage": "plan kullanımı"
+      }
+    },
+    "setup": {
+      "connect": {
+        "desc": "Siparişleri ve ilanları getirmek için Etsy, eBay, Amazon, Shopify, Wix veya Trendyol bağlayın.",
+        "doneDesc": "{name} bağlandı",
+        "title": "Mağaza bağlayın"
+      },
+      "hide": "Kurulumu gizle",
+      "label": {
+        "ctaCarrier": "Kargo firması bağla",
+        "ctaCreate": "Etiket oluştur",
+        "descNoCarrier": "Önce FedEx, UPS veya DHL eCommerce bağlayın.",
+        "descNoOrders": "Önce siparişlerinizi getirin.",
+        "descReady": "Bir sipariş seçin ve etiketini oluşturun.",
+        "title": "İlk etiketinizi oluşturun"
+      },
+      "progress": "{total} adımdan {done} tamamlandı",
+      "quota": "{limit} sipariş senkronu hakkınızdan 1 tanesini kullanır.",
+      "sender": {
+        "cta": "Adres ekle",
+        "desc": "Her etikette iade adresi olarak basılır.",
+        "title": "Gönderici adresinizi girin"
+      },
+      "title": "Başlayın"
+    },
+    "stores": {
+      "connect": "Mağaza bağla",
+      "manage": "Mağazaları yönet",
+      "refreshed": "{time} yenilendi",
+      "title": "Mağazalar"
+    },
+    "subscriptionActivated": "Aboneliğiniz aktif",
+    "subtitle": {
+      "allStores": "Tüm mağazalar"
     }
   }
 }

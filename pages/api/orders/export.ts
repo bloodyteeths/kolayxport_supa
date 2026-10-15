@@ -5,6 +5,7 @@ import { logger } from '@/lib/logger';
 import { safeDate, safeIsoDate } from '@/lib/utils/safeDate';
 import { queryValues, expandStatusFilter } from './index';
 import { parseIds } from './print-data';
+import { FAILED_LABEL_SQL } from '@/lib/orders/views';
 import {
   EXPORT_MAX_ORDERS,
   isExportFormat,
@@ -139,7 +140,8 @@ export function buildFilterSql(userId: string, q: Query): { where: string; param
   const labelStatus = first(q.labelStatus);
   if (labelStatus === 'created') where += ` AND ${LIST_LABELED_SQL}`;
   else if (labelStatus === 'not_created') where += ` AND ${LIST_UNLABELED_SQL}`;
-  else if (labelStatus === 'failed') where += ` AND o."labelStatus" = 'failed'`;
+  // Same clause as /api/orders?labelStatus=failed so the list and "Export all matching filters" agree.
+  else if (labelStatus === 'failed') where += ` AND ${FAILED_LABEL_SQL}`;
 
   const labelFilter = first(q.labelFilter);
   if (labelFilter === 'labeled') where += ` AND ${LIST_LABELED_SQL}`;

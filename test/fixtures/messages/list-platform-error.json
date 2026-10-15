@@ -1,0 +1,16 @@
+{
+  "conversations": [],
+  "totalCount": 0,
+  "unansweredCount": 0,
+  "page": 0,
+  "pageSize": 30,
+  "nextCursor": null,
+  "enabledPlatforms": ["trendyol", "wix"],
+  "errors": ["Wix: Inbox permission missing (403) — app version lacks Inbox scope; reinstall required", "Trendyol: 429 Too many requests"],
+  "platformErrors": [
+    { "platform": "wix", "code": "permission", "detail": "Wix: Inbox permission missing (403) — app version lacks Inbox scope; reinstall required" },
+    { "platform": "trendyol", "code": "rateLimited", "detail": "Trendyol: 429 Too many requests" }
+  ],
+  "fetchedAt": "2026-10-15T10:00:00.000Z",
+  "readStateStore": "memory"
+}

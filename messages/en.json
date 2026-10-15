@@ -8737,6 +8737,205 @@
       "credentials": "{name}: connection details are incomplete. Check Settings.",
       "rateLimited": "{name}: too many requests right now. Try again in a moment.",
       "unavailable": "{name}: messages couldn't be loaded right now."
+    },
+    "saved": {
+      "button": "Saved replies",
+      "search": "Search saved replies",
+      "empty": "No saved replies yet",
+      "emptyBody": "Save replies you send often and insert them with one click.",
+      "noMatches": "No saved replies match",
+      "loading": "Loading saved replies…",
+      "loadError": "Couldn't load saved replies",
+      "used": "{count, plural, one {Used once} other {Used # times}}",
+      "saveCurrent": "Save current text as a saved reply",
+      "manage": "Manage saved replies",
+      "panelTitle": "Saved replies",
+      "new": "New reply",
+      "editTitle": "Edit: {name}",
+      "modalTitle": "Save as saved reply",
+      "fields": {
+        "title": "Name",
+        "body": "Text",
+        "platform": "Use for",
+        "allStores": "All stores"
+      },
+      "insert": "Insert:",
+      "var": {
+        "customer": "Customer name",
+        "product": "Product",
+        "order": "Order number"
+      },
+      "save": "Save",
+      "saved": "Saved",
+      "delete": "Delete saved reply…",
+      "deleteTitle": "Delete saved reply \"{name}\"?",
+      "errors": {
+        "duplicate": "A saved reply with this name already exists",
+        "limit": "You can keep up to {max} saved replies",
+        "tooLong": "Text can have at most {max} characters",
+        "titleTooLong": "Names can have at most {max} characters",
+        "titleRequired": "Give this reply a name",
+        "bodyRequired": "Write the reply text",
+        "generic": "Couldn't save the reply. Try again.",
+        "deleteFailed": "Couldn't delete the reply. Try again."
+      },
+      "imported": "{count, plural, one {# saved reply moved to your account} other {# saved replies moved to your account}}",
+      "notReady": "Showing saved replies from this browser. Editing is paused while your account is updated.",
+      "notReadyShort": "Editing is paused while your account is updated"
+    },
+    "overflow": {
+      "manageSaved": "Manage saved replies"
+    },
+    "cmd": {
+      "nextNeedsReply": "Go to next message needing reply"
+    },
+    "views": {
+      "needsReply": "Needs reply",
+      "unread": "Unread",
+      "all": "All"
+    },
+    "filters": {
+      "store": "Store",
+      "storeAll": "All"
+    },
+    "search": {
+      "placeholder": "Search name, message or product",
+      "loadedOnly": "Searching {count} loaded conversations · Load more to search older"
+    },
+    "list": {
+      "count": "{count, plural, one {# conversation} other {# conversations}}",
+      "loadMore": "Load more",
+      "customerFallback": "Customer",
+      "youPrefix": "You:",
+      "noText": "No message text",
+      "timeUnknown": "Time unknown",
+      "unreadLabel": "Unread",
+      "regionLabel": "Conversations"
+    },
+    "thread": {
+      "prev": "Previous conversation",
+      "next": "Next conversation",
+      "lastMessage": "Last message {time}",
+      "asked": "Asked {time} · public question",
+      "nextUp": "Next: {name}",
+      "customer": "Customer",
+      "you": "You",
+      "markUnread": "Mark as unread",
+      "viewOnTrendyol": "View on Trendyol",
+      "empty": {
+        "title": "No messages yet",
+        "body": "This customer hasn't written to you."
+      },
+      "error": {
+        "title": "Couldn't load this conversation"
+      },
+      "publicNote": "Trendyol shows answers publicly on the product page. You can answer once.",
+      "answered": "Answered {date}. Trendyol allows one answer per question.",
+      "answeredNoDate": "Answered. Trendyol allows one answer per question.",
+      "inReview": "Your answer is waiting for Trendyol's approval.",
+      "rejected": "Trendyol rejected your answer: {reason}. You can answer again.",
+      "rejectedNoReason": "Trendyol rejected your answer. You can answer again.",
+      "cannotAnswer": "This question can't be answered here."
+    },
+    "empty": {
+      "connect": {
+        "title": "Answer Wix and Trendyol customers in one place",
+        "body": "Connect a store to see messages and product questions here.",
+        "action": "Connect a store"
+      },
+      "done": {
+        "title": "Every message has a reply",
+        "body": "New messages show up here within 2 minutes."
+      },
+      "none": {
+        "title": "No messages yet"
+      },
+      "noResults": {
+        "title": "No conversations match",
+        "action": "Clear filters"
+      }
+    },
+    "error": {
+      "list": {
+        "title": "Couldn't load messages"
+      }
+    },
+    "platformBanners": {
+      "permission": "Wix inbox access is missing. Reconnect Wix to allow messages.",
+      "auth": "{name} connection expired.",
+      "credentials": "{name} setup is incomplete.",
+      "rateLimited": "{name} is busy right now. Showing earlier messages.",
+      "unavailable": "Couldn't load {name} messages.",
+      "reconnect": "Reconnect {name}",
+      "finishSetup": "Finish setup",
+      "retry": "Try again"
+    },
+    "composer": {
+      "errors": {
+        "tooLongReply": "Replies can have at most {max} characters",
+        "empty": "Write a reply first",
+        "tooShort": "Answers need at least {min} characters",
+        "tooLong": "Answers can have at most {max} characters",
+        "unfilled": "Replace {tokens} before sending",
+        "alreadyAnswered": "This question already has an answer on Trendyol",
+        "auth": "{name} connection expired. Your text is kept.",
+        "generic": "Couldn't send. Your text is kept."
+      },
+      "labelReply": "Reply",
+      "labelAnswer": "Answer",
+      "placeholderWix": "Write a reply to {name}",
+      "placeholderTrendyol": "Write your answer",
+      "sendReply": "Send reply",
+      "sendAnswer": "Send answer",
+      "sending": "Sending…",
+      "shortcut": "{keys} to send",
+      "focusShortcut": "Write a reply",
+      "reconnect": "Reconnect {name}",
+      "discard": {
+        "title": "Discard your unsent reply?",
+        "confirm": "Discard",
+        "keep": "Keep editing"
+      }
+    },
+    "ai": {
+      "draft": "Draft with AI",
+      "redo": "Try another draft",
+      "drafting": "Drafting…",
+      "note": "AI draft · check facts before sending",
+      "missing": "AI didn't have: {items}",
+      "missingItem": {
+        "tracking": "tracking number",
+        "order": "order details",
+        "stock": "stock level",
+        "delivery": "delivery date",
+        "size": "product size",
+        "policy": "shop policy"
+      },
+      "failed": "Couldn't draft a reply. Try again.",
+      "replace": {
+        "title": "Replace your text with the AI draft?",
+        "confirm": "Replace"
+      }
+    },
+    "context": {
+      "title": "Customer & orders",
+      "customer": "Customer",
+      "email": "Email",
+      "orders": "Orders",
+      "summary": "{count, plural, one {# order} other {# orders}} · {latest}",
+      "noOrders": "No orders from this customer",
+      "ordersError": "Couldn't load Wix orders",
+      "openOrder": "Open order",
+      "tracking": "Tracking",
+      "moreItems": "+{count} more",
+      "product": "Product",
+      "price": "Price",
+      "stock": "In stock",
+      "barcode": "Barcode",
+      "openListing": "Open listing",
+      "notInCatalog": "This product isn't in KolayXport yet. Refresh Trendyol products to see price and stock.",
+      "productError": "Couldn't load product details",
+      "otherQuestions": "{count, plural, one {# other question about this product} other {# other questions about this product}}"
     }
   },
   "errors": {
@@ -11564,6 +11763,15 @@
       "clearWithKey": "Clear (Esc)",
       "selectAllInView": "Select all {count, number} in this view",
       "selectOnlyPage": "Select only these {count, number}"
+    },
+    "grid": {
+      "counter": "{value}/{max}",
+      "tooLong": "Use at most {max} characters ({length} now)",
+      "noOption": "“{value}” isn’t one of the options",
+      "revert": "Revert",
+      "readOnly": "Read-only: {reason}",
+      "invalid": "Can’t be saved: {reason}",
+      "edited": "Edited, not sent"
     }
   },
   "status": {
@@ -13838,6 +14046,485 @@
       "emptyBody": "Save a listing's tags, details or shipping as a profile, then fill new listings in one click",
       "draftOnly": "Applying fills the draft only. You can undo it right after",
       "storageFailed": "Couldn't save on this device. Check that the browser allows site storage"
+    }
+  },
+  "bulk": {
+    "paste": {
+      "colOverflow": "{count, plural, one {# column didn’t fit and wasn’t pasted} other {# columns didn’t fit and weren’t pasted}}",
+      "skippedReason": "{count, plural, one {# cell skipped} other {# cells skipped}}: {reason}",
+      "unchanged": "{count, plural, one {# cell already had this value} other {# cells already had these values}}",
+      "result": "Pasted {rows} rows × {cols} columns · {edits} edits{invalid, plural, =0 {} other { · # invalid}}{skipped, plural, =0 {} other { · # skipped}}",
+      "notRect": "The copied cells aren’t a rectangle (rows have different lengths). Copy a block of cells and paste again.",
+      "readOnlyColumn": "Can’t paste into {column}. Start the paste in an editable column.",
+      "overflow": "{count, plural, one {# row didn’t fit} other {# rows didn’t fit}} on this page",
+      "saved": "Saved · {listings, plural, one {# listing} other {# listings}}, {edits, plural, one {# edit not sent} other {# edits not sent}}"
+    },
+    "invalid": {
+      "currency": "Currency doesn’t match this shop ({currency})",
+      "enterValue": "Enter a value",
+      "banner": "{count, plural, one {# edit can't be saved} other {# edits can't be saved}}: {reason}",
+      "show": "Show them"
+    },
+    "fill": {
+      "done": "Filled {count} cells",
+      "confirmTags": "Replace tags on {count} listings with these {tags}?"
+    },
+    "revert": {
+      "cell": "Revert cell",
+      "row": "Revert row",
+      "selected": "Revert selected rows",
+      "failed": "{count, plural, one {# listing couldn't be reverted} other {# listings couldn't be reverted}}"
+    },
+    "shortcuts": {
+      "noUndo": "There’s no undo. Use Revert cell (⌥⌫) to restore the value on {on}.",
+      "save": "Save edits now"
+    },
+    "stage": {
+      "invalidRequest": "This change couldn't be saved. Reload the page and try again.",
+      "tooMany": "You can save at most {max} listings at once.",
+      "fieldNotEditable": "\"{field}\" can't be edited in the bulk grid.",
+      "duplicate": "This listing appears twice in the same save. Only the first one was saved.",
+      "empty": "Nothing to save for this listing.",
+      "budget": "Etsy's daily limit is close. Try again in {minutes} min.",
+      "invalidItem": "This listing couldn't be read. Reload the page and try again.",
+      "deleteQueued": "This listing is waiting to be deleted. Remove the queued delete before editing it.",
+      "priceFormat": "Enter a price like 12.50 (up to 2 decimals).",
+      "quantityRange": "Enter a whole number from {min} to {max}.",
+      "idInvalid": "\"{field}\" needs a valid option. Pick one from the list."
+    },
+    "title": "Bulk edit",
+    "back": "{marketplace} listings",
+    "meta": {
+      "counts": "{listings, plural, one {# listing} other {# listings}} · {edits, plural, one {# edit not sent} other {# edits not sent}}",
+      "saving": "Saving {done} / {total}…",
+      "saved": "Saved {time}",
+      "allSent": "Everything has been sent to {to}"
+    },
+    "discardAll": {
+      "cta": "Discard all edits",
+      "confirm": "Discard {edits} edits on {listings} listings? Edits made outside the bulk editor stay.",
+      "done": "{count, plural, one {# edit discarded} other {# edits discarded}}",
+      "kept": "{count, plural, one {# edit was kept} other {# edits were kept}}: the field already had an unsent change from before. Revert the cell to remove it."
+    },
+    "section": {
+      "set": "Set section…",
+      "title": "Set section",
+      "pick": "Choose a section",
+      "stage": "{count, plural, one {Stage # change} other {Stage # changes}}"
+    },
+    "tools": {
+      "exportRows": "Export these rows (CSV)",
+      "findReplaceIds": "Find & replace works on a filtered view. Open the bulk editor from a view to use it."
+    },
+    "filter": {
+      "placeholder": "Filter rows in this grid"
+    },
+    "show": {
+      "label": "Show",
+      "all": "All",
+      "edited": "Edited",
+      "invalid": "Can't be saved"
+    },
+    "rows": "{count, plural, one {# row} other {# rows}} · page {page} of {pages}",
+    "col": {
+      "title": "Title",
+      "price": "Price",
+      "qty": "Qty",
+      "section": "Section",
+      "health": "Health",
+      "photos": "Photos",
+      "status": "Status",
+      "changes": "Changes"
+    },
+    "readOnly": {
+      "variations": "Has variations: use Change price, or edit per variation in the editor",
+      "stockManaged": "Stock sync manages this quantity ({qty})",
+      "notEditable": "Not editable for {marketplace} yet",
+      "sending": "Sending to {to}…"
+    },
+    "stageFailed": {
+      "banner": "{count, plural, one {# listing couldn't be saved} other {# listings couldn't be saved}}"
+    },
+    "conflict": {
+      "banner": "{count, plural, one {# listing changed on {on} since your draft} other {# listings changed on {on} since your drafts}}. Sending skips them until you review the differences."
+    },
+    "send": {
+      "confirm": "Send {count, plural, one {# change} other {# changes}} to {to}? The live listings are updated."
+    },
+    "photos": {
+      "edit": "Edit photos…",
+      "editPro": "Edit photos… (Pro)"
+    },
+    "delete": {
+      "cta": "{count, plural, one {Delete # listing…} other {Delete # listings…}}",
+      "skippedEdited": "{count, plural, one {# listing with unsent edits was skipped} other {# listings with unsent edits were skipped}}. Send or discard those edits first."
+    },
+    "leaveSaving": "Some edits are still saving. Leave anyway?",
+    "mobile": {
+      "title": "The bulk editor works on a larger screen",
+      "body": "On your phone, use Change price and Add tags from the listings selection bar."
+    },
+    "error": {
+      "load": "Couldn't load these listings"
+    },
+    "empty": {
+      "title": "No listings to edit"
+    },
+    "ai": {
+      "suggestion": "AI suggestion · Revert to keep yours",
+      "action": "Improve with AI",
+      "progress": "Improving {done} / {total}…",
+      "unusable": "{count, plural, one {# listing} other {# listings}} didn't get a usable suggestion",
+      "cost": "{count, plural, one {# credit} other {# credits}}",
+      "cancel": "Stop",
+      "cancelled": "Stopped · {count, plural, one {# listing} other {# listings}} improved",
+      "done": "{count, plural, one {# listing} other {# listings}} improved · not sent yet",
+      "nothingNew": "AI had nothing new to suggest",
+      "failed": "AI couldn't improve these listings. Try again.",
+      "failedCount": "{count, plural, one {# listing} other {# listings}} couldn't be improved",
+      "limitReached": "You've used all AI credits on your plan"
+    }
+  },
+  "photoStudio": {
+    "stageWithCredits": "{stage} · {credits}",
+    "full": "{count, plural, one {# listing already has 20 photos} other {# listings already have 20 photos}}",
+    "title": "Photo studio",
+    "back": "Back",
+    "tabs": {
+      "photos": "Photos",
+      "video": "Video"
+    },
+    "meta": "{listings, plural, one {# listing} other {# listings}} · {count, plural, one {# photo change} other {# photo changes}} staged here · not sent yet",
+    "progress": "Staging {done} / {total}…",
+    "stage": "Stage {count, plural, one {# photo change} other {# photo changes}}",
+    "appliesTo": "Applies to {count} selected",
+    "summary": "{changes, plural, one {# change} other {# changes}} on {listings, plural, one {# listing} other {# listings}}",
+    "credits": "{count, plural, one {# credit} other {# credits}}",
+    "skipped": "{count, plural, one {# listing skipped} other {# listings skipped}}: {reason}",
+    "capped": "Only the first {cap} AI changes ran. Run it again for the rest.",
+    "aiCredits": "You're out of AI credits for this period. Changes without AI still work.",
+    "mobileTitle": "The photo studio works on a larger screen",
+    "mobile": "Add photos one listing at a time in the editor",
+    "noMatch": "No listings match this filter",
+    "selectAll": "Select all",
+    "footer": "{from}–{to} of {total}",
+    "op": {
+      "label": "Do",
+      "position": "at position",
+      "from": "from position",
+      "moveTo": "to position",
+      "source": "from",
+      "add": "Add",
+      "replace": "Replace",
+      "delete": "Delete",
+      "move": "Move",
+      "alt": "Alt text",
+      "enhance": "Improve quality",
+      "removeBg": "Remove background",
+      "copy": "Copy from…",
+      "chooseFiles": "Choose files…",
+      "filesChosen": "{count, plural, one {# file} other {# files}}",
+      "clearFiles": "Clear",
+      "urlPlaceholder": "https://… image link",
+      "prompt": "Describe the photo to generate",
+      "promptTweak": "Extra instruction (optional)",
+      "altAi": "Write with AI",
+      "altManual": "Type it",
+      "altAll": "All photos",
+      "altPlaceholder": "Alt text for these photos",
+      "copyFrom": "Copy photos from",
+      "copyFromPlaceholder": "Choose a listing"
+    },
+    "source": {
+      "upload": "Upload",
+      "ai": "Generate with AI",
+      "url": "Image link"
+    },
+    "position": {
+      "end": "End"
+    },
+    "filter": {
+      "label": "Show",
+      "placeholder": "Filter listings",
+      "all": "All",
+      "noPhotos": "No photos",
+      "lt5": "Fewer than 5",
+      "missingAlt": "Missing alt text"
+    },
+    "blocker": {
+      "noSelection": "Select listings first",
+      "chooseFiles": "Choose files first",
+      "chooseVideo": "Choose a video first",
+      "enterUrl": "Enter an https link first",
+      "enterAlt": "Type the alt text first",
+      "pickCopySource": "Choose the listing to copy from",
+      "nothing": "Nothing to change on the selected listings",
+      "running": "Wait for the current changes to finish"
+    },
+    "skip": {
+      "notLoaded": "photos still loading",
+      "queuedDelete": "a listing delete is queued",
+      "sending": "being sent to Etsy",
+      "full": "already 20 photos",
+      "noPhotoAtPosition": "no photo at that position",
+      "lastPhoto": "Etsy needs at least 1 photo",
+      "pendingPhoto": "new photos keep their place until they are on Etsy",
+      "samePosition": "already in that position",
+      "noVideo": "no video",
+      "hasVideo": "already has a video",
+      "isSource": "it is the listing being copied",
+      "nothingToCopy": "the source listing has no photos",
+      "noAltNeeded": "alt text is already the same"
+    },
+    "result": {
+      "staged": "{count, plural, one {# change saved} other {# changes saved}} to your drafts · not sent yet",
+      "partial": "{staged} saved · {failed, plural, one {# listing} other {# listings}} failed",
+      "none": "Nothing was changed",
+      "aiUnusable": "{count, plural, one {# AI result} other {# AI results}} weren't usable"
+    },
+    "tile": {
+      "staged": "Saved to your draft · not sent yet"
+    },
+    "failures": {
+      "banner": "{count, plural, one {# listing couldn't be updated} other {# listings couldn't be updated}}"
+    },
+    "failure": {
+      "generic": "Couldn't save the change. Try again."
+    },
+    "confirmDelete": {
+      "title": "Delete photo {position} on {count, plural, one {# listing} other {# listings}}?",
+      "body": "Nothing changes on Etsy until you send changes."
+    },
+    "row": {
+      "select": "Select {title}",
+      "count": "{count} / {max}",
+      "needAlt": "{count, plural, one {# needs alt text} other {# need alt text}}",
+      "willRemove": "will remove {count}",
+      "ai": "{count} AI",
+      "noPhotos": "No photos yet",
+      "loadFailed": "Couldn't load photos",
+      "queuedDelete": "Listing delete queued: photos stay as they are",
+      "sending": "Sending to Etsy…"
+    },
+    "empty": {
+      "title": "No listings to edit",
+      "body": "Select listings on the listings page, then open the photo studio.",
+      "back": "Back to listings"
+    },
+    "error": {
+      "load": "Couldn't load these listings"
+    },
+    "video": {
+      "add": "Add video to selected",
+      "remove": "Remove video from selected",
+      "stage": "Stage {count, plural, one {# video change} other {# video changes}}",
+      "sourceUrl": "Video link",
+      "urlPlaceholder": "https://… video link",
+      "chooseFile": "Choose video…",
+      "rejected": "Choose an MP4, WebM or MOV video up to 100 MB",
+      "none": "No video",
+      "onEtsy": "Video on Etsy",
+      "processing": "Etsy is processing the video",
+      "willAdd": "Video added when you send changes",
+      "willRemove": "Removed when you send changes",
+      "addOne": "Add video",
+      "removeOne": "Remove video",
+      "confirmRemove": "Remove the video from {count, plural, one {# listing} other {# listings}}?"
+    }
+  },
+  "overview": {
+    "toast": {
+      "refreshed": "Orders refreshed",
+      "refreshFailed": "Couldn't refresh orders",
+      "refreshTooSoon": "Orders were just refreshed — try again in a minute",
+      "refreshNothingToSync": "Nothing to refresh from your connected sources",
+      "openConnections": "Open connections",
+      "refreshNoStores": "Connect a store to refresh orders"
+    },
+    "actions": {
+      "goToOrdersCount": "Go to orders ({count})",
+      "addManualOrder": "Add manual order",
+      "connectStore": "Connect a store",
+      "goToOrders": "Go to orders",
+      "newListing": "New listing",
+      "refreshOrders": "Refresh orders",
+      "reports": "Reports",
+      "research": "Research"
+    },
+    "attention": {
+      "count": "{count, plural, one {# item needs attention} other {# items need attention}}",
+      "paused": {
+        "titleOrderSync": "Order syncs are paused",
+        "titleLabels": "Labels are paused",
+        "limitReason": "{reason, select, trial {Trial limits reached} other {Plan limits reached}}",
+        "cta": "See plans",
+        "reason": "{reason, select, trial {Your trial has ended} noSubscription {No active plan} planLimit {Plan limit reached} invalidPlan {Your plan needs attention} other {Plan issue}}",
+        "supportCta": "Contact support",
+        "title": "Order syncs and labels are paused"
+      },
+      "checkFailed": "Couldn't check {sections}",
+      "conflict": {
+        "cta": "Review",
+        "detail": "Changed on {marketplace} since your draft",
+        "title": "{count, plural, one {# listing changed on {marketplace} since your draft} other {# listings changed on {marketplace} since your draft}}"
+      },
+      "doneBody": "Nothing needs your attention right now.",
+      "doneTitle": "All caught up",
+      "doneWithErrors": "Nothing else needs attention · {count, plural, one {# check} other {# checks}} failed",
+      "health": {
+        "cta": "Open Listing doctor",
+        "ctaLegacy": "Show listings",
+        "title": "{count, plural, one {# listing under 50} other {# listings under 50}}"
+      },
+      "labelsFailed": {
+        "cta": "Review",
+        "title": "{count, plural, one {# label failed} other {# labels failed}}"
+      },
+      "loadFailed": "Couldn't load your overview",
+      "more": "+{count} more",
+      "noOrdersBody": "Bring in your orders from your connected stores.",
+      "noOrdersTitle": "No orders yet",
+      "notConnectedTitle": "Connect a store to see what needs your attention",
+      "notSent": {
+        "cta": "Review & send",
+        "title": "{count, plural, one {# listing with changes not sent to {marketplace}} other {# listings with changes not sent to {marketplace}}}"
+      },
+      "overdue": {
+        "cta": "Create label",
+        "title": "{count, plural, one {# order overdue} other {# orders overdue}}"
+      },
+      "reconnect": {
+        "cta": "Reconnect {provider}"
+      },
+      "refreshOrders": "Refresh orders",
+      "sendFailed": {
+        "cta": "Open",
+        "title": "{count, plural, one {# listing couldn't be sent to {marketplace}} other {# listings couldn't be sent to {marketplace}}}"
+      },
+      "showLess": "Show less",
+      "showMore": "Show {count} more",
+      "syncFailing": {
+        "cta": "View"
+      },
+      "title": "Needs your attention",
+      "tracking": {
+        "cta": "Review",
+        "detail": "Labels created, tracking not sent to Etsy",
+        "setupCta": "Set up extension",
+        "title": "{count, plural, one {# Etsy order} other {# Etsy orders}}"
+      },
+      "trialEnds": "Trial ends in {days, plural, one {# day} other {# days}}",
+      "usage": {
+        "cta": "See plans",
+        "detail": "{kind, select, orderSync {Order syncs} other {Labels}}: {used} of {limit} used"
+      }
+    },
+    "best": {
+      "colProduct": "Product",
+      "colUnits": "Units",
+      "empty": "No sales in the last 7 days",
+      "loadFailed": "Couldn't load best sellers",
+      "source": "Orders · grouped by SKU · units in orders, not listing sales",
+      "title": "Best sellers (7 days)",
+      "units": "{count, plural, one {# unit} other {# units}}"
+    },
+    "chart": {
+      "empty": "No orders in the last 14 days",
+      "loadFailed": "Couldn't load the orders chart",
+      "source": "Orders · by order date · {tz}",
+      "title": "Orders, last 14 days",
+      "total": "{count, plural, one {# order} other {# orders}}",
+      "vsPrev14": "vs previous 14 days"
+    },
+    "greeting": {
+      "afternoon": "Good afternoon, {name}",
+      "afternoonNoName": "Good afternoon",
+      "evening": "Good evening, {name}",
+      "eveningNoName": "Good evening",
+      "morning": "Good morning, {name}",
+      "morningNoName": "Good morning"
+    },
+    "kpi": {
+      "dueToday": "{count} due today",
+      "fxExcluded": "Not included: {list}",
+      "fxExcludedItem": "{currency} ({count, plural, one {# order} other {# orders}})",
+      "fxNote": "Converted at exchangerate-api.com rates, {date}",
+      "fxStale": "Rates may be out of date",
+      "loadFailed": "Couldn't load · Retry",
+      "messagesFailed": "Couldn't check messages",
+      "needsReply": "Needs reply",
+      "new": "New",
+      "noneOverdue": "None",
+      "orders7d": "Orders (7 days)",
+      "overdue": "Overdue",
+      "revenue7d": "Revenue (7 days)",
+      "sourceMessages": "Messages",
+      "sourceOrders": "Orders",
+      "sourceOrdersFx": "Orders · FX",
+      "toShip": "To ship",
+      "vsPrev7": "vs previous 7 days",
+      "withoutShipBy": "{count} without a ship-by date"
+    },
+    "meta": {
+      "ordersNeverRefreshed": "Orders not refreshed yet",
+      "ordersRefreshed": "Orders refreshed {time}",
+      "refreshPaused": "Order syncs are paused: see plans",
+      "refreshPausedSupport": "Order syncs are paused: contact support",
+      "refreshQuota": "Uses 1 of your {limit} order syncs ({used} used)",
+      "refreshing": "Refreshing orders…",
+      "updated": "Updated {time}"
+    },
+    "pageTitle": "Overview",
+    "reason": {
+      "incomplete_credentials": "Credentials incomplete",
+      "missing_refresh_token": "Authorization incomplete",
+      "reauth_required": "Access was revoked",
+      "refresh_token_expired": "Authorization expired",
+      "token_expired_no_refresh": "Access expired"
+    },
+    "section": {
+      "sources": {
+        "drafts": "listing drafts",
+        "labels": "label failures",
+        "listingHealth": "listing health",
+        "toShip": "orders to ship",
+        "tracking": "tracking",
+        "usage": "plan usage"
+      }
+    },
+    "setup": {
+      "connect": {
+        "desc": "Link Etsy, eBay, Amazon, Shopify, Wix or Trendyol to bring in orders and listings.",
+        "doneDesc": "{name} connected",
+        "title": "Connect a store"
+      },
+      "hide": "Hide setup",
+      "label": {
+        "ctaCarrier": "Connect a carrier",
+        "ctaCreate": "Create label",
+        "descNoCarrier": "Connect FedEx, UPS or DHL eCommerce first.",
+        "descNoOrders": "Bring in your orders first.",
+        "descReady": "Pick an order and create its label.",
+        "title": "Create your first label"
+      },
+      "progress": "{done} of {total} done",
+      "quota": "Uses 1 of your {limit} order syncs.",
+      "sender": {
+        "cta": "Add address",
+        "desc": "Printed as the return address on every label.",
+        "title": "Set your sender address"
+      },
+      "title": "Get started"
+    },
+    "stores": {
+      "connect": "Connect a store",
+      "manage": "Manage stores",
+      "refreshed": "Refreshed {time}",
+      "title": "Stores"
+    },
+    "subscriptionActivated": "Your subscription is active",
+    "subtitle": {
+      "allStores": "All stores"
     }
   }
 }

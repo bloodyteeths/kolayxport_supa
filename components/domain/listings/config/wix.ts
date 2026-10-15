@@ -25,14 +25,14 @@ export const wixConfig: ListingsConfig = {
   bulkPrimary: 'changePrice',
   // Spec deviation (listings-grid §6.3): "Add to collection" needs a collection field on CatalogDraft (BR request).
   bulkActions: ['changeStock', 'showInStore', 'hideInStore'],
-  bulkOverflow: ['sendSelected', 'discardSelected', 'scheduleSend', 'exportSelected', 'delete'],
+  bulkOverflow: ['editInGrid', 'sendSelected', 'discardSelected', 'scheduleSend', 'exportSelected', 'delete'],
   tools: ['findReplace', 'duplicates', 'import', 'export', 'scheduled'],
   inlineEdit: { price: true, qty: true },
   validation: {},
   drafts: 'catalog',
   editorHref: () => null,
   newListingHref: () => null,
-  bulkEditHref: null,
+  bulkEditHref: () => '/app/wix-urunler/bulk', // M7 BulkGrid (bulk-grid §1.2 v1: title/price/qty via CatalogDraft); flag `bulk`
   externalUrl: (row) => row.externalUrl,
   pull: () => ({ url: '/api/wix/products?action=sync', method: 'POST' }),
   columnStateKey: 'listings.wix.columns',

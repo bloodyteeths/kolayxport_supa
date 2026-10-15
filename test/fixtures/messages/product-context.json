@@ -1,0 +1,7 @@
+{
+  "inCatalog": {
+    "productMainId": "PMI-77", "inCatalog": true, "title": "Ahşap anı kutusu", "barcode": "8680001112223",
+    "salePrice": 449.9, "currency": "TRY", "quantity": 12, "onSale": true, "thumbnailUrl": "https://cdn.example.com/p.jpg"
+  },
+  "notInCatalog": { "productMainId": "PMI-12", "inCatalog": false }
+}

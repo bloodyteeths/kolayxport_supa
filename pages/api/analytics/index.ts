@@ -2,77 +2,11 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { withUsageLimiter } from '@/lib/middleware/withUsageLimiter';
+import { convertToBase, getExchangeRates } from '@/lib/fx';
 
 interface AnalyticsQuery {
   dateRange: string;
   marketplace?: string;
-}
-
-// Module-level cache for exchange rates (amount_in_currency * rate = TRY).
-// `cachedRatesAt` is when the cached rates were actually fetched, so a stale
-// fallback can say how old it is.
-let cachedRates: Record<string, number> = {};
-let cachedRatesAt = 0;
-let cacheExpiry = 0;
-const RATES_TTL_MS = 60 * 60 * 1000;
-// After a failed fetch, retry sooner than the normal TTL.
-const RATES_RETRY_MS = 5 * 60 * 1000;
-
-interface RatesSnapshot {
-  rates: Record<string, number>;
-  /** True when live rates could not be fetched (last-known or none used). */
-  stale: boolean;
-  /** When the rates in use were fetched; null when there are none. */
-  asOf: number | null;
-}
-
-async function fetchLiveRates(): Promise<Record<string, number> | null> {
-  try {
-    // exchangerate-api.com, USD base
-    const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-    if (!response.ok) throw new Error(`Exchange rate API ${response.status}`);
-    const data = await response.json();
-    const usdToTry = Number(data?.rates?.TRY);
-    if (!data?.rates || typeof data.rates !== 'object' || !Number.isFinite(usdToTry) || usdToTry <= 0) {
-      throw new Error('Exchange rate API returned no TRY rate');
-    }
-    const rates: Record<string, number> = {};
-    for (const [currency, perUsd] of Object.entries(data.rates as Record<string, unknown>)) {
-      const n = Number(perUsd);
-      // amount_in_currency * (TRY_per_USD / currency_per_USD)
-      if (Number.isFinite(n) && n > 0) rates[currency.toUpperCase()] = usdToTry / n;
-    }
-    rates.TRY = 1;
-    rates.TL = 1;
-    return rates;
-  } catch (error) {
-    console.error('[Analytics] Exchange rate API failed:', error);
-    return null;
-  }
-}
-
-async function getExchangeRates(): Promise<RatesSnapshot> {
-  const now = Date.now();
-  const haveCache = Object.keys(cachedRates).length > 0;
-  if (haveCache && now < cacheExpiry) {
-    // Inside a post-failure retry window the cache can be older than the TTL.
-    return { rates: cachedRates, stale: now - cachedRatesAt > RATES_TTL_MS, asOf: cachedRatesAt };
-  }
-  if (!haveCache && now < cacheExpiry) {
-    // A fetch failed recently and there is nothing cached — don't hammer the API.
-    return { rates: {}, stale: true, asOf: null };
-  }
-  const live = await fetchLiveRates();
-  if (live) {
-    cachedRates = live;
-    cachedRatesAt = now;
-    cacheExpiry = now + RATES_TTL_MS;
-    return { rates: live, stale: false, asOf: now };
-  }
-  cacheExpiry = now + RATES_RETRY_MS;
-  // Last-known rates (even if expired) beat summing USD as if it were TRY.
-  if (haveCache) return { rates: cachedRates, stale: true, asOf: cachedRatesAt };
-  return { rates: {}, stale: true, asOf: null };
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -188,18 +122,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const ratesSnapshot = await getExchangeRates();
     const exchangeRates = ratesSnapshot.rates;
 
-    // Convert to TRY; null when no rate is available for the currency.
-    const tryConvertToTRY = (amount: number, currency: string | null | undefined): number | null => {
-      if (!amount) return 0;
-      // No currency recorded: orders are stored in TRY unless they say otherwise.
-      if (!currency) return amount;
-      const code = currency.toUpperCase();
-      if (code === 'TRY' || code === 'TL') return amount;
-      const rate = exchangeRates[code];
-      // No rate: leave the amount OUT of TRY totals instead of summing it as TRY.
-      if (!rate) return null;
-      return amount * rate;
-    };
+    // Convert to TRY; null when no rate is available for the currency (lib/fx.ts: a missing
+    // currency is TRY; no rate → the amount is left OUT of TRY totals, not summed as TRY).
+    const tryConvertToTRY = (amount: number, currency: string | null | undefined): number | null =>
+      convertToBase(amount, currency, exchangeRates, 'TRY');
 
     // Same, but excluded amounts count as 0 (for sums).
     const convertToTRY = (amount: number, currency: string | null | undefined): number =>

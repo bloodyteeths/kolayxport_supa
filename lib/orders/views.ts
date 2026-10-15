@@ -592,7 +592,7 @@ export function effectiveShipBySortSql(dir: SortDir): string {
 export interface OrderViewFacts extends OrderViewRow {
   items?: ReadonlyArray<{
     shipBy?: Date | string | null;
-    labelJobs?: ReadonlyArray<{ status?: string | null; createdAt?: Date | string | null }>;
+    labelJobs?: ReadonlyArray<{ status?: string | null; createdAt?: Date | string | null; updatedAt?: Date | string | null }>;
   }>;
   trackingSubmissions?: ReadonlyArray<{ status?: string | null; etsySubmitStatus?: string | null; submittedAt?: Date | string | null }>;
   /** `shipToMissing(...).length > 0` with no EtsyAddress record (toOrderRows). */
@@ -685,4 +685,85 @@ export function countViews(rows: readonly OrderViewFacts[], now: Date = new Date
   const out: Record<CountedOrderViewKey, number> = { to_ship: 0, overdue: 0, label_created: 0, problems: 0 };
   for (const r of rows) for (const k of COUNTED_VIEW_KEYS) if (matchesOrderView(r, k, now)) out[k]++;
   return out;
+}
+
+
+/* ------------------------------- shared with Overview (M8 overview-G1) */
+
+/**
+ * Legacy unified status filters (the `status=` values of the legacy labels page and
+ * `/api/orders/export`) → the lowercase DB statuses they cover. Moved here from
+ * `pages/api/orders/index.ts` (re-exported there) so Overview and Orders read one list
+ * (overview §4.1 "Live order", CRITIQUE C4). Matched against `LOWER(o."status")`.
+ *
+ * 'onaylandi' = live orders that still need fulfilment. Amazon 'pending' is a
+ * live order (payment authorising; see commit a4acab0) and belongs here.
+ * Genuinely unpaid states (awaiting_payment / pending_payment) are excluded
+ * from /api/orders entirely and are deliberately NOT listed.
+ */
+export const STATUS_FILTER_GROUPS: Record<string, string[]> = {
+  onaylandi: [
+    'paid', 'created', 'approved', 'pending', 'new', 'open', 'processing',
+    'awaiting_fulfillment', 'awaiting_shipment', 'unshipped', 'unfulfilled',
+    'not_fulfilled', 'not_started', 'in_progress', 'picking', 'invoiced',
+    'ready_to_ship',
+    // Shopify financial_status values the mapper stores verbatim: an
+    // authorized payment (captured later) or a partial refund is still a live
+    // order that needs a label.
+    'authorized', 'partially_refunded',
+  ],
+  kargolandi: ['shipped', 'partially_shipped', 'shipping', 'in_transit', 'fulfilled'],
+  iptal: ['cancelled', 'canceled', 'refunded', 'returned', 'unfulfillable', 'voided'],
+  delivered: ['delivered', 'completed'],
+};
+
+/** Expand UI status filter values to the lowercase DB statuses they cover (unknown values pass through, lowercased). */
+export function expandStatusFilter(values: string[]): string[] {
+  const out = new Set<string>();
+  for (const v of values) {
+    const key = v.trim().toLowerCase();
+    if (!key) continue;
+    const group = STATUS_FILTER_GROUPS[key];
+    if (group) group.forEach((s) => out.add(s));
+    else out.add(key);
+  }
+  return Array.from(out);
+}
+
+/**
+ * A label exists (alias of HAS_LABEL_SQL under the name overview §4.1 uses; twin: `orderHasLabel`).
+ * `UNLABELED_SQL` (above) is its negation. Never NULL.
+ */
+export const LABELED_SQL = HAS_LABEL_SQL;
+
+/** How far back a failed label attempt still counts as "label failed" (overview §4.1 labels.failed). */
+export const FAILED_LABEL_WINDOW_DAYS = 14;
+
+/**
+ * Failed label, overview definition (overview §4.1 `labels.failed`, §4.3.2): the order still has
+ * no label AND some LabelJob of the order failed and was updated in the last 14 days. Used by the
+ * legacy `/api/orders?labelStatus=failed` filter (the `/app/labels?label=failed&from=all` list) and
+ * by the Overview summary, so both count the same orders. Never NULL. Twin: `isFailedLabelOrder`.
+ *
+ * Not the same rule as LABEL_FAILED_SQL (Orders v2 `label_failed` pill: newest job failed or
+ * `labelStatus='failed'`, no window). Parity: compose it with the same base clause as /api/orders:
+ *   `WHERE o."userId" = $1 AND ${LISTED_ORDER_SQL} AND ${FAILED_LABEL_SQL}`.
+ */
+export const FAILED_LABEL_SQL = `(${UNLABELED_SQL} AND EXISTS (
+    SELECT 1 FROM "OrderItem" fli JOIN "LabelJob" flj ON flj."orderItemId" = fli.id
+    WHERE fli."orderId" = o.id AND LOWER(flj.status) = 'failed'
+      AND flj."updatedAt" >= NOW() - INTERVAL '${FAILED_LABEL_WINDOW_DAYS} days'
+  ))`;
+
+/** Pure twin of FAILED_LABEL_SQL (a job without `updatedAt` falls back to `createdAt`). */
+export function isFailedLabelOrder(row: OrderViewFacts, now: Date = new Date()): boolean {
+  if (orderHasLabel(row)) return false;
+  const since = now.getTime() - FAILED_LABEL_WINDOW_DAYS * 86_400_000;
+  return (row.items ?? []).some((i) =>
+    (i.labelJobs ?? []).some((j) => {
+      if (String(j.status ?? '').toLowerCase() !== 'failed') return false;
+      const at = validDate(j.updatedAt) ?? validDate(j.createdAt);
+      return at !== null && at.getTime() >= since;
+    }),
+  );
 }

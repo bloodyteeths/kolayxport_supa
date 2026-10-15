@@ -250,12 +250,13 @@ export function orderActions(items: ActionSpec[]): { normal: ActionSpec[]; dange
   return { normal: items.filter((a) => a.tone !== 'danger'), danger: items.filter((a) => a.tone === 'danger') };
 }
 
-export function InlineAction({ action, size = 'sm' }: { action: ActionSpec; size?: 'sm' | 'lg' }) {
+/** sm = icon button; md = small labelled button (desktop rows: the main action must be readable, not a bare icon); lg = mobile card. */
+export function InlineAction({ action, size = 'sm' }: { action: ActionSpec; size?: 'sm' | 'md' | 'lg' }) {
   const Icon = action.icon;
   const disabled = action.disabled || action.loading;
   const label = action.loading && action.loadingLabel ? action.loadingLabel : action.label;
   const linkProps = action.href ? { component: NextLink, href: action.href } : {};
-  if (size === 'lg' || !Icon) {
+  if (size !== 'sm' || !Icon) {
     return (
       <Tooltip title={action.disabled && action.disabledReason ? action.disabledReason : ''}>
         <span>
@@ -265,7 +266,7 @@ export function InlineAction({ action, size = 'sm' }: { action: ActionSpec; size
             disabled={disabled}
             onClick={(e) => { e.stopPropagation(); action.onClick?.(); }}
             {...linkProps}
-            sx={{ minHeight: px(size === 'lg' ? control.lg : control.sm), whiteSpace: 'nowrap', ...(size === 'lg' ? { width: '100%' } : {}) }}
+            sx={{ minHeight: px(size === 'lg' ? control.lg : control.sm), whiteSpace: 'nowrap' }}
           >
             {label}
           </Button>

@@ -683,9 +683,10 @@ export function DataTable<T>(props: DataTableProps<T>) {
                         data-row-stop="true"
                         sx={{ ...bodyCellSx, px: px(space[2]), whiteSpace: 'nowrap', ...(scrollsX ? pinRight('inherit') : {}) }}
                       >
-                        <Box className="kx-row-actions" sx={{ display: 'inline-flex', alignItems: 'center', gap: px(space[1]) }}>
-                          {ia && <InlineAction action={ia} />}
-                          {overflow.length > 0 && <RowActionsMenu actions={overflow} label={t('moreActions')} />}
+                        {/* The row's main action is always visible (sellers missed a hover-only icon); only ⋯ waits for hover. */}
+                        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: px(space[1]) }}>
+                          {ia && <InlineAction action={ia} size="md" />}
+                          {overflow.length > 0 && <Box component="span" className="kx-row-actions" sx={{ display: 'inline-flex' }}><RowActionsMenu actions={overflow} label={t('moreActions')} /></Box>}
                         </Box>
                       </TableCell>
                     )}

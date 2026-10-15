@@ -175,7 +175,8 @@ function OrderTitle({ row, t, isNew, newLabel }: { row: OrderRow; t: OrdersT; is
   return (
     <Typography
       component="span"
-      sx={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: neutral[900], display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+      sx={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: neutral[900], display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+      title={title}
     >
       {title}
       {moreText ? <Box component="span" sx={{ color: neutral[600], fontWeight: 400 }}>{moreText}</Box> : null}

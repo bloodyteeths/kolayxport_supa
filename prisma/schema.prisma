@@ -74,6 +74,7 @@ model User {
   ebayListings            EbayListing[]
   adminAuditLogs          AdminAuditLog[]          @relation("AdminAuditLogs")
   notifications           Notification[]
+  inboxThreads            InboxThread[]
   notificationPreferences NotificationPreference[]
   notificationSettings    NotificationSettings?
   stockSettings           StockSettings?
@@ -2193,4 +2194,29 @@ model StockSnapshot {
   restoredAt DateTime?
 
   @@index([userId, takenAt])
+}
+
+/// Unified inbox cache + read state (design/surfaces/messages.md §6.2). One row per Wix conversation or
+/// Trendyol question; written by lib/messages/inboxCache.ts (DbInboxStore).
+model InboxThread {
+  id                String    @id @default(cuid())
+  userId            String
+  platform          String // 'wix' | 'trendyol'
+  externalId        String // Wix conversationId | Trendyol questionId
+  contactId         String?
+  customerName      String?
+  lastMessageAt     DateTime?
+  lastMessageText   String?   @db.Text // first 280 chars
+  lastFromCustomer  Boolean?
+  needsReply        Boolean   @default(false)
+  messageCount      Int? // Wix: 0 => hidden from the list (D4)
+  contactActivityAt DateTime? // Wix contact.lastActivity when the cache row was refreshed
+  lastOrderNumber   String?
+  lastSeenAt        DateTime?
+  updatedAt         DateTime  @updatedAt
+  createdAt         DateTime  @default(now())
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, platform, externalId])
+  @@index([userId, needsReply, lastMessageAt])
 }

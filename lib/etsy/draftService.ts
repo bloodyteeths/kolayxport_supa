@@ -6,7 +6,7 @@ import { logger } from '@/lib/logger';
 import { queueHealthRefresh } from '@/lib/listings/healthQueue';
 import { classifyEtsyDraftSyncError, ETSY_DRAFT_ERROR } from '@/lib/drafts/syncErrors';
 import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
-import { EtsyDraftError, isEtsyDraftError, type DraftIssue } from './draftErrors';
+import { EtsyDraftError, draftSendingError, isEtsyDraftError, type DraftIssue } from './draftErrors';
 import {
   ETSY_DRAFT_UPLOAD_ROOT,
   assertAllowedSourceUrl,
@@ -483,6 +483,19 @@ export async function getOrCreateDraft(params: {
 }) {
   await assertShopOwnership(params.userId, params.shopId);
   const listingId = parseListingId(params.listingId);
+  // A draft mid-send must not get a sibling draft (the sibling would carry a
+  // stale conflict base and race the send). A 'syncing' row older than the
+  // stale threshold is an orphan of a restart: recover it to 'failed' (which
+  // is editable) and let the lookup below reuse it.
+  const sending = await prisma.etsyListingDraft.findFirst({
+    where: { userId: params.userId, etsyShopId: params.shopId, etsyListingId: listingId, status: 'syncing' },
+    orderBy: { updatedAt: 'desc' },
+    select: { id: true, updatedAt: true },
+  });
+  if (sending) {
+    if (Date.now() - new Date(sending.updatedAt).getTime() < STALE_SYNCING_MS) throw draftSendingError();
+    await recoverStaleSyncingDrafts(params.userId, params.shopId);
+  }
   const existing = await prisma.etsyListingDraft.findFirst({
     where: {
       userId: params.userId,
@@ -639,6 +652,11 @@ export async function upsertDraftPatch(params: {
   removeQueuedActions?: string[];
   media?: Array<JsonMap>;
   replaceFields?: boolean;
+  /**
+   * Optional Etsy token, forwarded to getOrCreateDraft so a batch caller can
+   * fetch it once per request instead of once per new draft.
+   */
+  accessToken?: string;
 }) {
   if (params.fields !== undefined && (params.fields === null || typeof params.fields !== 'object' || Array.isArray(params.fields))) {
     throw new EtsyDraftError('INVALID_FIELDS', 'fields must be an object', { key: 'draftSync.invalidFields' });
@@ -765,6 +783,36 @@ export async function removeQueuedActions(draftId: string, userId: string, types
   });
 }
 
+/**
+ * Un-stage media rows (any operation) from a draft the user owns. Staged local
+ * files are removed through the upload-root-guarded unlink helper. Refused
+ * while the draft is being sent (409 DRAFT_SENDING) or once it is no longer
+ * editable. Ids that do not belong to this draft are ignored (reported in
+ * `missingIds`), so another user's media id can never be touched.
+ */
+export async function removeDraftMedia(draftId: string, userId: string, mediaId: string | string[]) {
+  const ids = [...new Set((Array.isArray(mediaId) ? mediaId : [mediaId]).map(String).filter(Boolean))];
+  if (ids.length === 0 || ids.length > 100) {
+    throw new EtsyDraftError('INVALID_MEDIA', 'removeMediaIds must hold 1-100 media ids', { key: 'draftSync.invalidMedia' });
+  }
+  const draft = await prisma.etsyListingDraft.findFirst({ where: { id: draftId, userId }, select: { id: true, status: true } });
+  if (!draft) throw new EtsyDraftError('DRAFT_NOT_FOUND', 'Draft not found', { status: 404, key: 'draftSync.draftNotFound' });
+  if (draft.status === 'syncing') throw draftSendingError();
+  if (!SYNCABLE_STATUSES.includes(draft.status)) {
+    throw new EtsyDraftError('DRAFT_NOT_EDITABLE', `Draft is not editable (${draft.status})`, { status: 409, key: 'draftSync.draftNotEditable', params: { status: draft.status } });
+  }
+  const rows = await prisma.etsyDraftMedia.findMany({
+    where: { draftId: draft.id, id: { in: ids } },
+    select: { id: true, localPath: true },
+  });
+  if (rows.length) {
+    await prisma.etsyDraftMedia.deleteMany({ where: { draftId: draft.id, id: { in: rows.map((r) => r.id) } } });
+    for (const r of rows) if (r.localPath) await unlinkDraftUploadFile(r.localPath);
+  }
+  const found = new Set(rows.map((r) => r.id));
+  return { removedIds: rows.map((r) => r.id), missingIds: ids.filter((id) => !found.has(id)) };
+}
+
 export function draftUploadDir(userId: string, draftId: string) {
   return path.join(UPLOAD_ROOT, userId, draftId);
 }
@@ -793,6 +841,7 @@ export async function createDraftMediaFile(params: {
     select: { id: true, status: true, queuedActions: true, etsyListingId: true },
   });
   if (!draft) throw new EtsyDraftError('DRAFT_NOT_FOUND', 'Draft not found', { status: 404, key: 'draftSync.draftNotFound' });
+  if (draft.status === 'syncing') throw draftSendingError();
   if (((draft.queuedActions as any[]) || []).some((a: any) => a?.type === 'delete')) {
     throw new EtsyDraftError('DELETE_NOT_EXCLUSIVE',
       'A listing delete cannot be combined with other staged changes. Sync or discard the other changes first, or remove the queued delete.',

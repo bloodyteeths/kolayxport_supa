@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { getAuthUser } from '@/lib/auth';
-import { assertShopOwnership, recoverStaleSyncingDrafts, upsertDraftPatch } from '@/lib/etsy/draftService';
+import { assertShopOwnership, getEtsyAccessToken, recoverStaleSyncingDrafts, upsertDraftPatch } from '@/lib/etsy/draftService';
 import { isEtsyDraftError } from '@/lib/etsy/draftErrors';
 import { canSpend, EtsyPriority } from '@/lib/etsy/rateBudget';
 import { logger } from '@/lib/logger';
@@ -119,6 +119,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     else editable.add(id);
   }
 
+  // New drafts read the live listing once for their conflict base: fetch the
+  // shop token once per request (lazily, only if some item needs a new draft).
+  // A token failure falls back to getListingSnapshot's own lookup/cache path.
+  let tokenPromise: Promise<string | undefined> | null = null;
+  const sharedToken = () => (tokenPromise ??= Promise.resolve().then(() => getEtsyAccessToken(shopId, user.id)).catch((err: unknown) => {
+    logger.warn('Etsy batch-stage: shared token fetch failed', { userId: user.id, error: (err as Error)?.message });
+    return undefined;
+  }));
+
   const results = await mapWithConcurrency(parsed, BATCH_STAGE_CONCURRENCY, async (p): Promise<BatchStageResult> => {
     if ('error' in p) return p.error;
     const { listingId } = p;
@@ -138,6 +147,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
     try {
+      const accessToken = editable.has(listingId) ? undefined : await sharedToken();
       const draft: any = await upsertDraftPatch({
         userId: user.id,
         shopId,
@@ -145,6 +155,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         fields: p.fields,
         inventory: p.inventory,
         replaceFields: p.replaceFields,
+        ...(accessToken ? { accessToken } : {}),
       });
       return {
         listingId,

@@ -39,6 +39,24 @@ export function isEtsyDraftError(err: unknown): err is EtsyDraftError {
   return Boolean(err) && (err as any).name === 'EtsyDraftError' && typeof (err as any).code === 'string';
 }
 
+/**
+ * The draft for this listing is being sent to Etsy right now. Staging onto it
+ * (or creating a sibling draft) is refused with 409 { code: 'DRAFT_SENDING' },
+ * the same code/key the batch-media route reports per item.
+ */
+export const DRAFT_SENDING = 'DRAFT_SENDING' as const;
+
+export function draftSendingError(): EtsyDraftError {
+  return new EtsyDraftError(DRAFT_SENDING, 'This draft is being sent to Etsy right now. Wait for it to finish.', {
+    status: 409,
+    key: 'draftSync.draftSyncing',
+  });
+}
+
+export function isDraftSendingError(err: unknown): boolean {
+  return isEtsyDraftError(err) && err.code === DRAFT_SENDING;
+}
+
 /** Shape an error for a JSON API response. Never leaks stack traces. */
 export function draftErrorResponse(err: any, fallback: string): { status: number; body: Record<string, any> } {
   if (isEtsyDraftError(err)) {

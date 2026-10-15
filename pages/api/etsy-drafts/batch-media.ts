@@ -18,16 +18,14 @@
 // otherwise whatever `upsertDraftPatch` throws (`draftErrorResponse`: code + `etsy.*` i18n key).
 // Concurrency 5 (a new draft costs one live listing + inventory read through `getOrCreateDraft`).
 //
-// Server gate (pro-gating §1 "server first"): `bulkPhotoStudio` must be in the account's plan. Until the billing
-// backend track ships `requireFeature` (tiers.md), the plan is derived exactly like the UI fallback
-// (`entitlementFromSettings` over the same fields `/api/user/settings` returns), so UI and server agree.
+// Server gate (pro-gating §1 "server first"): `bulkPhotoStudio` must be in the account's plan —
+// `requireFeature` (lib/billing/requireFeature.ts), which derives the plan exactly like the UI.
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { getAuthUser } from '@/lib/auth';
-import { assertShopOwnership, toSerializable, upsertDraftPatch } from '@/lib/etsy/draftService';
+import { assertShopOwnership, getEtsyAccessToken, toSerializable, upsertDraftPatch } from '@/lib/etsy/draftService';
 import { draftErrorResponse } from '@/lib/etsy/draftErrors';
-import { entitlementFromSettings } from '@/lib/billing/useEntitlement';
-import { isNeutralBilling } from '@/lib/billing/billingState';
+import { hasFeature, isFeatureLockedError, requireFeature } from '@/lib/billing/requireFeature';
 
 export const BATCH_MEDIA_MAX_ITEMS = 50;
 export const BATCH_MEDIA_MAX_OPS = 50;
@@ -69,28 +67,9 @@ export function parseBatchMediaBody(body: unknown): { ok: true; shopId: string; 
   return { ok: true, shopId, items };
 }
 
-/**
- * Server-side `bulkPhotoStudio` decision. `allowed` false → 402 featureLocked; `neutral` tells the UI to use the
- * Shopify-safe wording (no plans, no prices). Mirrors `/api/user/settings` (an active ShopifyShop or the
- * shopify_free provider is shopify_free) + `entitlementFromSettings`. Swap for tiers.md `requireFeature` later.
- */
-export async function bulkPhotoStudioAccess(userId: string, now: Date = new Date()): Promise<{ allowed: boolean; neutral: boolean }> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { subscriptionPlan: true, subscriptionStatus: true, billingInterval: true, billingProvider: true, trialExpiresAt: true },
-  });
-  if (!user) return { allowed: false, neutral: true };
-  const activeShopify = await prisma.shopifyShop.count({ where: { userId, isActive: true } });
-  const shopify = user.billingProvider === 'shopify_free' || activeShopify > 0;
-  const ent = entitlementFromSettings({
-    subscriptionPlan: shopify ? 'shopify_free' : user.subscriptionPlan,
-    subscriptionStatus: shopify ? 'active' : user.subscriptionStatus,
-    billingInterval: user.billingInterval,
-    billingProvider: shopify ? 'shopify_free' : user.billingProvider,
-    trialExpiresAt: user.trialExpiresAt ? new Date(user.trialExpiresAt).toISOString() : null,
-  }, now);
-  if (!ent) return { allowed: false, neutral: true };
-  return { allowed: ent.features[FEATURE] === true, neutral: isNeutralBilling(ent) };
+/** Server-side `bulkPhotoStudio` decision (kept as an export for callers/tests; see lib/billing/requireFeature). */
+export function bulkPhotoStudioAccess(userId: string, now: Date = new Date()): Promise<{ allowed: boolean; neutral: boolean }> {
+  return hasFeature(userId, FEATURE, now);
 }
 
 /** Pre-check per listing: a draft being sent, or one with a queued listing delete, is not staged onto. */
@@ -149,11 +128,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { shopId, items } = parsed;
 
   try {
-    const access = await bulkPhotoStudioAccess(user.id);
-    if (!access.allowed) {
-      return res.status(402).json({ error: 'Payment Required', limitType: 'feature', reason: 'featureLocked', feature: FEATURE, neutral: access.neutral });
+    try {
+      await requireFeature(user.id, FEATURE);
+    } catch (gateErr) {
+      if (isFeatureLockedError(gateErr)) return res.status(402).json(gateErr.body());
+      throw gateErr;
     }
     await assertShopOwnership(user.id, shopId);
+    // One token per request for every new draft's live-listing read (lazy; a failure falls back to
+    // getListingSnapshot's own lookup/cache path).
+    let tokenPromise: Promise<string | undefined> | null = null;
+    const sharedToken = () => (tokenPromise ??= Promise.resolve().then(() => getEtsyAccessToken(shopId, user.id)).catch(() => undefined));
     const blocked = await blockedListings(user.id, shopId, items.map((i) => i.listingId));
 
     const results: BatchMediaResult[] = new Array(items.length);
@@ -168,7 +153,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           continue;
         }
         try {
-          const draft = await upsertDraftPatch({ userId: user.id, shopId, listingId: item.listingId, media: item.media });
+          const accessToken = await sharedToken();
+          const draft = await upsertDraftPatch({ userId: user.id, shopId, listingId: item.listingId, media: item.media, ...(accessToken ? { accessToken } : {}) });
           if (!draft) {
             results[idx] = { listingId: item.listingId, ok: false, code: 'DRAFT_NOT_FOUND', key: 'draftSync.draftNotFound' };
             continue;

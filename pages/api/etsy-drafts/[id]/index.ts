@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { getAuthUser } from '@/lib/auth';
-import { discardDraft, removeQueuedActions, toSerializable } from '@/lib/etsy/draftService';
+import { discardDraft, removeDraftMedia, removeQueuedActions, toSerializable } from '@/lib/etsy/draftService';
 import { draftErrorResponse } from '@/lib/etsy/draftErrors';
 import { ScheduleError, scheduleErrorResponse, setDraftScheduledSendAt } from '@/lib/drafts/scheduledSend';
 import { withLegacyLastSyncError } from '@/lib/drafts/syncErrors';
@@ -22,14 +22,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ draft: toSerializable(draft ? withLegacyLastSyncError(draft as any) : draft) });
     }
 
-    // PATCH { removeQueuedActions?: ['delete', ...], scheduledSendAt?: string|null }
+    // PATCH { removeQueuedActions?: ['delete', ...], scheduledSendAt?: string|null, removeMediaIds?: string[] }
     // removeQueuedActions un-queues staged actions (e.g. cancel a queued
     // listing delete without discarding the draft). scheduledSendAt (additive,
     // listings-grid §9.4) schedules/unschedules the send; it never syncs.
+    // removeMediaIds (additive) un-stages EtsyDraftMedia rows of this draft by
+    // their row id and deletes their staged files; 409 DRAFT_SENDING while the
+    // draft is being sent. Ids not on this draft are ignored.
     if (req.method === 'PATCH') {
       const hasSchedule = req.body && Object.prototype.hasOwnProperty.call(req.body, 'scheduledSendAt');
       const types = req.body?.removeQueuedActions;
-      if (types !== undefined || !hasSchedule) {
+      const mediaIds = req.body?.removeMediaIds;
+      const hasRemoveMedia = mediaIds !== undefined;
+      if (hasRemoveMedia && (!Array.isArray(mediaIds) || mediaIds.length === 0 || mediaIds.length > 100
+        || mediaIds.some((m: unknown) => typeof m !== 'string' || !m))) {
+        return res.status(400).json({ error: 'removeMediaIds must be a non-empty array (max 100) of media ids', code: 'BAD_REQUEST' });
+      }
+      if (types !== undefined || (!hasSchedule && !hasRemoveMedia)) {
         if (!Array.isArray(types) || types.length === 0 || types.some((t: unknown) => typeof t !== 'string')) {
           return res.status(400).json({ error: 'removeQueuedActions must be a non-empty array of action types' });
         }
@@ -43,6 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             dryRun: true,
             assumeRemovedTypes: Array.isArray(types) ? types : [],
           });
+          if (hasRemoveMedia) await removeDraftMedia(id, user.id, mediaIds);
           if (Array.isArray(types)) await removeQueuedActions(id, user.id, types);
           await setDraftScheduledSendAt('etsy', id, user.id, req.body.scheduledSendAt);
         } catch (err) {
@@ -58,7 +68,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
         return res.status(200).json({ draft: toSerializable(draft ? withLegacyLastSyncError(draft as any) : draft) });
       }
-      const draft = await removeQueuedActions(id, user.id, types);
+      if (hasRemoveMedia) await removeDraftMedia(id, user.id, mediaIds);
+      const draft = Array.isArray(types)
+        ? await removeQueuedActions(id, user.id, types)
+        : await prisma.etsyListingDraft.findFirst({
+          where: { id, userId: user.id },
+          include: { media: true, syncAttempts: { orderBy: { startedAt: 'desc' }, take: 5 } },
+        });
       return res.status(200).json({ draft: toSerializable(draft ? withLegacyLastSyncError(draft as any) : draft) });
     }
 

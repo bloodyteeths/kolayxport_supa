@@ -1,10 +1,9 @@
 // lib/messages/inboxCache.ts — messages §6.2. Inbox cache + read state, and the Wix list enrichment.
 //
-// BR-4 guard: the `InboxThread` table is a backend-session migration (BUILD_PLAN §5). Until the generated
-// Prisma client has `prisma.inboxThread` AND the table answers, every call goes to a per-process in-memory
-// store with the same contract (single Hetzner process, so the cache still saves Wix calls; read state is
-// lost on restart). When the model lands, the DB store switches on by itself. A "table missing" error
-// (P2021/P2022) after deploy falls back to memory for the rest of the process.
+// BR-4: the `InboxThread` model + migration `20261015140000_inbox_threads` exist, so the generated client has
+// `prisma.inboxThread` and the DB store is used. The guard is kept as a safety net only: if the table is missing
+// at runtime (code deployed before `prisma migrate deploy`, P2021/P2022) calls fall back to a per-process
+// in-memory store with the same contract for the rest of the process.
 
 import type { MessagePlatform } from '@/types/messages';
 import { classifyPlatformError, newestWixMessage, toIso, wixContactName } from './normalize';

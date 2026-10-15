@@ -175,6 +175,47 @@ export async function isListingStockManagedImpl(userId: string, shopId: string, 
   return n > 0;
 }
 
+export type EtsyManagedVariant = { variantKey: string; canonical: number; stockItemId: string; sku: string };
+export type EtsyManagedInfo = { managed: boolean; live: boolean; variants: EtsyManagedVariant[] };
+
+/**
+ * Batch form of etsyManagedVariants (BR-11, grid rows): one settings read and one StockLink query.
+ * `listingShops` maps listingId -> its (already ownership-checked) shopId; ids with no shop are unmanaged.
+ * Returns an entry for every requested listing id.
+ */
+export async function etsyManagedVariantsMany(userId: string, listingShops: Map<string, string | null>): Promise<{ live: boolean; listings: Record<string, EtsyManagedInfo> }> {
+  const listings: Record<string, EtsyManagedInfo> = {};
+  const settings = await getStockSettings(userId);
+  const active = isStockSyncActive(settings);
+  const live = active ? isStockLive(settings) : false;
+  for (const id of listingShops.keys()) listings[id] = { managed: false, live, variants: [] };
+  const pairs = [...listingShops.entries()].filter((e): e is [string, string] => !!e[1]);
+  if (!active || pairs.length === 0) return { live, listings };
+  const byShop = new Map<string, string[]>();
+  for (const [id, shop] of pairs) byShop.set(shop, [...(byShop.get(shop) || []), id]);
+  const links = await prisma.stockLink.findMany({
+    where: {
+      userId,
+      channel: 'etsy',
+      status: 'active',
+      OR: [...byShop.entries()].map(([shop, ids]) => ({ accountRef: shop, externalId: { in: ids } })),
+    },
+    include: { stockItem: { select: { onHand: true, safetyBuffer: true, displaySku: true } } },
+  });
+  for (const l of links) {
+    const entry = listings[l.externalId];
+    if (!entry || listingShops.get(l.externalId) !== l.accountRef) continue;
+    entry.managed = true;
+    entry.variants.push({
+      variantKey: l.variantRef,
+      stockItemId: l.stockItemId,
+      sku: l.stockItem.displaySku,
+      canonical: computeLinkTarget({ onHand: l.stockItem.onHand, safetyBuffer: l.stockItem.safetyBuffer, buffer: l.buffer, unitsPerSale: l.unitsPerSale, maxListedQty: l.maxListedQty }),
+    });
+  }
+  return { live, listings };
+}
+
 /** For the editor chip: managed variants and their canonical (target) quantity. */
 export async function etsyManagedVariants(userId: string, shopId: string, listingId: string) {
   const settings = await getStockSettings(userId);

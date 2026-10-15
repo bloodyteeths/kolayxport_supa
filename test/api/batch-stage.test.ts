@@ -16,7 +16,9 @@ vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: 
 const etsyUpsert = vi.fn();
 const assertShopOwnership = vi.fn();
 const recoverStale = vi.fn();
+const getToken = vi.fn();
 vi.mock('@/lib/etsy/draftService', () => ({
+  getEtsyAccessToken: (...a: any[]) => getToken(...a),
   upsertDraftPatch: (...a: any[]) => etsyUpsert(...a),
   assertShopOwnership: (...a: any[]) => assertShopOwnership(...a),
   recoverStaleSyncingDrafts: (...a: any[]) => recoverStale(...a),
@@ -272,6 +274,21 @@ describe('POST /api/etsy-drafts/batch-stage', () => {
     expect(p).not.toHaveProperty('queuedActions');
     expect(p).not.toHaveProperty('media');
     expect(Object.keys(p).sort()).toEqual(['fields', 'inventory', 'listingId', 'replaceFields', 'shopId', 'userId']);
+  });
+
+  it('fetches the Etsy token once per request and forwards it only for new drafts', async () => {
+    getToken.mockReset();
+    getToken.mockResolvedValue('tok-shared');
+    etsyFindMany.mockResolvedValueOnce([{ etsyListingId: BigInt(1), status: 'draft' }]);
+    await call(etsyHandler, {
+      shopId: 's1',
+      items: [{ listingId: '1', fields: { quantity: 1 } }, { listingId: '2', fields: { quantity: 1 } }, { listingId: '3', fields: { quantity: 1 } }],
+    });
+    expect(getToken).toHaveBeenCalledTimes(1);
+    const byId = Object.fromEntries(etsyUpsert.mock.calls.map((c) => [c[0].listingId, c[0]]));
+    expect(byId['1']).not.toHaveProperty('accessToken');
+    expect(byId['2'].accessToken).toBe('tok-shared');
+    expect(byId['3'].accessToken).toBe('tok-shared');
   });
 
   it('stages an inventory-only item (SKU column)', async () => {

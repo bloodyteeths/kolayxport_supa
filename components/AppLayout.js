@@ -24,20 +24,16 @@ import {
   Link2,
   TrendingUp,
   Store,
-  ShoppingBag,
-  Target,
   Package,
   Wallet,
   Mail,
   Receipt,
-  Globe2,
   Pin,
   PinOff,
   Plus,
   Search,
   Boxes,
-  Activity,
-  Bell,
+  Bell
 } from 'lucide-react';
 import useSWR, { mutate } from 'swr';
 import { useAuth } from '@/lib/auth-context';
@@ -51,6 +47,7 @@ import { useConnections } from '@/lib/hooks/useConnections';
 import CommandPalette from './CommandPalette';
 import MobileTabBar, { MOBILE_TAB_BAR_HEIGHT } from './MobileTabBar';
 import NotificationBell from './NotificationBell';
+import { EtsyLogoIcon, EbayLogoIcon, TrendyolLogoIcon, WixLogoIcon, ShopifyLogoIcon, AmazonLogoIcon } from './MarketplaceLogoIcon';
 import LiveSoundToggle from './live/LiveSoundToggle';
 
 /**
@@ -135,13 +132,13 @@ function getNavGroups(t, labels) {
       id: 'listings',
       label: t('listings'),
       items: [
-        { href: '/app/etsy-listings', icon: Store, label: t('etsyListings'), requires: 'etsy', listings: true },
+        { href: '/app/etsy-listings', icon: EtsyLogoIcon, label: t('etsyListings'), requires: 'etsy', listings: true },
         // Etsy activity (W3): change history + SEO experiments.
-        { href: '/app/etsy-aktivite', icon: Activity, label: labels.etsyActivity, requires: 'etsy' },
-        { href: '/app/ebay-listings', icon: ShoppingBag, label: t('ebayListings'), requires: 'ebay', listings: true },
-        { href: '/app/trendyol-urunler', icon: Package, label: t('trendyolProducts'), requires: 'trendyol', listings: true },
-        { href: '/app/wix-urunler', icon: Package, label: t('wixProducts'), requires: 'wix', listings: true },
-        { href: '/app/shopify-urunler', icon: ShoppingBag, label: t('shopifyProducts'), requires: 'shopify', listings: true },
+        { href: '/app/etsy-aktivite', icon: EtsyLogoIcon, label: labels.etsyActivity, requires: 'etsy' },
+        { href: '/app/ebay-listings', icon: EbayLogoIcon, label: t('ebayListings'), requires: 'ebay', listings: true },
+        { href: '/app/trendyol-urunler', icon: TrendyolLogoIcon, label: t('trendyolProducts'), requires: 'trendyol', listings: true },
+        { href: '/app/wix-urunler', icon: WixLogoIcon, label: t('wixProducts'), requires: 'wix', listings: true },
+        { href: '/app/shopify-urunler', icon: ShopifyLogoIcon, label: t('shopifyProducts'), requires: 'shopify', listings: true },
         // Stock sync (W2): cross-marketplace stock hub. Shown once any store is connected.
         { href: '/app/stok-senkron', icon: Boxes, label: labels.stockSync, requires: STORE_PROVIDERS },
         { href: '/ayarlar?tab=connections', icon: Plus, label: t('connectStore'), connectCta: true },
@@ -158,13 +155,13 @@ function getNavGroups(t, labels) {
       id: 'research',
       label: t('research'),
       items: [
-        { href: '/app/etsy-research', icon: Target, label: t('etsyResearch') },
+        { href: '/app/etsy-research', icon: EtsyLogoIcon, label: t('etsyResearch') },
         // eBay research also hosts the arbitrage scanner (tab inside the page).
-        { href: '/app/ebay-research', icon: Target, label: t('ebayResearch') },
-        { href: '/app/trendyol-arastirma', icon: Target, label: t('trendyolResearch') },
+        { href: '/app/ebay-research', icon: EbayLogoIcon, label: t('ebayResearch') },
+        { href: '/app/trendyol-arastirma', icon: TrendyolLogoIcon, label: t('trendyolResearch') },
         // Product search/niche tools use the platform Creators API, not the
         // user's seller token, so this works without an Amazon connection.
-        { href: '/app/amazon-research', icon: Globe2, label: t('amazonResearch') },
+        { href: '/app/amazon-research', icon: AmazonLogoIcon, label: t('amazonResearch') },
       ],
     },
     {

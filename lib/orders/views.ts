@@ -156,8 +156,16 @@ export const EFFECTIVE_SHIP_BY_SQL = `COALESCE(
        FROM jsonb_array_elements(CASE WHEN jsonb_typeof(o."rawData"->'transactions') = 'array' THEN o."rawData"->'transactions' ELSE '[]'::jsonb END) AS tx)
   )`;
 
+/**
+ * An order still "open" this long after it was placed was shipped or cancelled
+ * outside KolayXport (the marketplace status never caught up). It is stale data,
+ * not work to do, so it stays out of To ship / Overdue and the sidebar counter.
+ */
+export const STALE_OPEN_ORDER_DAYS = 90;
+export const RECENT_ORDER_SQL = `(COALESCE(o."uiOrderDate", o."createdAt") >= NOW() - INTERVAL '${STALE_OPEN_ORDER_DAYS} days')`;
+
 /** Orders the seller still has to ship and label. */
-export const TO_SHIP_SQL = `(${LISTED_ORDER_SQL} AND ${OPEN_STATUS_SQL} AND ${UNLABELED_SQL} AND NOT ${FBA_SQL})`;
+export const TO_SHIP_SQL = `(${LISTED_ORDER_SQL} AND ${OPEN_STATUS_SQL} AND ${UNLABELED_SQL} AND NOT ${FBA_SQL} AND ${RECENT_ORDER_SQL})`;
 
 /** Ship-by passed. Combine with TO_SHIP_SQL (FBA never reaches here because To ship excludes it). */
 export const OVERDUE_SQL = `(${EFFECTIVE_SHIP_BY_SQL}) < NOW()`;
@@ -180,6 +188,9 @@ export interface OrderViewRow {
   trackingNumber?: string | null;
   shippingLabelUrl?: string | null;
   shipByAt?: Date | string | null;
+  /** When the order was placed (falls back to createdAt), for the stale-order rule. */
+  uiOrderDate?: Date | string | null;
+  createdAt?: Date | string | null;
   rawData?: unknown;
   items?: ReadonlyArray<{ shipBy?: Date | string | null; labelJobs?: ReadonlyArray<{ status?: string | null }> }>;
   shipments?: ReadonlyArray<{ status?: string | null; trackingNumber?: string | null; pdfUrl?: string | null }>;
@@ -264,12 +275,18 @@ export function effectiveShipBy(row: OrderViewRow): Date | null {
   return null;
 }
 
-export function isToShipOrder(row: OrderViewRow): boolean {
-  return isListedOrder(row) && isOpenOrder(row) && !orderHasLabel(row) && !isFbaOrder(row);
+/** Pure twin of RECENT_ORDER_SQL; an order with no known date counts as recent. */
+export function isRecentOrder(row: OrderViewRow, now: Date = new Date()): boolean {
+  const placed = validDate(row.uiOrderDate) ?? validDate(row.createdAt);
+  return placed === null || placed.getTime() >= now.getTime() - STALE_OPEN_ORDER_DAYS * 86_400_000;
+}
+
+export function isToShipOrder(row: OrderViewRow, now: Date = new Date()): boolean {
+  return isListedOrder(row) && isOpenOrder(row) && !orderHasLabel(row) && !isFbaOrder(row) && isRecentOrder(row, now);
 }
 
 export function isOverdueOrder(row: OrderViewRow, now: Date = new Date()): boolean {
-  if (!isToShipOrder(row)) return false;
+  if (!isToShipOrder(row, now)) return false;
   const d = effectiveShipBy(row);
   return d !== null && d.getTime() < now.getTime();
 }
@@ -279,7 +296,7 @@ export function countToShip(rows: readonly OrderViewRow[], now: Date = new Date(
   let toShip = 0;
   let overdue = 0;
   for (const r of rows) {
-    if (!isToShipOrder(r)) continue;
+    if (!isToShipOrder(r, now)) continue;
     toShip++;
     const d = effectiveShipBy(r);
     if (d && d.getTime() < now.getTime()) overdue++;

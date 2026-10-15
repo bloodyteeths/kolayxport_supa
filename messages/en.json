@@ -148,7 +148,8 @@
       "errorCode": "Error code:",
       "tryAgain": "Back to sign in",
       "backHome": "Back to home"
-    }
+    },
+    "loggingOut": "Signing out…"
   },
   "nav": {
     "overview": "Overview",
@@ -196,7 +197,29 @@
     "help": "Help",
     "more": "More",
     "mainNavigation": "Main navigation",
-    "search": "Search"
+    "search": "Search",
+    "items": {
+      "home": "Home",
+      "stockSync": "Stock sync",
+      "notifications": "Notifications",
+      "activity": "Activity",
+      "orders": "Orders",
+      "messages": "Messages",
+      "listingsOf": "{marketplace} listings",
+      "connectStore": "Connect a store",
+      "research": "Research",
+      "reports": "Reports",
+      "finance": "Finance",
+      "settings": "Settings",
+      "help": "Help",
+      "invoices": "Invoices",
+      "guides": "Integrations & guides",
+      "etsyActivity": "Etsy activity",
+      "overview": "Overview"
+    },
+    "groups": {
+      "listings": "Listings"
+    }
   },
   "manualOrder": {
     "addButton": "Add Manual Order",
@@ -10707,6 +10730,95 @@
       "noTags": "No tags yet",
       "noTaxonomy": "Pick a category to check its details",
       "noResearch": "No research data"
+    }
+  },
+  "shell": {
+    "badge": {
+      "toShip": "{count, plural, one {# to ship} other {# to ship}}",
+      "overdue": "{count, plural, one {# overdue} other {# overdue}}",
+      "unread": "{count, plural, one {# unread} other {# unread}}",
+      "unsent": "{count, plural, one {# change not sent yet} other {# changes not sent yet}}",
+      "reconnect": "{marketplace} needs reconnecting",
+      "settingsReconnect": "A store needs reconnecting",
+      "reconnectShort": "Reconnect needed"
+    },
+    "skipToContent": "Skip to content",
+    "mainNav": "Main",
+    "breadcrumbs": "Breadcrumb",
+    "sidebar": {
+      "collapse": "Collapse sidebar",
+      "expand": "Expand sidebar"
+    },
+    "topbar": {
+      "search": "Search or jump to…",
+      "notifications": "Notifications",
+      "notificationsUnread": "Notifications ({count} unread)",
+      "account": "Account",
+      "back": "Back"
+    },
+    "account": {
+      "settings": "Account settings",
+      "billing": "Plan & billing",
+      "plan": "Plan",
+      "language": "Language",
+      "shortcuts": "Keyboard shortcuts",
+      "signOut": "Sign out"
+    },
+    "usage": {
+      "region": "Plan usage",
+      "plan": {
+        "trial": "Trial",
+        "starter": "Starter",
+        "growth": "Growth",
+        "pro": "Pro",
+        "enterprise": "Enterprise · Unlimited",
+        "shopifyFree": "Free via Shopify"
+      },
+      "trialDaysLeft": "Trial · {days, plural, one {# day} other {# days}} left",
+      "labels": "Labels",
+      "ordersImported": "Orders imported",
+      "kind": {
+        "labels": "labels",
+        "orders": "order imports"
+      },
+      "railTooltip": "{kind} {used} of {limit} used",
+      "resets": "Resets {date}",
+      "ofLimit": "{used} / {limit}"
+    },
+    "banner": {
+      "trialEnded": "Your trial has ended. Choose a plan to keep importing orders and creating labels.",
+      "noPlan": "You don't have an active plan. Choose one to keep importing orders and creating labels.",
+      "limitReached": "You've used all {limit} {kind} for this period.",
+      "choosePlan": "Choose a plan",
+      "upgrade": "Upgrade"
+    },
+    "shortcuts": {
+      "title": "Keyboard shortcuts",
+      "palette": "Search or jump",
+      "goTo": "Go to a page (g, then a letter)",
+      "sidebar": "Collapse or expand the sidebar",
+      "help": "Show shortcuts",
+      "close": "Close or clear",
+      "goHint": "g …"
+    },
+    "mobile": {
+      "more": "More",
+      "menu": "Menu"
+    },
+    "pull": {
+      "pull": "Pull to refresh",
+      "release": "Release to refresh",
+      "refreshing": "Refreshing…"
+    },
+    "palette": {
+      "retry": "Retry",
+      "refreshing": "Refreshing orders…",
+      "refreshed": "Orders refreshed",
+      "onThisPage": "On this page",
+      "recent": "Recent",
+      "searchError": "Couldn't search orders",
+      "noOrders": "No orders match “{query}”",
+      "cancel": "Cancel"
     }
   }
 }

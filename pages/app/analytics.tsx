@@ -4,19 +4,17 @@ import ErrorState from '@/components/ui/ErrorState';
 import { useAuth } from '@/lib/auth-context';
 // supabase browser client removed — auth now handled by NextAuth cookies
 import { useRouter } from 'next/router';
-import AppLayout from '../../components/AppLayout';
+import { loginUrlFor } from '@/components/withAuth';
+import { Page, PageHeader, SyncMeta } from '@/components/ds/page';
 import dynamic from 'next/dynamic';
 import { useTranslations } from 'next-intl';
 import { toast } from 'react-hot-toast';
 import { useLocale } from '@/lib/i18n/useLocale';
 import {
-  TrendingUp,
-  TrendingDown,
   ShoppingCart,
   DollarSign,
   Users,
   Package,
-  RefreshCw,
   ChevronLeft,
   ChevronRight,
   Calendar,
@@ -224,6 +222,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const t = useTranslations('analytics');
   const tDash = useTranslations('dashboard');
+  const tNav = useTranslations('nav.items');
 
   // Back from Stripe checkout: confirm activation once, then drop the id from the URL.
   useEffect(() => {
@@ -245,6 +244,7 @@ export default function DashboardPage() {
   const [selectedMonth, setSelectedMonth] = useState('');
   const [selectedDay, setSelectedDay] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [loadedAt, setLoadedAt] = useState<Date | null>(null);
 
   // Init dates client-side
   useEffect(() => {
@@ -283,7 +283,7 @@ export default function DashboardPage() {
   // Fetch
   useEffect(() => {
     if (!authLoading && !user) {
-      router.replace('/app');
+      router.replace(loginUrlFor(router.asPath));
     } else if (user) {
       if (dateRange === 'day' && selectedDay) fetchData();
       else if (dateRange === 'month' && selectedMonth) fetchData();
@@ -313,6 +313,7 @@ export default function DashboardPage() {
         throw new Error('');
       }
       setData(json as AnalyticsData);
+      setLoadedAt(new Date());
       setError(null);
     } catch (e) {
       console.error('Dashboard fetch error:', e);
@@ -439,7 +440,12 @@ export default function DashboardPage() {
   // Full skeleton only for the very first load; later range changes keep the
   // previous data on screen (dimmed) under a thin progress bar.
   if (authLoading || (loading && !data && !error)) {
-    return <AppLayout title={t('pageTitle')}><Skeleton /></AppLayout>;
+    return (
+      <Page title={tNav('home')} width="detail">
+        <PageHeader title={tNav('home')} />
+        <Skeleton />
+      </Page>
+    );
   }
 
   const unconverted = data?.unconvertedCurrencies ?? [];
@@ -450,28 +456,13 @@ export default function DashboardPage() {
   const isStale = loading || !!error;
 
   return (
-    <AppLayout title={t('pageTitle')}>
+    <Page title={tNav('home')} width="detail">
+      <PageHeader
+        title={tNav('home')}
+        subtitle={dateRange === 'day' ? `${t('dayAnalysis')} · ${selectedDayLabel}` : t('trackPerformance')}
+        meta={<SyncMeta source="all" lastPulledAt={loadedAt} state={refreshing ? 'pulling' : 'idle'} onPull={handleRefresh} />}
+      />
       <div className="space-y-3 max-w-full">
-
-        {/* ── Header ─────────────────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h1 className="text-lg sm:text-2xl font-bold text-slate-900" style={{ letterSpacing: '-0.025em' }}>
-              {dateRange === 'day' ? t('dayAnalysis') : t('dashboardTitle')}
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-              {dateRange === 'day' ? selectedDayLabel : t('trackPerformance')}
-            </p>
-          </div>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="btn-primary text-xs sm:text-sm !py-2 !px-4 disabled:opacity-50 self-start sm:self-auto"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-            {t('refresh')}
-          </button>
-        </div>
 
         {/* ── Date Range Bar ─────────────────────────────────────── */}
         <Card className="p-3 sm:p-4">
@@ -859,6 +850,6 @@ export default function DashboardPage() {
         )}
 
       </div>
-    </AppLayout>
+    </Page>
   );
 }

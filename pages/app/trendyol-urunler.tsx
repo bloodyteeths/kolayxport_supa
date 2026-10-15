@@ -15,9 +15,6 @@ import {
   Paper,
   Chip,
   InputAdornment,
-  Menu,
-  ListItemIcon,
-  ListItemText,
   Checkbox,
   useMediaQuery,
   useTheme,
@@ -34,21 +31,14 @@ import {
   Refresh as RefreshIcon,
   Search as SearchIcon,
   Edit as EditIcon,
-  Archive as ArchiveIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
-  Add as AddIcon,
-  MoreVert as MoreVertIcon,
-  FindReplace as FindReplaceIcon,
-  FileDownload as FileDownloadIcon,
-  FileUpload as FileUploadIcon,
-  PriceChange as PriceChangeIcon,
   Inventory as InventoryIcon,
-  Close as CloseIcon,
   UnfoldMore as UnfoldMoreIcon,
   UnfoldLess as UnfoldLessIcon,
 } from '@mui/icons-material';
-import AppLayout from '@/components/AppLayout';
+import { Page, PageHeader, SyncMeta } from '@/components/ds/page';
+import { icons } from '@/lib/ds/icons';
 import { RequireConnection } from '@/components/ui/ConnectEmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import { notify } from '@/lib/notify';
@@ -103,6 +93,16 @@ interface TrendyolProductRow {
   _variantCount?: number;
   _variants?: TrendyolProductRow[];
   _expanded?: boolean;
+}
+
+/** Newest `syncedAt` across rows (null when none parse): the last time this catalogue was pulled. */
+function latestSyncedAt(rows: ReadonlyArray<{ syncedAt?: string | null }>): Date | null {
+  let best = 0;
+  for (const r of rows) {
+    const ms = r.syncedAt ? Date.parse(r.syncedAt) : NaN;
+    if (ms > best) best = ms;
+  }
+  return best > 0 ? new Date(best) : null;
 }
 
 type StatusFilter = 'all' | 'approved' | 'onSale' | 'rejected' | 'archived' | 'pending';
@@ -412,12 +412,15 @@ function MobileTrendyolCard({
 
 function TrendyolListingsPage() {
   const t = useTranslations('trendyolListings');
+  const tNav = useTranslations('nav.items');
   const { user } = useAuth();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   // State
   const [products, setProducts] = useState<TrendyolProductRow[]>([]);
+  // Newest row sync time = when this catalogue was last pulled (no separate per-shop timestamp is returned).
+  const lastSyncedAt = useMemo(() => latestSyncedAt(products), [products]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -426,7 +429,6 @@ function TrendyolListingsPage() {
   const [drawerProductId, setDrawerProductId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({ page: 0, pageSize: 25 });
-  const [toolsMenuAnchor, setToolsMenuAnchor] = useState<null | HTMLElement>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [findReplaceOpen, setFindReplaceOpen] = useState(false);
   const [backupOpen, setBackupOpen] = useState(false);
@@ -781,9 +783,17 @@ function TrendyolListingsPage() {
   // ---------------------------------------------------------------------------
 
   return (
-    <AppLayout title={t('title')}>
+    <Page title={tNav('listingsOf', { marketplace: 'Trendyol' })} width="list">
       <RequireConnection provider="trendyol">
-      <Box sx={{ p: { xs: 0.5, sm: 1, md: 1.5 }, maxWidth: 1400, mx: 'auto' }}>
+      <PageHeader
+        title={tNav('listingsOf', { marketplace: 'Trendyol' })}
+        meta={<SyncMeta source="trendyol" lastPulledAt={lastSyncedAt} state={syncing ? 'pulling' : 'idle'} onPull={handleSync} />}
+        overflowActions={[
+          { id: 'trendyol-find-replace', label: t('findReplace.title'), icon: icons.edit, onClick: () => setFindReplaceOpen(true) },
+          { id: 'trendyol-backup', label: t('backup'), icon: icons.download, onClick: () => setBackupOpen(true) },
+        ]}
+      />
+      <Box>
         {/* Toolbar */}
         <Paper sx={{ p: { xs: 1.5, md: 2 }, mb: 2, borderRadius: 2, display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center' }}>
           <TextField size="small" placeholder={t('searchProducts')} value={searchTerm}
@@ -802,30 +812,6 @@ function TrendyolListingsPage() {
               <MenuItem value="pending">{t('pending')}</MenuItem>
             </Select>
           </FormControl>
-          <Button variant="contained"
-            startIcon={syncing ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
-            onClick={handleSync} disabled={syncing}
-            sx={{ textTransform: 'none', fontWeight: 600, bgcolor: TRENDYOL_ORANGE, '&:hover': { bgcolor: '#e06a10' }, minWidth: 100, minHeight: 40 }}
-          >
-            {syncing ? t('syncing') : t('sync')}
-          </Button>
-          {/* Tools Menu */}
-          <IconButton onClick={e => setToolsMenuAnchor(e.currentTarget)}
-            aria-label={t('moreActions')}
-            sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5, minWidth: 44, minHeight: 44 }}
-          >
-            <MoreVertIcon />
-          </IconButton>
-          <Menu anchorEl={toolsMenuAnchor} open={Boolean(toolsMenuAnchor)} onClose={() => setToolsMenuAnchor(null)}>
-            <MenuItem onClick={() => { setToolsMenuAnchor(null); setFindReplaceOpen(true); }}>
-              <ListItemIcon><FindReplaceIcon fontSize="small" /></ListItemIcon>
-              <ListItemText>{t('findReplace.title')}</ListItemText>
-            </MenuItem>
-            <MenuItem onClick={() => { setToolsMenuAnchor(null); setBackupOpen(true); }}>
-              <ListItemIcon><FileDownloadIcon fontSize="small" /></ListItemIcon>
-              <ListItemText>{t('backup')}</ListItemText>
-            </MenuItem>
-          </Menu>
         </Paper>
 
         {/* Summary bar */}
@@ -992,7 +978,7 @@ function TrendyolListingsPage() {
           />
         )}
       </Suspense>
-    </AppLayout>
+    </Page>
   );
 }
 

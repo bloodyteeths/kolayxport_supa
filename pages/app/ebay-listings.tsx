@@ -25,13 +25,6 @@ import {
   TableHead,
   TableRow,
   Collapse,
-  Badge,
-  Menu,
-  ListItemText,
-  ListItemIcon,
-  ListSubheader,
-  Divider,
-  InputLabel,
   useMediaQuery,
   useTheme,
 } from '@mui/material';
@@ -44,32 +37,16 @@ import {
   GridRowId,
 } from '@mui/x-data-grid';
 import {
-  Refresh as RefreshIcon,
   Search as SearchIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  UploadFile as UploadFileIcon,
-  ErrorOutline as ErrorOutlineIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
-  MoreVert as MoreVertIcon,
-  FindReplace as FindReplaceIcon,
-  ContentCopy as ContentCopyIcon,
-  AttachMoney as AttachMoneyIcon,
-  ViewList as ViewListIcon,
-  Download as DownloadIcon,
-  Backup as BackupIcon,
-  Schedule as ScheduleIcon,
   Close as CloseIcon,
-  Build as BuildIcon,
   AutoFixHigh as AutoFixHighIcon,
   Psychology as PsychologyIcon,
   Add as AddIcon,
-  Sync as SyncIcon,
   Inventory2 as Inventory2Icon,
-  CheckCircle as CheckCircleIcon,
-  EditNote as EditNoteIcon,
-  RemoveShoppingCart as RemoveShoppingCartIcon,
   Circle as CircleIcon,
   Storefront as StorefrontIcon,
 } from '@mui/icons-material';
@@ -80,13 +57,12 @@ import { RequireConnection } from '@/components/ui/ConnectEmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { notify } from '@/lib/notify';
-import AppLayout from '@/components/AppLayout';
+import { Page, PageHeader, SyncMeta } from '@/components/ds/page';
+import { icons } from '@/lib/ds/icons';
 import withAuth from '@/components/withAuth';
 import { useAuth } from '@/lib/auth-context';
 import { useTranslations } from 'next-intl';
-import { useLocale } from '@/lib/i18n/useLocale';
 
-import { Tabs, Tab } from '@mui/material';
 import SEOIndicator from '@/components/ebay/SEOIndicator';
 import ListingEditorDrawer from '@/components/ebay/ListingEditorDrawer';
 import ListingCreatorDialog, { type EbayListingPrefill } from '@/components/ebay/ListingCreatorDialog';
@@ -806,6 +782,7 @@ function EbayListingsPage() {
   const { user } = useAuth();
   const userId = (user as any)?.id;
   const t = useTranslations('ebayListings');
+  const tNav = useTranslations('nav.items');
   const router = useRouter();
   const { has } = useConnections();
   /** Only offer cross-listing once Etsy is definitely connected. */
@@ -882,7 +859,6 @@ function EbayListingsPage() {
   const [scheduledCount, setScheduledCount] = useState(0);
 
   // Mobile "More" menu anchor
-  const [moreMenuAnchor, setMoreMenuAnchor] = useState<null | HTMLElement>(null);
 
   // --- Fetch listings from DB cache (instant) ---
   const fetchListings = useCallback(async (): Promise<boolean> => {
@@ -1832,72 +1808,32 @@ function EbayListingsPage() {
   }, [filteredListings, paginationModel]);
 
   return (
-    <Box sx={{ p: { xs: 0.5, sm: 1, md: 1.5 }, maxWidth: 1600, mx: 'auto', width: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
+    <Box sx={{ width: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
 
       {/* ---------------------------------------------------------------
           Page header — identity, sync state and the primary action in one row
          --------------------------------------------------------------- */}
-      <Box
-        sx={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          gap: 1.5,
-          mb: 2.5,
-        }}
-      >
-        <Box sx={{ flex: 1, minWidth: 220 }}>
-          <Typography variant="h4" fontWeight={700} sx={{ letterSpacing: '-0.02em' }}>
-            {t('pageTitle')}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {t('pageSubtitle', { count: totalCount })}
-            {lastSyncAt
-              ? ` · ${t('lastSync')}: ${new Date(lastSyncAt).toLocaleString()}`
-              : ` · ${t('neverSynced')}`}
-          </Typography>
-        </Box>
-
-        <Button
-          variant="outlined"
-          onClick={syncFromEbay}
-          disabled={syncing || loading}
-          startIcon={syncing ? <CircularProgress size={16} /> : <SyncIcon />}
-          sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}
-        >
-          {syncing ? t('syncing') : t('syncFromEbay')}
-        </Button>
-
-        <Button
-          variant="outlined"
-          startIcon={<DownloadIcon />}
-          onClick={handleExportCSV}
-          sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}
-        >
-          {t('csvDownload')}
-        </Button>
-
-        <Button
-          variant="outlined"
-          onClick={(e) => setMoreMenuAnchor(e.currentTarget)}
-          startIcon={<BuildIcon />}
-          endIcon={<ExpandMoreIcon />}
-          sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}
-        >
-          {t('tools')}
-        </Button>
-
-        <Button
-          variant="contained"
-          color="success"
-          onClick={() => setCreatorOpen(true)}
-          disabled={crosslistLoading}
-          startIcon={<AddIcon />}
-          sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}
-        >
-          {t('newListing')}
-        </Button>
-      </Box>
+      <PageHeader
+        title={tNav('listingsOf', { marketplace: 'eBay' })}
+        count={totalCount}
+        meta={<SyncMeta source="ebay" lastPulledAt={lastSyncAt} state={syncing ? 'pulling' : 'idle'} onPull={loading ? undefined : syncFromEbay} />}
+        primaryAction={{ id: 'ebay-new-listing', label: t('newListing'), icon: icons.add, onClick: () => setCreatorOpen(true), disabled: crosslistLoading }}
+        mobilePrimary="menu"
+        secondaryActions={[
+          { id: 'ebay-csv-export', label: t('csvDownload'), icon: icons.download, onClick: handleExportCSV },
+        ]}
+        overflowActions={[
+          { id: 'ebay-ai-optimize-titles', label: t('optimizeTitles'), icon: icons.ai, onClick: handleAIBulkOptimize },
+          { id: 'ebay-ai-analyze', label: t('analyzeListing'), icon: icons.ai, onClick: handleAIAnalyze },
+          { id: 'ebay-find-replace', label: t('findReplace'), icon: icons.edit, onClick: () => setFindReplaceOpen(true) },
+          { id: 'ebay-duplicates', label: t('duplicateDetection'), icon: icons.copy, onClick: () => setDuplicateDetectorOpen(true) },
+          { id: 'ebay-smart-pricing', label: t('smartPricing'), onClick: () => setSmartPricingOpen(true) },
+          { id: 'ebay-templates', label: t('templates'), onClick: () => setTemplatesOpen(true) },
+          { id: 'ebay-csv-import', label: t('csvImport'), icon: icons.upload, onClick: handleCSVFileSelect },
+          { id: 'ebay-backups', label: t('backupManager'), icon: icons.history, onClick: () => setBackupManagerOpen(true) },
+          { id: 'ebay-scheduled', label: `${t('scheduledTasks')}${scheduledCount > 0 ? ` (${scheduledCount})` : ''}`, icon: icons.schedule, onClick: () => setScheduledOpen(true) },
+        ]}
+      />
 
       {/* ---------------------------------------------------------------
       {/* ---------------------------------------------------------------
@@ -2060,67 +1996,6 @@ function EbayListingsPage() {
             </Box>
           </Paper>
 
-      <Menu
-        anchorEl={moreMenuAnchor}
-        open={Boolean(moreMenuAnchor)}
-        onClose={() => setMoreMenuAnchor(null)}
-        slotProps={{ paper: { sx: { minWidth: 320 } } }}
-      >
-        <ListSubheader sx={{ lineHeight: '32px', fontSize: 12, fontWeight: 700, color: 'primary.main' }}>
-          {t('aiAssistant')}
-        </ListSubheader>
-        <MenuItem onClick={() => { setMoreMenuAnchor(null); handleAIBulkOptimize(); }}>
-          <ListItemIcon><AutoFixHighIcon fontSize="small" /></ListItemIcon>
-          <ListItemText primary={t('optimizeTitles')} secondary={t('optimizeTitlesDesc')} />
-        </MenuItem>
-        <MenuItem onClick={() => { setMoreMenuAnchor(null); handleAIAnalyze(); }}>
-          <ListItemIcon><PsychologyIcon fontSize="small" /></ListItemIcon>
-          <ListItemText primary={t('analyzeListing')} secondary={t('aiAnalysisDesc')} />
-        </MenuItem>
-        <Divider />
-        <ListSubheader sx={{ lineHeight: '32px', fontWeight: 700 }}>{t('editingTools')}</ListSubheader>
-        <MenuItem onClick={() => { setMoreMenuAnchor(null); setFindReplaceOpen(true); }}>
-          <ListItemIcon><FindReplaceIcon fontSize="small" /></ListItemIcon>
-          <ListItemText primary={t('findReplace')} secondary={t('findReplaceDesc')} />
-        </MenuItem>
-        <MenuItem onClick={() => { setMoreMenuAnchor(null); setDuplicateDetectorOpen(true); }}>
-          <ListItemIcon><ContentCopyIcon fontSize="small" /></ListItemIcon>
-          <ListItemText primary={t('duplicateDetection')} secondary={t('duplicateDetectionDesc')} />
-        </MenuItem>
-
-        <ListSubheader sx={{ lineHeight: '32px', fontWeight: 700 }}>{t('priceTemplates')}</ListSubheader>
-        <MenuItem onClick={() => { setMoreMenuAnchor(null); setSmartPricingOpen(true); }}>
-          <ListItemIcon><AttachMoneyIcon fontSize="small" /></ListItemIcon>
-          <ListItemText primary={t('smartPricing')} secondary={t('smartPricingDesc')} />
-        </MenuItem>
-        <MenuItem onClick={() => { setMoreMenuAnchor(null); setTemplatesOpen(true); }}>
-          <ListItemIcon><ViewListIcon fontSize="small" /></ListItemIcon>
-          <ListItemText primary={t('templates')} secondary={t('templatesDesc')} />
-        </MenuItem>
-
-        <ListSubheader sx={{ lineHeight: '32px', fontWeight: 700 }}>{t('data')}</ListSubheader>
-        <MenuItem onClick={() => { setMoreMenuAnchor(null); handleCSVFileSelect(); }}>
-          <ListItemIcon><UploadFileIcon fontSize="small" /></ListItemIcon>
-          <ListItemText primary={t('csvImport')} secondary={t('csvImportDesc')} />
-        </MenuItem>
-
-        <ListSubheader sx={{ lineHeight: '32px', fontWeight: 700 }}>{t('security')}</ListSubheader>
-        <MenuItem onClick={() => { setMoreMenuAnchor(null); setBackupManagerOpen(true); }}>
-          <ListItemIcon><BackupIcon fontSize="small" /></ListItemIcon>
-          <ListItemText primary={t('backupManager')} secondary={t('backupManagerDesc')} />
-        </MenuItem>
-        <MenuItem onClick={() => { setMoreMenuAnchor(null); setScheduledOpen(true); }}>
-          <ListItemIcon>
-            <Badge badgeContent={scheduledCount} color="primary" sx={{ '& .MuiBadge-badge': { fontSize: '0.8rem' } }}>
-              <ScheduleIcon fontSize="small" />
-            </Badge>
-          </ListItemIcon>
-          <ListItemText
-            primary={`${t('scheduledTasks')}${scheduledCount > 0 ? ` (${scheduledCount})` : ''}`}
-            secondary={t('scheduledUpdatesDesc')}
-          />
-        </MenuItem>
-      </Menu>
 
       {crosslistLoading && (
         <Paper
@@ -2730,12 +2605,13 @@ function EbayListingsPage() {
 
 // --- Layout wrapper (follows Etsy listings pattern) ---
 function EbayListingsPageWithLayout(props: any): JSX.Element {
+  const tNav = useTranslations('nav.items');
   return (
-    <AppLayout title="eBay Listings — KolayXport">
+    <Page title={tNav('listingsOf', { marketplace: 'eBay' })} width="list">
       <RequireConnection provider="ebay">
         <EbayListingsPage {...props} />
       </RequireConnection>
-    </AppLayout>
+    </Page>
   );
 }
 

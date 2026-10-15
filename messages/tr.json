@@ -148,7 +148,8 @@
       "errorCode": "Hata Kodu:",
       "tryAgain": "Girişe dön",
       "backHome": "Ana Sayfaya Dön"
-    }
+    },
+    "loggingOut": "Çıkış yapılıyor…"
   },
   "nav": {
     "overview": "Genel Bakış",
@@ -196,7 +197,29 @@
     "help": "Yardım",
     "more": "Daha fazla",
     "mainNavigation": "Ana gezinme",
-    "search": "Ara"
+    "search": "Ara",
+    "items": {
+      "home": "Ana sayfa",
+      "stockSync": "Stok senkronu",
+      "notifications": "Bildirimler",
+      "activity": "Etkinlik",
+      "orders": "Siparişler",
+      "messages": "Mesajlar",
+      "listingsOf": "{marketplace} ilanları",
+      "connectStore": "Mağaza bağla",
+      "research": "Pazar araştırması",
+      "reports": "Raporlar",
+      "finance": "Finans",
+      "settings": "Ayarlar",
+      "help": "Yardım",
+      "invoices": "Faturalar",
+      "guides": "Entegrasyonlar ve rehberler",
+      "etsyActivity": "Etsy etkinliği",
+      "overview": "Genel bakış"
+    },
+    "groups": {
+      "listings": "İlanlar"
+    }
   },
   "manualOrder": {
     "addButton": "Manuel Sipariş Ekle",
@@ -10707,6 +10730,95 @@
       "noTags": "Henüz etiket yok",
       "noTaxonomy": "Ayrıntıları kontrol etmek için bir kategori seçin",
       "noResearch": "Araştırma verisi yok"
+    }
+  },
+  "shell": {
+    "badge": {
+      "toShip": "{count} gönderilecek",
+      "overdue": "{count} gecikti",
+      "unread": "{count} okunmadı",
+      "unsent": "{count} değişiklik henüz gönderilmedi",
+      "reconnect": "{marketplace} yeniden bağlanmalı",
+      "settingsReconnect": "Bir mağaza yeniden bağlanmalı",
+      "reconnectShort": "Yeniden bağlan"
+    },
+    "skipToContent": "İçeriğe geç",
+    "mainNav": "Ana menü",
+    "breadcrumbs": "Konum",
+    "sidebar": {
+      "collapse": "Kenar çubuğunu daralt",
+      "expand": "Kenar çubuğunu genişlet"
+    },
+    "topbar": {
+      "search": "Ara veya git…",
+      "notifications": "Bildirimler",
+      "notificationsUnread": "Bildirimler ({count} okunmadı)",
+      "account": "Hesap",
+      "back": "Geri"
+    },
+    "account": {
+      "settings": "Hesap ayarları",
+      "billing": "Plan ve faturalandırma",
+      "plan": "Plan",
+      "language": "Dil",
+      "shortcuts": "Klavye kısayolları",
+      "signOut": "Çıkış yap"
+    },
+    "usage": {
+      "region": "Plan kullanımı",
+      "plan": {
+        "trial": "Deneme",
+        "starter": "Starter",
+        "growth": "Growth",
+        "pro": "Pro",
+        "enterprise": "Enterprise · Sınırsız",
+        "shopifyFree": "Shopify üzerinden ücretsiz"
+      },
+      "trialDaysLeft": "Deneme · {days} gün kaldı",
+      "labels": "Etiketler",
+      "ordersImported": "Aktarılan siparişler",
+      "kind": {
+        "labels": "etiket",
+        "orders": "sipariş aktarma"
+      },
+      "railTooltip": "{kind}: {limit} hakkın {used} tanesi kullanıldı",
+      "resets": "{date} tarihinde sıfırlanır",
+      "ofLimit": "{used} / {limit}"
+    },
+    "banner": {
+      "trialEnded": "Deneme süreniz bitti. Sipariş aktarmaya ve etiket oluşturmaya devam etmek için bir plan seçin.",
+      "noPlan": "Aktif bir planınız yok. Sipariş aktarmaya ve etiket oluşturmaya devam etmek için bir plan seçin.",
+      "limitReached": "Bu dönemdeki {limit} {kind} hakkınızın tamamını kullandınız.",
+      "choosePlan": "Plan seç",
+      "upgrade": "Planı yükselt"
+    },
+    "shortcuts": {
+      "title": "Klavye kısayolları",
+      "palette": "Ara veya git",
+      "goTo": "Sayfaya git (g, ardından harf)",
+      "sidebar": "Kenar çubuğunu daralt veya genişlet",
+      "help": "Kısayolları göster",
+      "close": "Kapat veya temizle",
+      "goHint": "g …"
+    },
+    "mobile": {
+      "more": "Daha fazla",
+      "menu": "Menü"
+    },
+    "pull": {
+      "pull": "Yenilemek için çekin",
+      "release": "Yenilemek için bırakın",
+      "refreshing": "Yenileniyor…"
+    },
+    "palette": {
+      "retry": "Tekrar dene",
+      "refreshing": "Siparişler yenileniyor…",
+      "refreshed": "Siparişler yenilendi",
+      "onThisPage": "Bu sayfada",
+      "recent": "Son kullanılanlar",
+      "searchError": "Siparişler aranamadı",
+      "noOrders": "“{query}” ile eşleşen sipariş yok",
+      "cancel": "Vazgeç"
     }
   }
 }

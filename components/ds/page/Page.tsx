@@ -1,10 +1,17 @@
 // DS §3.2 Page template + shell-nav §6.1 contract.
+//
+// M2 wiring (shell-nav §12 F): inside the persistent AppShell, `<Page>` registers itself with ShellContext
+// on its own (`usePageMetaSink()`), so pages never pass the sink. That one switch also turns on
+// `shellManaged` (the shell's mobile TopBar owns the title row and ⋯) and hands `<title>` to the shell
+// (ShellProvider writes "{title} · KolayXport"). Outside the shell (tests, public layouts) nothing changes:
+// no sink, `shellManaged` false, Page writes its own `<title>`. Explicit props still win.
 import * as React from 'react';
 import Head from 'next/head';
 import Box from '@mui/material/Box';
 import type { SxProps, Theme } from '@mui/material/styles';
 import { useTranslations } from 'next-intl';
 import { layout } from '@/lib/ds/tokens';
+import { usePageMetaSink } from '@/lib/nav/ShellContext';
 import { actionsKey, breadcrumbsKey, withLiveHandler } from './actionSignature';
 import { PageContext, type PageContextValue, type PageHeaderActions, type PageShellMeta } from './PageContext';
 import type { ActionSpec, DsBaseProps, PageBreadcrumb, PageWidth } from './types';
@@ -18,11 +25,14 @@ export type PageProps = DsBaseProps & {
   backHref?: string;
   /** ≤ 1 labeled mobile TopBar action, e.g. `+ New` (CRITIQUE C2). */
   mobileAction?: ActionSpec;
-  /** Set by the shell (M2) when it renders the mobile title row and ⋯. Default false. */
+  /**
+   * The shell renders the mobile title row and ⋯. Default: true inside the AppShell (ShellContext present),
+   * false elsewhere. Never set it apart from the meta sink (MobileTopBar wiring contract).
+   */
   shellManaged?: boolean;
-  /** Receives everything the shell needs; M2 forwards it into ShellContext + usePageActions. */
+  /** Receives everything the shell needs. Default: the ShellContext sink inside the AppShell. */
   onShellMetaChange?: (meta: PageShellMeta) => void;
-  /** Skip writing `<title>` (e.g. when the shell owns it). Default false. */
+  /** Skip writing `<title>`. Default: true inside the AppShell (the shell writes it), false elsewhere. */
   disableDocumentTitle?: boolean;
   sx?: SxProps<Theme>;
   children: React.ReactNode;
@@ -41,15 +51,20 @@ export function Page({
   breadcrumbs,
   backHref,
   mobileAction,
-  shellManaged = false,
-  onShellMetaChange,
-  disableDocumentTitle = false,
+  shellManaged: shellManagedProp,
+  onShellMetaChange: onShellMetaChangeProp,
+  disableDocumentTitle: disableDocumentTitleProp,
   sx,
   className,
   children,
   ...rest
 }: PageProps) {
   const t = useTranslations('ds.page');
+  const shellSink = usePageMetaSink();
+  const inShell = Boolean(shellSink);
+  const onShellMetaChange = onShellMetaChangeProp ?? shellSink;
+  const shellManaged = shellManagedProp ?? Boolean(onShellMetaChange && inShell);
+  const disableDocumentTitle = disableDocumentTitleProp ?? inShell;
   const [headerActions, setHeaderActions] = React.useState<PageHeaderActions | null>(null);
 
   const reportHeaderActions = React.useCallback((a: PageHeaderActions | null) => setHeaderActions(a), []);

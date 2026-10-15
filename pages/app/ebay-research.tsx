@@ -18,7 +18,7 @@ import {
   Sparkles, Zap, Download, Layers, Lightbulb, MoreHorizontal, FilePlus2,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import AppLayout from '@/components/AppLayout';
+import { Page, PageHeader } from '@/components/ds/page';
 import withAuth from '@/components/withAuth';
 import { useAuth } from '@/lib/auth-context';
 import { useTranslations } from 'next-intl';
@@ -3282,9 +3282,10 @@ function EbayResearchPage() {
 function EbayResearchPageWithLayout(props: any): JSX.Element {
   const t = useTranslations('ebayResearch');
   return (
-    <AppLayout title={t('pageTitle')}>
+    <Page title={t('pageTitle')} width="list">
+      <PageHeader title={t('pageTitle')} />
       <EbayResearchPage {...props} />
-    </AppLayout>
+    </Page>
   );
 }
 

@@ -3,8 +3,8 @@ import {
   Box, Tabs, Tab, Button, TextField, Chip, CircularProgress,
   Typography, Paper, Tooltip,
 } from '@mui/material';
-import { RefreshCw, Calendar, Wallet, Store } from 'lucide-react';
-import AppLayout from '@/components/AppLayout';
+import { RefreshCw, Calendar, Store } from 'lucide-react';
+import { Page, PageHeader } from '@/components/ds/page';
 import withAuth from '@/components/withAuth';
 import useFinanceStore from '@/lib/stores/useFinanceStore';
 import { useTranslations } from 'next-intl';
@@ -59,6 +59,7 @@ const MARKETPLACE_TABS = [
 
 function FinancialsPage() {
   const t = useTranslations('financials');
+  const tNav = useTranslations('nav.items');
   const {
     marketplace, dateRange, syncStatus, syncMessage, syncError,
     setMarketplace, setDateRange, syncSettlements, fetchDashboard,
@@ -127,26 +128,9 @@ function FinancialsPage() {
   };
 
   return (
-    <AppLayout title={t('pageTitle')}>
-      <Box sx={{ p: { xs: 0.5, sm: 1, md: 1.5 }, maxWidth: 1400, mx: 'auto' }}>
-        {/* Header */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-          <Box sx={{
-            p: 1.5, borderRadius: '14px',
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Wallet size={24} color="#fff" />
-          </Box>
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 800, letterSpacing: '-0.02em' }}>
-              {t('pageTitle')}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {t('subtitle')}
-            </Typography>
-          </Box>
-        </Box>
+    <Page title={tNav('finance')} width="detail">
+      <PageHeader title={tNav('finance')} subtitle={t('subtitle')} />
+      <Box>
 
         {/* Marketplace Tabs */}
         <Paper sx={{ mb: 2, borderRadius: '12px', overflow: 'hidden' }}>
@@ -238,7 +222,7 @@ function FinancialsPage() {
           </Box>
         )}
       </Box>
-    </AppLayout>
+    </Page>
   );
 }
 

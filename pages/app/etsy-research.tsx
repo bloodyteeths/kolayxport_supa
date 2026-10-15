@@ -4,7 +4,7 @@ import {
   TextField, InputAdornment, Button, Tabs, Tab,
 } from '@mui/material';
 import { Search, BarChart2, Link, Store } from 'lucide-react';
-import AppLayout from '@/components/AppLayout';
+import { Page, PageHeader } from '@/components/ds/page';
 import withAuth from '@/components/withAuth';
 import { useAuth } from '@/lib/auth-context';
 import { useEtsyResearchStore } from '@/lib/stores/useEtsyResearchStore';
@@ -120,29 +120,32 @@ function EtsyResearchPage() {
 
   if (loading) {
     return (
-      <AppLayout title={t('pageTitle')}>
+      <Page title={t('pageTitle')} width="list">
+        <PageHeader title={t('pageTitle')} />
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
           <CircularProgress />
         </Box>
-      </AppLayout>
+      </Page>
     );
   }
 
   if (shops.length === 0) {
     return (
-      <AppLayout title={t('pageTitle')}>
+      <Page title={t('pageTitle')} width="list">
+        <PageHeader title={t('pageTitle')} />
         <Box sx={{ p: 3, textAlign: 'center' }}>
           <Typography variant="body1" color="text.secondary">
             {t('noShopsConnected')}
           </Typography>
         </Box>
-      </AppLayout>
+      </Page>
     );
   }
 
   return (
-    <AppLayout title={t('pageTitle')}>
-      <Box sx={{ maxWidth: 1400, mx: 'auto', width: '100%', p: { xs: 0.5, sm: 1, md: 1.5 } }}>
+    <Page title={t('pageTitle')} width="list">
+      <PageHeader title={t('pageTitle')} />
+      <Box sx={{ width: '100%' }}>
         {/* Horizontal pill tabs */}
         <Tabs value={tabIndex} onChange={handleTabChange} sx={pillTabsSx} variant="scrollable" scrollButtons="auto">
           <Tab icon={<BarChart2 size={16} />} iconPosition="start" label={t('tab_research')} />
@@ -171,7 +174,7 @@ function EtsyResearchPage() {
 
         {/* R0 (research.md §14.1): AiOptimizePanel FAB removed; AI help lives in Cmd+K. */}
       </Box>
-    </AppLayout>
+    </Page>
   );
 }
 

@@ -5,11 +5,12 @@ import {
   CircularProgress, IconButton, SwipeableDrawer, Skeleton, Collapse,
 } from '@mui/material';
 import {
-  Mail, Send, ArrowLeft, Package, MessageSquare, RefreshCw, ExternalLink, ShoppingBag,
+  Mail, Send, ArrowLeft, Package, MessageSquare, ExternalLink, ShoppingBag,
   ChevronDown, ChevronUp, User, AlertTriangle, BookmarkPlus,
 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import AppLayout from '@/components/AppLayout';
+import { Page, PageHeader } from '@/components/ds/page';
+import { icons } from '@/lib/ds/icons';
 import ConnectEmptyState from '@/components/ui/ConnectEmptyState';
 import useScreenSize from '@/hooks/useScreenSize';
 import { useAuth } from '@/lib/auth-context';
@@ -73,6 +74,7 @@ function parseTemplates(raw: string | null): string[] {
 export default function MessagesPage() {
   const t = useTranslations('messages');
   const tUi = useTranslations('ui');
+  const tNav = useTranslations('nav.items');
   const locale = useLocale();
   const intlLocale = locale === 'en' ? 'en-US' : 'tr-TR';
   const { isMobile } = useScreenSize();
@@ -786,7 +788,8 @@ export default function MessagesPage() {
 
   if (noneConnected) {
     return (
-      <AppLayout title={t('title')}>
+      <Page title={tNav('messages')} width="list">
+        <PageHeader title={tNav('messages')} />
         <div className="bg-white rounded-xl" style={{ border: '1px solid #e2e8f0' }}>
           <ConnectEmptyState provider="wix" description={t('connectEitherDescription')} className="pb-4" />
           <div className="flex justify-center pb-10 px-6">
@@ -800,13 +803,19 @@ export default function MessagesPage() {
             </Button>
           </div>
         </div>
-      </AppLayout>
+      </Page>
     );
   }
 
   return (
-    <AppLayout title={t('title')}>
-      <div className="h-full flex flex-col" style={{ maxHeight: 'calc(100vh - 5rem)' }}>
+    <Page title={tNav('messages')} width="list">
+      <PageHeader
+        title={tNav('messages')}
+        secondaryActions={[
+          { id: 'messages-refresh', label: t('refresh'), icon: icons.pull, onClick: () => fetchConversations('refresh'), loading: refreshing, disabled: refreshing },
+        ]}
+      />
+      <div className="h-full flex flex-col" style={{ maxHeight: 'calc(100dvh - 11rem)' }}>
         {/* ── Filter Bar ────────────────────────────────── */}
         <div className="flex items-center gap-2 p-2 bg-white rounded-xl mb-2" style={{ border: '1px solid #e2e8f0' }}>
           <FormControl size="small" sx={{ minWidth: 130 }}>
@@ -837,17 +846,6 @@ export default function MessagesPage() {
             </Select>
           </FormControl>
 
-          <div className="flex-1" />
-
-          <IconButton
-            size="small"
-            onClick={() => fetchConversations('refresh')}
-            disabled={refreshing}
-            aria-label={t('refresh')}
-            sx={{ color: 'rgb(100 116 139)', minWidth: 44, minHeight: 44 }}
-          >
-            <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
-          </IconButton>
         </div>
 
         {/* ── Per-platform warnings (shown even when the other platform has conversations) ── */}
@@ -944,6 +942,6 @@ export default function MessagesPage() {
           </div>
         )}
       </div>
-    </AppLayout>
+    </Page>
   );
 }

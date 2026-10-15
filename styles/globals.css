@@ -181,8 +181,11 @@ body {
     min-width: 44px;
   }
 
-  nav a,
-  nav button {
+  /* Legacy page / public navs only: the app shell's own <nav>s (sidebar, tab bar, breadcrumbs, More
+     sheet) and legacy page navs inside it size their rows themselves (shell-nav §4.3). */
+  /* :where() keeps the old (0,0,2) specificity, so MUI classes still win as before. */
+  nav:where(:not([data-testid="app-shell"] nav)) a,
+  nav:where(:not([data-testid="app-shell"] nav)) button {
     min-height: 48px;
     padding: 12px 16px;
   }
@@ -206,23 +209,6 @@ body {
   pointer-events: none;
   opacity: 1;
   transition: opacity 0.3s;
-}
-
-/* Mobile sidebar improvements */
-@media (max-width: 768px) {
-  body.sidebar-open {
-    overflow: hidden;
-  }
-
-  .mobile-nav-item {
-    padding: 16px 20px;
-    min-height: 56px;
-  }
-
-  .mobile-action-buttons button {
-    padding: 8px;
-    margin: 0 4px;
-  }
 }
 
 /* ─── MUI DataGrid Premium Styling ──────────────────────────── */

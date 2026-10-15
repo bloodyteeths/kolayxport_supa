@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import AppLayout from '../../components/AppLayout';
+import { Page, PageHeader } from '@/components/ds/page';
 import { NextSeo } from 'next-seo';
 import { motion } from 'framer-motion';
-import { Zap, Info, Settings, HelpCircle, CheckCircle, ExternalLink, ShoppingCart, Briefcase, Truck, ChevronDown, ChevronUp, BookOpen, Download, Chrome, Globe } from 'lucide-react';
+import { Info, Settings, HelpCircle, CheckCircle, ExternalLink, ShoppingCart, Briefcase, Truck, ChevronDown, ChevronUp, BookOpen, Download, Chrome, Globe } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 
@@ -58,25 +58,9 @@ export default function EntegrasyonlarVeRehberlerPage() {
   const shippoMarketplaces = ['Etsy', 'Amazon', 'eBay', 'Walmart', 'Mercari'];
 
   return (
-    <AppLayout title={t('pageTitle')}>
+    <Page title={t('title')} width="reading">
       <NextSeo noindex={true} nofollow={true} />
-
-      <motion.div
-        className="mb-6 sm:mb-8 overflow-hidden max-w-full"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-      >
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow overflow-hidden">
-          <h1 className="text-xl sm:text-3xl font-bold text-slate-800 flex items-center min-w-0">
-            <Zap size={28} className="mr-2 sm:mr-3 text-blue-600 flex-shrink-0" />
-            <span className="break-words min-w-0">{t('title')}</span>
-          </h1>
-          <p className="mt-2 text-sm sm:text-base text-slate-600" style={{ wordBreak: 'break-word' }}>
-            {t('subtitle')}
-          </p>
-        </div>
-      </motion.div>
+      <PageHeader title={t('title')} subtitle={t('subtitle')} />
 
       <Section title={t('generalApproach')} icon={Info}>
         <p>
@@ -540,10 +524,6 @@ export default function EntegrasyonlarVeRehberlerPage() {
         </Step>
       </Section>
 
-    </AppLayout>
+    </Page>
   );
 }
-
-EntegrasyonlarVeRehberlerPage.getLayout = function getLayout(page) {
-  return <AppLayout>{page}</AppLayout>;
-};

@@ -4,16 +4,27 @@ import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 
-// Mirrored from the /api/user/settings route — the PATCH payload shape.
+// Mirrored from the /api/user/settings route — the GET body (and the PATCH payload shape).
 export interface UserSettingsResponse {
   subscription?: {
-    subscriptionPlan: 'trial' | 'starter' | 'growth' | 'enterprise' | null;
+    /** 'shopify_free' when billingProvider is shopify_free or the account has an active Shopify store. */
+    subscriptionPlan: 'trial' | 'starter' | 'growth' | 'enterprise' | 'shopify_free' | null;
     subscriptionStatus: 'trialing' | 'active' | 'canceled' | 'past_due' | null;
     billingInterval: 'month' | 'year' | null;
+    /** 'stripe' | 'shopify_free' | null (other legacy values pass through). */
+    billingProvider?: string | null;
     trialExpiresAt: string | null;
     usageResetAt: string | null;
     orderSyncCount: number;
     labelCount: number;
+    /**
+     * Limits enforced for this plan/status (lib/billing/planLimits.ts getPlanLimits).
+     * null = unlimited; 0 = blocked (no active subscription / invalid plan).
+     * Optional so older cached responses still type-check.
+     */
+    limits?: { orderSync: number | null; label: number | null };
+    /** Usage window the counters belong to: whole trial, monthly reset period, or none (unlimited/blocked). */
+    period?: 'trial' | 'month' | null;
   };
   shippingSettings?: {
     etgbRecipientEmail?: string | null;

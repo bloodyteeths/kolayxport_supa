@@ -1,17 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Container, Box, Paper, Tabs, Tab, Alert, CircularProgress, Typography } from '@mui/material';
+import { Box, Paper, Tabs, Tab, Alert, CircularProgress, Typography } from '@mui/material';
 import CreditCardIcon from '@mui/icons-material/CreditCard';
 import StorefrontIcon from '@mui/icons-material/Storefront';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import SyncIcon from '@mui/icons-material/Sync';
 import { useRouter } from 'next/router';
-import Link from 'next/link';
 import { toast as hotToast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { useLocale } from '@/lib/i18n/useLocale';
-import AppLayout from '../components/AppLayout';
-import PageHeader from '@/components/ui/PageHeader';
+import { Page, PageHeader } from '@/components/ds/page';
+import { icons } from '@/lib/ds/icons';
 import { useSettings } from '@/lib/hooks/useSettings';
 import { useConnections } from '@/lib/hooks/useConnections';
 import { sanitizeMessage } from '@/lib/notify';
@@ -59,6 +58,7 @@ export default function AyarlarPage() {
   const t = useTranslations('settings');
   const tc = useTranslations('common');
   const tNotif = useTranslations('notificationCenter');
+  const tNav = useTranslations('nav.items');
   const { config } = useLocale();
   const { mutate: refreshConnections } = useConnections();
 
@@ -141,17 +141,16 @@ export default function AyarlarPage() {
   const showSaveBar = (tab === 'apiKeys' || tab === 'senderProfile') && initialDataLoaded;
 
   return (
-    <AppLayout title={t('pageTitle')}>
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4, maxWidth: '100%', px: { xs: 1.5, sm: 3 } }}>
-        <PageHeader title={t('pageTitle')} subtitle={t('pageSubtitle')}>
-          {/* Notification preferences live on the notifications page (W5 §5). */}
-          <Link
-            href="/app/bildirimler?tab=preferences"
-            className="inline-flex items-center min-h-[44px] px-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline"
-          >
-            {tNotif('prefs.title')}
-          </Link>
-        </PageHeader>
+    <Page title={tNav('settings')} width="form">
+      {/* Notification preferences live on the notifications page (W5 §5). */}
+      <PageHeader
+        title={tNav('settings')}
+        subtitle={t('pageSubtitle')}
+        secondaryActions={[
+          { id: 'settings-notification-prefs', label: tNotif('prefs.title'), icon: icons.notifications, href: '/app/bildirimler?tab=preferences' },
+        ]}
+      />
+      <Box>
 
         {needsSettings && fetchError && <Alert severity="error" sx={{ mb: 2 }}>{fetchError}</Alert>}
 
@@ -195,7 +194,7 @@ export default function AyarlarPage() {
         )}
 
         {showSaveBar && <SettingsSaveBar isDirty={isDirty} isSubmitting={isSubmitting} onSave={handleSave} />}
-      </Container>
-    </AppLayout>
+      </Box>
+    </Page>
   );
 }

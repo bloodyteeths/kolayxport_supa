@@ -3,6 +3,7 @@ import { getAuthUser } from '@/lib/auth';
 import prisma from '../../../lib/prisma';
 import { withPrismaRetry } from '../../../lib/prismaWithRetry';
 import { encryptCredentials, decryptCredentials, maskCredentials, stripMaskedSecrets } from '@/lib/encryption';
+import { getPlanLimits } from '@/lib/billing/planLimits';
 
 export default async function handler(
   req: NextApiRequest,
@@ -63,19 +64,37 @@ export default async function handler(
       const maskedCreds = userWithSettings.integrationSettings
         ? maskCredentials(decryptCredentials(userWithSettings.integrationSettings as Record<string, any>))
         : null;
+      const isShopifyFree = effectiveBillingProvider === 'shopify_free';
+      const effectivePlan = isShopifyFree ? 'shopify_free' : userWithSettings.subscriptionPlan;
+      const effectiveStatus = isShopifyFree ? 'active' : userWithSettings.subscriptionStatus;
+      // Limits the usage limiter actually applies (lib/billing/planLimits.ts, same
+      // decision as lib/middleware/withUsageLimiter.ts). null = unlimited; 0 = blocked.
+      // Computed from the RAW DB plan/status, not the display-level shopify_free
+      // mask above: the middleware only short-circuits when the User row itself
+      // says subscriptionPlan === 'shopify_free', so an account that is
+      // shopify_free only because of an active ShopifyShop / billingProvider is
+      // still limited (trial or noSubscription) and must not be reported as
+      // unlimited. The UI hides the meter for shopify_free (rule 1.2.1) anyway.
+      const planLimits = getPlanLimits(
+        userWithSettings.subscriptionPlan,
+        userWithSettings.subscriptionStatus,
+        userWithSettings.trialExpiresAt,
+      );
       res.status(200).json({
         integrationSettings: maskedCreds,
         shipperProfile: userWithSettings.shipperProfile,
         shippingSettings: userWithSettings.shippingSettings || {},
         subscription: {
-          subscriptionPlan: effectiveBillingProvider === 'shopify_free' ? 'shopify_free' : userWithSettings.subscriptionPlan,
-          subscriptionStatus: effectiveBillingProvider === 'shopify_free' ? 'active' : userWithSettings.subscriptionStatus,
+          subscriptionPlan: effectivePlan,
+          subscriptionStatus: effectiveStatus,
           billingInterval: userWithSettings.billingInterval,
           billingProvider: effectiveBillingProvider,
           trialExpiresAt: userWithSettings.trialExpiresAt,
           usageResetAt: userWithSettings.usageResetAt,
           orderSyncCount: userWithSettings.orderSyncCount,
           labelCount: userWithSettings.labelCount,
+          limits: planLimits.limits,
+          period: planLimits.period,
         },
       });
     } catch (error: any) {

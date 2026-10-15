@@ -5,7 +5,7 @@ import {
   FormControl, InputLabel,
 } from '@mui/material';
 import { Search, BarChart2, Key, TrendingUp } from 'lucide-react';
-import AppLayout from '@/components/AppLayout';
+import { Page, PageHeader } from '@/components/ds/page';
 import withAuth from '@/components/withAuth';
 import { useAmazonResearchStore } from '@/lib/stores/useAmazonResearchStore';
 import { useTranslations } from 'next-intl';
@@ -74,13 +74,9 @@ function AmazonResearchPage() {
   const tabIndex = activeView === 'research' ? 0 : activeView === 'keywords' ? 1 : 2;
 
   return (
-    <AppLayout>
-
-      <Box sx={{ px: isMobile ? 1.5 : 3, py: 2, maxWidth: 1400, mx: 'auto' }}>
-        {/* Header */}
-        <Typography variant="h5" fontWeight={700} sx={{ mb: 2 }}>
-          {t('title')}
-        </Typography>
+    <Page title={t('title')} width="list">
+      <PageHeader title={t('title')} />
+      <Box>
 
         {/* Search bar */}
         <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
@@ -143,7 +139,7 @@ function AmazonResearchPage() {
           {activeView === 'competitors' && <CompetitorIntelligence />}
         </Suspense>
       </Box>
-    </AppLayout>
+    </Page>
   );
 }
 

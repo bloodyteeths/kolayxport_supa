@@ -8,7 +8,7 @@ import {
   LayoutDashboard, FolderTree, DollarSign, Store, Tag,
   Calculator, Sparkles, Menu, ChevronLeft,
 } from 'lucide-react';
-import AppLayout from '@/components/AppLayout';
+import { Page, PageHeader } from '@/components/ds/page';
 import withAuth from '@/components/withAuth';
 import { useAuth } from '@/lib/auth-context';
 import { useTrendyolResearchStore } from '@/lib/stores/useTrendyolResearchStore';
@@ -147,7 +147,8 @@ function TrendyolResearchPage() {
   };
 
   return (
-    <AppLayout title={t('title')}>
+    <Page title={t('title')} width="list">
+      <PageHeader title={t('title')} />
       <Box sx={{ display: 'flex', minHeight: 'calc(100vh - 64px)' }}>
         {/* Desktop sidebar */}
         {!isMobile && (
@@ -191,7 +192,7 @@ function TrendyolResearchPage() {
           </Suspense>
         </Box>
       </Box>
-    </AppLayout>
+    </Page>
   );
 }
 

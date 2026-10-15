@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   Box, Button, CircularProgress, Collapse, Tooltip, TextField, Select, MenuItem,
-  FormControl, InputLabel, IconButton, Typography, Paper, Chip, InputAdornment,
+  FormControl, IconButton, Typography, Paper, Chip, InputAdornment,
   Dialog, DialogTitle, DialogContent, DialogActions, useMediaQuery, useTheme,
-  Menu, ListItemIcon, ListItemText, SwipeableDrawer, Badge, Checkbox, Divider,
+  SwipeableDrawer, Checkbox, Divider,
 } from '@mui/material';
 import {
   DataGrid, GridColDef, GridPaginationModel, GridRenderCellParams,
@@ -12,13 +12,13 @@ import {
 import {
   Search as SearchIcon, Edit as EditIcon, Delete as DeleteIcon,
   ExpandMore as ExpandMoreIcon, ExpandLess as ExpandLessIcon,
-  Add as AddIcon, Sync as SyncIcon, FilterList as FilterListIcon,
-  Close as CloseIcon, FileDownload as FileDownloadIcon,
-  MoreVert as MoreVertIcon, Visibility as VisibilityIcon,
-  VisibilityOff as VisibilityOffIcon, TextFields as TextFieldsIcon,
+  FilterList as FilterListIcon,
+  Close as CloseIcon, 
+  TextFields as TextFieldsIcon,
   CloudUpload as CloudUploadIcon, Undo as UndoIcon, ErrorOutline as ErrorOutlineIcon,
 } from '@mui/icons-material';
-import AppLayout from '@/components/AppLayout';
+import { Page, PageHeader, SyncMeta } from '@/components/ds/page';
+import { icons } from '@/lib/ds/icons';
 import withAuth from '@/components/withAuth';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/router';
@@ -142,17 +142,6 @@ function gradeColor(score: number): string {
   if (score >= 60) return '#ff9800';
   if (score >= 40) return '#f57c00';
   return '#f44336';
-}
-
-function formatTimeSince(dateStr: string | null, t: any): string {
-  if (!dateStr) return t('neverSynced');
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return t('justNow');
-  if (mins < 60) return t('minutesAgo', { count: mins });
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return t('hoursAgo', { count: hrs });
-  return t('daysAgo', { count: Math.floor(hrs / 24) });
 }
 
 // ---------------------------------------------------------------------------
@@ -518,17 +507,19 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 function WixProductsPage() {
   const t = useTranslations('wixListings');
+  const tNav = useTranslations('nav.items');
   return (
-    <AppLayout title={t('pageTitle')}>
+    <Page title={tNav('listingsOf', { marketplace: 'Wix' })} width="list">
       <RequireConnection provider="wix" description={t('noSiteConnectedDesc')}>
         <WixProductsContent />
       </RequireConnection>
-    </AppLayout>
+    </Page>
   );
 }
 
 function WixProductsContent() {
   const t = useTranslations('wixListings');
+  const tNav = useTranslations('nav.items');
   const tc = useTranslations('common');
   const router = useRouter();
   const confirm = useConfirm();
@@ -571,7 +562,6 @@ function WixProductsContent() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [deleteConfirmProduct, setDeleteConfirmProduct] = useState<WixProductRow | null>(null);
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
-  const [toolsAnchor, setToolsAnchor] = useState<null | HTMLElement>(null);
 
   // Cache
   const cacheRef = useRef<Record<string, { data: WixProductRow[]; count: number; statusCounts: StatusCounts; collectionCounts: Record<string, number>; ts: number }>>({});
@@ -988,7 +978,6 @@ function WixProductsContent() {
     a.download = `wix-products-${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    setToolsAnchor(null);
   };
 
   // ---------------------------------------------------------------------------
@@ -1127,7 +1116,15 @@ function WixProductsContent() {
 
   return (
     <>
-      <Box sx={{ display: 'flex', maxWidth: 1500, mx: 'auto', width: '100%', p: { xs: 0.5, sm: 1, md: 1.5 } }}>
+      <PageHeader
+        title={tNav('listingsOf', { marketplace: 'Wix' })}
+        count={filteredProducts.length}
+        meta={<SyncMeta source="wix" lastPulledAt={lastSyncAt} state={syncing ? 'pulling' : 'idle'} onPull={handleSync} />}
+        primaryAction={{ id: 'wix-create', label: t('createProduct'), icon: icons.add, onClick: () => setCreateDialogOpen(true) }}
+        mobilePrimary="menu"
+        overflowActions={[{ id: 'wix-csv', label: t('csvDownload'), icon: icons.download, onClick: handleCsvExport }]}
+      />
+      <Box sx={{ display: 'flex', width: '100%' }}>
         {/* Left Sidebar (desktop only) */}
         {!isMobile && (
           <LeftSidebar
@@ -1142,46 +1139,13 @@ function WixProductsContent() {
 
         {/* Main content */}
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          {/* Header */}
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, flexWrap: 'wrap', gap: 0.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="h6" fontWeight="bold">{t('pageTitle')}</Typography>
-              <Chip label={t('productCount', { count: filteredProducts.length })} size="small" variant="outlined" />
+          {isMobile && (
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+              <IconButton size="small" onClick={() => setFilterDrawerOpen(true)} aria-label={t('filters')}>
+                <FilterListIcon />
+              </IconButton>
             </Box>
-            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-              {lastSyncAt && (
-                <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>
-                  {formatTimeSince(lastSyncAt, t)}
-                </Typography>
-              )}
-              <Button
-                size="small" variant="outlined"
-                startIcon={syncing ? <CircularProgress size={14} /> : <SyncIcon />}
-                onClick={handleSync} disabled={syncing}
-              >
-                {syncing ? t('syncing') : t('syncBtn')}
-              </Button>
-              <Button size="small" variant="outlined" onClick={(e) => setToolsAnchor(e.currentTarget)} startIcon={<MoreVertIcon />}>
-                {t('tools')}
-              </Button>
-              <Button size="small" variant="contained" startIcon={<AddIcon />} onClick={() => setCreateDialogOpen(true)}>
-                {t('createProduct')}
-              </Button>
-              {isMobile && (
-                <IconButton size="small" onClick={() => setFilterDrawerOpen(true)}>
-                  <FilterListIcon />
-                </IconButton>
-              )}
-            </Box>
-          </Box>
-
-          {/* Tools Menu */}
-          <Menu anchorEl={toolsAnchor} open={!!toolsAnchor} onClose={() => setToolsAnchor(null)}>
-            <MenuItem onClick={handleCsvExport}>
-              <ListItemIcon><FileDownloadIcon fontSize="small" /></ListItemIcon>
-              <ListItemText>{t('csvDownload')}</ListItemText>
-            </MenuItem>
-          </Menu>
+          )}
 
           {/* Search */}
           <Paper sx={{ p: 1, mb: 1 }}>

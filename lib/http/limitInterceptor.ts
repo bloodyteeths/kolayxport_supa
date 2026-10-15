@@ -12,7 +12,17 @@
  * (fetch responses are cloned) and never swallows errors — callers still get
  * their 402 response / rejected promise. It only pushes a LimitReachedInfo into
  * useLimitReachedStore, which <LimitReachedDialog/> renders.
+ *
+ * M2 (shell-nav §12 F, CRITIQUE C6, pro-gating §3.5):
+ * - Opt-out. A surface that shows the 402 inline (warning Banner + disabled action) keeps the global dialog
+ *   from firing on top of it, in one of three ways: `useLimitDialogOptOut()` while its page is mounted;
+ *   the `LIMIT_UI_HEADER: 'inline'` request header on one call; or a route pattern in
+ *   `LIMIT_DIALOG_SKIP_ROUTES`. The caller still receives the 402.
+ * - `featureLocked`. A 402 `{ limitType: 'feature', reason: 'featureLocked', feature, neutral? }`
+ *   (tiers.md `withEntitlement`) never opens the dialog and never toasts: it is recorded in
+ *   `useFeatureLockStore`, which the pro gate (M4 `FeatureGate`) reads to swap its region to the locked state.
  */
+import { useEffect } from 'react';
 import axios from 'axios';
 import { create } from 'zustand';
 
@@ -133,8 +143,129 @@ function isLimiterBody(body: unknown): boolean {
   return b.error === 'Payment Required' || typeof b.limitType === 'string' || typeof b.details === 'string';
 }
 
-function report(body: unknown, path: string) {
+// ── featureLocked (pro-gating §3.5) ────────────────────────────────────────────────────────────────
+
+export interface FeatureLockInfo {
+  /** Entitlement feature key from the server (e.g. 'financials', 'bulkPhotoStudio', 'arbitrage'). */
+  feature: string;
+  /** Server hint for the locked copy: true = neutral wording (no "See plans"; Shopify-free / unknown). */
+  neutral?: boolean;
+  /** Request path that hit the gate. */
+  url?: string;
+  at: number;
+}
+
+interface FeatureLockState {
+  /** Latest lock per feature key. */
+  locked: Record<string, FeatureLockInfo>;
+  markLocked: (info: FeatureLockInfo) => void;
+  /** Forget one feature (e.g. after an upgrade) or all of them. */
+  clear: (feature?: string) => void;
+}
+
+export const useFeatureLockStore = create<FeatureLockState>((set) => ({
+  locked: {},
+  markLocked: (info) => set((s) => ({ locked: { ...s.locked, [info.feature]: info } })),
+  clear: (feature) =>
+    set((s) => {
+      if (!feature) return { locked: {} };
+      if (!(feature in s.locked)) return s;
+      const next = { ...s.locked };
+      delete next[feature];
+      return { locked: next };
+    }),
+}));
+
+/** `{ limitType: 'feature', reason: 'featureLocked', feature }` → FeatureLockInfo, else null. */
+export function parseFeatureLocked(body: unknown, path?: string): FeatureLockInfo | null {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
+  const b = body as Record<string, unknown>;
+  if (b.reason !== 'featureLocked' && b.limitType !== 'feature') return null;
+  const feature = typeof b.feature === 'string' && b.feature ? b.feature : 'unknown';
+  return { feature, neutral: typeof b.neutral === 'boolean' ? b.neutral : undefined, url: path, at: Date.now() };
+}
+
+// ── Opt-out of the global dialog (CRITIQUE C6) ─────────────────────────────────────────────────────
+
+/** Request header that marks one call as handled inline: `{ [LIMIT_UI_HEADER]: 'inline' }`. */
+export const LIMIT_UI_HEADER = 'x-kx-limit-ui';
+
+/**
+ * Route patterns (Next `router.pathname` / `location.pathname`) whose pages show 402s inline. '/x' exact,
+ * '/x/*' any sub-path. Empty in M2: each migrated surface adds its route here, or calls
+ * `useLimitDialogOptOut()`, in the PR that ships its inline Banner. The global dialog is deleted in M10.
+ */
+export const LIMIT_DIALOG_SKIP_ROUTES: readonly string[] = [];
+
+let optOutCount = 0;
+
+/** Imperative opt-out; returns the release function. Nested calls are counted. */
+export function optOutOfLimitDialog(): () => void {
+  optOutCount += 1;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    optOutCount = Math.max(0, optOutCount - 1);
+  };
+}
+
+/** While the calling component is mounted (and `enabled`), 402s skip the global dialog. */
+export function useLimitDialogOptOut(enabled = true): void {
+  useEffect(() => (enabled ? optOutOfLimitDialog() : undefined), [enabled]);
+}
+
+function routeMatches(pattern: string, path: string): boolean {
+  if (pattern.endsWith('/*')) {
+    const base = pattern.slice(0, -2);
+    return path === base || path.startsWith(`${base}/`);
+  }
+  return path === pattern;
+}
+
+/** True when a 402 for this request must not open the global dialog. Pure apart from `location`. */
+export function limitDialogSkipped(opts: { inlineHeader?: boolean; pagePath?: string | null } = {}): boolean {
+  if (opts.inlineHeader) return true;
+  if (optOutCount > 0) return true;
+  const page = opts.pagePath ?? (typeof window !== 'undefined' ? window.location.pathname : null);
+  if (!page) return false;
+  return LIMIT_DIALOG_SKIP_ROUTES.some((p) => routeMatches(p, page));
+}
+
+function headerValue(headers: unknown, name: string): string | null {
+  if (!headers) return null;
+  try {
+    if (typeof Headers !== 'undefined' && headers instanceof Headers) return headers.get(name);
+    if (Array.isArray(headers)) {
+      const hit = headers.find((h) => Array.isArray(h) && String(h[0]).toLowerCase() === name);
+      return hit ? String(hit[1]) : null;
+    }
+    if (typeof headers === 'object') {
+      const rec = headers as Record<string, unknown> & { get?: (n: string) => unknown };
+      if (typeof rec.get === 'function') {
+        const v = rec.get(name);
+        if (v != null) return String(v);
+      }
+      for (const [k, v] of Object.entries(rec)) if (k.toLowerCase() === name && v != null) return String(v);
+    }
+  } catch {
+    /* unreadable headers: treat as absent */
+  }
+  return null;
+}
+
+function isInline(headers: unknown): boolean {
+  return headerValue(headers, LIMIT_UI_HEADER) === 'inline';
+}
+
+function report(body: unknown, path: string, inlineHeader = false) {
+  const locked = parseFeatureLocked(body, path);
+  if (locked) {
+    useFeatureLockStore.getState().markLocked(locked);
+    return;
+  }
   if (!isLimiterBody(body)) return;
+  if (limitDialogSkipped({ inlineHeader })) return;
   useLimitReachedStore.getState().show(parseLimitResponse(body, path));
 }
 
@@ -161,7 +292,7 @@ export function installLimitInterceptor(): void {
         if (res?.status === 402) {
           const path = toPath(res.config?.url ?? error?.config?.url);
           // axios resolves relative URLs against baseURL; treat relative as own origin.
-          if (isOwnApi(path)) report(res.data, path);
+          if (isOwnApi(path)) report(res.data, path, isInline(res.config?.headers ?? error?.config?.headers));
         }
       } catch {
         /* never break the caller's error path */
@@ -181,11 +312,12 @@ export function installLimitInterceptor(): void {
           typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request)?.url;
         const path = toPath(rawUrl);
         if (isOwnApi(path)) {
+          const inline = isInline(init?.headers) || (typeof Request !== 'undefined' && input instanceof Request && isInline(input.headers));
           const copy = response.clone();
           copy
             .json()
-            .then((body) => report(body, path))
-            .catch(() => report(null, path));
+            .then((body) => report(body, path, inline))
+            .catch(() => report(null, path, inline));
         }
       }
     } catch {

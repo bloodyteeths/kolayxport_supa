@@ -1,50 +1,41 @@
 import React, { useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth } from '@/lib/auth-context';
-import { Loader2 } from 'lucide-react';
+import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
-import AppLayout from './AppLayout';
+import { useAuth } from '@/lib/auth-context';
 
-export default function withAuth(Component: React.ComponentType<any>) {
-  return function AuthenticatedComponent(props: any) {
+/** Sign-in URL that returns to the current page. `/app` is no longer a login screen (it redirects to /app/analytics). */
+export function loginUrlFor(asPath: string) {
+  return `/login?callbackUrl=${encodeURIComponent(asPath || '/app/analytics')}`;
+}
+
+/**
+ * Client-side auth guard for app pages. Keeps the redirect; renders nothing while the session loads or
+ * while redirecting (shell-nav §5, §11): the persistent AppShell (pages/_app.tsx) shows its skeleton chrome
+ * meanwhile, so there is no full-page spinner and no second layout.
+ */
+export default function withAuth<P extends object>(Component: React.ComponentType<P>) {
+  function AuthenticatedComponent(props: P) {
     const { user, isLoading: authLoading } = useAuth();
     const router = useRouter();
     const t = useTranslations('auth');
 
     useEffect(() => {
-      // If not loading and user is not authenticated, redirect to login
-      if (!authLoading && !user) {
-        // Redirect to main app page which handles OAuth login
-        // Use replace instead of push to avoid back button issues
-        router.replace('/app');
-      }
+      // Not loading and no user: to the sign-in page, returning here afterwards. `replace` keeps Back usable.
+      if (!authLoading && !user) router.replace(loginUrlFor(router.asPath));
     }, [authLoading, user, router]);
 
-    // Show loading state while checking authentication
-    if (authLoading) {
-      return (
-        <AppLayout title={t('loading')}>
-          <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
-            <Loader2 className="h-12 w-12 animate-spin text-blue-600 mb-4" />
-            <p className="text-slate-500 text-lg">{t('checkingAccount')}</p>
-          </div>
-        </AppLayout>
-      );
-    }
-
-    // If user is not authenticated, show redirecting message
+    if (authLoading) return null;
     if (!user) {
+      // Signed out the shell renders bare children, so never leave the screen blank while redirecting.
       return (
-        <AppLayout title={t('redirecting')}>
-          <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
-            <Loader2 className="h-12 w-12 animate-spin text-blue-600 mb-4" />
-            <p className="text-slate-500 text-lg">{t('redirectingToLogin')}</p>
-          </div>
-        </AppLayout>
+        <Typography role="status" variant="body2" color="text.secondary" sx={{ p: 3, textAlign: 'center' }}>
+          {t('redirectingToLogin')}
+        </Typography>
       );
     }
-
-    // User is authenticated, render the component
     return <Component {...props} />;
-  };
+  }
+  AuthenticatedComponent.displayName = `withAuth(${Component.displayName || Component.name || 'Component'})`;
+  return AuthenticatedComponent;
 }

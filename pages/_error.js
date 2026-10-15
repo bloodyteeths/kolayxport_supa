@@ -1,27 +1,25 @@
-import Link from 'next/link'
-import Layout from '@/components/Layout'
-import { useTranslations } from 'next-intl'
+import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import PublicLayout from '@/components/PublicLayout';
 
 export default function ErrorPage({ statusCode }) {
   const t = useTranslations('errors');
   return (
-    <Layout>
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
-        <h1 className="text-5xl font-bold mb-4 text-gray-900">{t('oops')}</h1>
-        <p className="text-lg mb-6 text-gray-700">
-          {statusCode
-            ? t('serverError', { statusCode })
-            : t('clientError')}
+    <PublicLayout title={t('oops')} seo={{ noindex: true }}>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 py-16">
+        <h1 className="text-3xl font-semibold text-slate-900 mb-3">{t('oops')}</h1>
+        <p className="text-base text-slate-600 mb-6">
+          {statusCode ? t('serverError', { statusCode }) : t('clientError')}
         </p>
         <Link href="/" className="text-blue-600 hover:underline">
           {t('goHome')}
         </Link>
       </div>
-    </Layout>
-  )
+    </PublicLayout>
+  );
 }
 
 ErrorPage.getInitialProps = ({ res, err }) => {
-  const statusCode = res?.statusCode ?? err?.statusCode ?? 404
-  return { statusCode }
-} 
+  const statusCode = res?.statusCode ?? err?.statusCode ?? 404;
+  return { statusCode };
+};

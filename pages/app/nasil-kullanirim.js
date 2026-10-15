@@ -1,8 +1,8 @@
 import React from 'react';
-import AppLayout from '../../components/AppLayout';
+import { Page, PageHeader } from '@/components/ds/page';
 import { NextSeo } from 'next-seo';
 import { motion } from 'framer-motion';
-import { HelpCircle, Settings, ExternalLink, Link as LinkIcon } from 'lucide-react';
+import { Settings, ExternalLink, Link as LinkIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 
@@ -40,25 +40,9 @@ export default function HowToUsePage() {
   const t = useTranslations('howToUse');
 
   return (
-    <AppLayout title={t('title')}>
+    <Page title={t('title')} width="reading">
       <NextSeo noindex={true} nofollow={true} />
-
-      <motion.div
-        className="mb-8"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-      >
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h1 className="text-3xl font-bold text-slate-800 flex items-center">
-            <HelpCircle size={36} className="mr-3 text-blue-600" />
-            {t('title')}
-          </h1>
-          <p className="mt-2 text-slate-600">
-            {t('description')}
-          </p>
-        </div>
-      </motion.div>
+      <PageHeader title={t('title')} subtitle={t('description')} />
 
       <GuideSection title={t('veeqoTitle')} icon={LinkIcon} id="connect-veeqo">
         <p className="mb-4">
@@ -110,10 +94,6 @@ export default function HowToUsePage() {
         </p>
       </GuideSection>
 
-    </AppLayout>
+    </Page>
   );
 }
-
-HowToUsePage.getLayout = function getLayout(page) {
-  return <AppLayout>{page}</AppLayout>;
-};

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
-  Container,
   Typography,
   Paper,
   Table,
@@ -20,16 +19,18 @@ import {
 import {
   GetApp,
   Visibility,
-  ArrowBack,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { enUS } from 'date-fns/locale';
-import Layout from '../components/AppLayout';
+import { Page, PageHeader } from '@/components/ds/page';
 import { useRouter } from 'next/router';
 import { useTranslations } from 'next-intl';
 import useLocaleStore from '@/lib/stores/useLocaleStore';
 import { useLocale } from '@/lib/i18n/useLocale';
+
+/** Back target: Settings › Plan & billing (shell-nav §6.2). */
+const BILLING_SETTINGS_HREF = '/ayarlar?tab=billing';
 
 interface Invoice {
   id: string;
@@ -53,6 +54,7 @@ export default function FaturalarPage() {
   const [error, setError] = useState<string | null>(null);
   const t = useTranslations('invoices');
   const tCommon = useTranslations('common');
+  const tNav = useTranslations('nav.items');
   const locale = useLocaleStore((s) => s.locale);
   const dateFnsLocale = locale === 'tr' ? tr : enUS;
   const { formatCurrency: fmtCurrency } = useLocale();
@@ -101,27 +103,19 @@ export default function FaturalarPage() {
 
   if (loading) {
     return (
-      <Layout>
-        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-            <CircularProgress />
-          </Box>
-        </Container>
-      </Layout>
+      <Page title={tNav('invoices')} width="form" backHref={BILLING_SETTINGS_HREF}>
+        <PageHeader title={tNav('invoices')} backLabel={tNav('settings')} />
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+          <CircularProgress />
+        </Box>
+      </Page>
     );
   }
 
   return (
-    <Layout>
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-          <IconButton onClick={() => router.push('/ayarlar')} sx={{ mr: 2 }}>
-            <ArrowBack />
-          </IconButton>
-          <Typography variant="h5" component="h1" sx={{ fontWeight: 'bold', fontSize: { xs: '1.25rem', sm: '1.5rem', md: '2rem' } }}>
-            {t('pageTitle')}
-          </Typography>
-        </Box>
+    <Page title={tNav('invoices')} width="form" backHref={BILLING_SETTINGS_HREF}>
+      <PageHeader title={tNav('invoices')} backLabel={tNav('settings')} />
+      <Box>
 
         {error && (
           <Alert severity="error" sx={{ mb: 3 }}>
@@ -225,7 +219,7 @@ export default function FaturalarPage() {
             </Button>
           </Box>
         )}
-      </Container>
-    </Layout>
+      </Box>
+    </Page>
   );
 }

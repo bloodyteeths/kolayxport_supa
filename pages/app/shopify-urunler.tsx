@@ -29,7 +29,6 @@ import {
   GridRenderCellParams,
 } from '@mui/x-data-grid';
 import {
-  Refresh as RefreshIcon,
   Search as SearchIcon,
   Edit as EditIcon,
   Close as CloseIcon,
@@ -38,7 +37,7 @@ import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
-import AppLayout from '@/components/AppLayout';
+import { Page, PageHeader, SyncMeta } from '@/components/ds/page';
 import withAuth from '@/components/withAuth';
 import { useTranslations } from 'next-intl';
 import { RequireConnection } from '@/components/ui/ConnectEmptyState';
@@ -76,6 +75,16 @@ interface ShopifyProductRow {
   shopifyCreatedAt: string | null;
   shopifyUpdatedAt: string | null;
   syncedAt: string;
+}
+
+/** Newest `syncedAt` across rows (null when none parse): the last time this catalogue was pulled. */
+function latestSyncedAt(rows: ReadonlyArray<{ syncedAt?: string | null }>): Date | null {
+  let best = 0;
+  for (const r of rows) {
+    const ms = r.syncedAt ? Date.parse(r.syncedAt) : NaN;
+    if (ms > best) best = ms;
+  }
+  return best > 0 ? new Date(best) : null;
 }
 
 type StatusFilter = 'all' | 'active' | 'draft' | 'archived';
@@ -259,17 +268,19 @@ function MobileShopifyProductCard({
 
 function ShopifyProductsPage() {
   const t = useTranslations('shopifyListings');
+  const tNav = useTranslations('nav.items');
   return (
-    <AppLayout>
+    <Page title={tNav('listingsOf', { marketplace: 'Shopify' })} width="list">
       <RequireConnection provider="shopify" description={t('connectDescription')}>
         <ShopifyProductsContent />
       </RequireConnection>
-    </AppLayout>
+    </Page>
   );
 }
 
 function ShopifyProductsContent() {
   const t = useTranslations('shopifyListings');
+  const tNav = useTranslations('nav.items');
   const tc = useTranslations('common');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -277,6 +288,8 @@ function ShopifyProductsContent() {
 
   // State
   const [products, setProducts] = useState<ShopifyProductRow[]>([]);
+  // Newest row sync time = when this catalogue was last pulled (no separate per-shop timestamp is returned).
+  const lastSyncedAt = useMemo(() => latestSyncedAt(products), [products]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [syncing, setSyncing] = useState(false);
@@ -496,25 +509,12 @@ function ShopifyProductsContent() {
 
   return (
     <>
-      <Box sx={{ p: { xs: 1, md: 3 }, maxWidth: 1400, mx: 'auto' }}>
-        {/* Header */}
-        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, mb: 2, gap: 1 }}>
-          <Typography variant="h5" fontWeight="bold">
-            {t('title')}
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button
-              variant="contained"
-              startIcon={syncing ? <CircularProgress size={18} color="inherit" /> : <RefreshIcon />}
-              onClick={handleSync}
-              disabled={syncing}
-              fullWidth={isMobile}
-              sx={{ minHeight: 44, bgcolor: SHOPIFY_GREEN, '&:hover': { bgcolor: '#7ea33e' } }}
-            >
-              {syncing ? t('syncing') : t('sync')}
-            </Button>
-          </Box>
-        </Box>
+      <PageHeader
+        title={tNav('listingsOf', { marketplace: 'Shopify' })}
+        count={totalCount}
+        meta={<SyncMeta source="shopify" lastPulledAt={lastSyncedAt} state={syncing ? 'pulling' : 'idle'} onPull={handleSync} />}
+      />
+      <Box>
 
         {/* Filters */}
         <Paper sx={{ p: { xs: 1.5, md: 2 }, mb: 2 }}>

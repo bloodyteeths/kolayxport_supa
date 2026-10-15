@@ -108,6 +108,12 @@ const nextConfig = {
     proxyClientMaxBodySize: '200mb',
   },
 
+  // The analytics dashboard is the app's home: login, the Stripe return and
+  // every "/app" link land there. Temporary so the target can change later.
+  async redirects() {
+    return [{ source: '/app', destination: '/app/analytics', permanent: false }];
+  },
+
   // Security headers
   async headers() {
     return [

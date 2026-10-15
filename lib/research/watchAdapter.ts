@@ -33,7 +33,7 @@
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { etsyFetch, etsyPublicHeaders, ETSY_API_BASE } from '@/lib/etsy/http';
-import { EtsyPriority } from '@/lib/etsy/rateBudget';
+import { EtsyPriority, canSpend, withEtsyBudget } from '@/lib/etsy/rateBudget';
 import { notify, type NotificationType } from '@/lib/notifications';
 import { isKnownType } from '@/lib/notificationCenter/registry';
 import { entitlementFromSettings } from '@/lib/billing/useEntitlement';
@@ -993,11 +993,49 @@ export async function fetchShopReading(shopId: string, opts: { priority: EtsyPri
   return { metrics: buildShopSnapshot(info, listings, complete, opts.nowMs ?? Date.now()), listings };
 }
 
-async function storeShopReading(shopId: string, reading: { metrics: EtsyShopSnapshotMetrics; listings: SnapListing[] }, takenAt: Date): Promise<void> {
+/** `ResearchSnapshot.day` (DATE column, unique with type/marketplace/refId): the UTC day of `takenAt` at 00:00Z. */
+export const snapshotDay = (takenAt: Date | string | number): Date => startOfUtcDay(toMs(takenAt));
+
+/**
+ * Inserts one shared reading. The (type, marketplace, refId, day) unique key makes a second reading of the same
+ * subject on the same UTC day a no-op (two users adding the same shop at once, cron racing the first reading).
+ * Returns false when a reading for that day already existed.
+ */
+export async function insertSnapshot(row: { type: WatchType; marketplace: string; refId: string; takenAt: Date; metrics: SnapshotMetrics }): Promise<boolean> {
   const s = snapshotDelegate();
   if (!s) throw UNAVAILABLE();
-  await s.create({ data: { type: 'etsyShop', marketplace: 'etsy', refId: shopId, takenAt, metrics: reading.metrics } });
-  await writeShared(listingsCacheKey(shopId, utcDay(takenAt)), reading.listings, LISTINGS_CACHE_TTL_MS, takenAt.toISOString());
+  try {
+    await s.create({ data: { ...row, day: snapshotDay(row.takenAt) } });
+    return true;
+  } catch (err) {
+    if (isUniqueError(err)) return false;
+    throw err;
+  }
+}
+
+async function storeShopReading(shopId: string, reading: { metrics: EtsyShopSnapshotMetrics; listings: SnapListing[] }, takenAt: Date): Promise<boolean> {
+  const inserted = await insertSnapshot({ type: 'etsyShop', marketplace: 'etsy', refId: shopId, takenAt, metrics: reading.metrics });
+  if (inserted) await writeShared(listingsCacheKey(shopId, utcDay(takenAt)), reading.listings, LISTINGS_CACHE_TTL_MS, takenAt.toISOString());
+  return inserted;
+}
+
+/**
+ * BR-8 budget gate for one daily shop reading: `/shops/{id}` + ⌈active/100⌉ listing pages (≤ 5), checked up front
+ * against the shared Etsy daily budget at Reconcile priority so a reading is never left half-fetched. Only a
+ * 'budget' refusal stops the run (a per-second wait is handled by the token bucket).
+ */
+export function snapshotCallsFor(lastActiveCount: number | null | undefined): number {
+  const n = typeof lastActiveCount === 'number' && Number.isFinite(lastActiveCount) ? lastActiveCount : MAX_SNAPSHOT_LISTINGS;
+  return 1 + Math.max(1, Math.ceil(Math.min(Math.max(n, 0), MAX_SNAPSHOT_LISTINGS) / 100));
+}
+export function snapshotBudgetOk(calls: number): boolean {
+  if (etsyBudgetLimited()) return false;
+  try {
+    const gate = canSpend('', EtsyPriority.Reconcile, calls);
+    return gate.ok || gate.reason !== 'budget';
+  } catch {
+    return true;
+  }
 }
 
 async function hasReadingToday(type: WatchType, marketplace: string, refId: string, nowMs: number): Promise<boolean> {
@@ -1738,7 +1776,7 @@ async function sendAlerts(watchers: ResearchWatchRow[], fires: (w: ResearchWatch
       if (!enabled) { summary.alerts.suppressed++; continue; }
       try {
         await notify(w.userId, {
-          type: f.type as unknown as NotificationType,
+          type: f.type satisfies NotificationType,
           severity: f.severity,
           titleKey: `types.${f.type}`,
           params: { shop: w.label, ...f.params },
@@ -1840,16 +1878,22 @@ export async function runResearchSnapshots(opts: { signal?: AbortSignal; nowMs?:
     const refId = key.split('|')[2];
     try {
       if (await hasReadingToday('etsyShop', 'etsy', refId, nowMs)) { summary.shops.alreadyToday++; continue; }
-      if (etsyBudgetLimited()) { summary.budgetStopped = true; break; }
+      const lastMetrics = (await sd.findFirst({
+        where: { type: 'etsyShop', marketplace: 'etsy', refId },
+        orderBy: { takenAt: 'desc' },
+        select: { metrics: true },
+      }))?.metrics;
+      if (!snapshotBudgetOk(snapshotCallsFor(isShopMetrics(lastMetrics) ? lastMetrics.activeCount : null))) { summary.budgetStopped = true; break; }
       const prevRows: ResearchSnapshotRow[] = await sd.findMany({
         where: { type: 'etsyShop', marketplace: 'etsy', refId, takenAt: { gte: new Date(nowMs - READ_WINDOW_DAYS * DAY_MS) } },
         orderBy: { takenAt: 'asc' },
         select: { id: true, refId: true, takenAt: true, metrics: true, type: true, marketplace: true },
       });
       const reading = await fetchShopReading(refId, { priority: EtsyPriority.Reconcile, deferOn429: true, nowMs });
-      await storeShopReading(refId, reading, takenAt);
-      summary.shops.taken++;
       consecutive429 = 0;
+      // Another run / a first reading on add stored today's reading meanwhile: no second row, no second alert.
+      if (!(await storeShopReading(refId, reading, takenAt))) { summary.shops.alreadyToday++; continue; }
+      summary.shops.taken++;
 
       const prevShop = prevRows.filter((r) => isShopMetrics(r.metrics));
       const prev = prevShop[prevShop.length - 1];
@@ -1874,14 +1918,14 @@ export async function runResearchSnapshots(opts: { signal?: AbortSignal; nowMs?:
     const refId = key.split('|')[2];
     try {
       if (await hasReadingToday('query', 'etsy', refId, nowMs)) { summary.queries.alreadyToday++; continue; }
-      if (etsyBudgetLimited()) { summary.budgetStopped = true; break; }
+      if (!snapshotBudgetOk(1)) { summary.budgetStopped = true; break; }
       const r = await queryReading(refId, nowMs);
       if ('deferred' in r) {
         if (r.deferred === 'budget') { summary.budgetStopped = true; break; }
         summary.queries.failed++;
         continue;
       }
-      await sd.create({ data: { type: 'query', marketplace: 'etsy', refId, takenAt: r.takenAt, metrics: r.metrics } });
+      if (!(await insertSnapshot({ type: 'query', marketplace: 'etsy', refId, takenAt: r.takenAt, metrics: r.metrics }))) { summary.queries.alreadyToday++; continue; }
       summary.queries.taken++;
       consecutive429 = 0;
     } catch (err) {
@@ -1906,14 +1950,18 @@ export async function runResearchSnapshots(opts: { signal?: AbortSignal; nowMs?:
   return summary;
 }
 
-/** BR-8: the scheduler entry (`lib/scheduler/jobs.ts`), daily after the 06:00 UTC slot. */
+/**
+ * BR-8: the scheduler entry (`lib/scheduler/jobs.ts`), daily at 06:00 UTC. Runs inside a Reconcile-priority,
+ * defer-on-429 Etsy budget context (background work: never competes with interactive calls, stops at the
+ * Reconcile daily gate).
+ */
 export const researchSnapshotsJob = {
   name: 'research-snapshots',
   dailyAtUtc: READING_TIME_UTC,
   timeoutMs: 50 * 60_000,
   maxAttemptsPerBucket: 1,
   run: async (ctx: { bucket: string; signal: AbortSignal }) => {
-    const s = await runResearchSnapshots({ signal: ctx.signal });
+    const s = await withEtsyBudget({ priority: EtsyPriority.Reconcile, deferOn429: true }, () => runResearchSnapshots({ signal: ctx.signal }));
     return s as unknown as Record<string, unknown>;
   },
 };

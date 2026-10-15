@@ -24,12 +24,12 @@
  * stockOutOfStock is a digest email. Changing any of these is a founder decision.
  */
 
-export type NotificationGroup = 'orders' | 'dispatch' | 'listings' | 'stock' | 'account' | 'system';
+export type NotificationGroup = 'orders' | 'dispatch' | 'listings' | 'stock' | 'research' | 'account' | 'system';
 export type NotificationEmailMode = 'instant' | 'digest';
 export type NotificationPresetName = 'critical' | 'recommended' | 'all';
 export type RegistrySeverity = 'info' | 'warning' | 'error';
 
-export const NOTIFICATION_GROUPS: readonly NotificationGroup[] = ['orders', 'dispatch', 'listings', 'stock', 'account', 'system'];
+export const NOTIFICATION_GROUPS: readonly NotificationGroup[] = ['orders', 'dispatch', 'listings', 'stock', 'research', 'account', 'system'];
 export const NOTIFICATION_PRESETS: readonly NotificationPresetName[] = ['critical', 'recommended', 'all'];
 
 export interface ChannelPrefs {
@@ -102,6 +102,14 @@ export const NOTIFICATION_REGISTRY: readonly NotificationTypeDef[] = [
   def('stockPushFailed', 'stock', 'error', INSTANT_EMAIL),
   def('stockDrift', 'stock', 'warning'),
   def('stockUnmatchedSale', 'stock', 'warning'),
+  // ---- research (shop tracker, BR-7) ----
+  // Raised by the daily 06:00 UTC reading only for watches whose alertRules switch is on
+  // (lib/research/watchAdapter evaluateShopAlerts), at most once per watch, type and UTC day
+  // (dedupeKey research:<type>:<watchId>:<day>). Opt-in competitor news, never a problem to fix:
+  // in-app with the badge, email only as the daily digest.
+  def('researchShopNewListings', 'research', 'info', DIGEST_EMAIL),
+  def('researchShopPriceDrop', 'research', 'info', DIGEST_EMAIL),
+  def('researchShopSalesSpike', 'research', 'info', DIGEST_EMAIL),
   // ---- account ----
   def('reauthRequired', 'account', 'error', INSTANT_EMAIL),
   def('usageNearLimit', 'account', 'warning'),

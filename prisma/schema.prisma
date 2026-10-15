@@ -75,6 +75,7 @@ model User {
   adminAuditLogs          AdminAuditLog[]          @relation("AdminAuditLogs")
   notifications           Notification[]
   inboxThreads            InboxThread[]
+  researchWatches         ResearchWatch[]
   notificationPreferences NotificationPreference[]
   notificationSettings    NotificationSettings?
   stockSettings           StockSettings?
@@ -1506,6 +1507,46 @@ model ResearchCache {
 
   @@unique([userId, cacheKey])
   @@index([expiresAt])
+}
+
+/// Research watch (research.md §8, RESEARCH_REDESIGN §4.3; BR-1c). One table for every watch kind:
+/// type = etsyShop | query | trendyolProduct (eBay sellers / ASINs stay in their own tables, read via
+/// lib/research/watchAdapter.ts). alertRules = AlertRules { newListing, priceDropPct, salesSpikeX, marginOver? }.
+/// Delete is soft (isActive = false).
+model ResearchWatch {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String
+  marketplace String
+  /// Etsy shop id, normalized query text, Trendyol product id.
+  refId       String
+  label       String
+  alertRules  Json
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type, marketplace, refId])
+  @@index([userId, isActive, createdAt])
+  @@index([isActive, type, marketplace, refId])
+}
+
+/// Shared daily reading (not per user): one row per (type, marketplace, refId) per UTC day. Small counters only
+/// (EtsyShopSnapshotMetrics / QuerySnapshotMetrics JSON); per-listing arrays live in the shared ResearchCache.
+model ResearchSnapshot {
+  id          String   @id @default(cuid())
+  type        String
+  marketplace String
+  refId       String
+  /// UTC day of takenAt (dedupe key: one reading per subject per day).
+  day         DateTime @db.Date
+  takenAt     DateTime @default(now())
+  metrics     Json
+
+  @@unique([type, marketplace, refId, day])
+  @@index([type, marketplace, refId, takenAt])
+  @@index([takenAt])
 }
 
 // ---------------------------------------------------------------------------

@@ -66,6 +66,10 @@ export type NotificationType =
   | 'stockUnmatchedSale'
   | 'seoExperimentReady'
   | 'scheduledSendResult'
+  // ---- Research shop tracker (BR-7; emitted by lib/research/watchAdapter runResearchSnapshots) ----
+  | 'researchShopNewListings'
+  | 'researchShopPriceDrop'
+  | 'researchShopSalesSpike'
   | 'webhookBacklog';
 
 export type NotificationParams = Record<string, string | number>;

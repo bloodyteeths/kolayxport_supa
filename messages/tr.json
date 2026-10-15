@@ -10291,6 +10291,9 @@
       "reauthRequired": "Bağlantı süresi doldu",
       "usageNearLimit": "Kullanım limite yakın",
       "usageLimitReached": "Kullanım limiti doldu",
+      "researchShopNewListings": "Rakiplerin yeni ilanları",
+      "researchShopPriceDrop": "Rakip fiyat düşüşü",
+      "researchShopSalesSpike": "Rakip satış artışı",
       "webhookBacklog": "Webhook birikmesi (yönetici)"
     },
     "groups": {
@@ -10299,6 +10302,7 @@
       "dispatch": "Kargo süreleri",
       "listings": "İlanlar",
       "stock": "Stok",
+      "research": "Araştırma",
       "account": "Hesap",
       "system": "Sistem"
     },

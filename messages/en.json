@@ -10291,6 +10291,9 @@
       "reauthRequired": "Connection expired",
       "usageNearLimit": "Usage near limit",
       "usageLimitReached": "Usage limit reached",
+      "researchShopNewListings": "Competitor new listings",
+      "researchShopPriceDrop": "Competitor price drop",
+      "researchShopSalesSpike": "Competitor sales spike",
       "webhookBacklog": "Webhook backlog (admin)"
     },
     "groups": {
@@ -10299,6 +10302,7 @@
       "dispatch": "Shipping deadlines",
       "listings": "Listings",
       "stock": "Stock",
+      "research": "Research",
       "account": "Account",
       "system": "System"
     },

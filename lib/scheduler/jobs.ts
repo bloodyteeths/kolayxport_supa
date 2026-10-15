@@ -19,6 +19,7 @@ const MINUTE = 60_000;
 /**
  * Listings-grid jobs (BR-8) and research housekeeping.
  *  send-scheduled-drafts   every 5 min   lib/drafts/scheduledSend (HTTP fallback: /api/cron/send-scheduled-drafts)
+ *  research-snapshots      daily 06:00   lib/research/watchAdapter (HTTP fallback: /api/cron/research-snapshots)
  *  research-cache-prune    daily 04:10   delete expired ResearchCache rows
  * Loaded lazily so the draft services are not imported when the scheduler module loads.
  */
@@ -31,6 +32,19 @@ const listingsGridJobs: ScheduledJob[] = [
     run: async (ctx) => {
       const { scheduledSendJob } = await import('@/lib/drafts/scheduledSend');
       return scheduledSendJob.run(ctx);
+    },
+  },
+  {
+    // R3 Shop tracker (BR-8): one shared reading per watched Etsy shop / query per UTC day, Reconcile priority
+    // under the shared Etsy daily budget (stops at the gate), then the watchers' alerts. HTTP fallback:
+    // /api/cron/research-snapshots.
+    name: 'research-snapshots',
+    dailyAtUtc: '06:00',
+    timeoutMs: 50 * MINUTE,
+    maxAttemptsPerBucket: 1,
+    run: async (ctx) => {
+      const { researchSnapshotsJob } = await import('@/lib/research/watchAdapter');
+      return researchSnapshotsJob.run(ctx);
     },
   },
   {

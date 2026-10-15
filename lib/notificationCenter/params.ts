@@ -35,6 +35,9 @@ export const REQUIRED_NOTIFICATION_PARAMS: Record<string, string[]> = {
   stockUnmatchedSale: ['count'],
   seoExperimentReady: ['title'],
   scheduledSendResult: ['marketplace', 'sent'],
+  researchShopNewListings: ['shop', 'count'],
+  researchShopPriceDrop: ['shop', 'pct'],
+  researchShopSalesSpike: ['shop', 'sales', 'ratio'],
   webhookBacklog: [],
 };
 

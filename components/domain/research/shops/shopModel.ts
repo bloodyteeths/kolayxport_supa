@@ -8,7 +8,7 @@ import type { DsFormat } from '@/components/ds/data/fmt';
 import type { AlertRules, SalesPoint, ShopWatchCreate, WatchListingLite, WatchQuota, WatchSummary } from '@/lib/research/hooks/useWatches';
 import { AT_LEAST_KEY, DEFAULT_ALERT_RULES, NO_READING_KEY, PRICE_DROP_PCT, SALES_SPIKE_X, TRACKED_ITEMS_KEY } from '@/lib/research/hooks/useWatches';
 
-/** Marketplaces the Shop tracker serves in v1 (Etsy shops, eBay sellers). Amazon ASIN watches stay on the legacy page. */
+/** Marketplaces the Shop tracker serves (Etsy shops; eBay sellers and eBay items). Amazon is not covered (PA-API). */
 export type ShopMkt = 'etsy' | 'ebay';
 export const SHOP_MKTS: readonly ShopMkt[] = ['etsy', 'ebay'];
 export function isShopMkt(m: unknown): m is ShopMkt {
@@ -30,7 +30,14 @@ export const SHOPS_URL_SCHEMA = {
 // ─── "Watch a shop" input ────────────────────────────────────────────────────────────────────────────────
 
 export type ParsedShop =
-  | { ok: true; request: Omit<ShopWatchCreate, 'alertRules'>; name: string }
+  | {
+      ok: true;
+      request: Omit<ShopWatchCreate, 'alertRules'>;
+      /** Shop / seller name, or the item id for an eBay item (what the duplicate check compares). */
+      name: string;
+      /** eBay item link: the readable title from the link slug (or the id). */
+      itemLabel?: string;
+    }
   | { ok: false; reason: 'empty' | 'invalid' | 'unsupported' };
 
 function etsy(name: string): ParsedShop {
@@ -39,6 +46,10 @@ function etsy(name: string): ParsedShop {
 function ebay(name: string): ParsedShop {
   return { ok: true, request: { input: name, type: 'ebaySeller', marketplace: 'ebay', refId: name, label: name }, name };
 }
+function ebayItem(input: string, itemId: string, title: string | null): ParsedShop {
+  const label = (title ?? '').trim().slice(0, 80) || itemId;
+  return { ok: true, request: { input, type: 'ebayItem', marketplace: 'ebay', refId: itemId, label }, name: itemId, itemLabel: label };
+}
 
 /** Etsy shop names: letters and digits, up to 20 (Etsy's rule); we accept up to 40 for older shops. */
 const ETSY_NAME = /^[A-Za-z0-9]{2,40}$/;
@@ -46,8 +57,9 @@ const ETSY_NAME = /^[A-Za-z0-9]{2,40}$/;
 const EBAY_NAME = /^[A-Za-z0-9._*-]{2,64}$/;
 
 /**
- * "Shop link or name" → a watch request. A link picks its marketplace (etsy.com/shop/…, ebay.com/usr/… or /str/…);
- * a plain name uses the hub's marketplace. Other links (a listing, Trendyol, Amazon) are `unsupported`.
+ * "Shop link or name" → a watch request. A link picks its marketplace (etsy.com/shop/…, ebay.com/usr/… or /str/…;
+ * ebay.com/itm/… = "Watch an eBay item"); a plain name uses the hub's marketplace. Other links (an Etsy listing,
+ * Trendyol, Amazon) are `unsupported`.
  */
 export function parseShopInput(input: string, mkt: ShopMkt): ParsedShop {
   const text = String(input ?? '').trim();
@@ -61,6 +73,7 @@ export function parseShopInput(input: string, mkt: ShopMkt): ParsedShop {
     const name = safeDecode(d.seller);
     return EBAY_NAME.test(name) ? ebay(name) : { ok: false, reason: 'invalid' };
   }
+  if (d.kind === 'ebayItem') return ebayItem(text.slice(0, 500), d.itemId, d.slugTitle);
   if (d.kind !== 'text') return { ok: false, reason: 'unsupported' };
   if (/^https?:\/\//i.test(text) || /\s/.test(text)) return { ok: false, reason: /\s/.test(text) ? 'invalid' : 'unsupported' };
   const name = text.replace(/^@/, '');
@@ -152,6 +165,15 @@ export function soldAllTime(row: WatchSummary): number | null {
   return row.marketplace === 'ebay' && typeof v === 'number' && Number.isFinite(v) ? v : null;
 }
 
+/** `ebayItem`: "$24.90 · 312 sold (all time)" (the item's own listed price and eBay's lifetime counter), or ''. */
+export function itemLine(row: WatchSummary, t: ShopT, fmt: DsFormat): string {
+  if (row.type !== 'ebayItem' || !row.item) return '';
+  const parts: string[] = [];
+  if (row.item.price !== null) parts.push(fmt.money(row.item.price, row.item.currency));
+  if (row.item.soldAllTime !== null) parts.push(t('research.shops.itemSold', { value: fmt.num(row.item.soldAllTime) }));
+  return parts.join(' · ');
+}
+
 export function cardSubtitle(row: WatchSummary, t: ShopT, fmt: DsFormat): string {
   const s = salesText(row, fmt);
   if (s === null) {
@@ -174,6 +196,7 @@ export function newCountText(g: Guarded<number>, fmt: DsFormat): string | null {
 
 /** Card meta (research §8.2): "412 active · +9 new". */
 export function cardMeta(row: WatchSummary, t: ShopT, fmt: DsFormat): string {
+  if (row.type === 'ebayItem') return itemLine(row, t, fmt);
   const parts: string[] = [];
   if (usable(row.metrics.active)) parts.push(t('research.shops.card.active', { value: fmt.num(row.metrics.active.value) }));
   if (usable(row.metrics.new7d)) {
@@ -194,6 +217,11 @@ function utcDayMs(date: string): number | null {
   if (m) return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
   const t = new Date(date).getTime();
   return Number.isFinite(t) ? Math.floor(t / DAY_MS) * DAY_MS : null;
+}
+
+/** `ebayItem` panel: the daily listed price as a chart series (same gap rules as the sales series). */
+export function priceSeries(points: Array<{ date: string; value: number | null }> | undefined) {
+  return salesSeries((points ?? []).map((p) => ({ date: p.date, value: p.value, dropped: false })));
 }
 
 /**

@@ -38,6 +38,8 @@ import { G6_EN as OVERVIEW_EN, G6_TR as OVERVIEW_TR } from '../overview/g6-messa
 import { psEn, psTr, psPendingEn, psPendingTr } from '../photoStudio/messages';
 import { C_EN as REP_C_EN, C_TR as REP_C_TR } from '../reports/c-messages';
 import { D_EN as REP_D_EN, D_TR as REP_D_TR, FRAME_EN, FRAME_TR } from '../reports/d-messages';
+import { ETSY_PORT_EN, ETSY_PORT_TR } from '../listings/etsy-port-messages';
+import { PORT_EN as RESEARCH_PORT_EN, PORT_TR as RESEARCH_PORT_TR } from '../research/legacy-port-messages';
 import { E_EN as REP_E_EN, E_TR as REP_E_TR } from '../reports/e-messages';
 import { DOCTOR_EN, DOCTOR_TR } from '../research/listings-doctor/messages';
 import { R1C_EN, R1C_TR } from '../research/r1c-messages';
@@ -109,6 +111,8 @@ export const FIXTURES: Fixture[] = [
   fx('messages/g5-messages', MSG_G5_EN, MSG_G5_TR),
   fx('messages/g6-messages', MSG_G6_EN, MSG_G6_TR),
   fx('orders/g2-messages', ORD_G2_EN, ORD_G2_TR),
+  fx('listings/etsy-port-messages', ETSY_PORT_EN, ETSY_PORT_TR),
+  fx('research/legacy-port-messages', RESEARCH_PORT_EN, RESEARCH_PORT_TR),
   fx('orders/g3-messages', ORD_G3_EN, ORD_G3_TR),
   fx('orders/g4-messages', ORD_G4_EN, ORD_G4_TR),
   fx('orders/g5-messages', ORD_G5_EN, ORD_G5_TR),

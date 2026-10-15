@@ -1,8 +1,6 @@
 // components/domain/listing-editor/CatalogEditorRoute.tsx — the Trendyol / Wix / Shopify editor and creator routes
 // (marketplace-editors §2, §5; M6b-C). `pages/app/{trendyol,wix,shopify}-urunler/{[id],new}.tsx` render this.
 //
-// - Behind `editor-trendyol` / `editor-wix` / `editor-shopify` (lib/ds/uiFlags.ts): with the flag off the route goes
-//   back to the list, where the M5 quick view stays the default.
 // - Store: Wix `?site=`, Shopify `?shop=` (Trendyol has one supplier per account). Resolved through the grid API
 //   (`GET /api/listings`), which also answers "not connected" (→ ConnectState).
 // - The workspace is the shared `ListingEditor` with the marketplace's adapter (adapters/{trendyol,wix,shopify}.ts)
@@ -23,8 +21,7 @@ import { scoreListing, type ShopifyScoreInput, type TrendyolScoreInput, type Wix
 import type { ScoreResult } from '@/lib/listingScore/types';
 import { editorHref, listHref, newListingHref } from '@/lib/listingEditor/editorNav';
 import type { CopySourceData, DraftRow, EditorMode, FieldMap, ListingView } from '@/lib/listingEditor/types';
-import type { UiFlagKey } from '@/lib/ds/uiFlags';
-import { ListingEditor, useResolvedUiFlag, type ListingEditorProps, type SectionComponents } from './ListingEditor';
+import { ListingEditor, type ListingEditorProps, type SectionComponents } from './ListingEditor';
 import type { ListingHealth } from './RailHealth';
 import type { ListingEditorAdapter } from './adapters/types';
 import { catalogBackHref, CATALOG_DISPLAY_NAME, type CatalogMarketplace } from './adapters/catalog';
@@ -55,7 +52,6 @@ const ADAPTERS: { [M in CatalogMarketplace]: ListingEditorAdapter<FieldMap> } = 
   shopify: shopifyAdapter as unknown as ListingEditorAdapter<FieldMap>,
 };
 
-const FLAG: Record<CatalogMarketplace, UiFlagKey> = { trendyol: 'editor-trendyol', wix: 'editor-wix', shopify: 'editor-shopify' };
 
 /** The store query param per marketplace (lib/listingEditor/editorNav.ts STORE_PARAM). */
 const STORE_PARAM: Record<CatalogMarketplace, string | null> = { trendyol: null, wix: 'site', shopify: 'shop' };
@@ -254,7 +250,6 @@ export function CatalogEditorRoute({ marketplace, mode }: CatalogEditorRouteProp
   const t = useTranslations('listingEditor');
   const router = useRouter();
   const toast = useToast();
-  const flag = useResolvedUiFlag(FLAG[marketplace]);
   const param = STORE_PARAM[marketplace];
   const storeParam = param ? (one(router.query[param]) ?? null) : null;
   const name = CATALOG_DISPLAY_NAME[marketplace];
@@ -279,10 +274,10 @@ export function CatalogEditorRoute({ marketplace, mode }: CatalogEditorRouteProp
 
   React.useEffect(() => {
     if (!router.isReady) return;
-    if (flag === false || invalid) void router.replace(listHref(marketplace, storeParam));
-  }, [flag, invalid, router, marketplace, storeParam]);
+    if (invalid) void router.replace(listHref(marketplace, storeParam));
+  }, [invalid, router, marketplace, storeParam]);
 
-  const store = useCatalogStore(marketplace, storeParam, Boolean(flag) && router.isReady && !invalid, id);
+  const store = useCatalogStore(marketplace, storeParam, router.isReady && !invalid, id);
 
   // Cross-list source (Etsy / eBay) loads before the workspace mounts (the engine reads `copy` once).
   const [cross, setCross] = React.useState<{ key: string | null; status: 'idle' | 'loading' | 'done'; copy: CopySourceData | null; currency: string | null }>({
@@ -293,7 +288,7 @@ export function CatalogEditorRoute({ marketplace, mode }: CatalogEditorRouteProp
   });
   React.useEffect(() => {
     const source = b?.crosslist;
-    if (!flag || !source || !crossKey || cross.key === crossKey) return;
+    if (!source || !crossKey || cross.key === crossKey) return;
     setCross({ key: crossKey, status: 'loading', copy: null, currency: null });
     const load = source.from === 'etsy' ? loadEtsyCrosslistSource(source.id) : loadEbayCopySource({ shopId: 'ebay', listingId: source.id });
     load
@@ -306,7 +301,7 @@ export function CatalogEditorRoute({ marketplace, mode }: CatalogEditorRouteProp
         toast.error(t('catalog.crosslistFailed'));
         setCross({ key: crossKey, status: 'done', copy: null, currency: null });
       });
-  }, [flag, b, crossKey, cross.key, toast, t]);
+  }, [b, crossKey, cross.key, toast, t]);
 
   const storeCurrency = store.status === 'ready' ? store.store.currency : null;
   const fitted = React.useMemo(() => fitCopyToStore(cross.copy, cross.currency, storeCurrency), [cross.copy, cross.currency, storeCurrency]);
@@ -339,7 +334,7 @@ export function CatalogEditorRoute({ marketplace, mode }: CatalogEditorRouteProp
     [marketplace],
   );
 
-  if (!flag || !router.isReady || invalid) return null;
+  if (!router.isReady || invalid) return null;
   const pageTitle = mode === 'create' ? t('common.newProduct') : t('page.editTitle');
   if (store.status === 'not_connected') {
     return (

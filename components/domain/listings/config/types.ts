@@ -25,6 +25,8 @@ export type RowActionKey =
   | 'activate'
   | 'renew'
   | 'archive'
+  /** Trendyol: restore an archived product (staged queued `unarchive`, sent with "Send N"). */
+  | 'unarchive'
   | 'showInStore'
   | 'hideInStore'
   | 'delete'
@@ -44,6 +46,10 @@ export type BulkActionKey =
   | 'improveWithAi'
   | 'copyToEbay'
   | 'copyToEtsy'
+  /** Etsy: queued `copy` into another of the seller's shops (only with 2+ shops; sent explicitly). */
+  | 'copyToShop'
+  /** Etsy: "Set field…" (shipping / return policy / processing / category / item details / materials / description / personalization / weight / size). */
+  | 'setField'
   | 'sendSelected'
   | 'discardSelected'
   | 'scheduleSend'
@@ -52,6 +58,7 @@ export type BulkActionKey =
   | 'activate'
   | 'renew'
   | 'archive'
+  | 'unarchive'
   | 'showInStore'
   | 'hideInStore'
   | 'addToCollection'
@@ -143,8 +150,7 @@ export type ListingsConfig = {
   /** Which staging adapter (§9.4). */
   drafts: 'etsy' | 'ebay' | 'catalog';
   /**
-   * Full editor route (used only while the marketplace's `EDITOR_FLAG` is on). `null` = no full editor: `e`/✎ open
-   * the quick view (CatalogDraft marketplaces in SidePanel `xl`, CRITIQUE X3).
+   * Full editor route. `null` = no full editor: `e`/✎ open the quick view.
    */
   editorHref(id: string, storeId: string | null): string | null;
   /** `null` = no create route on this marketplace yet. */

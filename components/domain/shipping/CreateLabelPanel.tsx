@@ -35,7 +35,7 @@ import { useFormatters } from '@/lib/format';
 import { useConnections } from '@/lib/hooks/useConnections';
 import { useLimitDialogOptOut } from '@/lib/http/limitInterceptor';
 import CancelledOrderLabelDialog, { type LabelGuardCode } from '@/components/orders-live/CancelledOrderLabelDialog';
-import { ShipToForm, phoneToE164, type ShipToFieldKey } from '@/components/domain/orders/panel/ShipToForm';
+import { ShipToForm, phoneToE164, senderPhoneE164, type ShipToFieldKey } from '@/components/domain/orders/panel/ShipToForm';
 import type { OrderRow, TrackingSubmissionSummary } from '@/lib/orders/types';
 import {
   canPushTracking, draftFromOrder, isInternational, withCarrier, applyPreset,
@@ -541,6 +541,7 @@ export function CreateLabelPanel({ order, open, onClose, onBack, defaultCarrier,
               onBlurField={(f) => blur(`shipTo.${f}` as FieldPath)}
               showDistrict={fields.includes('district')}
               required={required}
+              phoneFallback={draft.carrier === 'dhl' ? senderPhoneE164(settings.sender) || undefined : undefined}
               autoFocusField={autoFocusField}
               idPrefix="label-shipto"
             />

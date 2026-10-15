@@ -7,7 +7,6 @@ vi.mock('../../lib/logger', () => ({
 const nodeFetchMock = vi.fn();
 vi.mock('node-fetch', () => ({ default: (...args: any[]) => nodeFetchMock(...args) }));
 
-import { appendOrderFilters } from '../../lib/hooks/useOrders';
 import { mngTokenCacheKey, getMngToken, clearMngTokenCache } from '../../lib/mng/mng.service';
 import { getProductImages, imageCache, imageCacheKey } from '../../lib/integrations/trendyolClient';
 import {
@@ -16,23 +15,6 @@ import {
   catalogCooldownKey,
   resetCatalogAccessDenied,
 } from '../../lib/integrations/amazonClient';
-
-describe('useOrders appendOrderFilters', () => {
-  it('sends multi-select arrays as repeated params, not a comma-joined value', () => {
-    const p = new URLSearchParams();
-    appendOrderFilters(p, { marketplace: ['Etsy', 'Trendyol', ''], status: 'onaylandi', search: '', x: undefined });
-    expect(p.getAll('marketplace')).toEqual(['Etsy', 'Trendyol']);
-    expect(p.get('status')).toBe('onaylandi');
-    expect(p.has('search')).toBe(false);
-    expect(p.has('x')).toBe(false);
-  });
-
-  it('keeps comma-containing names intact', () => {
-    const p = new URLSearchParams();
-    appendOrderFilters(p, { marketplace: ['Shop, Inc'] });
-    expect(p.getAll('marketplace')).toEqual(['Shop, Inc']);
-  });
-});
 
 describe('MNG token cache key', () => {
   const base = { appId: 'app', appSecret: 's3cret', customerNumber: '42', customerPassword: 'pw', environment: 'test' as const };

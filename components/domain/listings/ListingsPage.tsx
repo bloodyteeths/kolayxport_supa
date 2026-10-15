@@ -23,9 +23,9 @@ import { ConnectState } from '@/components/ds/state/ConnectState';
 import { ErrorState } from '@/components/ds/state/ErrorState';
 import { useConfirm } from '@/components/ds/overlay/ConfirmDialog';
 import { useUrlState } from '@/lib/ds/useUrlState';
-import { useUiFlag } from '@/lib/ds/uiFlags';
 import { renderSendError, type SendErrorTranslator } from '@/lib/listings/sendError';
 import { listQueryForEditor, writeEditorNav } from '@/lib/listingEditor/editorNav';
+import { crosslistCreateHref } from '@/lib/listings/legacyHandoff';
 import { useCommands, type Command } from '@/lib/ds/useCommand';
 import { icons } from '@/lib/ds/icons';
 import { useAuth } from '@/lib/auth-context';
@@ -45,9 +45,7 @@ import {
   type StagePatch,
 } from '@/lib/listings/types';
 import {
-  BULK_FLAG,
   CONNECT_HREF,
-  EDITOR_FLAG,
   FRESHNESS_CHIP,
   MARKETPLACE_NAME,
   SCHEDULED_SENDS_ENABLED,
@@ -58,8 +56,10 @@ import {
   COLUMN_SORT_FIELD,
   dirtyCellKeys,
   displayPrice,
+  displayListPrice,
   displayQty,
   hasOpenChanges,
+  isArchivedRow,
   listingColumns,
   removalKindOf,
   type ListingCellContext,
@@ -90,6 +90,10 @@ import { ChangePriceModal } from './bulk/ChangePriceModal';
 import { ChangeStockModal } from './bulk/ChangeStockModal';
 import { AddTagsModal } from './bulk/AddTagsModal';
 import { ScheduleSendModal } from './bulk/ScheduleSendModal';
+import { CopyToShopModal } from './bulk/CopyToShopModal';
+import { SetFieldModal } from './bulk/SetFieldModal';
+import { NewDraftsBanner } from './NewDraftsBanner';
+import { buildVariationPriceInventories, priceModeToOp, type VariationMatch } from '@/lib/bulk/variationPriceOps';
 import { useToolsMenuItems, fetchToolText, storeSearchParams, type ListingsToolContext, type ListingsToolKey } from './tools/ToolsMenuItems';
 import { FindReplacePanel } from './tools/FindReplacePanel';
 import { DuplicatesPanel } from './tools/DuplicatesPanel';
@@ -268,9 +272,6 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
   // 402s on this route show the inline usage Banner instead of the global dialog (CRITIQUE C6).
   useLimitDialogOptOut();
 
-  const editorOn = useUiFlag(EDITOR_FLAG[marketplace]);
-  const bulkOn = useUiFlag(BULK_FLAG);
-
   // ── URL state + data ─────────────────────────────────────────────────────────────────────────────────
   const [url, setUrl] = useUrlState(LISTINGS_URL_SCHEMA);
   const query = React.useMemo(() => toListingsQuery(url, config), [url, config]);
@@ -294,6 +295,9 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
   // ── connection (§7: not connected / reconnect / couldn't check) ──────────────────────────────────────
   const connections = useConnections();
   const connected = connections.has(marketplace);
+  // Cross-list targets ("Copy to eBay" / "Copy to Etsy"): hidden only when known not connected.
+  const ebayConnected = connections.has('ebay');
+  const etsyConnected = connections.has('etsy');
   const notConnected = connected === false || list.error?.code === 'not_connected';
   const needsReauth = Boolean(connections.get(marketplace)?.needsReauth);
   const couldntCheck = Boolean(connections.error) && !connections.connections;
@@ -416,7 +420,7 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
   }, []);
 
   // ── panels / modals ──────────────────────────────────────────────────────────────────────────────────
-  const [modal, setModal] = React.useState<null | 'price' | 'stock' | 'tags' | 'schedule'>(null);
+  const [modal, setModal] = React.useState<null | 'price' | 'stock' | 'tags' | 'schedule' | 'copyShop' | 'setField'>(null);
   const [modalRows, setModalRows] = React.useState<ListingRow[]>([]);
   // "Change stock" skips stock-managed rows (counted as skipped, like variation rows).
   const stockModalRows = React.useMemo(() => modalRows.map((r) => withStockManaged(r, stockManagedIds)), [modalRows, stockManagedIds]);
@@ -436,8 +440,8 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
   const closePanel = React.useCallback(() => setPanel({ open: undefined, tool: undefined }, 'replace'), [setPanel]);
 
   const editorHref = React.useCallback(
-    (id: string): string | null => (editorOn ? config.editorHref(id, storeId) : null),
-    [editorOn, config, storeId],
+    (id: string): string | null => config.editorHref(id, storeId),
+    [config, storeId],
   );
   const openEditor = React.useCallback(
     (r: ListingRow) => {
@@ -459,7 +463,7 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
     [editorHref, router, openQuick, marketplace, storeId, rows, config.storeParam],
   );
   // Row click / Enter (founder follow-up, supersedes listings-grid §2 "row click = quick view"): the whole row opens
-  // the listing — the full editor while this marketplace's editor flag is on, else the quick view. The checkbox,
+  // the listing in the full editor (the quick view when the marketplace has no editor route). The checkbox,
   // ✎ / ⋯ buttons and the inline price/qty cells stop the click in DataTable. A drag that selects title text does not
   // navigate.
   const openFromRow = React.useCallback(
@@ -469,11 +473,9 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
     },
     [openEditor],
   );
-  const newHref = editorOn ? config.newListingHref(storeId) : null;
-  const bulkHref = bulkOn && config.bulkEditHref ? config.bulkEditHref(storeId) : null;
-  // CRITIQUE X3: the CatalogDraft marketplaces' quick view is the `xl` editing surface while their full editor (M6b)
-  // is off; with it on (and on Etsy/eBay) the quick view is the `md` peek.
-  const quickSize: 'md' | 'xl' = config.drafts === 'catalog' && !editorOn ? 'xl' : 'md';
+  const newHref = config.newListingHref(storeId);
+  const bulkHref = config.bulkEditHref ? config.bulkEditHref(storeId) : null;
+  // The quick view is the `md` peek (every marketplace has the full editor, M6b).
 
   // ── stage helpers ────────────────────────────────────────────────────────────────────────────────────
   const stageOne = React.useCallback(
@@ -633,6 +635,14 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
             if (href) out.push({ id: key, label: t('listings.action.duplicate'), icon: icons.copy, href });
             break;
           }
+          case 'copyToEbay':
+          case 'copyToEtsy': {
+            // Hidden when the target marketplace is known not connected (unknown while loading: shown).
+            if ((key === 'copyToEbay' ? ebayConnected : etsyConnected) === false) break;
+            const href = crosslistCreateHref(key, marketplace, r.id);
+            if (href) out.push({ id: key, label: t(key === 'copyToEbay' ? 'listingEditor.action.copyToEbay' : 'listings.action.copyToEtsy'), icon: icons.copy, href });
+            break;
+          }
           case 'reviewDifferences':
             if (sync?.status === 'conflict' && editorHref(r.id)) out.push({ id: key, label: t('listings.action.reviewDiff'), onClick: () => openEditor(r) });
             break;
@@ -663,8 +673,20 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
           case 'renew':
             if (!removalQueued && (r.status === 'expired' || r.status === 'sold_out')) out.push({ id: key, label: t('listings.action.renew'), onClick: () => void stageActionFor([r], { type: 'renew' }) });
             break;
+          case 'unarchive':
+            if (!removalQueued && isArchivedRow(r)) {
+              const pendingOther = hasOpenChanges(r);
+              out.push({
+                id: key,
+                label: t('listings.action.unarchive'),
+                disabled: pendingOther,
+                disabledReason: pendingOther ? t('listings.action.unarchiveNeedsAlone') : undefined,
+                onClick: () => void stageActionFor([r], { type: 'unarchive' }),
+              });
+            }
+            break;
           case 'archive':
-            if (!removalQueued && r.status !== 'inactive') {
+            if (!removalQueued && r.status !== 'inactive' && !isArchivedRow(r)) {
               const pendingOther = hasOpenChanges(r);
               out.push({
                 id: key,
@@ -701,13 +723,41 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
       }
       return out;
     },
-    [config, t, mpName, copyHref, editorHref, openEditor, openQuick, sendRows, openSchedule, discardRow, sendDeletion, stageActionFor, confirmDelete, sendDisabledReason, staged.sendingIds, removalKind],
+    [config, t, mpName, copyHref, marketplace, editorHref, openEditor, openQuick, sendRows, openSchedule, discardRow, sendDeletion, stageActionFor, confirmDelete, sendDisabledReason, staged.sendingIds, removalKind, ebayConnected, etsyConnected],
   );
 
   const inlineAction = React.useCallback(
     (r: ListingRow): ActionSpec => ({ id: 'edit', label: t('listings.action.edit'), icon: icons.edit, shortcut: 'e', onClick: () => openEditor(r) }),
     [t, openEditor],
   );
+
+  // Etsy shops other than the open one ("Copy to another shop…", shop names in the new-listings list).
+  const otherStores = React.useMemo(() => (data?.stores ?? []).filter((s) => s.id !== storeId), [data?.stores, storeId]);
+  const storeNameOf = React.useCallback((id: string) => data?.stores.find((s) => s.id === id)?.name ?? null, [data?.stores]);
+
+  // Change price on listings with variations (Etsy): the same change on every variation, staged as inventory.
+  const stageVariationPrices = React.useMemo(() => {
+    if (!staged.adapter.stagesEtsyExtras || !storeId) return undefined;
+    return async (targets: ListingRow[], op: { mode: Parameters<typeof priceModeToOp>[0]; value: number; round: '99' | '00' | 'none'; match?: VariationMatch | null }) => {
+      const { patches, skipped } = await buildVariationPriceInventories(storeId, targets.map((r) => r.id), [priceModeToOp(op.mode, op.value)], {
+        round: op.round,
+        minPrice: config.validation.priceMin,
+        match: op.match,
+      });
+      const res = patches.length
+        ? await staged.stageMany(
+            patches.map((p) => {
+              const patch: ExtendedStagePatch = { etsy: { inventory: p.inventory } };
+              return { id: p.id, patch };
+            }),
+          )
+        : { ok: [], failed: [] };
+      if (res.failed.length) toast.error(t('listings.tools.stageFailed', { count: res.failed.length }));
+      else if (skipped.length) toast.info(t('listings.price.variationsSkipped', { count: skipped.length }));
+      else if (res.ok.length) toast.success(t('listings.tools.staged', { count: res.ok.length }));
+      if (!res.failed.length) clearSelection();
+    };
+  }, [staged, storeId, config.validation.priceMin, toast, t, clearSelection]);
 
   // ── bulk bar (§6.3) ──────────────────────────────────────────────────────────────────────────────────
   const loadTags = React.useCallback(
@@ -717,6 +767,33 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
       const csv = readListingsCsv(await fetchToolText(`/api/listings/export?${p.toString()}`));
       const map = new Map<string, string[] | null>();
       for (const r of targets) map.set(r.id, csv.get(r.id)?.tags ?? null);
+      return map;
+    },
+    [marketplace, data?.store, storeId],
+  );
+
+  // Live Etsy materials for "Set field… → Materials → Add / Remove" (the export's `materials` column).
+  const loadMaterials = React.useCallback(
+    async (targets: ListingRow[]) => {
+      const p = storeSearchParams({ marketplace, store: data?.store ?? null, query: { marketplace, store: storeId ?? undefined } });
+      p.set('ids', targets.map((r) => r.id).join(','));
+      const csv = readListingsCsv(await fetchToolText(`/api/listings/export?${p.toString()}`));
+      const map = new Map<string, string[] | null>();
+      for (const r of targets) map.set(r.id, csv.get(r.id)?.materials ?? null);
+      return map;
+    },
+    [marketplace, data?.store, storeId],
+  );
+
+  // Live Etsy descriptions for "Set field… → Description → Add before / after" (export with includeDescription).
+  const loadDescriptions = React.useCallback(
+    async (targets: ListingRow[]) => {
+      const p = storeSearchParams({ marketplace, store: data?.store ?? null, query: { marketplace, store: storeId ?? undefined } });
+      p.set('ids', targets.map((r) => r.id).join(','));
+      p.set('includeDescription', '1');
+      const csv = readListingsCsv(await fetchToolText(`/api/listings/export?${p.toString()}`));
+      const map = new Map<string, string | null>();
+      for (const r of targets) map.set(r.id, csv.get(r.id)?.description ?? null);
       return map;
     },
     [marketplace, data?.store, storeId],
@@ -769,6 +846,17 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
             .catch(() => toast.error(t('listings.tools.loadFailed')));
           return;
         }
+        case 'setField': {
+          const rowsFor = editableTargets(targets);
+          if (!rowsFor) return;
+          setModalRows(rowsFor);
+          setModal('setField');
+          return;
+        }
+        case 'copyToShop':
+          setModalRows(targets);
+          setModal('copyShop');
+          return;
         case 'sendSelected':
           sendRows(targets);
           return;
@@ -803,6 +891,15 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
           if (rowsFor) void stageActionFor(rowsFor, { type: key === 'showInStore' ? 'show' : key === 'hideInStore' ? 'hide' : key });
           return;
         }
+        case 'unarchive': {
+          // Only archived rows without other open changes (an unarchive is sent alone).
+          const archived = targets.filter((r) => isArchivedRow(r) && !(r.sync?.queuedDelete && r.sync.status !== 'synced'));
+          const alone = archived.filter((r) => !hasOpenChanges(r));
+          const skipped = targets.length - alone.length;
+          if (skipped) toast.info(t('listings.bulk.unarchiveSkipped', { count: skipped }));
+          if (alone.length) void stageActionFor(alone, { type: 'unarchive' });
+          return;
+        }
         case 'archive':
         case 'delete': {
           // A removal is staged alone: rows that already queue one, or hold other open changes, are skipped.
@@ -835,6 +932,10 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
         return t('listings.bulk.changeStock');
       case 'addTags':
         return config.tags ? t('listings.bulk.addTags') : null;
+      case 'setField':
+        return staged.adapter.stagesEtsyExtras && storeId ? t('listings.action.setField') : null;
+      case 'copyToShop':
+        return staged.adapter.stagesCopyToShop && otherStores.length > 0 ? t('listings.action.copyToShop') : null;
       case 'sendSelected':
         return selectedRows.some((r) => r.sync && (r.sync.status === 'pending' || r.sync.status === 'sync_failed') && !r.sync.queuedDelete) ? t('listings.send.selected') : null;
       case 'discardSelected':
@@ -851,6 +952,8 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
         return t('listings.action.renew');
       case 'archive':
         return t('listings.action.archive');
+      case 'unarchive':
+        return selectedRows.some(isArchivedRow) ? t('listings.action.unarchive') : null;
       case 'showInStore':
         return t('listings.action.showInStore');
       case 'hideInStore':
@@ -1149,6 +1252,18 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
 
       {failureBanner}
 
+      {staged.adapter.listNewListings ? (
+        <NewDraftsBanner
+          marketplaceName={mpName}
+          load={staged.adapter.listNewListings}
+          version={data}
+          hrefFor={(d) => (d.listingId ? editorHref(d.listingId) : null) ?? (newHref ? withQuery(newHref, 'draft', d.draftId) : null)}
+          shopName={storeNameOf}
+          discard={(id) => staged.discard([id])}
+          t={t}
+        />
+      ) : null}
+
       {legacy.length ? (
         <Box sx={{ mb: '8px' }}>
           <Banner
@@ -1249,8 +1364,8 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
       <QuickViewPanel
         row={openRow}
         open={Boolean(openRow) && !url.tool}
-        size={quickSize}
-        editTitle={quickSize === 'xl'}
+        size="md"
+        editTitle={false}
         ctx={cellCtx}
         t={t}
         onClose={closePanel}
@@ -1278,7 +1393,10 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
         currency={storeCurrency}
         priceMin={config.validation.priceMin}
         currentPrice={(r) => displayPrice(r, staged.overlays)}
+        // Trendyol: list price moves with the sale price (a sale price above the list price is rejected).
+        currentListPrice={marketplace === 'trendyol' ? (r) => displayListPrice(r, staged.overlays) : undefined}
         formatMoney={formatMoney}
+        onStageVariations={stageVariationPrices}
         onStage={async (patches) => {
           const res = await staged.stageMany(patches);
           reportStaged(res);
@@ -1313,6 +1431,40 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
             reportStaged(res);
             if (!res.failed.length) clearSelection();
             return res;
+          }}
+          t={t}
+        />
+      ) : null}
+      <SetFieldModal
+        open={modal === 'setField'}
+        onClose={() => setModal(null)}
+        rows={modalRows}
+        shopId={storeId}
+        loadMaterials={loadMaterials}
+        loadDescriptions={loadDescriptions}
+        onStage={async (patches) => {
+          const res = await staged.stageMany(patches);
+          reportStaged(res);
+          if (!res.failed.length) clearSelection();
+          return res;
+        }}
+      />
+      {staged.adapter.stagesCopyToShop ? (
+        <CopyToShopModal
+          open={modal === 'copyShop'}
+          onClose={() => setModal(null)}
+          rows={modalRows}
+          shops={otherStores}
+          onStage={async (targets, targetShopId) => {
+            const res = await staged.stageActions(
+              targets.map((r) => r.id),
+              { type: 'copy', targetShopId },
+            );
+            if (res.failed.length) toast.error(t('listings.tools.stageFailed', { count: res.failed.length }));
+            else if (res.ok.length) {
+              toast.success(t('listings.copyToShop.staged', { count: res.ok.length, shop: storeNameOf(targetShopId) ?? targetShopId }));
+              clearSelection();
+            }
           }}
           t={t}
         />

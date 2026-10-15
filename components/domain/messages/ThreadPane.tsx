@@ -22,7 +22,6 @@ import { icons } from '@/lib/ds/icons';
 import { neutral as n, type as typeScale, zIndex } from '@/lib/ds/tokens';
 import { useShortcuts } from '@/lib/ds/useShortcuts';
 import { useFormatters } from '@/lib/format';
-import { useNavLinks } from '@/lib/nav/links';
 import type { FillContext } from '@/lib/messages/fillVariables';
 import { messageRowState } from '@/lib/messages/threadState';
 import type { UnifiedConversation } from '@/types/messages';
@@ -160,7 +159,6 @@ function ThreadPaneInner({
     { title: tComposer('discard.title'), keep: tComposer('discard.keep'), discard: tComposer('discard.confirm') },
     { enabled: guardNavigation },
   );
-  const links = useNavLinks();
 
   const { orders } = useOrderContext(isWix ? c.contactId : null);
   const newest = orders[0];
@@ -205,7 +203,7 @@ function ThreadPaneInner({
     overflow.push({ id: 'viewOnTrendyol', label: t('viewOnTrendyol'), icon: icons.externalLink, href: c.productInfo.webUrl });
   }
   if (isWix && newest?.kxOrderId) {
-    overflow.push({ id: 'openOrder', label: tContext('openOrder'), href: orderHref(newest.kxOrderId, newest.orderNumber, links.flags) });
+    overflow.push({ id: 'openOrder', label: tContext('openOrder'), href: orderHref(newest.kxOrderId) });
   }
   if (onManageSavedReplies) {
     overflow.push({ id: 'manageSaved', label: tSaved('manage'), onClick: onManageSavedReplies });

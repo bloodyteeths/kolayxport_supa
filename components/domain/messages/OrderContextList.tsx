@@ -17,7 +17,7 @@ import { ErrorState } from '@/components/ds/state/ErrorState';
 import { Bone } from '@/components/ds/state/Skeletons';
 import { isClosedOrderStatus, orderStatus } from '@/lib/ds/status/orders';
 import { neutral as n, font, type as typeScale } from '@/lib/ds/tokens';
-import { ordersHref, useNavLinks, type LinkFlags } from '@/lib/nav/links';
+import { ordersHref } from '@/lib/nav/links';
 import type { OrderContext, OrderContextResponse } from '@/types/messages';
 import { jsonFetcher, MESSAGES_API } from './useThread';
 
@@ -27,12 +27,9 @@ export function orderContextUrl(contactId: string): string {
   return `${MESSAGES_API}?action=orderContext&contactId=${encodeURIComponent(contactId)}`;
 }
 
-/**
- * "Open order" target, flag-aware (lib/nav/links.ts): v2 Orders `view=all&open=<id>` (OrderPanel), legacy
- * `/app/labels` searches the order number (`q=…&qt=order`) or highlights the id.
- */
-export function orderHref(kxOrderId: string, orderNumber?: string | null, flags?: LinkFlags): string {
-  return ordersHref('order', kxOrderId, null, null, { orderNumber }, flags);
+/** "Open order" target (lib/nav/links.ts): Orders `view=all&open=<id>` (OrderPanel). */
+export function orderHref(kxOrderId: string): string {
+  return ordersHref('order', kxOrderId);
 }
 
 export interface UseOrderContextResult {
@@ -77,7 +74,6 @@ function OrderSkeleton() {
 
 export function OrderContextRow({ order, now }: { order: OrderContext; now?: Date }) {
   const t = useTranslations('messages.context');
-  const { flags } = useNavLinks();
   const status = orderStatus(order.status, 'wix');
   const items = Array.isArray(order.items) ? order.items : [];
   const shown = items.slice(0, ORDER_THUMBS_MAX);
@@ -132,7 +128,7 @@ export function OrderContextRow({ order, now }: { order: OrderContext; now?: Dat
       )}
       {order.kxOrderId && (
         <Box>
-          <Button variant="secondary" size="sm" href={orderHref(order.kxOrderId, order.orderNumber, flags)} data-testid="open-order">
+          <Button variant="secondary" size="sm" href={orderHref(order.kxOrderId)} data-testid="open-order">
             {t('openOrder')}
           </Button>
         </Box>

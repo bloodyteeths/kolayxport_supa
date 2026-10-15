@@ -50,8 +50,6 @@ const photoAccess = { visible: true, tag: false, locked: false };
 vi.mock('@/lib/billing/useFeatureAction', () => ({
   useFeatureAction: () => ({ access: 'allowed', trialEndsAt: null, onBlockedClick: undefined, ...photoAccess }),
 }));
-const flags = new Set<string>();
-vi.mock('@/lib/ds/uiFlags', () => ({ useUiFlag: (k: string) => flags.has(k) }));
 vi.mock('@/components/withAuth', () => ({ default: (C: React.ComponentType) => C }));
 
 let grid: BulkGridProps<ListingRow> | null = null;
@@ -206,7 +204,6 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
-  flags.clear();
 });
 
 const header = () => screen.getByTestId('bulk-header');
@@ -349,7 +346,7 @@ describe('BulkEditPage (Etsy, desktop)', () => {
   });
 });
 
-describe('bulk routes (flag `bulk`)', () => {
+describe('bulk routes', () => {
   const ROUTES = [
     ['etsy', '/app/etsy-listings', () => import('@/pages/app/etsy-listings/bulk')],
     ['ebay', '/app/ebay-listings', () => import('@/pages/app/ebay-listings/bulk')],
@@ -357,7 +354,7 @@ describe('bulk routes (flag `bulk`)', () => {
     ['wix', '/app/wix-urunler', () => import('@/pages/app/wix-urunler/bulk')],
     ['shopify', '/app/shopify-urunler', () => import('@/pages/app/shopify-urunler/bulk')],
   ] as const;
-  it.each(ROUTES)('%s: flag off → back to %s; flag on → the bulk page', async (_mp, listRoute, load) => {
+  it.each(ROUTES)('%s (list %s): the bulk page', async (_mp, _listRoute, load) => {
     const Route = (await load()).default as React.ComponentType;
     const wrap = (el: React.ReactNode) => (
       <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
@@ -368,11 +365,6 @@ describe('bulk routes (flag `bulk`)', () => {
         </NextIntlClientProvider>
       </SWRConfig>
     );
-    const { unmount } = render(wrap(<Route />));
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith(listRoute));
-    expect(screen.queryByTestId('bulk-header')).toBeNull();
-    unmount();
-    flags.add('bulk');
     render(wrap(<Route />));
     expect(await screen.findByTestId('bulk-header')).toBeTruthy();
   });

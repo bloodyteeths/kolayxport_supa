@@ -44,7 +44,7 @@ import { copyText } from '@/lib/hooks/useCopy';
 import type { KeywordView, ResearchMkt } from '@/lib/research/types';
 import { COMPETITION_BANDS, type KeywordFilters, type KeywordMkt, type KeywordRowExt, type TrackedKeywordRow } from '@/lib/research/keywordTypes';
 import { ResearchFetchError, trackKeywords, untrackKeywords, useKeywords, type KeywordsHookResult } from '@/lib/research/hooks/useKeywords';
-import { exportToCSV } from '@/components/etsy/research/shared/exportUtils';
+import { exportToCSV } from '@/lib/research/exportCsv';
 import { isLikelyTurkish } from '@/lib/research/detectQuery';
 import { requestSeeds } from '@/lib/research/hooks/useResearchProducts';
 import { SeedChips } from '../products/SeedChips';

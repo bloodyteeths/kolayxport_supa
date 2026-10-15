@@ -492,6 +492,15 @@ export function assertDeleteIsExclusive(patch: CatalogFieldPatch, actions: Catal
   }
 }
 
+/** An unarchive (Trendyol) is sent alone: never next to an archive, a create or field changes. */
+export function assertUnarchiveIsExclusive(patch: CatalogFieldPatch, actions: CatalogQueuedAction[]) {
+  const open = actions.filter((a) => !a.completedAt);
+  if (!open.some((a) => a.type === 'unarchive')) return;
+  if (open.some((a) => a.type !== 'unarchive') || Object.keys(patch).length > 0) {
+    throw new CatalogDraftError('DELETE_NOT_EXCLUSIVE', 'An unarchive cannot be combined with other staged changes');
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Stores and cache rows
 // ---------------------------------------------------------------------------
@@ -687,6 +696,7 @@ export async function stageCatalogDraft(input: StageInput): Promise<CatalogDraft
     if (incomingActions) actions = mergeQueuedActions(actions, incomingActions);
     if (removeTypes.length) actions = actions.filter((a) => a.completedAt || !removeTypes.includes(a.type));
     assertDeleteIsExclusive(fieldPatch, actions);
+    assertUnarchiveIsExclusive(fieldPatch, actions);
     // Check the whole draft as it will be sent (only on what this stage touches, so an old draft whose
     // product changed since is still editable until its send re-checks it).
     if (Object.keys(set).length > 0) assertEditable(marketplace, fieldPatch, rulesSnapshot ?? snapshot);

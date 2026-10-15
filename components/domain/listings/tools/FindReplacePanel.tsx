@@ -47,13 +47,21 @@ import {
   type ListingsToolPanelProps,
 } from './ToolsMenuItems';
 
-export type FindReplaceField = 'title' | 'tags' | 'description';
+export type FindReplaceField = 'title' | 'tags' | 'description' | 'materials';
 export type FindReplaceScope = 'view' | 'selected';
 
-/** Fields offered per marketplace. Description needs StagePatch.description (requested from G0/G5): opt-in. */
-export function findReplaceFields(marketplace: ListingMarketplace, opts: { description?: boolean } = {}): FindReplaceField[] {
-  return stageableFields(marketplace, opts).filter((f): f is FindReplaceField => f === 'title' || f === 'tags' || f === 'description');
+/**
+ * Fields offered per marketplace. Description needs StagePatch.description (requested from G0/G5): opt-in.
+ * Materials (Etsy) needs the adapter to stage Etsy draft fields (`stagesEtsyExtras`): opt-in.
+ */
+export function findReplaceFields(marketplace: ListingMarketplace, opts: { description?: boolean; materials?: boolean } = {}): FindReplaceField[] {
+  const out: FindReplaceField[] = stageableFields(marketplace, opts).filter((f): f is 'title' | 'tags' | 'description' => f === 'title' || f === 'tags' || f === 'description');
+  if (opts.materials && marketplace === 'etsy') out.push('materials');
+  return out;
 }
+
+/** Etsy materials limits (the listing editor's: 13 materials, 45 characters each). */
+export const ETSY_MATERIALS = { max: 13, maxLen: 45 } as const;
 
 /**
  * Why a change is shown but not staged: over the limit, a tag over its length or holding a tag separator
@@ -70,7 +78,8 @@ export type FindReplaceChange = {
   title: string;
   before: string;
   after: string;
-  patch: ImportPatch;
+  /** `etsy.fields.materials` for the materials field (the Etsy draft's fieldPatch key). */
+  patch: ImportPatch & { etsy?: { fields?: Record<string, unknown> } };
   /** Set when the result would be rejected; the row shows the reason and is not staged. */
   flag?: FindReplaceFlag;
   flagParams?: Record<string, number>;
@@ -147,6 +156,23 @@ export function computeFindReplace(
         change.flagParams = { max: limits.tags.maxLen };
       }
       changes.push(change);
+    } else if (input.field === 'materials') {
+      if (marketplace !== 'etsy' || !l.materials?.length) continue;
+      if (!l.materials.some((m) => m.search(re) !== -1)) continue;
+      const afterList = cleanTags(l.materials.map(swap));
+      const before = l.materials.join(', ');
+      const after = afterList.join(', ');
+      if (after === before) continue;
+      const change: FindReplaceChange = { id: l.id, title: l.title, before, after, patch: { etsy: { fields: { materials: afterList } } } };
+      if (afterList.some((m) => TAG_SEPARATORS.test(m))) change.flag = 'tagSeparator';
+      else if (afterList.some((m) => m.length > ETSY_MATERIALS.maxLen)) {
+        change.flag = 'tagTooLong';
+        change.flagParams = { max: ETSY_MATERIALS.maxLen };
+      } else if (afterList.length > ETSY_MATERIALS.max) {
+        change.flag = 'overLimit';
+        change.flagParams = { max: ETSY_MATERIALS.max };
+      }
+      changes.push(change);
     } else {
       const desc = l.description ?? '';
       if (!desc || desc.search(re) === -1) continue;
@@ -204,14 +230,17 @@ function snippet(text: string, re: RegExp | null): string {
 }
 
 export interface FindReplacePanelProps extends ListingsToolPanelProps {
-  /** Override the offered fields (default `findReplaceFields(marketplace)`). */
+  /** Override the offered fields (default `findReplaceFields(marketplace)`, plus description when the adapter stages it). */
   fields?: FindReplaceField[];
 }
 
 export function FindReplacePanel({ open, onClose, ctx, fields: fieldsProp }: FindReplacePanelProps) {
   const t = useTranslations('listings');
   const toast = useToast();
-  const fields = fieldsProp ?? findReplaceFields(ctx.marketplace);
+  // Description is offered when the staging adapter carries it into the draft (Etsy, ExtendedStagePatch.description);
+  // materials when it carries Etsy draft fields (ExtendedStagePatch.etsy.fields).
+  const adapterCaps = ctx.adapter as { stagesDescription?: boolean; stagesEtsyExtras?: boolean };
+  const fields = fieldsProp ?? findReplaceFields(ctx.marketplace, { description: Boolean(adapterCaps.stagesDescription), materials: Boolean(adapterCaps.stagesEtsyExtras) });
   const unavailable = fields.length === 0;
   const [field, setField] = useState<FindReplaceField>(fields[0] ?? 'title');
   const [find, setFind] = useState('');

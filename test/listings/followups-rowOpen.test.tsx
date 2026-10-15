@@ -183,49 +183,15 @@ afterEach(() => {
 });
 
 
-const flagOn = () => window.localStorage.setItem('kx-ui-override', 'editor-etsy');
-const flagOff = () => window.localStorage.removeItem('kx-ui-override');
 const titleCell = (title = 'Wooden Keepsake Box') => screen.getAllByTestId('listing-title').find((el) => el.textContent === title)!;
 const rowOf = (el: HTMLElement) => el.closest('[data-row-id]') as HTMLElement;
 
 describe('listings row open (founder follow-up)', { timeout: 30_000 }, () => {
-  // Build default pinned off so flagOn()/flagOff() (a ?ui= list override / none) decide the editor flag.
-  // Since M10 an unset NEXT_PUBLIC_UI_V2 means every surface on; that default is covered below.
-  beforeEach(() => {
-    vi.stubEnv('NEXT_PUBLIC_UI_V2', 'none');
-  });
   afterEach(() => {
-    flagOff();
     window.sessionStorage.removeItem('kx:editorNav');
-    vi.unstubAllEnvs();
   });
 
-  it('build default (NEXT_PUBLIC_UI_V2 unset → all on), no override: clicking the title opens the editor route', async () => {
-    delete process.env.NEXT_PUBLIC_UI_V2; // restored by unstubAllEnvs
-    await renderPage();
-    fireEvent.click(titleCell());
-    await waitFor(() => expect(router.push).toHaveBeenCalledWith(expect.stringMatching(/^\/app\/etsy-listings\/1(\?|$)/)));
-  });
-
-  it('?ui=1 stored over the all-on default: clicking the title opens the quick view', async () => {
-    delete process.env.NEXT_PUBLIC_UI_V2;
-    window.localStorage.setItem('kx-ui-override', '1');
-    await renderPage();
-    fireEvent.click(titleCell());
-    await waitFor(() => expect(router.push).toHaveBeenCalledWith(expect.objectContaining({ query: expect.objectContaining({ open: '1' }) }), undefined, expect.anything()));
-    expect(router.push).not.toHaveBeenCalledWith(expect.stringMatching(/^\/app\/etsy-listings\/1/));
-  });
-
-  it('editor flag off: clicking the title opens the quick view (no editor navigation)', async () => {
-    await renderPage();
-    fireEvent.click(titleCell());
-    // The mock router is not reactive: assert the shallow URL write that opens the quick view (?open=1).
-    await waitFor(() => expect(router.push).toHaveBeenCalledWith(expect.objectContaining({ query: expect.objectContaining({ open: '1' }) }), undefined, expect.anything()));
-    expect(router.push).not.toHaveBeenCalledWith(expect.stringMatching(/^\/app\/etsy-listings\/1/));
-  });
-
-  it('editor flag on: clicking the title, a plain cell or the row opens the editor route', async () => {
-    flagOn();
+  it('clicking the title, a plain cell or the row opens the editor route', async () => {
     await renderPage();
     fireEvent.click(titleCell());
     await waitFor(() => expect(router.push).toHaveBeenCalledWith(expect.stringMatching(/^\/app\/etsy-listings\/1(\?|$)/)));
@@ -240,8 +206,7 @@ describe('listings row open (founder follow-up)', { timeout: 30_000 }, () => {
     expect(JSON.parse(window.sessionStorage.getItem('kx:editorNav') ?? 'null')?.ids).toContain('2');
   });
 
-  it('M6b: with editor-wix on, a Wix row opens the catalog editor in its site and ‹ › stay in that site', async () => {
-    window.localStorage.setItem('kx-ui-override', 'editor-wix');
+  it('M6b: a Wix row opens the catalog editor in its site and ‹ › stay in that site', async () => {
     await renderPage({ marketplace: 'wix' });
     fireEvent.click(titleCell());
     await waitFor(() => expect(router.push).toHaveBeenCalledWith('/app/wix-urunler/1?site=S1'));
@@ -250,35 +215,15 @@ describe('listings row open (founder follow-up)', { timeout: 30_000 }, () => {
     expect(nav?.shopId).toBe('S1');
   });
 
-  it('M6b: with editor-wix off, a Wix row opens the quick view', async () => {
-    await renderPage({ marketplace: 'wix' });
-    fireEvent.click(titleCell());
-    await waitFor(() => expect(router.push).toHaveBeenCalledWith(expect.objectContaining({ query: expect.objectContaining({ open: '1' }) }), undefined, expect.anything()));
-    expect(router.push).not.toHaveBeenCalledWith(expect.stringMatching(/^\/app\/wix-urunler\/1/));
-  });
-
-  it('Enter on a focused row opens the editor (flag on) or the quick view (flag off)', async () => {
-    flagOn();
+  it('Enter on a focused row opens the editor', async () => {
     await renderPage();
     const r = rowOf(titleCell());
     r.focus();
     fireEvent.keyDown(r, { key: 'Enter' });
     await waitFor(() => expect(router.push).toHaveBeenCalledWith(expect.stringMatching(/^\/app\/etsy-listings\/1(\?|$)/)));
-    cleanup();
-    flagOff();
-    __resetShortcutsForTests();
-    __resetUrlStateForTests();
-    router.query = {};
-    router.push.mockClear();
-    await renderPage();
-    const r2 = rowOf(titleCell());
-    r2.focus();
-    fireEvent.keyDown(r2, { key: 'Enter' });
-    await waitFor(() => expect(router.push).toHaveBeenCalledWith(expect.objectContaining({ query: expect.objectContaining({ open: '1' }) }), undefined, expect.anything()));
   });
 
   it('the checkbox and the row action buttons do not open the listing', async () => {
-    flagOn();
     await renderPage();
     const r = rowOf(titleCell());
     fireEvent.click(within(r).getByRole('checkbox'));
@@ -291,7 +236,6 @@ describe('listings row open (founder follow-up)', { timeout: 30_000 }, () => {
   });
 
   it('a click that ends a text selection does not navigate', async () => {
-    flagOn();
     await renderPage();
     const el = titleCell();
     const range = document.createRange();

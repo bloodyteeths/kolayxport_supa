@@ -380,31 +380,8 @@ describe('ContextRail', () => {
     const [first, second] = screen.getAllByTestId('order-context-row');
     expect(first).toHaveTextContent('#10482');
     expect(first).toHaveTextContent('$64.50');
-    // Flag-aware: the orders flag is on by default (M10) → the new Orders page opens the order panel.
     expect(within(first).getByTestId('open-order')).toHaveAttribute('href', '/app/labels?view=all&open=ckx_order_1');
     expect(second).toHaveTextContent('Tracking');
-  });
-
-  it('Wix with the orders flag off (NEXT_PUBLIC_UI_V2=none): Open order searches the order number on legacy /app/labels', async () => {
-    vi.stubEnv('NEXT_PUBLIC_UI_V2', 'none');
-    try {
-      render(<Providers><ContextRail conversation={wixConv} now={NOW} /></Providers>);
-      await waitFor(() => expect(screen.getAllByTestId('order-context-row')).toHaveLength(2));
-      const [first] = screen.getAllByTestId('order-context-row');
-      expect(within(first).getByTestId('open-order')).toHaveAttribute('href', '/app/labels?q=10482&qt=order&label=all&from=all');
-    } finally {
-      vi.unstubAllEnvs();
-    }
-  });
-
-  it('Trendyol with the editor flag off (NEXT_PUBLIC_UI_V2=none): Open listing opens the legacy quick view', async () => {
-    vi.stubEnv('NEXT_PUBLIC_UI_V2', 'none');
-    try {
-      render(<Providers><ContextRail conversation={tyWaiting} otherQuestions={{ count: 2, onShow: vi.fn() }} /></Providers>);
-      await waitFor(() => expect(screen.getByTestId('open-listing')).toHaveAttribute('href', '/app/trendyol-urunler?open=8680001112223'));
-    } finally {
-      vi.unstubAllEnvs();
-    }
   });
 
   it('a 502 from orderContext is an inline error with retry, never "No orders"', async () => {

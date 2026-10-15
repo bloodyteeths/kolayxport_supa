@@ -292,12 +292,8 @@ describe('demand inputs: a failed lookup is never cached as null', () => {
 });
 
 describe('Research Home tracked keyword links', () => {
-  it('Keywords page with shop + mkt now that keywords:etsy has shipped (the default)', () => {
+  it('opens the Keyword explorer tracked view with shop + mkt', () => {
     expect(trackedKeywordHref('123', 'shop1')).toBe('/app/research/keywords?view=tracked&listing=123&shop=shop1&mkt=etsy');
     expect(trackedKeywordHref('123', null)).toBe('/app/research/keywords?view=tracked&listing=123&mkt=etsy');
-  });
-  it('falls back to the Listing doctor deep link when keywords:etsy is not shipped', () => {
-    expect(trackedKeywordHref('123', 'shop1', new Set(['listings:etsy']))).toBe('/app/research/listings?mkt=etsy&shop=shop1&open=123');
-    expect(trackedKeywordHref('123', 'shop1', new Set(['keywords:etsy']))).toBe('/app/research/keywords?view=tracked&listing=123&shop=shop1&mkt=etsy');
   });
 });

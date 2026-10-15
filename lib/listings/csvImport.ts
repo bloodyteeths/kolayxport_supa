@@ -288,6 +288,8 @@ export type CurrentListing = {
   quantity: number | null;
   tags: string[] | null;
   description: string | null;
+  /** Etsy materials, from the export's optional `materials` column (null when the export has none). */
+  materials?: string[] | null;
   /** From an optional `has_variations` / `variations` / `variants` column: price and qty are edited per variation. */
   hasVariations: boolean;
   /**
@@ -359,6 +361,7 @@ export function readListingsCsv(text: string): Map<string, CurrentListing> {
   const iQty = col('quantity');
   const iTags = col('tags');
   const iDesc = col('description');
+  const iMat = col('materials');
   const iVar = ['has_variations', 'variations', 'variants'].map(col).find((i) => i >= 0) ?? -1;
   // Optional (requested from G1): `editable_price` / `editable_qty`, from ListingRow.editable.
   const iEdPrice = col('editable_price');
@@ -375,6 +378,7 @@ export function readListingsCsv(text: string): Map<string, CurrentListing> {
       quantity: iQty >= 0 ? parseQty(r[iQty]) : null,
       tags: iTags >= 0 ? parseTags(r[iTags]) : null,
       description: iDesc >= 0 ? r[iDesc] : null,
+      materials: iMat >= 0 ? parseTags(r[iMat]) : null,
       hasVariations: iVar >= 0 ? parseBool(r[iVar]) : false,
       ...(iEdPrice >= 0 && iEdQty >= 0 ? { editable: { price: parseBool(r[iEdPrice]), qty: parseBool(r[iEdQty]) } } : {}),
     });

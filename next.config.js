@@ -110,9 +110,8 @@ const nextConfig = {
 
   // The analytics dashboard is the app's home: login, the Stripe return and
   // every "/app" link land there. Temporary so the target can change later.
-  // Exception (M8 integrator, overview flag preview): `/app?ui=…` is NOT redirected, so the founder can
-  // open the flag-gated Overview at `/app?ui=overview` (pages/app/index.js picks Overview vs legacy from
-  // the `overview` ui flag). Plain `/app` (and `/app?session_id=…`) still lands on /app/analytics.
+  // Exception (M8 integrator): `/app?ui=…` is NOT redirected, so the founder can open the Overview
+  // (pages/app/index.js) at `/app?ui=overview`. Plain `/app` (and `/app?session_id=…`) lands on /app/analytics.
   async redirects() {
     return [
       {
@@ -168,10 +167,6 @@ const nextConfig = {
       },
     ];
   },
-
-  transpilePackages: [
-    '@mui/x-data-grid',
-  ],
 };
 
 module.exports = withPWA(nextConfig);

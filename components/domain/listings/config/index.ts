@@ -1,7 +1,6 @@
 // components/domain/listings/config/index.ts — the one lookup from marketplace to ListingsConfig (listings-grid §3).
 // `ListingsPage` reads everything marketplace-specific from here; it never branches on the marketplace itself.
 import type { ListingMarketplace } from '@/lib/listings/types';
-import type { UiFlagKey } from '@/lib/ds/uiFlags';
 import type { ListingsConfig } from './types';
 import { etsyConfig } from './etsy';
 import { ebayConfig } from './ebay';
@@ -24,30 +23,6 @@ export const LISTINGS_CONFIGS: Record<ListingMarketplace, ListingsConfig> = {
 export function listingsConfig(marketplace: ListingMarketplace): ListingsConfig {
   return LISTINGS_CONFIGS[marketplace];
 }
-
-/** The surface flag of each listings route (lib/ds/uiFlags.ts, BUILD_PLAN §2). */
-export const LISTINGS_FLAG: Record<ListingMarketplace, UiFlagKey> = {
-  etsy: 'listings-etsy',
-  ebay: 'listings-ebay',
-  trendyol: 'listings-trendyol',
-  wix: 'listings-wix',
-  shopify: 'listings-shopify',
-};
-
-/**
- * The full editor's flag. `editorHref` / `newListingHref` / "Copy listing" are used only while it is on;
- * otherwise `e` / ✎ open the quick view (Etsy/eBay `md`, the CatalogDraft marketplaces `xl`, CRITIQUE X3).
- */
-export const EDITOR_FLAG: Record<ListingMarketplace, UiFlagKey> = {
-  etsy: 'editor-etsy',
-  ebay: 'editor-ebay',
-  trendyol: 'editor-trendyol',
-  wix: 'editor-wix',
-  shopify: 'editor-shopify',
-};
-
-/** BulkGrid (M7) flag: "Bulk edit", "Edit in grid" and "Improve with AI" render only while it is on. */
-export const BULK_FLAG: UiFlagKey = 'bulk';
 
 /** `ConnectState` target (settings › connections). */
 export const CONNECT_HREF = '/ayarlar?tab=connections';

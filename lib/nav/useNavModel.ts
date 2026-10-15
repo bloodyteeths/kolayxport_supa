@@ -16,7 +16,6 @@ import * as React from 'react';
 import { useRouter } from 'next/router';
 import { useTranslations } from 'next-intl';
 import { useConnections, type ConnectionsMap } from '@/lib/hooks/useConnections';
-import { useUiFlag } from '@/lib/ds/uiFlags';
 import useMessageCountStore from '@/lib/stores/useMessageCountStore';
 import { icons, type IconKey, type LucideIcon } from '@/lib/ds/icons';
 import { LOGOS } from '@/lib/ds/logos';
@@ -25,10 +24,11 @@ import type { PageBreadcrumb } from '@/components/ds/page/types';
 import {
   CONNECTIONS_HREF,
   G_LISTINGS_KEY,
+  NAV_CONFIG,
   NAV_EXTRA_DESTINATIONS,
   REPORTS_EXTRA_DESTINATIONS,
+  RESEARCH_HOME,
   STORE_PROVIDERS,
-  navConfigFor,
   matchPath,
   matchScore,
   normalizePath,
@@ -181,11 +181,6 @@ export type BuildNavModelInput = {
   billingProvider?: string | null;
   /** Stock sync has been configured (shows the row even with < 2 stores). */
   stockSyncConfigured?: boolean;
-  /**
-   * The `reports` UI flag (M9): Home is the Reports overview, the Finance row is dropped, and Reports › Profit /
-   * Payouts / Transactions become ⌘K destinations and breadcrumbs under Home (`navConfigFor`).
-   */
-  reportsV2?: boolean;
 };
 
 /**
@@ -290,10 +285,8 @@ function bestMatch<T extends { match: readonly string[] }>(entries: readonly T[]
 export function buildNavModel(input: BuildNavModelInput): NavModel {
   const { t, connections } = input;
   const path = normalizePath(input.path);
-  const navConfig = navConfigFor({ reportsV2: input.reportsV2 });
-  const extras: readonly NavExtraDestination[] = input.reportsV2
-    ? [...NAV_EXTRA_DESTINATIONS, ...REPORTS_EXTRA_DESTINATIONS]
-    : NAV_EXTRA_DESTINATIONS;
+  const navConfig = NAV_CONFIG;
+  const extras: readonly NavExtraDestination[] = [...NAV_EXTRA_DESTINATIONS, ...REPORTS_EXTRA_DESTINATIONS];
   const known = knownFn(connections, input.cachedFlags);
 
   const storeStates = STORE_PROVIDERS.map(known);
@@ -393,7 +386,7 @@ export function buildNavModel(input: BuildNavModelInput): NavModel {
     tab('listings', listingsHref, 'nav.groups.listings', 'listing', listingsActive),
     !wixTrendyolOff && messages
       ? tab('messages', messages.href, 'nav.items.messages', 'message', activeId === 'messages', messages)
-      : tab('research', research?.href ?? '/app/etsy-research', 'nav.items.research', 'research', activeId === 'research'),
+      : tab('research', research?.href ?? RESEARCH_HOME, 'nav.items.research', 'research', activeId === 'research'),
   ];
 
   // Breadcrumbs (shell-nav §2.3).
@@ -592,7 +585,6 @@ export function useNavModel(options: UseNavModelOptions = {}): NavModel {
   const uid = options.userId ?? null;
   const { connections } = useConnections();
   const messagesUnread = useMessageCountStore((s) => s.counts.total);
-  const reportsV2 = useUiFlag('reports');
 
   const [cachedFlags, setCachedFlags] = React.useState<Record<string, boolean> | null>(null);
   useIsomorphicLayoutEffect(() => {
@@ -631,9 +623,8 @@ export function useNavModel(options: UseNavModelOptions = {}): NavModel {
         messagesUnread,
         billingProvider: options.billingProvider,
         stockSyncConfigured: options.stockSyncConfigured,
-        reportsV2,
       }),
-    [t, path, connections, cachedFlags, countsKey, messagesUnread, options.billingProvider, options.stockSyncConfigured, reportsV2],
+    [t, path, connections, cachedFlags, countsKey, messagesUnread, options.billingProvider, options.stockSyncConfigured],
   );
 }
 

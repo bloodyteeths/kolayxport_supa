@@ -53,6 +53,8 @@ export function catalogDraftOverlay(d: DbRow): DraftOverlay {
   const qty = toNumber(fp.quantity);
   if (qty !== null) draft.qty = Math.trunc(qty);
   if (typeof fp.title === 'string') draft.title = decodeEntities(fp.title);
+  const listPrice = toNumber(fp.listPrice);
+  if (listPrice !== null) draft.listPrice = listPrice;
   return { changedFields: Object.keys(fp), draft };
 }
 

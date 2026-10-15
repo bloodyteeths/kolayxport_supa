@@ -19,7 +19,7 @@ import useLocaleStore from '@/lib/stores/useLocaleStore';
 import trMessages from '@/messages/tr.json';
 import enMessages from '@/messages/en.json';
 import CookieConsent from '@/components/CookieConsent';
-import { ConfirmProvider } from '@/lib/hooks/useConfirm';
+import { ConfirmProvider } from '@/components/ds/overlay/ConfirmDialog';
 import LimitReachedDialog from '@/components/billing/LimitReachedDialog';
 import { installLimitInterceptor } from '@/lib/http/limitInterceptor';
 import LiveAppMount from '@/components/live/LiveAppMount';
@@ -149,15 +149,6 @@ function MyApp({ Component, pageProps }: AppProps) {
   useEffect(() => {
     hydrate();
   }, []);
-
-  useEffect(() => {
-    const { session_id } = router.query;
-    // Stripe checkout returns with ?session_id: send the user to the dashboard (analytics is
-    // home), keeping the id so the dashboard can confirm activation and then clear it.
-    if (session_id && router.pathname !== '/app/analytics') {
-      router.replace({ pathname: '/app/analytics', query: { session_id } }, undefined, { shallow: false });
-    }
-  }, [router.query]);
 
   return (
     <SessionProvider session={pageProps.session}>

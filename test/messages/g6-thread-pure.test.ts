@@ -157,13 +157,9 @@ describe('small helpers', () => {
   it('send hint and link targets', () => {
     expect(sendKeysLabel(true)).toBe('⌘↵');
     expect(sendKeysLabel(false)).toBe('Ctrl+↵');
-    // Flag-aware (lib/nav/links.ts): v2 Orders opens the OrderPanel with every order in scope.
-    expect(orderHref('ckx 1', '10482', { orders: true })).toBe('/app/labels?view=all&open=ckx+1');
-    // Legacy /app/labels reads no `open`: it searches the order number.
-    expect(orderHref('ckx 1', '10482', { orders: false })).toBe('/app/labels?q=10482&qt=order&label=all&from=all');
-    expect(orderHref('ckx 1', null, { orders: false })).toBe('/app/labels?highlight=ckx+1&label=all&from=all');
-    expect(listingHref('8680001112223', { 'listings-trendyol': true })).toBe('/app/trendyol-urunler?open=8680001112223');
-    expect(listingHref('8680001112223', { 'listings-trendyol': false })).toBe('/app/trendyol-urunler?open=8680001112223');
+    // lib/nav/links.ts: Orders opens the OrderPanel with every order in scope; Trendyol opens the product editor.
+    expect(orderHref('ckx 1')).toBe('/app/labels?view=all&open=ckx+1');
+    expect(listingHref('8680001112223')).toBe('/app/trendyol-urunler/8680001112223');
   });
 });
 

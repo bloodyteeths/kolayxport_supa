@@ -1,1 +1,7 @@
-{ "paths": [] }
+{
+  "paths": [
+    "components/domain/**/*.{js,jsx,ts,tsx}",
+    "components/ds/**/*.{js,jsx,ts,tsx}",
+    "lib/nav/**/*.{js,jsx,ts,tsx}"
+  ]
+}

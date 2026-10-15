@@ -5,9 +5,8 @@ import { act, cleanup, fireEvent, screen } from '@testing-library/react';
 import { ConfirmProvider, useConfirm } from '@/lib/hooks/useConfirm';
 import { renderIntl, msg, LOCALES } from './m1f-helpers';
 
-// lib/hooks/useConfirm imports components/ui/ConfirmDialog, which now re-exports the DS dialog
-// (which itself imports lib/hooks/useConfirm): this checks the import cycle resolves and the legacy
-// promise API still works end to end through the shim.
+// lib/hooks/useConfirm re-exports the DS ConfirmProvider/useConfirm: the older promise API (description /
+// destructive aliases) still works end to end through that path.
 
 afterEach(cleanup);
 
@@ -23,7 +22,7 @@ function Harness({ onResult, locale }: { onResult: (ok: boolean) => void; locale
   );
 }
 
-describe.each(LOCALES)('useConfirm through the M1-f ConfirmDialog shim (%s)', (locale) => {
+describe.each(LOCALES)('useConfirm through lib/hooks/useConfirm (%s)', (locale) => {
   it('resolves true on confirm and false on cancel', async () => {
     const results: boolean[] = [];
     renderIntl(

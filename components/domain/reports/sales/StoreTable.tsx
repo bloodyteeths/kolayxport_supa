@@ -17,8 +17,6 @@ import { Money } from '@/components/ds/format/Money';
 import { getLogo } from '@/lib/ds/logos';
 import { useFormatters, type Formatters } from '@/lib/format';
 import { accent, neutral, px, space } from '@/lib/ds/tokens';
-import { ordersHref, type LinkFlags } from '@/lib/nav/links';
-import type { OrderViewKey } from '@/lib/orders/types';
 import type { SalesStoreRow } from '@/lib/reports/useSalesReport';
 
 // ── links into Orders (shared with StatusSummary) ──────────────────────────────────────────────────────
@@ -32,33 +30,16 @@ export interface ReportOrdersLink {
   status?: string | null;
 }
 
-const LEGACY_VIEW_BY_STATUS: Record<string, OrderViewKey> = {
-  to_ship: 'to_ship',
-  overdue: 'overdue',
-  shipped: 'shipped',
-  delivered: 'shipped',
-  problem: 'problems',
-};
-
-/**
- * Pure: Orders for a store/status in the same range. Orders v2 (flag `orders`) takes the range and filters
- * (`view=all&store&status&from&to&preset=custom`); the legacy page has no range parameters, so it gets the closest
- * view through `lib/nav/links.ordersHref`.
- */
-export function reportOrdersHref(link: ReportOrdersLink, flags: LinkFlags): string {
+/** Pure: Orders for a store/status in the same range (`view=all&store&status&from&to&preset=custom`). */
+export function reportOrdersHref(link: ReportOrdersLink): string {
   const stores = (typeof link.store === 'string' ? [link.store] : link.store ?? []).filter((v) => v.trim() !== '');
-  if (flags.orders) {
-    const sp = new URLSearchParams({ view: 'all' });
-    for (const v of stores) sp.append('store', v);
-    if (link.status) sp.append('status', link.status);
-    sp.set('from', link.from);
-    sp.set('to', link.to);
-    sp.set('preset', 'custom');
-    return `/app/labels?${sp.toString()}`;
-  }
-  const view = (link.status && LEGACY_VIEW_BY_STATUS[link.status]) || 'all';
-  // The legacy page filters one store; callers only pass several values with Orders v2 (`storeOrdersHref`).
-  return ordersHref(view, null, stores[0] ?? null, null, {}, flags);
+  const sp = new URLSearchParams({ view: 'all' });
+  for (const v of stores) sp.append('store', v);
+  if (link.status) sp.append('status', link.status);
+  sp.set('from', link.from);
+  sp.set('to', link.to);
+  sp.set('preset', 'custom');
+  return `/app/labels?${sp.toString()}`;
 }
 
 // ── store naming ────────────────────────────────────────────────────────────────────────────────────────
@@ -83,16 +64,14 @@ export function storeOrdersValues(row: Pick<SalesStoreRow, 'shopName'> & { rawMa
   return null;
 }
 
-/** Pure: the store-name link, or null (plain text) when the exact values are unknown or the legacy page cannot take them. */
+/** Pure: the store-name link, or null (plain text) when the exact values are unknown. */
 export function storeOrdersHref(
   row: Pick<SalesStoreRow, 'shopName'> & { rawMarketplaces?: string[] | null },
   range: { from: string; to: string },
-  flags: LinkFlags,
 ): string | null {
   const values = storeOrdersValues(row);
   if (!values) return null;
-  if (!flags.orders && values.length > 1) return null;
-  return reportOrdersHref({ ...range, store: values }, flags);
+  return reportOrdersHref({ ...range, store: values });
 }
 
 /** Pure: original per-currency revenue, never summed ("$2.910,10 · €410,00"). */
@@ -119,12 +98,11 @@ export interface StoreTableProps {
   excludedCurrencies?: readonly string[];
   from: string;
   to: string;
-  flags: LinkFlags;
   /** Empty-state slot when the store filter excludes everything. */
   empty?: React.ReactNode;
 }
 
-export function StoreTable({ rows, currency, fxNote, excludedCurrencies = [], from, to, flags, empty }: StoreTableProps) {
+export function StoreTable({ rows, currency, fxNote, excludedCurrencies = [], from, to, empty }: StoreTableProps) {
   const t = useTranslations('reports');
   const fmt = useFormatters();
   const manual = t('sales.stores.manual');
@@ -132,7 +110,7 @@ export function StoreTable({ rows, currency, fxNote, excludedCurrencies = [], fr
 
   const storeCell = (r: SalesStoreRow) => {
     const name = storeDisplayName(r, manual);
-    const href = storeOrdersHref(r, { from, to }, flags);
+    const href = storeOrdersHref(r, { from, to });
     const mpName = r.marketplace !== 'manual' && r.marketplace !== 'other' && r.shopName ? getLogo(r.marketplace)?.name ?? null : null;
     const label = (
       <Box component="span" sx={{ display: 'inline-flex', flexDirection: 'column', minWidth: 0 }}>

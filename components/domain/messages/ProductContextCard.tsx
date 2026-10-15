@@ -14,7 +14,7 @@ import { ErrorState } from '@/components/ds/state/ErrorState';
 import { Bone } from '@/components/ds/state/Skeletons';
 import { icons } from '@/lib/ds/icons';
 import { neutral as n, type as typeScale } from '@/lib/ds/tokens';
-import { listingHref as navListingHref, useNavLinks, type LinkFlags } from '@/lib/nav/links';
+import { listingHref as navListingHref } from '@/lib/nav/links';
 import type { ProductContext, UnifiedConversation } from '@/types/messages';
 import { jsonFetcher, MESSAGES_API } from './useThread';
 
@@ -22,9 +22,9 @@ export function productContextUrl(productMainId: string): string {
   return `${MESSAGES_API}?action=productContext&productMainId=${encodeURIComponent(productMainId)}`;
 }
 
-/** "Open listing" target, flag-aware (lib/nav/links.ts): Trendyol grid, `?open=<barcode>` on v2. */
-export function listingHref(barcode: string, flags?: LinkFlags): string {
-  return navListingHref('trendyol', barcode, flags);
+/** "Open listing" target (lib/nav/links.ts): the Trendyol product editor. */
+export function listingHref(barcode: string): string {
+  return navListingHref('trendyol', barcode);
 }
 
 export interface UseProductContextResult {
@@ -55,7 +55,6 @@ export interface ProductContextCardProps {
 export function ProductContextCard({ productInfo }: ProductContextCardProps) {
   const t = useTranslations('messages.context');
   const tThread = useTranslations('messages.thread');
-  const { flags } = useNavLinks();
   const { product, loading, error, retry } = useProductContext(productInfo.id);
   const [capSize, capLine] = typeScale.caption;
   const [titleSize, titleLine, titleWeight] = typeScale.titleSm;
@@ -95,7 +94,7 @@ export function ProductContextCard({ productInfo }: ProductContextCardProps) {
       {(product?.inCatalog && product.barcode) || productInfo.webUrl ? (
         <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }}>
           {product?.inCatalog && product.barcode && (
-            <Button variant="secondary" size="sm" href={listingHref(product.barcode, flags)} data-testid="open-listing">
+            <Button variant="secondary" size="sm" href={listingHref(product.barcode)} data-testid="open-listing">
               {t('openListing')}
             </Button>
           )}

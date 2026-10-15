@@ -12,7 +12,10 @@ import {
 import { ETSY_FIELD_KEYS } from '@/components/domain/listing-editor/adapters/etsy';
 import { EBAY_FIELD_KEYS, decodeAspects, encodeAspects } from '@/components/domain/listing-editor/adapters/ebay';
 import { EBAY_DIFF_FIELDS } from '@/lib/ebay/draftPlan';
-import type { EbayListingTemplate } from '@/components/ebay/ListingTemplates';
+/** The stored eBay profile shape the old drawer read (components/ebay/ListingTemplates.tsx, deleted). */
+type EbayListingTemplate = {
+  fields: { price?: number; aspects?: Record<string, string[]>; listingPolicies?: Record<string, string>; [k: string]: unknown };
+};
 import en from '@/messages/en.json';
 import tr from '@/messages/tr.json';
 import { H_EN, H_TR, mergeMessages } from './h-messages';

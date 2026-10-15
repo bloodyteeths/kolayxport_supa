@@ -44,7 +44,6 @@ import { useLiveEvent } from '@/components/live/useLiveEvent';
 import ListingHistoryPanel from '@/components/etsy-history/ListingHistoryPanel';
 import { fieldAnchorId, resolveEditorHash, sectionAnchorId, sectionsFor } from '@/lib/listingEditor/sections';
 import { editorHref, editorNeighbors, listHref, newListingHref, readEditorNav } from '@/lib/listingEditor/editorNav';
-import { useUiFlag, type UiFlagKey } from '@/lib/ds/uiFlags';
 import { ConnectState } from '@/components/ds/state/ConnectState';
 import {
   hasQueuedDelete,
@@ -71,6 +70,7 @@ import { MarketplacePreview, type PreviewModel } from '../MarketplacePreview';
 import { useListingAI, type UseListingAI } from './useListingAI';
 import { ReviewDifferencesPanel } from './ReviewDifferencesPanel';
 import { ScheduleModal } from './ScheduleModal';
+import { SCHEDULED_SENDS_ENABLED } from '@/components/domain/listings/config/shared';
 import { PhotosSection } from './sections/PhotosSection';
 import { TitleSection } from './sections/TitleSection';
 import { TagsSection } from './sections/TagsSection';
@@ -797,7 +797,7 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
       overflow.push({
         id: 'copyToEbay',
         label: t('action.copyToEbay'),
-        onClick: () => void router.push(`/app/ebay-listings?crosslist=etsy:${encodeURIComponent(listingIdForLinks)}`),
+        onClick: () => void router.push(newListingHref('ebay', null, { crosslist: `etsy:${listingIdForLinks}` })),
       });
     }
   }
@@ -805,7 +805,9 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
     overflow.push({ id: 'profiles', label: t('action.applyProfile'), onClick: () => openProfiles('apply') });
     overflow.push({ id: 'saveProfile', label: t('action.saveProfile'), onClick: () => openProfiles('save') });
   }
-  if (mode === 'edit' && draft && !queuedDelete && draftStatus === 'draft') {
+  // Scheduled sends need the backend (BR-1a `scheduledSendAt` + BR-8 cron): same build switch as the grid, so the
+  // item is not offered before the backend can run it (it used to answer 503 inline).
+  if (SCHEDULED_SENDS_ENABLED && mode === 'edit' && draft && !queuedDelete && draftStatus === 'draft') {
     overflow.push({ id: 'schedule', label: t('action.schedule'), icon: icons.schedule, onClick: () => setPanel('schedule') });
   }
   if (marketplace === 'etsy' && listingIdForLinks) {
@@ -1396,47 +1398,36 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
 export default ListingEditor;
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
-// Route gate (pages/app/etsy-listings/{[listingId],new}.tsx): flag, shop resolution, connect state
+// Route gate (pages/app/etsy-listings/{[listingId],new}.tsx): shop resolution, connect state
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 /** A connected Etsy shop (`/api/integrations/etsy/shops`). */
 export type EditorShop = { shopId: string; shopName: string | null };
 
-/** The flag after the client override is applied (`null` until known, so the legacy redirect never flashes). */
-export function useResolvedUiFlag(key: UiFlagKey): boolean | null {
-  // Reuses the DS hook (M1); only masks its pre-mount default. Both effects' updates land in the same commit,
-  // so `value` is the resolved flag on the first non-null render. (A tri-state `useUiFlag` is a DS request.)
-  const value = useUiFlag(key);
-  const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => setMounted(true), []);
-  return mounted ? value : null;
-}
-
 export interface EtsyEditorGateProps {
-  /** Rendered once the flag is on and the shop is known. */
+  /** Rendered once the shop is known. */
   children: (shop: EditorShop) => React.ReactNode;
+  /**
+   * `?shop` missing and several shops: use the first one instead of going back to the list (cross-list hand-offs
+   * from another marketplace, which do not know the Etsy shop; the workspace header names the shop).
+   */
+  firstShopFallback?: boolean;
 }
 
 /**
- * Flag `editor-etsy` off → back to the list (the legacy drawer stays the default). `?shop` missing: the only shop
- * is used; several → back to the list with "Choose a shop first". No shop connected → ConnectState.
+ * `?shop` missing: the only shop is used; several → back to the list with "Choose a shop first". No shop connected →
+ * ConnectState.
  */
-export function EtsyEditorGate({ children }: EtsyEditorGateProps) {
+export function EtsyEditorGate({ children, firstShopFallback = false }: EtsyEditorGateProps) {
   const t = useTranslations('listingEditor');
   const router = useRouter();
   const toast = useToast();
-  const flag = useResolvedUiFlag('editor-etsy');
   const [shops, setShops] = React.useState<EditorShop[] | null>(null);
   const [failed, setFailed] = React.useState(false);
   const [nonce, setNonce] = React.useState(0);
   const shopParam = typeof router.query.shop === 'string' ? router.query.shop : null;
 
   React.useEffect(() => {
-    if (flag === false && router.isReady) void router.replace(listHref('etsy', shopParam));
-  }, [flag, router, shopParam]);
-
-  React.useEffect(() => {
-    if (!flag) return undefined;
     let cancelled = false;
     setFailed(false);
     fetch('/api/integrations/etsy/shops')
@@ -1454,9 +1445,16 @@ export function EtsyEditorGate({ children }: EtsyEditorGateProps) {
     return () => {
       cancelled = true;
     };
-  }, [flag, nonce]);
+  }, [nonce]);
 
-  const shop = shops && router.isReady ? (shopParam ? shops.find((s) => s.shopId === shopParam) ?? null : shops.length === 1 ? shops[0] : null) : null;
+  const shop =
+    shops && router.isReady
+      ? shopParam
+        ? shops.find((s) => s.shopId === shopParam) ?? null
+        : shops.length === 1 || (firstShopFallback && shops.length > 0)
+          ? shops[0]
+          : null
+      : null;
   const mismatch = Boolean(shops && shops.length > 0 && router.isReady && !shop);
 
   React.useEffect(() => {
@@ -1465,7 +1463,7 @@ export function EtsyEditorGate({ children }: EtsyEditorGateProps) {
     void router.replace(listHref('etsy', null));
   }, [mismatch, router, toast, t]);
 
-  if (!flag || !router.isReady) return null;
+  if (!router.isReady) return null;
   if (failed) {
     return (
       <Page title={t('page.editTitle')} width="detail">

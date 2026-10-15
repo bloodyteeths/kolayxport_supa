@@ -257,3 +257,59 @@ describe('BulkCreateLabelsPanel', () => {
     expect(await screen.findByText('DHL eCommerce yalnızca tüm siparişler Türkiye içine gönderiliyorsa kullanılabilir')).toBeTruthy();
   });
 });
+
+describe('DHL recipient phone: "Use my phone" (legacy MNG fallback, explicit only)', () => {
+  const trRow = (p: Partial<OrderRow> = {}) => {
+    const base = row({ marketplace: 'Trendyol', store: { key: 'trendyol', marketplace: 'trendyol', shopName: null } as never });
+    return row({
+      ...base,
+      shipTo: { ...base.shipTo, name: 'Ayşe Yılmaz', phone: '', email: '', country: 'TR', street1: 'Cumhuriyet Mah. 5', city: 'Bursa', state: '', postal: '16000', district: 'Nilüfer' },
+      ...p,
+    });
+  };
+
+  it('pure: senderPhoneE164 normalizes the sender phone; withSenderPhone fills only empty phones', async () => {
+    const { senderPhoneE164 } = await import('@/components/domain/orders/panel/ShipToForm');
+    const { withSenderPhone } = await import('@/components/domain/shipping/BulkCreateLabelsPanel');
+    expect(senderPhoneE164({ shipperPhoneNumber: '0532 111 22 33', shipperCountryCode: 'TR' })).toBe('+905321112233');
+    expect(senderPhoneE164({ shipperPhoneNumber: '', shipperCountryCode: 'TR' })).toBe('');
+    expect(senderPhoneE164(null)).toBe('');
+    const mk = (phone: string) => ({ draft: { shipTo: { phone } } as never });
+    const out = withSenderPhone([mk(''), mk('+905550000000')], '+905321112233');
+    expect(out.map((r) => (r.draft as { shipTo: { phone: string } }).shipTo.phone)).toEqual(['+905321112233', '+905550000000']);
+    expect(withSenderPhone([mk('')], '')[0].draft).toEqual(mk('').draft);
+  });
+
+  it.each(['en', 'tr'] as Locale[])('single label: DHL + no order phone offers the seller phone in one click (%s)', async (locale) => {
+    connState.connections = { fedex: { connected: false }, ups: { connected: false }, mng: { connected: true } };
+    wrap(<CreateLabelPanel order={trRow()} open onClose={vi.fn()} onCreated={vi.fn()} />, locale);
+    const label = locale === 'en' ? 'Use my phone (+905321112233)' : 'Telefonumu kullan (+905321112233)';
+    const btn = await screen.findByRole('button', { name: label });
+    // Never applied automatically: the offer only renders while the phone is empty.
+    const inputs = Array.from(screen.getByTestId('shipto-phone').querySelectorAll('input')) as HTMLInputElement[];
+    expect(inputs.some((i) => i.value.includes('5321112233'))).toBe(false);
+    fireEvent.click(btn);
+    await waitFor(() => expect(screen.queryByTestId('shipto-use-sender-phone')).toBeNull());
+    const after = Array.from(screen.getByTestId('shipto-phone').querySelectorAll('input')) as HTMLInputElement[];
+    expect(after.some((i) => i.value.replace(/\D/g, '').includes('5321112233'))).toBe(true);
+  });
+
+  it('single label: not offered for UPS/FedEx or when the order has a phone', async () => {
+    connState.connections = { fedex: { connected: false }, ups: { connected: true }, mng: { connected: false } };
+    wrap(<CreateLabelPanel order={row({ shipTo: { ...row().shipTo, phone: '' } })} open onClose={vi.fn()} onCreated={vi.fn()} />);
+    await screen.findByTestId('label-carrier');
+    expect(screen.queryByTestId('shipto-use-sender-phone')).toBeNull();
+  });
+
+  it('bulk: DHL rows missing only the phone become Ready after "Use my phone"', async () => {
+    connState.connections = { fedex: { connected: false }, ups: { connected: false }, mng: { connected: true } };
+    const a = trRow();
+    const b = trRow({ id: 'ord_2', orderNumber: '3892' });
+    wrap(<BulkCreateLabelsPanel orders={[a, b]} open onClose={vi.fn()} onFixOrder={vi.fn()} onDone={vi.fn()} />);
+    expect(await screen.findByText('2 orders have no recipient phone')).toBeTruthy();
+    expect(screen.getByText('0 ready · 2 need details')).toBeTruthy();
+    fireEvent.click(within(screen.getByTestId('bulk-no-phone')).getByRole('button', { name: 'Use my phone (+905321112233)' }));
+    expect(await screen.findByText('2 ready · 0 need details')).toBeTruthy();
+    expect(screen.queryByTestId('bulk-no-phone')).toBeNull();
+  });
+});

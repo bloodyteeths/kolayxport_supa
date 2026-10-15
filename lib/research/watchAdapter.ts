@@ -4,6 +4,8 @@
 //   - `ResearchWatch` rows (BR-1c migration): Etsy shops, saved queries, Trendyol products (R4).
 //   - Read-only adapter over the existing tables, no data move: `EbayTrackedSeller` (+ its `EbayTrackedProduct` /
 //     `EbayPriceSnapshot` rows for measured sales) and `AmazonTrackedProduct` (ASIN watch).
+//   - "Watch an eBay item" (type `ebayItem`): one `EbayTrackedProduct` row (lib/research/ebayItemTracker.ts writes the
+//     row, its first reading and the daily `EbayPriceSnapshot`s; this adapter reads them).
 //
 // Data rules (honest numbers):
 //   - Sales/day is **Measured** only from ≥ 2 readings of Etsy's `transaction_sold_count` (Δcount / Δdays). Before
@@ -41,6 +43,7 @@ import { isNeutralBilling } from '@/lib/billing/billingState';
 import { isFeatureLockedError, requireFeature } from '@/lib/billing/requireFeature';
 import type { PlanKey } from '@/lib/billing/types';
 import { detectQuery } from './detectQuery';
+import { EbayItemNotFoundError, isEbayItemId, trackEbayItem } from './ebayItemTracker';
 import { median, summarizePrices, type PriceSummary } from './stats';
 import {
   EtsyUpstreamError,
@@ -63,14 +66,14 @@ import type { Guarded, MetricKind, ResearchMkt, SourceNoteProps } from './types'
 
 // ─── Types (API contract; shared with the R3-B UI through `import type`) ────────────────────────────
 
-export type WatchType = 'etsyShop' | 'ebaySeller' | 'query' | 'asin' | 'trendyolProduct';
-export const WATCH_TYPES: readonly WatchType[] = ['etsyShop', 'ebaySeller', 'query', 'asin', 'trendyolProduct'];
+export type WatchType = 'etsyShop' | 'ebaySeller' | 'ebayItem' | 'query' | 'asin' | 'trendyolProduct';
+export const WATCH_TYPES: readonly WatchType[] = ['etsyShop', 'ebaySeller', 'ebayItem', 'query', 'asin', 'trendyolProduct'];
 export function isWatchType(v: unknown): v is WatchType {
   return typeof v === 'string' && (WATCH_TYPES as readonly string[]).includes(v);
 }
 
 /** Which table the row lives in. Only `researchWatch` rows can be renamed or have alert rules. */
-export type WatchSource = 'researchWatch' | 'ebayTrackedSeller' | 'amazonTrackedProduct';
+export type WatchSource = 'researchWatch' | 'ebayTrackedSeller' | 'ebayTrackedProduct' | 'amazonTrackedProduct';
 
 /**
  * Alert rules (research.md §8.1 "Alerts (Switch ×3)"). `null` = the switch is off.
@@ -160,6 +163,18 @@ export interface WatchSummary {
   href: string;
   /** Set when the daily reading skips this watch (it is past the plan's watch limit, oldest watches first). */
   paused?: { reasonKey: string };
+  /** `ebayItem` only: the item's latest reading (its own listed price, not a sample; sold = eBay's lifetime counter). */
+  item?: WatchItemInfo;
+}
+
+export interface WatchItemInfo {
+  /** Listed price at the latest reading (Measured). null = eBay showed no price. */
+  price: number | null;
+  currency: string;
+  /** eBay's estimated sold quantity, all time. */
+  soldAllTime: number | null;
+  condition: string | null;
+  seller: string | null;
 }
 
 export interface WatchQuota {
@@ -232,6 +247,8 @@ export interface WatchDetail {
   /** Listings in the latest reading (newest first, ≤ 500) and whether that was the whole shop. */
   listingsSampled: number;
   listingsComplete: boolean;
+  /** `ebayItem` only: the item's listed price per UTC day (last 30 days, oldest first; null = no reading that day). */
+  prices?: Array<{ date: string; value: number | null }>;
 }
 
 /** `data` of `POST /api/research/watches`. */
@@ -362,7 +379,7 @@ export const RESEARCH_ALERT_TYPES = ['researchShopNewListings', 'researchShopPri
 export type ResearchAlertType = (typeof RESEARCH_ALERT_TYPES)[number];
 
 const MKT_OF: Record<WatchType, ResearchMkt> = {
-  etsyShop: 'etsy', ebaySeller: 'ebay', asin: 'amazon', trendyolProduct: 'trendyol', query: 'etsy',
+  etsyShop: 'etsy', ebaySeller: 'ebay', ebayItem: 'ebay', asin: 'amazon', trendyolProduct: 'trendyol', query: 'etsy',
 };
 
 // ─── Guarded helpers ────────────────────────────────────────────────────────────────────────────────
@@ -446,6 +463,7 @@ export function alertsAvailable(): boolean {
 export type WatchTarget =
   | { type: 'etsyShop'; shopId?: string; shopName?: string; fromListingId?: string }
   | { type: 'ebaySeller'; seller: string }
+  | { type: 'ebayItem'; itemId: string; label: string | null }
   | { type: 'query'; text: string; marketplace: 'etsy' | 'ebay' }
   | { type: 'trendyolProduct'; productId: string; label: string | null }
   | { type: 'asin'; asin: string };
@@ -478,11 +496,12 @@ export function detectWatchTarget(input: string, hint: { type?: WatchType; marke
     case 'amazonAsin':
       return hint.type && hint.type !== 'asin' ? null : { type: 'asin', asin: d.asin };
     case 'ebayItem':
-      return null;
+      return hint.type && hint.type !== 'ebayItem' ? null : { type: 'ebayItem', itemId: d.itemId, label: d.slugTitle };
     case 'text': {
       const t = d.text;
       const wantEbay = hint.type === 'ebaySeller' || (!hint.type && hint.marketplace === 'ebay');
       if (wantEbay) return EBAY_SELLER.test(t) ? { type: 'ebaySeller', seller: t } : null;
+      if (hint.type === 'ebayItem') return isEbayItemId(t) ? { type: 'ebayItem', itemId: t, label: null } : null;
       if (hint.type === 'asin') return /^[A-Z0-9]{10}$/i.test(t) ? { type: 'asin', asin: t.toUpperCase() } : null;
       if (hint.type === 'trendyolProduct') return /^\d{3,20}$/.test(t) ? { type: 'trendyolProduct', productId: t, label: null } : null;
       if (hint.type && hint.type !== 'etsyShop') return null;
@@ -1067,11 +1086,12 @@ async function queryReading(text: string, nowMs: number): Promise<{ metrics: Que
 
 export const watchHref = (id: string) => `/app/research/shops?open=${encodeURIComponent(id)}`;
 
-const LEGACY_PREFIX = { ebaySeller: 'ebaySeller.', asin: 'asin.' } as const;
+const LEGACY_PREFIX = { ebaySeller: 'ebaySeller.', ebayItem: 'ebayItem.', asin: 'asin.' } as const;
 
 export function parseWatchId(id: string): { source: WatchSource; id: string } | null {
   const s = String(id || '');
   if (s.startsWith(LEGACY_PREFIX.ebaySeller)) return { source: 'ebayTrackedSeller', id: s.slice(LEGACY_PREFIX.ebaySeller.length) };
+  if (s.startsWith(LEGACY_PREFIX.ebayItem)) return { source: 'ebayTrackedProduct', id: s.slice(LEGACY_PREFIX.ebayItem.length) };
   if (s.startsWith(LEGACY_PREFIX.asin)) return { source: 'amazonTrackedProduct', id: s.slice(LEGACY_PREFIX.asin.length) };
   if (/^[A-Za-z0-9_-]{8,64}$/.test(s)) return { source: 'researchWatch', id: s };
   return null;
@@ -1222,6 +1242,122 @@ async function legacyEbayRows(userId: string, sinceMs: number, onlyId?: string):
   });
 }
 
+// ─── eBay items ("Watch an eBay item": EbayTrackedProduct + EbayPriceSnapshot) ──────────────────────────────
+
+export interface ItemReading {
+  timestamp: Date | string;
+  price: number | null;
+  currency: string;
+  soldQuantity: number | null;
+}
+
+/** Pure: the item's listed price change vs the newest reading ≥ 6.5 days older (Measured; same currency only). */
+export function itemPriceChange(readings: ItemReading[]): Guarded<number> {
+  const rs = readings
+    .map((r) => ({ t: toMs(r.timestamp), price: numOrNull(r.price), currency: r.currency }))
+    .filter((r) => Number.isFinite(r.t))
+    .sort((a, b) => a.t - b.t);
+  const latest = rs[rs.length - 1];
+  if (!latest || latest.price === null || latest.price <= 0) return na('research.shops.noReading');
+  const base = [...rs].reverse().find((r) => r.t <= latest.t - 6.5 * DAY_MS && r.price !== null && r.price > 0);
+  if (!base || base.price === null) return na('research.shops.needWeek');
+  if (base.currency !== latest.currency) return na('research.shops.currencyChanged');
+  return ok(round(latest.price / base.price - 1, 3));
+}
+
+/** Pure: Shop tracker metrics of one tracked eBay item (sales/day = Δ estimatedSoldQuantity between readings). */
+export function ebayItemMetrics(readings: ItemReading[]): WatchMetrics {
+  const m = salesMetrics(readings.map((r) => ({ takenAt: r.timestamp, sold: r.soldQuantity })));
+  const latestMs = m.latestMs ?? 0;
+  return {
+    salesPerDay: m.salesPerDay7d,
+    salesVsPrev: m.salesChange,
+    active: na('research.watch.notApplicable'),
+    new7d: na('research.watch.notApplicable'),
+    priceChange: itemPriceChange(readings),
+    price: null,
+    soldItemsAllTime: null,
+    droppedPoints: m.pairs.filter((p) => p.flagged && p.end > latestMs - SERIES_DAYS * DAY_MS).length,
+  };
+}
+
+/** Pure: one value per UTC day (the day's last reading), 30 days ending at the latest reading; gaps are null. */
+export function itemPriceSeries(readings: ItemReading[], days = SERIES_DAYS): Array<{ date: string; value: number | null }> {
+  const byDay = new Map<string, { t: number; v: number | null }>();
+  let latest: number | null = null;
+  for (const r of readings) {
+    const t = toMs(r.timestamp);
+    if (!Number.isFinite(t)) continue;
+    const k = utcDay(t);
+    const prev = byDay.get(k);
+    if (!prev || t >= prev.t) byDay.set(k, { t, v: numOrNull(r.price) });
+    latest = Math.max(latest ?? 0, t);
+  }
+  if (latest === null) return [];
+  const endDay = Date.parse(`${utcDay(latest)}T00:00:00.000Z`);
+  const out: Array<{ date: string; value: number | null }> = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const date = utcDay(endDay - i * DAY_MS);
+    out.push({ date, value: byDay.get(date)?.v ?? null });
+  }
+  return out;
+}
+
+interface EbayItemRow {
+  id: string;
+  legacyItemId: string;
+  title: string;
+  imageUrl: string | null;
+  itemWebUrl: string | null;
+  seller: string | null;
+  condition: string | null;
+  currentPrice: number | null;
+  currency: string;
+  totalSold: number | null;
+  createdAt: Date;
+  snapshots: ItemReading[];
+}
+
+/** Pure: an EbayTrackedProduct row (with its readings in the window) → a Shop tracker row. */
+export function ebayItemSummary(p: EbayItemRow): WatchSummary {
+  const id = `${LEGACY_PREFIX.ebayItem}${p.id}`;
+  const url = p.itemWebUrl ?? `https://www.ebay.com/itm/${encodeURIComponent(p.legacyItemId)}`;
+  return {
+    id,
+    type: 'ebayItem',
+    marketplace: 'ebay',
+    refId: p.legacyItemId,
+    label: cleanLabel(p.title) ?? p.legacyItemId,
+    source: 'ebayTrackedProduct',
+    url,
+    iconUrl: p.imageUrl,
+    capabilities: { alerts: false, remove: true },
+    alertRules: { ...DEFAULT_ALERT_RULES },
+    createdAt: isoOrNull(p.createdAt) ?? '',
+    shop: null,
+    metrics: ebayItemMetrics(p.snapshots ?? []),
+    snapshots: snapshotsInfo((p.snapshots ?? []).map((x) => ({ takenAt: x.timestamp }))),
+    href: watchHref(id),
+    item: { price: numOrNull(p.currentPrice), currency: p.currency || 'USD', soldAllTime: numOrNull(p.totalSold), condition: p.condition, seller: p.seller },
+  };
+}
+
+async function ebayItemRows(userId: string, sinceMs: number, onlyId?: string): Promise<EbayItemRow[]> {
+  return prisma.ebayTrackedProduct.findMany({
+    where: { userId, isActive: true, ...(onlyId ? { id: onlyId } : {}) },
+    orderBy: { createdAt: 'asc' },
+    select: {
+      id: true, legacyItemId: true, title: true, imageUrl: true, itemWebUrl: true, seller: true, condition: true,
+      currentPrice: true, currency: true, totalSold: true, createdAt: true,
+      snapshots: { where: { timestamp: { gte: new Date(sinceMs) } }, orderBy: { timestamp: 'asc' }, select: { timestamp: true, price: true, currency: true, soldQuantity: true } },
+    },
+  }) as Promise<EbayItemRow[]>;
+}
+
+async function legacyEbayItemRows(userId: string, sinceMs: number, onlyId?: string): Promise<WatchSummary[]> {
+  return (await ebayItemRows(userId, sinceMs, onlyId)).map(ebayItemSummary);
+}
+
 async function legacyAmazonRows(userId: string, onlyId?: string): Promise<WatchSummary[]> {
   const rows = await prisma.amazonTrackedProduct.findMany({
     where: { userId, isActive: true, ...(onlyId ? { id: onlyId } : {}) },
@@ -1285,8 +1421,9 @@ export async function listWatches(userId: string, filter: ListWatchesFilter = {}
       rwRows = [];
     }
   }
-  const [ebay, amazon, quota] = await Promise.all([
+  const [ebay, ebayItems, amazon, quota] = await Promise.all([
     legacyEbayRows(userId, since),
+    legacyEbayItemRows(userId, since),
     legacyAmazonRows(userId),
     watchQuota(userId),
   ]);
@@ -1298,7 +1435,7 @@ export async function listWatches(userId: string, filter: ListWatchesFilter = {}
       metrics: { ...r.metrics, salesPerDay: na('research.shops.overQuota') },
     }));
   }
-  let rows = [...rwRows, ...ebay, ...amazon];
+  let rows = [...rwRows, ...ebay, ...ebayItems, ...amazon];
   if (filter.mkt) rows = rows.filter((r) => r.marketplace === filter.mkt);
   if (filter.type) rows = rows.filter((r) => r.type === filter.type);
   return { available, alertsAvailable: alertsAvailable(), rows, quota: available ? quota : { ...quota, used: 0 }, readingTimeUtc: READING_TIME_UTC };
@@ -1378,6 +1515,15 @@ export async function getWatchDetail(userId: string, rawId: string, nowMs = Date
       }
     }
     return { ...detailShell(row), sales };
+  }
+
+  if (parsed.source === 'ebayTrackedProduct') {
+    const [p] = await ebayItemRows(userId, since, parsed.id);
+    if (!p) throw new WatchError(404, { error: 'not_found', key: 'research.watch.notFound' });
+    const row = ebayItemSummary(p);
+    const pairs = ratePairs(p.snapshots.map((x) => ({ takenAt: x.timestamp, sold: x.soldQuantity })));
+    const latest = p.snapshots.length ? Math.max(...p.snapshots.map((x) => toMs(x.timestamp))) : null;
+    return { ...detailShell(row), sales: salesSeries(pairs, latest), prices: itemPriceSeries(p.snapshots) };
   }
 
   if (parsed.source === 'amazonTrackedProduct') {
@@ -1483,6 +1629,7 @@ export function parseCreateBody(raw: unknown): { target: WatchTarget; label: str
     // A shop name or link in `refId` is resolved like a pasted input.
     if (type === 'etsyShop') target = ETSY_ID.test(refId) ? { type, shopId: refId } : detectWatchTarget(refId.slice(0, 500), { type });
     else if (type === 'ebaySeller') target = detectWatchTarget(refId.slice(0, 500), { type });
+    else if (type === 'ebayItem') target = isEbayItemId(refId) ? { type, itemId: refId, label } : detectWatchTarget(refId.slice(0, 500), { type });
     else if (type === 'asin') target = /^[A-Z0-9]{10}$/i.test(refId) ? { type, asin: refId.toUpperCase() } : null;
     else if (type === 'trendyolProduct') target = /^\d{3,20}$/.test(refId) ? { type, productId: refId, label } : null;
     else target = { type: 'query', text: refId.slice(0, MAX_QUERY), marketplace: marketplace === 'ebay' ? 'ebay' : 'etsy' };
@@ -1532,6 +1679,20 @@ export async function createWatch(userId: string, body: unknown, nowMs = Date.no
   if (target.type === 'trendyolProduct') {
     // Price gap watches are part of the Pro arbitrage feature (pro-gating §2: server first). 402 via sendWatchError.
     await requireFeature(userId, 'arbitrage');
+  }
+
+  if (target.type === 'ebayItem') {
+    // Legacy eBay tracker table (no quota, no BR-1c): the row + its first reading through the Browse API.
+    let tracked: { id: string; created: boolean };
+    try {
+      tracked = await trackEbayItem(userId, target.itemId, new Date(nowMs));
+    } catch (err) {
+      if (err instanceof EbayItemNotFoundError) throw new WatchError(404, { error: 'not_found', key: 'research.shops.error.itemNotFound' });
+      throw err;
+    }
+    const [summary] = await legacyEbayItemRows(userId, nowMs - READ_WINDOW_DAYS * DAY_MS, tracked.id);
+    if (!summary) throw new WatchError(500, { error: 'server_error' });
+    return { summary, quota: await watchQuota(userId), created: tracked.created, errors };
   }
 
   if (target.type === 'ebaySeller') {
@@ -1685,6 +1846,11 @@ export async function removeWatch(userId: string, rawId: string): Promise<{ id: 
   if (!parsed) throw new WatchError(404, { error: 'not_found', key: 'research.watch.notFound' });
   if (parsed.source === 'ebayTrackedSeller') {
     const r = await prisma.ebayTrackedSeller.updateMany({ where: { id: parsed.id, userId, isActive: true }, data: { isActive: false } });
+    if (r.count === 0) throw new WatchError(404, { error: 'not_found', key: 'research.watch.notFound' });
+    return { id: rawId, removed: true };
+  }
+  if (parsed.source === 'ebayTrackedProduct') {
+    const r = await prisma.ebayTrackedProduct.updateMany({ where: { id: parsed.id, userId, isActive: true }, data: { isActive: false } });
     if (r.count === 0) throw new WatchError(404, { error: 'not_found', key: 'research.watch.notFound' });
     return { id: rawId, removed: true };
   }

@@ -44,6 +44,7 @@ import { openLabelUrl } from '@/lib/shipping/labelLinks';
 import { pushTracking, type TrackingPushStatus } from '@/lib/shipping/submit/tracking';
 import { useSenderProfile } from '@/lib/shipping/useSenderProfile';
 import { usePackagePresets } from '@/lib/shipping/usePackagePresets';
+import { senderPhoneE164 } from '@/components/domain/orders/panel/ShipToForm';
 import { FromSection } from './FromSection';
 import { PackageSection } from './PackageSection';
 import { CarrierServiceSection } from './CarrierServiceSection';
@@ -100,6 +101,17 @@ export function initialRowState(d: LabelDraft): RowState {
   return missing.length ? { kind: 'blocked', missing } : { kind: 'ready' };
 }
 
+/**
+ * Pure: rows that would be blocked only for want of a recipient phone get the seller's phone (explicit
+ * "Use my phone" in the DHL fix-up, never automatic — orders §6.1). Rows with a phone are left as they are.
+ */
+export function withSenderPhone<R extends { draft: LabelDraft }>(rows: R[], phone: string): R[] {
+  if (!phone) return rows;
+  return rows.map((r) => ((r.draft.shipTo.phone || '').trim()
+    ? r
+    : { ...r, draft: { ...r.draft, shipTo: { ...r.draft.shipTo, phone } } }));
+}
+
 export function BulkCreateLabelsPanel({ orders, open, onClose, onFixOrder, onDone }: BulkCreateLabelsPanelProps) {
   const t = useTranslations('createLabel');
   const tf = useTranslations('createLabel.field');
@@ -143,7 +155,8 @@ export function BulkCreateLabelsPanel({ orders, open, onClose, onFixOrder, onDon
     [snapshots, senderCountry, allTr],
   );
   const rateList = useMemo(() => rateRows(elig), [elig]);
-  const chosen = rate ? parseRateId(rate) : null;
+  // Memoized: `effectiveDraft` depends on it, and a fresh object per render re-ran the Ready/Problem effect forever.
+  const chosen = useMemo(() => (rate ? parseRateId(rate) : null), [rate]);
   const key = orders.map((o) => o.id).join(',');
 
   // Build drafts when the panel opens (or the order set changes).
@@ -320,6 +333,13 @@ export function BulkCreateLabelsPanel({ orders, open, onClose, onFixOrder, onDon
           : t('unavailable.notConnected', { carrier: CARRIER_NAME[chosenElig.carrier] }))
       : undefined;
   const readyIds = rows.filter((r) => r.state.kind === 'ready').map((r) => r.id);
+  // DHL needs a recipient phone; Trendyol orders never carry one. Offer the seller's phone in one click.
+  const senderPhone = senderPhoneE164(settings.sender);
+  const noPhoneCount = phase === 'setup' && chosen?.carrier === 'dhl' && senderPhone
+    ? rows.filter((r) => r.state.kind === 'blocked' && r.state.missing.includes('phone')).length
+    : 0;
+  const useSenderPhone = () => setRows((prev) => withSenderPhone(prev, senderPhone).map((r) => (
+    r.state.kind === 'ready' || r.state.kind === 'blocked' ? { ...r, state: initialRowState(effectiveDraft(r.draft)) } : r)));
 
   const primary = phase === 'running'
     ? { id: 'running', label: t('bulk.runningPrimary', progress), loading: true, loadingLabel: t('bulk.runningPrimary', progress), disabled: true }
@@ -377,6 +397,16 @@ export function BulkCreateLabelsPanel({ orders, open, onClose, onFixOrder, onDon
               </Box>
             ) : null}
             {openFailed ? <Box sx={{ p: '20px 20px 0' }}><Banner tone="warning" title={t('success.openFailed')} /></Box> : null}
+            {noPhoneCount > 0 ? (
+              <Box sx={{ p: '20px 20px 0' }}>
+                <Banner
+                  tone="warning"
+                  title={t('bulk.noPhone', { count: noPhoneCount })}
+                  action={{ id: 'use-sender-phone', label: t('useSenderPhone', { phone: senderPhone }), onClick: useSenderPhone }}
+                  data-testid="bulk-no-phone"
+                />
+              </Box>
+            ) : null}
             <FromSection sender={settings.sender} missing={settings.state === 'ready' ? settings.missing : []} compact />
             <CarrierServiceSection
               rows={rateList}

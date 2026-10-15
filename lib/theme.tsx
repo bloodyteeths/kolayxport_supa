@@ -2,7 +2,6 @@
 // h1–h6 kept (remapped). Gradients, purple, hover transforms and heavy shadows are gone.
 import type { CSSProperties } from 'react';
 import { createTheme, alpha } from '@mui/material/styles';
-import type {} from '@mui/x-data-grid/themeAugmentation';
 import type {} from '@mui/x-date-pickers/themeAugmentation';
 import {
   neutral as n, accent as a, tone, font, type, elevation as e, focusRing, backdrop,
@@ -336,28 +335,6 @@ const theme = createTheme({
         head: { height: 36, fontSize: 12, fontWeight: 500, color: n[500], borderBottom: `1px solid ${n[200]}`, textTransform: 'none', whiteSpace: 'nowrap' },
         sizeSmall: { height: 36, padding: '0 12px' },
         paddingCheckbox: { width: 44, padding: '0 0 0 8px' },
-      },
-    },
-
-    // ── DataGrid (BulkGrid + legacy pages until M5) ──────────────────────
-    MuiDataGrid: {
-      defaultProps: { rowHeight: 44, columnHeaderHeight: 36, disableRowSelectionOnClick: true },
-      styleOverrides: {
-        root: {
-          border: `1px solid ${n[200]}`, borderRadius: radius.md, fontSize: 13, backgroundColor: n[0],
-          '--DataGrid-rowBorderColor': n[100],
-          '--DataGrid-containerBackground': n[25],
-        },
-        columnHeaderTitle: { fontWeight: 500, color: n[500], fontSize: 12 },
-        row: {
-          '&:hover': { backgroundColor: n[50] },
-          '&.Mui-selected, &.Mui-selected:hover': { backgroundColor: a[50], boxShadow: `inset 2px 0 0 ${a[600]}` },
-        },
-        cell: {
-          '&:focus, &:focus-within': { outline: `2px solid ${a[600]}`, outlineOffset: -2 },
-          '&.kx-dirty': { backgroundColor: tone.attention.bg, boxShadow: `inset 2px 0 0 ${tone.attention.solid}` },
-          '&.kx-invalid': { outline: `1px solid ${tone.danger.solid}`, outlineOffset: -1 },
-        },
       },
     },
   },

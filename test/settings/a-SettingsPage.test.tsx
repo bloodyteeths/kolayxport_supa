@@ -54,21 +54,23 @@ vi.mock('@/components/ds/feedback', async (orig) => ({ ...(await orig<object>())
 vi.mock('@/components/ds/overlay/ConfirmDialog', async (orig) => ({ ...(await orig<object>()), useConfirm: () => h.confirm }));
 
 // Section stubs (Groups B/C/D own the real ones).
-vi.mock('@/components/settings/ConnectionsPanel', async () => {
+vi.mock('@/components/domain/settings/connections', async (orig) => {
   const { useSettingsShell } = await import('@/components/domain/settings/settingsNav');
   return {
-    default: function Stub({ refreshKey }: { refreshKey: number }) {
+    ...(await orig<object>()),
+    ConnectionsSection: function Stub({ refreshKey }: { refreshKey: number }) {
       h.shell = useSettingsShell();
       return <div data-testid="stub-connections">{`refresh:${refreshKey}`}</div>;
     },
+    CredentialsSection: () => <div data-testid="stub-apikeys" />,
   };
 });
-vi.mock('@/components/settings/ApiKeysPanel', () => ({ default: () => <div data-testid="stub-apikeys" /> }));
-vi.mock('@/components/settings/BillingPanel', () => ({ default: () => <div data-testid="stub-billing" /> }));
-vi.mock('@/components/settings/SyncPanel', () => ({ default: () => <div data-testid="stub-sync" /> }));
+vi.mock('@/components/domain/billing/BillingPanel', () => ({ BillingPanel: () => <div data-testid="stub-billing" /> }));
+vi.mock('@/components/domain/settings/refresh', async (orig) => ({ ...(await orig<object>()), RefreshOverview: () => <div data-testid="stub-sync" /> }));
 vi.mock('@/components/domain/settings/PreferencesPanel', () => ({ default: () => <div data-testid="stub-preferences" /> }));
-vi.mock('@/components/settings/SenderProfilePanel', () => ({
-  default: (props: Record<string, unknown>) => {
+vi.mock('@/components/domain/settings/sender', async (orig) => ({
+  ...(await orig<object>()),
+  SenderForm: (props: Record<string, unknown>) => {
     h.senderProps = props;
     const onChangeProfile = props.onChangeProfile as (n: string, v: string) => void;
     return (

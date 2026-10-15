@@ -59,7 +59,6 @@ export type DoctorPanelProps = {
   onPrev?: () => void;
   onNext?: () => void;
   /** `editor-etsy` / `editor-ebay` flag: open the new editor, else the listings page with `?open=`. */
-  editorFlag: boolean;
   /** `features.bulkPhotoStudio`. */
   photoStudio: boolean;
   /** Staging (one draft per listing). */
@@ -79,7 +78,7 @@ const valueOf = (g: Guarded<number>) => (g.guard.ok && typeof g.value === 'numbe
 type TitleState = { status: 'idle' } | { status: 'loading' } | { status: 'ready'; value: string; rationale?: string } | { status: 'error'; message?: string };
 
 export function DoctorPanel({
-  row, open, mkt, shopId, onClose, onPrev, onNext, editorFlag, photoStudio, stage, onStaged, navigate,
+  row, open, mkt, shopId, onClose, onPrev, onNext, photoStudio, stage, onStaged, navigate,
 }: DoctorPanelProps) {
   const t = useTranslations();
   const fmt = useDsFormat();
@@ -156,7 +155,7 @@ export function DoctorPanel({
       const kind = fixKindFor(check);
       if (kind === 'price') {
         if (priceProposalBlocked(listing)) {
-          leave(editorHref(mkt, listing.id, shopId, editorFlag, 'price'));
+          leave(editorHref(mkt, listing.id, shopId, 'price'));
           return;
         }
         setPriceDraft(peerMedian ?? listing.price?.amount ?? null);
@@ -171,12 +170,12 @@ export function DoctorPanel({
         return;
       }
       if (kind === 'photos') {
-        leave(photoFixHref(mkt, listing.id, shopId, { photoStudio, editorFlag }));
+        leave(photoFixHref(mkt, listing.id, shopId, { photoStudio }));
         return;
       }
-      leave(editorHref(mkt, listing.id, shopId, editorFlag, editorFieldFor(check)));
+      leave(editorHref(mkt, listing.id, shopId, editorFieldFor(check)));
     },
-    [listing, mkt, shopId, editorFlag, photoStudio, peerMedian, suggestTitle, go, leave],
+    [listing, mkt, shopId, photoStudio, peerMedian, suggestTitle, go, leave],
   );
 
   const acceptPrice = () => {
@@ -230,7 +229,7 @@ export function DoctorPanel({
     disabledReason: count === 0 ? t('research.doc.noProposals') : undefined,
     shortcut: '⌘S',
   };
-  const editorTarget = editorHref(mkt, listing.id, shopId, editorFlag);
+  const editorTarget = editorHref(mkt, listing.id, shopId);
   const secondary = hasProposals
     ? { id: 'doctor-open-editor', label: t('research.doc.fix.openEditor'), onClick: () => leave(editorTarget) }
     : { id: 'doctor-open-editor', label: t('research.doc.fix.openEditor'), href: editorTarget };

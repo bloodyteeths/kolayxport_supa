@@ -20,6 +20,10 @@
 // (and the 140-char Etsy limit), normalizeTags (13 × 20, no title-word overlap) for tags. A result that fails the
 // guards leaves the cell untouched and is counted in `unusable` ("2 listings didn't get a usable suggestion").
 // Raw model or server text is never shown: only i18n keys.
+//
+// eBay lane (legacy EbayListingsLegacy `handleAIBulkOptimize`): `/api/clawd/ebay-ai?action=bulk_optimize_titles`
+// (existing action, ≤ 10 listings per request, title only). Titles are guarded with `guardEbayTitle` (entity-decoded,
+// not garbled, ≤ 80 characters; Etsy's house style is NOT applied). Same staging path: suggestions are cell edits.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import {
@@ -41,11 +45,23 @@ import { LIMIT_UI_HEADER } from '@/lib/http/limitInterceptor';
 export type BulkAiField = 'title' | 'tags';
 export const BULK_AI_FIELDS: readonly BulkAiField[] = ['title', 'tags'];
 
-/** Marketplaces with a bulk AI action in v1. Others: `supported === false` (the bar action is not rendered). */
-export type BulkAiMarketplace = 'etsy';
+/** Marketplaces with a bulk AI action. Others: `supported === false` (the bar action is not rendered). */
+export type BulkAiMarketplace = 'etsy' | 'ebay';
 export function bulkAiSupported(marketplace: string): marketplace is BulkAiMarketplace {
-  return marketplace === 'etsy';
+  return marketplace === 'etsy' || marketplace === 'ebay';
 }
+
+/** Fields each marketplace's AI action can improve (eBay `bulk_optimize_titles` returns titles only). */
+export const BULK_AI_MARKETPLACE_FIELDS: Readonly<Record<BulkAiMarketplace, readonly BulkAiField[]>> = {
+  etsy: ['title', 'tags'],
+  ebay: ['title'],
+};
+
+/** Listings per request each endpoint accepts. */
+export const BULK_AI_MAX_CHUNK: Readonly<Record<BulkAiMarketplace, number>> = { etsy: 20, ebay: 10 };
+
+/** eBay title limit (Inventory API `product.title`). */
+export const EBAY_AI_TITLE_MAX = 80;
 
 /** What the hook needs per grid row: the CURRENT (draft-overlaid) values the seller sees in the grid. */
 export interface BulkAiRow {
@@ -163,8 +179,8 @@ export function bulkAiCredits(listings: number): number {
   return Math.max(0, Math.floor(listings));
 }
 
-export function chunkRows<T>(rows: readonly T[], size: number): T[][] {
-  const n = Math.max(1, Math.min(20, Math.floor(size) || 20));
+export function chunkRows<T>(rows: readonly T[], size: number, max = 20): T[][] {
+  const n = Math.max(1, Math.min(max, Math.floor(size) || max));
   const out: T[][] = [];
   for (let i = 0; i < rows.length; i += n) out.push(rows.slice(i, i + n));
   return out;
@@ -177,6 +193,35 @@ export function guardTitle(raw: unknown): string {
   const t = normalizeTitle(decodeEntities(coerced));
   if (!t || t.length > TITLE_MAX || looksGarbled(t)) return '';
   return t;
+}
+
+/** eBay title guard: entity-decoded, whitespace collapsed, not garbled, within eBay's 80. Returns '' when unusable. */
+export function guardEbayTitle(raw: unknown): string {
+  const coerced = coerceAiString(raw);
+  if (!coerced) return '';
+  const t = decodeEntities(coerced).replace(/[\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!t || t.length > EBAY_AI_TITLE_MAX) return '';
+  // eBay titles keep separators ("Lamp - Brass | Gold"); stand-alone punctuation is not a garbled word.
+  const words = t.replace(/(^|\s)[^\p{L}\p{N}\s]+(?=\s|$)/gu, '$1').replace(/\s+/g, ' ').trim();
+  if (!words || looksGarbled(words)) return '';
+  return t;
+}
+
+/**
+ * eBay `bulk_optimize_titles` answer → the item shape `resolveRow` reads (`{ listing_id, title }`). Pure; anything
+ * that is not `{ results: [{ id, optimized }] }` yields no items (every row then counts as unusable).
+ */
+export function ebayAiItems(body: unknown): Array<{ listing_id: string; title: unknown }> {
+  const results = body && typeof body === 'object' ? (body as { results?: unknown }).results : undefined;
+  if (!Array.isArray(results)) return [];
+  const out: Array<{ listing_id: string; title: unknown }> = [];
+  for (const r of results) {
+    if (!r || typeof r !== 'object') continue;
+    const id = (r as { id?: unknown }).id;
+    if (id === undefined || id === null || id === '') continue;
+    out.push({ listing_id: String(id), title: (r as { optimized?: unknown }).optimized });
+  }
+  return out;
 }
 
 /** Tags guard against the title the listing will have. Returns [] when unusable. */
@@ -217,6 +262,7 @@ export function resolveRow(
   fields: readonly BulkAiField[],
   keys: Record<BulkAiField, string>,
   canEdit: (rowId: string, field: string) => boolean,
+  titleGuard: (raw: unknown) => string = guardTitle,
 ): ResolvedRow {
   const obj = item && typeof item === 'object' ? (item as Record<string, unknown>) : null;
   if (!obj) return { patches: [], outcome: 'unusable', skippedCells: 0 };
@@ -227,7 +273,7 @@ export function resolveRow(
   let finalTitle = currentTitle;
 
   if (fields.includes('title')) {
-    const t = guardTitle(obj.title);
+    const t = titleGuard(obj.title);
     if (t) {
       usable++;
       if (t !== currentTitle) {
@@ -305,7 +351,10 @@ export function useBulkAi(options: UseBulkAiOptions): UseBulkAi {
       if (runningRef.current) return null;
       const o = opts.current;
       if (!bulkAiSupported(o.marketplace)) return null;
-      const fields = (fieldsIn && fieldsIn.length ? fieldsIn : BULK_AI_FIELDS).filter((f) => BULK_AI_FIELDS.includes(f));
+      const mp: BulkAiMarketplace = o.marketplace;
+      const allowed = BULK_AI_MARKETPLACE_FIELDS[mp];
+      const fields = (fieldsIn && fieldsIn.length ? fieldsIn : allowed).filter((f) => allowed.includes(f));
+      const titleGuard = mp === 'ebay' ? guardEbayTitle : guardTitle;
       const seen = new Set<string>();
       const rows = rowsIn.filter((r) => r && !seen.has(r.rowId) && (seen.add(r.rowId), true));
       if (rows.length === 0 || fields.length === 0) return null;
@@ -334,31 +383,46 @@ export function useBulkAi(options: UseBulkAiOptions): UseBulkAi {
       setStatus('running');
       setProgress({ done: 0, total: rows.length });
 
-      const chunks = chunkRows(rows, o.chunkSize ?? 20);
+      const chunks = chunkRows(rows, o.chunkSize ?? BULK_AI_MAX_CHUNK[mp], BULK_AI_MAX_CHUNK[mp]);
       let next = 0;
 
       const runChunk = async (chunk: BulkAiRow[]) => {
         let res: Response;
         let body: unknown = null;
         try {
-          res = await f('/api/ai/etsy', {
+          const init: RequestInit = {
             method: 'POST',
             credentials: 'same-origin',
             signal: controller.signal,
             headers: { 'Content-Type': 'application/json', [LIMIT_UI_HEADER]: 'inline' },
-            body: JSON.stringify({
-              action: 'bulk_optimize',
-              fields,
-              ...(o.instructions ? { instructions: o.instructions } : {}),
-              listings: chunk.map((r) => ({
-                listing_id: r.listingId,
-                title: decodeEntities(r.title ?? ''),
-                tags: [...(r.tags ?? [])],
-                description: r.description ?? '',
-                category: r.category ?? '',
-              })),
-            }),
-          });
+          };
+          res =
+            mp === 'ebay'
+              ? await f('/api/clawd/ebay-ai?action=bulk_optimize_titles', {
+                  ...init,
+                  body: JSON.stringify({
+                    listings: chunk.map((r) => ({
+                      id: String(r.listingId),
+                      title: decodeEntities(r.title ?? ''),
+                      ...(r.category ? { categoryName: r.category } : {}),
+                    })),
+                  }),
+                })
+              : await f('/api/ai/etsy', {
+                  ...init,
+                  body: JSON.stringify({
+                    action: 'bulk_optimize',
+                    fields,
+                    ...(o.instructions ? { instructions: o.instructions } : {}),
+                    listings: chunk.map((r) => ({
+                      listing_id: r.listingId,
+                      title: decodeEntities(r.title ?? ''),
+                      tags: [...(r.tags ?? [])],
+                      description: r.description ?? '',
+                      category: r.category ?? '',
+                    })),
+                  }),
+                });
           body = await res.json().catch(() => null);
         } catch {
           if (controller.signal.aborted) return;
@@ -388,9 +452,12 @@ export function useBulkAi(options: UseBulkAiOptions): UseBulkAi {
           return;
         }
 
-        const items = body && typeof body === 'object' && Array.isArray((body as { optimized?: unknown }).optimized)
-          ? ((body as { optimized: unknown[] }).optimized)
-          : [];
+        const items: unknown[] =
+          mp === 'ebay'
+            ? ebayAiItems(body)
+            : body && typeof body === 'object' && Array.isArray((body as { optimized?: unknown }).optimized)
+              ? (body as { optimized: unknown[] }).optimized
+              : [];
         const byId = new Map<string, unknown>();
         for (const it of items) {
           if (!it || typeof it !== 'object') continue;
@@ -401,7 +468,7 @@ export function useBulkAi(options: UseBulkAiOptions): UseBulkAi {
         for (const row of chunk) {
           // A cell the seller changed while this chunk was in flight is not editable for the AI any more.
           const editable = (rowId: string, field: string) => canEdit(rowId, field) && !changedSinceSent(row, field);
-          const r = resolveRow(row, byId.get(String(row.listingId)), fields, keys, editable);
+          const r = resolveRow(row, byId.get(String(row.listingId)), fields, keys, editable, titleGuard);
           s.skippedCells += r.skippedCells;
           s[r.outcome] += 1;
           patches.push(...r.patches);

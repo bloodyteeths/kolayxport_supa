@@ -272,18 +272,11 @@ export function notSentHref(mkt: DoctorMkt, shop: string | null | undefined): st
   return shop && mkt === 'etsy' ? `${base}?shop=${enc(shop)}&view=not_sent` : `${base}?view=not_sent`;
 }
 
-/**
- * The full editor (listing-editor §1) while its flag is on; otherwise the listings page with the listing open
- * (`?open=`, quick view in the new grid; the legacy page ignores it and lists the shop).
- */
-export function editorHref(mkt: DoctorMkt, id: string, shop: string | null | undefined, editorFlag: boolean, field?: string): string {
+/** The full editor (listing-editor §1), optionally scrolled to a field (`#field`). */
+export function editorHref(mkt: DoctorMkt, id: string, shop: string | null | undefined, field?: string): string {
   const hash = field ? `#${field}` : '';
-  if (mkt === 'etsy') {
-    if (editorFlag) return `/app/etsy-listings/${enc(id)}${shop ? `?shop=${enc(shop)}` : ''}${hash}`;
-    return `/app/etsy-listings?${shop ? `shop=${enc(shop)}&` : ''}open=${enc(id)}`;
-  }
-  if (editorFlag) return `/app/ebay-listings/${enc(id)}${hash}`;
-  return `/app/ebay-listings?open=${enc(id)}`;
+  if (mkt === 'etsy') return `/app/etsy-listings/${enc(id)}${shop ? `?shop=${enc(shop)}` : ''}${hash}`;
+  return `/app/ebay-listings/${enc(id)}${hash}`;
 }
 
 /** Keyword explorer for one listing (R2 panel; a new tab until R2 ships). */
@@ -292,9 +285,9 @@ export function keywordExplorerHref(mkt: DoctorMkt, id: string, shop: string | n
 }
 
 /** Photo studio (Pro, `features.bulkPhotoStudio`) or the editor `#photos` (pro-gating §4). */
-export function photoFixHref(mkt: DoctorMkt, id: string, shop: string | null | undefined, opts: { photoStudio: boolean; editorFlag: boolean }): string {
+export function photoFixHref(mkt: DoctorMkt, id: string, shop: string | null | undefined, opts: { photoStudio: boolean }): string {
   if (mkt === 'etsy' && opts.photoStudio) return `/app/etsy-listings/photos?ids=${enc(id)}${shop ? `&shop=${enc(shop)}` : ''}`;
-  return editorHref(mkt, id, shop, opts.editorFlag, 'photos');
+  return editorHref(mkt, id, shop, 'photos');
 }
 
 /** BulkGrid (M7) with the selection. */

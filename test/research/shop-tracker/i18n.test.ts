@@ -9,6 +9,7 @@ import tr from '@/messages/tr.json';
 import { ALERT_KEYS } from '@/components/domain/research/shops/shopModel';
 import { KNOWN_REASON_KEYS } from '@/lib/research/hooks/useWatches';
 import { SHOPS_EN, SHOPS_TR, flattenKeys } from './messages';
+import { PORT_EN, PORT_TR } from '../legacy-port-messages';
 
 type Obj = Record<string, unknown>;
 function deepMerge(a: Obj, b: Obj): Obj {
@@ -18,7 +19,10 @@ function deepMerge(a: Obj, b: Obj): Obj {
   }
   return out;
 }
-const MERGED = { en: deepMerge(en as Obj, SHOPS_EN as Obj), tr: deepMerge(tr as Obj, SHOPS_TR as Obj) };
+const MERGED = {
+  en: deepMerge(deepMerge(en as Obj, SHOPS_EN as Obj), PORT_EN as unknown as Obj),
+  tr: deepMerge(deepMerge(tr as Obj, SHOPS_TR as Obj), PORT_TR as unknown as Obj),
+};
 const PARAMS = { count: 2, value: '14.3', used: 3, limit: 10, marketplace: 'Etsy', shop: 'WoodAndWords', year: '2021', rating: '4.9', date: '1 Oct', tag: 'recipe box', items: 3, days: 6.5 };
 
 describe('R3-B keys', () => {

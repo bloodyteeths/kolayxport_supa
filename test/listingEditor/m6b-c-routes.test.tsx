@@ -1,11 +1,10 @@
 // @vitest-environment jsdom
-// M6b-C routes: /app/{trendyol,wix,shopify}-urunler/{[id],new} behind `editor-*`, store resolution, connect state,
+// M6b-C routes: /app/{trendyol,wix,shopify}-urunler/{[id],new}, store resolution, connect state,
 // create bootstraps, and the rail health over the catalog scorers. The frame itself is stubbed (its own tests cover it).
 import * as React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 
-const flags = new Set<string>();
 const router = {
   isReady: true,
   query: {} as Record<string, string>,
@@ -27,7 +26,6 @@ vi.mock('@/components/domain/listing-editor/catalogSectionMap', async () => {
   return { CATALOG_SECTIONS: { trendyol: {}, wix: {}, shopify: {} }, CatalogCopyContext: R.createContext({ translateCopy: false }) };
 });
 vi.mock('@/components/domain/listing-editor/ListingEditor', () => ({
-  useResolvedUiFlag: (key: string) => flags.has(key),
   ListingEditor: (p: Record<string, any>) => {
     editorProps.push(p);
     return <div data-testid="editor" data-mp={p.marketplace} data-mode={p.mode} data-id={p.listingId ?? ''} data-shop={p.shopId} />;
@@ -60,7 +58,6 @@ function stubListings(body: unknown, status = 200) {
 
 afterEach(() => {
   cleanup();
-  flags.clear();
   router.isReady = true;
   router.query = {};
   router.replace.mockClear();
@@ -108,16 +105,8 @@ describe('route params', () => {
   });
 });
 
-describe('editor routes behind editor-* flags', () => {
-  it('flag off → back to the list (the quick view stays the default)', async () => {
-    router.query = { id: '8690000000017' };
-    render(<TrendyolEdit />);
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/app/trendyol-urunler'));
-    expect(screen.queryByTestId('editor')).toBeNull();
-  });
-
-  it('flag on → resolves the store and mounts the workspace on the product', async () => {
-    flags.add('editor-trendyol');
+describe('editor routes', () => {
+  it('resolves the store and mounts the workspace on the product', async () => {
     router.query = { id: '8690000000017' };
     stubListings({ rows: [], store: { id: 'sup1', name: 'Belle', currency: 'TRY' }, stores: [] });
     render(<TrendyolEdit />);
@@ -134,7 +123,6 @@ describe('editor routes behind editor-* flags', () => {
   });
 
   it('Wix keeps the ?site= store in the read and in links', async () => {
-    flags.add('editor-wix');
     router.query = { id: 'p-1', site: 'site9' };
     stubListings({ rows: [], store: { id: 'site9', name: 'Shop', currency: 'USD' } });
     render(<WixEdit />);
@@ -144,7 +132,6 @@ describe('editor routes behind editor-* flags', () => {
   });
 
   it('not connected → ConnectState instead of the workspace', async () => {
-    flags.add('editor-wix');
     router.query = { id: 'p-1' };
     stubListings({ error: 'not_connected' }, 404);
     render(<WixEdit />);
@@ -153,7 +140,6 @@ describe('editor routes behind editor-* flags', () => {
   });
 
   it('create: ?draft= resumes; the first save replaces the URL shallowly with ?draft=', async () => {
-    flags.add('editor-shopify');
     router.query = { shop: 'sh1', draft: 'd1' };
     stubListings({ rows: [], store: { id: 'sh1', name: 'S', currency: 'USD' } });
     render(<ShopifyNew />);
@@ -168,7 +154,6 @@ describe('editor routes behind editor-* flags', () => {
   });
 
   it('create: a Send that returns a non-numeric id (Wix GUID) moves to the edit route', async () => {
-    flags.add('editor-wix');
     router.query = { site: 'site9' };
     stubListings({ rows: [], store: { id: 'site9', name: 'S', currency: 'USD' } });
     render(<WixNew />);
@@ -186,7 +171,6 @@ describe('editor routes behind editor-* flags', () => {
   });
 
   it('create: a cross-list in another currency opens without its price', async () => {
-    flags.add('editor-trendyol');
     router.query = { crosslist: 'ebay:SKU-1' };
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       fetches.push(url);
@@ -204,7 +188,6 @@ describe('editor routes behind editor-* flags', () => {
   });
 
   it('create: a failed cross-list source still opens a blank workspace', async () => {
-    flags.add('editor-trendyol');
     router.query = { crosslist: 'etsy:123' };
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       fetches.push(url);

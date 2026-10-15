@@ -250,7 +250,7 @@ describe('GET/POST /api/research/watches', () => {
     store.enabled = false;
     p.ebayTrackedSeller.findMany.mockResolvedValue([{ id: 'seller1', sellerUsername: 'engrave_us', feedbackScore: 900, createdAt: day(20), lastCheckedAt: null }]);
     p.ebayTrackedProduct.findMany.mockResolvedValue([
-      { id: 'p1', seller: 'engrave_us', totalSold: 31, currentPrice: 20, currency: 'USD', snapshots: [] },
+      { id: 'p1', legacyItemId: '123456789012', title: 'Engraved box', seller: 'engrave_us', totalSold: 31, currentPrice: 20, currency: 'USD', createdAt: day(5), snapshots: [] },
     ]);
     const res = await run(listHandler);
     expect(res.statusCode).toBe(200);

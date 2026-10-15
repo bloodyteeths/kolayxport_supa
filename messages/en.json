@@ -11387,7 +11387,8 @@
       "shopReviewsValue": "★ {rating} ({count})",
       "shopActive": "Active listings",
       "shopSince": "Open since",
-      "shopFailed": "Couldn't load the shop"
+      "shopFailed": "Couldn't load the shop",
+      "watchItem": "Watch this item"
     },
     "source": {
       "searchApiOrder": "{marketplace} search (API order, not personalized)",
@@ -11607,7 +11608,8 @@
         "unavailable": "Shop tracking isn't available yet. Try again later",
         "failed": "Couldn't add the shop. Try again",
         "gone": "This shop was already removed",
-        "rateLimited": "Too many shops added at once. Wait a minute and try again"
+        "rateLimited": "Too many shops added at once. Wait a minute and try again",
+        "itemNotFound": "Couldn't find this eBay item. It may have ended"
       },
       "loadFailed": "Couldn't load your watched shops",
       "emptyBody": "Paste a {marketplace} shop link or type a shop name. Daily sales appear after the second daily reading.",
@@ -11666,7 +11668,15 @@
       "alertsLegacy": "Alerts for this seller are set on the eBay research page.",
       "alertsFailed": "Couldn't save the alert. Try again",
       "addedLater": "Watching {shop} · First reading at the next daily check",
-      "fromTrackedItems": "from {count, plural, one {# tracked item} other {# tracked items}} of this seller"
+      "fromTrackedItems": "from {count, plural, one {# tracked item} other {# tracked items}} of this seller",
+      "watchEbayItem": "eBay item · {item}",
+      "ebayItemPrompt": "Paste an eBay seller link or name, or an eBay item link to follow its price and sales",
+      "itemSold": "{value} sold (all time)",
+      "itemSalesNote": "Measured from eBay's sold counter for this item · gaps are days without a usable reading",
+      "itemPriceChart": "Price, 30 days",
+      "itemPriceNote": "The item's listed price at each daily reading",
+      "itemPriceNotYet": "The price line appears after a few daily readings.",
+      "itemChartAria": "Price of {item}, last 30 days"
     },
     "gap": {
       "title": "Price gap: Türkiye → abroad",
@@ -11776,7 +11786,10 @@
       "toast": {
         "watched": "Watching '{title}'",
         "watchFailed": "Couldn't add the watch"
-      }
+      },
+      "refreshIndex": "Refresh prices",
+      "indexUpdated": "Prices updated {date}",
+      "refreshFailed": "Couldn't refresh the prices. Try again later"
     }
   },
   "ds": {
@@ -13018,7 +13031,8 @@
       "printAll": "Print {count, plural, one {# label} other {# labels}}",
       "dhlMixed": "DHL eCommerce only works when every order ships within Turkey",
       "presetDefault": "Weight from each order",
-      "sendTracking": "Send tracking to each marketplace"
+      "sendTracking": "Send tracking to each marketplace",
+      "noPhone": "{count, plural, one {# order has} other {# orders have}} no recipient phone"
     },
     "title": "Create label · Order {number}",
     "backToOrder": "Order",
@@ -13196,7 +13210,8 @@
       "download": "Download PDF",
       "next": "Next order",
       "openFailed": "Couldn't open the label. Allow pop-ups for KolayXport."
-    }
+    },
+    "useSenderPhone": "Use my phone ({phone})"
   },
   "billing": {
     "banner": {
@@ -13463,7 +13478,12 @@
       "discarded": "Changes discarded",
       "reviewDiff": "Review differences",
       "schedule": "Schedule send…",
-      "archiveConfirm": "Archive…"
+      "archiveConfirm": "Archive…",
+      "setField": "Set field…",
+      "copyToShop": "Copy to another shop…",
+      "copyToEtsy": "Copy to Etsy",
+      "unarchive": "Unarchive",
+      "unarchiveNeedsAlone": "Send or discard the other changes on this product before unarchiving it"
     },
     "bulk": {
       "skippedRemovals": "{kind, select, archive {{count, plural, one {# listing} other {# listings}} skipped: they will be archived on send} other {{count, plural, one {# listing} other {# listings}} skipped: they will be deleted on send}}",
@@ -13477,7 +13497,12 @@
       "selectAllInView": "Select all {count} in this view",
       "discardSelected": "Discard selected changes",
       "discardConfirm": "Discard unsent changes on {count, plural, one {# listing} other {# listings}}?",
-      "pageOnly": "Works on the listings on this page. Clear \"Select all\" first."
+      "pageOnly": "Works on the listings on this page. Clear \"Select all\" first.",
+      "price": {
+        "salePrice": "Sale price {from} → {to}",
+        "listPrice": "List price {from} → {to}"
+      },
+      "unarchiveSkipped": "{count, plural, one {# product} other {# products}} skipped: only archived products without other unsent changes can be unarchived"
     },
     "tags": {
       "unsentSkipped": "{count, plural, one {# listing has} other {# listings have}} unsent tag edits: change them in the editor",
@@ -13543,7 +13568,15 @@
       "previewEmpty": "{count, plural, one {# listing} other {# listings}} selected",
       "skippedVariations": "{count} listings with variations skipped: change them in the grid",
       "skippedInvalid": "{count, plural, one {# listing} other {# listings}} skipped: the new price would be too low",
-      "nothingToStage": "Nothing would change"
+      "nothingToStage": "Nothing would change",
+      "variations": "{count, plural, one {# listing has} other {# listings have}} variations: every variation's price changes the same way",
+      "variationsSkipped": "{count, plural, one {# listing} other {# listings}} with variations skipped: their variations couldn't be read. Try again or change them in the editor",
+      "matchHelp": "Leave empty to change every variation",
+      "matchProperty": "Only variations where",
+      "matchPropertyPlaceholder": "Property, e.g. Size",
+      "matchSkipsPlain": "{count, plural, one {# listing} other {# listings}} without variations won't change",
+      "matchValue": "is",
+      "matchValuePlaceholder": "Value, e.g. Large"
     },
     "stock": {
       "in": "In stock",
@@ -13759,7 +13792,8 @@
       "fields": {
         "title": "Title",
         "tags": "Tags",
-        "description": "Description"
+        "description": "Description",
+        "materials": "Materials"
       },
       "noMatches": "No listings contain this text",
       "summary": "{count, plural, one {# listing will change} other {# listings will change}}{flagged, plural, =0 {} other { · # skipped}}",
@@ -13823,7 +13857,31 @@
       "stagePartial": "{done} staged · {failed} couldn't be saved. Stage again to retry.",
       "duplicateRow": "This listing is in the file more than once",
       "tagsTooMany": "More than {max} tags",
-      "tagTooLong": "Tag \"{tag}\" is over {max} characters"
+      "tagTooLong": "Tag \"{tag}\" is over {max} characters",
+      "modeLabel": "What this file does",
+      "modeUpdate": "Update listings",
+      "modeCreate": "Create new listings",
+      "create": {
+        "fields": {
+          "title": "Title",
+          "price": "Price",
+          "quantity": "Quantity",
+          "condition": "Condition",
+          "description": "Description"
+        },
+        "required": "Match a SKU and a Title column",
+        "skuMissing": "Add a SKU",
+        "skuDuplicate": "This SKU is in the file more than once",
+        "skuExists": "A listing with this SKU is already on eBay",
+        "conditionInvalid": "Unknown condition",
+        "ready": "Ready to send from the editor",
+        "incomplete": "Finish in the editor",
+        "openEditor": "Open in editor",
+        "note": "Each row is saved as a new eBay listing draft. Nothing is listed until you send it from its editor.",
+        "summary": "{rows} rows · {ready} ready · {incomplete} to finish in the editor · {invalid} invalid",
+        "stage": "Save {count, plural, one {# new listing} other {# new listings}}",
+        "staged": "{count, plural, one {# new listing saved} other {# new listings saved}} · not sent yet"
+      }
     },
     "export": {
       "selectedTooMany": "Too many listings selected to export at once. Use Current view or All listings.",
@@ -13832,6 +13890,65 @@
       "download": "Download CSV",
       "preparing": "Preparing CSV…",
       "failed": "Couldn't download the CSV. Try again."
+    },
+    "newDrafts": {
+      "title": "{count, plural, one {# new listing is} other {# new listings are}} not on {marketplace} yet",
+      "show": "Show them",
+      "hide": "Hide",
+      "open": "Open",
+      "discard": "Discard",
+      "discardConfirm": "Discard \"{title}\"?",
+      "discardBody": "It was never sent, so nothing changes on {marketplace}. The draft and its staged photos are removed.",
+      "discarded": "New listing discarded",
+      "untitled": "Untitled listing",
+      "photos": "{count, plural, =0 {No photos} one {# photo} other {# photos}}",
+      "copyTo": "Copy to {shop}",
+      "partiallyCreated": "Partly created on {marketplace} (#{id}): open it to finish sending",
+      "willPublish": "Goes live when sent",
+      "failed": "Last send failed",
+      "sending": "Sending…"
+    },
+    "setField": {
+      "title": "{count, plural, one {Set a field on # listing} other {Set a field on # listings}}",
+      "help": "Fills the drafts only. Nothing changes on Etsy until you send.",
+      "field": "Field",
+      "itemDetails": "Who made it, when, and what it is",
+      "dimensions": "Size",
+      "keep": "Keep as is",
+      "categoryHelp": "Category details are not changed here. Check them in each listing's editor.",
+      "materialsHelp": "Replaces the materials on every selected listing",
+      "stage": "{count, plural, =0 {Stage changes} one {Stage # change} other {Stage # changes}}",
+      "pickValue": "Choose a value first",
+      "descriptionAddHelp": "Added to each listing's own description, with a blank line between",
+      "descriptionAppend": "Add after",
+      "descriptionPrepend": "Add before",
+      "descriptionReplace": "Replace",
+      "descriptionReplaceHelp": "Replaces the description on every selected listing",
+      "descriptionSkipped": "{count, plural, one {# listing} other {# listings}} skipped: the description has an unsent change, couldn't be read or would be too long",
+      "materialsAdd": "Add",
+      "materialsAddHelp": "Added to each listing's own materials (up to 13)",
+      "materialsNoChange": "No listing needed a change",
+      "materialsRemove": "Remove",
+      "materialsRemoveHelp": "Removed from each listing's materials where present",
+      "materialsReplace": "Replace",
+      "materialsSkipped": "{count, plural, one {# listing} other {# listings}} skipped: their materials have an unsent change or couldn't be read",
+      "personalization": "Personalization",
+      "personalizationInstructions": "Instructions for buyers",
+      "personalizationInstructionsHelp": "Up to {max} characters. Replaces the listing's personalization questions",
+      "personalizationMaxChars": "Buyer's answer: character limit",
+      "personalizationOff": "Off",
+      "personalizationOffHelp": "Removes personalization from every selected listing when you send",
+      "personalizationOn": "On (one text question)",
+      "personalizationRequired": "Buyers must fill it in"
+    },
+    "copyToShop": {
+      "title": "{count, plural, one {Copy # listing to another shop} other {Copy # listings to another shop}}",
+      "help": "Each copy becomes a new listing in that shop when you send it. Photos, tags and details come along.",
+      "target": "Shop",
+      "pick": "Choose a shop",
+      "stage": "{count, plural, =0 {Stage copies} one {Stage # copy} other {Stage # copies}}",
+      "skipped": "{count, plural, one {# listing} other {# listings}} skipped: send or discard their other changes first",
+      "staged": "{count, plural, one {# copy} other {# copies}} to {shop} staged. Select the listings and send them when you're ready"
     }
   },
   "listingEditor": {
@@ -14005,7 +14122,8 @@
       "shopsFailed": "Couldn't load your Etsy shops",
       "connectTitle": "Connect Etsy to edit your listings",
       "connectBody": "Your listings, photos and drafts appear here once your shop is connected.",
-      "crosslistFailed": "Couldn't load the Etsy listing to copy"
+      "crosslistFailed": "Couldn't load the Etsy listing to copy",
+      "crosslistEbayFailed": "Couldn't load the eBay listing to copy"
     },
     "createdOnSend": "It's created on Etsy when you send this listing",
     "stageFailed": "Couldn't save this. Try again",
@@ -14560,7 +14678,10 @@
       "emptyTitle": "No profiles yet",
       "emptyBody": "Save a listing's tags, details or shipping as a profile, then fill new listings in one click",
       "draftOnly": "Applying fills the draft only. You can undo it right after",
-      "storageFailed": "Couldn't save on this device. Check that the browser allows site storage"
+      "storageFailed": "Couldn't save on this device. Check that the browser allows site storage",
+      "delete": "Delete profile",
+      "deleteConfirm": "Delete the profile \"{name}\"?",
+      "deleted": "Deleted profile \"{name}\""
     },
     "media": {
       "invalidUrl": "This image link can't be used. Use a public https link",

@@ -8,6 +8,8 @@
 // Estimate) · "Tags they use that you don't" → Keyword explorer · Alerts (3 switches).
 // Footer primary: "Compare with my listing" (listing picker → Product finder compare). Nothing here writes to a
 // marketplace: the only writes are the watch's alert rules and its removal (KolayXport rows).
+// eBay item rows (`ebayItem`): header = price · sold (all time) · condition; body = sales per day (Δ eBay sold counter)
+// and the listed price over 30 days. Alerts render only for rows that support them (Etsy shops).
 import * as React from 'react';
 import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
@@ -32,7 +34,7 @@ import type { Guarded } from '@/lib/research/types';
 import { useWatchDetail, type WatchDetail, type WatchListingLite, type WatchSummary } from '@/lib/research/hooks/useWatches';
 import { MKT_NAME } from '../ResearchLayout';
 import { AlertSwitches } from './AlertSwitches';
-import { keywordHref, notYetKey, researchIdeaHref, salesSeries, sinceYear, usable, type ShopMkt, type ShopT } from './shopModel';
+import { itemLine, keywordHref, notYetKey, priceSeries, researchIdeaHref, salesSeries, sinceYear, usable, type ShopMkt, type ShopT } from './shopModel';
 
 export type ShopPanelProps = {
   row: WatchSummary | null;
@@ -81,6 +83,12 @@ export function ShopPanel({ row, open, onClose, onPrev, onNext, onCompare, onDra
     metaParts.push(t('research.shops.rating', { rating: fmt.num(rating, { decimals: 1 }), count: fmt.num(reviews) }));
   }
   const shopUrl = row.url ?? row.shop?.url ?? null;
+  const isItem = row.type === 'ebayItem';
+  if (isItem) {
+    const line = itemLine(row, t, fmt);
+    if (line) metaParts.push(line);
+    if (row.item?.condition) metaParts.push(row.item.condition);
+  }
   if (row.createdAt) metaParts.push(t('research.shops.watchingSince', { date: fmt.date(row.createdAt) }));
 
   const overflow = row.capabilities.remove
@@ -107,10 +115,16 @@ export function ShopPanel({ row, open, onClose, onPrev, onNext, onCompare, onDra
       data-testid="shop-panel"
     >
       <SalesSection row={row} detail={detail} t={t} />
-      <DetailSections row={row} mkt={mkt} detail={detail} t={t} fmt={fmt} go={go} onDraftSimilar={onDraftSimilar} etsyConnected={etsyConnected} />
-      <SidePanelSection id="shop-alerts" title={t('research.shops.alerts')}>
-        <AlertSwitches key={row.id} watch={row} alertsAvailable={alertsAvailable} onSaved={() => onAlertsSaved?.()} />
-      </SidePanelSection>
+      {isItem ? (
+        <PriceSection row={row} detail={detail} t={t} />
+      ) : (
+        <DetailSections row={row} mkt={mkt} detail={detail} t={t} fmt={fmt} go={go} onDraftSimilar={onDraftSimilar} etsyConnected={etsyConnected} />
+      )}
+      {row.capabilities.alerts ? (
+        <SidePanelSection id="shop-alerts" title={t('research.shops.alerts')}>
+          <AlertSwitches key={row.id} watch={row} alertsAvailable={alertsAvailable} onSaved={() => onAlertsSaved?.()} />
+        </SidePanelSection>
+      ) : null}
       {detail.source ? (
         <Box sx={{ px: '20px', pb: '16px' }}>
           <ApiSourceNote source={detail.source} data-testid="shop-panel-source" />
@@ -167,7 +181,44 @@ function SalesSection({ row, detail, t }: { row: WatchSummary; detail: DetailHoo
     );
   }
   return (
-    <SidePanelSection id="shop-sales" title={title} description={t('research.shops.salesChartNote')}>
+    <SidePanelSection id="shop-sales" title={title} description={t(row.type === 'ebayItem' ? 'research.shops.itemSalesNote' : 'research.shops.salesChartNote')}>
+      {body}
+    </SidePanelSection>
+  );
+}
+
+/** `ebayItem`: the listed price per day (Measured: the item's own price at each daily reading; gaps = no reading). */
+function PriceSection({ row, detail, t }: { row: WatchSummary; detail: DetailHook; t: ShopT }) {
+  const s = detail.data ? priceSeries(detail.data.prices) : null;
+  const state = detail.region.state;
+  let body: React.ReactNode;
+  if (state === 'loading') body = <ListSkeleton rows={2} leading="none" />;
+  else if (state === 'slow' || state === 'error' || !s) body = null; // the sales section carries the slow / error state
+  else if (s.measured < 2) {
+    body = (
+      <Typography variant="body2" component="p" sx={{ m: 0, color: n[600] }} data-testid="shop-item-price-notyet">
+        {t('research.shops.itemPriceNotYet')}
+      </Typography>
+    );
+  } else {
+    body = (
+      <Chart
+        type="line"
+        series={[{ name: t('research.shops.itemPriceChart'), data: s.data }]}
+        categories={s.categories}
+        format="money"
+        currency={row.item?.currency ?? 'USD'}
+        height={180}
+        ariaLabel={t('research.shops.itemChartAria', { item: row.label })}
+        directLabel="none"
+        actions="table"
+        data-testid="shop-item-price-chart"
+      />
+    );
+  }
+  if (body === null) return null;
+  return (
+    <SidePanelSection id="shop-item-price" title={t('research.shops.itemPriceChart')} description={t('research.shops.itemPriceNote')}>
       {body}
     </SidePanelSection>
   );

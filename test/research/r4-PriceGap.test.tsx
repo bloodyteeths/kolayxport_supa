@@ -15,12 +15,13 @@ import en from '@/messages/en.json';
 import tr from '@/messages/tr.json';
 import { __resetUrlStateForTests } from '@/lib/ds/useUrlState';
 import { useFeatureLockStore } from '@/lib/http/limitInterceptor';
-import { LISTING_PREFILL_KEY } from '@/components/etsy/research/shared/listingPrefill';
+import { LISTING_PREFILL_KEY } from '@/lib/listings/listingPrefill';
 import { summarizeAmounts } from '@/lib/research/stats';
 import type { PriceGapData, PriceGapRow } from '@/lib/research/priceGap';
 import type { ResearchResponse } from '@/lib/research/types';
 import { F } from '../billing/d-fixtures';
 import { R4_EN, R4_TR } from './r4-messages';
+import { PORT_EN, PORT_TR } from './legacy-port-messages';
 
 const router = {
   pathname: '/app/research/products',
@@ -49,7 +50,10 @@ function deepMerge(a: Obj, b: Obj): Obj {
   }
   return out;
 }
-const MESSAGES = { en: deepMerge(en as Obj, R4_EN as unknown as Obj), tr: deepMerge(tr as Obj, R4_TR as unknown as Obj) };
+const MESSAGES = {
+  en: deepMerge(deepMerge(en as Obj, R4_EN as unknown as Obj), PORT_EN as unknown as Obj),
+  tr: deepMerge(deepMerge(tr as Obj, R4_TR as unknown as Obj), PORT_TR as unknown as Obj),
+};
 
 const gapRow = (o: Partial<PriceGapRow> = {}): PriceGapRow => ({
   id: '1',
@@ -271,21 +275,6 @@ describe('PriceGap table (Pro)', () => {
     expect(writes()).toHaveLength(0);
   });
 
-  it('"List on eBay" with the editor flag off (NEXT_PUBLIC_UI_V2=none) opens the legacy eBay listings creator', async () => {
-    vi.stubEnv('NEXT_PUBLIC_UI_V2', 'none');
-    try {
-      router.query = { source: 'trendyol', open: '1' };
-      renderUi(<PriceGap />);
-      await screen.findByTestId('price-gap-marginbox');
-      const btn = screen.getAllByText('List on eBay').find((el) => el.closest('button, a'))!;
-      fireEvent.click(btn.closest('button, a') as HTMLElement);
-      await waitFor(() => expect(router.push).toHaveBeenCalledWith('/app/ebay-listings?prefill=session'));
-      expect(writes()).toHaveLength(0);
-    } finally {
-      vi.unstubAllEnvs();
-    }
-  });
-
   it('category source: other sellers\' photos never become listing images (reference only)', async () => {
     router.query = { source: 'trendyol', open: '1' };
     renderUi(<PriceGap />);
@@ -348,5 +337,48 @@ describe('PriceGap table (Pro)', () => {
     expect(priceGapKey({ from: 'mine', cat: 'a' })).toBe('/api/research/price-gap?from=mine');
     expect(priceGapKey({ from: 'link', url: 'nope' })).toBeNull();
     expect(priceGapKey({ from: 'link', url: 'https://www.trendyol.com/a/b-p-123456' })).toBe('/api/research/price-gap?from=link&url=123456');
+  });
+});
+
+describe('Price gap index freshness (legacy ArbitrageScanner port)', () => {
+  const at = (msAgo: number) => new Date(Date.now() - msAgo).toISOString();
+
+  it('"Prices updated {date}" + "Refresh prices" POSTs the chosen category, then re-reads the table', async () => {
+    body = gapBody({ rows: [gapRow({ fetchedAt: at(3 * 3_600_000) }), gapRow({ id: '2', fetchedAt: at(5 * 3_600_000) })] });
+    const refreshMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const u = String(input);
+      if (u === '/api/research/price-gap/refresh') {
+        return new Response(JSON.stringify({ data: { category: 'cezve-x-c1', refreshed: true, updatedAt: new Date().toISOString() } }), { status: 200 });
+      }
+      return fetchMock(input, init);
+    });
+    vi.stubGlobal('fetch', refreshMock);
+    renderUi(<PriceGap />);
+    await waitFor(() => expect(screen.getByTestId('price-gap-updated')).toBeTruthy());
+    expect(screen.getByTestId('price-gap-updated').textContent).toMatch(/^Prices updated /);
+    const reads = () => refreshMock.mock.calls.filter(([u]) => String(u).startsWith('/api/research/price-gap?')).length;
+    const before = reads();
+    fireEvent.click(screen.getByTestId('price-gap-refresh'));
+    await waitFor(() => expect(refreshMock.mock.calls.some(([u]) => String(u) === '/api/research/price-gap/refresh')).toBe(true));
+    const [, init] = refreshMock.mock.calls.find(([u]) => String(u) === '/api/research/price-gap/refresh')!;
+    expect(init?.method).toBe('POST');
+    expect(JSON.parse(String(init?.body))).toEqual({ cat: 'cezve-x-c1' });
+    await waitFor(() => expect(reads()).toBeGreaterThan(before));
+  });
+
+  it('read less than an hour ago: the button is disabled and says when the prices were updated', async () => {
+    body = gapBody({ rows: [gapRow({ fetchedAt: at(10 * 60_000) })] });
+    renderUi(<PriceGap />);
+    await waitFor(() => expect(screen.getByTestId('price-gap-refresh')).toBeTruthy());
+    const btn = screen.getByTestId('price-gap-refresh');
+    expect(btn.hasAttribute('disabled') || btn.getAttribute('aria-disabled') === 'true' || Boolean(btn.querySelector('button[disabled]'))).toBe(true);
+  });
+
+  it('other sources (my products / a link) have no category to refresh', async () => {
+    router.query = { source: 'trendyol', from: 'mine' };
+    body = gapBody({ from: 'mine', category: null });
+    renderUi(<PriceGap />);
+    await waitFor(() => expect(screen.getByTestId('price-gap-toolbar')).toBeTruthy());
+    expect(screen.queryByTestId('price-gap-refresh')).toBeNull();
   });
 });

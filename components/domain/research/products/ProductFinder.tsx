@@ -34,7 +34,6 @@ import { Bone, TableSkeleton } from '@/components/ds/state/Skeletons';
 import { icons } from '@/lib/ds/icons';
 import { neutral } from '@/lib/ds/tokens';
 import { urlField, useUrlState } from '@/lib/ds/useUrlState';
-import { useUiFlag } from '@/lib/ds/uiFlags';
 import { copyText } from '@/lib/hooks/useCopy';
 import { broaderPhrase, isLikelyTurkish } from '@/lib/research/detectQuery';
 import type { ProductsResult, ResearchMkt, TopListing } from '@/lib/research/types';
@@ -47,8 +46,8 @@ import {
   type ProductSort,
 } from '@/lib/research/hooks/useResearchProducts';
 import { contentWords } from '@/lib/etsy/seoRules';
-import { exportToCSV } from '@/components/etsy/research/shared/exportUtils';
-import { prefillHref, writeListingPrefill } from '@/components/etsy/research/shared/listingPrefill';
+import { exportToCSV } from '@/lib/research/exportCsv';
+import { prefillHref, writeListingPrefill } from '@/lib/listings/listingPrefill';
 import { MKT_NAME, ResearchLayout, useResearchMkt } from '../ResearchLayout';
 import { QuestionChips } from '../home/QuestionChips';
 import { rememberSearch } from '../home/recentSearches';
@@ -123,14 +122,9 @@ export function startFromPrefill(row: TopListing, r: ProductsResult) {
   };
 }
 
-/**
- * Pure: where the research prefill (`kx:listingPrefill`, ?prefill=session) is read. The M6 editor route
- * (§3.4 `/app/{mkt}-listings/new?prefill=session`) while its flag is on; otherwise the listings route, which keeps
- * serving the legacy page (and its creator) for `?prefill=session` even with the `listings-*` flag on
- * (lib/listings/legacyHandoff.ts). `listingsOn` is kept for callers; the hand-off no longer depends on it.
- */
-export function prefillRoute(target: 'etsy' | 'ebay', flags: { listingsOn: boolean; editorOn: boolean }): string {
-  return flags.listingsOn && flags.editorOn ? `/app/${target}-listings/new?prefill=session` : prefillHref(target);
+/** Pure: where the research prefill (`kx:listingPrefill`, ?prefill=session) is read: the editor's create route (§3.4). */
+export function prefillRoute(target: 'etsy' | 'ebay'): string {
+  return prefillHref(target);
 }
 
 async function fetchShopCurrency(mkt: 'etsy' | 'ebay'): Promise<string | null> {
@@ -193,10 +187,6 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
   const [stageMode, setStageMode] = React.useState<StageMode | null>(null);
   const [openRow, setOpenRow] = React.useState<TopListing | null>(null);
   const [hint, setHint] = React.useState<QuestionKey | null>(null);
-  const listingsFlags = {
-    etsy: { listingsOn: useUiFlag('listings-etsy'), editorOn: useUiFlag('editor-etsy') },
-    ebay: { listingsOn: useUiFlag('listings-ebay'), editorOn: useUiFlag('editor-ebay') },
-  };
 
   const params = !priceGap && !comparing && q && !amazonBlocked ? { q, mkt, country: url.country, sort: url.sort as ProductSort } : null;
   const result = useResearchProducts(params);
@@ -271,7 +261,7 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
   };
 
   const draftTarget: 'etsy' | 'ebay' = data?.mkt === 'ebay' ? 'ebay' : 'etsy';
-  const draftHref = prefillRoute(draftTarget, listingsFlags[draftTarget]);
+  const draftHref = prefillRoute(draftTarget);
 
   const draftListing = async () => {
     if (!data) return;
@@ -287,7 +277,7 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
   const startFrom = (row: TopListing) => {
     if (!data) return;
     const p = startFromPrefill(row, data);
-    const href = prefillRoute(p.target, listingsFlags[p.target]);
+    const href = prefillRoute(p.target);
     if (!writeListingPrefill(p)) {
       toast.error(t('toast.prefillFailed'), { persist: false });
       return;
@@ -443,7 +433,6 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
         kind="locked"
         icon={icons.research}
         title={t('mkt.amazonIneligible')}
-        action={{ id: 'learn', label: t('mkt.learnHow'), href: '/app/amazon-research' }}
         data-testid="research-amazon-ineligible"
       />
     );

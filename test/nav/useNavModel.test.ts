@@ -31,7 +31,7 @@ const build = (over: Partial<BuildNavModelInput>) =>
 
 const ids = (m: ReturnType<typeof buildNavModel>) => m.groups.flatMap((g) => g.items.map((i) => i.id));
 
-const ALWAYS = ['home', 'orders', 'research', 'finance', 'notifications', 'settings', 'help'];
+const ALWAYS = ['home', 'orders', 'research', 'notifications', 'settings', 'help'];
 
 describe('gating parity with legacy AppLayout (6 fixtures)', () => {
   it('1. unknown, no cache: every gated row is shown, no Connect CTA', () => {
@@ -39,7 +39,7 @@ describe('gating parity with legacy AppLayout (6 fixtures)', () => {
     expect(ids(m)).toEqual([
       'home', 'orders', 'messages',
       'listings-etsy', 'listings-ebay', 'listings-trendyol', 'listings-wix', 'listings-shopify', 'stock-sync',
-      'research', 'finance',
+      'research',
       'notifications', 'settings', 'help',
     ]);
     expect(m.showConnectCta).toBe(false);
@@ -67,7 +67,7 @@ describe('gating parity with legacy AppLayout (6 fixtures)', () => {
     expect(ids(m)).toEqual([
       'home', 'orders',
       'listings-etsy', 'listings-ebay', 'stock-sync', 'connect-store',
-      'research', 'finance',
+      'research',
       'notifications', 'settings', 'help',
     ]);
     expect(m.showConnectCta).toBe(true);
@@ -144,8 +144,8 @@ describe('active row and breadcrumbs', () => {
     ['/app/etsy-listings/123', 'listings-etsy'],
     ['/app/etsy-listings/bulk?ids=1,2', 'listings-etsy'],
     ['/app/etsy-aktivite', 'listings-etsy'],
-    ['/app/ebay-research', 'research'],
-    ['/app/amazon-research', 'research'],
+    ['/app/research', 'research'],
+    ['/app/research/shops?mkt=ebay', 'research'],
     ['/faturalar', 'settings'],
     ['/ayarlar?tab=billing', 'settings'],
     ['/app/entegrasyonlar-ve-rehberler', 'help'],
@@ -244,7 +244,7 @@ describe('listingsHref and mobile tabs', () => {
 });
 
 describe('g-shortcuts and palette destinations', () => {
-  it('g map: h o l m r f s, unique, only visible destinations', () => {
+  it('g map: h o l m r s, unique, only visible destinations', () => {
     const m = build({ connections: conns(['etsy', 'wix']) });
     const keys = m.goShortcuts.map((g) => g.key);
     expect(new Set(keys).size).toBe(keys.length);
@@ -253,7 +253,6 @@ describe('g-shortcuts and palette destinations', () => {
       o: '/app/labels',
       m: '/app/mesajlar',
       r: '/app/research',
-      f: '/app/financials',
       s: '/ayarlar',
       l: '/app/etsy-listings',
     });
@@ -302,16 +301,10 @@ describe('path matching', () => {
   });
 });
 
-describe('reports flag (M9: Home is the Reports overview)', () => {
-  it('flag off: the legacy Finance row stays and Reports tabs are not destinations', () => {
-    const m = build({ path: '/app/analytics' });
-    expect(ids(m)).toContain('finance');
-    expect(m.destinations.map((d) => d.id)).not.toContain('reports-profit');
-  });
-
-  it('flag on: no Finance row, no Reports row, `g f` gone, Home active on every Reports tab', () => {
+describe('Reports (M9: Home is the Reports overview)', () => {
+  it('no Finance row, no Reports row, `g f` gone, Home active on every Reports tab', () => {
     for (const path of ['/app/analytics', '/app/reports', '/app/reports/profit', '/app/reports/payouts?mp=ebay', '/app/reports/transactions']) {
-      const m = build({ path, reportsV2: true });
+      const m = build({ path });
       expect(ids(m)).not.toContain('finance');
       expect(ids(m)).not.toContain('reports');
       expect(m.activeId, path).toBe('home');
@@ -320,8 +313,8 @@ describe('reports flag (M9: Home is the Reports overview)', () => {
     }
   });
 
-  it('flag on: Profit/Payouts/Transactions are ⌘K destinations and crumbs under Home (hidden for shopify_free)', () => {
-    const m = build({ path: '/app/reports/profit', reportsV2: true, billingProvider: 'stripe' });
+  it('Profit/Payouts/Transactions are ⌘K destinations and crumbs under Home (hidden for shopify_free)', () => {
+    const m = build({ path: '/app/reports/profit', billingProvider: 'stripe' });
     const dest = m.destinations.filter((d) => d.id.startsWith('reports-'));
     expect(dest.map((d) => [d.id, d.href, d.label])).toEqual([
       ['reports-profit', '/app/reports/profit', 'nav.items.reportsProfit'],
@@ -329,7 +322,7 @@ describe('reports flag (M9: Home is the Reports overview)', () => {
       ['reports-transactions', '/app/reports/transactions', 'nav.items.reportsTransactions'],
     ]);
     expect(m.breadcrumbs.map((c) => c.label)).toEqual(['nav.items.home', 'reports.tabs.profit']);
-    const free = build({ path: '/app/reports', reportsV2: true, billingProvider: 'shopify_free' });
+    const free = build({ path: '/app/reports', billingProvider: 'shopify_free' });
     expect(free.destinations.some((d) => d.id.startsWith('reports-'))).toBe(false);
   });
 });

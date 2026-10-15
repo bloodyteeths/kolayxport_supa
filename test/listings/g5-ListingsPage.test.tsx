@@ -267,8 +267,7 @@ describe('ListingsPage (Etsy, desktop)', () => {
     await waitFor(() => expect(adapter.send).toHaveBeenCalledWith(['d1']));
   });
 
-  it('editor-etsy on: "Open editor" goes to the editor route and writes kx:editorNav for ‹ › and Back (M6)', async () => {
-    window.localStorage.setItem('kx-ui-override', 'editor-etsy');
+  it('"Open editor" goes to the editor route and writes kx:editorNav for ‹ › and Back (M6)', async () => {
     window.sessionStorage.removeItem('kx:editorNav');
     try {
       router.query = { open: '1' };
@@ -281,7 +280,6 @@ describe('ListingsPage (Etsy, desktop)', () => {
       expect(nav?.ids).toContain('1');
       expect(String(nav?.query ?? '')).not.toContain('open=');
     } finally {
-      window.localStorage.removeItem('kx-ui-override');
       window.sessionStorage.removeItem('kx:editorNav');
     }
   });

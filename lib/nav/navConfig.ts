@@ -21,15 +21,15 @@
 import type { IconKey } from '@/lib/ds/icons';
 import type { MarketplaceKey } from '@/components/ds/data/types';
 
-/** Research hub landing (flipped by the R1 PR, shell-nav §2.1). With the `research` flag off, /app/research forwards to the legacy page (ResearchRouteGate). */
+/** Research hub landing (shell-nav §2.1). The old research routes redirect into the hub (lib/research/legacyRoutes.ts). */
 export const RESEARCH_HOME = '/app/research';
 
 /**
  * Reports hub landing. `null` = no Reports row. M9 (integrator) keeps it `null`: founder decision "analytics is Home"
- * makes Home the Reports overview (the Sales tab), so a second "Reports" row would point at the same page. With the
- * `reports` flag on, `buildNavModel({ reportsV2: true })` drops the legacy "Finance" row, makes the Home row active on
- * every `/app/reports/*` tab (and the legacy `/app/financials` redirect), and adds `REPORTS_EXTRA_DESTINATIONS` to ⌘K
- * (finance-analytics §0.2 A1 adapted: one nav item for the whole Reports area, and it is Home).
+ * makes Home the Reports overview (the Sales tab), so a second "Reports" row would point at the same page. The Home
+ * row is active on every `/app/reports/*` tab, and `REPORTS_EXTRA_DESTINATIONS` are ⌘K destinations (the old
+ * `/app/financials` URL redirects to Profit; finance-analytics §0.2 A1 adapted: one nav item for the whole Reports
+ * area, and it is Home).
  */
 export const REPORTS_HOME: string | null = null;
 
@@ -61,7 +61,6 @@ export type NavItemId =
   | 'connect-store'
   | 'research'
   | 'reports'
-  | 'finance'
   | 'notifications'
   | 'settings'
   | 'help';
@@ -163,8 +162,8 @@ export const NAV_CONFIG: readonly NavGroupConfig[] = [
         href: HOME_HREF,
         icon: 'overview',
         gKey: 'h',
-        // `/app` itself redirects to Home.
-        match: ['/app', HOME_HREF, `${HOME_HREF}/*`],
+        // `/app` itself redirects to Home; Home is the Reports overview.
+        match: ['/app', HOME_HREF, `${HOME_HREF}/*`, '/app/reports', '/app/reports/*'],
       },
       {
         id: 'orders',
@@ -225,14 +224,7 @@ export const NAV_CONFIG: readonly NavGroupConfig[] = [
         href: RESEARCH_HOME,
         icon: 'research',
         gKey: 'r',
-        match: [
-          '/app/research',
-          '/app/research/*',
-          '/app/etsy-research',
-          '/app/ebay-research',
-          '/app/trendyol-arastirma',
-          '/app/amazon-research',
-        ],
+        match: ['/app/research', '/app/research/*'],
       },
       ...(REPORTS_HOME
         ? [
@@ -246,14 +238,6 @@ export const NAV_CONFIG: readonly NavGroupConfig[] = [
             } satisfies NavItemConfig,
           ]
         : []),
-      {
-        id: 'finance',
-        labelKey: 'nav.items.finance',
-        href: '/app/financials',
-        icon: 'finance',
-        gKey: 'f',
-        match: ['/app/financials'],
-      },
     ],
   },
   {
@@ -319,8 +303,8 @@ export const NAV_EXTRA_DESTINATIONS: readonly NavExtraDestination[] = [
 ];
 
 /**
- * Reports › Profit / Payouts / Transactions as ⌘K "Go to" entries and breadcrumbs under Home, used only with the
- * `reports` flag on (finance-analytics §10 F "⌘K tab commands"). They are the `financials` Pro feature: hidden for
+ * Reports › Profit / Payouts / Transactions as ⌘K "Go to" entries and breadcrumbs under Home (finance-analytics §10 F
+ * "⌘K tab commands"). They are the `financials` Pro feature: hidden for
  * Shopify-free accounts (pro-gating §2 neutral rule); Stripe accounts without the feature reach the locked tab.
  */
 export const REPORTS_EXTRA_DESTINATIONS: readonly NavExtraDestination[] = [
@@ -355,17 +339,6 @@ export const REPORTS_EXTRA_DESTINATIONS: readonly NavExtraDestination[] = [
     hideForShopifyFree: true,
   },
 ];
-
-/** Nav config with the `reports` flag applied: no Finance row; Home also matches the Reports area. Pure. */
-export function navConfigFor(opts: { reportsV2?: boolean } = {}): readonly NavGroupConfig[] {
-  if (!opts.reportsV2) return NAV_CONFIG;
-  return NAV_CONFIG.map((g) => ({
-    ...g,
-    items: g.items
-      .filter((i) => i.id !== 'finance')
-      .map((i) => (i.id === 'home' ? { ...i, match: [...i.match, '/app/reports', '/app/reports/*'] } : i)),
-  }));
-}
 
 /** `g l` target id: resolved to `listingsHref` at runtime (first visible listing row). */
 export const G_LISTINGS_KEY = 'l';

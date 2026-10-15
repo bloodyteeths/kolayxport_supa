@@ -167,7 +167,8 @@ export function touchesStock(patch: CatalogFieldPatch): boolean {
 // Queued actions
 // ---------------------------------------------------------------------------
 
-export type CatalogQueuedActionType = 'archive' | 'delete' | 'create';
+/** `unarchive` (Trendyol) restores an archived product; it is not a removal and rides alone like `archive`. */
+export type CatalogQueuedActionType = 'archive' | 'unarchive' | 'delete' | 'create';
 export type CatalogQueuedAction = {
   type: CatalogQueuedActionType;
   queuedAt: string;
@@ -176,7 +177,7 @@ export type CatalogQueuedAction = {
   payload?: Record<string, unknown>;
 };
 export const ALLOWED_ACTIONS: Record<CatalogMarketplace, CatalogQueuedActionType[]> = {
-  trendyol: ['archive', 'create'],
+  trendyol: ['archive', 'unarchive', 'create'],
   wix: ['delete', 'create'],
   shopify: ['delete', 'create'],
 };

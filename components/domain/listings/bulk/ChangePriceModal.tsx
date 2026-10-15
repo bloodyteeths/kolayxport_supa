@@ -1,6 +1,9 @@
 // components/domain/listings/bulk/ChangePriceModal.tsx — listings-grid §6.3 "Change price" (Modal sm, 3 fields).
 // Mode · Value · Round to. Footer preview "24 listings · $38.00 → $41.80 (example)". Primary STAGES drafts
 // ("Stage 24 price changes"); listings whose price can't be edited inline (variations) are skipped and counted.
+// Trendyol (`currentListPrice` given): the list price moves with the sale price (legacy TrendyolBulkOpsBar: same
+// formula on both), and never ends below the new sale price (Trendyol rejects sale > list). "Set to" keeps the list
+// price unless it would fall below the new sale price. The preview shows both.
 import * as React from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -9,6 +12,8 @@ import { FormField } from '@/components/ds/inputs/FormField';
 import { Select } from '@/components/ds/inputs/Select';
 import { MoneyField } from '@/components/ds/inputs/MoneyField';
 import { NumberField } from '@/components/ds/inputs/NumberField';
+import { TextField } from '@/components/ds/inputs/TextField';
+import { activeMatch, type VariationMatch } from '@/lib/bulk/variationPriceOps';
 import { neutral } from '@/lib/ds/tokens';
 import type { ListingRow, StagePatch } from '@/lib/listings/types';
 import type { ListingsT } from '../columns';
@@ -57,8 +62,25 @@ export type ChangePriceModalProps = {
   currentPrice: (row: ListingRow) => number | null;
   formatMoney: (amount: number, currency: string) => string;
   onStage: (patches: Array<{ id: string; patch: StagePatch }>) => Promise<{ ok: string[]; failed: string[] }>;
+  /** Trendyol: current list price (draft overlay first). Given → the list price is staged too. */
+  currentListPrice?: (row: ListingRow) => number | null;
+  /**
+   * Etsy: listings with variations are not skipped; the same change is applied to every variation's price and
+   * staged as the listing's inventory (lib/bulk/variationPriceOps.ts). Omitted → they are skipped and counted.
+   */
+  onStageVariations?: (rows: ListingRow[], op: { mode: PriceMode; value: number; round: PriceRound; match?: VariationMatch | null }) => Promise<void>;
   t: ListingsT;
 };
+
+/** New Trendyol list price next to a new sale price (pure). Null = leave the list price as it is. */
+export function computeNewListPrice(currentList: number | null, newSale: number, mode: PriceMode, value: number, round: PriceRound): number | null {
+  if (currentList === null || !Number.isFinite(currentList) || currentList <= 0) return null;
+  const moved = mode === 'set' ? currentList : computeNewPrice(currentList, mode, value, round);
+  const next = Math.max(moved ?? currentList, newSale);
+  return next === currentList ? null : Math.round(next * 100) / 100;
+}
+
+export type PricePlanItem = { id: string; patch: StagePatch; from: number; to: number; listFrom?: number; listTo?: number };
 
 export function planPriceChanges(
   rows: ListingRow[],
@@ -67,8 +89,9 @@ export function planPriceChanges(
   value: number | null,
   round: PriceRound,
   priceMin?: number,
-): { patches: Array<{ id: string; patch: StagePatch; from: number; to: number }>; skippedVariations: number; skippedInvalid: number } {
-  const patches: Array<{ id: string; patch: StagePatch; from: number; to: number }> = [];
+  currentListPrice?: (row: ListingRow) => number | null,
+): { patches: PricePlanItem[]; skippedVariations: number; skippedInvalid: number } {
+  const patches: PricePlanItem[] = [];
   let skippedVariations = 0;
   let skippedInvalid = 0;
   for (const r of rows) {
@@ -82,33 +105,58 @@ export function planPriceChanges(
       skippedInvalid += 1;
       continue;
     }
-    if (next !== cur) patches.push({ id: r.id, patch: { price: next }, from: cur as number, to: next });
+    const listFrom = currentListPrice ? currentListPrice(r) : null;
+    const listTo = currentListPrice && value !== null ? computeNewListPrice(listFrom, next, mode, value, round) : null;
+    if (next === cur && listTo === null) continue;
+    const item: PricePlanItem = { id: r.id, patch: { price: next }, from: cur as number, to: next };
+    if (listTo !== null && listFrom !== null) {
+      item.patch.listPrice = listTo;
+      item.listFrom = listFrom;
+      item.listTo = listTo;
+    }
+    patches.push(item);
   }
   return { patches, skippedVariations, skippedInvalid };
 }
 
-export function ChangePriceModal({ open, onClose, rows, currency, priceMin, currentPrice, formatMoney, onStage, t }: ChangePriceModalProps) {
+export function ChangePriceModal({ open, onClose, rows, currency, priceMin, currentPrice, currentListPrice, formatMoney, onStage, onStageVariations, t }: ChangePriceModalProps) {
   const [mode, setMode] = React.useState<PriceMode>('incPct');
   const [value, setValue] = React.useState<number | null>(null);
   const [round, setRound] = React.useState<PriceRound>('none');
   const [busy, setBusy] = React.useState(false);
+  // "Only variations where <property> is <value>" (legacy Variation Price dialog): limits the change to matching
+  // variations, and leaves listings without variations alone.
+  const [matchProperty, setMatchProperty] = React.useState('');
+  const [matchValue, setMatchValue] = React.useState('');
 
   React.useEffect(() => {
     if (open) {
       setValue(null);
       setBusy(false);
+      setMatchProperty('');
+      setMatchValue('');
     }
   }, [open]);
 
-  const plan = React.useMemo(() => planPriceChanges(rows, currentPrice, mode, value, round, priceMin), [rows, currentPrice, mode, value, round, priceMin]);
+  const plan = React.useMemo(
+    () => planPriceChanges(rows, currentPrice, mode, value, round, priceMin, currentListPrice),
+    [rows, currentPrice, mode, value, round, priceMin, currentListPrice],
+  );
   const example = plan.patches[0];
   const isMoney = mode === 'set' || mode === 'incAmt' || mode === 'decAmt';
+  // Listings with variations (price per variation): staged as inventory when the marketplace supports it.
+  const variationRows = React.useMemo(() => (onStageVariations ? rows.filter((r) => !r.editable.price) : []), [rows, onStageVariations]);
+  const variationCount = value !== null ? variationRows.length : 0;
+  const match = variationRows.length > 0 ? activeMatch({ property: matchProperty, value: matchValue }) : null;
+  const plainPatches = match ? [] : plan.patches;
+  const stageCount = plainPatches.length + variationCount;
 
   const stage = async () => {
-    if (!plan.patches.length || busy) return;
+    if (!stageCount || busy) return;
     setBusy(true);
     try {
-      await onStage(plan.patches.map(({ id, patch }) => ({ id, patch })));
+      if (plainPatches.length) await onStage(plainPatches.map(({ id, patch }) => ({ id, patch })));
+      if (variationCount && value !== null && onStageVariations) await onStageVariations(variationRows, { mode, value, round, ...(match ? { match } : {}) });
       onClose();
     } finally {
       setBusy(false);
@@ -123,11 +171,11 @@ export function ChangePriceModal({ open, onClose, rows, currency, priceMin, curr
       title={t('listings.bulk.changePrice')}
       primary={{
         id: 'stagePrice',
-        label: t('listings.price.stage', { count: plan.patches.length }),
+        label: t('listings.price.stage', { count: stageCount }),
         onClick: () => void stage(),
         loading: busy,
-        disabled: plan.patches.length === 0,
-        disabledReason: plan.patches.length === 0 ? t('listings.price.nothingToStage') : undefined,
+        disabled: stageCount === 0,
+        disabledReason: stageCount === 0 ? t('listings.price.nothingToStage') : undefined,
       }}
       data-testid="listings-change-price"
     >
@@ -168,7 +216,38 @@ export function ChangePriceModal({ open, onClose, rows, currency, priceMin, curr
               })
             : t('listings.price.previewEmpty', { count: rows.length })}
         </Typography>
-        {plan.skippedVariations > 0 ? (
+        {currentListPrice && example ? (
+          <Box component="ul" sx={{ m: 0, p: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '2px' }} data-testid="listings-change-price-both">
+            <Typography component="li" variant="caption" sx={{ color: neutral[600] }}>
+              {t('listings.bulk.price.salePrice', { from: formatMoney(example.from, currency), to: formatMoney(example.to, currency) })}
+            </Typography>
+            {example.listFrom !== undefined && example.listTo !== undefined ? (
+              <Typography component="li" variant="caption" sx={{ color: neutral[600] }}>
+                {t('listings.bulk.price.listPrice', { from: formatMoney(example.listFrom, currency), to: formatMoney(example.listTo, currency) })}
+              </Typography>
+            ) : null}
+          </Box>
+        ) : null}
+        {variationRows.length > 0 ? (
+          <>
+            <Typography variant="caption" sx={{ color: neutral[600] }} data-testid="listings-change-price-variations">
+              {t('listings.price.variations', { count: variationRows.length })}
+            </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: '8px' }}>
+              <FormField label={t('listings.price.matchProperty')} helper={t('listings.price.matchHelp')}>
+                <TextField value={matchProperty} onChange={setMatchProperty} placeholder={t('listings.price.matchPropertyPlaceholder')} data-testid="listings-change-price-match-property" />
+              </FormField>
+              <FormField label={t('listings.price.matchValue')}>
+                <TextField value={matchValue} onChange={setMatchValue} placeholder={t('listings.price.matchValuePlaceholder')} data-testid="listings-change-price-match-value" />
+              </FormField>
+            </Box>
+            {match && plan.patches.length > 0 ? (
+              <Typography variant="caption" sx={{ color: neutral[600] }}>
+                {t('listings.price.matchSkipsPlain', { count: plan.patches.length })}
+              </Typography>
+            ) : null}
+          </>
+        ) : plan.skippedVariations > 0 ? (
           <Typography variant="caption" sx={{ color: neutral[600] }}>
             {t('listings.price.skippedVariations', { count: plan.skippedVariations })}
           </Typography>

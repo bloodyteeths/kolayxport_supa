@@ -62,7 +62,7 @@ export function duplicateActionsFor(r: ListingRow, keys: readonly DuplicateActio
   });
 }
 
-const STAGED_ACTION: Record<DuplicateActionKey, StagedAction['type']> = { deactivate: 'deactivate', hideInStore: 'hide', archive: 'archive', delete: 'delete' };
+const STAGED_ACTION: Record<DuplicateActionKey, Exclude<StagedAction['type'], 'copy'>> = { deactivate: 'deactivate', hideInStore: 'hide', archive: 'archive', delete: 'delete' };
 
 type Pending = { row: ListingRow; action: 'delete' | 'archive' } | null;
 
@@ -75,7 +75,7 @@ export function DuplicatesPanel({ open, onClose, ctx }: ListingsToolPanelProps) 
   const url = open && ctx.store ? `/api/listings/duplicates?${storeSearchParams(ctx).toString()}` : null;
   const { data, error, isLoading, mutate } = useSWR(url, (u: string) => fetchToolJson<DuplicatesResponse>(u), { revalidateOnFocus: false });
 
-  const stage = async (row: ListingRow, action: StagedAction['type']) => {
+  const stage = async (row: ListingRow, action: Exclude<StagedAction['type'], 'copy'>) => {
     setBusyId(row.id);
     try {
       await ctx.adapter.stage(row.id, {}, { queuedActions: [{ type: action }] });

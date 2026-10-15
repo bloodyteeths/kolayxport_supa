@@ -13,7 +13,7 @@ import { Metric } from '@/components/ds/research/Metric';
 import { neutral as n } from '@/lib/ds/tokens';
 import type { Guarded } from '@/lib/research/types';
 import { TRACKED_ITEMS_KEY, type WatchSummary } from '@/lib/research/hooks/useWatches';
-import { cardMeta, cardSubtitle, deltaText, newCountText, salesText, soldAllTime, trackedItems, usable, type ShopT } from './shopModel';
+import { cardMeta, cardSubtitle, deltaText, itemLine, newCountText, salesText, soldAllTime, trackedItems, usable, type ShopT } from './shopModel';
 
 const guardOf = (g: Guarded<number>) => ({ ok: g.guard.ok, reasonKey: g.guard.reasonKey, reasonParams: g.guard.reasonParams });
 
@@ -78,11 +78,22 @@ export function shopColumns({ t, fmt }: { t: ShopT; fmt: DsFormat }): Column<Wat
       header: t('research.shops.col.shop'),
       minWidth: 200,
       mobile: 'title',
-      render: (r) => (
-        <Typography variant="dense" component="span" sx={{ color: n[900], display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.label}>
-          {r.label}
-        </Typography>
-      ),
+      render: (r) => {
+        // eBay item rows: the item's own price and lifetime sold count under its title.
+        const line = itemLine(r, t, fmt);
+        return (
+          <Box component="span" sx={{ display: 'block', minWidth: 0 }}>
+            <Typography variant="dense" component="span" sx={{ color: n[900], display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.label}>
+              {r.label}
+            </Typography>
+            {line ? (
+              <Typography variant="caption" component="span" sx={{ color: n[500], display: 'block' }} data-testid="shop-item-line">
+                {line}
+              </Typography>
+            ) : null}
+          </Box>
+        );
+      },
       mobileRender: (r) => r.label,
     },
     {

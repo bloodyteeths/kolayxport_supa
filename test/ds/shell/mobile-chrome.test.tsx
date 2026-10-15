@@ -316,13 +316,13 @@ describe.each(LOCALES)('MoreSheet (%s)', (locale) => {
   });
 
   it('the active row has aria-current="page"; tapping a row closes the sheet', () => {
-    const nav = model(locale, { path: '/app/financials' });
+    const nav = model(locale, { path: '/app/nasil-kullanirim' });
     useShellStore.setState({ moreOpen: true });
     renderIntl(<MoreSheet groups={nav.groups} tabs={nav.tabs} />, locale);
-    const finance = screen.getByTestId('more-row-finance');
-    expect(finance.getAttribute('aria-current')).toBe('page');
-    expect(screen.getByTestId('more-row-help').getAttribute('aria-current')).toBeNull();
-    fireEvent.click(finance);
+    const help = screen.getByTestId('more-row-help');
+    expect(help.getAttribute('aria-current')).toBe('page');
+    expect(screen.getByTestId('more-row-settings').getAttribute('aria-current')).toBeNull();
+    fireEvent.click(help);
     expect(useShellStore.getState().moreOpen).toBe(false);
   });
 

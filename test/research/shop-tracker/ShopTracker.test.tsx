@@ -14,9 +14,10 @@ import en from '@/messages/en.json';
 import tr from '@/messages/tr.json';
 import { __resetUrlStateForTests } from '@/lib/ds/useUrlState';
 import { __resetShortcutsForTests } from '@/lib/ds/useShortcuts';
-import { LISTING_PREFILL_KEY } from '@/components/etsy/research/shared/listingPrefill';
+import { LISTING_PREFILL_KEY } from '@/lib/listings/listingPrefill';
 import { setViewport } from '../../ds/m1e-helpers';
 import { SHOPS_EN, SHOPS_TR } from './messages';
+import { PORT_EN, PORT_TR } from '../legacy-port-messages';
 import { rawRow } from './fixtures';
 
 const router = {
@@ -57,7 +58,10 @@ function deepMerge(a: Obj, b: Obj): Obj {
   }
   return out;
 }
-const MESSAGES = { en: deepMerge(en as Obj, SHOPS_EN as Obj), tr: deepMerge(tr as Obj, SHOPS_TR as Obj) };
+const MESSAGES = {
+  en: deepMerge(deepMerge(en as Obj, SHOPS_EN as Obj), PORT_EN as unknown as Obj),
+  tr: deepMerge(deepMerge(tr as Obj, SHOPS_TR as Obj), PORT_TR as unknown as Obj),
+};
 const NOW = new Date('2026-10-15T12:00:00Z');
 
 const SOURCE = { source: 'research.shops.col.shop', fetchedAt: '2026-10-15T06:00:00Z', kind: 'measured' };
@@ -341,21 +345,6 @@ describe('Watch a shop: quota / availability apply to Etsy only (review R3-B)', 
 });
 
 describe('Shop panel', () => {
-  it('with the editor flag off (NEXT_PUBLIC_UI_V2=none) "Draft similar" opens the legacy listings creator', async () => {
-    vi.stubEnv('NEXT_PUBLIC_UI_V2', 'none');
-    try {
-      router.query = { mkt: 'etsy', open: 'w1' };
-      const { navigate } = renderTracker();
-      const panel = await screen.findByTestId('shop-panel');
-      await within(panel).findByText('Personalized Recipe Box, Wooden Kitchen Gift');
-      fireEvent.click(within(panel).getByTestId('shop-draft-similar'));
-      expect(navigate).toHaveBeenCalledWith('/app/etsy-listings?prefill=session', undefined);
-      noMarketplaceWrites();
-    } finally {
-      vi.unstubAllEnvs();
-    }
-  });
-
   it('shows the detail, drafts a similar listing without their title, saves alerts', async () => {
     router.query = { mkt: 'etsy', open: 'w1' };
     const { navigate } = renderTracker();
@@ -367,7 +356,6 @@ describe('Shop panel', () => {
     expect(within(panel).getByText('kitchen keepsake')).toBeTruthy();
 
     fireEvent.click(within(panel).getByTestId('shop-draft-similar'));
-    // editor-etsy is on by default (M10) → the new full-page creator.
     expect(navigate).toHaveBeenCalledWith('/app/etsy-listings/new?prefill=session', undefined);
     const prefill = JSON.parse(window.sessionStorage.getItem(LISTING_PREFILL_KEY) ?? '{}');
     expect(prefill.title).toBeUndefined();
@@ -396,5 +384,56 @@ describe('Shop panel', () => {
     expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
     fireEvent.click(within(confirm).getByRole('button', { name: 'Stop watching' }));
     await waitFor(() => expect(calls.some((c) => c.method === 'DELETE' && c.url === '/api/research/watches/w1')).toBe(true));
+  });
+});
+
+describe('Watch an eBay item (legacy eBay Product tracker port)', () => {
+  const item = (over: Record<string, unknown> = {}) =>
+    rawRow({
+      id: 'ebayItem.tp1',
+      type: 'ebayItem',
+      marketplace: 'ebay',
+      refId: '123456789012',
+      label: 'Engraved Walnut Box',
+      source: 'ebayTrackedProduct',
+      url: 'https://www.ebay.com/itm/123456789012',
+      capabilities: { alerts: false, remove: true },
+      item: { price: 24.9, currency: 'USD', soldAllTime: 312, condition: 'New', seller: 'engrave_us' },
+      ...over,
+    });
+
+  it('the eBay hub lists the item with its price · sold line; the modal POSTs an ebayItem watch and says the first reading is today', async () => {
+    router.query = { mkt: 'ebay' };
+    listBody = listOf([item()]);
+    postResponse = () =>
+      new Response(JSON.stringify({ data: { watch: item({ id: 'ebayItem.tp2', refId: '222222222222', label: 'Copper Pot', snapshots: { count: 1 } }), quota: { used: 0, limit: 10 }, created: true } }), { status: 201 });
+    renderTracker();
+    await screen.findByText('Engraved Walnut Box');
+    expect(screen.getByTestId('shop-item-line').textContent).toBe('$24.90 · 312 sold (all time)');
+    fireEvent.click(screen.getAllByRole('button', { name: /Watch a shop/ })[0]);
+    const modal = await screen.findByTestId('shops-watch-modal');
+    expect(within(modal).getByText('Paste an eBay seller link or name, or an eBay item link to follow its price and sales')).toBeTruthy();
+    const input = within(modal).getByTestId('shops-watch-input').querySelector('input') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'https://www.ebay.com/itm/copper-pot/222222222222' } });
+    expect(within(modal).getByText(/^eBay item · /)).toBeTruthy();
+    fireEvent.click(within(modal).getByRole('button', { name: 'Watch' }));
+    await waitFor(() => expect(calls.some((c) => c.method === 'POST')).toBe(true));
+    expect(calls.find((c) => c.method === 'POST')!.body).toMatchObject({ type: 'ebayItem', marketplace: 'ebay', refId: '222222222222' });
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
+    expect(String(toastSuccess.mock.calls[0][0])).toContain('First reading today');
+    noMarketplaceWrites();
+  });
+
+  it('the item panel shows the price line and no alert switches', async () => {
+    router.query = { mkt: 'ebay', open: 'ebayItem.tp1' };
+    listBody = listOf([item()]);
+    const prices = Array.from({ length: 4 }, (_, i) => ({ date: `2026-10-1${2 + i}`, value: 20 + i }));
+    detailBody = { data: { watch: item(), sales: [], prices, newListings: [], fastest: [], tagGap: [] }, source: SOURCE };
+    renderTracker();
+    const panel = await screen.findByTestId('shop-panel');
+    await within(panel).findByTestId('shop-item-price-chart');
+    expect(within(panel).getAllByText('Price, 30 days').length).toBeGreaterThan(0);
+    expect(within(panel).queryByTestId('shop-alerts')).toBeNull();
+    expect(within(panel).queryByTestId('shop-new-list')).toBeNull();
   });
 });

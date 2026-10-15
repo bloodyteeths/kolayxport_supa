@@ -90,8 +90,8 @@ describe('GET /api/listings/export', () => {
     expect(r.headers['Content-Disposition']).toMatch(/filename="etsy-listings-belle-couture-gifts-\d{4}-\d{2}-\d{2}\.csv"/);
     expect(r.headers['X-Export-Rows']).toBe('2');
     const lines = String(r.body).replace(/^﻿/, '').trim().split('\r\n');
-    expect(lines[0]).toBe('id,title,price,currency,quantity,status,sku,tags,health,url,section,views,favorites,description');
-    expect(lines[1]).toBe('1001,Box 1,10,USD,1,active,,"gift, box",,https://www.etsy.com/listing/1001,,0,0,Desc 1');
+    expect(lines[0]).toBe('id,title,price,currency,quantity,status,sku,tags,health,url,section,views,favorites,materials,description');
+    expect(lines[1]).toBe('1001,Box 1,10,USD,1,active,,"gift, box",,https://www.etsy.com/listing/1001,,0,0,,Desc 1');
     expect(lines).toHaveLength(3);
   });
   it('guards formula titles and honours ids', async () => {

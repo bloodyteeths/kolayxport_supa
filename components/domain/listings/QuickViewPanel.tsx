@@ -43,7 +43,7 @@ export type QuickViewPanelProps = {
   /** Sends this listing's draft (explicit). */
   onSend: (row: ListingRow) => void;
   onDiscard: (row: ListingRow) => void;
-  /** Null when the full editor is not available (flag off or no route). */
+  /** Null when the full editor is not available (no route). */
   onOpenEditor: ((row: ListingRow) => void) | null;
   /** Opens the editor's conflict review; null without an editor. */
   onReviewDifferences: ((row: ListingRow) => void) | null;

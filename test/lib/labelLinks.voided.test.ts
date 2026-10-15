@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getLatestLabel } from '@/components/labels/labelLinks';
+import { getLatestLabel } from '@/lib/shipping/labelLinks';
 
 describe('getLatestLabel: voided order-level label', () => {
   it('a voided order-level label is no label', () => {

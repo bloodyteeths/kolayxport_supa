@@ -25,11 +25,10 @@ import { useConnections } from '@/lib/hooks/useConnections';
 import { SettingsProvider, useSettings } from '@/lib/hooks/useSettings';
 import { useUnsavedChangesGuard } from '@/lib/hooks/useUnsavedChangesGuard';
 import { useEntitlement } from '@/lib/billing/useEntitlement';
-import BillingPanel from '@/components/settings/BillingPanel';
-import ConnectionsPanel from '@/components/settings/ConnectionsPanel';
-import ApiKeysPanel from '@/components/settings/ApiKeysPanel';
-import SenderProfilePanel from '@/components/settings/SenderProfilePanel';
-import SyncPanel from '@/components/settings/SyncPanel';
+import { BillingPanel } from '@/components/domain/billing/BillingPanel';
+import { ConnectionsSection, CredentialsSection } from '@/components/domain/settings/connections';
+import { SenderForm } from '@/components/domain/settings/sender';
+import { RefreshOverview } from '@/components/domain/settings/refresh';
 import PreferencesPanel from './PreferencesPanel';
 import {
   FOCUS_RING_MS, OAUTH_PARAMS, SETTINGS_NAV_GAP, SETTINGS_NAV_STICKY_TOP, SETTINGS_NAV_WIDTH, SETTINGS_PATH,
@@ -405,17 +404,12 @@ export default function SettingsPage() {
   const content = (() => {
     switch (tab) {
       case 'connections':
-        return <ConnectionsPanel refreshKey={connectionsRefreshKey} />;
+        return <ConnectionsSection refreshKey={connectionsRefreshKey} />;
       case 'apiKeys':
-        return (
-          <ApiKeysPanel
-            integrationSettings={settings.formData.integrationSettings || {}}
-            onChange={(name, value) => settings.handleInputChange('integrationSettings', name, value)}
-          />
-        );
+        return <CredentialsSection />;
       case 'senderProfile':
         return (
-          <SenderProfilePanel
+          <SenderForm
             shipperProfile={settings.formData.shipperProfile || {}}
             shippingSettings={settings.formData.shippingSettings || {}}
             onChangeProfile={(name, value) => settings.handleInputChange('shipperProfile', name, value)}
@@ -431,11 +425,11 @@ export default function SettingsPage() {
           />
         );
       case 'billing':
-        return <BillingPanel subscriptionData={settings.subscriptionData} ready={settings.initialDataLoaded} />;
+        return <BillingPanel />;
       case 'preferences':
         return <PreferencesPanel onDirtyChange={setPreferencesDirty} />;
       case 'syncAdvanced':
-        return <SyncPanel onLastRunFailedChange={setLastRunFailed} />;
+        return <RefreshOverview onLastRunFailedChange={setLastRunFailed} />;
       default:
         return null;
     }

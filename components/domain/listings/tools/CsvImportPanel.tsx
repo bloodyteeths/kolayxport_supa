@@ -7,6 +7,7 @@
 //     Summary "120 rows · 96 listings will change · 3 not found · 2 invalid".
 // Primary "Stage 96 changes" (progress "Staging 40 / 96…"). Resumable: a failed item stays in the queue and the
 // primary re-offers only what is left. Every change is a staged draft; nothing is sent from here.
+// eBay also offers "Create new listings" (EbayCsvCreateSection.tsx): each row becomes a staged create draft.
 //
 // Current values = the export (live) with every open draft overlaid (`fetchOpenDraftRows` + `applyListingRows`),
 // so a row is diffed against the seller's unsent value. Price/qty are staged only for listings whose
@@ -16,6 +17,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
 import { useTranslations } from 'next-intl';
 import { SidePanel } from '@/components/ds/overlay/SidePanel';
+import { SegmentedControl } from '@/components/ds/inputs/SegmentedControl';
 import { Section } from '@/components/ds/page/Section';
 import { Button } from '@/components/ds/inputs/Button';
 import { Select, type SelectOption } from '@/components/ds/inputs/Select';
@@ -57,10 +59,12 @@ import {
   ToolFetchError,
   type ListingsToolPanelProps,
 } from './ToolsMenuItems';
+import { EBAY_CREATE_TEMPLATE, useEbayCsvCreate } from './EbayCsvCreateSection';
 
 type FileState = { name: string; csv: ParsedCsv } | null;
 type FileError = 'tooLarge' | 'notCsv' | 'empty' | 'unreadable' | null;
 type MapValue = ImportField | 'ignore';
+type ImportMode = 'update' | 'create';
 
 const PREVIEW_MAX = 200;
 
@@ -107,6 +111,9 @@ export function CsvImportPanel({ open, onClose, ctx, allowDescription = false }:
   const [dragOver, setDragOver] = useState(false);
   const [staged, setStaged] = useState<Set<string>>(() => new Set());
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [mode, setMode] = useState<ImportMode>('update');
+  const canCreate = ctx.marketplace === 'ebay';
+  const creating = canCreate && mode === 'create';
   // The page keeps this panel mounted and toggles `open`: start fresh on every open (no stale file or plan).
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
@@ -118,11 +125,12 @@ export function CsvImportPanel({ open, onClose, ctx, allowDescription = false }:
       setDragOver(false);
       setStaged(new Set());
       setProgress(null);
+      setMode('update');
     }
   }
 
   const fields = useMemo(() => stageableFields(ctx.marketplace, { description: allowDescription }), [ctx.marketplace, allowDescription]);
-  const idMapped = mapping.includes('id');
+  const idMapped = !creating && mapping.includes('id');
   const descriptionMapped = mapping.includes('description');
 
   // Current values of every listing in the store (for not-found, unchanged and the before → after preview).
@@ -177,12 +185,14 @@ export function CsvImportPanel({ open, onClose, ctx, allowDescription = false }:
     setMap(detectMapping(res.csv.headers, ctx.marketplace, fields));
   };
 
+  const createMode = useEbayCsvCreate({ active: creating && open, csv: file?.csv ?? null, ctx });
+
   const downloadTemplate = () => {
-    const blob = new Blob([importTemplateCsv(ctx.marketplace)], { type: 'text/csv;charset=utf-8' });
+    const blob = new Blob([creating ? EBAY_CREATE_TEMPLATE : importTemplateCsv(ctx.marketplace)], { type: 'text/csv;charset=utf-8' });
     const href = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = href;
-    a.download = `${ctx.marketplace}-listings-template.csv`;
+    a.download = creating ? 'ebay-new-listings-template.csv' : `${ctx.marketplace}-listings-template.csv`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -299,7 +309,9 @@ export function CsvImportPanel({ open, onClose, ctx, allowDescription = false }:
       size="lg"
       title={t('tools.import')}
       primary={
-        plan
+        creating
+          ? createMode.primary
+          : plan
           ? {
               id: 'csv-stage',
               label: t('csv.stage', { count: stageCount }),
@@ -315,6 +327,19 @@ export function CsvImportPanel({ open, onClose, ctx, allowDescription = false }:
       data-testid="listings-tool-import"
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: px(space[6]) }}>
+        {canCreate && (
+          <SegmentedControl<ImportMode>
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: 'update', label: t('csv.modeUpdate') },
+              { value: 'create', label: t('csv.modeCreate') },
+            ]}
+            fullWidth
+            aria-label={t('csv.modeLabel')}
+            data-testid="csv-mode"
+          />
+        )}
         <Section id="csv-file" title={t('csv.stepFile')} headingLevel={3} variant="plain" action={{ id: 'csv-template', label: t('csv.template'), icon: icons.download, onClick: downloadTemplate }}>
           <div
             data-testid="csv-drop"
@@ -365,7 +390,9 @@ export function CsvImportPanel({ open, onClose, ctx, allowDescription = false }:
           )}
         </Section>
 
-        {file && (
+        {creating && createMode.body}
+
+        {file && !creating && (
           <Section id="csv-mapping" title={t('csv.mapping')} headingLevel={3} variant="plain">
             <div style={{ display: 'flex', flexDirection: 'column', gap: px(space[2]) }}>
               {file.csv.headers.map((h, i) => (

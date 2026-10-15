@@ -11,7 +11,6 @@ import {
   effectiveView,
   explorerHref,
   filtersFromUrl,
-  legacyKeywordsHref,
   monthName,
   parseSel,
   planTitleAdd,
@@ -79,10 +78,7 @@ describe('keywordModel', () => {
     expect(rankCell({ now: 34, delta7: 41 })).toEqual({ kind: 'rank', rank: 34, delta: 41 });
   });
 
-  it('hrefs: legacy tool per marketplace, full explorer for a listing', () => {
-    expect(legacyKeywordsHref('etsy')).toBe('/app/etsy-research?tab=research');
-    expect(legacyKeywordsHref('ebay')).toBe('/app/ebay-research?sub=keyword_intelligence');
-    expect(legacyKeywordsHref(undefined)).toBe('/app/etsy-research?tab=research');
+  it('hrefs: full explorer for a listing', () => {
     expect(explorerHref('123', 's1', 'mine')).toBe('/app/research/keywords?listing=123&shop=s1&mkt=etsy&view=mine');
     expect(explorerHref('123')).toBe('/app/research/keywords?listing=123&mkt=etsy');
   });

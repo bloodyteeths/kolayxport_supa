@@ -343,7 +343,8 @@ export async function loadRowSync(
 export type ListingBase = Omit<ListingRow, 'sync'>;
 
 /** Values the export and duplicates tools need that `ListingRow` does not carry. */
-export type ListingExportFields = { sku: string | null; tags: string[]; description: string | null };
+/** `materials`: Etsy only (exported as a `materials` column; Find & replace reads it). */
+export type ListingExportFields = { sku: string | null; tags: string[]; description: string | null; materials?: string[] };
 
 export interface ListingsAdapter {
   marketplace: ListingMarketplace;

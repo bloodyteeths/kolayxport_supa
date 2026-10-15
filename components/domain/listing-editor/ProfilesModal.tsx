@@ -4,11 +4,11 @@
 // engine's setField (dirty markers, autosave stages it), one toast "Applied 'Baby blankets' · Undo". Nothing
 // reaches the marketplace until the seller presses Send (Vela pushes profiles straight to live listings).
 //
-// Storage is the legacy ListingTemplates storage, read and written in the same format so profiles saved in the
-// old drawer show up here and vice versa (components/{etsy,ebay}/ListingTemplates.tsx are import-only; their
-// storage helpers are not exported, so the key + shape are mirrored here):
-//   Etsy  localStorage['etsy_listing_templates'] = ListingTemplate[]
-//   eBay  localStorage['ebay_listing_templates'] = EbayListingTemplate[]
+// Storage keeps the legacy ListingTemplates format (key + shape below), so profiles saved by the old drawers keep
+// working after those files are deleted:
+//   Etsy  localStorage['etsy_listing_templates'] = StoredProfile[]
+//   eBay  localStorage['ebay_listing_templates'] = StoredProfile[]
+// Apply mode also deletes a profile (legacy LoadTemplateDialog delete).
 import { useEffect, useMemo, useState } from 'react';
 import Box from '@mui/material/Box';
 import { useTranslations } from 'next-intl';
@@ -22,8 +22,8 @@ import { useToast } from '@/components/ds/feedback/toast';
 import { useFormatters } from '@/lib/format';
 import { neutral } from '@/lib/ds/tokens';
 import { decodeEntities } from '@/lib/text/decodeEntities';
-import type { ListingTemplate } from '@/components/etsy/ListingTemplates';
-import type { EbayListingTemplate } from '@/components/ebay/ListingTemplates';
+import { Button } from '@/components/ds/inputs/Button';
+import { useConfirm } from '@/components/ds/overlay/ConfirmDialog';
 import { decodeAspects, encodeAspects, toPriceString } from './adapters/ebay';
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -120,8 +120,7 @@ function ebayEditorValue(key: string, v: unknown): unknown {
 }
 
 /**
- * Editor value → the legacy EbayListingTemplate shape (components/ebay/ListingTemplates.tsx), so a profile saved
- * here still opens in the legacy drawer: `price?: number`, `aspects?: Record<string, string[]>`.
+ * Editor value → the stored EbayListingTemplate shape (kept so profiles saved by the old drawer still load): `price?: number`, `aspects?: Record<string, string[]>`.
  */
 function ebayStoredValue(key: string, v: unknown): unknown {
   if (key === 'aspects') {
@@ -236,10 +235,25 @@ export function saveProfile(
   }
 }
 
-// Compile-time check that the mirrored shape stays compatible with the legacy types.
-type _EtsyCompat = ListingTemplate extends { id: string; name: string; createdAt: string; fields: object } ? true : never;
-type _EbayCompat = EbayListingTemplate extends { id: string; name: string; createdAt: string; fields: object } ? true : never;
-export const __profileShapeCompat: [_EtsyCompat, _EbayCompat] = [true, true];
+/** Removes a profile by id. Returns the stored list, or null when storage is unavailable. */
+export function deleteProfile(
+  marketplace: ProfileMarketplace,
+  id: string,
+  storage?: Pick<Storage, 'getItem' | 'setItem'> | null,
+): StoredProfile[] | null {
+  try {
+    const s = storage === undefined ? (typeof window !== 'undefined' ? window.localStorage : null) : storage;
+    if (!s) return null;
+    // Raw entries are kept as stored (names not decoded) so the legacy format round-trips unchanged.
+    const raw = s.getItem(PROFILE_STORAGE_KEY[marketplace]);
+    const list: unknown = raw ? JSON.parse(raw) : [];
+    const next = (Array.isArray(list) ? list : []).filter((p) => !(p && typeof p === 'object' && (p as { id?: unknown }).id === id));
+    s.setItem(PROFILE_STORAGE_KEY[marketplace], JSON.stringify(next));
+    return loadProfiles(marketplace, s);
+  } catch {
+    return null;
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 // Component
@@ -269,6 +283,7 @@ export function ProfilesModal({ open, onClose, mode: modeProp, marketplace, fiel
   const t = useTranslations('listingEditor');
   const fmt = useFormatters();
   const toast = useToast();
+  const confirm = useConfirm();
   const [mode, setMode] = useState(modeProp);
   const [profiles, setProfiles] = useState<StoredProfile[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -325,6 +340,24 @@ export function ProfilesModal({ open, onClose, mode: modeProp, marketplace, fiel
     }
     toast.success(t('profile.saved', { name: trimmed }));
     onClose();
+  };
+
+  const remove = async () => {
+    if (!selected) return;
+    const ok = await confirm({
+      title: t('profile.deleteConfirm', { name: selected.name }),
+      confirmLabel: t('profile.delete'),
+      tone: 'danger',
+    });
+    if (!ok) return;
+    const next = deleteProfile(marketplace, selected.id, storage);
+    if (!next) {
+      toast.error(t('profile.storageFailed'));
+      return;
+    }
+    setProfiles(next);
+    setSelectedId(next[next.length - 1]?.id ?? null);
+    toast.success(t('profile.deleted', { name: selected.name }));
   };
 
   const replaces = mode === 'save' && name.trim() !== '' && profiles.some((p) => p.name.trim().toLowerCase() === name.trim().toLowerCase());
@@ -390,6 +423,13 @@ export function ProfilesModal({ open, onClose, mode: modeProp, marketplace, fiel
             />
           </FormField>
           {selected ? sectionChecks : null}
+          {selected ? (
+            <Box>
+              <Button variant="danger-ghost" size="sm" onClick={() => void remove()} data-testid="le-profile-delete">
+                {t('profile.delete')}
+              </Button>
+            </Box>
+          ) : null}
           <Box sx={{ fontSize: 12, lineHeight: '16px', color: neutral[600] }}>{t('profile.draftOnly')}</Box>
         </Box>
       ) : (

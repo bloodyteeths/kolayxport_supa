@@ -149,12 +149,12 @@ describe('buildDoctorScore', () => {
 
 describe('links (staging and navigation only, never a send)', () => {
   it('builds the editor, explorer, studio, grid and not-sent links', () => {
-    expect(editorHref('etsy', '149', 'S1', true, 'photos')).toBe('/app/etsy-listings/149?shop=S1#photos');
-    expect(editorHref('etsy', '149', 'S1', false)).toBe('/app/etsy-listings?shop=S1&open=149');
-    expect(editorHref('ebay', 'SKU 1', null, true)).toBe('/app/ebay-listings/SKU%201');
+    expect(editorHref('etsy', '149', 'S1', 'photos')).toBe('/app/etsy-listings/149?shop=S1#photos');
+    expect(editorHref('etsy', '149', 'S1')).toBe('/app/etsy-listings/149?shop=S1');
+    expect(editorHref('ebay', 'SKU 1', null)).toBe('/app/ebay-listings/SKU%201');
     expect(keywordExplorerHref('etsy', '149', 'S1')).toBe('/app/research/keywords?listing=149&shop=S1&mkt=etsy');
-    expect(photoFixHref('etsy', '149', 'S1', { photoStudio: true, editorFlag: false })).toBe('/app/etsy-listings/photos?ids=149&shop=S1');
-    expect(photoFixHref('etsy', '149', 'S1', { photoStudio: false, editorFlag: true })).toBe('/app/etsy-listings/149?shop=S1#photos');
+    expect(photoFixHref('etsy', '149', 'S1', { photoStudio: true })).toBe('/app/etsy-listings/photos?ids=149&shop=S1');
+    expect(photoFixHref('etsy', '149', 'S1', { photoStudio: false })).toBe('/app/etsy-listings/149?shop=S1#photos');
     expect(bulkGridHref('etsy', ['1', '2'], 'S1')).toBe('/app/etsy-listings/bulk?shop=S1&ids=1%2C2');
     expect(notSentHref('etsy', 'S1')).toBe('/app/etsy-listings?shop=S1&view=not_sent');
     expect(notSentHref('ebay', 'x')).toBe('/app/ebay-listings?view=not_sent');

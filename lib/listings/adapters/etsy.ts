@@ -195,7 +195,7 @@ export const etsyAdapter: ListingsAdapter = {
     etsyCreatedTimestamp: true,
     etsyUpdatedTimestamp: true,
   },
-  exportSelect: { tags: true },
+  exportSelect: { tags: true, materials: true },
 
   toRow(r, _ctx, caps) {
     const id = String(r.etsyListingId);
@@ -234,9 +234,10 @@ export const etsyAdapter: ListingsAdapter = {
       sku: etsySkus(r, caps)[0] ?? null,
       tags: decodeEntityList(r.tags),
       description: typeof r.description === 'string' ? decodeEntities(r.description) : null,
+      materials: decodeEntityList(r.materials),
     };
   },
-  exportExtras: ['section', 'views', 'favorites'],
+  exportExtras: ['section', 'views', 'favorites', 'materials'],
 
   drafts: {
     model: 'EtsyListingDraft',

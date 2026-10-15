@@ -270,7 +270,7 @@ describe('export rows', () => {
     const { items, truncated } = await collectExportRows(db, plan, query, { includeDescription: true });
     expect(truncated).toBe(false);
     expect(items.map((i) => i.row.id)).toEqual(['1006', '1002']);
-    expect(items[0].fields).toEqual({ sku: null, tags: [], description: null });
+    expect(items[0].fields).toEqual({ sku: null, tags: [], description: null, materials: [] });
   });
 });
 

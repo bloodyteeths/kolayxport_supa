@@ -2,7 +2,7 @@
 // the ordered "Needs your attention" rows (overview §3.2). No React, no formatting: text is described as i18n
 // keys (full paths from the root, e.g. `overview.attention.paused.title`), raw strings (item names, order
 // numbers, errors), a ship-by date (rendered by `<ShipBy>`) or a notification (rendered by the bell's text
-// helper). Hrefs come from `lib/nav/links.ts` with explicit flags, so the result is the same in tests.
+// helper). Hrefs come from `lib/nav/links.ts` (pure).
 //
 // Rules (§3.2): one row per kind (reconnect: one per provider; drafts: one per marketplace), the table order
 // 1–11, a kind with 0 items is not rendered, the first affected item is named and the rest are "+N more".
@@ -15,7 +15,6 @@ import {
   listingsHref,
   ordersHref,
   settingsHref,
-  type LinkFlags,
 } from '@/lib/nav/links';
 import { TRIAL_ENDING_DAYS } from '@/lib/ds/status/billing';
 import { QUEUE_SECTION_KEYS, type DraftBucket, type OrderRef, type OverviewSummary, type SectionKey } from '@/lib/overview/types';
@@ -128,7 +127,6 @@ export interface AttentionInput {
   extensionDetected: boolean | null | undefined;
   /** `useConnections().anyMarketplace`: false = no store connected → rows 1–3 only. */
   anyMarketplace: boolean | undefined;
-  flags: LinkFlags;
   now: Date;
 }
 
@@ -268,7 +266,7 @@ function syncFailingRow(list: readonly SyncFailureInput[]): AttentionRow | null 
   };
 }
 
-function labelsFailedRow(summary: OverviewSummary, flags: LinkFlags): AttentionRow | null {
+function labelsFailedRow(summary: OverviewSummary): AttentionRow | null {
   const l = summary.labels;
   if (!l || l.failed <= 0) return null;
   const first = l.first;
@@ -282,11 +280,11 @@ function labelsFailedRow(summary: OverviewSummary, flags: LinkFlags): AttentionR
     title: refText ? raw(refText) : key('overview.attention.labelsFailed.title', { count: l.failed }),
     detail: err ? raw(err) : null,
     more: refText ? l.failed - 1 : 0,
-    cta: { label: key('overview.attention.labelsFailed.cta'), href: ordersHref('problems', null, null, null, {}, flags) },
+    cta: { label: key('overview.attention.labelsFailed.cta'), href: ordersHref('problems', null, null, null) },
   };
 }
 
-function overdueRow(summary: OverviewSummary, flags: LinkFlags): AttentionRow | null {
+function overdueRow(summary: OverviewSummary): AttentionRow | null {
   const s = summary.toShip;
   if (!s || s.overdue <= 0) return null;
   const first = s.firstOverdue;
@@ -301,7 +299,7 @@ function overdueRow(summary: OverviewSummary, flags: LinkFlags): AttentionRow | 
     more: refText ? s.overdue - 1 : 0,
     cta: {
       label: key('overview.attention.overdue.cta'),
-      href: first ? createLabelHref(first.id, first.orderNumber, flags) : ordersHref('overdue', null, null, null, {}, flags),
+      href: first ? createLabelHref(first.id) : ordersHref('overdue', null, null, null),
     },
   };
 }
@@ -311,7 +309,7 @@ function draftTitle(ref: { title: string | null; listingId: string } | null): st
   return t || null;
 }
 
-function conflictRow(mp: DraftMarketplace, b: DraftBucket, flags: LinkFlags): AttentionRow | null {
+function conflictRow(mp: DraftMarketplace, b: DraftBucket): AttentionRow | null {
   if (b.conflict <= 0) return null;
   const first = b.firstConflict;
   const title = draftTitle(first);
@@ -327,12 +325,12 @@ function conflictRow(mp: DraftMarketplace, b: DraftBucket, flags: LinkFlags): At
     cta: {
       label: key('overview.attention.conflict.cta'),
       // Review only: a conflicted draft is never re-sent from here (it may hold a queued delete).
-      href: first ? listingHref(mp, first.listingId, flags) : listingsHref(mp, 'send_failed', flags),
+      href: first ? listingHref(mp, first.listingId) : listingsHref(mp, 'send_failed'),
     },
   };
 }
 
-function sendFailedRow(mp: DraftMarketplace, b: DraftBucket, flags: LinkFlags): AttentionRow | null {
+function sendFailedRow(mp: DraftMarketplace, b: DraftBucket): AttentionRow | null {
   if (b.failed <= 0) return null;
   const first = b.firstFailed;
   const title = draftTitle(first);
@@ -348,12 +346,12 @@ function sendFailedRow(mp: DraftMarketplace, b: DraftBucket, flags: LinkFlags): 
     more: title ? b.failed - 1 : 0,
     cta: {
       label: key('overview.attention.sendFailed.cta'),
-      href: first ? listingHref(mp, first.listingId, flags) : listingsHref(mp, 'send_failed', flags),
+      href: first ? listingHref(mp, first.listingId) : listingsHref(mp, 'send_failed'),
     },
   };
 }
 
-function trackingRow(summary: OverviewSummary, extensionDetected: boolean | null | undefined, flags: LinkFlags): AttentionRow | null {
+function trackingRow(summary: OverviewSummary, extensionDetected: boolean | null | undefined): AttentionRow | null {
   const tr = summary.tracking;
   if (!tr) return null;
   const total = tr.notSent + tr.failed;
@@ -369,12 +367,12 @@ function trackingRow(summary: OverviewSummary, extensionDetected: boolean | null
     detail: key('overview.attention.tracking.detail'),
     more: num ? total - 1 : 0,
     cta: extensionDetected
-      ? { label: key('overview.attention.tracking.cta'), href: ordersHref('label_created', null, 'etsy', null, {}, flags) }
+      ? { label: key('overview.attention.tracking.cta'), href: ordersHref('label_created', null, 'etsy', null) }
       : { label: key('overview.attention.tracking.setupCta'), href: EXTENSION_SETUP_HREF },
   };
 }
 
-function notSentRow(mp: DraftMarketplace, b: DraftBucket, flags: LinkFlags): AttentionRow | null {
+function notSentRow(mp: DraftMarketplace, b: DraftBucket): AttentionRow | null {
   if (b.draft <= 0) return null;
   const marketplace = MARKETPLACE_NAME[mp];
   return {
@@ -386,15 +384,14 @@ function notSentRow(mp: DraftMarketplace, b: DraftBucket, flags: LinkFlags): Att
     detail: null,
     more: 0,
     // "Review & send" opens the list's Not sent view; nothing is sent from the Overview (explicit send only).
-    cta: { label: key('overview.attention.notSent.cta'), href: listingsHref(mp, 'changes_not_sent', flags) },
+    cta: { label: key('overview.attention.notSent.cta'), href: listingsHref(mp, 'changes_not_sent') },
   };
 }
 
-function listingHealthRow(summary: OverviewSummary, flags: LinkFlags): AttentionRow | null {
+function listingHealthRow(summary: OverviewSummary): AttentionRow | null {
   const h = summary.listingHealth?.etsy;
   if (!h || h.needsWork <= 0) return null;
-  const href = listingDoctorHref(flags);
-  if (!href) return null; // before M5 there is no needs-work list: the row is hidden (§3.2 row 10)
+  const href = listingDoctorHref();
   const worst = h.worst;
   return {
     id: 'listingHealth',
@@ -404,7 +401,7 @@ function listingHealthRow(summary: OverviewSummary, flags: LinkFlags): Attention
     title: key('overview.attention.health.title', { count: h.needsWork }),
     detail: worst?.title ? raw(worst.title) : null,
     more: 0,
-    cta: { label: key(flags.research ? 'overview.attention.health.cta' : 'overview.attention.health.ctaLegacy'), href },
+    cta: { label: key('overview.attention.health.cta'), href },
   };
 }
 
@@ -447,7 +444,7 @@ function usageRow(summary: OverviewSummary, now: Date): AttentionRow | null {
 
 /** Pure: the ordered queue. */
 export function buildAttentionRows(input: AttentionInput): AttentionModel {
-  const { summary, flags, now } = input;
+  const { summary, now } = input;
   const rows: AttentionRow[] = [];
   const push = (r: AttentionRow | null) => {
     if (r) rows.push(r);
@@ -461,14 +458,14 @@ export function buildAttentionRows(input: AttentionInput): AttentionModel {
 
   // No store: only rows 1–3 (§3.2 "Not connected").
   if (summary && input.anyMarketplace !== false) {
-    push(labelsFailedRow(summary, flags));
-    push(overdueRow(summary, flags));
+    push(labelsFailedRow(summary));
+    push(overdueRow(summary));
     const drafts = summary.drafts;
-    if (drafts) for (const mp of DRAFT_MARKETPLACES) push(conflictRow(mp, drafts[mp], flags));
-    if (drafts) for (const mp of DRAFT_MARKETPLACES) push(sendFailedRow(mp, drafts[mp], flags));
-    push(trackingRow(summary, input.extensionDetected, flags));
-    if (drafts) for (const mp of DRAFT_MARKETPLACES) push(notSentRow(mp, drafts[mp], flags));
-    push(listingHealthRow(summary, flags));
+    if (drafts) for (const mp of DRAFT_MARKETPLACES) push(conflictRow(mp, drafts[mp]));
+    if (drafts) for (const mp of DRAFT_MARKETPLACES) push(sendFailedRow(mp, drafts[mp]));
+    push(trackingRow(summary, input.extensionDetected));
+    if (drafts) for (const mp of DRAFT_MARKETPLACES) push(notSentRow(mp, drafts[mp]));
+    push(listingHealthRow(summary));
     push(usageRow(summary, now));
   }
 

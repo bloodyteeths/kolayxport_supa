@@ -21,7 +21,7 @@ import {
 } from '@/lib/reports/dateRange';
 import { CSV_BOM, buildCsv, csvCell, csvNumber, reportCsvFilename } from '@/lib/reports/exportCsv';
 import { normalizeSalesReport, salesReportKey, salesReportUrl } from '@/lib/reports/useSalesReport';
-import { legacyReportsHref, reportTabHref, resolveFinanceMarketplace } from '@/components/domain/reports/ReportsPage';
+import { reportTabHref, resolveFinanceMarketplace } from '@/components/domain/reports/ReportsPage';
 import { bucketLabel, alignPrevious } from '@/components/domain/reports/sales/SalesTrendChart';
 import { currencySymbol, originalRevenueText, reportOrdersHref, rowConverted, storeDisplayName, storeOrdersHref, storeOrdersValues } from '@/components/domain/reports/sales/StoreTable';
 import { summarizeStatuses } from '@/components/domain/reports/sales/StatusSummary';
@@ -189,10 +189,6 @@ describe('ReportsPage helpers', () => {
     expect(reportTabHref('profit', { preset: 'lastMonth' }, { mp: 'etsy' })).toBe('/app/reports/profit?preset=lastMonth&mp=etsy');
     expect(reportTabHref('payouts')).toBe('/app/reports/payouts');
   });
-  it('legacy fallback keeps the query', () => {
-    expect(legacyReportsHref('sales', { preset: 'last7' })).toBe('/app/analytics?preset=last7');
-    expect(legacyReportsHref('profit', { mp: 'ebay' })).toBe('/app/financials?mp=ebay');
-  });
   it('finance marketplace: URL, then first connected, unsupported deep links flagged', () => {
     expect(resolveFinanceMarketplace('ebay', {})).toEqual({ mp: 'ebay', supported: true });
     expect(resolveFinanceMarketplace(undefined, { etsy: false, ebay: false, amazon: true })).toEqual({ mp: 'amazon', supported: true });
@@ -222,17 +218,17 @@ describe('Sales helpers', () => {
     expect(rowConverted({ byCurrency: [{ currency: 'CAD', revenue: 540 }] }, 'TRY')).toBe(true);
     expect(currencySymbol('TRY', 'tr-TR')).toBe('₺');
   });
-  it('Orders deep links: v2 carries the range, legacy falls back to a view', () => {
-    expect(reportOrdersHref({ from: '2026-09-01', to: '2026-09-30', status: 'shipped' }, { orders: true })).toBe(
+  it('Orders deep links carry the range and the filters', () => {
+    expect(reportOrdersHref({ from: '2026-09-01', to: '2026-09-30', status: 'shipped' })).toBe(
       '/app/labels?view=all&status=shipped&from=2026-09-01&to=2026-09-30&preset=custom',
     );
-    expect(reportOrdersHref({ from: '2026-09-01', to: '2026-09-30', store: 'Trendyol' }, { orders: false })).toBe('/app/labels?label=all&mp=Trendyol&from=all');
+    expect(reportOrdersHref({ from: '2026-09-01', to: '2026-09-30', store: 'Trendyol' })).toBe(
+      '/app/labels?view=all&store=Trendyol&from=2026-09-01&to=2026-09-30&preset=custom',
+    );
     const range = { from: '2026-09-01', to: '2026-09-30' };
     const amazon = { shopName: null, rawMarketplaces: ['Amazon', 'amazon'] };
-    expect(storeOrdersHref(amazon, range, { orders: true })).toBe('/app/labels?view=all&store=Amazon&store=amazon&from=2026-09-01&to=2026-09-30&preset=custom');
-    // The legacy page takes one store: several raw values → plain text, never a partial list.
-    expect(storeOrdersHref(amazon, range, { orders: false })).toBeNull();
-    expect(storeOrdersHref({ shopName: null }, range, { orders: true })).toBeNull();
+    expect(storeOrdersHref(amazon, range)).toBe('/app/labels?view=all&store=Amazon&store=amazon&from=2026-09-01&to=2026-09-30&preset=custom');
+    expect(storeOrdersHref({ shopName: null }, range)).toBeNull();
   });
   it('statuses map through the DS order vocabulary and sum per key, in display order', () => {
     const s = summarizeStatuses(r.statuses);

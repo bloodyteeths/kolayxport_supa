@@ -15,31 +15,16 @@ import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { firstParam } from '@/lib/research/etsySearch';
 import type { HomeData, RecentWatchedItem, ResearchErrorBody, ResearchResponse } from '@/lib/research/types';
-import { SHIPPED_RESEARCH_TARGETS, type ShippedResearchKey } from '@/lib/research/legacyRedirects';
 import { loadDoctor } from './listings';
 
-/**
- * Where a tracked keyword opens. The Keywords page (`/app/research/keywords?view=tracked&listing=&shop=&mkt=`,
- * research.md §2) is R2; until `keywords:etsy` ships, the item deep-links the listing in the Listing doctor
- * (`?open=`), whose panel shows the tracked main keyword and its rank, so a Home click never 404s.
- */
-export function trackedKeywordHref(
-  listingId: string,
-  shopId: string | null,
-  shipped: ReadonlySet<ShippedResearchKey> = SHIPPED_RESEARCH_TARGETS,
-): string {
+/** Where a tracked keyword opens: the Keyword explorer's tracked view for that listing (research.md §2). */
+export function trackedKeywordHref(listingId: string, shopId: string | null): string {
   const p = new URLSearchParams();
-  if (shipped.has('keywords:etsy')) {
-    p.set('view', 'tracked');
-    p.set('listing', listingId);
-    if (shopId) p.set('shop', shopId);
-    p.set('mkt', 'etsy');
-    return `/app/research/keywords?${p.toString()}`;
-  }
-  p.set('mkt', 'etsy');
+  p.set('view', 'tracked');
+  p.set('listing', listingId);
   if (shopId) p.set('shop', shopId);
-  p.set('open', listingId);
-  return `/app/research/listings?${p.toString()}`;
+  p.set('mkt', 'etsy');
+  return `/app/research/keywords?${p.toString()}`;
 }
 
 export async function recentTracked(userId: string, limit = 5): Promise<RecentWatchedItem[]> {

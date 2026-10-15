@@ -52,11 +52,53 @@ export type OpenDraft = {
  * scheduler stored description changes). `StagePatch` itself is G0's contract; adapters that can stage a
  * description say so with `stagesDescription`.
  */
-export type ExtendedStagePatch = StagePatch & { description?: string };
+export type ExtendedStagePatch = StagePatch & { description?: string; etsy?: EtsyStageExtras };
+
+/**
+ * Etsy-only parts of a staged change that the grid's bulk tools write ("Set field…", variation prices). They go
+ * into the same draft as every other edit (`stageEtsyDraft`), so nothing reaches Etsy before an explicit send.
+ * `fields` keys are the draft service's `fieldPatch` keys (shipping_profile_id, materials, item_weight…).
+ */
+export type EtsyStageExtras = {
+  fields?: Record<string, unknown>;
+  /** `taxonomyPatch` (category details: `{ properties: [...] }`). */
+  taxonomy?: Record<string, unknown>;
+  /** `inventoryPatch` (whole inventory: `{ products, price_on_property, ... }`). */
+  inventory?: Record<string, unknown>;
+  /** `personalizationPatch` (`{ personalization_questions: [...] }` or `{ remove: true }`, PersonalizationEditor shape). */
+  personalization?: Record<string, unknown>;
+};
+
+/** An Etsy draft that creates a listing (not on Etsy yet, or a staged copy to a shop). */
+export type NewListingDraft = {
+  draftId: string;
+  /** Local negative id, the real id of a partly created listing, or the source listing of a copy. */
+  listingId: string;
+  kind: 'create' | 'copy';
+  title: string;
+  photoCount: number;
+  /** First staged photo (staged file preview or its source URL); null when the draft has none. */
+  thumbUrl: string | null;
+  /** Real Etsy id when an earlier send created the listing and then failed on a later step. */
+  partialId: string | null;
+  /** A queued `publish`: the listing goes live when it is sent. */
+  willPublish: boolean;
+  /** Copy target shop id (`kind: 'copy'`). */
+  targetShopId: string | null;
+  status: OpenDraft['status'];
+  queuedDelete: boolean;
+  updatedAt: string | null;
+};
 
 export interface ListingsStagingAdapter extends StagingAdapter {
   /** True when `stage` carries `ExtendedStagePatch.description` into the draft (Etsy). */
   stagesDescription?: boolean;
+  /** True when `stage` carries `ExtendedStagePatch.etsy` (fields / taxonomy / inventory) into the draft. */
+  stagesEtsyExtras?: boolean;
+  /** Queued `copy` to another shop (Etsy). */
+  stagesCopyToShop?: boolean;
+  /** Drafts that create a listing: shown as "not on Etsy yet" on the grid (they have no grid row). */
+  listNewListings?(): Promise<NewListingDraft[]>;
   /** Every open draft of the store (all pages, not only the visible rows). */
   listOpen(): Promise<OpenDraft[]>;
   /**
@@ -188,6 +230,8 @@ function etsyAction(a: StagedAction): Record<string, unknown> {
     case 'renew':
     case 'delete':
       return { type: a.type };
+    case 'copy':
+      return { type: 'copy', targetShopId: a.targetShopId };
     default:
       throw new StagingError(400, `Unsupported Etsy action ${a.type}`);
   }
@@ -249,12 +293,95 @@ export type AdapterContext = {
   currencyOf?: (id: string) => string | undefined;
 };
 
+/** Images a draft adds (upload / AI upload ops, by rank), same rule as the legacy "pending new listings" panel. */
+function draftPhotos(media: unknown): AnyRecord[] {
+  return (Array.isArray(media) ? media : [])
+    .map(asRecord)
+    .filter((m) => m.kind === 'image' && (m.operation === 'upload' || m.operation === 'ai_upload'))
+    .sort((a, b) => (Number(a.rank ?? 99) || 99) - (Number(b.rank ?? 99) || 99));
+}
+
+function photoUrl(m: AnyRecord | undefined): string | null {
+  if (!m) return null;
+  if (m.localPath && m.id != null) return `/api/etsy-drafts/media-preview?id=${encodeURIComponent(String(m.id))}`;
+  return typeof m.sourceUrl === 'string' && /^https:\/\//i.test(m.sourceUrl) ? m.sourceUrl : null;
+}
+
+/**
+ * Serialised `EtsyListingDraft` → a "not on Etsy yet" entry, or null when the draft does not create a listing
+ * (pure, unit-tested). Same classification as `listOpen().createsListing`.
+ */
+export function toNewListingDraft(raw: unknown): NewListingDraft | null {
+  const d = asRecord(raw);
+  const status = openStatus(d.status);
+  if (!status || d.id == null) return null;
+  const pending = (Array.isArray(d.queuedActions) ? d.queuedActions : []).map(asRecord).filter((a) => typeof a.type === 'string' && !a.completedAt);
+  const types = pending.map((a) => String(a.type));
+  const listingId = Number(d.etsyListingId);
+  const local = !(listingId > 0);
+  const copy = pending.find((a) => a.type === 'copy');
+  const creates = local || types.includes('create_listing');
+  if (!creates && !copy) return null;
+  const fields = asRecord(d.fieldPatch);
+  const title = typeof fields.title === 'string' ? fields.title.trim() : '';
+  const photos = draftPhotos(d.media);
+  return {
+    draftId: String(d.id),
+    listingId: String(d.etsyListingId ?? ''),
+    kind: creates ? 'create' : 'copy',
+    title,
+    photoCount: photos.length,
+    thumbUrl: photoUrl(photos[0]),
+    partialId: creates && !local ? String(listingId) : null,
+    willPublish: types.includes('publish'),
+    targetShopId: copy && copy.targetShopId != null ? String(copy.targetShopId) : null,
+    status,
+    queuedDelete: types.includes('delete'),
+    updatedAt: typeof d.updatedAt === 'string' ? d.updatedAt : null,
+  };
+}
+
+/**
+ * Serialised `EbayListingDraft` with a pending `create` (editor or CSV "Create new listings") → a "not on eBay yet"
+ * entry, else null (pure). These drafts are keyed by a local SKU with no grid row, so this is the only place the grid
+ * shows them. `listingId` is empty: they open in create mode (`/new?draft=`), never the edit route.
+ */
+export function toNewEbayListingDraft(raw: unknown): NewListingDraft | null {
+  const d = asRecord(raw);
+  const status = openStatus(d.status);
+  if (!status || d.id == null) return null;
+  const pending = (Array.isArray(d.queuedActions) ? d.queuedActions : []).map(asRecord).filter((a) => typeof a.type === 'string' && !a.completedAt);
+  const create = pending.find((a) => a.type === 'create');
+  if (!create) return null;
+  const product = asRecord(asRecord(d.inventoryPatch).product);
+  const title = typeof product.title === 'string' ? product.title.trim() : '';
+  const images = (Array.isArray(product.imageUrls) ? product.imageUrls : []).filter((u): u is string => typeof u === 'string' && /^https:\/\//i.test(u));
+  return {
+    draftId: String(d.id),
+    listingId: '',
+    kind: 'create',
+    title: title || (typeof d.sku === 'string' ? d.sku : ''),
+    photoCount: images.length,
+    thumbUrl: images[0] ?? null,
+    partialId: null,
+    willPublish: create.publish === true,
+    targetShopId: null,
+    status,
+    queuedDelete: pending.some((a) => a.type === 'delete'),
+    updatedAt: typeof d.updatedAt === 'string' ? d.updatedAt : null,
+  };
+}
+
 export function etsyAdapter(ctx: AdapterContext): ListingsStagingAdapter {
   const shopId = ctx.storeId ?? '';
   return {
     stagesDescription: true,
+    stagesEtsyExtras: true,
+    stagesCopyToShop: true,
     async stage(id, patch, opts) {
-      const fields: Record<string, unknown> = {};
+      const extras = (patch as ExtendedStagePatch).etsy;
+      // Extra fields first: the grid's own keys (price, title…) win when both are set.
+      const fields: Record<string, unknown> = { ...(extras?.fields ?? {}) };
       if (patch.price !== undefined) fields.price = patch.price;
       if (patch.qty !== undefined) fields.quantity = patch.qty;
       if (patch.title !== undefined) fields.title = patch.title;
@@ -268,6 +395,9 @@ export function etsyAdapter(ctx: AdapterContext): ListingsStagingAdapter {
             shopId,
             listingId: id,
             fields: Object.keys(fields).length ? fields : undefined,
+            taxonomy: extras?.taxonomy,
+            inventory: extras?.inventory,
+            personalization: extras?.personalization,
             queuedActions: opts?.queuedActions?.map(etsyAction),
           }),
         );
@@ -308,6 +438,11 @@ export function etsyAdapter(ctx: AdapterContext): ListingsStagingAdapter {
           },
         ];
       });
+    },
+    async listNewListings() {
+      if (!shopId) return [];
+      const drafts = (await fetchEtsyDrafts(shopId)) as unknown[];
+      return drafts.map(toNewListingDraft).filter((d): d is NewListingDraft => Boolean(d));
     },
   };
 }
@@ -354,8 +489,13 @@ export function ebayAdapter(ctx: AdapterContext): ListingsStagingAdapter {
         const status = openStatus(d.status);
         if (!status) return [];
         const actions = pendingActionTypes(d.queuedActions);
-        return [{ draftId: String(d.id), id: String(d.sku ?? ''), status, queuedDelete: actions.includes('delete'), createsListing: false }];
+        // A queued `create` (editor / CSV "Create new listings") is a new listing: sent from its editor, never from "Send N".
+        return [{ draftId: String(d.id), id: String(d.sku ?? ''), status, queuedDelete: actions.includes('delete'), createsListing: actions.includes('create') }];
       });
+    },
+    async listNewListings() {
+      const drafts = (await ebayCall(() => fetchEbayDrafts())) as unknown[];
+      return drafts.map(toNewEbayListingDraft).filter((d): d is NewListingDraft => Boolean(d));
     },
   };
 }
@@ -366,8 +506,9 @@ export function catalogAdapter(ctx: AdapterContext): ListingsStagingAdapter {
   const storeId = ctx.storeId ?? undefined;
   return {
     async stage(id, patch, opts) {
-      const fields: { title?: string; price?: number; quantity?: number; tags?: string[]; visible?: boolean } = {};
+      const fields: { title?: string; price?: number; listPrice?: number; quantity?: number; tags?: string[]; visible?: boolean } = {};
       if (patch.price !== undefined) fields.price = patch.price;
+      if (patch.listPrice !== undefined) fields.listPrice = patch.listPrice;
       if (patch.qty !== undefined) fields.quantity = patch.qty;
       if (patch.title !== undefined) fields.title = patch.title;
       if (patch.tags !== undefined) fields.tags = patch.tags;
@@ -375,7 +516,7 @@ export function catalogAdapter(ctx: AdapterContext): ListingsStagingAdapter {
       for (const a of opts?.queuedActions ?? []) {
         if (a.type === 'show') fields.visible = true;
         else if (a.type === 'hide') fields.visible = false;
-        else if (a.type === 'archive' || a.type === 'delete') queuedActions.push({ type: a.type });
+        else if (a.type === 'archive' || a.type === 'unarchive' || a.type === 'delete') queuedActions.push({ type: a.type });
         else throw new StagingError(400, `Unsupported ${ctx.marketplace} action ${a.type}`);
       }
       try {
@@ -460,6 +601,7 @@ export function mergeOverlay(prev: ListingDraftOverlay | undefined, patch: Stage
   if (patch.price !== undefined) next.price = patch.price;
   if (patch.qty !== undefined) next.qty = patch.qty;
   if (patch.title !== undefined) next.title = patch.title;
+  if (patch.listPrice !== undefined) next.listPrice = patch.listPrice;
   return next;
 }
 

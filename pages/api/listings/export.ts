@@ -26,6 +26,7 @@ export function exportRecord(item: ExportItem, includeDescription: boolean): Rec
     health: row.health.score,
     url: row.externalUrl,
   };
+  if (fields.materials) rec.materials = fields.materials.join(TAG_SEPARATOR);
   for (const [k, v] of Object.entries(row.extra)) if (!(k in rec)) rec[k] = v;
   if (includeDescription) rec.description = fields.description;
   return rec;

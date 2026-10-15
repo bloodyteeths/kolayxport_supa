@@ -9,7 +9,7 @@ import { Button, FormField, TagInput } from '@/components/ds/inputs';
 import { icons } from '@/lib/ds/icons';
 import { neutral, type as typeScale } from '@/lib/ds/tokens';
 import { cleanTag, tagKey, tagTitleOverlap, TAG_MAX_COUNT, TAG_MAX_LEN } from '@/lib/etsy/seoRules';
-import { RESEARCH_TOOL_PATH, RESEARCH_TOOL_SHIPPED } from '@/components/domain/research/ResearchLayout';
+import { RESEARCH_TOOL_PATH } from '@/components/domain/research/ResearchLayout';
 import { sectionAnchorId } from '@/lib/listingEditor/sections';
 import type { ListingSectionProps } from '@/lib/listingEditor/types';
 import { displayList, displayText, fieldDomId, MATERIAL_MAX, MATERIAL_MAX_LEN } from './etsyShared';
@@ -49,11 +49,9 @@ export function TagsSection({ id = 'tags', aiTags, flaggedTags, explorerHref }: 
   const tags = displayList(api.fields.tags);
   const materials = displayList(api.fields.materials);
   const title = displayText(api.fields.title);
-  // The Keyword explorer route ships with R2 (RESEARCH_TOOL_SHIPPED.keywords): no link to a 404 before that.
+  // Keyword explorer for this listing (a not-yet-created listing has a negative temp id: plain explorer).
   const href = explorerHref === undefined
-    ? (!RESEARCH_TOOL_SHIPPED.keywords
-      ? null
-      : api.listingId && !api.listingId.startsWith('-') ? `${RESEARCH_TOOL_PATH.keywords}?listing=${encodeURIComponent(api.listingId)}` : RESEARCH_TOOL_PATH.keywords)
+    ? (api.listingId && !api.listingId.startsWith('-') ? `${RESEARCH_TOOL_PATH.keywords}?listing=${encodeURIComponent(api.listingId)}` : RESEARCH_TOOL_PATH.keywords)
     : explorerHref;
 
   const invalidTag = (tag: string) => {

@@ -8,8 +8,6 @@ import useSWR from 'swr';
 import { SenderForm } from '@/components/domain/settings/sender';
 import { PreferencesPanel } from '@/components/domain/settings/PreferencesPanel';
 import { RefreshOverview } from '@/components/domain/settings/refresh';
-import SenderProfilePanel from '@/components/settings/SenderProfilePanel';
-import SyncPanel from '@/components/settings/SyncPanel';
 import useLocaleStore from '@/lib/stores/useLocaleStore';
 import { SettingsShellContext, type SettingsShellValue } from '@/components/domain/settings/settingsNav';
 import { LOCALES, intlErrors, renderC } from './c-harness';
@@ -114,11 +112,11 @@ describe('SenderForm', () => {
     expect(screen.getByTestId('sender-etgb-body')).toBeTruthy();
   });
 
-  it('legacy SenderProfilePanel props still work and render no save bar without onSave', () => {
+  it('SenderForm without onSave renders no save bar and reports edits', () => {
     const onChangeProfile = vi.fn();
     renderC(
       <SettingsShellContext.Provider value={SHELL}>
-        <SenderProfilePanel shipperProfile={profile} shippingSettings={{}} onChangeProfile={onChangeProfile} onChangeShipping={() => {}} importerJsonError={null} etgbCollapsed={false} />
+        <SenderForm shipperProfile={profile} shippingSettings={{}} onChangeProfile={onChangeProfile} onChangeShipping={() => {}} importerJsonError={null} etgbCollapsed={false} />
       </SettingsShellContext.Provider>,
     );
     expect(screen.queryByTestId('sender-save-bar')).toBeNull();
@@ -284,7 +282,7 @@ describe('RefreshOverview', () => {
 
   it('empty history shows the first-use state with the refresh action', async () => {
     vi.stubGlobal('fetch', vi.fn(() => jsonResponse({ syncs: [], nextCursor: null })));
-    renderC(<SettingsShellContext.Provider value={SHELL}><SyncPanel /></SettingsShellContext.Provider>);
+    renderC(<SettingsShellContext.Provider value={SHELL}><RefreshOverview /></SettingsShellContext.Provider>);
     expect(await screen.findByText('No refreshes yet')).toBeTruthy();
   });
 

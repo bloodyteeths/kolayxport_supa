@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 // research R1-C Home (research.md §4) + the route gate: search + chips, needs-work card (rows, ConnectState when no
-// Etsy/eBay store), seasons with editable production days, recent searches, ⌘K `?q=` routing, EN/TR, mobile, and the
-// `research` flag gate (off → legacy page).
+// Etsy/eBay store), seasons with editable production days, recent searches, ⌘K `?q=` routing, EN/TR, mobile.
 import * as React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -13,7 +12,6 @@ import en from '@/messages/en.json';
 import tr from '@/messages/tr.json';
 import { __resetShortcutsForTests } from '@/lib/ds/useShortcuts';
 import { __resetUrlStateForTests } from '@/lib/ds/useUrlState';
-import { UI_OVERRIDE_STORAGE_KEY } from '@/lib/ds/uiFlags';
 import { setViewport } from '../ds/m1e-helpers';
 import { R1C_EN, R1C_TR } from './r1c-messages';
 import { homeResponse, seasonsResponse } from './r1c-fixtures';
@@ -36,7 +34,6 @@ vi.mock('@/lib/hooks/useConnections', () => ({
 }));
 
 import { ResearchHome } from '@/components/domain/research/home/ResearchHome';
-import { ResearchRouteGate } from '@/components/domain/research/ResearchLayout';
 import { RECENT_KEY } from '@/components/domain/research/home/recentSearches';
 
 type Obj = Record<string, unknown>;
@@ -163,62 +160,3 @@ describe('Research Home', () => {
   });
 });
 
-describe('ResearchRouteGate (flag `research`)', () => {
-  it('flag off (NEXT_PUBLIC_UI_V2=none) → replaces with the legacy page for ?mkt', async () => {
-    vi.stubEnv('NEXT_PUBLIC_UI_V2', 'none');
-    try {
-      wrap(
-        <ResearchRouteGate mkt="ebay">
-          <div data-testid="hub" />
-        </ResearchRouteGate>,
-      );
-      await act(async () => {});
-      expect(screen.queryByTestId('hub')).toBeNull();
-      expect(router.replace).toHaveBeenCalledWith('/app/ebay-research');
-    } finally {
-      vi.unstubAllEnvs();
-    }
-  });
-
-  it('flag off by ?ui=1 stored override over the all-on default → a link to the legacy page, no redirect', async () => {
-    window.localStorage.setItem(UI_OVERRIDE_STORAGE_KEY, '1');
-    wrap(
-      <ResearchRouteGate mkt="ebay">
-        <div data-testid="hub" />
-      </ResearchRouteGate>,
-    );
-    await act(async () => {});
-    expect(screen.queryByTestId('hub')).toBeNull();
-    expect(screen.getByTestId('research-legacy-link')).toBeTruthy();
-    expect(router.replace).not.toHaveBeenCalled();
-  });
-
-  it('build default (NEXT_PUBLIC_UI_V2 unset → all on), no override → renders the hub', async () => {
-    const prev = process.env.NEXT_PUBLIC_UI_V2;
-    delete process.env.NEXT_PUBLIC_UI_V2;
-    try {
-      wrap(
-        <ResearchRouteGate mkt="ebay">
-          <div data-testid="hub" />
-        </ResearchRouteGate>,
-      );
-      await act(async () => {});
-      expect(screen.getByTestId('hub')).toBeTruthy();
-      expect(router.replace).not.toHaveBeenCalled();
-    } finally {
-      if (prev !== undefined) process.env.NEXT_PUBLIC_UI_V2 = prev;
-    }
-  });
-
-  it('flag on (?ui override) → renders the hub', async () => {
-    window.localStorage.setItem(UI_OVERRIDE_STORAGE_KEY, 'research');
-    wrap(
-      <ResearchRouteGate>
-        <div data-testid="hub" />
-      </ResearchRouteGate>,
-    );
-    await act(async () => {});
-    expect(screen.getByTestId('hub')).toBeTruthy();
-    expect(router.replace).not.toHaveBeenCalled();
-  });
-});

@@ -1,5 +1,5 @@
 /**
- * lib/shipping/labelLinks.ts — moved from components/labels/labelLinks.ts (orders §12, G4); the old path is a re-export shim.
+ * lib/shipping/labelLinks.ts (orders §12, G4).
  *
  * Label link helpers shared by the labels page and the carrier drawers.
  *

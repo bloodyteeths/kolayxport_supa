@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../../lib/prisma';
 import { getAuthUser } from '@/lib/auth';
 
-/** Private per-order note (never pushed to a marketplace). Keep in sync with components/labels/OrderNoteField.tsx. */
+/** Private per-order note (never pushed to a marketplace). Keep in sync with components/domain/orders/panel/useOrderNote.ts. */
 const ORDER_NOTE_MAX_LENGTH = 1000;
 
 /**

@@ -85,28 +85,57 @@ function roundPrice(value: number, round: PriceRounding): number {
 }
 
 /**
- * Applies price ops to every live offering of an inventory (pure). Prices never go below `minPrice` (Etsy 0.20).
- * Quantities, SKUs and the `*_on_property` arrays are kept as they are. Returns null for a single-product
- * inventory (the plain `fields.price` patch is correct there).
+ * "Only variations where <property> is <value>" (legacy Variation Price dialog). Case-insensitive, trimmed.
+ * Empty property or value = no filter.
+ */
+export type VariationMatch = { property: string; value: string };
+
+const norm = (s: unknown) => String(s ?? '').trim().toLocaleLowerCase('tr');
+
+/** True when an inventory product has `match.property` = `match.value` in its property values (pure). */
+export function productMatches(product: unknown, match: VariationMatch | null | undefined): boolean {
+  if (!match || !norm(match.property) || !norm(match.value)) return true;
+  return list(rec(product).property_values).some(
+    (pv) => norm(pv.property_name) === norm(match.property) && (Array.isArray(pv.values) ? pv.values : []).some((v) => norm(v) === norm(match.value)),
+  );
+}
+
+/** An active match filter, or null (pure). */
+export function activeMatch(match: VariationMatch | null | undefined): VariationMatch | null {
+  return match && norm(match.property) && norm(match.value) ? match : null;
+}
+
+/**
+ * Applies price ops to every live offering of an inventory (pure), or only to the products `match` selects.
+ * Prices never go below `minPrice` (Etsy 0.20). Quantities, SKUs and the `*_on_property` arrays are kept as they
+ * are. Returns null for a single-product inventory (the plain `fields.price` patch is correct there) and when
+ * `match` selects no product.
  */
 export function applyPriceOpsToInventory(
   inventory: unknown,
   ops: NumberOp[],
-  opts: { round?: PriceRounding; minPrice?: number } = {},
+  opts: { round?: PriceRounding; minPrice?: number; match?: VariationMatch | null } = {},
 ): AnyRecord | null {
   if (!ops.length || !isMultiVariation(inventory)) return null;
   const source = rec(inventory);
   const minPrice = opts.minPrice ?? ETSY_MIN_PRICE;
   const round = opts.round ?? 'none';
+  const match = activeMatch(opts.match);
+  const products = liveProducts(source);
+  if (match && !products.some((p) => productMatches(p, match))) return null;
   return {
-    products: liveProducts(source).map((p) => ({
+    products: products.map((p) => ({
       ...p,
       offerings: list(p.offerings)
         .filter((o) => !o.is_deleted)
         .map((o) => {
-          const price = rec(o.price);
+          if (match && !productMatches(p, match)) return o;
+          // A live inventory carries Money objects; an open draft's inventoryPatch may carry plain decimals
+          // (the editor's variation table). Both are read; the result is always a Money object.
+          const plain = typeof o.price === 'number' || typeof o.price === 'string' ? Number(String(o.price).replace(',', '.')) : null;
+          const price = plain === null ? rec(o.price) : {};
           const divisor = Number(price.divisor) || 100;
-          const current = (Number(price.amount) || 0) / divisor;
+          const current = plain !== null ? (Number.isFinite(plain) ? plain : 0) : (Number(price.amount) || 0) / divisor;
           const value = Math.max(minPrice, roundPrice(applyNumberOps(current, ops), round));
           return { ...o, price: { ...price, amount: Math.round(value * divisor), divisor } };
         }),
@@ -158,11 +187,42 @@ export async function buildVariationPriceInventory(
   shopId: string,
   listingId: string,
   ops: NumberOp[],
-  opts: { round?: PriceRounding; minPrice?: number } = {},
+  opts: { round?: PriceRounding; minPrice?: number; match?: VariationMatch | null } = {},
   deps: VariationPriceDeps = defaultVariationPriceDeps,
 ): Promise<AnyRecord | null> {
   const [remote, drafts] = await Promise.all([deps.fetchInventory(shopId, listingId), deps.fetchDrafts(shopId, listingId).catch(() => [])]);
   const source = pendingInventoryOf(drafts) ?? (remote ? rec(remote) : null);
   if (!source) return null;
   return applyPriceOpsToInventory(source, ops, opts);
+}
+
+/**
+ * Inventory patches for many variation listings (reads only, at most `concurrency` at a time). Listings whose
+ * inventory could not be read, or that turned out to be single-product, are returned in `skipped`.
+ */
+export async function buildVariationPriceInventories(
+  shopId: string,
+  listingIds: string[],
+  ops: NumberOp[],
+  opts: { round?: PriceRounding; minPrice?: number; match?: VariationMatch | null } = {},
+  deps: VariationPriceDeps = defaultVariationPriceDeps,
+  concurrency = 4,
+): Promise<{ patches: Array<{ id: string; inventory: AnyRecord }>; skipped: string[] }> {
+  const patches: Array<{ id: string; inventory: AnyRecord }> = [];
+  const skipped: string[] = [];
+  let next = 0;
+  const lane = async () => {
+    while (next < listingIds.length) {
+      const id = listingIds[next++];
+      try {
+        const inventory = await buildVariationPriceInventory(shopId, id, ops, opts, deps);
+        if (inventory) patches.push({ id, inventory });
+        else skipped.push(id);
+      } catch {
+        skipped.push(id);
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(concurrency, listingIds.length)) }, lane));
+  return { patches, skipped };
 }

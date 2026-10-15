@@ -452,3 +452,25 @@ export function ebayPrefill(row: PriceGapRow, margin: RowMargin, from: GapFrom =
     },
   };
 }
+
+// ─── Index freshness ("Prices updated {date}" · Refresh prices) ──────────────────────────────────────
+
+/** A manual refresh within this window of the newest Trendyol read is pointless (server: same cooldown). */
+export const GAP_REFRESH_COOLDOWN_MS = 3_600_000;
+
+/** Newest Trendyol read among the rows (ISO), or null when no row carries one. */
+export function gapIndexUpdatedAt(rows: ReadonlyArray<Pick<PriceGapRow, 'fetchedAt'>>): string | null {
+  let best: number | null = null;
+  for (const r of rows) {
+    const t = r.fetchedAt ? Date.parse(r.fetchedAt) : Number.NaN;
+    if (Number.isFinite(t) && (best === null || t > best)) best = t;
+  }
+  return best === null ? null : new Date(best).toISOString();
+}
+
+/** True when "Refresh prices" can do something: no read yet, or the newest read is older than the cooldown. */
+export function canRefreshGapIndex(updatedAt: string | null, nowMs: number): boolean {
+  if (!updatedAt) return true;
+  const t = Date.parse(updatedAt);
+  return !Number.isFinite(t) || nowMs - t >= GAP_REFRESH_COOLDOWN_MS;
+}

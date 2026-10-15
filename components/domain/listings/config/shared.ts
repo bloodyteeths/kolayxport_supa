@@ -71,11 +71,12 @@ export function booleanFilter(key: 'hasVideo' | 'personalizable' | 'visible', la
 }
 
 /**
- * Scheduled sends need `scheduledSendAt` on the draft tables (BUILD_PLAN BR-1a) and the cron (BR-8).
- * Until the backend reports both deployed, "Schedule send…" is not rendered (listing-editor §7.1 G3 rule).
- * Set NEXT_PUBLIC_KX_SCHEDULED_SENDS=1 at build time to turn it on.
+ * Scheduled sends need `scheduledSendAt` on the draft tables (BUILD_PLAN BR-1a, migration
+ * 20261015130000_listings_grid) and the `send-scheduled-drafts` cron (BR-8, lib/scheduler/jobs.ts). Both ship
+ * with this build, so "Schedule send…" is on by default. Set NEXT_PUBLIC_KX_SCHEDULED_SENDS=0 at build time
+ * to hide it (kill switch only).
  */
-export const SCHEDULED_SENDS_ENABLED = process.env.NEXT_PUBLIC_KX_SCHEDULED_SENDS === '1';
+export const SCHEDULED_SENDS_ENABLED = process.env.NEXT_PUBLIC_KX_SCHEDULED_SENDS !== '0';
 
 /** Etsy activity page (BUILD_PLAN §7 item 6: Etsy listings PageHeader ⋯ "Activity"). */
 export const ETSY_ACTIVITY_ROUTE = '/app/etsy-aktivite';

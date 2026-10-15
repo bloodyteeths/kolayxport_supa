@@ -11387,7 +11387,8 @@
       "shopReviewsValue": "★ {rating} ({count})",
       "shopActive": "Aktif ilanlar",
       "shopSince": "Açılış",
-      "shopFailed": "Mağaza yüklenemedi"
+      "shopFailed": "Mağaza yüklenemedi",
+      "watchItem": "Bu ürünü izle"
     },
     "source": {
       "searchApiOrder": "{marketplace} araması (API sırası, kişiselleştirilmemiş)",
@@ -11607,7 +11608,8 @@
         "unavailable": "Mağaza takibi henüz kullanılamıyor. Daha sonra tekrar deneyin",
         "failed": "Mağaza eklenemedi. Tekrar deneyin",
         "gone": "Bu mağaza zaten kaldırılmış",
-        "rateLimited": "Kısa sürede çok fazla mağaza eklendi. Bir dakika bekleyip tekrar deneyin"
+        "rateLimited": "Kısa sürede çok fazla mağaza eklendi. Bir dakika bekleyip tekrar deneyin",
+        "itemNotFound": "Bu eBay ürünü bulunamadı. Satışı sona ermiş olabilir"
       },
       "loadFailed": "İzlediğiniz mağazalar yüklenemedi",
       "emptyBody": "Bir {marketplace} mağaza linki yapıştırın veya mağaza adını yazın. Günlük satışlar ikinci günlük ölçümden sonra görünür.",
@@ -11666,7 +11668,15 @@
       "alertsLegacy": "Bu satıcının uyarıları eBay araştırma sayfasında ayarlanır.",
       "alertsFailed": "Uyarı kaydedilemedi. Tekrar deneyin",
       "addedLater": "{shop} izleniyor · İlk ölçüm bir sonraki günlük kontrolde",
-      "fromTrackedItems": "bu satıcının takip ettiğiniz {count} ürününden"
+      "fromTrackedItems": "bu satıcının takip ettiğiniz {count} ürününden",
+      "watchEbayItem": "eBay ürünü · {item}",
+      "ebayItemPrompt": "Bir eBay satıcı bağlantısı veya adı ya da fiyatını ve satışlarını izlemek için bir eBay ürün bağlantısı yapıştırın",
+      "itemSold": "{value} satıldı (tüm zamanlar)",
+      "itemSalesNote": "eBay'in bu ürün için satış sayacından ölçülür · boşluklar kullanılabilir okuma olmayan günlerdir",
+      "itemPriceChart": "Fiyat, 30 gün",
+      "itemPriceNote": "Ürünün her günlük okumadaki liste fiyatı",
+      "itemPriceNotYet": "Fiyat çizgisi birkaç günlük okumadan sonra görünür.",
+      "itemChartAria": "{item} fiyatı, son 30 gün"
     },
     "gap": {
       "title": "Fiyat farkı: Türkiye → yurtdışı",
@@ -11776,7 +11786,10 @@
       "toast": {
         "watched": "'{title}' izleniyor",
         "watchFailed": "İzleme eklenemedi"
-      }
+      },
+      "refreshIndex": "Fiyatları yenile",
+      "indexUpdated": "Fiyatlar güncellendi: {date}",
+      "refreshFailed": "Fiyatlar yenilenemedi. Daha sonra tekrar deneyin"
     }
   },
   "ds": {
@@ -13018,7 +13031,8 @@
       "printAll": "{count} etiketi yazdır",
       "dhlMixed": "DHL eCommerce yalnızca tüm siparişler Türkiye içine gönderiliyorsa kullanılabilir",
       "presetDefault": "Ağırlık her siparişten",
-      "sendTracking": "Takip numarasını her pazaryerine gönder"
+      "sendTracking": "Takip numarasını her pazaryerine gönder",
+      "noPhone": "{count} siparişte alıcı telefonu yok"
     },
     "title": "Etiket oluştur · Sipariş {number}",
     "backToOrder": "Sipariş",
@@ -13196,7 +13210,8 @@
       "download": "PDF indir",
       "next": "Sonraki sipariş",
       "openFailed": "Etiket açılamadı. KolayXport için açılır pencerelere izin verin."
-    }
+    },
+    "useSenderPhone": "Telefonumu kullan ({phone})"
   },
   "billing": {
     "banner": {
@@ -13463,7 +13478,12 @@
       "discarded": "Değişiklikler atıldı",
       "reviewDiff": "Farkları incele",
       "schedule": "Gönderimi zamanla…",
-      "archiveConfirm": "Arşivle…"
+      "archiveConfirm": "Arşivle…",
+      "setField": "Alan ayarla…",
+      "copyToShop": "Başka mağazaya kopyala…",
+      "copyToEtsy": "Etsy'ye kopyala",
+      "unarchive": "Arşivden çıkar",
+      "unarchiveNeedsAlone": "Arşivden çıkarmadan önce bu ürünün diğer değişikliklerini gönderin ya da atın"
     },
     "bulk": {
       "skippedRemovals": "{kind, select, archive {{count} ilan atlandı: gönderildiğinde arşivlenecekler} other {{count} ilan atlandı: gönderildiğinde silinecekler}}",
@@ -13477,7 +13497,12 @@
       "selectAllInView": "Bu görünümdeki {count} ilanın tümünü seç",
       "discardSelected": "Seçili değişiklikleri at",
       "discardConfirm": "{count} ilandaki gönderilmemiş değişiklikler atılsın mı?",
-      "pageOnly": "Bu sayfadaki ilanlarda çalışır. Önce \"Tümünü seç\" seçimini kaldırın."
+      "pageOnly": "Bu sayfadaki ilanlarda çalışır. Önce \"Tümünü seç\" seçimini kaldırın.",
+      "price": {
+        "salePrice": "Satış fiyatı {from} → {to}",
+        "listPrice": "Liste fiyatı {from} → {to}"
+      },
+      "unarchiveSkipped": "{count} ürün atlandı: yalnızca başka gönderilmemiş değişikliği olmayan arşivlenmiş ürünler arşivden çıkarılabilir"
     },
     "tags": {
       "unsentSkipped": "{count} ilanda gönderilmemiş etiket düzenlemesi var: bunları düzenleyicide değiştirin",
@@ -13543,7 +13568,15 @@
       "previewEmpty": "{count} ilan seçili",
       "skippedVariations": "Varyasyonlu {count} ilan atlandı: bunları tabloda değiştirin",
       "skippedInvalid": "{count} ilan atlandı: yeni fiyat çok düşük olurdu",
-      "nothingToStage": "Hiçbir şey değişmeyecek"
+      "nothingToStage": "Hiçbir şey değişmeyecek",
+      "variations": "{count, plural, one {# ilanın} other {# ilanın}} varyasyonları var: her varyasyonun fiyatı aynı şekilde değişir",
+      "variationsSkipped": "{count, plural, one {# varyasyonlu ilan} other {# varyasyonlu ilan}} atlandı: varyasyonları okunamadı. Tekrar deneyin veya düzenleyicide değiştirin",
+      "matchHelp": "Tüm varyasyonları değiştirmek için boş bırakın",
+      "matchProperty": "Yalnızca şu varyasyonlar",
+      "matchPropertyPlaceholder": "Özellik, ör. Beden",
+      "matchSkipsPlain": "Varyasyonu olmayan {count} ilan değişmeyecek",
+      "matchValue": "değeri",
+      "matchValuePlaceholder": "Değer, ör. Büyük"
     },
     "stock": {
       "in": "Stokta var",
@@ -13759,7 +13792,8 @@
       "fields": {
         "title": "Başlık",
         "tags": "Etiketler",
-        "description": "Açıklama"
+        "description": "Açıklama",
+        "materials": "Malzemeler"
       },
       "noMatches": "Bu metni içeren ilan yok",
       "summary": "{count} ilan değişecek{flagged, plural, =0 {} other { · # tanesi atlandı}}",
@@ -13823,7 +13857,31 @@
       "stagePartial": "{done} hazırlandı · {failed} kaydedilemedi. Yeniden denemek için tekrar hazırlayın.",
       "duplicateRow": "Bu ilan dosyada birden fazla kez var",
       "tagsTooMany": "{max} etiketten fazla",
-      "tagTooLong": "\"{tag}\" etiketi {max} karakteri aşıyor"
+      "tagTooLong": "\"{tag}\" etiketi {max} karakteri aşıyor",
+      "modeLabel": "Bu dosya ne yapacak",
+      "modeUpdate": "İlanları güncelle",
+      "modeCreate": "Yeni ilan oluştur",
+      "create": {
+        "fields": {
+          "title": "Başlık",
+          "price": "Fiyat",
+          "quantity": "Adet",
+          "condition": "Durum",
+          "description": "Açıklama"
+        },
+        "required": "Bir SKU ve bir Başlık sütunu eşleştirin",
+        "skuMissing": "SKU ekleyin",
+        "skuDuplicate": "Bu SKU dosyada birden fazla kez var",
+        "skuExists": "Bu SKU ile eBay'de zaten bir ilan var",
+        "conditionInvalid": "Bilinmeyen durum",
+        "ready": "Düzenleyiciden gönderilmeye hazır",
+        "incomplete": "Düzenleyicide tamamlayın",
+        "openEditor": "Düzenleyicide aç",
+        "note": "Her satır yeni bir eBay ilan taslağı olarak kaydedilir. Düzenleyicisinden göndermediğiniz sürece hiçbir şey listelenmez.",
+        "summary": "{rows} satır · {ready} hazır · {incomplete} düzenleyicide tamamlanacak · {invalid} geçersiz",
+        "stage": "{count} yeni ilanı kaydet",
+        "staged": "{count} yeni ilan kaydedildi · henüz gönderilmedi"
+      }
     },
     "export": {
       "selectedTooMany": "Tek seferde dışa aktarmak için çok fazla ilan seçili. Geçerli görünümü veya tüm ilanları kullanın.",
@@ -13832,6 +13890,65 @@
       "download": "CSV indir",
       "preparing": "CSV hazırlanıyor…",
       "failed": "CSV indirilemedi. Tekrar deneyin."
+    },
+    "newDrafts": {
+      "title": "{count, plural, one {# yeni ilan} other {# yeni ilan}} henüz {marketplace}'de değil",
+      "show": "Göster",
+      "hide": "Gizle",
+      "open": "Aç",
+      "discard": "Vazgeç",
+      "discardConfirm": "\"{title}\" silinsin mi?",
+      "discardBody": "Hiç gönderilmedi, bu yüzden {marketplace}'de hiçbir şey değişmez. Taslak ve hazırlanan fotoğrafları silinir.",
+      "discarded": "Yeni ilan silindi",
+      "untitled": "Başlıksız ilan",
+      "photos": "{count, plural, =0 {Fotoğraf yok} one {# fotoğraf} other {# fotoğraf}}",
+      "copyTo": "{shop} mağazasına kopya",
+      "partiallyCreated": "{marketplace}'de kısmen oluşturuldu (#{id}): göndermeyi tamamlamak için açın",
+      "willPublish": "Gönderilince yayına girer",
+      "failed": "Son gönderim başarısız",
+      "sending": "Gönderiliyor…"
+    },
+    "setField": {
+      "title": "{count, plural, one {# ilanda alan ayarla} other {# ilanda alan ayarla}}",
+      "help": "Yalnızca taslakları doldurur. Siz gönderene kadar Etsy'de hiçbir şey değişmez.",
+      "field": "Alan",
+      "itemDetails": "Kim yaptı, ne zaman yapıldı, ne olduğu",
+      "dimensions": "Ölçü",
+      "keep": "Olduğu gibi kalsın",
+      "categoryHelp": "Kategori detayları burada değişmez. Her ilanın düzenleyicisinde kontrol edin.",
+      "materialsHelp": "Seçili tüm ilanlarda malzemelerin yerine geçer",
+      "stage": "{count, plural, =0 {Değişiklikleri hazırla} one {# değişikliği hazırla} other {# değişikliği hazırla}}",
+      "pickValue": "Önce bir değer seçin",
+      "descriptionAddHelp": "Her ilanın kendi açıklamasına, arada boş bir satırla eklenir",
+      "descriptionAppend": "Sonuna ekle",
+      "descriptionPrepend": "Başına ekle",
+      "descriptionReplace": "Değiştir",
+      "descriptionReplaceHelp": "Seçili tüm ilanlarda açıklamanın yerine geçer",
+      "descriptionSkipped": "{count} ilan atlandı: açıklamada gönderilmemiş bir değişiklik var, okunamadı ya da çok uzun olur",
+      "materialsAdd": "Ekle",
+      "materialsAddHelp": "Her ilanın kendi malzemelerine eklenir (en fazla 13)",
+      "materialsNoChange": "Hiçbir ilanda değişiklik gerekmedi",
+      "materialsRemove": "Kaldır",
+      "materialsRemoveHelp": "Bulunduğu her ilanın malzemelerinden kaldırılır",
+      "materialsReplace": "Değiştir",
+      "materialsSkipped": "{count} ilan atlandı: malzemelerinde gönderilmemiş bir değişiklik var ya da okunamadı",
+      "personalization": "Kişiselleştirme",
+      "personalizationInstructions": "Alıcılar için talimatlar",
+      "personalizationInstructionsHelp": "En fazla {max} karakter. İlanın kişiselleştirme sorularının yerine geçer",
+      "personalizationMaxChars": "Alıcı yanıtı: karakter sınırı",
+      "personalizationOff": "Kapalı",
+      "personalizationOffHelp": "Gönderdiğinizde seçili tüm ilanlardan kişiselleştirmeyi kaldırır",
+      "personalizationOn": "Açık (tek metin sorusu)",
+      "personalizationRequired": "Alıcıların doldurması zorunlu"
+    },
+    "copyToShop": {
+      "title": "{count, plural, one {# ilanı başka mağazaya kopyala} other {# ilanı başka mağazaya kopyala}}",
+      "help": "Her kopya, gönderdiğinizde o mağazada yeni bir ilan olur. Fotoğraflar, etiketler ve detaylar da gelir.",
+      "target": "Mağaza",
+      "pick": "Bir mağaza seçin",
+      "stage": "{count, plural, =0 {Kopyaları hazırla} one {# kopyayı hazırla} other {# kopyayı hazırla}}",
+      "skipped": "{count, plural, one {# ilan} other {# ilan}} atlandı: önce diğer değişikliklerini gönderin veya vazgeçin",
+      "staged": "{shop} için {count, plural, one {# kopya} other {# kopya}} hazırlandı. Hazır olduğunuzda ilanları seçip gönderin"
     }
   },
   "listingEditor": {
@@ -14005,7 +14122,8 @@
       "shopsFailed": "Etsy mağazalarınız yüklenemedi",
       "connectTitle": "İlanlarınızı düzenlemek için Etsy'yi bağlayın",
       "connectBody": "Mağazanız bağlandığında ilanlarınız, fotoğraflarınız ve taslaklarınız burada görünür.",
-      "crosslistFailed": "Kopyalanacak Etsy ilanı yüklenemedi"
+      "crosslistFailed": "Kopyalanacak Etsy ilanı yüklenemedi",
+      "crosslistEbayFailed": "Kopyalanacak eBay ilanı yüklenemedi"
     },
     "createdOnSend": "Bu ilanı gönderdiğinizde Etsy'de oluşturulur",
     "stageFailed": "Kaydedilemedi. Tekrar deneyin",
@@ -14560,7 +14678,10 @@
       "emptyTitle": "Henüz profil yok",
       "emptyBody": "Bir ilanın etiketlerini, detaylarını veya kargo bilgisini profil olarak kaydedin, yeni ilanları tek tıkla doldurun",
       "draftOnly": "Uygulamak yalnızca taslağı doldurur. Hemen ardından geri alabilirsiniz",
-      "storageFailed": "Bu cihaza kaydedilemedi. Tarayıcının site depolamasına izin verdiğini kontrol edin"
+      "storageFailed": "Bu cihaza kaydedilemedi. Tarayıcının site depolamasına izin verdiğini kontrol edin",
+      "delete": "Profili sil",
+      "deleteConfirm": "\"{name}\" profili silinsin mi?",
+      "deleted": "\"{name}\" profili silindi"
     },
     "media": {
       "invalidUrl": "Bu görsel bağlantısı kullanılamıyor. Herkese açık bir https bağlantısı kullanın",

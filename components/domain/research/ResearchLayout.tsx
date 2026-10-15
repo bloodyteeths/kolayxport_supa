@@ -8,10 +8,9 @@
 // (hidden options never render; a disabled option carries its reason). Mobile: the shell TopBar owns the title,
 // so the switch moves into ⋯ ("Marketplace: eBay") and the tabs scroll horizontally (the allowed h-scroll).
 //
-// A tool that has not shipped yet links to its legacy route until its PR flips `RESEARCH_TOOL_SHIPPED` (all five
-// tools are on the hub since R3).
+// The hub is the only research UI: no flag gate, no legacy fallbacks (the old research routes only redirect here,
+// lib/research/legacyRoutes.ts).
 import * as React from 'react';
-import { useRouter } from 'next/router';
 import Box from '@mui/material/Box';
 import { useTranslations } from 'next-intl';
 import { Page, PageHeader, type ActionSpec } from '@/components/ds/page';
@@ -20,9 +19,6 @@ import { FilterButton } from '@/components/ds/toolbar/FilterButton';
 import type { FilterOption } from '@/components/ds/toolbar/types';
 import { LogoTile } from '@/components/ds/data/LogoTile';
 import { Tabs } from '@/components/ds/inputs/Tabs';
-import { EmptyState } from '@/components/ds/state/EmptyState';
-import { icons } from '@/lib/ds/icons';
-import { defaultUiFlags, readClientUiOverride, resolveUiFlag } from '@/lib/ds/uiFlags';
 import { useConnections } from '@/lib/hooks/useConnections';
 import { urlField, useUrlState } from '@/lib/ds/useUrlState';
 import { RESEARCH_MKTS, isResearchMkt as isMkt, type ResearchMkt } from '@/lib/research/types';
@@ -41,35 +37,8 @@ export const RESEARCH_TOOL_PATH: Record<ResearchTab, string> = {
   shops: '/app/research/shops',
 };
 
-/** Which tools have their hub route live. R2 integrator flipped `keywords`; R3 integrator flipped `shops` (pages/app/research/shops.tsx). */
-export const RESEARCH_TOOL_SHIPPED: Record<ResearchTab, boolean> = {
-  home: true,
-  products: true,
-  keywords: true,
-  listings: true,
-  shops: true,
-};
-
-/** Legacy routes for tools that are not on the hub yet (verified against the legacy route files). */
-function legacyToolHref(tab: ResearchTab, mkt: ResearchMkt): string {
-  if (mkt === 'amazon') return '/app/amazon-research';
-  if (mkt === 'trendyol') return '/app/trendyol-arastirma';
-  if (tab === 'keywords') return mkt === 'ebay' ? '/app/ebay-research?sub=keyword_intelligence' : '/app/etsy-research?tab=research';
-  if (tab === 'shops') return mkt === 'ebay' ? '/app/ebay-research?sub=seller_tracker' : '/app/etsy-research?tab=shopIntel';
-  return mkt === 'ebay' ? '/app/ebay-research' : '/app/etsy-research';
-}
-
-/** Legacy page for a marketplace (flag `research` off). */
-export function legacyResearchHref(mkt: ResearchMkt | undefined): string {
-  if (mkt === 'ebay') return '/app/ebay-research';
-  if (mkt === 'trendyol') return '/app/trendyol-arastirma';
-  if (mkt === 'amazon') return '/app/amazon-research';
-  return '/app/etsy-research';
-}
-
 /** Href of a tool with the current marketplace (and optional extra query). */
 export function researchToolHref(tab: ResearchTab, mkt?: ResearchMkt, extra?: Record<string, string | undefined>): string {
-  if (!RESEARCH_TOOL_SHIPPED[tab]) return legacyToolHref(tab, mkt ?? 'etsy');
   const sp = new URLSearchParams();
   if (mkt) sp.set('mkt', mkt);
   for (const [k, v] of Object.entries(extra ?? {})) if (v !== undefined && v !== '') sp.set(k, v);
@@ -293,47 +262,3 @@ export function ResearchLayout({
 }
 
 export default ResearchLayout;
-
-// ─── Route gate (flag `research`) ───────────────────────────────────────────────────────────────────────
-
-/**
- * Hub routes live behind the `research` flag (DS §7.1.5). Flag off → the legacy page for the requested
- * marketplace. When the build default has the flag ON (so the legacy routes redirect to the hub, R1-E) but this
- * viewer turned it off with `?ui=`, an automatic redirect would bounce forever; the gate shows a link instead.
- */
-export function useResearchRouteGate(): { state: 'pending' | 'on' | 'off-redirect' | 'off-link' } {
-  const [state, setState] = React.useState<'pending' | 'on' | 'off-redirect' | 'off-link'>('pending');
-  React.useEffect(() => {
-    const defaults = defaultUiFlags();
-    const on = resolveUiFlag('research', defaults, readClientUiOverride());
-    setState(on ? 'on' : defaults.has('research') ? 'off-link' : 'off-redirect');
-  }, []);
-  return { state };
-}
-
-export type ResearchRouteGateProps = {
-  /** `?mkt=` of the request (picks the legacy page). */
-  mkt?: string | string[];
-  children: React.ReactNode;
-};
-
-export function ResearchRouteGate({ mkt, children }: ResearchRouteGateProps) {
-  const t = useTranslations('research');
-  const router = useRouter();
-  const { state } = useResearchRouteGate();
-  const m = Array.isArray(mkt) ? mkt[0] : mkt;
-  const legacy = legacyResearchHref(isMkt(m) ? m : undefined);
-  React.useEffect(() => {
-    // Static pages: router.query is empty until hydration — wait for isReady so `?mkt=` picks the right page.
-    if (state === 'off-redirect' && router?.isReady) void router.replace(legacy);
-  }, [state, router, router?.isReady, legacy]);
-  if (state === 'on') return <>{children}</>;
-  if (state === 'off-link') {
-    return (
-      <Box sx={{ p: '24px' }}>
-        <EmptyState kind="first-use" icon={icons.research} title={t('legacy.title')} action={{ id: 'legacy', label: t('legacy.open'), href: legacy }} data-testid="research-legacy-link" />
-      </Box>
-    );
-  }
-  return null;
-}

@@ -1,6 +1,6 @@
 // lib/print/openPrintPage.ts — orders §2.3 / §12: opens the existing print pages
 // (`/app/print/packing-slips?ids=`, `/app/print/pick-list?ids=`) for a selection. Replaces
-// `components/print/PrintSelectionActions.tsx` (kept for the legacy page until it is deleted).
+// the old `PrintSelectionActions` buttons.
 //
 // Popup rule: call it synchronously inside the click handler (no await before it), so pop-up blockers treat
 // the new tab as a user gesture. Pure apart from `window.open`; the caller shows the returned outcome.

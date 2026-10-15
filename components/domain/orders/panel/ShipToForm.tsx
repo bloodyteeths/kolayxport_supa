@@ -13,9 +13,11 @@ import { useTranslations } from 'next-intl';
 import { FormField } from '@/components/ds/inputs/FormField';
 import { TextField } from '@/components/ds/inputs/TextField';
 import { Select, type SelectOption } from '@/components/ds/inputs/Select';
+import { Button } from '@/components/ds/inputs/Button';
 import { CountrySelect } from '@/components/ds/inputs/CountrySelect';
 import { PhoneInput, toE164 } from '@/components/ds/inputs/PhoneInput';
 import type { ShipTo } from '@/lib/orders/types';
+import { toIso2, type SenderProfile } from '@/lib/shipping/labelDraft';
 import { stateRequired, US_STATES, CA_PROVINCES } from '@/lib/shipping/regions';
 
 /** Same shape as `LabelDraft['shipTo']` (orders §6.1). */
@@ -56,6 +58,12 @@ export interface ShipToFormProps {
   showDistrict?: boolean;
   /** Mark fields required (label asterisk only; the caller still validates). Phone/district for DHL. */
   required?: Partial<Record<ShipToFieldKey, boolean>>;
+  /**
+   * Seller's own phone (E.164) offered as a one-click "Use my phone (…)" under an empty phone field.
+   * Never applied automatically (orders §6.1: the recipient phone comes from the order); G4 passes it for
+   * DHL eCommerce only, where a phone is required and Trendyol orders never carry one.
+   */
+  phoneFallback?: string;
   /** Focus this field on mount (Fix address: the first invalid field). */
   autoFocusField?: ShipToFieldKey;
   /** Prefix for the control ids (`${idPrefix}-${field}`), so a caller can focus a field by id. */
@@ -78,6 +86,11 @@ export function phoneToE164(phone: string | null | undefined, country: string | 
     return digits ? `+${digits}` : '';
   }
   return toE164((country || 'TR').toUpperCase(), raw);
+}
+
+/** Seller's phone as E.164 for the "Use my phone" offer; '' when the sender profile has none. */
+export function senderPhoneE164(sender: SenderProfile | null | undefined): string {
+  return phoneToE164(sender?.shipperPhoneNumber, toIso2(sender?.shipperCountryCode) || 'TR');
 }
 
 /** `OrderRow.shipTo` → form value. */
@@ -115,10 +128,11 @@ export function stateCode(country: string, state: string): string {
 }
 
 export function ShipToForm({
-  value, onChange, errors = {}, onBlurField, showDistrict, required = {}, autoFocusField, idPrefix = 'shipto', disabled,
+  value, onChange, errors = {}, onBlurField, showDistrict, required = {}, phoneFallback, autoFocusField, idPrefix = 'shipto', disabled,
   className, 'data-testid': testId,
 }: ShipToFormProps) {
   const t = useTranslations('createLabel.field');
+  const tl = useTranslations('createLabel');
   const country = (value.country || '').toUpperCase();
   const withDistrict = showDistrict ?? country === 'TR';
   const stateSelect = stateRequired(country);
@@ -168,6 +182,22 @@ export function ShipToForm({
             data-testid="shipto-phone"
           />
         </FormField>
+        {phoneFallback && !(value.phone || '').trim() && !disabled ? (
+          <Box sx={{ mt: '4px' }}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const nextValue = { ...value, phone: phoneFallback };
+                onChange(nextValue);
+                onBlurField?.('phone', nextValue);
+              }}
+              data-testid="shipto-use-sender-phone"
+            >
+              {tl('useSenderPhone', { phone: phoneFallback })}
+            </Button>
+          </Box>
+        ) : null}
       </Box>
       <Box className="span2">{text('email', { type: 'email', autoComplete: 'email', optional: !required.email })}</Box>
       <Box className="span2">

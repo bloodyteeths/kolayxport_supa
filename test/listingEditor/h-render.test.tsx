@@ -22,9 +22,11 @@ import { ReviewDifferencesPanel } from '@/components/domain/listing-editor/Revie
 import { ProfilesModal, PROFILE_STORAGE_KEY } from '@/components/domain/listing-editor/ProfilesModal';
 import { ScheduleModal } from '@/components/domain/listing-editor/ScheduleModal';
 import { H_EN, H_TR, mergeMessages } from './h-messages';
+import { ETSY_PORT_EN, ETSY_PORT_TR } from '../listings/etsy-port-messages';
 
 type Locale = 'en' | 'tr';
-const MESSAGES = { en: mergeMessages(en, H_EN), tr: mergeMessages(tr, H_TR) };
+// + the listings-etsy port keys (profile delete) until messages/*.json are merged.
+const MESSAGES = { en: mergeMessages(mergeMessages(en, H_EN), ETSY_PORT_EN), tr: mergeMessages(mergeMessages(tr, H_TR), ETSY_PORT_TR) };
 
 function wrap(ui: React.ReactElement, locale: Locale = 'en') {
   return render(

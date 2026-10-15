@@ -7,10 +7,10 @@
 // `banners`, `mobilePrimary` (documented on the props).
 //
 // Founder decision (BUILD_PLAN M9, "analytics is Home"): Home stays `/app/analytics` (`HOME_HREF`), and Home *is* the
-// Reports overview: `/app/analytics` (flag on, pages/app/analytics.tsx) and `/app/reports` render the same Sales
-// report, and the Sales tab links Home (`SALES_TAB_PATH = HOME_HREF`). The nav has no separate Reports row: with the
-// flag on, the Home row is active on every `/app/reports/*` tab and the legacy "Finance" row is dropped
-// (lib/nav/useNavModel.ts `reportsV2`). Profit/Payouts/Transactions live under `/app/reports/*`.
+// Reports overview: `/app/analytics` (pages/app/analytics.tsx) and `/app/reports` render the same Sales
+// report, and the Sales tab links Home (`SALES_TAB_PATH = HOME_HREF`). The nav has no separate Reports row: the
+// Home row is active on every `/app/reports/*` tab (lib/nav/useNavModel.ts). Profit/Payouts/Transactions live under
+// `/app/reports/*`.
 //
 // Shared URL state (§1): `from`, `to` (YYYY-MM-DD in the seller timezone), `preset`, `g` (granularity override).
 // The tab links carry `from`/`to`/`preset`, so the range survives a tab switch, Back works and links are shareable.
@@ -32,7 +32,6 @@ import { LogoTile } from '@/components/ds/data/LogoTile';
 import { FeatureGate } from '@/components/domain/billing/FeatureGate';
 import { useFeatureAccess } from '@/lib/billing/useFeatureAction';
 import { isTabGated } from '@/lib/billing/featureMap';
-import { defaultUiFlags, readClientUiOverride, resolveUiFlag } from '@/lib/ds/uiFlags';
 import { urlField, useUrlState, type UrlQuery } from '@/lib/ds/useUrlState';
 import { useFormatters } from '@/lib/format';
 import { control, neutral, px, space } from '@/lib/ds/tokens';
@@ -63,7 +62,7 @@ export const REPORT_TABS: readonly ReportTab[] = ['sales', 'profit', 'payouts', 
 /** The Reports hub route that also renders Sales (spec §0.3 `/app/reports`). */
 export const REPORTS_INDEX_PATH = '/app/reports';
 
-/** The Sales tab's href: Home (`/app/analytics`), which renders `SalesReport` behind the `reports` flag. */
+/** The Sales tab's href: Home (`/app/analytics`), which renders `SalesReport`. */
 export const SALES_TAB_PATH: string = HOME_HREF;
 
 /** Canonical path per tab. Sales = Home in the end state (founder decision; see `SALES_TAB_PATH`). */
@@ -88,54 +87,6 @@ export function reportTabHref(tab: ReportTab, query: UrlQuery = {}, extra: Recor
   for (const [k, v] of Object.entries(extra)) if (v) sp.set(k, v);
   const qs = sp.toString();
   return qs ? `${REPORT_TAB_PATH[tab]}?${qs}` : REPORT_TAB_PATH[tab];
-}
-
-// ── flag gate for the /app/reports/* routes ─────────────────────────────────────────────────────────────
-
-export type ReportsFlagState = 'pending' | 'on' | 'off';
-
-/**
- * The `reports` flag, resolved after mount (build default + `?ui=` override). `pending` on the server and the first
- * client render, so a route never redirects before the viewer's override is known.
- */
-export function useReportsFlag(): ReportsFlagState {
-  const [state, setState] = React.useState<ReportsFlagState>('pending');
-  React.useEffect(() => {
-    setState(resolveUiFlag('reports', defaultUiFlags(), readClientUiOverride()) ? 'on' : 'off');
-  }, []);
-  return state;
-}
-
-/** Pure: the legacy destination of a Reports route while the flag is off (§0.3: links never break). */
-export function legacyReportsHref(tab: ReportTab, query: UrlQuery = {}): string {
-  const sp = new URLSearchParams();
-  for (const [k, v] of Object.entries(query)) {
-    if (v == null) continue;
-    for (const s of Array.isArray(v) ? v : [v]) sp.append(k, s);
-  }
-  const qs = sp.toString();
-  const base = tab === 'sales' ? HOME_HREF : '/app/financials';
-  return qs ? `${base}?${qs}` : base;
-}
-
-export interface ReportsRouteGateProps {
-  tab: ReportTab;
-  children: React.ReactNode;
-}
-
-/**
- * `/app/reports/*` route wrapper: flag on → the new tab; flag off → `router.replace` to the legacy page (Home or
- * `/app/financials`), keeping the query. Renders nothing while the flag or the query is unknown.
- */
-export function ReportsRouteGate({ tab, children }: ReportsRouteGateProps) {
-  const router = useRouter();
-  const flag = useReportsFlag();
-  const ready = Boolean(router?.isReady);
-  React.useEffect(() => {
-    if (flag === 'off' && ready) void router.replace(legacyReportsHref(tab, (router.query ?? {}) as UrlQuery));
-  }, [flag, ready, router, tab]);
-  if (flag !== 'on') return null;
-  return <>{children}</>;
 }
 
 // ── shared range state ──────────────────────────────────────────────────────────────────────────────────

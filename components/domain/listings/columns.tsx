@@ -68,6 +68,11 @@ export function hasOpenChanges(row: ListingRow): boolean {
   return Boolean(s && s.status !== 'synced' && !s.queuedDelete && s.changedFields.length > 0);
 }
 
+/** Trendyol rows the marketplace archived (`statusRaw` carries `archived`); only these offer Unarchive (pure). */
+export function isArchivedRow(row: ListingRow): boolean {
+  return row.statusRaw.split(',').includes('archived');
+}
+
 // ─── Row value helpers (pure) ───────────────────────────────────────────────
 
 /** The draft overlay shown for a row: local optimistic values first, then the server draft. */
@@ -78,6 +83,15 @@ export function overlayOf(row: ListingRow, overlays: ReadonlyMap<string, Listing
 export function displayPrice(row: ListingRow, overlays: ReadonlyMap<string, ListingDraftOverlay>): number | null {
   const o = overlayOf(row, overlays);
   return o.price ?? row.price?.amount ?? null;
+}
+
+/** Trendyol list price shown for a row (draft overlay first, then the live `extra.listPrice`); null when unknown. */
+export function displayListPrice(row: ListingRow, overlays: ReadonlyMap<string, ListingDraftOverlay>): number | null {
+  const o = overlayOf(row, overlays);
+  if (typeof o.listPrice === 'number') return o.listPrice;
+  const v = row.extra.listPrice;
+  const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() ? Number(v) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 export function displayQty(row: ListingRow, overlays: ReadonlyMap<string, ListingDraftOverlay>): number | null {

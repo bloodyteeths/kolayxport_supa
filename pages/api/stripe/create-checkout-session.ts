@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { stripe } from '@/lib/stripe';
 import { getAuthUser } from '@/lib/auth';
 import { logger } from '@/lib/logger';
+import { checkoutSuccessUrl, checkoutCancelUrl } from '@/lib/billing/checkoutUrls';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -221,8 +222,8 @@ export default async function handler(req, res) {
             interval: interval,
           }
         },
-        success_url: `${req.headers.origin || 'http://localhost:3000'}/app?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${req.headers.origin || 'http://localhost:3000'}/fiyatlandirma`,
+        success_url: checkoutSuccessUrl(req.headers.origin),
+        cancel_url: checkoutCancelUrl(req.headers.origin),
       });
 
       res.status(200).json({ sessionId: checkoutSession.id, url: checkoutSession.url });

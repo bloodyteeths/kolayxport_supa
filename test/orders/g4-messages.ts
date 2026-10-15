@@ -190,7 +190,9 @@ export const G4_EN = {
       dhlMixed: 'DHL eCommerce only works when every order ships within Turkey',
       presetDefault: 'Weight from each order',
       sendTracking: 'Send tracking to each marketplace',
+      noPhone: '{count, plural, one {# order has} other {# orders have}} no recipient phone',
     },
+    useSenderPhone: 'Use my phone ({phone})',
   },
 };
 
@@ -375,7 +377,9 @@ export const G4_TR = {
       dhlMixed: 'DHL eCommerce yalnızca tüm siparişler Türkiye içine gönderiliyorsa kullanılabilir',
       presetDefault: 'Ağırlık her siparişten',
       sendTracking: 'Takip numarasını her pazaryerine gönder',
+      noPhone: '{count} siparişte alıcı telefonu yok',
     },
+    useSenderPhone: 'Telefonumu kullan ({phone})',
   },
 };
 

@@ -12,7 +12,7 @@ import { OverflowMenu, orderOverflowItems } from '@/components/ds/overlay/Overfl
 import { StickyActionBar, ACTION_BAR_VAR } from '@/components/ds/overlay/StickyActionBar';
 import { Tooltip } from '@/components/ds/overlay/Tooltip';
 import { ActionButton } from '@/components/ds/overlay/actions';
-import { ConfirmProvider as LegacyConfirmProvider } from '@/lib/hooks/useConfirm';
+import { ConfirmProvider as HooksConfirmProvider } from '@/lib/hooks/useConfirm';
 import { panelWidth, zIndex } from '@/lib/ds/tokens';
 import { LOCALES, m, renderIntl } from './m1c-helpers';
 
@@ -118,12 +118,12 @@ describe.each(LOCALES)('useConfirm DS (%s)', (locale) => {
     expect(results).toEqual([true, false]);
   });
 
-  it('falls back to the legacy provider mounted in _app (lib/hooks/useConfirm API unchanged)', async () => {
+  it('lib/hooks/useConfirm exports the same provider (older import path keeps working)', async () => {
     const results: boolean[] = [];
     renderIntl(
-      <LegacyConfirmProvider>
+      <HooksConfirmProvider>
         <ConfirmHarness onResult={(ok) => results.push(ok)} />
-      </LegacyConfirmProvider>,
+      </HooksConfirmProvider>,
       locale,
     );
     fireEvent.click(screen.getByText('open'));

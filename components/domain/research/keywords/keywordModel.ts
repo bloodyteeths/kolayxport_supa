@@ -166,14 +166,6 @@ export function monthName(month: number, locale: string): string {
   }
 }
 
-/** Legacy keyword tool per marketplace while the `research` flag is off (verified against the legacy routes). */
-export function legacyKeywordsHref(mkt: string | undefined): string {
-  // etsy-research.tsx tabs are research | grader | shopIntel (keywords and ranks live in the research tab).
-  if (mkt === 'ebay') return '/app/ebay-research?sub=keyword_intelligence';
-  if (mkt === 'amazon') return '/app/amazon-research';
-  return '/app/etsy-research?tab=research';
-}
-
 /** Full explorer for one listing (the panel's "Open full Keyword explorer ↗"). */
 export function explorerHref(listingId: string, shopId?: string | null, view: KeywordView = 'suggested'): string {
   const sp = new URLSearchParams({ listing: listingId });

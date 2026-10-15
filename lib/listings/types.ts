@@ -35,7 +35,7 @@ export type ListingSyncKey = Extract<SyncStatusKey, 'pending' | 'syncing' | 'syn
 export const LISTING_SYNC_KEYS = ['pending', 'syncing', 'sync_failed', 'conflict', 'synced'] as const satisfies readonly ListingSyncKey[];
 
 /** Draft fields the grid overlays on the live values (§4 "Draft overlay"). */
-export type ListingDraftOverlay = { price?: number; qty?: number; title?: string };
+export type ListingDraftOverlay = { price?: number; qty?: number; title?: string; /** Trendyol list price (major units). */ listPrice?: number };
 
 export type ListingRowSync = {
   draftId: string;
@@ -509,10 +509,14 @@ export type ListingsExportOptions = {
 
 // ─── Staging adapter (§9.4; implemented by G5 `useStagedChanges`) ───────────
 
-export type StagePatch = { price?: number; qty?: number; title?: string; tags?: string[] };
+/** `listPrice`: CatalogDraft only (Trendyol list price, staged next to the sale price); other adapters ignore it. */
+export type StagePatch = { price?: number; qty?: number; title?: string; tags?: string[]; listPrice?: number };
 
 /** v1 queued actions the grid can stage. `delete` is never in "Send N"; it needs "Send deletion…". */
-export type StagedAction = { type: 'delete' | 'deactivate' | 'activate' | 'renew' | 'archive' | 'show' | 'hide' };
+export type StagedAction =
+  | { type: 'delete' | 'deactivate' | 'activate' | 'renew' | 'archive' | 'unarchive' | 'show' | 'hide' }
+  /** Etsy: copy the listing into another of the seller's shops (draftService queued `copy`, sent explicitly). */
+  | { type: 'copy'; targetShopId: string };
 
 export type StageOptions = { queuedActions?: StagedAction[]; scheduledSendAt?: string | null };
 

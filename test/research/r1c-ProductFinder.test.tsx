@@ -13,7 +13,7 @@ import en from '@/messages/en.json';
 import tr from '@/messages/tr.json';
 import { __resetShortcutsForTests } from '@/lib/ds/useShortcuts';
 import { __resetUrlStateForTests } from '@/lib/ds/useUrlState';
-import { LISTING_PREFILL_KEY } from '@/components/etsy/research/shared/listingPrefill';
+import { LISTING_PREFILL_KEY } from '@/lib/listings/listingPrefill';
 import { setViewport } from '../ds/m1e-helpers';
 import { R1C_EN, R1C_TR } from './r1c-messages';
 import { productsResponse } from './r1c-fixtures';
@@ -170,7 +170,7 @@ describe('Product finder states', () => {
 });
 
 describe('Draft a listing (primary) writes a prefill, never a marketplace', () => {
-  it('desktop header primary → sessionStorage prefill + creator route (editor-etsy on by default → new editor)', async () => {
+  it('desktop header primary → sessionStorage prefill + creator route (the new editor)', async () => {
     router.query = { q: 'halloween decor' };
     renderPage();
     await waitFor(() => expect(screen.getByTestId('research-cards')).toBeTruthy());
@@ -180,21 +180,6 @@ describe('Draft a listing (primary) writes a prefill, never a marketplace', () =
     expect(prefill).toMatchObject({ v: 1, target: 'etsy', source: 'etsy-research', price: 38, currency: 'USD', tags: ['halloween decor', 'spooky decor', 'fall decor'] });
     expect(prefill.title).toBeUndefined();
     expect(marketplaceWrites()).toEqual([]);
-  });
-
-  it('all flags off (NEXT_PUBLIC_UI_V2=none) → the legacy listings route keeps the creator', async () => {
-    vi.stubEnv('NEXT_PUBLIC_UI_V2', 'none');
-    try {
-      router.query = { q: 'halloween decor' };
-      renderPage();
-      await waitFor(() => expect(screen.getByTestId('research-cards')).toBeTruthy());
-      fireEvent.click(screen.getByText('Draft a listing'));
-      await waitFor(() => expect(router.push).toHaveBeenCalledWith('/app/etsy-listings?prefill=session'));
-      expect(window.sessionStorage.getItem(LISTING_PREFILL_KEY)).not.toBeNull();
-      expect(marketplaceWrites()).toEqual([]);
-    } finally {
-      vi.unstubAllEnvs();
-    }
   });
 
   it('mobile: the primary is a sticky action bar once results exist', async () => {
@@ -222,21 +207,6 @@ describe('compare mode', () => {
 });
 
 describe('review fixes', () => {
-  it('listings-etsy flag on (editor off): Draft a listing hands off to the listings route, which keeps the legacy creator', async () => {
-    vi.stubEnv('NEXT_PUBLIC_UI_V2', 'none'); // build default off, so the list override turns on listings-etsy only
-    try {
-      window.localStorage.setItem('kx-ui-override', 'listings-etsy');
-      router.query = { q: 'halloween decor' };
-      renderPage();
-      await waitFor(() => expect(screen.getByTestId('research-cards')).toBeTruthy());
-      fireEvent.click(screen.getAllByText('Draft a listing')[0]);
-      await waitFor(() => expect(router.push).toHaveBeenCalledWith('/app/etsy-listings?prefill=session'));
-      expect(window.sessionStorage.getItem(LISTING_PREFILL_KEY)).not.toBeNull();
-    } finally {
-      vi.unstubAllEnvs();
-    }
-  });
-
   it('Trendyol (not served yet) is an info state, never an error page', async () => {
     router.query = { q: 'kolye', mkt: 'trendyol' };
     productsBody = { data: null, errors: [{ section: 'marketplace', key: 'research.products.trendyolLater' }] };

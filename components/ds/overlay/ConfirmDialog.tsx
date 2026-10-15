@@ -2,14 +2,12 @@ import React, { createContext, useCallback, useContext, useEffect, useId, useRef
 import Box from '@mui/material/Box';
 import OutlinedInput from '@mui/material/OutlinedInput';
 import { useTranslations } from 'next-intl';
-import { useConfirm as useLegacyConfirm } from '@/lib/hooks/useConfirm';
 import { neutral as n, radius, tone as toneTokens } from '@/lib/ds/tokens';
 import { Modal } from './Modal';
 
 /**
- * DS confirm options. A superset of the legacy `components/ui/ConfirmDialog` `ConfirmOptions`
- * (`description`, `destructive` are accepted as aliases of `body`, `tone: 'danger'`), so
- * `components/ui/ConfirmDialog` can become a plain re-export shim (M1-f) without touching callers.
+ * DS confirm options (`description`, `destructive` are accepted as aliases of `body`, `tone: 'danger'`, so older
+ * callers of `lib/hooks/useConfirm` keep working unchanged).
  */
 export interface ConfirmOptions {
   /** Names the object: "Delete listing 'Baby Blanket'?" */
@@ -157,7 +155,7 @@ export function ConfirmDialog({
 export type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>;
 const DsConfirmContext = createContext<ConfirmFn | null>(null);
 
-/** Mount once (replaces the legacy provider in `_app` when the integrator switches). */
+/** Mount once (pages/_app.tsx). */
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   const [options, setOptions] = useState<ConfirmOptions | null>(null);
   const [open, setOpen] = useState(false);
@@ -192,28 +190,22 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
 /**
  * `const confirm = useConfirm(); if (!(await confirm({ title, tone: 'danger', typeToConfirm: shopName }))) return;`
  *
- * Uses the DS `ConfirmProvider` when mounted; otherwise delegates to the legacy provider from
- * `lib/hooks/useConfirm` (mounted in `_app` today), so DS callers work before the integrator swaps
- * providers. `lib/hooks/useConfirm` keeps its own API unchanged.
+ * Uses the `ConfirmProvider` mounted in `_app`; without one (isolated renders) it falls back to `window.confirm`
+ * (and `window.prompt` for `typeToConfirm`).
  */
 export function useConfirm(): ConfirmFn {
   const ds = useContext(DsConfirmContext);
-  const legacy = useLegacyConfirm();
   return useCallback<ConfirmFn>(
-    (opts) => {
+    async (opts) => {
       if (ds) return ds(opts);
-      return legacy({
-        title: opts.title,
-        description: opts.body ?? opts.description,
-        items: opts.items,
-        maxItems: opts.maxItems,
-        confirmLabel: opts.confirmLabel,
-        cancelLabel: opts.cancelLabel,
-        destructive: isDangerConfirm(opts),
-        typeToConfirm: opts.typeToConfirm,
-      });
+      if (typeof window === 'undefined') return false;
+      const body = opts.body ?? opts.description;
+      const text = [opts.title, typeof body === 'string' ? body : ''].filter(Boolean).join('\n\n');
+      const ok = window.confirm(text);
+      if (!ok || !opts.typeToConfirm) return ok;
+      return (window.prompt(opts.typeToConfirm) || '').trim() === opts.typeToConfirm.trim();
     },
-    [ds, legacy],
+    [ds],
   );
 }
 

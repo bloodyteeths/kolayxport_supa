@@ -240,11 +240,19 @@ export function sentItemFor(draft: CatalogDraftRecord): Record<string, unknown> 
   if (stored && typeof stored === 'object' && !Array.isArray(stored) && (stored as any).barcode === draft.externalId) {
     return stored as Record<string, unknown>;
   }
-  if (draft.queuedActions.some((a) => a.type === 'archive' && !a.completedAt)) return { barcode: draft.externalId, archived: true };
+  const archiveState = queuedArchiveState(draft);
+  if (archiveState !== null) return { barcode: draft.externalId, archived: archiveState };
   const item: Record<string, unknown> = { barcode: draft.externalId };
   if (draft.fieldPatch.quantity !== undefined) item.quantity = draft.fieldPatch.quantity;
   if (draft.fieldPatch.price !== undefined) item.salePrice = draft.fieldPatch.price;
   return item;
+}
+
+/** `true` for a queued archive, `false` for a queued unarchive (both go through the archive endpoint), else null. */
+export function queuedArchiveState(draft: Pick<CatalogDraftRecord, 'queuedActions'>): boolean | null {
+  if (draft.queuedActions.some((a) => a.type === 'archive' && !a.completedAt)) return true;
+  if (draft.queuedActions.some((a) => a.type === 'unarchive' && !a.completedAt)) return false;
+  return null;
 }
 
 const BATCH_KINDS: SentBatch['kind'][] = ['content', 'price', 'archive', 'create'];
@@ -260,7 +268,7 @@ export function sentBatchesFor(draft: CatalogDraftRecord, batchRequestId: string
     // A list from an earlier send (not holding the batch the draft now waits on) is stale: never poll it.
     if (list.length && list.some((b) => b.batchRequestId === batchRequestId)) return list;
   }
-  const archive = draft.queuedActions.some((a) => a.type === 'archive' && !a.completedAt);
+  const archive = queuedArchiveState(draft) !== null;
   return [{ kind: archive ? 'archive' : 'price', batchRequestId, item: sentItemFor(draft) }];
 }
 
@@ -345,8 +353,8 @@ export function createTrendyolSession(client: TrendyolApiClient, userId: string,
             const item = createItem(draft);
             createBarcode.set(draft.id, String(item.barcode));
             groups.create.push({ draft, barcode: String(item.barcode), item });
-          } else if (draft.queuedActions.some((a) => a.type === 'archive' && !a.completedAt)) {
-            groups.archive.push({ draft, barcode: draft.externalId, item: { barcode: draft.externalId, archived: true } });
+          } else if (queuedArchiveState(draft) !== null) {
+            groups.archive.push({ draft, barcode: draft.externalId, item: { barcode: draft.externalId, archived: queuedArchiveState(draft) } });
           } else {
             const content = hasContentPatch(draft) ? contentItem(draft, remote) : null;
             const price = hasPricePatch(draft) ? priceInventoryItem(draft, remote) : null;

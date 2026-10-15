@@ -13,6 +13,10 @@
 // entered), landed cost and margin are Estimates and are only shown when every input is known. Low-confidence AI
 // matches are collapsed. Per row the one primary is "List on eBay": a session prefill that opens the creator;
 // nothing is published and nothing is written to a marketplace here.
+//
+// Index freshness: "Prices updated {date}" (newest Trendyol read in the rows) and a ghost "Refresh prices" for the
+// chosen category (POST /api/research/price-gap/refresh, Pro, server cooldown 1 h + per-user limit). The scheduler job
+// `arbitrage-index-refresh` keeps every category filled; the button is the on-demand top-up.
 import * as React from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
@@ -44,19 +48,20 @@ import { useEntitlement } from '@/lib/billing/useEntitlement';
 import { LIMIT_UI_HEADER } from '@/lib/http/limitInterceptor';
 import { useAsyncRegion } from '@/lib/ds/useAsyncState';
 import { urlField, useUrlState } from '@/lib/ds/useUrlState';
-import { useUiFlag } from '@/lib/ds/uiFlags';
 import { icons } from '@/lib/ds/icons';
 import { neutral, radius } from '@/lib/ds/tokens';
 import { useConnections } from '@/lib/hooks/useConnections';
-import { prefillHref, writeListingPrefill } from '@/components/etsy/research/shared/listingPrefill';
+import { prefillHref, writeListingPrefill } from '@/lib/listings/listingPrefill';
 import {
   GAP_FROM,
   PRODUCT_SOURCES,
   WEIGHT_BANDS,
   bandBounds,
   bandsForCarrier,
+  canRefreshGapIndex,
   confidenceTier,
   ebayPrefill,
+  gapIndexUpdatedAt,
   parseTrendyolProductId,
   pickShipping,
   rowMargin,
@@ -202,14 +207,13 @@ function PriceGapBody({ amazonEligible = false, canWatch = false }: PriceGapProp
   const toast = useToast();
   const mobile = useIsMobile();
   const connections = useConnections();
-  const listingsOn = useUiFlag('listings-ebay');
-  const editorOn = useUiFlag('editor-ebay');
   const [url, setUrl] = useUrlState(PRICE_GAP_SCHEMA);
   const [linkDraft, setLinkDraft] = React.useState(url.url ?? '');
   const [linkInvalid, setLinkInvalid] = React.useState(false);
   const [showLow, setShowLow] = React.useState(false);
   const [showUnmatched, setShowUnmatched] = React.useState(false);
   const [ownShip, setOwnShip] = React.useState<number | null>(null);
+  const [refreshing, setRefreshing] = React.useState(false);
 
   const key = priceGapKey({ from: url.from, cat: url.cat, url: url.url });
   const swr = useSWR<ResearchResponse<PriceGapData>, PriceGapFetchError>(key, fetchGap, {
@@ -259,7 +263,7 @@ function PriceGapBody({ amazonEligible = false, canWatch = false }: PriceGapProp
       toast.error(t('toast.prefillFailed'), { persist: false });
       return;
     }
-    void router.push(listingsOn && editorOn ? '/app/ebay-listings/new?prefill=session' : prefillHref('ebay'));
+    void router.push(prefillHref('ebay'));
   };
 
   const watch = async (r: GapRowView) => {
@@ -274,6 +278,32 @@ function PriceGapBody({ amazonEligible = false, canWatch = false }: PriceGapProp
       toast.success(t('gap.toast.watched', { title: r.title.slice(0, 40) }));
     } catch {
       toast.error(t('gap.toast.watchFailed'), { persist: false });
+    }
+  };
+
+  // ── index freshness / refresh ────────────────────────────────────────────
+  const indexUpdatedAt = data ? gapIndexUpdatedAt(data.rows) : null;
+  const refreshCat = url.from === 'category' ? data?.category ?? null : null;
+  const refreshable = canRefreshGapIndex(indexUpdatedAt, Date.now());
+  const refreshIndex = async () => {
+    if (!refreshCat || refreshing) return;
+    setRefreshing(true);
+    try {
+      const res = await fetch('/api/research/price-gap/refresh', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', [LIMIT_UI_HEADER]: 'inline' },
+        body: JSON.stringify({ cat: refreshCat }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      const body = (await res.json().catch(() => null)) as { data?: { updatedAt?: unknown } } | null;
+      const at = typeof body?.data?.updatedAt === 'string' ? body.data.updatedAt : null;
+      await swr.mutate();
+      toast.success(at ? t('gap.indexUpdated', { date: fmt.date(at) }) : t('gap.refreshIndex'));
+    } catch {
+      toast.error(t('gap.refreshFailed'), { persist: false });
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -426,6 +456,27 @@ function PriceGapBody({ amazonEligible = false, canWatch = false }: PriceGapProp
           }}
           data-testid="price-gap-category"
         />
+      ) : null}
+      {refreshCat ? (
+        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }} data-testid="price-gap-freshness">
+          {indexUpdatedAt ? (
+            <Typography variant="caption" component="span" sx={{ color: neutral[600] }} data-testid="price-gap-updated">
+              {t('gap.indexUpdated', { date: fmt.date(indexUpdatedAt) })}
+            </Typography>
+          ) : null}
+          <Button
+            variant="ghost"
+            size={mobile ? 'md' : 'sm'}
+            icon={icons.pull}
+            onClick={() => void refreshIndex()}
+            loading={refreshing}
+            disabled={!refreshable}
+            disabledReason={!refreshable && indexUpdatedAt ? t('gap.indexUpdated', { date: fmt.date(indexUpdatedAt) }) : undefined}
+            data-testid="price-gap-refresh"
+          >
+            {t('gap.refreshIndex')}
+          </Button>
+        </Box>
       ) : null}
       {url.from === 'link' ? (
         <Box

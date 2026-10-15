@@ -1,6 +1,4 @@
 // /app/etsy-listings/[listingId] — the full-page Etsy listing editor (listing-editor §1, M6 Group A).
-// Behind the `editor-etsy` flag (lib/ds/uiFlags.ts): with it off the route sends you back to the list, where the
-// legacy drawer stays the default until the flag flips (it is deleted one release later, listing-editor §9).
 // A negative id is a staged new listing that is not on Etsy yet: it opens the same workspace in create mode.
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';

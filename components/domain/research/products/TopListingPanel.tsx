@@ -37,6 +37,17 @@ export type TopListingPanelProps = {
   onNext?: () => void;
 };
 
+/**
+ * eBay item → the Shop tracker's "Watch an eBay item" (prefilled `?add=` with the canonical item link), or null for
+ * other marketplaces / links without an item id (pure). Port of the legacy eBay research "Track product" button.
+ */
+export function watchItemHref(mkt: ResearchMkt, url: string | null | undefined): string | null {
+  if (mkt !== 'ebay' || !url) return null;
+  const m = /ebay\.[a-z.]+\/itm\/(?:[^/?#]+\/)?(\d{9,15})/i.exec(url);
+  if (!m) return null;
+  return `/app/research/shops?mkt=ebay&add=${encodeURIComponent(`https://www.ebay.com/itm/${m[1]}`)}`;
+}
+
 async function fetchShop(url: string): Promise<PublicShop> {
   const res = await fetch(url, { credentials: 'same-origin' });
   if (!res.ok) throw new Error(`shop ${res.status}`);
@@ -49,6 +60,7 @@ export function TopListingPanel({ row, mkt, onClose, onStartFrom, onPrev, onNext
   const shopKey = row && mkt === 'etsy' && row.shop.id ? `/api/clawd/etsy?action=get_public_shop&target_shop_id=${encodeURIComponent(row.shop.id)}` : null;
   const shop = useSWR<PublicShop>(shopKey, fetchShop, { revalidateOnFocus: false, dedupingInterval: 600_000, shouldRetryOnError: false });
   const age = row ? ageParts(row.ageDays) : null;
+  const watchHref = row ? watchItemHref(mkt, row.url) : null;
 
   return (
     <SidePanel
@@ -62,6 +74,7 @@ export function TopListingPanel({ row, mkt, onClose, onStartFrom, onPrev, onNext
       onNext={onNext}
       primary={row ? { id: 'start', label: t('top.startFrom'), icon: icons.ai, onClick: () => onStartFrom(row) } : undefined}
       secondary={row?.url ? { id: 'open', label: t('top.openOn', { marketplace: MKT_NAME[mkt] }), icon: icons.externalLink, onClick: () => window.open(row.url as string, '_blank', 'noopener,noreferrer') } : undefined}
+      overflow={watchHref ? [{ id: 'watchItem', label: t('top.watchItem'), href: watchHref }] : undefined}
       data-testid="research-top-panel"
     >
       {row ? (

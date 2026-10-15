@@ -17,7 +17,6 @@ import { Page, PageHeader, SyncMeta, usePageContext, type ActionSpec, type SyncM
 import { useIsMobile } from '@/components/ds/page/useViewport';
 import { usePageActions } from '@/lib/ds/usePageActions';
 import { useAsyncRegion } from '@/lib/ds/useAsyncState';
-import { useUiFlag } from '@/lib/ds/uiFlags';
 import { icons } from '@/lib/ds/icons';
 import { getLogo } from '@/lib/ds/logos';
 import { useFormatters } from '@/lib/format';
@@ -107,7 +106,6 @@ export function OverviewPage({ now: nowProp }: OverviewPageProps = {}) {
   const fmt = useFormatters();
   const { user } = useAuth() as { user: (AuthUserLike & { id?: string }) | null };
   const links = useNavLinks();
-  const ordersFlag = useUiFlag('orders');
   const conn = useConnections();
   const notifications = useNotifications();
   const counts = useMessageCountStore((s) => s.counts);
@@ -194,7 +192,7 @@ export function OverviewPage({ now: nowProp }: OverviewPageProps = {}) {
   const primary = primaryKind === 'goToOrders' ? goToOrders : primaryKind === 'newListing' ? newListing ?? undefined : primaryKind === 'connectStore' ? connectStore : undefined;
   const secondary: ActionSpec[] = newListing && primaryKind !== 'newListing' ? [newListing] : [];
   const overflow: ActionSpec[] = [
-    { id: 'addManualOrder', label: t('actions.addManualOrder'), icon: icons.add, href: ordersFlag ? '/app/labels?panel=manual' : '/app/labels' },
+    { id: 'addManualOrder', label: t('actions.addManualOrder'), icon: icons.add, href: '/app/labels?panel=manual' },
     { id: 'research', label: t('actions.research'), icon: icons.research, href: RESEARCH_HOME },
     { id: 'reports', label: t('actions.reports'), icon: icons.reports, href: links.reportsHref() },
   ];
@@ -245,7 +243,6 @@ export function OverviewPage({ now: nowProp }: OverviewPageProps = {}) {
     syncFailures: notifications.items,
     extensionDetected: conn.extension?.detected,
     anyMarketplace: conn.anyMarketplace,
-    flags: links.flags,
     now,
   });
   // DS P6: 15 s → "Still loading… Retry", 30 s → the whole-error state (never a stuck skeleton).

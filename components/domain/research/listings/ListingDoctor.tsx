@@ -5,7 +5,7 @@
 // Composition: Toolbar (search · Shop · Issue · Health · Sort) → DataTable (cards < 900) → DoctorPanel
 // (`?open=`). Primary = "Stage N fixes" (selection bulk bar or the open panel): it STAGES drafts, never sends;
 // the listings page's "Send N changes" picks them up (research §3.4). Bulk AI titles go to BulkGrid as dirty
-// cells (M7, flag `bulk`), never straight into drafts.
+// cells (M7), never straight into drafts.
 //
 // States (research §7.4, §3.6): not connected → ConnectState · connected, never pulled → first-use "Bring in
 // your listings first" · filtered empty → no-results · every listing ≥ 75 → done · 15 s slow · 30 s error ·
@@ -27,11 +27,10 @@ import { EmptyState } from '@/components/ds/state/EmptyState';
 import { ErrorState } from '@/components/ds/state/ErrorState';
 import { SlowState } from '@/components/ds/state/SlowState';
 import { CardListSkeleton, TableSkeleton } from '@/components/ds/state/Skeletons';
-import ConnectEmptyState from '@/components/ui/ConnectEmptyState';
+import { ConnectState } from '@/components/ds/state/ConnectState';
 import { ApiSourceNote } from '@/components/domain/research/products/ApiSourceNote';
 import { etsyConfig } from '@/components/domain/listings/config/etsy';
 import { useUrlState } from '@/lib/ds/useUrlState';
-import { useUiFlag } from '@/lib/ds/uiFlags';
 import { icons } from '@/lib/ds/icons';
 import { useConnections } from '@/lib/hooks/useConnections';
 import { useEntitlement } from '@/lib/billing/useEntitlement';
@@ -106,8 +105,6 @@ function DoctorForMkt({ mkt, navigate }: { mkt: DoctorMkt; navigate?: ListingDoc
   const fmt = useDsFormat();
   const toast = useToast();
   const mobile = useIsMobile();
-  const editorFlag = useUiFlag(mkt === 'etsy' ? 'editor-etsy' : 'editor-ebay');
-  const bulkFlag = useUiFlag('bulk');
   const entitlement = useEntitlement();
   const photoStudio = Boolean(entitlement.data?.features.bulkPhotoStudio);
   const connections = useConnections();
@@ -334,8 +331,8 @@ function DoctorForMkt({ mkt, navigate }: { mkt: DoctorMkt; navigate?: ListingDoc
     {
       id: 'doctor-bulk-titles',
       label: t('bulk.aiTitles'),
-      disabled: !bulkFlag || mobile,
-      disabledReason: !bulkFlag || mobile ? t('bulk.gridUnavailable') : undefined,
+      disabled: mobile,
+      disabledReason: mobile ? t('bulk.gridUnavailable') : undefined,
       onClick: () => go(`${bulkGridHref(mkt, selectedIds, shopId)}&ai=title`),
     },
   ];
@@ -347,7 +344,7 @@ function DoctorForMkt({ mkt, navigate }: { mkt: DoctorMkt; navigate?: ListingDoc
           primary: mobile ? stageFixesAction : undefined,
           actions: [
             ...(bulkBusy ? [{ id: 'doctor-bulk-stop', label: t('bulk.stop'), onClick: () => { bulkCancel.current = true; } }] : []),
-            ...(bulkFlag && !mobile
+            ...(!mobile
               ? [{ id: 'doctor-bulk-grid', label: root('research.action.openBulkGrid'), icon: icons.columns, onClick: () => go(bulkGridHref(mkt, selectedIds, shopId)) }]
               : []),
           ],
@@ -359,7 +356,16 @@ function DoctorForMkt({ mkt, navigate }: { mkt: DoctorMkt; navigate?: ListingDoc
 
   // ── states ───────────────────────────────────────────────────────────────────────────────────────────
   if (connected === false || (data && data.connected === false)) {
-    return <ConnectEmptyState provider={mkt} description={t('connectBody', { marketplace: MKT_NAME[mkt] })} data-testid="doctor-connect" />;
+    return (
+      <ConnectState
+        brand={mkt}
+        title={root('ui.connectEmpty.title', { name: MKT_NAME[mkt] })}
+        body={t('connectBody', { marketplace: MKT_NAME[mkt] })}
+        actionLabel={root('ui.connectEmpty.cta', { name: MKT_NAME[mkt] })}
+        connectHref="/ayarlar?tab=connections"
+        data-testid="doctor-connect"
+      />
+    );
   }
 
   const filtered = hasDoctorFilters(url);
@@ -486,7 +492,6 @@ function DoctorForMkt({ mkt, navigate }: { mkt: DoctorMkt; navigate?: ListingDoc
         onClose={() => setOpen(undefined)}
         onPrev={openIndex > 0 ? () => setOpen(rows[openIndex - 1].listing.id) : undefined}
         onNext={openIndex >= 0 && openIndex < rows.length - 1 ? () => setOpen(rows[openIndex + 1].listing.id) : undefined}
-        editorFlag={editorFlag}
         photoStudio={photoStudio}
         stage={stageMany}
         onStaged={() => void list.mutate()}

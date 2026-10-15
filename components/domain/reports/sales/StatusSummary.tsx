@@ -13,7 +13,6 @@ import { orderStatus } from '@/lib/ds/status/orders';
 import type { OrderStatusKey } from '@/lib/ds/status/vocabulary';
 import { icons } from '@/lib/ds/icons';
 import { accent, neutral, px, radius, space } from '@/lib/ds/tokens';
-import type { LinkFlags } from '@/lib/nav/links';
 import type { SalesStatusRow } from '@/lib/reports/useSalesReport';
 import { reportOrdersHref } from './StoreTable';
 
@@ -50,10 +49,9 @@ export interface StatusSummaryProps {
   rows: SalesStatusRow[];
   from: string;
   to: string;
-  flags: LinkFlags;
 }
 
-export function StatusSummary({ rows, from, to, flags }: StatusSummaryProps) {
+export function StatusSummary({ rows, from, to }: StatusSummaryProps) {
   const t = useTranslations('reports');
   const counts = React.useMemo(() => summarizeStatuses(rows), [rows]);
   const Next = icons.next;
@@ -68,7 +66,7 @@ export function StatusSummary({ rows, from, to, flags }: StatusSummaryProps) {
             <Box component="li" key={c.key} sx={{ borderTop: i === 0 ? 'none' : `1px solid ${neutral[100]}` }}>
               <Box
                 component={NextLink}
-                href={reportOrdersHref({ from, to, status: c.key }, flags)}
+                href={reportOrdersHref({ from, to, status: c.key })}
                 data-testid={`status-row-${c.key}`}
                 sx={{
                   display: 'flex',

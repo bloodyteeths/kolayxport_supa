@@ -42,8 +42,6 @@ vi.mock('@/lib/hooks/useConnections', () => ({
   useConnections: () => ({ has: (p: string) => conn[p], get: () => undefined, anyMarketplace: true, connections: {} }),
 }));
 vi.mock('@/lib/billing/useEntitlement', () => ({ useEntitlement: () => ({ data: { features: { bulkPhotoStudio: false } } }) }));
-const flags = new Set<string>();
-vi.mock('@/lib/ds/uiFlags', () => ({ useUiFlag: (k: string) => flags.has(k) }));
 
 import { ListingDoctor } from '@/components/domain/research/listings/ListingDoctor';
 
@@ -95,7 +93,6 @@ beforeEach(() => {
   router.push.mockClear();
   conn.etsy = true;
   conn.ebay = false;
-  flags.clear();
   calls = [];
   listBody = listResponse([doctorRow(), doctorRow({ issues: 2 }, { id: '222', title: 'Wooden Ring Box', health: { score: 61, used: 10, total: 12, fails: ['photos_count'] } })]);
   peersBody = peersResponse();
@@ -256,7 +253,6 @@ describe('Doctor panel: stage, never send', () => {
 
   it('variation listing: the price fix opens the editor instead of staging', async () => {
     listBody = listResponse([doctorRow({}, { editable: { price: false, qty: false, reason: 'variations' } })]);
-    flags.add('editor-etsy');
     const { navigate, sync } = renderDoctor();
     const table = await screen.findByTestId('doctor-table');
     fireEvent.click((await within(table).findAllByText('Baby Name Puzzle, Personalized Wooden Toy'))[0]);

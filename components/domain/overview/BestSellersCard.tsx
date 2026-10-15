@@ -24,7 +24,7 @@ export interface BestSellersCardProps {
   failed: boolean;
   errorId?: string;
   onRetry: () => void;
-  /** `ordersHref('search', null, null, q)` bound to the current flags. */
+  /** `ordersHref('search', null, null, q)`. */
   searchHref: (q: string) => string;
 }
 

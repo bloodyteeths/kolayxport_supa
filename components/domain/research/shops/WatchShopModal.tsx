@@ -1,6 +1,7 @@
 // components/domain/research/shops/WatchShopModal.tsx (research R3-B) — "Watch a shop" (research.md §8): Modal sm with
 // one TextField "Shop link or name"; the marketplace is detected from the link (etsy.com/shop/…, ebay.com/usr|str/…),
-// a plain name uses the hub's marketplace. Writes a KolayXport watch row only (POST /api/research/watches); the first
+// a plain name uses the hub's marketplace. An eBay item link (ebay.com/itm/…) watches that item: its price and sold
+// count are read on add and then daily (lib/research/ebayItemTracker.ts). Writes a KolayXport watch row only (POST /api/research/watches); the first
 // daily reading is taken by the snapshot job, so sales per day appear the next day.
 import * as React from 'react';
 import Typography from '@mui/material/Typography';
@@ -86,8 +87,12 @@ export function WatchShopModal({ open, onClose, mkt, initial, rows, quotaReason,
   const helper = parsed.ok
     ? existing
       ? t('research.shops.alreadyWatching', { shop: existing.label })
-      : t('research.shops.detected', { marketplace: MKT_NAME[parsed.request.marketplace], shop: parsed.name })
-    : t('research.shops.linkHelper', { marketplace: MKT_NAME[mkt] });
+      : parsed.request.type === 'ebayItem'
+        ? t('research.shops.watchEbayItem', { item: parsed.itemLabel ?? parsed.name })
+        : t('research.shops.detected', { marketplace: MKT_NAME[parsed.request.marketplace], shop: parsed.name })
+    : mkt === 'ebay'
+      ? t('research.shops.ebayItemPrompt')
+      : t('research.shops.linkHelper', { marketplace: MKT_NAME[mkt] });
 
   const submit = async () => {
     setTouched(true);

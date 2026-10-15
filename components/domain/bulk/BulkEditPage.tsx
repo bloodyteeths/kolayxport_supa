@@ -23,7 +23,6 @@ import { SlowState } from '@/components/ds/state/SlowState';
 import { TableSkeleton } from '@/components/ds/state/Skeletons';
 import type { BulkActionBarProps } from '@/components/ds/toolbar/BulkActionBar';
 import { useUrlState, urlField } from '@/lib/ds/useUrlState';
-import { useUiFlag } from '@/lib/ds/uiFlags';
 import { useAsyncRegion } from '@/lib/ds/useAsyncState';
 import { dispatchShortcutEvent, useShortcuts } from '@/lib/ds/useShortcuts';
 import { Modal } from '@/components/ds/overlay/Modal';
@@ -37,7 +36,7 @@ import { useUnsavedChangesGuard } from '@/lib/hooks/useUnsavedChangesGuard';
 import { useLiveRevalidate } from '@/components/live/useLiveEvent';
 import { readListingsCsv } from '@/lib/listings/csvImport';
 import type { ListingMarketplace, ListingRow, ListingSortKey, ListingSyncKey, ListingsQuery, ListingsResponse, StagedAction } from '@/lib/listings/types';
-import { BULK_FLAG, CONNECT_HREF, MARKETPLACE_NAME } from '@/components/domain/listings/config';
+import { CONNECT_HREF, MARKETPLACE_NAME } from '@/components/domain/listings/config';
 import type { ListingsT } from '@/components/domain/listings/columns';
 import {
   LISTINGS_LIVE_EVENTS,
@@ -676,9 +675,7 @@ export function BulkEditPage({ marketplace, transport: injectedTransport, stagin
   const [modalRows, setModalRows] = React.useState<ListingRow[]>([]);
   const [tagLookup, setTagLookup] = React.useState<Map<string, string[] | null>>(new Map());
   const photo = useFeatureAction('bulkPhotoStudio', { lockedHref: config.photosRoute ?? undefined });
-  // M7 integrator seam: PhotoStudio has its own `photo-studio` flag; with it off the route bounces to the list,
-  // so the grid only offers "Edit photos…" when both flags are on. `back` returns to this grid (safeBackHref).
-  const photoStudioOn = useUiFlag('photo-studio');
+  // "Edit photos…" opens PhotoStudio; `back` returns to this grid (safeBackHref).
   const gridRouter = useRouter();
 
   const editableRows = React.useCallback(
@@ -735,11 +732,14 @@ export function BulkEditPage({ marketplace, transport: injectedTransport, stagin
       if (!targets.length) return;
       // Current tags (live + this session's staged tags). Tags are only improved when every row's tags are known,
       // so an unknown tag list is never replaced by a suggestion.
+      // Marketplaces without a tags column (eBay: title only) skip the tag lookup.
       let lookup = new Map<string, string[] | null>();
-      try {
-        lookup = await loadTags(targets);
-      } catch {
-        lookup = new Map();
+      if (config.fields.includes('tags')) {
+        try {
+          lookup = await loadTags(targets);
+        } catch {
+          lookup = new Map();
+        }
       }
       const tagsOf = (r: ListingRow): string[] | null => {
         const v = values[r.id]?.tags;
@@ -750,7 +750,14 @@ export function BulkEditPage({ marketplace, transport: injectedTransport, stagin
       const summary = await ai.start(
         targets.map((r) => {
           const title = values[r.id]?.title;
-          return { rowId: r.id, listingId: r.id, title: typeof title === 'string' ? title : r.title, tags: tagsOf(r) ?? [] };
+          const category = r.extra.category;
+          return {
+            rowId: r.id,
+            listingId: r.id,
+            title: typeof title === 'string' ? title : r.title,
+            tags: tagsOf(r) ?? [],
+            ...(typeof category === 'string' && category ? { category } : {}),
+          };
         }),
         tagsKnown ? ['title', 'tags'] : ['title'],
       );
@@ -804,7 +811,7 @@ export function BulkEditPage({ marketplace, transport: injectedTransport, stagin
         onClick: () => void improveWithAi(selectedRows),
       });
     }
-    if (config.photosHref && photo.visible && photoStudioOn) {
+    if (config.photosHref && photo.visible) {
       const back = gridRouter.asPath.startsWith('/app/') ? `&back=${encodeURIComponent(gridRouter.asPath)}` : '';
       const href = `${config.photosHref(selectedRows.map((r) => r.id), storeId)}${back}`;
       actions.push({
@@ -842,7 +849,7 @@ export function BulkEditPage({ marketplace, transport: injectedTransport, stagin
       overflow,
       onClear: () => setSelectedIds([]),
     };
-  }, [selectedRows, config, t, editableRows, loadTags, toast, photo, storeId, sendAction, revertCells, stageActions, deleteSelected, ai, improveWithAi, sectionOptions, photoStudioOn, gridRouter.asPath]);
+  }, [selectedRows, config, t, editableRows, loadTags, toast, photo, storeId, sendAction, revertCells, stageActions, deleteSelected, ai, improveWithAi, sectionOptions, gridRouter.asPath]);
 
   // ── header overflow (§2): Find & replace · Export these rows (CSV) · Keyboard shortcuts ──
   // Find & replace stages through its own draft calls, so the grid queue is drained first (one writer per draft)
@@ -1157,22 +1164,9 @@ export function BulkEditPage({ marketplace, transport: injectedTransport, stagin
 
 export default BulkEditPage;
 
-// ─── Route switch (flag `bulk`) ─────────────────────────────────────────────
+// ─── Route ───────────────────────────────────────────────────────────────────
 
-/**
- * `/app/{marketplace-listings}/bulk` behind the `bulk` flag (lib/ds/uiFlags.ts). With the flag off the route sends
- * you back to the list (the legacy screens stay the default and untouched).
- */
+/** `/app/{marketplace-listings}/bulk`. */
 export function BulkEditRoute({ marketplace }: { marketplace: ListingMarketplace }) {
-  const on = useUiFlag(BULK_FLAG);
-  const router = useRouter();
-  const route = bulkConfig(marketplace).listings.route;
-  // useUiFlag resolves the `?ui=` override in an effect; wait one render before redirecting.
-  const [settled, setSettled] = React.useState(false);
-  React.useEffect(() => setSettled(true), []);
-  React.useEffect(() => {
-    if (settled && router.isReady && !on) void router.replace(route);
-  }, [settled, on, router, route]);
-  if (!on) return null;
   return <BulkEditPage marketplace={marketplace} />;
 }

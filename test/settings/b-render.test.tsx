@@ -38,12 +38,8 @@ vi.mock('axios', () => {
   return { default: { get, post: vi.fn(async () => ({ data: {} })), patch: vi.fn(async () => ({ data: {} })), delete: vi.fn(async () => ({ data: {} })) } };
 });
 
-vi.mock('@/components/legacy/settings/ConnectionsPanelLegacy', () => ({ default: () => <div data-testid="legacy-connections" /> }));
-vi.mock('@/components/legacy/settings/ApiKeysPanelLegacy', () => ({ default: () => <div data-testid="legacy-apikeys" /> }));
 
 import { ConnectionsSection, CredentialsSection, ProviderCredentialsPanel, StoreLimitModal } from '@/components/domain/settings/connections';
-import ConnectionsPanel from '@/components/settings/ConnectionsPanel';
-import ApiKeysPanel from '@/components/settings/ApiKeysPanel';
 import { SettingsShellContext, type SettingsShellValue } from '@/components/domain/settings/settingsNav';
 
 // ── fixtures ───────────────────────────────────────────────────────────────────────────────────────
@@ -323,26 +319,5 @@ describe.each(LOCALES)('CredentialsSection (%s)', (locale) => {
     renderB(<CredentialsSection credentials={store(VALUES)} />, locale);
     fireEvent.click(screen.getByTestId('credentials-row-fedex-action'));
     await waitFor(() => expect(screen.getByTestId('credentials-panel')).toBeTruthy());
-  });
-});
-
-describe('legacy switch shims', () => {
-  it('outside SettingsPage the legacy bodies render', () => {
-    renderB(<><ConnectionsPanel refreshKey={0} /><ApiKeysPanel integrationSettings={{}} onChange={() => undefined} /></>);
-    expect(screen.getByTestId('legacy-connections')).toBeTruthy();
-    expect(screen.getByTestId('legacy-apikeys')).toBeTruthy();
-  });
-  it('inside SettingsPage (shell context) the DS sections render', () => {
-    const shell: SettingsShellValue = {
-      tab: 'connections', mobile: false, provider: null, clearProvider: vi.fn(), focusProvider: null, focusNonce: 0,
-      connectionsRefreshKey: 0, goToTab: vi.fn(async () => true), confirmDiscard: vi.fn(async () => true),
-    };
-    renderB(
-      <SettingsShellContext.Provider value={shell}>
-        <ConnectionsPanel refreshKey={0} />
-      </SettingsShellContext.Provider>,
-    );
-    expect(screen.queryByTestId('legacy-connections')).toBeNull();
-    expect(screen.getByTestId('connections-section')).toBeTruthy();
   });
 });

@@ -52,11 +52,12 @@ export const ebayConfig: ListingsConfig = {
   views: ['all', 'active', 'not_sent', 'send_failed', 'needs_work', 'sold_out', 'inactive'],
   defaultView: 'all',
   rowInlineAction: 'edit',
-  // Spec deviation (listings-grid §3/§6.1): "Copy to Etsy" waits for the editor's cross-list prefill contract (M6).
+  // "Copy to Etsy" opens /app/etsy-listings/new?crosslist=ebay:<sku> (crosslistEbayToEtsy.ts).
   rowActions: [
     'quickView',
     'viewExternal',
     'copyListing',
+    'copyToEtsy',
     'reviewDifferences',
     'sendChange',
     'scheduleSend',

@@ -23,7 +23,6 @@ function input(summary: OverviewSummary | null | undefined, over: Partial<Attent
     syncFailures: [],
     extensionDetected: true,
     anyMarketplace: true,
-    flags: {},
     now: NOW,
     ...over,
   };
@@ -68,7 +67,8 @@ describe('buildAttentionRows', () => {
       'tracking',
       'notSent:etsy',
       'notSent:ebay',
-      // blocked: the usage row (11) is replaced by the paused row (1); listing health hidden without a doctor link
+      'listingHealth',
+      // blocked: the usage row (11) is replaced by the paused row (1); listing health always links the hub doctor
     ]);
     const kindsSeen = buildAttentionRows(input(s)).rows.map((r) => ATTENTION_ORDER.indexOf(r.kind));
     expect([...kindsSeen].sort((a, b) => a - b)).toEqual(kindsSeen);
@@ -151,7 +151,7 @@ describe('buildAttentionRows', () => {
   it('tracking: Review with the extension, Set up extension without it (or when unknown)', () => {
     const s = busySummary();
     const withExt = buildAttentionRows(input(s, { extensionDetected: true })).rows.find((r) => r.kind === 'tracking')!;
-    expect(withExt.cta.href).toBe('/app/labels?label=labeled&mp=etsy&from=all');
+    expect(withExt.cta.href).toBe('/app/labels?view=label_created&store=etsy');
     expect(withExt.pill).toEqual({ kind: 'status', domain: 'tracking', status: 'not_sent' });
     const without = buildAttentionRows(input(s, { extensionDetected: false })).rows.find((r) => r.kind === 'tracking')!;
     expect(without.cta.href).toBe(EXTENSION_SETUP_HREF);
@@ -161,29 +161,20 @@ describe('buildAttentionRows', () => {
     expect(buildAttentionRows(input(failed)).rows.find((r) => r.kind === 'tracking')!.pill).toEqual({ kind: 'status', domain: 'tracking', status: 'send_failed' });
   });
 
-  it('listing health shows only with a doctor link; label switches with the research flag', () => {
-    expect(kinds(busySummary())).not.toContain('listingHealth');
-    const m5 = buildAttentionRows(input(busySummary(), { flags: { 'listings-etsy': true } })).rows.find((r) => r.kind === 'listingHealth')!;
-    expect(m5.cta.href).toBe('/app/etsy-listings?view=needs_work');
-    expect(m5.cta.label).toEqual({ kind: 'key', key: 'overview.attention.health.ctaLegacy' });
-    expect(m5.pill).toEqual({ kind: 'score', score: 22 });
-    const r1 = buildAttentionRows(input(busySummary(), { flags: { research: true } })).rows.find((r) => r.kind === 'listingHealth')!;
-    expect(r1.cta.href).toBe('/app/research/listings');
-    expect(r1.cta.label).toEqual({ kind: 'key', key: 'overview.attention.health.cta' });
+  it('listing health always opens the hub Listing doctor', () => {
+    const row = buildAttentionRows(input(busySummary())).rows.find((r) => r.kind === 'listingHealth')!;
+    expect(row.cta.href).toBe('/app/research/listings');
+    expect(row.cta.label).toEqual({ kind: 'key', key: 'overview.attention.health.cta' });
+    expect(row.pill).toEqual({ kind: 'score', score: 22 });
   });
 
-  it('deep links follow the flags (legacy vs v2)', () => {
-    const legacy = buildAttentionRows(input(busySummary())).rows;
-    const v2 = buildAttentionRows(input(busySummary(), { flags: { orders: true, 'editor-etsy': true, 'listings-etsy': true } })).rows;
-    const href = (rows: typeof legacy, id: string) => rows.find((r) => r.id === id)!.cta.href;
-    expect(href(legacy, 'overdue')).toBe('/app/labels?q=114-0098&qt=order&label=all&from=all');
-    expect(href(v2, 'overdue')).toBe('/app/labels?view=all&open=ord_1&panel=label');
-    expect(href(legacy, 'labelsFailed')).toBe('/app/labels?label=failed&from=all');
-    expect(href(v2, 'labelsFailed')).toBe('/app/labels?view=problems');
-    expect(href(legacy, 'conflict:etsy')).toBe('/app/etsy-listings?open=111');
-    expect(href(v2, 'conflict:etsy')).toBe('/app/etsy-listings/111');
-    expect(href(legacy, 'notSent:etsy')).toBe('/app/etsy-listings');
-    expect(href(v2, 'notSent:etsy')).toBe('/app/etsy-listings?view=not_sent');
+  it('deep links open the Orders panels, the editor and the not-sent view', () => {
+    const rows = buildAttentionRows(input(busySummary())).rows;
+    const href = (id: string) => rows.find((r) => r.id === id)!.cta.href;
+    expect(href('overdue')).toBe('/app/labels?view=all&open=ord_1&panel=label');
+    expect(href('labelsFailed')).toBe('/app/labels?view=problems');
+    expect(href('conflict:etsy')).toBe('/app/etsy-listings/111');
+    expect(href('notSent:etsy')).toBe('/app/etsy-listings?view=not_sent');
   });
 
   it('partial errors are reported (queue sections only) and the queue is never "done"', () => {

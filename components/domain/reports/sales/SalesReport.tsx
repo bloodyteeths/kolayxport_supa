@@ -1,7 +1,7 @@
 // components/domain/reports/sales/SalesReport.tsx — Reports › Sales (finance-analytics §2.1, §2.5, §3, §4, M9 Group C).
 //
 // "How much am I selling, where, and what?" for every connected store, converted to one display currency (`≈`, with
-// the real FX source named: exchangerate-api.com, not TCMB). This is also **Home**: `/app/analytics` (flag on) and
+// the real FX source named: exchangerate-api.com, not TCMB). This is also **Home**: `/app/analytics` and
 // `/app/reports` both render this component (founder decision; ReportsPage `REPORT_TAB_PATH.sales = HOME_HREF`).
 //
 // Data: `useSalesReport` (GET /api/analytics, §6.1) with the shared range (`useReportRange`), the Store filter
@@ -317,7 +317,7 @@ export function SalesReport({ now }: SalesReportProps = {}) {
     disabled: nothing,
     disabledReason: nothing ? t('actions.nothingToExport') : undefined,
   };
-  const ordersLink = reportOrdersHref({ from: range.from, to: range.to }, links.flags);
+  const ordersLink = reportOrdersHref({ from: range.from, to: range.to });
   const overflow: ActionSpec[] = [{ id: 'reports-open-orders', label: t('actions.openOrders'), icon: icons.order, href: ordersLink }];
 
   // ── meta ──
@@ -488,7 +488,6 @@ export function SalesReport({ now }: SalesReportProps = {}) {
             excludedCurrencies={excludedCur}
             from={range.from}
             to={range.to}
-            flags={links.flags}
             empty={
               <EmptyState
                 kind="no-results"
@@ -515,7 +514,7 @@ export function SalesReport({ now }: SalesReportProps = {}) {
               q={url.q ?? ''}
               onQueryChange={(q) => setUrl({ q: q || undefined })}
             />
-            <StatusSummary rows={data.statuses} from={range.from} to={range.to} flags={links.flags} />
+            <StatusSummary rows={data.statuses} from={range.from} to={range.to} />
           </Box>
         </Box>
       );

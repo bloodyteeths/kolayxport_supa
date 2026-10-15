@@ -1,6 +1,6 @@
 // research R1-C pure logic: URL/compare helpers, prefill payloads (never a title, price only in the shop currency),
 // tag merge rules (13 × 20, no title overlap, replace weakest), payload normalisation, marketplace eligibility,
-// season re-basing, recent searches, routing to unshipped tools.
+// season re-basing, recent searches, hub hrefs.
 import { describe, expect, it } from 'vitest';
 import { draftPrefill, parseCompare, prefillRoute, serializeCompare, startFromPrefill } from '@/components/domain/research/products/ProductFinder';
 import { stageBlockReason } from '@/components/domain/research/products/StageToListingModal';
@@ -12,8 +12,9 @@ import { needsWorkLine } from '@/components/domain/research/home/NeedsWorkCard';
 import { seasonSeed } from '@/components/domain/research/home/SeasonsCard';
 import { mergeRecent } from '@/components/domain/research/home/RecentCard';
 import { isSafeRecentHref, toolOfHref, withRecent } from '@/components/domain/research/home/recentSearches';
-import { routeResearchSearch, toShippedHref } from '@/components/domain/research/home/routeSearch';
-import { legacyResearchHref, mktAvailability, researchToolHref, resolveMkt } from '@/components/domain/research/ResearchLayout';
+import { routeResearchSearch } from '@/components/domain/research/home/routeSearch';
+import * as Layout from '@/components/domain/research/ResearchLayout';
+import { mktAvailability, researchToolHref, resolveMkt } from '@/components/domain/research/ResearchLayout';
 import { compareKey, infoNotice, isEmptyResult, matchCompareResults, normalizeProducts, productsKey } from '@/lib/research/hooks/useResearchProducts';
 import type { ListingRow } from '@/lib/listings/types';
 import { rebaseSeason, seasonViews, seasonsKey } from '@/lib/research/hooks/useSeasons';
@@ -120,14 +121,15 @@ describe('marketplace eligibility (§3.2) and defaults', () => {
     expect(resolveMkt('products', { connected: { amazon: true } })).toBe('etsy');
     expect(resolveMkt('home', {})).toBe('etsy');
   });
-  it('hrefs: shipped tools on the hub, unshipped tools on their legacy page', () => {
+  it('hrefs: every tool is on the hub (no legacy fallbacks left)', () => {
     expect(researchToolHref('products', 'ebay', { q: 'a b' })).toBe('/app/research/products?mkt=ebay&q=a+b');
     expect(researchToolHref('keywords', 'etsy')).toBe('/app/research/keywords?mkt=etsy');
     expect(researchToolHref('shops', 'ebay')).toBe('/app/research/shops?mkt=ebay');
-    expect(legacyResearchHref('trendyol')).toBe('/app/trendyol-arastirma');
-    // Shop tracker shipped with R3: a shop link stays on the hub.
-    expect(toShippedHref('/app/research/shops?mkt=etsy&add=WoodAndWords', 'ebay')).toBe('/app/research/shops?mkt=etsy&add=WoodAndWords');
-    expect(toShippedHref('/app/research/products?mkt=etsy&q=x#price', 'etsy')).toBe('/app/research/products?mkt=etsy&q=x#price');
+    expect(researchToolHref('listings', 'trendyol')).toBe('/app/research/listings?mkt=trendyol');
+    expect(researchToolHref('home')).toBe('/app/research');
+    for (const name of ['legacyResearchHref', 'ResearchRouteGate', 'useResearchRouteGate', 'RESEARCH_TOOL_SHIPPED']) {
+      expect(name in Layout).toBe(false);
+    }
   });
 });
 
@@ -229,9 +231,8 @@ describe('review fixes (R1-C)', () => {
     expect(m('implausible')).toMatchObject({ priceMedian: null, priceP25: null, priceP75: null });
   });
   it('prefill goes only to a page that reads it', () => {
-    expect(prefillRoute('etsy', { listingsOn: false, editorOn: false })).toBe('/app/etsy-listings?prefill=session');
-    expect(prefillRoute('ebay', { listingsOn: true, editorOn: false })).toBe('/app/ebay-listings?prefill=session');
-    expect(prefillRoute('ebay', { listingsOn: true, editorOn: true })).toBe('/app/ebay-listings/new?prefill=session');
+    expect(prefillRoute('etsy')).toBe('/app/etsy-listings/new?prefill=session');
+    expect(prefillRoute('ebay')).toBe('/app/ebay-listings/new?prefill=session');
   });
   it('unavailable marketplace / budget with nothing cached is a notice, not an error', () => {
     expect(infoNotice({ data: null, errors: [{ section: 'marketplace', key: 'research.products.trendyolLater' }] } as never)?.key).toBe('research.products.trendyolLater');

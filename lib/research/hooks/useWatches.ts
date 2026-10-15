@@ -32,6 +32,7 @@ import type {
   WatchListingLite,
   WatchMetrics,
   WatchQuota,
+  WatchItemInfo,
   WatchShopInfo,
   WatchSource,
   WatchSummary,
@@ -41,12 +42,12 @@ import type {
 import { ResearchFetchError, errorsOf } from './useResearchProducts';
 
 export { ResearchFetchError };
-export type { AlertRules, FastestListing, SalesPoint, WatchDetail, WatchListingLite, WatchQuota, WatchSummary, WatchType, WatchesData };
+export type { AlertRules, FastestListing, SalesPoint, WatchDetail, WatchItemInfo, WatchListingLite, WatchQuota, WatchSummary, WatchType, WatchesData };
 
 export const WATCHES_PATH = '/api/research/watches';
 
-/** The Shop tracker shows Etsy shops and eBay sellers (ASIN / query / Trendyol watches live in their own tools). */
-export const SHOP_WATCH_TYPES: readonly WatchType[] = ['etsyShop', 'ebaySeller'];
+/** The Shop tracker shows Etsy shops, eBay sellers and eBay items (ASIN / query / Trendyol watches live in their own tools). */
+export const SHOP_WATCH_TYPES: readonly WatchType[] = ['etsyShop', 'ebaySeller', 'ebayItem'];
 
 /** research.md §8.1 switches: new listings on, price drop > 10% on, sales spike off (on = 2×). Same as R3-A's default. */
 export const DEFAULT_ALERT_RULES: AlertRules = { newListing: true, priceDropPct: 10, salesSpikeX: null };
@@ -108,7 +109,7 @@ export function knownReasonKey(key: string | null | undefined): string | undefin
 /** `POST /api/research/watches` body the Shop tracker sends (R3-A `WatchCreateRequest`; the server resolves a shop name/link in `refId`). */
 export interface ShopWatchCreate {
   input: string;
-  type: 'etsyShop' | 'ebaySeller';
+  type: 'etsyShop' | 'ebaySeller' | 'ebayItem';
   marketplace: 'etsy' | 'ebay';
   refId: string;
   label: string;
@@ -129,8 +130,8 @@ const httpUrl = (v: unknown): string | null => {
   return s && /^https?:\/\//i.test(s) ? s : null;
 };
 const KINDS = ['measured', 'estimate', 'signal', 'user'] as const;
-const WATCH_TYPES: readonly string[] = ['etsyShop', 'ebaySeller', 'query', 'asin', 'trendyolProduct'];
-const SOURCES: readonly string[] = ['researchWatch', 'ebayTrackedSeller', 'amazonTrackedProduct'];
+const WATCH_TYPES: readonly string[] = ['etsyShop', 'ebaySeller', 'ebayItem', 'query', 'asin', 'trendyolProduct'];
+const SOURCES: readonly string[] = ['researchWatch', 'ebayTrackedSeller', 'ebayTrackedProduct', 'amazonTrackedProduct'];
 
 /** A `Guarded<number>` from anything; a missing value fails its guard. `forceKind` pins the label (Estimate for shares). */
 export function toGuarded(v: unknown, forceKind?: Guarded<number>['kind']): Guarded<number> {
@@ -175,6 +176,21 @@ export function normalizeAlertRules(v: unknown): AlertRules {
     newListing: r.newListing === true || r.newListings === true,
     priceDropPct: drop !== null && drop > 0 ? drop : null,
     salesSpikeX: spike !== null && spike > 1 ? spike : null,
+  };
+}
+
+/** `ebayItem` rows: the latest reading (a non-positive price is no price). */
+function itemInfo(v: unknown): WatchItemInfo | undefined {
+  if (!isObj(v)) return undefined;
+  const price = num(v.price);
+  const sold = num(v.soldAllTime);
+  const cur = str(v.currency);
+  return {
+    price: price !== null && price > 0 ? price : null,
+    currency: cur && /^[A-Za-z]{3}$/.test(cur) ? cur.toUpperCase() : 'USD',
+    soldAllTime: sold !== null && sold >= 0 ? Math.floor(sold) : null,
+    condition: str(v.condition),
+    seller: str(v.seller),
   };
 }
 
@@ -230,6 +246,7 @@ export function normalizeWatchRow(raw: unknown): WatchSummary | null {
     metrics,
     snapshots: { count, first: str(snap.first), last: str(snap.last) },
     href: str(raw.href) ?? `/app/research/shops?open=${encodeURIComponent(id)}`,
+    ...(type === 'ebayItem' ? { item: itemInfo(raw.item) ?? { price: null, currency: 'USD', soldAllTime: null, condition: null, seller: null } } : {}),
   };
 }
 
@@ -327,6 +344,18 @@ export function normalizeDetail(raw: unknown, fallback: WatchSummary | null): Wa
     tagGapAvailable: raw.tagGapAvailable !== false,
     listingsSampled: Math.max(0, num(raw.listingsSampled) ?? 0),
     listingsComplete: raw.listingsComplete !== false,
+    ...(Array.isArray(raw.prices)
+      ? {
+          prices: raw.prices
+            .filter(isObj)
+            .map((p) => {
+              const v = num(p.value);
+              return { date: str(p.date) ?? '', value: v !== null && v > 0 ? v : null };
+            })
+            .filter((p) => p.date)
+            .slice(-30),
+        }
+      : {}),
   };
 }
 

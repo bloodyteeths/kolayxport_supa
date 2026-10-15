@@ -4,56 +4,23 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, screen, act } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { renderIntl, msg, LOCALES, MESSAGES } from './m1f-helpers';
-import { tone } from '@/lib/ds/tokens';
-
-const copySpy = vi.fn(async () => true);
-vi.mock('@/lib/hooks/useCopy', () => ({
-  useCopy: () => ({ copy: copySpy, copied: false }),
-}));
 
 const connections = { has: vi.fn<(p: string) => boolean | undefined>(), isLoading: false };
 vi.mock('@/lib/hooks/useConnections', () => ({
   useConnections: () => connections,
 }));
 
-import StatusBadge, { BADGE_TONE } from '@/components/ui/StatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
 import PageHeader from '@/components/ui/PageHeader';
 import ErrorState from '@/components/ui/ErrorState';
-import StatCard from '@/components/ui/StatCard';
-import LegacyConfirmDialog, { ConfirmDialog as NamedConfirmDialog, type ConfirmOptions } from '@/components/ui/ConfirmDialog';
-import DsConfirmDialog from '@/components/ds/overlay/ConfirmDialog';
+import DsConfirmDialog, { type ConfirmOptions } from '@/components/ds/overlay/ConfirmDialog';
 import ConnectEmptyState, { RequireConnection, connectHrefFor } from '@/components/ui/ConnectEmptyState';
-import CopyButton from '@/components/ui/CopyButton';
-import { Button as LegacyButton } from '@/components/ui/button';
 
 afterEach(() => {
   cleanup();
-  copySpy.mockClear();
 });
 
-function rgbOf(hex: string) {
-  const n = parseInt(hex.slice(1), 16);
-  return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
-}
-
 describe.each(LOCALES)('M1-f shims (%s)', (locale) => {
-  it('StatusBadge renders the label as a DS tone pill', () => {
-    renderIntl(<StatusBadge label="Bağlı" variant="error" data-testid="b" />, locale);
-    const el = screen.getByTestId('b');
-    expect(el.textContent).toBe('Bağlı');
-    expect(el.getAttribute('data-tone')).toBe('danger');
-    expect(getComputedStyle(el).color).toBe(rgbOf(tone.danger.fg));
-  });
-
-  it('StatusBadge maps every legacy variant onto a DS tone and can hide the dot', () => {
-    expect(BADGE_TONE).toEqual({ success: 'success', warning: 'warning', error: 'danger', info: 'info', neutral: 'neutral', purple: 'neutral' });
-    renderIntl(<StatusBadge label="x" variant="purple" dot={false} data-testid="b" />, locale);
-    const el = screen.getByTestId('b');
-    expect(el.getAttribute('data-tone')).toBe('neutral');
-    expect(el.querySelectorAll('[aria-hidden]').length).toBe(0);
-  });
-
   it('EmptyState renders icon tile, title, body and the action node', () => {
     renderIntl(
       <EmptyState
@@ -140,28 +107,7 @@ describe.each(LOCALES)('M1-f shims (%s)', (locale) => {
     expect(alert.textContent).not.toContain('{');
   });
 
-  it('StatCard renders a neutral KPI tile with a locale-formatted delta', () => {
-    renderIntl(<StatCard label="Revenue" value="₺1.200" icon={<svg />} trend={12.4} data-testid="k" />, locale);
-    const el = screen.getByTestId('k');
-    expect(el.textContent).toContain('Revenue');
-    expect(el.textContent).toContain('₺1.200');
-    const delta = el.querySelector('[data-trend]')!;
-    expect(delta.getAttribute('data-trend')).toBe('up');
-    expect(delta.textContent).toContain(locale === 'tr' ? '%12,4' : '12.4%');
-    cleanup();
-    renderIntl(<StatCard label="L" value={3} icon={<svg />} trend={-3} data-testid="k" />, locale);
-    expect(screen.getByTestId('k').querySelector('[data-trend]')!.getAttribute('data-trend')).toBe('down');
-    cleanup();
-    renderIntl(<StatCard label="L" value={3} trend={0} data-testid="k" />, locale);
-    const flat = screen.getByTestId('k').querySelector('[data-trend]')!;
-    expect(flat.getAttribute('data-trend')).toBe('flat');
-    expect(flat.textContent).not.toMatch(/[▲▼]/);
-    expect((flat as HTMLElement).style.color || getComputedStyle(flat).color).toBe(rgbOf(tone.neutral.fg));
-  });
-
-  it('ConfirmDialog is the DS ConfirmDialog (re-export) and keeps the legacy option contract', () => {
-    expect(LegacyConfirmDialog).toBe(DsConfirmDialog);
-    expect(NamedConfirmDialog).toBe(DsConfirmDialog);
+  it('ConfirmDialog keeps the older option contract (description / destructive aliases)', () => {
     const onConfirm = vi.fn();
     const onCancel = vi.fn();
     const legacyOptions: ConfirmOptions = {
@@ -173,7 +119,7 @@ describe.each(LOCALES)('M1-f shims (%s)', (locale) => {
       confirmLabel: msg(locale, 'common.delete'),
       cancelLabel: msg(locale, 'common.cancel'),
     };
-    renderIntl(<LegacyConfirmDialog {...legacyOptions} open onConfirm={onConfirm} onCancel={onCancel} />, locale);
+    renderIntl(<DsConfirmDialog {...legacyOptions} open onConfirm={onConfirm} onCancel={onCancel} />, locale);
     expect(screen.getByText('Delete?')).toBeTruthy();
     expect(screen.getByText(msg(locale, 'ui.errorState.message'))).toBeTruthy();
     const list = screen.getByTestId('confirm-items');
@@ -190,7 +136,7 @@ describe.each(LOCALES)('M1-f shims (%s)', (locale) => {
   it('ConfirmDialog typeToConfirm keeps confirm disabled until the text matches', () => {
     const onConfirm = vi.fn();
     renderIntl(
-      <LegacyConfirmDialog open title="X" typeToConfirm="12" confirmLabel={msg(locale, 'common.confirm')} onConfirm={onConfirm} onCancel={() => undefined} />,
+      <DsConfirmDialog open title="X" typeToConfirm="12" confirmLabel={msg(locale, 'common.confirm')} onConfirm={onConfirm} onCancel={() => undefined} />,
       locale,
     );
     const confirm = screen.getByRole('button', { name: msg(locale, 'common.confirm') }) as HTMLButtonElement;
@@ -256,52 +202,4 @@ describe.each(LOCALES)('M1-f shims (%s)', (locale) => {
     }
   });
 
-  it('CopyButton (icon) copies without bubbling to the row and is labelled in the locale', async () => {
-    const rowClick = vi.fn();
-    renderIntl(
-      <div onClick={rowClick}>
-        <CopyButton value="1Z999" label="Tracking" />
-      </div>,
-      locale,
-    );
-    const btn = screen.getByRole('button', { name: msg(locale, 'ui.copy.copyLabel', { label: 'Tracking' }) });
-    await act(async () => {
-      fireEvent.click(btn);
-    });
-    expect(copySpy).toHaveBeenCalledWith('1Z999');
-    expect(rowClick).not.toHaveBeenCalled();
-  });
-
-  it('CopyButton (chip) shows its label, resolves function values, and disables when empty', async () => {
-    renderIntl(<CopyButton variant="chip" value={() => 'a\tb'} label="TSV" />, locale);
-    const chip = screen.getByRole('button', { name: msg(locale, 'ui.copy.copyLabel', { label: 'TSV' }) });
-    expect(chip.textContent).toContain('TSV');
-    await act(async () => {
-      fireEvent.click(chip);
-    });
-    expect(copySpy).toHaveBeenCalledWith('a\tb');
-    cleanup();
-    renderIntl(<CopyButton value="" />, locale);
-    expect((screen.getByRole('button', { name: msg(locale, 'ui.copy.copy') }) as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it('legacy button.js keeps its API with DS token classes', () => {
-    const onClick = vi.fn();
-    const ref = React.createRef<HTMLButtonElement>();
-    renderIntl(
-      <>
-        <LegacyButton ref={ref} onClick={onClick} className="w-full">{msg(locale, 'common.save')}</LegacyButton>
-        <LegacyButton variant="outline">{msg(locale, 'common.cancel')}</LegacyButton>
-      </>,
-      locale,
-    );
-    const primary = screen.getByRole('button', { name: msg(locale, 'common.save') });
-    expect(ref.current).toBe(primary);
-    expect(primary.className).toContain('bg-accent-600');
-    expect(primary.className).toContain('w-full');
-    expect(primary.className).not.toMatch(/blue-|gray-/);
-    fireEvent.click(primary);
-    expect(onClick).toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: msg(locale, 'common.cancel') }).getAttribute('data-variant')).toBe('outline');
-  });
 });

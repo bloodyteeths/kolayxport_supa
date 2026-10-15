@@ -27,12 +27,11 @@ import { ErrorState } from '@/components/ds/state/ErrorState';
 import { SlowState } from '@/components/ds/state/SlowState';
 import { CardListSkeleton, TableSkeleton } from '@/components/ds/state/Skeletons';
 import { ApiSourceNote } from '@/components/domain/research/products/ApiSourceNote';
-import { prefillHref, writeListingPrefill } from '@/components/etsy/research/shared/listingPrefill';
+import { prefillHref, writeListingPrefill } from '@/lib/listings/listingPrefill';
 import { CHOOSE_PLAN_HREF } from '@/lib/billing/billingState';
 import { useEntitlement } from '@/lib/billing/useEntitlement';
 import { icons } from '@/lib/ds/icons';
 import { neutral as n } from '@/lib/ds/tokens';
-import { useUiFlag } from '@/lib/ds/uiFlags';
 import { useUrlState } from '@/lib/ds/useUrlState';
 import { removeWatch, useWatches, watchErrorKind, type WatchListingLite, type WatchSummary } from '@/lib/research/hooks/useWatches';
 import { useConnections } from '@/lib/hooks/useConnections';
@@ -75,8 +74,6 @@ function ShopTrackerFor({ mkt, market, navigate }: { mkt: ShopMkt; market: Retur
   const router = useRouter();
   const entitlement = useEntitlement();
   const connections = useConnections();
-  const listingsOn = useUiFlag(mkt === 'etsy' ? 'listings-etsy' : 'listings-ebay');
-  const editorOn = useUiFlag(mkt === 'etsy' ? 'editor-etsy' : 'editor-ebay');
 
   const go = React.useCallback(
     (href: string, opts?: { newTab?: boolean }) => {
@@ -147,9 +144,9 @@ function ShopTrackerFor({ mkt, market, navigate }: { mkt: ShopMkt; market: Retur
         toast.error(t('research.shops.prefillFailed'), { persist: false });
         return;
       }
-      go(listingsOn && editorOn ? `/app/${target}-listings/new?prefill=session` : prefillHref(target));
+      go(prefillHref(target));
     },
-    [toast, t, go, listingsOn, editorOn],
+    [toast, t, go],
   );
 
   // ── header ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -271,8 +268,10 @@ function ShopTrackerFor({ mkt, market, navigate }: { mkt: ShopMkt; market: Retur
         rows={watches.rows}
         quotaReason={blockedReason}
         onAdded={(watch, label, readingSkipped) => {
-          // eBay sellers and skipped/failed first readings: no reading was taken today, so never say it was.
-          const later = readingSkipped || (watch?.marketplace ?? mkt) !== 'etsy';
+          // eBay sellers and skipped/failed first readings: no reading was taken today, so never say it was. An eBay
+          // item gets its first reading on add (lib/research/ebayItemTracker.ts).
+          const firstReadingOnAdd = (watch?.marketplace ?? mkt) === 'etsy' || watch?.type === 'ebayItem';
+          const later = readingSkipped || !firstReadingOnAdd;
           toast.success(t(later ? 'research.shops.addedLater' : 'research.shops.added', { shop: watch?.label ?? label }));
           // Open the new row once the list has it (the `?open=` guard drops ids the list doesn't know).
           void watches.mutate().then(() => {

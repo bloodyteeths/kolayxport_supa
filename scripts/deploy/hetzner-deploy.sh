@@ -52,6 +52,9 @@ echo "==> sha-after-pull=$(git rev-parse --short HEAD)"
 if [ "$MODE" = "full" ]; then
   echo "==> npm install --legacy-peer-deps"
   npm install --legacy-peer-deps
+  # npm keeps yarn.lock in sync when it exists; restore it so the tree stays clean
+  # and the next deploy's `git pull --ff-only` is never blocked by a lockfile diff.
+  git checkout -- yarn.lock 2>/dev/null || true
 fi
 
 # --- 3. Apply Prisma migrations (always — no-op if up to date) ---

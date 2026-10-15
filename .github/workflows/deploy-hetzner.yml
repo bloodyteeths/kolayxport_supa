@@ -20,6 +20,12 @@ on:
           - full
           - restart
 
+# Deploys share one working tree on the VPS: never run two at once.
+# A newer push queues behind the running deploy instead of racing it.
+concurrency:
+  group: deploy-hetzner
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -43,5 +49,8 @@ jobs:
             # `git pull` lives in the workflow itself (not the script) so the latest version
             # of scripts/deploy/hetzner-deploy.sh is present on disk before we invoke it.
             # The script will perform any further pulls it considers necessary; idempotent.
+            # npm install rewrites yarn.lock on the server; it is a generated file, not local
+            # work, so restore it before pulling or a lockfile change on main blocks the pull.
+            git checkout -- yarn.lock 2>/dev/null || true
             git pull --ff-only origin main
             bash scripts/deploy/hetzner-deploy.sh "$MODE"

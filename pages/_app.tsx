@@ -22,6 +22,7 @@ import CookieConsent from '@/components/CookieConsent';
 import { ConfirmProvider } from '@/lib/hooks/useConfirm';
 import LimitReachedDialog from '@/components/billing/LimitReachedDialog';
 import { installLimitInterceptor } from '@/lib/http/limitInterceptor';
+import LiveAppMount from '@/components/live/LiveAppMount';
 
 // Module scope (client only) so the 402 interceptor is active before any page
 // effect issues a request. Idempotent.
@@ -110,6 +111,8 @@ function MyApp({ Component, pageProps }: AppProps) {
         />
         <Component {...pageProps} />
         <Toaster position="top-center" />
+        {/* Live events: SSE stream, new-order chime + toast, live SWR refresh. Signed-in /app/* only. */}
+        <LiveAppMount ordersPath="/app/labels" />
         <LimitReachedDialog />
         <CookieConsent />
       </ConfirmProvider>

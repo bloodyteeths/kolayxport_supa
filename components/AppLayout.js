@@ -48,6 +48,7 @@ import { useConnections } from '@/lib/hooks/useConnections';
 import CommandPalette from './CommandPalette';
 import MobileTabBar, { MOBILE_TAB_BAR_HEIGHT } from './MobileTabBar';
 import NotificationBell from './NotificationBell';
+import LiveSoundToggle from './live/LiveSoundToggle';
 
 /**
  * AppLayout: For authenticated application routes (e.g., /app/*)
@@ -822,6 +823,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
                 <Search size={19} />
               </button>
 
+              {session && <LiveSoundToggle />}
               <NotificationBell enabled={Boolean(session)} />
 
               {/* On phones the bottom tab bar already carries Messages. */}

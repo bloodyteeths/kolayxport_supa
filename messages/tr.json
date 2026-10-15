@@ -13999,7 +13999,8 @@
       "prev": "Önceki ilan",
       "next": "Sonraki ilan",
       "stats": "{views} görüntülenme · {favorites} favori",
-      "remoteChanged": "{marketplace} bu ilanı {time} saatinde değiştirdi"
+      "remoteChanged": "{marketplace} bu ilanı {time} saatinde değiştirdi",
+      "changesPending": "{count, plural, one {# değişiklik gönderilmedi} other {# değişiklik gönderilmedi}}"
     },
     "nav": {
       "label": "Bölümler",
@@ -14342,7 +14343,8 @@
       "linksHelper": "Her satıra bir https bağlantısı. Değişiklikleri gönderdiğinizde fotoğraflar {marketplace} tarafına eklenir",
       "linksAdd": "Fotoğrafları ekle",
       "linksEmpty": "En az bir bağlantı yapıştırın",
-      "linksRejected": "{count} bağlantı atlandı (https değil, tekrar ediyor veya sınırı aşıyor)"
+      "linksRejected": "{count} bağlantı atlandı (https değil, tekrar ediyor veya sınırı aşıyor)",
+      "moreActions": "Diğer fotoğraf işlemleri"
     },
     "video": {
       "label": "Video",
@@ -14514,7 +14516,13 @@
       "deleteNote": "Gönderdiğinizde ilan {marketplace} mağazanızdan kaldırılır"
     },
     "health": {
-      "empty": "Puan için bir fotoğraf ve başlık ekleyin"
+      "empty": "Puan için bir fotoğraf ve başlık ekleyin",
+      "fix": "Düzelt",
+      "gain": "+{points} puan",
+      "fixAria": "{fix}",
+      "showAll": "Tümünü göster ({count})",
+      "topFixes": "Öncelikli düzeltmeler",
+      "showLess": "Daha az göster"
     },
     "preview": {
       "title": "Önizleme",

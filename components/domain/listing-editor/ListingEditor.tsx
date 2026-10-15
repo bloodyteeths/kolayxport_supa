@@ -140,6 +140,10 @@ export interface EditorSlots<F extends FieldMap> {
   onFixAction?: (action: string, c: EditorSlotContext<F>) => boolean;
 }
 
+/** Space between two editor sections, rule included (USABILITY_FINDINGS density rule). */
+export const SECTION_GAP = 24;
+export const SECTION_GAP_MOBILE = 16;
+
 const MP_NAME: Record<EditorMarketplace, string> = { etsy: 'Etsy', ebay: 'eBay', trendyol: 'Trendyol', wix: 'Wix', shopify: 'Shopify' };
 
 /** The CatalogDraft marketplaces (marketplace-editors §1): no preview, no profiles, one create primary. */
@@ -288,6 +292,24 @@ function toRailAttempts(draft: DraftRow | null): RailSyncAttempt[] {
 function draftMediaUploads(draft: DraftRow | null): number {
   return (draft?.media ?? []).filter((m) => m.kind === 'image' && (m.operation === 'upload' || m.operation === 'ai_upload')).length;
 }
+
+/**
+ * The editor header shows the whole listing title on up to 2 lines (a 129-character Etsy title was cut to
+ * "…Boy First Birthday,…"). PageHeader keeps one line for list pages, so the editor relaxes it here.
+ */
+const headerSx = {
+  '& header[data-layout="desktop"] > div': { height: 'auto', minHeight: 56, py: '6px' },
+  '& header[data-layout="desktop"] h1': {
+    whiteSpace: 'normal',
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden',
+    overflowWrap: 'anywhere',
+    fontSize: 18,
+    lineHeight: '24px',
+  },
+} as const;
 
 function Dot({ color }: { color: string }) {
   return <Box component="span" aria-hidden sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: color, flexShrink: 0, display: 'inline-block' }} />;
@@ -824,6 +846,9 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
     if ((state === 'expired' || state === 'sold_out') && !pending.includes('renew')) overflow.push({ id: 'renew', label: t('action.renew', mp), onClick: () => void stageState('renew') });
     overflow.push({ id: 'delete', label: t('action.delete'), icon: icons.delete, tone: 'danger', onClick: () => void stageState('delete') });
   }
+  // Phone: Preview sits beside the send button; with nothing to send it moves to ⋯ so the bar stays one quiet line.
+  const mobilePreviewInBar = isMobile && !catalog && Boolean(primary || primarySlot);
+  if (isMobile && !catalog && !mobilePreviewInBar) overflow.unshift(previewSpec);
   if (isMobile && discardSpec) overflow.push({ ...discardSpec, tone: 'danger' });
 
   // ⌘K: the footer actions + "Jump to section…"
@@ -1035,11 +1060,32 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
   const headerTitle = mode === 'create' ? fieldTitle || t('page.newTitle') : fieldTitle || t('page.editTitle');
   const pageTitle = isMobile ? (mode === 'create' ? t('page.newTitle') : t('page.editTitle')) : headerTitle;
   const listingPill = mode === 'edit' && view.meta.state ? listingStatus({ state: view.meta.state }, 'etsy') : null;
-  const syncPill = draft ? syncStatus({ status: draftStatus, syncedAt: draft.syncedAt, updatedAt: draft.updatedAt }) : saveState === 'dirty' && mode === 'edit' && count > 0 ? 'pending' : null;
+  const rawSyncPill = draft ? syncStatus({ status: draftStatus, syncedAt: draft.syncedAt, updatedAt: draft.updatedAt }) : saveState === 'dirty' && mode === 'edit' && count > 0 ? 'pending' : null;
+  // "N changes not sent" (a link to the list) says what the plain "Not sent yet" pill said, with the number.
+  const showChanges = mode === 'edit' && count > 0;
+  const syncPill = showChanges && rawSyncPill === 'pending' ? null : rawSyncPill;
+  const changesIndicator = showChanges ? (
+    <ButtonBase
+      onClick={(e) => setStatusAnchor(e.currentTarget)}
+      aria-haspopup="dialog"
+      data-testid="le-header-changes"
+      sx={{
+        display: 'inline-flex', alignItems: 'center', gap: '6px', height: 22, px: '8px', borderRadius: '9999px',
+        bgcolor: toneTokens.attention.bg, color: toneTokens.attention.fg, border: `1px solid ${toneTokens.attention.border}`,
+        fontSize: 12, lineHeight: '16px', fontWeight: 500, whiteSpace: 'nowrap', flexShrink: 0,
+        '&:hover': { textDecoration: 'underline', textUnderlineOffset: 3 },
+        '@media (pointer: coarse)': { height: 32 },
+      }}
+    >
+      <Dot color={toneTokens.attention.solid} />
+      {t('page.changesPending', { count })}
+    </ButtonBase>
+  ) : null;
   const pills = (
     <>
       {listingPill && marketplace === 'etsy' ? <StatusPill domain="listing" status={listingPill} raw={view.meta.state ?? undefined} /> : null}
       {syncPill ? <StatusPill domain="sync" status={syncPill} /> : null}
+      {changesIndicator}
     </>
   );
 
@@ -1050,7 +1096,7 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
         ? t('page.idMeta', { ...mp, id: view.meta.id, date: format.dateTime(view.meta.updatedAt, { day: 'numeric', month: 'short' }) })
         : t('page.idOnly', { id: view.meta.id }),
     );
-    if (view.meta.views > 0 || view.meta.favorites > 0) subtitleParts.push(t('page.stats', { views: view.meta.views, favorites: view.meta.favorites }));
+    if (!isMobile && (view.meta.views > 0 || view.meta.favorites > 0)) subtitleParts.push(t('page.stats', { views: view.meta.views, favorites: view.meta.favorites }));
   } else if (mode === 'create') {
     subtitleParts.push(props.shopName || mpName);
   }
@@ -1145,11 +1191,11 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
         alignSelf: 'start',
         display: 'flex',
         flexDirection: 'column',
-        gap: '20px',
+        gap: '16px',
         maxHeight: 'calc(100vh - 160px)',
         overflowY: 'auto',
         pr: '2px',
-        '& > * + *': { borderTop: `1px solid ${neutral[100]}`, pt: '20px' },
+        '& > * + *': { borderTop: `1px solid ${neutral[100]}`, pt: '16px' },
       }}
     >
       <RailHealth health={health} onFix={onFix} />
@@ -1211,7 +1257,7 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
             gridTemplateColumns: isNarrow ? 'minmax(0, 1fr)' : 'minmax(0, 848px) 360px',
             justifyContent: 'space-between',
             columnGap: '24px',
-            mt: '16px',
+            mt: isMobile ? '12px' : '16px',
           }}
         >
           <Box
@@ -1226,7 +1272,14 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
               flexDirection: 'column',
               // fields ≤ 720 (founder: "1470px-wide fields")
               '& .MuiInputBase-root, & .MuiAutocomplete-root, & .MuiFormControl-root': { maxWidth: 720 },
-              '& > [data-le-section] + [data-le-section]': { borderTop: `1px solid ${neutral[100]}`, mt: '32px', pt: '32px' },
+              // Usability pass: one calm rhythm between sections (≤ 24px desktop, 16px phone incl. the rule), and the
+              // DS Section's own 24px bottom margin is dropped here so gaps never stack into ~90px of white.
+              '& > [data-le-section] > section': { mb: 0 },
+              '& > [data-le-section] + [data-le-section]': {
+                borderTop: `1px solid ${neutral[100]}`,
+                mt: isMobile ? `${SECTION_GAP_MOBILE / 2}px` : `${SECTION_GAP / 2}px`,
+                pt: isMobile ? `${SECTION_GAP_MOBILE / 2}px` : `${SECTION_GAP / 2}px`,
+              },
               ...(formLocked ? { pointerEvents: 'none', opacity: 0.7 } : {}),
             }}
           >
@@ -1282,9 +1335,13 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
       </SidePanel>
     ) : null;
 
+  // The changes list opens under the header indicator and above the footer status.
+  const statusBelow = Boolean(statusAnchor && typeof window !== 'undefined' && statusAnchor.getBoundingClientRect().top < window.innerHeight / 2);
+
   return (
     <ListingEditorContext.Provider value={ctxValue as unknown as ListingEditorContextValue}>
       <Page title={pageTitle} width="detail" backHref={backHref} data-testid="listing-editor">
+        <Box sx={headerSx}>
         <PageHeader
           title={headerTitle}
           titleAdornment={isMobile ? undefined : pills}
@@ -1301,8 +1358,9 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
           overflowActions={isMobile ? overflow : undefined}
           mobilePrimary="none"
         />
+        </Box>
         {isMobile && engine.loadState === 'ready' ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', mb: '8px' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', mb: '4px' }}>
             {pills}
             <Box sx={{ ml: 'auto' }}>
               <ScoreMeter score={health.score} afterScore={health.afterScore} variant="cell" checksUsed={health.result.checksUsed} checksTotal={health.result.checksTotal} onClick={() => setPanel('health')} />
@@ -1310,12 +1368,16 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
           </Box>
         ) : null}
         {body}
+        {/* The phone footer is fixed: leave its height (published as --kx-action-bar) free so it never covers the last field. */}
+        {isMobile && engine.loadState === 'ready' ? (
+          <Box aria-hidden data-testid="le-footer-spacer" sx={{ height: 'calc(var(--kx-action-bar, 0px) + 16px)' }} />
+        ) : null}
         {engine.loadState === 'ready' ? (
           <StickyActionBar
             status={statusNode}
             primary={primarySlot ? undefined : primary}
             primarySlot={primarySlot || undefined}
-            secondary={isMobile ? (catalog ? undefined : previewSpec) : discardSpec}
+            secondary={isMobile ? (mobilePreviewInBar ? previewSpec : undefined) : discardSpec}
             overflow={isMobile ? [] : overflow}
             ariaLabel={t('footer.label')}
             data-testid="le-footer"
@@ -1326,8 +1388,8 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
         open={Boolean(statusAnchor)}
         anchorEl={statusAnchor}
         onClose={() => setStatusAnchor(null)}
-        anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
-        transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        anchorOrigin={{ vertical: statusBelow ? 'bottom' : 'top', horizontal: 'left' }}
+        transformOrigin={{ vertical: statusBelow ? 'top' : 'bottom', horizontal: 'left' }}
         slotProps={{ paper: { sx: { p: '16px', width: 360, maxWidth: 'calc(100vw - 32px)' } } }}
       >
         <Typography component="h2" variant="titleSm" sx={{ m: 0, mb: '8px' }}>

@@ -138,7 +138,7 @@ describe.each<Locale>(['en', 'tr'])('TitleSection (%s)', (locale) => {
   it('shows decoded text, never raw entities, and stages decoded edits', () => {
     const { value, h } = makeCtx({ dirty: ['title'] });
     renderIn(<TitleSection />, value, locale);
-    const input = screen.getByTestId('le-title-input').querySelector('input') as HTMLInputElement;
+    const input = screen.getByTestId('le-title-input').querySelector('textarea:not([aria-hidden])') as HTMLTextAreaElement;
     expect(input.value).toBe("Mom's Personalized Baby Blanket, Custom Name Blanket");
     expect(document.body.textContent).not.toContain('&#39;');
     fireEvent.change(input, { target: { value: "Mom's Baby Blanket" } });

@@ -13999,7 +13999,8 @@
       "prev": "Previous listing",
       "next": "Next listing",
       "stats": "{views, plural, one {# view} other {# views}} · {favorites, plural, one {# favorite} other {# favorites}}",
-      "remoteChanged": "{marketplace} changed this listing at {time}"
+      "remoteChanged": "{marketplace} changed this listing at {time}",
+      "changesPending": "{count, plural, one {# change not sent} other {# changes not sent}}"
     },
     "nav": {
       "label": "Sections",
@@ -14342,7 +14343,8 @@
       "linksHelper": "One https link per line. {marketplace} gets the photos when you send changes",
       "linksAdd": "Add photos",
       "linksEmpty": "Paste at least one link",
-      "linksRejected": "{count, plural, one {# link was} other {# links were}} skipped (not https, repeated or over the limit)"
+      "linksRejected": "{count, plural, one {# link was} other {# links were}} skipped (not https, repeated or over the limit)",
+      "moreActions": "More photo actions"
     },
     "video": {
       "label": "Video",
@@ -14514,7 +14516,13 @@
       "deleteNote": "Removes the listing from {marketplace} when you send"
     },
     "health": {
-      "empty": "Add a photo and a title to get a score"
+      "empty": "Add a photo and a title to get a score",
+      "fix": "Fix",
+      "gain": "+{points} pts",
+      "fixAria": "{fix}",
+      "showAll": "Show all ({count})",
+      "topFixes": "Top fixes",
+      "showLess": "Show less"
     },
     "preview": {
       "title": "Preview",

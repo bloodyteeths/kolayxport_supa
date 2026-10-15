@@ -69,7 +69,7 @@ describe.each(['en', 'tr'] as Locale[])('CatalogTitleSection (%s)', (locale) => 
     const { value, setField } = makeCtx('trendyol', { title: 'Kutu', description: '<p>Bir iki</p>' });
     renderIn(<CatalogTitleSection />, value, locale);
     expect(screen.getByText('4 / 100')).toBeTruthy();
-    fireEvent.change(screen.getByTestId('le-catalog-title-input').querySelector('input') ?? screen.getByTestId('le-catalog-title-input'), { target: { value: 'Yeni başlık' } });
+    fireEvent.change(screen.getByTestId('le-catalog-title-input').querySelector('textarea:not([aria-hidden])') ?? screen.getByTestId('le-catalog-title-input'), { target: { value: 'Yeni başlık' } });
     expect(setField).toHaveBeenCalledWith('title', 'Yeni başlık');
   });
   it('renders a field issue inline (server key + params)', () => {

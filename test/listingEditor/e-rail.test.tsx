@@ -29,13 +29,14 @@ describe.each(LOCALES)('RailHealth (%s)', (locale) => {
     if (locale === 'en') {
       expect(out).toContain(`${health.score} → ${health.afterScore} after you send`);
       expect(out).toMatch(/Scored on \d+ of 12 checks/);
-      expect(out).toContain('Add photos');
+      expect(out).toContain('Fix'); // plain-language problem + one small "Fix" link (usability wave)
     } else {
       expect(out).toContain('İlan sağlığı');
-      expect(out).toContain('Fotoğraf ekle');
+      expect(out).toContain('Düzelt');
     }
-    // No research → price check is a neutral n/a row (never a warning / orange corner banner).
-    expect(markup).toMatch(/data-check-id="price_market" data-status="na"/);
+    // No research → the price check is never a warning; n/a rows wait behind "Show all" (only the top 3 fixes show).
+    expect(markup).not.toMatch(/data-check-id="price_market" data-status="(warn|fail)"/);
+    expect(markup).toContain('data-testid="rail-health-top"');
   });
 
   it('empty create workspace: no number, the empty line, no list of n/a rows', () => {
@@ -65,7 +66,9 @@ describe.each(LOCALES)('RailHealth (%s)', (locale) => {
     const onFix = vi.fn();
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     render(<Providers locale={locale}><RailHealth health={computeListingHealth('etsy', draft, null)} onFix={onFix} /></Providers>);
-    fireEvent.click(screen.getByRole('button', { name: locale === 'en' ? 'Add photos' : 'Fotoğraf ekle' }));
+    const showAll = screen.queryByRole('button', { name: /Show all|Tümünü göster/ });
+    if (showAll) fireEvent.click(showAll);
+    fireEvent.click(screen.getByTestId('rail-fix-photos_count'));
     expect(onFix).toHaveBeenCalledWith(expect.objectContaining({ id: 'photos_count' }));
     expect(fetchSpy).not.toHaveBeenCalled();
   });

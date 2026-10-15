@@ -9,7 +9,7 @@ import * as React from 'react';
 import Box from '@mui/material/Box';
 import { useTranslations } from 'next-intl';
 import { Section } from '@/components/ds/page/Section';
-import { Button, FieldSuggestion, FormField, TextArea, TextField } from '@/components/ds/inputs';
+import { Button, FieldSuggestion, FormField, TextArea } from '@/components/ds/inputs';
 import { useToast } from '@/components/ds/feedback/toast';
 import { icons } from '@/lib/ds/icons';
 import { neutral } from '@/lib/ds/tokens';
@@ -21,6 +21,7 @@ import { useListingEditor, useRegisterDraftSection } from '../useListingDraft';
 import { useFieldError } from './useEtsySection';
 import type { PhotosSummary } from './photosModel';
 import type { FieldAiState } from './sectionTypes';
+import { DESCRIPTION_MAX_ROWS, DESCRIPTION_MIN_ROWS, TitleInput } from './TitleInput';
 
 type CatalogMp = Extract<EditorMarketplace, 'trendyol' | 'wix' | 'shopify'>;
 
@@ -223,10 +224,10 @@ export function CatalogTitleSection({ id = 'title', aiTitle, aiDescription }: Ca
             labelAction={aiButton(aiTitle, t('ai.suggestTitle'))}
             required
           >
-            <TextField
+            <TitleInput
               id={fieldAnchorId('title')}
               value={title}
-              onChange={(v) => ed.setField('title', v.replace(/[\r\n]+/g, ' '))}
+              onChange={(v) => ed.setField('title', v)}
               readOnly={ro}
               data-testid="le-catalog-title-input"
             />
@@ -251,8 +252,8 @@ export function CatalogTitleSection({ id = 'title', aiTitle, aiDescription }: Ca
               id={fieldAnchorId('description')}
               value={description}
               onChange={(v) => ed.setField('description', v)}
-              minRows={6}
-              maxRows={24}
+              minRows={DESCRIPTION_MIN_ROWS}
+              maxRows={DESCRIPTION_MAX_ROWS}
               maxLength={descMax}
               preview={(v) => <HtmlPreview html={v} title={t('catalog.descriptionPreview')} />}
               readOnly={ro}

@@ -37,7 +37,7 @@ describe('registry defaults (spec W5 T1)', () => {
       'orderNew', 'orderCanceled', 'orderCanceledAfterLabel', 'orderShippedExternal', 'dispatchDueTomorrow',
       'dispatchDueToday', 'dispatchOverdue', 'listingDeactivated', 'listingExpired', 'listingDeleted',
       'listingChangedExternally', 'stockOutOfStock', 'stockPushFailed', 'stockDrift', 'stockUnmatchedSale',
-      'seoExperimentReady', 'webhookBacklog',
+      'seoExperimentReady', 'scheduledSendResult', 'webhookBacklog',
     ];
     for (const t of types) expect(getTypeDef(t), t).toBeDefined();
     expect(NOTIFICATION_REGISTRY.length).toBe(types.length);

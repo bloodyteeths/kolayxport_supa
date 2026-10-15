@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { classifyEbayDraftSyncError, EBAY_DRAFT_ERROR } from '@/lib/drafts/syncErrors';
 import { getUserAccessToken } from '@/lib/integrations/ebayClient';
 import { callEbayRateLimited } from '@/lib/integrations/ebayRateLimiter';
 import { sanitizeInventoryItemPayload } from '@/lib/ebay/payloadRules';
@@ -349,11 +350,11 @@ export async function syncDraft(draftId: string, userId: string) {
           if (baseVal !== currentVal && !userPatched) {
             await prisma.ebayListingDraft.update({
               where: { id: draft.id },
-              data: { status: 'conflict', lastSyncError: `Remote inventory field "${field}" changed since draft was created` },
+              data: { status: 'conflict', lastSyncError: EBAY_DRAFT_ERROR.conflict },
             });
             await prisma.ebayDraftSyncAttempt.update({
               where: { id: attempt.id },
-              data: { status: 'conflict', finishedAt: new Date(), error: `Conflict on field: ${field}` },
+              data: { status: 'conflict', finishedAt: new Date(), error: `Remote inventory field "${field}" changed since draft was created`, result: { errorKey: EBAY_DRAFT_ERROR.conflict, errorParams: { field } } },
             });
             return { status: 'conflict', draftId: draft.id, field };
           }
@@ -363,11 +364,11 @@ export async function syncDraft(draftId: string, userId: string) {
         if (String(err.message).includes('404') && !queuedActions.some((a) => a.type === 'create')) {
           await prisma.ebayListingDraft.update({
             where: { id: draft.id },
-            data: { status: 'conflict', lastSyncError: 'Inventory item no longer exists on eBay' },
+            data: { status: 'conflict', lastSyncError: EBAY_DRAFT_ERROR.itemMissing },
           });
           await prisma.ebayDraftSyncAttempt.update({
             where: { id: attempt.id },
-            data: { status: 'conflict', finishedAt: new Date(), error: 'Inventory item missing' },
+            data: { status: 'conflict', finishedAt: new Date(), error: 'Inventory item no longer exists on eBay' },
           });
           return { status: 'conflict', draftId: draft.id, reason: 'missing' };
         }
@@ -594,11 +595,12 @@ export async function syncDraft(draftId: string, userId: string) {
   } catch (err: any) {
     await prisma.ebayListingDraft.update({
       where: { id: draft.id },
-      data: { status: 'failed', lastSyncError: err.message || 'Sync failed' },
+      // Stable i18n key (docs/integration/draft-sync-error-codes.md); English text stays on the attempt.
+      data: { status: 'failed', lastSyncError: classifyEbayDraftSyncError(err).key },
     });
     await prisma.ebayDraftSyncAttempt.update({
       where: { id: attempt.id },
-      data: { status: 'failed', finishedAt: new Date(), error: err.message || 'Sync failed' },
+      data: { status: 'failed', finishedAt: new Date(), error: err.message || 'Sync failed', result: { errorKey: classifyEbayDraftSyncError(err).key } },
     });
     throw err;
   }

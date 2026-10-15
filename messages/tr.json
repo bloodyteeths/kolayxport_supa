@@ -4326,7 +4326,15 @@
       "remoteChanged": "Bu ilan, sen değişiklikleri hazırladıktan sonra Etsy'de değiştirildi.",
       "deletedOnEtsy": "Bu ilan Etsy'de silinmiş. Hazırlanan değişiklikler artık gönderilemez — taslağı sil.",
       "deleteQueuedNotice": "Bu listing için silme işlemi sırada. Bir sonraki Etsy senkronunda çalışacak.",
-      "stockOverrideFailed": "Bu ilan stok senkronu tarafından yönetiliyor ve miktarlar uygulanamadı. Taslağınız korundu — senkronu tekrar deneyin."
+      "stockOverrideFailed": "Bu ilan stok senkronu tarafından yönetiliyor ve miktarlar uygulanamadı. Taslağınız korundu — senkronu tekrar deneyin.",
+      "interrupted": "Senkronizasyon bir sunucu yeniden başlatması nedeniyle yarıda kaldı. Etsy'ye tekrar gönderin.",
+      "rateLimited": "Etsy şu anda yoğun. Birkaç dakika sonra tekrar deneyin.",
+      "whoMadeRequired": "Etsy \"Kim yaptı\", \"Ne zaman yapıldı\" ve \"Malzeme mi\" alanlarını birlikte ister. Doldurmak için tekrar gönderin.",
+      "shippingProfileInvalid": "Seçili kargo profili artık Etsy'de yok. Başka bir profil seçip tekrar gönderin.",
+      "notFoundOnEtsy": "Etsy bu değişikliğin ilgili olduğu bir şeyi (ilan, fotoğraf veya bölüm) bulamadı. İlanı yenileyip tekrar deneyin.",
+      "rejected": "Etsy bu değişiklikteki bir değeri kabul etmedi. İlanı açıp düzeltin ve tekrar gönderin.",
+      "etsyUnavailable": "Etsy yanıt vermedi. Birkaç dakika sonra tekrar deneyin.",
+      "failed": "Bu değişiklik Etsy'ye gönderilemedi. Tekrar deneyin."
     },
     "webhooks": {
       "outOfStockSubject": "Etsy'de stok bitti: {title}",
@@ -6514,6 +6522,17 @@
       "backupDeleted": "Yedek silindi",
       "allBackupsCleared": "Tüm yedekler temizlendi",
       "downloadTooltip": "JSON İndir"
+    },
+    "draftSync": {
+      "interrupted": "Gönderim bir sunucu yeniden başlatması nedeniyle yarıda kaldı. Tekrar deneyin.",
+      "conflict": "Bu ilan, değişiklikleri hazırladıktan sonra eBay'de değişti. Göndermeden önce kontrol edin.",
+      "itemMissing": "Bu ürün artık eBay'de yok.",
+      "reauthRequired": "eBay bağlantınızın süresi doldu. Ayarlar'dan eBay'i yeniden bağlayın.",
+      "rateLimited": "eBay şu anda yoğun. Birkaç dakika sonra tekrar deneyin.",
+      "notFound": "eBay bu değişikliğin ilgili olduğu bir şeyi bulamadı. İlanı yenileyip tekrar deneyin.",
+      "rejected": "eBay bu değişiklikteki bir değeri kabul etmedi. İlanı açıp düzeltin ve tekrar gönderin.",
+      "unavailable": "eBay yanıt vermedi. Birkaç dakika sonra tekrar deneyin.",
+      "failed": "Bu değişiklik eBay'e gönderilemedi. Tekrar deneyin."
     }
   },
   "dashboard": {
@@ -9723,6 +9742,7 @@
       "stockDrift": "Bugün {count} stok uyuşmazlığı bulundu",
       "stockUnmatchedSale": "{count} satış bir stok kalemiyle eşleştirilemedi",
       "seoExperimentReady": "\"{title}\" için SEO testi sonuçları hazır",
+      "scheduledSendResult": "{sent} zamanlanmış değişiklik {marketplace, select, etsy {Etsy'ye} ebay {eBay'e} trendyol {Trendyol'a} wix {Wix'e} shopify {Shopify'a} other {mağazaya}} gönderildi{failed, plural, =0 {} other { · # tanesi gönderilemedi}}{conflicts, plural, =0 {} other { · # ilan pazaryerinde değişmiş}}{skipped, plural, =0 {} other { · # tanesi atlandı}}",
       "webhookBacklog": "Etsy olay kuyruğu birikiyor"
     }
   },
@@ -10019,6 +10039,7 @@
       "draftSyncFailed": "Etsy senkronu başarısız",
       "draftConflict": "İlan düzenleme çakışması",
       "seoExperimentReady": "SEO testi sonuçları",
+      "scheduledSendResult": "Zamanlanmış gönderimler",
       "stockOutOfStock": "Stok tükendi",
       "stockPushFailed": "Stok güncellemesi başarısız",
       "stockDrift": "Stok uyuşmazlığı",

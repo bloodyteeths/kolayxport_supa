@@ -93,6 +93,10 @@ export const NOTIFICATION_REGISTRY: readonly NotificationTypeDef[] = [
   def('draftSyncFailed', 'listings', 'error'),
   def('draftConflict', 'listings', 'warning'),
   def('seoExperimentReady', 'listings', 'info', DIGEST_EMAIL),
+  // Rollup per scheduled-send run (lib/drafts/scheduledSend). The emitter passes
+  // badge: problem > 0, so an all-sent run is activity-only and only failures,
+  // conflicts or skips raise the bell.
+  def('scheduledSendResult', 'listings', 'info'),
   // ---- stock ----
   def('stockOutOfStock', 'stock', 'warning', DIGEST_EMAIL),
   def('stockPushFailed', 'stock', 'error', INSTANT_EMAIL),

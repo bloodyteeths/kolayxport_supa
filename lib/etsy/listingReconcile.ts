@@ -29,6 +29,7 @@ import { buildOfferingRows, extractImages, extractInventory, offeringsStockDiffe
 import { decideListingAlerts, emitListingAlerts, publishListingLive } from './listingAlerts';
 import { writeDailyTotals, type DailyTotalsRow } from './listingStatsDaily';
 import { publishLive } from '@/lib/live/publish';
+import { runHealthRefresh } from '@/lib/listings/healthQueue';
 
 export const RECONCILE_STATES = ['active', 'draft', 'inactive', 'sold_out', 'expired'] as const;
 export const RECONCILE_PAGE_LIMIT = 100;
@@ -191,6 +192,8 @@ async function run(
   let synced = 0;
   let lostWebhookChanges = 0;
   let enqueued = 0;
+  // Listing ids written this run; scored in one refreshHealth batch at the end.
+  const healthIds = new Set<string>();
   // Live progress: the reconcile writes through applyListingPayload directly
   // (no per-row listing events), so open listing pages refetch from the DB on
   // 'sync.progress' / 'sync.finished' (scope 'listings:etsy'). Throttled: at
@@ -271,6 +274,7 @@ async function run(
             });
             if (!applied.stale) {
               synced++;
+              healthIds.add(key);
               if (prev && prev.contentHash && incomingTs > (prev.etsyUpdatedTimestamp || 0)) lostWebhookChanges++;
               if (prev && opts.mode !== 'initial' && applied.prevState !== applied.newState) {
                 const alerts = decideListingAlerts({
@@ -363,6 +367,7 @@ async function run(
       const listingId = BigInt(id);
       try {
         const r = await refreshListingDetailed({ userId, shopId, listingId, accessToken, source: 'reconcile' });
+        if (!r.deleted && !r.stale && r.newState !== 'removed') healthIds.add(id);
         if (r.deleted || r.newState === 'removed') {
           // Cache/tombstone/drafts/alert now; stock observation goes through the
           // webhook worker (its 404 path observes 'removed'), never from here.
@@ -399,6 +404,11 @@ async function run(
       logger.warn('writeDailyTotals failed', { shopId, error: err?.message });
     }
   }
+
+  // Listing health (listings-grid §9.3), fire-and-forget: the initial import scores the whole
+  // shop (rows that were already cached but never scored), later runs only the written ids.
+  if (opts.mode === 'initial') void runHealthRefresh('etsy', shopId, userId);
+  else if (healthIds.size) void runHealthRefresh('etsy', shopId, userId, Array.from(healthIds));
 
   logger.info('Etsy listing reconcile finished', {
     shopId,

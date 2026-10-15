@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { getAuthUser } from '@/lib/auth';
 import { toSerializable, upsertDraftPatch, recoverStaleSyncingDrafts } from '@/lib/etsy/draftService';
 import { draftErrorResponse } from '@/lib/etsy/draftErrors';
+import { withLegacyLastSyncError } from '@/lib/drafts/syncErrors';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const user = await getAuthUser(req, res);
@@ -28,7 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         include: { media: true, syncAttempts: { orderBy: { startedAt: 'desc' }, take: 5 } },
         orderBy: { updatedAt: 'desc' },
       });
-      return res.status(200).json({ drafts: toSerializable(drafts), count: drafts.length });
+      return res.status(200).json({ drafts: toSerializable(drafts.map(withLegacyLastSyncError)), count: drafts.length });
     }
 
     if (req.method === 'POST') {
@@ -66,7 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         removeQueuedActions,
         replaceFields: Boolean(replaceFields),
       });
-      return res.status(200).json({ draft: toSerializable(draft) });
+      return res.status(200).json({ draft: toSerializable(draft ? withLegacyLastSyncError(draft as any) : draft) });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });

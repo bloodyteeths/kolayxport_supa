@@ -51,6 +51,7 @@ import {
   wasDeletedByKolayxport,
 } from './listingAlerts';
 import { upsertSeoCohort } from './seoExperiments';
+import { queueHealthRefresh } from '@/lib/listings/healthQueue';
 
 export type RefreshListingSource = 'webhook' | 'reconcile' | 'draft_sync' | 'initial' | 'manual_refresh';
 
@@ -362,6 +363,11 @@ export async function applyListingPayload(a: {
         });
       }
     }
+  }
+
+  // Listing health (listings-grid §9.3). Reconcile/initial batch their own ids at the end of the run.
+  if (a.source !== 'reconcile' && a.source !== 'initial' && (hashChanged || tsAdvanced || created)) {
+    queueHealthRefresh('etsy', a.shopId, a.userId, [a.listingId]);
   }
 
   return {

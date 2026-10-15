@@ -4326,7 +4326,15 @@
       "remoteChanged": "This listing was changed on Etsy after you staged these edits.",
       "deletedOnEtsy": "This listing was deleted on Etsy. Your staged edits can no longer be synced — discard the draft.",
       "deleteQueuedNotice": "A listing delete is queued. It will run on the next Sync to Etsy.",
-      "stockOverrideFailed": "Stock sync manages this listing and its quantities could not be applied. Your draft was kept — try syncing again."
+      "stockOverrideFailed": "Stock sync manages this listing and its quantities could not be applied. Your draft was kept — try syncing again.",
+      "interrupted": "Sync was interrupted by a server restart. Try Sync to Etsy again.",
+      "rateLimited": "Etsy is busy right now. Try again in a few minutes.",
+      "whoMadeRequired": "Etsy needs \"Who made it\", \"When was it made\" and \"Is it a supply\" together. Sync again to fill them in.",
+      "shippingProfileInvalid": "The selected shipping profile no longer exists on Etsy. Pick another one and sync again.",
+      "notFoundOnEtsy": "Etsy couldn't find something this change refers to (the listing, a photo or a section). Refresh the listing and try again.",
+      "rejected": "Etsy rejected a value in this change. Open the listing, fix it and sync again.",
+      "etsyUnavailable": "Etsy didn't respond. Try again in a few minutes.",
+      "failed": "Couldn't send this change to Etsy. Try again."
     },
     "webhooks": {
       "outOfStockSubject": "Out of stock on Etsy: {title}",
@@ -6514,6 +6522,17 @@
       "backupDeleted": "Backup deleted",
       "allBackupsCleared": "All backups cleared",
       "downloadTooltip": "Download JSON"
+    },
+    "draftSync": {
+      "interrupted": "Sending was interrupted by a server restart. Try again.",
+      "conflict": "This listing changed on eBay after you staged these edits. Review it before sending.",
+      "itemMissing": "This item no longer exists on eBay.",
+      "reauthRequired": "Your eBay connection has expired. Reconnect eBay in Settings.",
+      "rateLimited": "eBay is busy right now. Try again in a few minutes.",
+      "notFound": "eBay couldn't find something this change refers to. Refresh the listing and try again.",
+      "rejected": "eBay rejected a value in this change. Open the listing, fix it and send again.",
+      "unavailable": "eBay didn't respond. Try again in a few minutes.",
+      "failed": "Couldn't send this change to eBay. Try again."
     }
   },
   "dashboard": {
@@ -9723,6 +9742,7 @@
       "stockDrift": "{count, plural, one {# stock mismatch} other {# stock mismatches}} found today",
       "stockUnmatchedSale": "{count, plural, one {# sale} other {# sales}} could not be matched to a stock item",
       "seoExperimentReady": "SEO test results are ready for \"{title}\"",
+      "scheduledSendResult": "{sent, plural, one {# scheduled change} other {# scheduled changes}} sent to {marketplace, select, etsy {Etsy} ebay {eBay} trendyol {Trendyol} wix {Wix} shopify {Shopify} other {the store}}{failed, plural, =0 {} other { · # failed}}{conflicts, plural, =0 {} other { · # changed on the marketplace}}{skipped, plural, =0 {} other { · # skipped}}",
       "webhookBacklog": "The Etsy event queue is backing up"
     }
   },
@@ -10019,6 +10039,7 @@
       "draftSyncFailed": "Sync to Etsy failed",
       "draftConflict": "Listing edit conflict",
       "seoExperimentReady": "SEO test results",
+      "scheduledSendResult": "Scheduled sends",
       "stockOutOfStock": "Out of stock",
       "stockPushFailed": "Stock update failed",
       "stockDrift": "Stock mismatch",

@@ -4,6 +4,7 @@ import { getAuthUser } from '@/lib/auth';
 import { discardDraft, removeQueuedActions, toSerializable } from '@/lib/etsy/draftService';
 import { draftErrorResponse } from '@/lib/etsy/draftErrors';
 import { ScheduleError, scheduleErrorResponse, setDraftScheduledSendAt } from '@/lib/drafts/scheduledSend';
+import { withLegacyLastSyncError } from '@/lib/drafts/syncErrors';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const user = await getAuthUser(req, res);
@@ -18,7 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         include: { media: true, syncAttempts: { orderBy: { startedAt: 'desc' }, take: 10 } },
       });
       if (!draft) return res.status(404).json({ error: 'Draft not found' });
-      return res.status(200).json({ draft: toSerializable(draft) });
+      return res.status(200).json({ draft: toSerializable(draft ? withLegacyLastSyncError(draft as any) : draft) });
     }
 
     // PATCH { removeQueuedActions?: ['delete', ...], scheduledSendAt?: string|null }
@@ -55,10 +56,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           where: { id, userId: user.id },
           include: { media: true, syncAttempts: { orderBy: { startedAt: 'desc' }, take: 5 } },
         });
-        return res.status(200).json({ draft: toSerializable(draft) });
+        return res.status(200).json({ draft: toSerializable(draft ? withLegacyLastSyncError(draft as any) : draft) });
       }
       const draft = await removeQueuedActions(id, user.id, types);
-      return res.status(200).json({ draft: toSerializable(draft) });
+      return res.status(200).json({ draft: toSerializable(draft ? withLegacyLastSyncError(draft as any) : draft) });
     }
 
     if (req.method === 'DELETE') {

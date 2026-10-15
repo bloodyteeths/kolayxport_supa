@@ -2,7 +2,7 @@
  * LiveSoundToggle (owner W6-live) — header icon button next to the
  * NotificationBell.
  *
- *   icon      volume-up (sound on and armed) / volume-down + amber dot (on, but
+ *   icon      volume-up (sound on and armed) / volume-down + small dot (on, but
  *             the browser still needs one click before it may play) /
  *             volume-off (muted)
  *   dot       live connection: green live, amber connecting/polling, grey offline
@@ -106,10 +106,18 @@ export default function LiveSoundToggle({ size = 'medium', sx }: LiveSoundToggle
             },
           }}
         >
-          <Icon
-            fontSize={size === 'small' ? 'small' : 'medium'}
-            sx={{ color: sound === 'needsGesture' ? 'warning.main' : sound === 'muted' ? 'text.disabled' : 'text.secondary' }}
-          />
+          <Badge
+            variant="dot"
+            overlap="circular"
+            anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+            invisible={sound !== 'needsGesture'}
+            sx={{ '& .MuiBadge-badge': { bgcolor: 'primary.main', minWidth: 6, width: 6, height: 6 } }}
+          >
+            <Icon
+              fontSize={size === 'small' ? 'small' : 'medium'}
+              sx={{ color: sound === 'muted' ? 'text.disabled' : 'text.secondary' }}
+            />
+          </Badge>
         </Badge>
       </IconButton>
     </Tooltip>

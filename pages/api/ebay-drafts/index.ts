@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { getAuthUserOrApiKey } from '@/lib/auth';
 import { upsertDraftPatch, toSerializable } from '@/lib/ebay/draftService';
 import { logger } from '@/lib/logger';
+import { withLegacyLastSyncError } from '@/lib/drafts/syncErrors';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const user = await getAuthUserOrApiKey(req, res);
@@ -23,7 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         orderBy: { updatedAt: 'desc' },
       });
 
-      return res.status(200).json({ drafts: toSerializable(drafts), count: drafts.length });
+      return res.status(200).json({ drafts: toSerializable(drafts.map(withLegacyLastSyncError)), count: drafts.length });
     }
 
     if (req.method === 'POST') {
@@ -52,7 +53,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         replaceFields: Boolean(replaceFields),
       });
 
-      return res.status(200).json({ draft: toSerializable(draft) });
+      return res.status(200).json({ draft: toSerializable(draft ? withLegacyLastSyncError(draft as any) : draft) });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });

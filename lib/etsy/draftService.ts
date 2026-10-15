@@ -3,6 +3,8 @@ import { AsyncLocalStorage } from 'async_hooks';
 import path from 'path';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { queueHealthRefresh } from '@/lib/listings/healthQueue';
+import { classifyEtsyDraftSyncError, ETSY_DRAFT_ERROR } from '@/lib/drafts/syncErrors';
 import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
 import { EtsyDraftError, isEtsyDraftError, type DraftIssue } from './draftErrors';
 import {
@@ -1346,6 +1348,8 @@ export async function legacyRefreshListingCache(shopId: string, listingId: bigin
       syncedAt: new Date(),
     },
   });
+  // Listing health (listings-grid §9.3): debounced, fire-and-forget, never throws.
+  queueHealthRefresh('etsy', shopId, undefined, [listingId]);
   return listing;
 }
 
@@ -1372,7 +1376,7 @@ export async function recoverStaleSyncingDrafts(userId: string, shopId?: string)
   });
   await prisma.etsyListingDraft.updateMany({
     where: { id: { in: ids } },
-    data: { status: 'failed', lastSyncError: 'Sync interrupted by a server restart — retry Sync to Etsy' },
+    data: { status: 'failed', lastSyncError: ETSY_DRAFT_ERROR.interrupted },
   });
   return ids.length;
 }
@@ -1840,7 +1844,7 @@ async function syncDraftInner(draftId: string, userId: string, options: SyncDraf
             await prisma.etsyListingDraft.update({ where: { id: draft.id }, data: { baseEtsyUpdatedTimestamp: remoteUpdated } });
           } else {
             const message = 'Listing changed on Etsy after these edits were staged. Review it, then sync again with "apply anyway" to overwrite.';
-            await prisma.etsyListingDraft.update({ where: { id: draft.id }, data: { status: 'conflict', lastSyncError: message } });
+            await prisma.etsyListingDraft.update({ where: { id: draft.id }, data: { status: 'conflict', lastSyncError: ETSY_DRAFT_ERROR.conflict } });
             notifyDraftProblem(userId, draft, 'draftConflict');
             await prisma.etsyDraftSyncAttempt.update({
               where: { id: attempt.id },
@@ -2422,9 +2426,12 @@ async function syncDraftInner(draftId: string, userId: string, options: SyncDraf
       } catch { /* keep old base */ }
     }
     const message = err?.message || 'Sync failed';
+    // Stable i18n key in the draft (docs/integration/draft-sync-error-codes.md); the English
+    // message stays on the attempt row, params in attempt.result.errorParams.
+    const stored = classifyEtsyDraftSyncError(err);
     await prisma.etsyListingDraft.update({
       where: { id: draft.id },
-      data: { status: 'failed', lastSyncError: message, queuedActions, ...rebase },
+      data: { status: 'failed', lastSyncError: stored.key, queuedActions, ...rebase },
     }).catch(() => undefined);
     notifyDraftProblem(userId, draft, 'draftSyncFailed');
     await prisma.etsyDraftSyncAttempt.update({
@@ -2438,6 +2445,8 @@ async function syncDraftInner(draftId: string, userId: string, options: SyncDraf
           partial: results.length > 0,
           warnings,
           ...(isEtsyDraftError(err) ? { code: err.code, key: err.key, issues: err.issues } : {}),
+          errorKey: stored.key,
+          ...(stored.params ? { errorParams: stored.params } : {}),
         }) as any,
       },
     }).catch(() => undefined);

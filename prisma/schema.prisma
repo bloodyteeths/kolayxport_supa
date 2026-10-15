@@ -70,6 +70,7 @@ model User {
   amazonNicheResearch     AmazonNicheResearch[]
   etsyListingDrafts       EtsyListingDraft[]
   ebayListingDrafts       EbayListingDraft[]
+  catalogDrafts           CatalogDraft[]
   ebayListings            EbayListing[]
   adminAuditLogs          AdminAuditLog[]          @relation("AdminAuditLogs")
   notifications           Notification[]
@@ -701,13 +702,18 @@ model EtsyListing {
   lastRefreshAt      DateTime?
   stateChangedAt     DateTime?
 
-  etsyShop  EtsyShop              @relation("EtsyShopListings", fields: [etsyShopId], references: [shopId], onDelete: Cascade)
-  offerings EtsyListingOffering[]
+  etsyShop          EtsyShop              @relation("EtsyShopListings", fields: [etsyShopId], references: [shopId], onDelete: Cascade)
+  offerings         EtsyListingOffering[]
+  healthScore       Int?
+  healthChecksUsed  Int                   @default(0)
+  healthChecksTotal Int                   @default(0)
+  healthFails       String[]              @default([])
 
   @@unique([etsyShopId, etsyListingId])
   @@index([etsyShopId])
   @@index([etsyShopId, state])
   @@index([etsyShopId, etsyCreatedTimestamp])
+  @@index([etsyShopId, healthScore])
 }
 
 /// Cached Etsy inventory offerings keyed by variantKey (never product_id:
@@ -834,14 +840,16 @@ model EtsyListingDraft {
   updatedAt                DateTime  @updatedAt
   syncedAt                 DateTime?
 
-  user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  etsyShop     EtsyShop               @relation("EtsyShopDrafts", fields: [etsyShopId], references: [shopId], onDelete: Cascade)
-  media        EtsyDraftMedia[]
-  syncAttempts EtsyDraftSyncAttempt[]
+  user            User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  etsyShop        EtsyShop               @relation("EtsyShopDrafts", fields: [etsyShopId], references: [shopId], onDelete: Cascade)
+  media           EtsyDraftMedia[]
+  syncAttempts    EtsyDraftSyncAttempt[]
+  scheduledSendAt DateTime?
 
   @@index([userId, etsyShopId])
   @@index([etsyShopId, etsyListingId])
   @@index([status])
+  @@index([scheduledSendAt])
 }
 
 model EtsyDraftMedia {
@@ -906,13 +914,41 @@ model EbayListingDraft {
   updatedAt             DateTime  @updatedAt
   syncedAt              DateTime?
 
-  user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  media        EbayDraftMedia[]
-  syncAttempts EbayDraftSyncAttempt[]
+  user            User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  media           EbayDraftMedia[]
+  syncAttempts    EbayDraftSyncAttempt[]
+  scheduledSendAt DateTime?
 
   @@index([userId])
   @@index([userId, sku])
   @@index([status])
+  @@index([scheduledSendAt])
+}
+
+/// DB staging for Trendyol, Wix and Shopify edits (listings-grid §9.3). At most one open
+/// draft (draft|failed|conflict|syncing) per product, enforced by lib/catalogDrafts/service.
+model CatalogDraft {
+  id              String    @id @default(cuid())
+  userId          String
+  marketplace     String // 'trendyol' | 'wix' | 'shopify'
+  storeId         String // supplierId | WixSite.id | ShopifyShop.id
+  externalId      String // barcode | wixProductId | shopifyProductId
+  status          String    @default("draft") // draft | syncing | failed | conflict | synced | cancelled
+  baseUpdatedAt   DateTime?
+  baseSnapshot    Json      @default("{}")
+  fieldPatch      Json      @default("{}")
+  queuedActions   Json      @default("[]")
+  batchRequestId  String?
+  lastSyncError   String?
+  scheduledSendAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  syncedAt        DateTime?
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, marketplace, storeId])
+  @@index([status])
+  @@index([scheduledSendAt])
 }
 
 model EbayDraftMedia {
@@ -1143,12 +1179,17 @@ model EbayListing {
   // Cache control
   syncedAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  healthScore       Int?
+  healthChecksUsed  Int      @default(0)
+  healthChecksTotal Int      @default(0)
+  healthFails       String[] @default([])
 
   @@unique([userId, sku])
   @@index([userId])
   @@index([userId, status])
   @@index([userId, syncedAt])
+  @@index([userId, healthScore])
 }
 
 // ---------------------------------------------------------------------------
@@ -1590,12 +1631,17 @@ model TrendyolProduct {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  healthScore       Int?
+  healthChecksUsed  Int      @default(0)
+  healthChecksTotal Int      @default(0)
+  healthFails       String[] @default([])
 
   @@unique([userId, supplierId, barcode])
   @@index([userId, supplierId])
   @@index([userId, onSale])
   @@index([userId, categoryId])
+  @@index([supplierId, healthScore])
 }
 
 model WixSite {
@@ -1660,11 +1706,16 @@ model WixProduct {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  site WixSite @relation("WixSiteProducts", fields: [wixSiteId], references: [id], onDelete: Cascade)
-  user User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  site              WixSite  @relation("WixSiteProducts", fields: [wixSiteId], references: [id], onDelete: Cascade)
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  healthScore       Int?
+  healthChecksUsed  Int      @default(0)
+  healthChecksTotal Int      @default(0)
+  healthFails       String[] @default([])
 
   @@unique([userId, wixSiteId, wixProductId])
   @@index([userId, wixSiteId])
+  @@index([wixSiteId, healthScore])
 }
 
 model ShopifyShop {
@@ -1734,12 +1785,17 @@ model ShopifyProduct {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  shop ShopifyShop @relation("ShopifyShopProducts", fields: [shopifyShopId], references: [id], onDelete: Cascade)
-  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shop              ShopifyShop @relation("ShopifyShopProducts", fields: [shopifyShopId], references: [id], onDelete: Cascade)
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  healthScore       Int?
+  healthChecksUsed  Int         @default(0)
+  healthChecksTotal Int         @default(0)
+  healthFails       String[]    @default([])
 
   @@unique([userId, shopifyShopId, shopifyProductId])
   @@index([userId, shopifyShopId])
   @@index([shopifyShopId, status])
+  @@index([shopifyShopId, healthScore])
 }
 
 // ---------------------------------------------------------------------------

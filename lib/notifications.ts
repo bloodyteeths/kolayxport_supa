@@ -65,6 +65,7 @@ export type NotificationType =
   | 'stockDrift'
   | 'stockUnmatchedSale'
   | 'seoExperimentReady'
+  | 'scheduledSendResult'
   | 'webhookBacklog';
 
 export type NotificationParams = Record<string, string | number>;

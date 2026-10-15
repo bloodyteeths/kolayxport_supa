@@ -4,6 +4,7 @@ import { getAuthUserOrApiKey } from '@/lib/auth';
 import { discardDraft, toSerializable } from '@/lib/ebay/draftService';
 import { logger } from '@/lib/logger';
 import { ScheduleError, scheduleErrorResponse, setDraftScheduledSendAt } from '@/lib/drafts/scheduledSend';
+import { withLegacyLastSyncError } from '@/lib/drafts/syncErrors';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const user = await getAuthUserOrApiKey(req, res);
@@ -21,7 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
       });
       if (!draft) return res.status(404).json({ error: 'Draft not found' });
-      return res.status(200).json({ draft: toSerializable(draft) });
+      return res.status(200).json({ draft: toSerializable(draft ? withLegacyLastSyncError(draft as any) : draft) });
     }
 
     // PATCH { scheduledSendAt: string|null } (additive, listings-grid §9.4):
@@ -40,7 +41,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         throw err;
       }
       const draft = await prisma.ebayListingDraft.findFirst({ where: { id, userId: user.id } });
-      return res.status(200).json({ draft: toSerializable(draft) });
+      return res.status(200).json({ draft: toSerializable(draft ? withLegacyLastSyncError(draft as any) : draft) });
     }
 
     if (req.method === 'DELETE') {

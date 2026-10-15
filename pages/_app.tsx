@@ -25,6 +25,9 @@ import LimitReachedDialog from '@/components/billing/LimitReachedDialog';
 import { installLimitInterceptor } from '@/lib/http/limitInterceptor';
 import LiveAppMount from '@/components/live/LiveAppMount';
 import { zIndex as dsZ, neutral as dsN, radius as dsRadius } from '@/lib/ds/tokens';
+import useSWR from 'swr';
+import { FormatProvider } from '@/lib/format';
+import { PlanTagProvider } from '@/components/ds/data/PlanTag';
 
 // Inter via next/font (self-hosted). latin-ext covers ğ ş ı İ. Exposed as --font-inter at :root below.
 const inter = Inter({ subsets: ['latin', 'latin-ext'], display: 'swap', variable: '--font-inter' });
@@ -56,6 +59,41 @@ const TOAST_OPTIONS = {
   error: { duration: 8000 },
 };
 
+type SettingsSnapshot = {
+  subscription?: { billingProvider?: string | null; subscriptionPlan?: string | null } | null;
+  timezone?: string | null;
+} | null;
+
+/**
+ * DS app-level providers (lib/format FormatProvider, PlanTagProvider), mounted once inside
+ * NextIntlClientProvider. Reads `/api/user/settings` from the SWR cache only (fetcher null = no extra
+ * request): AppLayout and LimitReachedDialog already fetch that key for signed-in users.
+ * - timeZone: the settings response has no seller timezone yet (BR-2 / D-T1), so `timezone` is read
+ *   if present and FormatProvider otherwise falls back to Europe/Istanbul.
+ * - stripeUpsell: true only when billingProvider is 'stripe' (and the plan is not shopify_free); false for
+ *   shopify_free; a missing subscription or NULL billingProvider is unknown → null
+ *   (PlanTag renders nothing — the Shopify-review-safe default).
+ */
+function DsAppProviders({ children }: { children: ReactNode }) {
+  const { data } = useSWR<SettingsSnapshot>('/api/user/settings', null, {
+    revalidateOnMount: false,
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+  });
+  const sub = data?.subscription ?? null;
+  // Only an explicit Stripe account gets the upsell. A NULL billingProvider (e.g. the Shopify 1.2.1
+  // reviewer-account shape) is unknown → null, never true.
+  const stripeUpsell =
+    !sub || !sub.billingProvider
+      ? null
+      : sub.billingProvider === 'stripe' && sub.subscriptionPlan !== 'shopify_free';
+  return (
+    <FormatProvider timeZone={data?.timezone ?? undefined}>
+      <PlanTagProvider stripeUpsell={stripeUpsell}>{children}</PlanTagProvider>
+    </FormatProvider>
+  );
+}
+
 function MyApp({ Component, pageProps }: AppProps) {
   const router = useRouter();
   const locale = useLocaleStore((s) => s.locale);
@@ -85,6 +123,7 @@ function MyApp({ Component, pageProps }: AppProps) {
     <SessionProvider session={pageProps.session}>
     <AuthProvider>
       <NextIntlClientProvider locale={locale} messages={messages[locale]} timeZone="Europe/Istanbul">
+      <DsAppProviders>
       <ThemeProvider theme={theme}>
       <ConfirmProvider>
         {/* defines the font var at :root so MUI portals (dialogs, menus) get Inter too */}
@@ -149,6 +188,7 @@ function MyApp({ Component, pageProps }: AppProps) {
         <CookieConsent />
       </ConfirmProvider>
       </ThemeProvider>
+      </DsAppProviders>
       </NextIntlClientProvider>
     </AuthProvider>
     </SessionProvider>

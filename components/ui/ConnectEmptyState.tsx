@@ -1,11 +1,22 @@
 import React from 'react';
-import Link from 'next/link';
-import { Button, CircularProgress } from '@mui/material';
-import LinkRoundedIcon from '@mui/icons-material/LinkRounded';
 import { useTranslations } from 'next-intl';
 import { useConnections, type ConnectionProvider } from '@/lib/hooks/useConnections';
+import { ConnectState } from '@/components/ds/state/ConnectState';
+import { PanelSkeleton } from '@/components/ds/state/Skeletons';
 
-const PROVIDER_NAMES: Record<string, string> = {
+/**
+ * M1-f shim → `components/ds/state/ConnectState` (DESIGN_SYSTEM §3.13 `first-use`, §4.5; deleted in M10).
+ *
+ * Adapter (legacy prop → DS prop):
+ * - `provider` → `brand` (real logo from `lib/ds/logos.ts`; `mng` resolves to the DHL mark)
+ * - title `ui.connectEmpty.title` → `title`; `description` or `ui.connectEmpty.description` → `body`
+ * - `ui.connectEmpty.cta` → `actionLabel`; settings tab by provider → `connectHref`
+ * - `className`, `data-testid` pass through
+ * Legacy `ui.*` copy is kept so the shim does not depend on the `ds.state.connect` keys being merged.
+ */
+
+/** Proper nouns (not translated). `mng` is shown as "DHL eCommerce" (DS §3.19 glossary). */
+export const PROVIDER_NAMES: Record<string, string> = {
   etsy: 'Etsy', ebay: 'eBay', amazon: 'Amazon', shopify: 'Shopify', wix: 'Wix',
   trendyol: 'Trendyol', hepsiburada: 'Hepsiburada', veeqo: 'Veeqo', shippo: 'Shippo',
   fedex: 'FedEx', ups: 'UPS', mng: 'DHL eCommerce', parasut: 'Paraşüt',
@@ -14,45 +25,39 @@ const PROVIDER_NAMES: Record<string, string> = {
 /** Settings tab where each provider is connected (OAuth vs pasted API keys). */
 const KEY_BASED: readonly string[] = ['trendyol', 'hepsiburada', 'veeqo', 'shippo', 'fedex', 'ups', 'mng', 'parasut'];
 
+export function connectHrefFor(provider: string): string {
+  return `/ayarlar?tab=${KEY_BASED.includes(provider) ? 'apiKeys' : 'connections'}`;
+}
+
 export interface ConnectEmptyStateProps {
   provider: ConnectionProvider;
   /** Optional extra line under the title, e.g. what the page does once connected. */
   description?: string;
   className?: string;
+  'data-testid'?: string;
 }
 
 /** Shown on a provider-specific page when that provider is not connected. */
-export default function ConnectEmptyState({ provider, description, className = '' }: ConnectEmptyStateProps) {
+export default function ConnectEmptyState({ provider, description, className, 'data-testid': testId }: ConnectEmptyStateProps) {
   const t = useTranslations('ui');
   const name = PROVIDER_NAMES[provider] || provider;
-  const tab = KEY_BASED.includes(provider) ? 'apiKeys' : 'connections';
-
   return (
-    <div className={`flex flex-col items-center justify-center py-14 px-6 text-center ${className}`}>
-      <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center mb-4 bg-slate-100">
-        <LinkRoundedIcon sx={{ color: '#475569', fontSize: 30 }} />
-      </div>
-      <h3 className="text-base sm:text-lg font-semibold text-slate-800 mb-1.5" style={{ letterSpacing: '-0.01em' }}>
-        {t('connectEmpty.title', { name })}
-      </h3>
-      <p className="text-sm text-slate-500 max-w-sm mb-5">{description || t('connectEmpty.description', { name })}</p>
-      <Button
-        component={Link}
-        href={`/ayarlar?tab=${tab}`}
-        variant="contained"
-        disableElevation
-        sx={{ minHeight: 44, textTransform: 'none', borderRadius: 2 }}
-      >
-        {t('connectEmpty.cta', { name })}
-      </Button>
-    </div>
+    <ConnectState
+      brand={provider}
+      title={t('connectEmpty.title', { name })}
+      body={description || t('connectEmpty.description', { name })}
+      actionLabel={t('connectEmpty.cta', { name })}
+      connectHref={connectHrefFor(provider)}
+      className={className}
+      data-testid={testId}
+    />
   );
 }
 
 /**
- * Wraps a provider page: renders children when connected (or while the status
- * is still loading / errored, so a transient failure never hides a connected
- * user's data), and ConnectEmptyState when definitely not connected.
+ * Wraps a provider page: renders children when connected (or while the status is still loading / errored, so
+ * a transient failure never hides a connected user's data), and ConnectEmptyState when definitely not
+ * connected. Loading shows the DS PanelSkeleton, delayed 200ms (DS §3.13: no flash, spinners only inside buttons).
  */
 export function RequireConnection({
   provider,
@@ -63,11 +68,8 @@ export function RequireConnection({
   const connected = has(provider);
   if (connected === false) return <ConnectEmptyState provider={provider} description={description} />;
   if (connected === undefined && isLoading) {
-    return (
-      <div className="flex justify-center py-16">
-        <CircularProgress size={28} />
-      </div>
-    );
+    // DS skeleton: appears only after SKELETON_DELAY_MS (200ms) so fast connection checks never flash.
+    return <PanelSkeleton sections={2} data-testid="require-connection-loading" />;
   }
   return <>{children}</>;
 }

@@ -16,6 +16,9 @@ import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { draftErrorI18n } from '@/lib/etsy/seoRules';
 import { stageEtsyDraft, fetchEtsyDrafts } from '@/lib/etsy/draftClient';
+import { useStockManaged } from '@/components/stock/useStockManaged';
+import StockManagedQtyChip from '@/components/stock/StockManagedQtyChip';
+import { etsyVariantKeys, pairsFromEtsyProduct } from '@/lib/etsy/variantKey';
 
 // --- Types ---
 
@@ -45,6 +48,59 @@ interface Product {
   sku: string;
   offerings: Offering[];
   property_values: PropertyValue[];
+  /**
+   * Quantity the seller started from for this variant (W1). Lets the draft sync
+   * tell "restocked back to the old value" from "untouched". Stripped server-side
+   * before the Etsy PUT.
+   */
+  kx_loaded_quantity?: number;
+}
+
+/** Match products by variant tuple (property_id + values), not product_id (Etsy regenerates ids). */
+function variantTupleKey(p: any): string {
+  return JSON.stringify(
+    (p?.property_values || [])
+      .map((pv: any) => [
+        Number(pv.property_id) === 508 ? 513 : Number(pv.property_id),
+        (pv.values || []).map((v: any) => String(v).trim().toLowerCase()),
+      ])
+      .sort((a: any, b: any) => a[0] - b[0]),
+  );
+}
+
+/**
+ * Stamp `kx_loaded_quantity` on each product before staging (W1 cross-workstream note):
+ * 1) carry an earlier staged marker over unchanged; 2) no pending draft -> the live
+ * Etsy quantity the editor showed; 3) legacy pending draft without markers -> only
+ * variants edited in this session, with the value shown before the edit.
+ */
+export function stampLoadedQuantities(
+  productsToSave: any[],
+  opts: { liveInventory: any | null; pendingDraft: any | null; originalProducts: any[] },
+): any[] {
+  const liveByKey = new Map<string, any>(
+    (opts.liveInventory?.products || []).filter((p: any) => !p.is_deleted).map((p: any) => [variantTupleKey(p), p]),
+  );
+  const stagedByKey = new Map<string, any>(
+    (opts.pendingDraft?.inventoryPatch?.products || []).map((p: any) => [variantTupleKey(p), p]),
+  );
+  const originalByKey = new Map<string, any>(opts.originalProducts.map((p: any) => [variantTupleKey(p), p]));
+  return productsToSave.map((p: any) => {
+    const k = variantTupleKey(p);
+    const staged = stagedByKey.get(k);
+    if (staged && staged.kx_loaded_quantity !== undefined && staged.kx_loaded_quantity !== null) {
+      return { ...p, kx_loaded_quantity: staged.kx_loaded_quantity };
+    }
+    if (!opts.pendingDraft) {
+      const live = liveByKey.get(k);
+      const q = live?.offerings?.find((o: any) => !o.is_deleted)?.quantity;
+      return q === undefined || q === null ? p : { ...p, kx_loaded_quantity: Number(q) };
+    }
+    const orig = originalByKey.get(k);
+    const before = orig?.offerings?.[0]?.quantity;
+    const now = p.offerings?.[0]?.quantity;
+    return before !== undefined && Number(before) !== Number(now) ? { ...p, kx_loaded_quantity: Number(before) } : p;
+  });
 }
 
 interface TaxonomyScale {
@@ -458,6 +514,10 @@ function sanitizeProducts(raw: any[]): Product[] {
         ? { value_ids: pv.value_ids.map((v: any) => Number(v)).filter((v: number) => Number.isFinite(v)) }
         : {}),
     })) : [],
+    // Keep the W1 restock marker so a later save can carry it over unchanged.
+    ...(p.kx_loaded_quantity !== undefined && p.kx_loaded_quantity !== null && Number.isFinite(Number(p.kx_loaded_quantity))
+      ? { kx_loaded_quantity: Number(p.kx_loaded_quantity) }
+      : {}),
   }));
 }
 
@@ -486,6 +546,16 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
   const [products, setProducts] = useState<Product[]>([]);
   const [originalProducts, setOriginalProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  // Live inventory + pending draft as loaded, for the kx_loaded_quantity stamp at save time.
+  const liveInventoryRef = useRef<any>(null);
+  const pendingDraftRef = useRef<any>(null);
+
+  // W2: variants managed by stock sync show a read-only quantity chip (when live)
+  // and are skipped by bulk quantity edits. Off / not set up -> unchanged editor.
+  const stockManaged = useStockManaged(listingId, shopId);
+  const managedFor = (product: Product) =>
+    stockManaged.managed ? stockManaged.get(etsyVariantKeys(pairsFromEtsyProduct(product)).variantKey) : undefined;
+  const isLiveManaged = (product: Product) => stockManaged.live && !!managedFor(product);
   const [saving, setSaving] = useState(false);
 
   // Tabs: 0=Variations, 1=Price, 2=Quantity, 3=SKU, 4=Visibility, 5=Photos, 6=Processing
@@ -741,6 +811,8 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
         ? draftsRes.find((d: any) => ['draft', 'failed', 'conflict'].includes(d.status) && d.inventoryPatch && Array.isArray(d.inventoryPatch.products) && d.inventoryPatch.products.length > 0)
         : null;
 
+      liveInventoryRef.current = data;
+      pendingDraftRef.current = pendingDraft || null;
       const source = pendingDraft ? pendingDraft.inventoryPatch : data;
       const fetched = sanitizeProducts(source.products || []);
       const apiPriceOnProperty = normalizePropertyIds(source.price_on_property);
@@ -895,6 +967,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
     if (isNaN(v)) return;
     setProducts(prev => prev.map(p => {
       if (!p.offerings.length) return p;
+      if (isLiveManaged(p)) return p; // stock sync owns this quantity
       const o = { ...p.offerings[0] };
       let newQty = o.quantity;
       if (quantityAction === 'set') newQty = v;
@@ -971,6 +1044,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
       const pv = p.property_values.find(v => v.property_id === propertyId);
       if (pv?.values?.[0] !== value) return p;
       if (!p.offerings.length) return p;
+      if (isLiveManaged(p)) return p; // stock sync owns this quantity
       const o = { ...p.offerings[0], quantity: n };
       return { ...p, offerings: [o, ...p.offerings.slice(1)] };
     }));
@@ -1337,7 +1411,14 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
         setProducts(productsToSave);
       }
 
-      await stageEtsyDraft({ shopId, listingId, inventory: { products: productsToSave, price_on_property, quantity_on_property, sku_on_property } });
+      const stamped = stampLoadedQuantities(productsToSave, {
+        liveInventory: liveInventoryRef.current,
+        pendingDraft: pendingDraftRef.current,
+        originalProducts,
+      });
+      await stageEtsyDraft({ shopId, listingId, inventory: { products: stamped, price_on_property, quantity_on_property, sku_on_property } });
+      // The staged patch is now the pending draft: later saves carry its markers over (rule 1).
+      pendingDraftRef.current = { inventoryPatch: { products: stamped } };
       toast.success(t('variationsStaged'));
       setOriginalProducts(JSON.parse(JSON.stringify(productsToSave)));
       setOriginalPriceOnPropertyIds(price_on_property);
@@ -1658,13 +1739,20 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
                         <Typography variant="body2" color="text.secondary" sx={{ minWidth: 55, textAlign: 'right' }}>
                           {sym}{getPrice(o)}
                         </Typography>
-                        <Chip
-                          label={o.quantity === 0 ? t('outOfStock') : `${o.quantity} ${t('pieces')}`}
-                          size="small"
-                          color={o.quantity === 0 ? 'error' : 'default'}
-                          variant="outlined"
-                          sx={{ fontSize: '0.7rem', height: 22, minWidth: { xs: 'auto', sm: 60 } }}
-                        />
+                        {(() => {
+                          const m = managedFor(product);
+                          return m ? (
+                            <StockManagedQtyChip qty={m.canonical} live={stockManaged.live} />
+                          ) : (
+                            <Chip
+                              label={o.quantity === 0 ? t('outOfStock') : `${o.quantity} ${t('pieces')}`}
+                              size="small"
+                              color={o.quantity === 0 ? 'error' : 'default'}
+                              variant="outlined"
+                              sx={{ fontSize: '0.7rem', height: 22, minWidth: { xs: 'auto', sm: 60 } }}
+                            />
+                          );
+                        })()}
 
                         {/* Enabled indicator */}
                         {!o.is_enabled && (
@@ -1906,13 +1994,23 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
                     return (
                       <Box key={globalIdx} sx={rowSx}>
                         <Typography variant="body2" fontWeight={500} sx={{ flex: 1 }}>{getLabel(product)}</Typography>
-                        <TextField
-                          size="small" type="number"
-                          value={o.quantity}
-                          onChange={(e) => updateField(globalIdx, 'quantity', e.target.value)}
-                          inputProps={{ min: 0 }}
-                          sx={{ width: { xs: '100%', sm: 90 } }}
-                        />
+                        {(() => {
+                          const m = managedFor(product);
+                          return m && stockManaged.live ? (
+                            <StockManagedQtyChip qty={m.canonical} live />
+                          ) : (
+                            <>
+                              <TextField
+                                size="small" type="number"
+                                value={o.quantity}
+                                onChange={(e) => updateField(globalIdx, 'quantity', e.target.value)}
+                                inputProps={{ min: 0 }}
+                                sx={{ width: { xs: '100%', sm: 90 } }}
+                              />
+                              {m && <StockManagedQtyChip qty={m.canonical} live={false} />}
+                            </>
+                          );
+                        })()}
                       </Box>
                     );
                   })}

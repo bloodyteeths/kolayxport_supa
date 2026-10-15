@@ -31,6 +31,10 @@ import type { CopyableAddress } from '@/lib/format/address';
 import { isEtsyOrderSync } from '@/lib/utils/etsyDetection';
 import { buildTrendyolProductUrl } from '@/lib/utils/trendyolUrl';
 import withAuth from '@/components/withAuth';
+import CancelledOrderLabelDialog, { isLabelGuardResponse, type LabelGuardCode } from '@/components/orders-live/CancelledOrderLabelDialog';
+import OrderLifecycleBadges from '@/components/orders-live/OrderLifecycleBadges';
+import { useOrderLifecycleFlags } from '@/components/orders-live/useOrderLifecycleFlags';
+import { useHighlightParam, useRecentLiveOrders } from '@/components/live/useLiveEvent';
 // supabase browser client removed — auth now handled by NextAuth cookies
 import {
   FEDEX_SERVICE_TYPES,
@@ -980,10 +984,13 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
     const hasShipment = latestShipment?.status === 'created' && 
       (!!latestShipment?.trackingNumber || !!latestShipment?.pdfUrl);
       
-    const hasOrderLabel = !!order.trackingNumber || 
-                         order.labelStatus === 'created' || 
-                         hasShipment || 
-                         !!order.shippingLabelUrl;
+    // W4: labelStatus 'voided' = the order-level label was voided (URL/tracking
+    // are kept for the record) -> no active label unless a newer shipment exists.
+    const hasOrderLabel = hasShipment ||
+                         (!isOrderLabelVoided(order) &&
+                           (!!order.trackingNumber ||
+                             order.labelStatus === 'created' ||
+                             !!order.shippingLabelUrl));
     
     
     
@@ -1051,7 +1058,7 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         fedexPackagingType: order.fedexPackagingType,
         countryOfOrigin: order.countryOfMfg,
         labelJobStatus: hasOrderLabel ? 'created' : undefined,
-        trackingNumber: latestShipment?.trackingNumber || order.trackingNumber || (safeRaw?.cargoTrackingNumber ? String(safeRaw.cargoTrackingNumber) : undefined),
+        trackingNumber: latestShipment?.trackingNumber || (isOrderLabelVoided(order) ? undefined : order.trackingNumber) || (safeRaw?.cargoTrackingNumber ? String(safeRaw.cargoTrackingNumber) : undefined),
         shipByDate: order.shipByDate || (addr as any)?._etsyShipByDate,
         // Prefer DB-persisted Etsy message_from_buyer (synced from the receipt
         // mapper) over the Chrome extension's _etsyCustomerNote scrape, so
@@ -1060,7 +1067,7 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         giftMessage: order.giftMessage || '',
         originalOrder: order,
         labelCreated: hasOrderLabel,
-        shippingLabelUrl: hasOrderLabel ? (latestShipment?.pdfUrl || order.shippingLabelUrl) : undefined,
+        shippingLabelUrl: hasOrderLabel ? (latestShipment?.pdfUrl || (isOrderLabelVoided(order) ? undefined : order.shippingLabelUrl)) : undefined,
         labelStockType: order.labelStockType,
         variantInfo: lineItems?.[0]?.variantInfo || '—',
         listingUrl: (() => {
@@ -1173,7 +1180,8 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         originalOrder: order,
         labelCreated: latestLabelJob?.status === 'created' && !!latestLabelJob?.trackingNumber,
         // No /api/labels/:itemId/pdf route exists — only real stored URLs here.
-        shippingLabelUrl: latestLabelJob?.pdfUrl || undefined,
+        // A voided job keeps its pdfUrl for the record; it is not a label (W4).
+        shippingLabelUrl: latestLabelJob?.status === 'voided' ? undefined : latestLabelJob?.pdfUrl || undefined,
         labelStockType: order.labelStockType,
         variantInfo: item.variantInfo || '—',
         listingUrl: (() => {
@@ -1377,11 +1385,22 @@ function dedupeLabelRows(rows: LabelRow[]): LabelRow[] {
   return Array.from(seen.values());
 }
 
+/** W4: `labelStatus === 'voided'` means the order-level label was voided -> no active label. */
+function isOrderLabelVoided(order: { labelStatus?: string | null } | null | undefined): boolean {
+  return order?.labelStatus === 'voided';
+}
+
 /** Shared label status derivation — used by both mobile cards and desktop DataGrid */
 function getLabelStatus(row: LabelRow): 'labeled' | 'pending' | 'failed' | 'unlabeled' {
   const originalOrder = row?.originalOrder as LocalUIOrder | undefined;
   const shipments = originalOrder?.shipments || [];
   const hasShipment = shipments.some(s => s?.status === 'created' && (s?.trackingNumber || s?.pdfUrl));
+
+  // Voided order label or voided label job: only a live shipment counts (W4 §8).
+  // `labelCreated` is already voided-aware (order rows: hasOrderLabel; item rows: a created job).
+  if (isOrderLabelVoided(originalOrder) || row.labelJobStatus === 'voided') {
+    return hasShipment || row.labelCreated ? 'labeled' : 'unlabeled';
+  }
 
   const hasLabel = row.trackingNumber ||
                    row.labelCreated ||
@@ -1612,6 +1631,9 @@ function LabelsPage(props: { source?: string; channel?: string }) {
   const [statusFilter, setStatusFilter] = useState(initialFilters.status);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [generatingLabelId, setGeneratingLabelId] = useState<string | null>(null);
+  // W4 label guard (FedEx): 409 ORDER_CANCELLED / ORDER_SHIPPED_EXTERNALLY -> confirm -> retry with forceCancelled.
+  const [fedexGuard, setFedexGuard] = useState<{ code: LabelGuardCode; row: LabelRow } | null>(null);
+  const forceFedexRef = useRef(false);
   const [syncingOrders, setSyncingOrders] = useState(false);
   const [shipperPhoneNumber, setShipperPhoneNumber] = useState('');
   const [hasFedexCredentials, setHasFedexCredentials] = useState(false);
@@ -1815,6 +1837,31 @@ function LabelsPage(props: { source?: string; channel?: string }) {
       primaryRow: items[0],
     }));
   }, [filteredAndPaginatedItems]);
+
+  // W4: lifecycle flags (cancelled after label, shipped outside, late, ...) for the visible orders.
+  // Keyed by a stable id string, never the array (re-renders must not refetch).
+  const visibleOrderIdsKey = orderGroups.map((g) => g.orderId).join(',');
+  const visibleOrderIds = useMemo(
+    () => (visibleOrderIdsKey ? visibleOrderIdsKey.split(',') : []),
+    [visibleOrderIdsKey],
+  );
+  const { flags: lifecycleFlags, mutate: refreshLifecycle } = useOrderLifecycleFlags(visibleOrderIds);
+
+  // W6: ?highlight=<orderId> from the new-order toast; recently arrived orders get a "New" chip.
+  const tLive = useTranslations('liveOrders');
+  const { highlightId, clear: clearHighlight } = useHighlightParam();
+  const recentLiveOrders = useRecentLiveOrders();
+  // Expand + scroll once per highlighted id (list refreshes must not re-open a card the user closed).
+  const highlightAppliedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!highlightId || highlightAppliedRef.current === highlightId) return;
+    if (!orderGroups.some((g) => g.orderId === highlightId)) return;
+    highlightAppliedRef.current = highlightId;
+    setExpandedCardId(highlightId);
+    requestAnimationFrame(() => {
+      document.getElementById(`order-card-${highlightId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }, [highlightId, orderGroups]);
 
   // Reset pagination when filters change, but use a more stable approach
   useEffect(() => {
@@ -2325,7 +2372,8 @@ function LabelsPage(props: { source?: string; channel?: string }) {
 
         // And orderId / orderItemId
         orderId: currentFormValues.orderId, // Ensure orderId is at top level
-        orderItemId: currentFormValues.itemId
+        orderItemId: currentFormValues.itemId,
+        forceCancelled: forceFedexRef.current || undefined,
       };
 
       const { fetchWithLimit } = await import('../../lib/fetchWithLimit');
@@ -2335,6 +2383,14 @@ function LabelsPage(props: { source?: string; channel?: string }) {
         body: JSON.stringify(bodyForGenerateLabel) 
       });
 
+      if (labelResponse.status === 409) {
+        const guardBody = await labelResponse.clone().json().catch(() => null);
+        if (isLabelGuardResponse(409, guardBody)) {
+          toast.dismiss(toastLabelId);
+          setFedexGuard({ code: guardBody.code, row: rowForLabel });
+          return;
+        }
+      }
       if (!labelResponse.ok) {
         let errorMsg = `${t('labelGenerationError')} (HTTP ${labelResponse.status})`;
         try {
@@ -2665,8 +2721,17 @@ function LabelsPage(props: { source?: string; channel?: string }) {
               return (
                 <Paper
                   key={group.orderId}
+                  id={`order-card-${group.orderId}`}
                   elevation={isExpanded ? 3 : 1}
-                  sx={{ border: '1px solid', borderColor: isExpanded ? 'primary.light' : 'divider', borderRadius: 1.5, overflow: 'hidden' }}
+                  onClick={highlightId === group.orderId ? clearHighlight : undefined}
+                  sx={{
+                    border: '1px solid',
+                    borderColor: highlightId === group.orderId ? 'success.main' : isExpanded ? 'primary.light' : 'divider',
+                    boxShadow: highlightId === group.orderId ? (theme) => `0 0 0 3px ${theme.palette.success.light}` : undefined,
+                    transition: 'box-shadow 300ms ease, border-color 300ms ease',
+                    borderRadius: 1.5,
+                    overflow: 'hidden',
+                  }}
                 >
                   {/* Order header — always visible */}
                   <Box
@@ -2717,6 +2782,9 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                           {group.customerName || '—'}
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end', rowGap: 0.25, maxWidth: '100%' }}>
+                          {recentLiveOrders.has(group.orderId) && (
+                            <Chip size="small" color="success" label={tLive('badge.new')} sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }} />
+                          )}
                           {(() => {
                             // Ship-by deadline at a glance: earliest deadline across the
                             // order's items, hidden once the order no longer needs shipping.
@@ -2753,6 +2821,9 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                               />
                             );
                           })()}
+                          {!isExpanded && (
+                            <OrderLifecycleBadges orderId={group.orderId} flags={lifecycleFlags[group.orderId]} compact />
+                          )}
                           {(() => {
                             const up = String(row.shippingUpgrade || '').trim();
                             if (!up) return null;
@@ -2851,6 +2922,15 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                   {/* Expanded details */}
                   {isExpanded && (
                     <Box sx={{ px: 1.25, pb: 1.25, pt: 0, borderTop: '1px solid', borderColor: 'divider', overflow: 'hidden', wordBreak: 'break-word' }}>
+                      {lifecycleFlags[group.orderId] && (
+                        <Box sx={{ pt: 1 }}>
+                          <OrderLifecycleBadges
+                            orderId={group.orderId}
+                            flags={lifecycleFlags[group.orderId]}
+                            onChanged={() => { void refreshLifecycle(); void mutate(); }}
+                          />
+                        </Box>
+                      )}
                       {/* Items list */}
                       {group.items.length > 0 && (
                         <Box sx={{ py: 0.75 }}>
@@ -3291,6 +3371,20 @@ function LabelsPage(props: { source?: string; channel?: string }) {
           }}
         />
       )}
+
+      <CancelledOrderLabelDialog
+        open={!!fedexGuard}
+        code={fedexGuard?.code ?? null}
+        orderNumber={fedexGuard?.row?.orderNumber}
+        onClose={() => setFedexGuard(null)}
+        onConfirm={() => {
+          const guardRow = fedexGuard?.row;
+          setFedexGuard(null);
+          if (!guardRow) return;
+          forceFedexRef.current = true;
+          handleGenerateLabel(guardRow).finally(() => { forceFedexRef.current = false; });
+        }}
+      />
 
       {/* MNG Kargo Drawer mount */}
       {selectedOrderForMNG && (

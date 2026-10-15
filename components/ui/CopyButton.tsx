@@ -1,9 +1,23 @@
 import React from 'react';
-import { Chip, IconButton, Tooltip, type SxProps, type Theme } from '@mui/material';
-import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
-import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
+import Box from '@mui/material/Box';
+import type { SxProps, Theme } from '@mui/material/styles';
 import { useTranslations } from 'next-intl';
 import { useCopy } from '@/lib/hooks/useCopy';
+import { icons } from '@/lib/ds/icons';
+import { IconButton as DsIconButton } from '@/components/ds/inputs/IconButton';
+import { Button as DsButton } from '@/components/ds/inputs/Button';
+
+/**
+ * M1-f shim (DESIGN_SYSTEM §4.4: `ds/format/CopyText` absorbs `ui/CopyButton`; deleted in M10).
+ *
+ * `CopyText` renders the value itself, while every legacy call site already renders the value next to this
+ * button, so routing through `CopyText` would print it twice. The shim keeps the legacy API and renders DS
+ * controls:
+ * - `icon` (default): DS `IconButton` ghost (`small` → sm 32, `medium` → md 40; 44 on touch), registry icon
+ *   `copy` → `check` while copied; aria-label + tooltip "Copy {label}" / "Copied".
+ * - `chip`: DS `Button` secondary sm with the `copy`/`check` icon and the label text.
+ * Works inside clickable rows/cards: click, mousedown, touchstart and Enter/Space never reach the row.
+ */
 
 export interface CopyButtonProps {
   /** Text to copy, or a function computed at click time (e.g. formatAddressForCopy). */
@@ -17,16 +31,14 @@ export interface CopyButtonProps {
   /** Suppress toasts (only the check-icon feedback). */
   silent?: boolean;
   disabled?: boolean;
+  /** Applied to the wrapper span. */
   sx?: SxProps<Theme>;
   className?: string;
+  'data-testid'?: string;
   /** Called after the copy attempt with the real result. */
   onCopied?: (ok: boolean) => void;
 }
 
-/**
- * Copy-to-clipboard button. Works inside clickable rows/cards (stops click,
- * mousedown and key propagation). >= 44px tap target on phones.
- */
 export default function CopyButton({
   value,
   label,
@@ -37,6 +49,7 @@ export default function CopyButton({
   disabled,
   sx,
   className,
+  'data-testid': testId,
   onCopied,
 }: CopyButtonProps) {
   const t = useTranslations('ui');
@@ -47,9 +60,9 @@ export default function CopyButton({
 
   const resolve = () => (typeof value === 'function' ? value() : value) ?? '';
   const isEmpty = typeof value !== 'function' && !value;
-  const isDisabled = disabled || isEmpty;
+  const isDisabled = !!disabled || isEmpty;
 
-  const handleClick = async (e: React.MouseEvent) => {
+  const handleClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     e.preventDefault();
     if (isDisabled) return;
@@ -63,74 +76,42 @@ export default function CopyButton({
   };
 
   const actionLabel = label ? t('copy.copyLabel', { label }) : t('copy.copy');
-  const tooltip = copied ? t('copy.copiedShort') : actionLabel;
-  const iconSize = size === 'small' ? 16 : 20;
-  const Icon = copied ? CheckRoundedIcon : ContentCopyRoundedIcon;
-
-  if (variant === 'chip') {
-    return (
-      <Tooltip title={tooltip} arrow>
-        <span className={className} style={{ display: 'inline-flex' }} onMouseDown={stop} onTouchStart={stop}>
-          <Chip
-            component="button"
-            type="button"
-            clickable
-            disabled={isDisabled}
-            onClick={handleClick}
-            onKeyDown={stopKeys}
-            aria-label={actionLabel}
-            size={size}
-            variant="outlined"
-            color={copied ? 'success' : 'default'}
-            icon={<Icon sx={{ fontSize: iconSize }} />}
-            label={label || t('copy.copy')}
-            sx={[
-              {
-                position: 'relative',
-                maxWidth: '100%',
-                // Visually compact chip, but a 44px-tall hit area on phones.
-                '&::after': {
-                  content: '""',
-                  position: 'absolute',
-                  left: 0,
-                  right: 0,
-                  top: { xs: size === 'small' ? -10 : -6, md: 0 },
-                  bottom: { xs: size === 'small' ? -10 : -6, md: 0 },
-                },
-              },
-              ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
-            ]}
-          />
-        </span>
-      </Tooltip>
-    );
-  }
+  const Icon = copied ? icons.check : icons.copy;
 
   return (
-    <Tooltip title={tooltip} arrow>
-      {/* span keeps the Tooltip working while the button is disabled */}
-      <span className={className} style={{ display: 'inline-flex' }} onMouseDown={stop} onTouchStart={stop}>
-        <IconButton
-          type="button"
-          size={size}
+    <Box
+      component="span"
+      className={className}
+      data-copied={copied ? 'true' : undefined}
+      sx={[{ display: 'inline-flex', maxWidth: '100%' }, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}
+      onMouseDown={stop}
+      onTouchStart={stop}
+      onClick={stop}
+      onKeyDown={stopKeys}
+    >
+      {variant === 'chip' ? (
+        <DsButton
+          variant="secondary"
+          size="sm"
+          icon={Icon}
           disabled={isDisabled}
           onClick={handleClick}
-          onKeyDown={stopKeys}
           aria-label={actionLabel}
-          color={copied ? 'success' : 'default'}
-          sx={[
-            {
-              minWidth: { xs: 44, md: size === 'small' ? 30 : 36 },
-              minHeight: { xs: 44, md: size === 'small' ? 30 : 36 },
-              color: copied ? 'success.main' : 'text.secondary',
-            },
-            ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
-          ]}
+          data-testid={testId}
         >
-          <Icon sx={{ fontSize: iconSize }} />
-        </IconButton>
-      </span>
-    </Tooltip>
+          {label || t('copy.copy')}
+        </DsButton>
+      ) : (
+        <DsIconButton
+          icon={Icon}
+          label={copied ? t('copy.copiedShort') : actionLabel}
+          size={size === 'small' ? 'sm' : 'md'}
+          disabled={isDisabled}
+          onClick={handleClick}
+          data-testid={testId}
+        />
+      )}
+    </Box>
   );
 }
 

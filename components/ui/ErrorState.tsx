@@ -1,29 +1,41 @@
 import React from 'react';
-import { Button, CircularProgress } from '@mui/material';
-import ErrorOutlineRoundedIcon from '@mui/icons-material/ErrorOutlineRounded';
-import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
+import Box from '@mui/material/Box';
 import { useTranslations } from 'next-intl';
 import { getErrorMessage } from '@/lib/notify';
+import { ErrorState as DsErrorState } from '@/components/ds/state/ErrorState';
+
+/**
+ * M1-f shim → `components/ds/state/ErrorState` (DESIGN_SYSTEM §3.13/§4.5; deleted in M10).
+ *
+ * Adapter (legacy prop → DS prop):
+ * - `compact` (or `variant="inline"`) → `variant="inline"`, otherwise `variant="page"`
+ * - `title` (default `ui.errorState.title`) → `title`
+ * - `message`, else a safe short message from `error` via `getErrorMessage`, else `ui.errorState.message` → `cause`
+ * - `onRetry` (may return a Promise) → `onRetry`; label stays `errors.tryAgain` (`retryLabel`)
+ * - `retrying` → DS `retrying` (the retry ActionSpec gets `loading`: in-button spinner, disabled, aria-busy);
+ *   clicks are also ignored here while it is true.
+ * - `className`, `data-testid` pass through
+ * Clicks inside the error never bubble to a clickable parent card/row (legacy behavior).
+ */
 
 export interface ErrorStateProps {
   /** Default: ui.errorState.title ("Couldn't load this data"). */
   title?: string;
-  /** Explicit message. If omitted, derived from `error`, else ui.errorState.message. */
+  /** Explicit message (DS: `cause`). If omitted, derived from `error`, else ui.errorState.message. */
   message?: string;
   /** Raw error (axios/fetch/Error) — a safe short message is extracted. */
   error?: unknown;
   onRetry?: () => void | Promise<unknown>;
-  /** Shows a spinner on the retry button. */
+  /** While true, the retry button shows its spinner, is announced busy/disabled and clicks are ignored. */
   retrying?: boolean;
-  /** Inline one-row variant for cards/widgets. */
+  /** Inline one-row variant for cards/widgets (DS `variant="inline"`). */
   compact?: boolean;
+  /** DS-style alias: `inline` = `compact`. */
+  variant?: 'page' | 'inline';
   className?: string;
+  'data-testid'?: string;
 }
 
-/**
- * Use for failed fetches instead of rendering zeros / empty states that look
- * like real data.
- */
 export default function ErrorState({
   title,
   message,
@@ -31,56 +43,40 @@ export default function ErrorState({
   onRetry,
   retrying = false,
   compact = false,
-  className = '',
+  variant,
+  className,
+  'data-testid': testId,
 }: ErrorStateProps) {
   const t = useTranslations('ui');
   const te = useTranslations('errors');
   const heading = title || t('errorState.title');
-  const body = message || (error !== undefined ? getErrorMessage(error, t('errorState.message')) : t('errorState.message'));
-
-  const retryButton = onRetry ? (
-    <Button
-      onClick={(e) => {
-        e.stopPropagation();
-        void onRetry();
-      }}
-      disabled={retrying}
-      size="small"
-      variant={compact ? 'text' : 'outlined'}
-      startIcon={retrying ? <CircularProgress size={14} color="inherit" /> : <RefreshRoundedIcon fontSize="small" />}
-      sx={{ minHeight: 44, flexShrink: 0, textTransform: 'none' }}
-    >
-      {te('tryAgain')}
-    </Button>
-  ) : null;
-
-  if (compact) {
-    return (
-      <div
-        role="alert"
-        className={`flex items-center gap-3 rounded-xl border border-red-100 bg-red-50/60 px-3 py-2 ${className}`}
-      >
-        <ErrorOutlineRoundedIcon sx={{ color: '#dc2626', fontSize: 20, flexShrink: 0 }} />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-slate-800 truncate">{heading}</p>
-          <p className="text-xs text-slate-500 break-words">{body}</p>
-        </div>
-        {retryButton}
-      </div>
-    );
-  }
+  const cause = message || (error !== undefined ? getErrorMessage(error, t('errorState.message')) : t('errorState.message'));
+  const dsVariant = (variant ?? (compact ? 'inline' : 'page')) === 'inline' ? 'inline' : 'page';
 
   return (
-    <div role="alert" className={`flex flex-col items-center justify-center py-12 px-6 text-center ${className}`}>
-      <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center mb-4 bg-red-50">
-        <ErrorOutlineRoundedIcon sx={{ color: '#dc2626', fontSize: 30 }} />
-      </div>
-      <h3 className="text-base sm:text-lg font-semibold text-slate-800 mb-1.5" style={{ letterSpacing: '-0.01em' }}>
-        {heading}
-      </h3>
-      <p className="text-sm text-slate-500 max-w-sm mb-5 break-words">{body}</p>
-      {retryButton}
-    </div>
+    <Box
+      onClick={(e: React.MouseEvent) => e.stopPropagation()}
+      data-retrying={retrying || undefined}
+      aria-busy={retrying || undefined}
+      sx={{ display: 'contents' }}
+    >
+      <DsErrorState
+        variant={dsVariant}
+        title={heading}
+        cause={cause}
+        onRetry={
+          onRetry
+            ? () => {
+                if (!retrying) void onRetry();
+              }
+            : undefined
+        }
+        retrying={retrying}
+        retryLabel={te('tryAgain')}
+        className={className}
+        data-testid={testId}
+      />
+    </Box>
   );
 }
 

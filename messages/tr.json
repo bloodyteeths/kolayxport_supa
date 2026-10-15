@@ -7221,7 +7221,8 @@
       "connectEtsy": "Bu araştırmadan ilan oluşturmak için bir Etsy mağazası bağlayın.",
       "notFound": "Doldurulacak araştırma verisi bulunamadı. Araştırma sayfasından yeniden başlayın.",
       "priceCurrencyMismatch": "Fiyat kopyalanmadı: araştırma fiyatı {from}, Etsy mağazanız {to} kullanıyor."
-    }
+    },
+    "syncPartial": "{count} ilan Etsy'den senkronize edildi, ancak bazı sayfalar alınamadı. Daha sonra tekrar deneyin."
   },
   "ebayListings": {
     "syncFromEbay": "eBay'den Senkronize Et",
@@ -10169,6 +10170,543 @@
         "a": "Son dakika Noel hediyeleri: dijital ürünler ve hızlı kargo öne çıkar.",
         "b": "Yeni yıl ilanlarına şimdiden hazırlanın."
       }
+    }
+  },
+  "ds": {
+    "kbd": {
+      "ctrl": "Ctrl",
+      "win": "Win",
+      "shift": "Shift",
+      "alt": "Alt",
+      "esc": "Esc",
+      "tab": "Tab",
+      "space": "Boşluk",
+      "delete": "Sil"
+    },
+    "format": {
+      "approx": "Dönüştürülmüş tutar"
+    },
+    "shipBy": {
+      "today": "Son gönderim: bugün {time}",
+      "tomorrow": "Son gönderim: yarın {time}",
+      "date": "Son gönderim: {date}",
+      "overdueHours": "{count} saat gecikti",
+      "overdueDays": "{count} gün gecikti",
+      "shipped": "Kargoya verildi: {date}",
+      "unknown": "Son gönderim tarihi yok"
+    },
+    "copy": {
+      "action": "Kopyala",
+      "label": "Kopyala: {value}",
+      "copied": "Kopyalandı",
+      "failed": "Kopyalanamadı"
+    },
+    "terms": {
+      "etgb": "Türkiye'den e-ihracat gönderileri için elektronik gümrük beyannamesi.",
+      "hs": "GTİP: ürünün gümrük tarife kodu.",
+      "ioss": "Düşük değerli AB ithalatı için KDV numarası. Alıcının teslimatta KDV ödemesini önler.",
+      "sku": "Stok kodu: bu ürün için kendi kodunuz.",
+      "gtin": "Küresel Ticari Ürün Numarası: barkod numarası (UPC, EAN veya ISBN)."
+    },
+    "termNames": {
+      "etgb": "ETGB",
+      "hs": "GTİP",
+      "ioss": "IOSS",
+      "sku": "SKU",
+      "gtin": "GTIN"
+    },
+    "termHint": {
+      "label": "{term} nedir?"
+    },
+    "inputs": {
+      "charCount": "{value} / {max}",
+      "formField": {
+        "optional": "(isteğe bağlı)",
+        "changed": "Değiştirildi",
+        "revert": "Geri al",
+        "revertLabel": "{label} alanını geri al"
+      },
+      "textArea": {
+        "modeLabel": "Düzenle veya önizle",
+        "edit": "Düzenle",
+        "preview": "Önizleme"
+      },
+      "splitButton": {
+        "more": "{label} için diğer seçenekler"
+      },
+      "tagInput": {
+        "placeholder": "Bir etiket yazıp Enter’a basın",
+        "tooLong": "“{tag}” {length} / {max} karakter",
+        "duplicate": "Zaten eklendi: “{tag}”",
+        "invalid": "“{tag}” etiket olarak kullanılamaz",
+        "overLimit": "En fazla {max} etiket eklenebilir. Yenisini eklemek için birini kaldırın",
+        "summary": "{added} eklendi. Eklenmeyen: {details}",
+        "reason": {
+          "too_long": "{count} çok uzun",
+          "duplicate": "{count} tekrar",
+          "invalid": "{count} geçersiz",
+          "over_limit": "{count} sınırı aşıyor"
+        },
+        "show": "Göster",
+        "hide": "Gizle",
+        "remove": "{tag} etiketini kaldır",
+        "overlap": "Başlıktaki “{words}” kelimesini tekrarlıyor. Etiketler yeni kelimelerle daha iyi çalışır",
+        "singleWord": "İki veya üç kelimelik etiketler daha çok aramayla eşleşir",
+        "chipCounter": "{value}/{max}",
+        "suggestions": "Öneriler",
+        "addSuggestion": "{tag} etiketini ekle",
+        "addAll": "Sığanların hepsini ekle"
+      },
+      "dateRange": {
+        "any": "Tüm tarihler",
+        "labelValue": "{label}: {value}",
+        "presets": "Hazır tarih aralıkları",
+        "pickEnd": "Bitiş tarihini seçin",
+        "dialogLabel": "Tarih seçin",
+        "preset": {
+          "today": "Bugün",
+          "yesterday": "Dün",
+          "last7": "Son 7 gün",
+          "last30": "Son 30 gün",
+          "last90": "Son 90 gün",
+          "thisMonth": "Bu ay",
+          "lastMonth": "Geçen ay",
+          "thisYear": "Bu yıl",
+          "lastYear": "Geçen yıl",
+          "custom": "Özel"
+        }
+      },
+      "dateTime": {
+        "zone": "{zone} ({offset})",
+        "time": "Saat",
+        "timePlaceholder": "Saat seçin",
+        "placeholder": "Tarih ve saat seçin",
+        "dialogLabel": "Tarih ve saat seçin",
+        "clear": "Temizle",
+        "done": "Tamam"
+      },
+      "suggestion": {
+        "label": "Öneri",
+        "writing": "Yazılıyor…",
+        "error": "Öneri düzgün oluşmadı",
+        "dismiss": "Kapat",
+        "retry": "Tekrar dene",
+        "retryCost": "Tekrar dene · {count} kredi",
+        "use": "Kullan"
+      },
+      "combobox": {
+        "create": "“{value}” oluştur",
+        "loading": "Yükleniyor…",
+        "loadFailed": "Seçenekler yüklenemedi",
+        "noResults": "Sonuç yok",
+        "clear": "Temizle",
+        "open": "Aç",
+        "close": "Kapat",
+        "remove": "{value} kaldır"
+      },
+      "phone": {
+        "country": "Ülke kodu",
+        "number": "Telefon numarası"
+      },
+      "rates": {
+        "label": "Kargo firması ve hizmet",
+        "loading": "Fiyatlar yükleniyor",
+        "error": "Fiyatlar alınamadı",
+        "retry": "Tekrar dene",
+        "empty": "Bu paket için fiyat yok",
+        "recommended": "Önerilen",
+        "transit": "{count} gün",
+        "transitRange": "{min}–{max} gün"
+      },
+      "images": {
+        "label": "Fotoğraflar",
+        "hint": "Sıralamak için sürükleyin. İlk fotoğraf ana fotoğraftır.",
+        "count": "{value} / {max}",
+        "tile": "Fotoğraf {position} / {total}: {alt}",
+        "noAlt": "alternatif metin yok",
+        "lifted": "Fotoğraf {position} / {total} seçildi. Taşımak için ok tuşlarını, bırakmak için Boşluk tuşunu kullanın.",
+        "moved": "{total} içinde {position}. sıraya taşındı",
+        "dropped": "{total} içinde {position}. sıraya bırakıldı",
+        "cancelled": "Sıralama iptal edildi",
+        "new": "Yeni",
+        "missingAlt": "Alternatif metin eksik",
+        "willBeRemoved": "Kaldırılacak",
+        "undo": "Geri al",
+        "remove": "{position}. fotoğrafı kaldır",
+        "upload": "Fotoğraf yükle",
+        "add": "Fotoğraf ekle"
+      }
+    },
+    "overlay": {
+      "close": "Kapat",
+      "prev": "Önceki",
+      "next": "Sonraki",
+      "more": "Diğer işlemler",
+      "cancel": "Vazgeç",
+      "sections": "Bölümler",
+      "actionBar": "İşlemler",
+      "saveState": {
+        "dirty": "Kaydedilmemiş değişiklikler",
+        "saving": "Kaydediliyor…",
+        "saved": "Kaydedildi",
+        "error": "Kaydedilemedi"
+      },
+      "dirtyGuard": {
+        "title": "Değişiklikleriniz silinsin mi?",
+        "body": "Bu panelde kaydetmediğiniz değişiklikler kaybolacak.",
+        "keep": "Düzenlemeye devam et",
+        "discard": "Değişiklikleri sil"
+      },
+      "confirm": {
+        "confirm": "Onayla",
+        "delete": "Sil",
+        "typeToConfirm": "Onaylamak için <b>{text}</b> yazın",
+        "typeToConfirmAria": "Onay metni",
+        "mismatch": "Yazdığınız metin eşleşmiyor",
+        "andMore": "ve {count} tane daha"
+      }
+    },
+    "feedback": {
+      "banner": {
+        "dismiss": "Kapat"
+      },
+      "toast": {
+        "dismiss": "Kapat",
+        "undo": "Geri al",
+        "retry": "Tekrar dene"
+      }
+    },
+    "state": {
+      "loading": "Yükleniyor…",
+      "slow": "Hâlâ yükleniyor…",
+      "error": {
+        "retry": "Tekrar dene",
+        "retryShort": "Yeniden dene",
+        "copyId": "Hata kimliğini kopyala",
+        "copied": "Kopyalandı",
+        "staleSince": "{time} itibarıyla veriler gösteriliyor",
+        "staleUnknown": "Eski veriler gösteriliyor"
+      },
+      "connect": {
+        "cta": "{name} hesabını bağla"
+      }
+    },
+    "chart": {
+      "showAsTable": "Tablo olarak göster",
+      "chartActions": "{name} için diğer işlemler",
+      "close": "Kapat",
+      "previousPeriod": "Önceki dönem",
+      "category": "Dönem"
+    },
+    "table": {
+      "columns": "Sütunlar",
+      "showColumns": "Sütunları göster",
+      "invalidNumber": "Bir sayı girin",
+      "wholeNumber": "Tam sayı girin",
+      "editCell": "{column} düzenle",
+      "pagination": "Sayfalar",
+      "range": "{total} kayıttan {from}–{to}",
+      "rows": "Satır",
+      "prevPage": "Önceki sayfa",
+      "nextPage": "Sonraki sayfa",
+      "page": "Sayfa {page}",
+      "loadMore": "Daha fazla yükle",
+      "loadingMore": "Yükleniyor…",
+      "empty": "Henüz gösterilecek bir şey yok",
+      "error": "Bu liste yüklenemedi",
+      "selectedCount": "{count} seçildi",
+      "select": "Seç",
+      "done": "Bitti",
+      "selectRow": "Satırı seç",
+      "selectPage": "Bu sayfadakilerin hepsini seç",
+      "moreActions": "Diğer işlemler"
+    },
+    "kpi": {
+      "deltaUp": "{value} artış",
+      "deltaDown": "{value} düşüş",
+      "deltaFlat": "Değişiklik yok",
+      "asOf": "{time} itibarıyla · {source}"
+    },
+    "score": {
+      "title": "İlan sağlığı",
+      "outOf": "{score} / 100",
+      "band": {
+        "needs_work": "Geliştirilmeli",
+        "fair": "Orta",
+        "good": "İyi",
+        "great": "Mükemmel"
+      },
+      "scoredOn": "{total} kontrolün {used} tanesiyle puanlandı",
+      "tooltip": "İlan sağlığı {score} · {band}",
+      "notScored": "Henüz puanlanmadı · puanlamak için yenileyin",
+      "notEnoughData": "Bu ilanı puanlamak için henüz yeterli veri yok",
+      "afterSend": "Gönderdikten sonra {from} → {to}",
+      "na": "yok",
+      "status": {
+        "pass": "Geçti",
+        "warn": "Daha iyi olabilir",
+        "fail": "Düzeltilmeli",
+        "na": "Puanlanmadı"
+      },
+      "gain": "+{points}",
+      "fixRunning": "Hazırlanıyor…",
+      "passesCollapsed": "{count, plural, other {# kontrol geçti}} · Göster",
+      "peersTitle": "Rakiplerle karşılaştırma"
+    },
+    "plan": {
+      "pro": "Pro",
+      "proTooltip": "Pro planına dahil",
+      "trialTooltip": "{date} tarihine kadar deneme sürenize dahil"
+    },
+    "usage": {
+      "ofLimit": "{used} / {limit}",
+      "unlimited": "Sınırsız"
+    },
+    "research": {
+      "kind": {
+        "measured": "Ölçülen",
+        "estimate": "Tahmin",
+        "signal": "Sinyal",
+        "user": "Sizin girdiğiniz"
+      },
+      "noData": "Yeterli veri yok",
+      "approxPrefix": "~",
+      "sample": {
+        "listings": "{count, plural, other {# ilan incelendi}}",
+        "keywords": "{count, plural, other {# anahtar kelime kontrol edildi}}",
+        "shops": "{count, plural, other {# mağaza}}",
+        "orders": "{count, plural, other {# sipariş}}",
+        "items": "{count, plural, other {# öğe}}"
+      },
+      "sampleOf": {
+        "listings": "{total} ilandan {count} tanesi kullanıldı",
+        "keywords": "{total} anahtar kelimeden {count} tanesi kontrol edildi",
+        "shops": "{total} mağazadan {count}",
+        "orders": "{total} siparişten {count}",
+        "items": "{total} öğeden {count}"
+      },
+      "excluded": "{count} hariç tutuldu",
+      "excludedWithReason": "{count} hariç tutuldu ({reason})",
+      "updated": "{time} güncellendi",
+      "signalAria": "Sinyal 5 üzerinden {tier}",
+      "inputLine": "{label}: {value}",
+      "median": "medyan",
+      "range": "{low}–{high}",
+      "middleHalf": "Ortadaki yarı {range} · {count, plural, other {# ilan}}",
+      "smallSample": "Küçük örneklem: {count, plural, other {# ilan}}",
+      "notEnoughSample": "Yeterli veri yok: {count, plural, other {# ilan}}",
+      "implausible": "Kontrol edin: alışılmadık fiyat aralığı",
+      "confidence": {
+        "high": "Güven: yüksek",
+        "medium": "Güven: orta",
+        "low": "Güven: düşük"
+      },
+      "basisSuffix": " · {basis}"
+    },
+    "syncMeta": {
+      "refreshed": "{key, select, etsy {Etsy'den} ebay {eBay'den} amazon {Amazon'dan} shopify {Shopify'dan} wix {Wix'ten} trendyol {Trendyol'dan} hepsiburada {Hepsiburada'dan} fedex {FedEx'ten} ups {UPS'ten} dhl {DHL'den} veeqo {Veeqo'dan} shippo {Shippo'dan} parasut {Paraşüt'ten} google {Google'dan} other {{source} kaynağından}} {relative} yenilendi",
+      "refreshing": "{key, select, etsy {Etsy'den} ebay {eBay'den} amazon {Amazon'dan} shopify {Shopify'dan} wix {Wix'ten} trendyol {Trendyol'dan} hepsiburada {Hepsiburada'dan} fedex {FedEx'ten} ups {UPS'ten} dhl {DHL'den} veeqo {Veeqo'dan} shippo {Shippo'dan} parasut {Paraşüt'ten} google {Google'dan} other {{source} kaynağından}} yenileniyor…",
+      "failed": "{key, select, etsy {Etsy'den} ebay {eBay'den} amazon {Amazon'dan} shopify {Shopify'dan} wix {Wix'ten} trendyol {Trendyol'dan} hepsiburada {Hepsiburada'dan} fedex {FedEx'ten} ups {UPS'ten} dhl {DHL'den} veeqo {Veeqo'dan} shippo {Shippo'dan} parasut {Paraşüt'ten} google {Google'dan} other {{source} kaynağından}} yenilenemedi",
+      "pull": "{key, select, etsy {Etsy'den} ebay {eBay'den} amazon {Amazon'dan} shopify {Shopify'dan} wix {Wix'ten} trendyol {Trendyol'dan} hepsiburada {Hepsiburada'dan} fedex {FedEx'ten} ups {UPS'ten} dhl {DHL'den} veeqo {Veeqo'dan} shippo {Shippo'dan} parasut {Paraşüt'ten} google {Google'dan} other {{source} kaynağından}} yenile",
+      "refreshedAll": "{relative} yenilendi",
+      "refreshingAll": "Yenileniyor…",
+      "progress": "{done, number} / {total, number}",
+      "failedAll": "Yenilenemedi",
+      "retry": "Tekrar dene",
+      "pullAll": "Yenile"
+    },
+    "page": {
+      "documentTitle": "{title} · KolayXport",
+      "back": "Geri",
+      "moreActions": "Diğer işlemler"
+    },
+    "toolbar": {
+      "all": "Tümü",
+      "filterLabel": "{label}:",
+      "andMore": "{first} +{count}",
+      "searchOptions": "Seçeneklerde ara",
+      "noOptions": "Eşleşme yok",
+      "clearSearch": "Aramayı temizle",
+      "filters": "Filtreler",
+      "filtersWithCount": "Filtreler • {count}",
+      "close": "Kapat",
+      "clear": "Temizle",
+      "clearAll": "Tümünü temizle",
+      "removeFilter": "Filtreyi kaldır: {label}",
+      "chip": "{label}: {value}",
+      "results": "{count, plural, other {# sonuç}}",
+      "showResults": "{count, plural, other {# sonucu göster}}",
+      "done": "Tamam",
+      "min": "En az",
+      "max": "En çok",
+      "yes": "Evet",
+      "between": "{a} – {b}",
+      "atLeast": "≥ {a}",
+      "atMost": "≤ {a}",
+      "view": "Görünüm",
+      "myViews": "Görünümlerim",
+      "saveView": "Görünümü kaydet…",
+      "viewName": "Görünüm adı",
+      "save": "Kaydet",
+      "deleteView": "{label} görünümünü sil",
+      "compactRows": "Kompakt satırlar"
+    },
+    "bulk": {
+      "selected": "{count, number} seçili",
+      "clear": "Seçimi temizle",
+      "clearWithKey": "Temizle (Esc)",
+      "selectAllInView": "Bu görünümdeki {count, number} öğenin tümünü seç",
+      "selectOnlyPage": "Yalnızca bu {count, number} öğeyi seç"
+    }
+  },
+  "status": {
+    "order": {
+      "to_ship": "Gönderilecek",
+      "overdue": "Gecikti",
+      "label_created": "Etiket hazır",
+      "shipped": "Kargoda",
+      "delivered": "Teslim edildi",
+      "on_hold": "Beklemede",
+      "problem": "Sorun",
+      "cancelled": "İptal",
+      "refunded": "İade edildi"
+    },
+    "label": {
+      "label_failed": "Etiket hatası"
+    },
+    "listing": {
+      "active": "Yayında",
+      "draft": "Taslak",
+      "inactive": "Pasif",
+      "sold_out": "Tükendi",
+      "expired": "Süresi doldu",
+      "in_review": "Onay bekliyor",
+      "rejected": "Reddedildi"
+    },
+    "sync": {
+      "pending": "Henüz gönderilmedi",
+      "syncing": "Gönderiliyor…",
+      "sync_failed": "Gönderilemedi",
+      "conflict": "Etsy'de değişti",
+      "synced": "Gönderildi",
+      "refresh_failed": "Yenilenemedi"
+    },
+    "connection": {
+      "connected": "Bağlı",
+      "needs_reconnect": "Yeniden bağlan",
+      "incomplete": "Kurulum eksik",
+      "not_connected": "Bağlı değil",
+      "check_failed": "Kontrol edilemedi"
+    },
+    "message": {
+      "unread": "Okunmadı",
+      "needs_reply": "Yanıt bekliyor",
+      "in_review": "Yanıt onayda",
+      "answer_rejected": "Yanıt reddedildi"
+    },
+    "subscription": {
+      "trial": "Deneme",
+      "grace": "Ek süre",
+      "active": "Aktif",
+      "canceling": "İptal edilecek",
+      "past_due": "Ödeme başarısız",
+      "expired": "Durduruldu",
+      "near_limit": "Limite yakın",
+      "trial_ending": "Deneme bitiyor"
+    },
+    "invoice": {
+      "paid": "Ödendi",
+      "open": "Ödenmedi",
+      "void": "İptal edildi",
+      "uncollectible": "Tahsil edilemedi"
+    },
+    "run": {
+      "completed": "Tamamlandı",
+      "running": "Çalışıyor",
+      "failed": "Başarısız"
+    },
+    "tracking": {
+      "not_sent": "Takip gönderilmedi",
+      "send_failed": "Takip gönderilemedi"
+    }
+  },
+  "pro": {
+    "preview": {
+      "caption": "Örnek verilerle gösterim"
+    }
+  },
+  "listingScore": {
+    "etsy": {
+      "photosCount": {
+        "pass": "{count} fotoğraf",
+        "low": "Yalnızca {count} fotoğraf: {missing} tane daha ekleyin"
+      },
+      "photosAlt": {
+        "pass": "Her fotoğrafın alternatif metni var",
+        "missing": "{count} fotoğrafın alternatif metni yok"
+      },
+      "video": {
+        "pass": "Video var",
+        "missing": "Video yok"
+      },
+      "titleLength": {
+        "ok": "Başlık {length} / {max} karakter",
+        "short": "Başlık {length} / {max} karakter: en az {min} hedefleyin",
+        "long": "Başlık {max} karakteri aşıyor ({length})"
+      },
+      "titleFormat": {
+        "pass": "Başlık biçimi doğru görünüyor",
+        "issues": "{count} başlık biçimi sorunu"
+      },
+      "tagsCount": "{count} / {max} etiket",
+      "tagsQuality": {
+        "pass": "Etiketler başlıktaki kelimeleri tekrar etmiyor",
+        "weak": "{count} zayıf etiket (başlık kelimeleri, tek kelimeler veya tekrarlar)"
+      },
+      "description": {
+        "pass": "Açıklama ayrıntılı ve anahtar kelimelerinizle başlıyor",
+        "short": "Açıklama {words} kelime: en az {min} hedefleyin",
+        "noKeyword": "İlk satırlarda başlıktaki anahtar kelimeler geçmiyor"
+      },
+      "attributes": {
+        "pass": "Tüm zorunlu ayrıntılar dolu",
+        "missing": "{count} zorunlu ayrıntı eksik"
+      },
+      "materials": {
+        "pass": "Malzemeler eklendi",
+        "missing": "Malzeme yok"
+      },
+      "shipping": {
+        "pass": "Kargo ayarlandı",
+        "noProfile": "Kargo profili yok",
+        "noWeight": "Paket ağırlığı eksik",
+        "noProcessing": "Hazırlık süresi eksik"
+      },
+      "priceMarket": {
+        "pass": "Fiyat piyasa aralığının içinde",
+        "outside": "Fiyat piyasa aralığının dışında"
+      }
+    },
+    "fix": {
+      "addPhotos": "Fotoğraf ekle",
+      "writeAltText": "Alternatif metin yaz",
+      "addVideo": "Video ekle",
+      "suggestTitles": "Başlık öner",
+      "fixTitleFormat": "Başlık biçimini düzelt",
+      "getTagIdeas": "Etiket fikri al",
+      "showWeakTags": "Zayıf etiketleri göster",
+      "writeDescription": "Açıklama yaz",
+      "fillDetails": "Ayrıntıları doldur",
+      "addMaterials": "Malzeme ekle",
+      "setUpShipping": "Kargoyu ayarla",
+      "checkPrice": "Fiyatı kontrol et"
+    },
+    "na": {
+      "noData": "Bu kontrol için henüz veri yok",
+      "noPhotos": "Henüz fotoğraf yok",
+      "noTags": "Henüz etiket yok",
+      "noTaxonomy": "Ayrıntıları kontrol etmek için bir kategori seçin",
+      "noResearch": "Araştırma verisi yok"
     }
   }
 }

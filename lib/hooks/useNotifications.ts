@@ -5,8 +5,15 @@
  *   GET  /api/notifications?limit=20 -> { items: NotificationItem[], unreadCount }
  *   POST /api/notifications/read { ids?: string[], all?: boolean } -> { ok: true }
  *
- * One SWR key app-wide ('/api/notifications'), refreshed every 60s and on
- * window focus. Mark-read is optimistic: the local cache is updated first and
+ * One SWR key app-wide ('/api/notifications'), refreshed on window focus, by
+ * the live stream (LiveEventsProvider revalidates '/api/notifications' on every
+ * notification.* event) and by a poll: 60s, relaxed to 120s while the stream is
+ * live. `unreadCount` counts only badge=true rows (W5); activity-only rows
+ * (e.g. orderNew) never raise the badge and never play a sound here (the
+ * new-order chime belongs to W6's order event).
+ *
+ * Every fetch sends `X-KX-Locale` so the server renders emails in the UI
+ * language (stored at most once per hour). Mark-read is optimistic: the local cache is updated first and
  * revalidated after the POST settles, so the badge reacts instantly.
  *
  * The response is validated defensively — an unexpected shape (HTML error
@@ -14,6 +21,8 @@
  */
 import useSWR from 'swr';
 import { useCallback } from 'react';
+import useLocaleStore from '@/lib/stores/useLocaleStore';
+import { useLiveStatus } from '@/components/live/useLiveEvent';
 
 export const NOTIFICATIONS_KEY = '/api/notifications';
 const LIMIT = 20;
@@ -30,6 +39,11 @@ export interface NotificationItem {
   link: string | null;
   readAt: string | null;
   createdAt: string;
+  /** false = activity-feed row (never counted in the badge). */
+  badge?: boolean;
+  resolvedAt?: string | null;
+  entityType?: string | null;
+  entityId?: string | null;
 }
 
 export interface NotificationsResponse {
@@ -81,6 +95,10 @@ function normalizeItem(raw: unknown): NotificationItem | null {
     link: sanitizeLink(r.link),
     readAt: typeof r.readAt === 'string' ? r.readAt : null,
     createdAt: typeof r.createdAt === 'string' ? r.createdAt : new Date().toISOString(),
+    badge: typeof r.badge === 'boolean' ? r.badge : undefined,
+    resolvedAt: typeof r.resolvedAt === 'string' ? r.resolvedAt : null,
+    entityType: typeof r.entityType === 'string' ? r.entityType : null,
+    entityId: typeof r.entityId === 'string' ? r.entityId : null,
   };
 }
 
@@ -97,8 +115,19 @@ export function normalizeNotifications(raw: unknown): NotificationsResponse {
   return { items, unreadCount: unread };
 }
 
+function currentLocale(): string {
+  try {
+    return useLocaleStore.getState().locale || 'tr';
+  } catch {
+    return 'tr';
+  }
+}
+
 const fetcher = async (url: string): Promise<NotificationsResponse> => {
-  const res = await fetch(`${url}?limit=${LIMIT}`, { credentials: 'same-origin' });
+  const res = await fetch(`${url}?limit=${LIMIT}`, {
+    credentials: 'same-origin',
+    headers: { 'X-KX-Locale': currentLocale() },
+  });
   if (!res.ok) throw new NotificationsFetchError(res.status);
   return normalizeNotifications(await res.json());
 };
@@ -114,11 +143,12 @@ export interface UseNotificationsResult {
 }
 
 export function useNotifications(enabled = true): UseNotificationsResult {
+  const { status: liveStatus } = useLiveStatus();
   const { data, error, isLoading, mutate } = useSWR<NotificationsResponse>(
     enabled ? NOTIFICATIONS_KEY : null,
     fetcher,
     {
-      refreshInterval: 60_000,
+      refreshInterval: liveStatus === 'live' ? 120_000 : 60_000,
       revalidateOnFocus: true,
       keepPreviousData: true,
       dedupingInterval: 10_000,

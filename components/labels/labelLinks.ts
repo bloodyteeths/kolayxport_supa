@@ -34,6 +34,8 @@ export interface LabelOrderLike {
   shippingLabelUrl?: string | null;
   trackingNumber?: string | null;
   lastShipmentCarrier?: string | null;
+  /** Order-level label status; 'voided' means the order-level label (shippingLabelUrl) no longer counts. */
+  labelStatus?: string | null;
 }
 
 export interface LatestLabel {
@@ -74,6 +76,12 @@ const time = (s?: string | null) => {
 export function getLatestLabel(order: LabelOrderLike | null | undefined): LatestLabel {
   const empty: LatestLabel = { url: null, trackingNumber: null, carrier: null, shipmentId: null };
   if (!order) return empty;
+  // A voided order-level label is no label: never fall back to its URL (W4 §8). Newer created
+  // shipments / label jobs still count.
+  // Its tracking number belongs to the voided label too, so it is not reused either.
+  const orderVoided = order.labelStatus === 'voided';
+  const orderLabelUrl = orderVoided ? null : order.shippingLabelUrl;
+  const orderTracking = orderVoided ? null : nonEmpty(order.trackingNumber);
 
   const shipments = (order.shipments || [])
     .filter((s): s is LabelShipmentLike => !!s && s.status === 'created' && !!(s.trackingNumber || s.pdfUrl))
@@ -106,17 +114,17 @@ export function getLatestLabel(order: LabelOrderLike | null | undefined): Latest
 
   if (job) {
     return {
-      url: isOpenableLabelUrl(job.pdfUrl) ? job.pdfUrl.trim() : isOpenableLabelUrl(order.shippingLabelUrl) ? order.shippingLabelUrl.trim() : null,
-      trackingNumber: nonEmpty(job.trackingNumber) || nonEmpty(order.trackingNumber),
+      url: isOpenableLabelUrl(job.pdfUrl) ? job.pdfUrl.trim() : isOpenableLabelUrl(orderLabelUrl) ? orderLabelUrl.trim() : null,
+      trackingNumber: nonEmpty(job.trackingNumber) || orderTracking,
       carrier: nonEmpty(job.carrier),
       shipmentId: null,
     };
   }
 
-  if (isOpenableLabelUrl(order.shippingLabelUrl)) {
+  if (isOpenableLabelUrl(orderLabelUrl)) {
     return {
-      url: order.shippingLabelUrl.trim(),
-      trackingNumber: nonEmpty(order.trackingNumber),
+      url: orderLabelUrl.trim(),
+      trackingNumber: orderTracking,
       carrier: nonEmpty(order.lastShipmentCarrier),
       shipmentId: null,
     };

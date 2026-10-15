@@ -94,6 +94,8 @@ import BulkEditor from '@/components/etsy/BulkEditor';
 import SmartPricing from '@/components/etsy/SmartPricing';
 import DuplicateDetector from '@/components/etsy/DuplicateDetector';
 import BackupManager from '@/components/etsy/BackupManager';
+import { useLiveEvent } from '@/components/live/useLiveEvent';
+import CacheFreshnessChip from '@/components/etsy-history/CacheFreshnessChip';
 import { discardEtsyDraft, EtsyDraftClientError, fetchEtsyDrafts, stageEtsyDraft, syncEtsyDraft, syncEtsyDrafts } from '@/lib/etsy/draftClient';
 
 // ---------------------------------------------------------------------------
@@ -1507,7 +1509,9 @@ function EtsyListingsPage() {
       }
       const data = await res.json();
       setLastSyncAt(data.lastSyncAt);
-      toast.success(t('syncSuccess', { count: data.synced }), { id: toastId });
+      // A partial run (some Etsy pages failed) still answers 200: warn instead of success (W3 §2d).
+      if (data.partial) toast(t('syncPartial', { count: data.synced }), { id: toastId, icon: '⚠️', duration: 8000 });
+      else toast.success(t('syncSuccess', { count: data.synced }), { id: toastId });
 
       // Clear in-memory cache and refetch from DB inline (no circular call)
       Object.keys(listingsCacheRef.current).forEach(key => {
@@ -1582,6 +1586,66 @@ function EtsyListingsPage() {
       console.error('Failed to fetch Etsy drafts:', err);
     }
   }, [selectedShopId]);
+
+  // DB-only refetch (no Etsy call): same steps as syncListings after a sync.
+  // Live events must never call fetchListings(): its 5-min cache would hide the
+  // change and a cache miss pages listings_with_images, a LIVE Etsy call (W3 §2b).
+  const refetchListingsFromDb = useCallback(async () => {
+    if (!selectedShopId) return;
+    const shopId = selectedShopId;
+    const state = statusFilter || 'active';
+    Object.keys(listingsCacheRef.current).forEach((key) => {
+      if (key.startsWith(shopId)) delete listingsCacheRef.current[key];
+    });
+    statusCountsCacheRef.current[shopId] = {};
+    try {
+      const r = await fetch(`/api/clawd/etsy?action=cached_listings&shop_id=${shopId}&state=${state}`);
+      if (r.ok) {
+        const d = await r.json();
+        const rows: EtsyListingRow[] = (d.listings || []).map(mapListing);
+        setListings(rows);
+        setTotalCount(d.count || rows.length);
+        setListingsLoadedFor(shopId);
+        if (d.stateCounts) statusCountsCacheRef.current[shopId] = d.stateCounts;
+        setStatusCountsVersion((v) => v + 1);
+        listingsCacheRef.current[`${shopId}:${state}`] = { listings: rows, total: d.count || rows.length, ts: Date.now() };
+        if (d.lastSyncAt) setLastSyncAt(d.lastSyncAt);
+      }
+    } catch {
+      /* the next live event or the reconnect revalidate retries */
+    }
+    await fetchPendingDrafts();
+  }, [selectedShopId, statusFilter, fetchPendingDrafts]);
+
+  // Coalesce bursts (a bulk sync emits one event per listing): at most one
+  // DB refetch per 2 s, trailing.
+  const liveRefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refetchFromDbRef = useRef(refetchListingsFromDb);
+  refetchFromDbRef.current = refetchListingsFromDb;
+  useEffect(() => () => { if (liveRefetchTimerRef.current) clearTimeout(liveRefetchTimerRef.current); }, []);
+
+  useLiveEvent(
+    ['listing.changed', 'listing.removed', 'sync.progress', 'sync.finished', 'sync.status'],
+    (ev) => {
+      if (ev.type === 'sync') {
+        if (ev.kind === 'status') {
+          // only after a reconnect / while polling (events may have been missed)
+          const phase = (ev as any).phase;
+          if (phase !== 'reconnected' && phase !== 'polling') return;
+        } else if ((ev as any).scope !== 'listings:etsy') {
+          return; // order syncs etc.
+        }
+      } else if ('shopId' in ev && (ev as any).shopId && String((ev as any).shopId) !== selectedShopId) {
+        return; // another shop's listing / draft
+      }
+      if (syncing) return; // the manual Sync handler refetches itself when done
+      if (liveRefetchTimerRef.current) return;
+      liveRefetchTimerRef.current = setTimeout(() => {
+        liveRefetchTimerRef.current = null;
+        void refetchFromDbRef.current();
+      }, 2000);
+    },
+  );
 
   useEffect(() => {
     if (selectedShopId) {
@@ -2902,17 +2966,8 @@ function EtsyListingsPage() {
                   {syncing ? t('syncing') : t('syncBtn')}
                 </Button>
               </Tooltip>
-              {lastSyncAt && !isMobile && (
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
-                  {t('lastSync')}: {(() => {
-                    const diff = Math.round((Date.now() - new Date(lastSyncAt).getTime()) / 60000);
-                    if (diff < 1) return t('justNow');
-                    if (diff < 60) return t('minutesAgo', { count: diff });
-                    if (diff < 1440) return t('hoursAgo', { count: Math.round(diff / 60) });
-                    return t('daysAgo', { count: Math.round(diff / 1440) });
-                  })()}
-                </Typography>
-              )}
+              {/* Cache freshness (W3 §2a): "Etsy live · last change …" / "Delayed · checked daily …". */}
+              {selectedShopId && <CacheFreshnessChip shopId={selectedShopId} />}
 
               {/* Spacer */}
               <Box sx={{ flex: '1 0 0' }} />

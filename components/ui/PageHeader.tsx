@@ -1,27 +1,36 @@
 import React from 'react';
+import { PageHeader as DsPageHeader } from '@/components/ds/page/PageHeader';
 
-interface PageHeaderProps {
+/**
+ * M1-f shim → `components/ds/page/PageHeader` (DESIGN_SYSTEM §3.2/§4.2; deleted in M10).
+ *
+ * Adapter (legacy prop → DS prop):
+ * - `title` → `title`, `subtitle` → `subtitle` (one line, caption)
+ * - `children` (arbitrary right-aligned action elements) → `actionsSlot`
+ * - `className`, `data-testid` pass through
+ * Legacy pages are not inside a shell-managed `<Page>`, so the DS header keeps the title on mobile too.
+ * New code: pass `primaryAction` / `secondaryActions` / `overflowActions` as `ActionSpec`s to the DS header.
+ */
+
+export interface PageHeaderProps {
   title: string;
   subtitle?: string;
-  children?: React.ReactNode; // Right-aligned actions
+  /** Right-aligned actions (legacy slot → DS `actionsSlot`). */
+  children?: React.ReactNode;
+  className?: string;
+  'data-testid'?: string;
 }
 
-export default function PageHeader({ title, subtitle, children }: PageHeaderProps) {
+export default function PageHeader({ title, subtitle, children, className, 'data-testid': testId }: PageHeaderProps) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900" style={{ letterSpacing: '-0.025em' }}>
-          {title}
-        </h1>
-        {subtitle && (
-          <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
-        )}
-      </div>
-      {children && (
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {children}
-        </div>
-      )}
-    </div>
+    <DsPageHeader
+      title={title}
+      subtitle={subtitle}
+      actionsSlot={children ?? undefined}
+      className={className}
+      data-testid={testId}
+    />
   );
 }
+
+export { PageHeader };

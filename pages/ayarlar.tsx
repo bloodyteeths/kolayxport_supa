@@ -6,6 +6,7 @@ import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import SyncIcon from '@mui/icons-material/Sync';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import { toast as hotToast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { useLocale } from '@/lib/i18n/useLocale';
@@ -57,6 +58,7 @@ export default function AyarlarPage() {
   const router = useRouter();
   const t = useTranslations('settings');
   const tc = useTranslations('common');
+  const tNotif = useTranslations('notificationCenter');
   const { config } = useLocale();
   const { mutate: refreshConnections } = useConnections();
 
@@ -141,7 +143,15 @@ export default function AyarlarPage() {
   return (
     <AppLayout title={t('pageTitle')}>
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4, maxWidth: '100%', px: { xs: 1.5, sm: 3 } }}>
-        <PageHeader title={t('pageTitle')} subtitle={t('pageSubtitle')} />
+        <PageHeader title={t('pageTitle')} subtitle={t('pageSubtitle')}>
+          {/* Notification preferences live on the notifications page (W5 §5). */}
+          <Link
+            href="/app/bildirimler?tab=preferences"
+            className="inline-flex items-center min-h-[44px] px-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline"
+          >
+            {tNotif('prefs.title')}
+          </Link>
+        </PageHeader>
 
         {needsSettings && fetchError && <Alert severity="error" sx={{ mb: 2 }}>{fetchError}</Alert>}
 

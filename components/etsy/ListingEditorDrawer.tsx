@@ -73,6 +73,8 @@ import ScheduledUpdateDialog, {
   type ScheduledChanges,
 } from './ScheduledUpdateDialog';
 import { discardEtsyDraft, fetchEtsyDrafts, removeEtsyDraftQueuedActions, stageEtsyDraft, syncEtsyDraft } from '@/lib/etsy/draftClient';
+import { useStockManaged } from '@/components/stock/useStockManaged';
+import StockManagedQtyChip from '@/components/stock/StockManagedQtyChip';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -331,6 +333,36 @@ function buildInitialFields(listing: ListingData): EditableFields {
   };
 }
 
+/** Server draft statuses whose fieldPatch is still pending (not yet on Etsy). */
+const PENDING_DRAFT_STATUSES = ['draft', 'failed', 'conflict'];
+
+/**
+ * Overlay a DB draft's `fieldPatch` onto editor fields (W3 §1 / §10).
+ * fieldPatch keys are snake_case and match EditableFields one to one; keys the
+ * editor has no input for (e.g. taxonomy_id) are returned in `extra`, so Save
+ * (which stages with replaceFields) re-sends them instead of dropping them.
+ */
+export function overlayFieldPatch(
+  base: EditableFields,
+  patch: Record<string, any> | null | undefined,
+): { next: EditableFields; extra: Record<string, any>; applied: number } {
+  const next: EditableFields = { ...base, tags: [...base.tags], materials: [...base.materials] };
+  const extra: Record<string, any> = {};
+  let applied = 0;
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return { next, extra, applied };
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === null || v === undefined) continue;
+    if (k in next) {
+      if (k === 'price' && typeof v === 'number' && Number.isFinite(v)) (next as any)[k] = priceToDecimal({ amount: Math.round(v * 100), divisor: 100, currency_code: '' });
+      else (next as any)[k] = Array.isArray(v) ? [...v] : v;
+      applied += 1;
+    } else {
+      extra[k] = v;
+    }
+  }
+  return { next, extra, applied };
+}
+
 /** Shallow compare two EditableFields objects and return changed keys */
 function getChangedFields(
   original: EditableFields,
@@ -390,6 +422,12 @@ export default function ListingEditorDrawer({
   // Editable fields
   const [fields, setFields] = useState<EditableFields | null>(null);
   const fieldsRef = useRef<EditableFields | null>(null);
+  // fieldPatch keys of the DB draft the editor has no input for (e.g. taxonomy_id).
+  // handleSave re-sends them so replaceFields does not drop them.
+  const restoredExtraFieldsRef = useRef<Record<string, any>>({});
+  // W2: single-product listings managed by stock sync show the canonical quantity read-only.
+  const stockManaged = useStockManaged(listingId, shopId);
+  const managedSingle = stockManaged.managed ? stockManaged.get('') : undefined;
   const originalFieldsRef = useRef<EditableFields | null>(null);
   const [taxonomyProperties, setTaxonomyProperties] = useState<TaxonomyProperty[]>([]);
   const [listingProperties, setListingProperties] = useState<Record<number, ListingPropertyValue>>({});
@@ -601,6 +639,7 @@ export default function ListingEditorDrawer({
   const fetchListing = useCallback(async () => {
     if (!listingId || !shopId) return;
 
+    restoredExtraFieldsRef.current = {};
     setLoading(true);
     setFetchError(null);
 
@@ -934,22 +973,73 @@ export default function ListingEditorDrawer({
   // --------------------------------------------------
   // Trigger fetch on open / listingId change
   // --------------------------------------------------
+  // --------------------------------------------------
+  // Overlay the pending DB draft (+ newer device edits) on the Etsy values.
+  // Must run after EVERY fetchListing(): fetchListing resets fields/extras to
+  // Etsy, and a later replaceFields Save would otherwise wipe the DB draft.
+  // --------------------------------------------------
+  const applyServerDraftOverlay = useCallback(async (announce: boolean) => {
+    if (!listingId) return;
+    const original = originalFieldsRef.current;
+    if (!original) return;
+    // 1) The DB draft is the source of staged values (W3 §10): without this
+    //    overlay a listing staged elsewhere (other device, bulk editor) opens
+    //    with Etsy values and the next Save (replaceFields) wipes the draft.
+    let serverPatch: Record<string, any> | null = null;
+    let draftsKnown = false;
+    if (shopId) {
+      try {
+        const drafts = await fetchEtsyDrafts(shopId, listingId);
+        draftsKnown = true;
+        const pending = (drafts || []).find((d: any) => PENDING_DRAFT_STATUSES.includes(d?.status));
+        if (pending?.fieldPatch && typeof pending.fieldPatch === 'object') serverPatch = pending.fieldPatch;
+      } catch {
+        // No draft info: fall back to the device copy only (previous behaviour).
+      }
+    }
+    if (originalFieldsRef.current !== original) return; // listing changed meanwhile
+
+    // A staged stamp without a pending DB draft means that draft was synced or
+    // discarded elsewhere: drop the stamp, and the device copy too when it is
+    // only a mirror of that staged content (not newer device-only edits).
+    let draft = loadDraft(listingId);
+    if (draftsKnown && !serverPatch) {
+      if (draft && matchesStaged(listingId, draft)) { clearDraft(listingId); draft = null; }
+      markStaged(listingId, null);
+    }
+
+    const { next: serverFields, extra, applied } = overlayFieldPatch(original, serverPatch);
+    restoredExtraFieldsRef.current = extra;
+
+    // 2) The device copy holds edits newer than the DB draft: apply only the
+    //    fields it changed relative to Etsy, on top of the DB draft.
+    const deviceChanges = draft ? getChangedFields(original, draft) : {};
+    const hasDevice = Object.keys(deviceChanges).length > 0;
+    if (!hasDevice && applied === 0) return;
+    const merged: EditableFields = { ...serverFields, ...(deviceChanges as Partial<EditableFields>) };
+    setFields(merged);
+    setAutoSaveStatus('saved');
+    if (hasDevice) {
+      // Same fields as the last Save Draft → they are in the DB draft, not device-only.
+      setSaveTarget(matchesStaged(listingId, draft as EditableFields) ? 'draft' : 'device');
+    } else {
+      markStaged(listingId, merged);
+      setSaveTarget('draft');
+    }
+    if (announce && Object.keys(getChangedFields(original, merged)).length > 0) {
+      toast(t('editor.draftLoaded'), { icon: '\u270F\uFE0F' });
+    }
+  }, [listingId, shopId]);
+
+  // Reload from Etsy and re-apply the DB-draft overlay (used by onSaved/sync/discard/retry).
+  const reloadListing = useCallback(async () => {
+    await fetchListing();
+    await applyServerDraftOverlay(false);
+  }, [fetchListing, applyServerDraftOverlay]);
+
   useEffect(() => {
     if (open && listingId) {
-      fetchListing().then(() => {
-        // After fetching from Etsy, check for a localStorage draft
-        const draft = loadDraft(listingId);
-        if (draft && originalFieldsRef.current) {
-          const draftChanges = getChangedFields(originalFieldsRef.current, draft);
-          if (Object.keys(draftChanges).length > 0) {
-            setFields(draft);
-            setAutoSaveStatus('saved');
-            // Same fields as the last Save Draft → they are in the DB draft, not device-only.
-            setSaveTarget(matchesStaged(listingId, draft) ? 'draft' : 'device');
-            toast(t('editor.draftLoaded'), { icon: '\u270F\uFE0F' });
-          }
-        }
-      });
+      fetchListing().then(() => applyServerDraftOverlay(true));
       fetchVideos();
     }
 
@@ -957,7 +1047,9 @@ export default function ListingEditorDrawer({
     if (!open) {
       if (listingId && fieldsRef.current && originalFieldsRef.current) {
         const changed = getChangedFields(originalFieldsRef.current, fieldsRef.current);
-        if (Object.keys(changed).length > 0) {
+        // Skip when the form only mirrors the DB draft: a device copy of staged
+        // content would resurrect it as "device edits" after a discard elsewhere.
+        if (Object.keys(changed).length > 0 && !matchesStaged(listingId, fieldsRef.current)) {
           saveDraft(listingId, fieldsRef.current);
         }
       }
@@ -980,7 +1072,7 @@ export default function ListingEditorDrawer({
         autoSaveTimerRef.current = null;
       }
     }
-  }, [open, listingId, fetchListing, fetchVideos, refreshKey]);
+  }, [open, listingId, fetchListing, applyServerDraftOverlay, fetchVideos, refreshKey]);
 
   // --------------------------------------------------
   // Track pending scheduled updates count
@@ -1176,7 +1268,7 @@ export default function ListingEditorDrawer({
       if (draftId) {
         setSaving(true);
         try {
-          const draft = await stageEtsyDraft({ shopId, listingId, fields: {}, replaceFields: true });
+          const draft = await stageEtsyDraft({ shopId, listingId, fields: { ...restoredExtraFieldsRef.current }, replaceFields: true });
           setDraftId(draft?.id || null);
           if (listingId) { clearDraft(listingId); markStaged(listingId, null); }
           if (autoSaveTimerRef.current) {
@@ -1247,6 +1339,11 @@ export default function ListingEditorDrawer({
         payload.item_height = Number(changed.item_height);
       }
       if (changed.item_dimensions_unit !== undefined) payload.item_dimensions_unit = changed.item_dimensions_unit;
+
+      // Re-send DB-draft keys the editor has no input for, so replaceFields keeps them.
+      for (const [k, v] of Object.entries(restoredExtraFieldsRef.current)) {
+        if (payload[k] === undefined) payload[k] = v;
+      }
 
       if (Object.keys(payload).length === 0) {
         toast(t('editor.noChanges'), { icon: '\u2139\uFE0F' });
@@ -1593,7 +1690,7 @@ export default function ListingEditorDrawer({
         toast.success(t('editor.draftSynced'));
       }
       setDraftId(null);
-      await fetchListing();
+      await reloadListing();
       onSaved();
     } catch (err: any) {
       // Conflict / validation / failure: the server already updated the
@@ -1628,7 +1725,7 @@ export default function ListingEditorDrawer({
       await discardEtsyDraft(draftId);
       setDraftId(null);
       toast.success(t('editor.draftDiscarded'));
-      await fetchListing();
+      await reloadListing();
       onSaved();
     } catch (err: any) {
       toast.error(draftErr(err, 'editor.draftDiscardFailed'));
@@ -1653,7 +1750,7 @@ export default function ListingEditorDrawer({
       <Typography color="error" gutterBottom>
         {fetchError}
       </Typography>
-      <Button variant="outlined" onClick={fetchListing}>
+      <Button variant="outlined" onClick={() => { void reloadListing(); }}>
         {t('editor.retry')}
       </Button>
     </Box>
@@ -2583,15 +2680,28 @@ export default function ListingEditorDrawer({
                       ),
                     }}
                   />
-                  <TextField
-                    label={t('editor.stockLabel')}
-                    type="number"
-                    value={fields.quantity}
-                    onChange={(e) => updateField('quantity', Math.max(0, parseInt(e.target.value) || 0))}
-                    size="medium"
-                    sx={{ width: 120 }}
-                    inputProps={{ min: 0 }}
-                  />
+                  {managedSingle && stockManaged.live ? (
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <StockManagedQtyChip qty={managedSingle.canonical} live />
+                    </Box>
+                  ) : (
+                    <>
+                      <TextField
+                        label={t('editor.stockLabel')}
+                        type="number"
+                        value={fields.quantity}
+                        onChange={(e) => updateField('quantity', Math.max(0, parseInt(e.target.value) || 0))}
+                        size="medium"
+                        sx={{ width: 120 }}
+                        inputProps={{ min: 0 }}
+                      />
+                      {managedSingle && (
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <StockManagedQtyChip qty={managedSingle.canonical} live={false} />
+                        </Box>
+                      )}
+                    </>
+                  )}
                 </Box>
               </Box>
             )}
@@ -2655,7 +2765,7 @@ export default function ListingEditorDrawer({
                     personalization_instructions: listing.personalization_instructions || '',
                     personalization_char_count_max: listing.personalization_char_count_max || 0,
                   }}
-                  onSaved={() => { fetchListing(); refreshDraftState(); }}
+                  onSaved={() => { void reloadListing(); refreshDraftState(); }}
                 />
               </Box>
             )}
@@ -2669,7 +2779,7 @@ export default function ListingEditorDrawer({
                   listingId={String(listing.listing_id)}
                   shopId={shopId}
                   taxonomyId={listing?.taxonomy_id}
-                  onSaved={() => { fetchListing(); refreshDraftState(); }}
+                  onSaved={() => { void reloadListing(); refreshDraftState(); }}
                 />
               </Box>
             )}

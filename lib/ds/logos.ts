@@ -115,3 +115,20 @@ export function getLogo(provider: string | null | undefined): LogoAsset | null {
   const key = toLogoProvider(provider);
   return key ? LOGOS[key] : null;
 }
+
+/** Glossary name for the domestic carrier integration (MNG Kargo is now DHL eCommerce). */
+export const DHL_ECOMMERCE_NAME = 'DHL eCommerce';
+
+/**
+ * The proper-noun name to show for a raw provider string. Same as `getLogo(raw).name`, except that the
+ * MNG / DHL eCommerce integration is named "DHL eCommerce" (glossary) while sharing the DHL mark.
+ */
+export function logoDisplayName(raw: string | null | undefined): string | null {
+  const asset = getLogo(raw);
+  if (!asset) return null;
+  if (asset.provider === 'dhl') {
+    const compact = String(raw).trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (compact.startsWith('mng') || compact.startsWith('dhlecommerce')) return DHL_ECOMMERCE_NAME;
+  }
+  return asset.name;
+}

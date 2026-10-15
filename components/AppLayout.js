@@ -35,6 +35,9 @@ import {
   PinOff,
   Plus,
   Search,
+  Boxes,
+  Activity,
+  Bell,
 } from 'lucide-react';
 import useSWR, { mutate } from 'swr';
 import { useAuth } from '@/lib/auth-context';
@@ -111,7 +114,8 @@ let pinnedMemo = null;
  * which unlocks the item). Items without `requires` are always shown.
  * Groups with `bottom: true` are pinned to the foot of the sidebar.
  */
-function getNavGroups(t) {
+/** `labels` carries nav labels that live outside the `nav` namespace (backend pages). */
+function getNavGroups(t, labels) {
   return [
     {
       id: 'home',
@@ -132,10 +136,14 @@ function getNavGroups(t) {
       label: t('listings'),
       items: [
         { href: '/app/etsy-listings', icon: Store, label: t('etsyListings'), requires: 'etsy', listings: true },
+        // Etsy activity (W3): change history + SEO experiments.
+        { href: '/app/etsy-aktivite', icon: Activity, label: labels.etsyActivity, requires: 'etsy' },
         { href: '/app/ebay-listings', icon: ShoppingBag, label: t('ebayListings'), requires: 'ebay', listings: true },
         { href: '/app/trendyol-urunler', icon: Package, label: t('trendyolProducts'), requires: 'trendyol', listings: true },
         { href: '/app/wix-urunler', icon: Package, label: t('wixProducts'), requires: 'wix', listings: true },
         { href: '/app/shopify-urunler', icon: ShoppingBag, label: t('shopifyProducts'), requires: 'shopify', listings: true },
+        // Stock sync (W2): cross-marketplace stock hub. Shown once any store is connected.
+        { href: '/app/stok-senkron', icon: Boxes, label: labels.stockSync, requires: STORE_PROVIDERS },
         { href: '/ayarlar?tab=connections', icon: Plus, label: t('connectStore'), connectCta: true },
       ],
     },
@@ -172,6 +180,7 @@ function getNavGroups(t) {
       label: null,
       bottom: true,
       items: [
+        { href: '/app/bildirimler', icon: Bell, label: t('notifications') },
         { href: '/ayarlar', icon: Settings, label: t('settings'), reauthDot: true },
         { href: '/faturalar', icon: Receipt, label: t('invoices') },
         { href: '/app/nasil-kullanirim', icon: LifeBuoy, label: t('help') },
@@ -187,6 +196,8 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
   const { isOpen, openSidebar, closeSidebar } = useSidebar();
   const { isMobile, isDesktop } = useScreenSize();
   const t = useTranslations('nav');
+  const tStock = useTranslations('stockSync');
+  const tListingHistory = useTranslations('listingHistory');
   const locale = useLocaleStore((s) => s.locale);
   const setLocale = useLocaleStore((s) => s.setLocale);
   const messageCount = useMessageCountStore((s) => s.counts.total);
@@ -243,7 +254,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
   // Free Shopify-tier accounts never see Stripe billing surfaces, including
   // the invoices page (App Store rule 1.2.1).
   const isShopifyFree = userSubscription?.billingProvider === 'shopify_free';
-  const navGroups = getNavGroups(t)
+  const navGroups = getNavGroups(t, { stockSync: tStock('pageTitle'), etsyActivity: tListingHistory('navLabel') })
     .map((group) => ({
       ...group,
       items: group.items.filter((item) => {

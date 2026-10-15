@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { isUsageLimitError } from '@/lib/notify';
 import { Drawer, Box, Typography, IconButton, TextField, Select, MenuItem, FormControl, InputLabel, Button, Alert, Chip, Autocomplete, Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
@@ -12,6 +12,7 @@ import { useLocale } from '@/lib/i18n/useLocale';
 import CopyButton from '@/components/ui/CopyButton';
 import PrintLabelButton from '@/components/labels/PrintLabelButton';
 import { openLabelUrl, isOpenableLabelUrl } from '@/components/labels/labelLinks';
+import CancelledOrderLabelDialog, { isLabelGuardResponse, type LabelGuardCode } from '@/components/orders-live/CancelledOrderLabelDialog';
 
 // Check if an order has existing successful shipments (labels)
 function hasExistingLabel(order: any): boolean {
@@ -554,6 +555,9 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  // W4 label guard: 409 ORDER_CANCELLED / ORDER_SHIPPED_EXTERNALLY -> confirm -> retry with forceCancelled.
+  const [guardCode, setGuardCode] = useState<LabelGuardCode | null>(null);
+  const forceRef = useRef(false);
   const { user }: { user: any } = useAuth();
   const [labelUrl, setLabelUrl] = useState<string | null>(null);
   const [createdTrackingNumber, setCreatedTrackingNumber] = useState<string | null>(null);
@@ -566,6 +570,8 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
       setLabelUrl(null);
       setCreatedTrackingNumber(null);
       setSaving(false);
+      setGuardCode(null);
+      forceRef.current = false;
       
       const orderValue = order?.orderTotalPrice || 0;
       setForm(f => ({
@@ -620,6 +626,8 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
       setLabelUrl(null);
       setCreatedTrackingNumber(null);
       setSaving(false);
+      setGuardCode(null);
+      forceRef.current = false;
     }
   }, [open]);
 
@@ -662,8 +670,8 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
   };
 
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     // The drawer stays open after a label is created and the `order` snapshot's
     // shipments do not refresh, so block a duplicate create (Enter key too).
     if (success || saving) return;
@@ -678,6 +686,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
         body: JSON.stringify({
           userId: user?.id,
           orderId: order?.orderId,
+          forceCancelled: forceRef.current || undefined,
           recipient: {
             name: `${form.recipientFirstName} ${form.recipientLastName}`.trim(),
             phone: form.recipientPhone,
@@ -732,6 +741,13 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
         }),
       });
       const data = await res.json();
+      if (isLabelGuardResponse(res.status, data)) {
+        forceRef.current = false;
+        setGuardCode(data.code);
+        setSaving(false);
+        return;
+      }
+      forceRef.current = false;
       if (!res.ok || !data.success) {
         setError(data.error || 'UPS label creation failed');
         setSaving(false);
@@ -767,6 +783,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
         }
       }
     } catch (err: any) {
+      forceRef.current = false;
       setSaving(false);
       if (isUsageLimitError(err)) return;
       setError(err.message || 'UPS label creation failed');
@@ -1241,6 +1258,18 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
           )}
         </Box>
       </Box>
+      <CancelledOrderLabelDialog
+        open={!!guardCode}
+        code={guardCode}
+        orderNumber={order?.orderNumber}
+        busy={saving}
+        onClose={() => setGuardCode(null)}
+        onConfirm={() => {
+          forceRef.current = true;
+          setGuardCode(null);
+          void handleSubmit();
+        }}
+      />
     </Drawer>
   );
 }

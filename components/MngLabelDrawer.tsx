@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   Drawer, Box, Typography, IconButton, TextField, Select, MenuItem,
   FormControl, InputLabel, Button, Alert, Switch, FormControlLabel,
@@ -13,6 +13,7 @@ import { MNG_SERVICE_TYPES, MNG_PAYMENT_TYPES, MNG_DELIVERY_TYPES, MNG_PACKAGING
 import CopyButton from '@/components/ui/CopyButton';
 import PrintLabelButton from '@/components/labels/PrintLabelButton';
 import { getLatestLabel, toLabelHref } from '@/components/labels/labelLinks';
+import CancelledOrderLabelDialog, { isLabelGuardResponse, type LabelGuardCode } from '@/components/orders-live/CancelledOrderLabelDialog';
 
 interface MngOrder {
   orderId: string;
@@ -68,6 +69,9 @@ export default function MngLabelDrawer({ open, onClose, order, onSaved }: MngLab
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState('');
+  // W4 label guard: 409 ORDER_CANCELLED / ORDER_SHIPPED_EXTERNALLY -> confirm -> retry with forceCancelled.
+  const [guardCode, setGuardCode] = useState<LabelGuardCode | null>(null);
+  const forceRef = useRef(false);
 
   // Populate from order when drawer opens
   React.useEffect(() => {
@@ -85,6 +89,8 @@ export default function MngLabelDrawer({ open, onClose, order, onSaved }: MngLab
       setContent(order.title || order.orderNumber || '');
       setResult(null);
       setError('');
+      setGuardCode(null);
+      forceRef.current = false;
     }
   }, [order, open]);
 
@@ -118,6 +124,7 @@ export default function MngLabelDrawer({ open, onClose, order, onSaved }: MngLab
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           orderId: order.orderId,
+          forceCancelled: forceRef.current || undefined,
           recipient: {
             name: recipientName,
             phone,
@@ -150,6 +157,12 @@ export default function MngLabelDrawer({ open, onClose, order, onSaved }: MngLab
       });
 
       const data = await res.json();
+      forceRef.current = false;
+
+      if (isLabelGuardResponse(res.status, data)) {
+        setGuardCode(data.code);
+        return;
+      }
 
       if (!res.ok || !data.success) {
         setError(data.error || t('createFailed'));
@@ -160,6 +173,7 @@ export default function MngLabelDrawer({ open, onClose, order, onSaved }: MngLab
       toast.success(t('createSuccess'));
       onSaved();
     } catch (err: any) {
+      forceRef.current = false;
       setError(err.message || t('createFailed'));
     } finally {
       setLoading(false);
@@ -338,6 +352,18 @@ export default function MngLabelDrawer({ open, onClose, order, onSaved }: MngLab
           {loading ? t('creating') : result ? t('created') : t('createLabel')}
         </Button>
       </Box>
+      <CancelledOrderLabelDialog
+        open={!!guardCode}
+        code={guardCode}
+        orderNumber={order?.orderNumber}
+        busy={loading}
+        onClose={() => setGuardCode(null)}
+        onConfirm={() => {
+          forceRef.current = true;
+          setGuardCode(null);
+          void handleSubmit();
+        }}
+      />
     </Drawer>
   );
 }

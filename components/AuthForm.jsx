@@ -24,7 +24,7 @@ const POLICY_CODES = new Set([
 function safeCallbackUrl(raw) {
   const value = Array.isArray(raw) ? raw[0] : raw;
   if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//') || value.startsWith('/\\')) {
-    return '/app';
+    return '/app/analytics';
   }
   return value;
 }

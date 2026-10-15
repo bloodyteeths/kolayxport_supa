@@ -8,7 +8,7 @@ export default function Dashboard() {
     if (sessionId) {
       router.replace(`/app?session_id=${sessionId}`);
     } else {
-      router.replace('/app');
+      router.replace('/app/analytics');
     }
   }, [router]);
   return null;

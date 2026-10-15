@@ -7,6 +7,7 @@ import { useRouter } from 'next/router';
 import AppLayout from '../../components/AppLayout';
 import dynamic from 'next/dynamic';
 import { useTranslations } from 'next-intl';
+import { toast } from 'react-hot-toast';
 import { useLocale } from '@/lib/i18n/useLocale';
 import {
   TrendingUp,
@@ -222,6 +223,15 @@ export default function DashboardPage() {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const t = useTranslations('analytics');
+  const tDash = useTranslations('dashboard');
+
+  // Back from Stripe checkout: confirm activation once, then drop the id from the URL.
+  useEffect(() => {
+    if (!router.isReady || !router.query.session_id) return;
+    toast.success(tDash('subscriptionActivated'), { id: 'stripe-session-activated' });
+    const { session_id: _sid, ...rest } = router.query;
+    router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+  }, [router.isReady, router.query.session_id]);
   const { config, formatCurrency: _formatCurrency, formatDate, formatDateTime, formatNumber } = useLocale();
   // All analytics values are converted to TRY — always show ₺
   const formatCurrency = (value: number) => _formatCurrency(value, 'TRY');

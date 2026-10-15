@@ -74,9 +74,10 @@ function MyApp({ Component, pageProps }: AppProps) {
 
   useEffect(() => {
     const { session_id } = router.query;
-    if (session_id) {
-      // clear query param then redirect dashboard to refresh subscription
-      router.replace('/app', undefined, { shallow: false });
+    // Stripe checkout returns with ?session_id: send the user to the dashboard (analytics is
+    // home), keeping the id so the dashboard can confirm activation and then clear it.
+    if (session_id && router.pathname !== '/app/analytics') {
+      router.replace({ pathname: '/app/analytics', query: { session_id } }, undefined, { shallow: false });
     }
   }, [router.query]);
 

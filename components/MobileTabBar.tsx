@@ -65,7 +65,7 @@ export default function MobileTabBar({
   }, []);
 
   const tabs: Tab[] = [
-    { key: 'home', label: t('home'), icon: LayoutDashboard, href: '/app', active: path === '/app' },
+    { key: 'home', label: t('home'), icon: LayoutDashboard, href: '/app/analytics', active: path === '/app' || path === '/app/analytics' },
     { key: 'orders', label: t('labelsNav'), icon: FileText, href: '/app/labels', active: ORDERS_PATHS.includes(path) },
     { key: 'listings', label: t('listings'), icon: Store, href: listingsHref, active: listingsPaths.includes(path) },
     showMessages

@@ -1,0 +1,571 @@
+{
+  "version": 2,
+  "generatedAt": "2026-10-15T07:42:00.000Z",
+  "currency": "TRY",
+  "range": {
+    "from": "2026-09-16",
+    "to": "2026-10-15",
+    "tz": "Europe/Istanbul",
+    "granularity": "day",
+    "days": 30
+  },
+  "previousRange": {
+    "from": "2026-08-17",
+    "to": "2026-09-15"
+  },
+  "totals": {
+    "revenue": 1070860.03,
+    "orders": 1284,
+    "aov": 834.0,
+    "units": 1912,
+    "revenueDelta": 0.124,
+    "ordersDelta": 0.081,
+    "aovDelta": -0.032,
+    "unitsDelta": null,
+    "convertedOrders": 1272
+  },
+  "previousTotals": {
+    "revenue": 952700.0,
+    "orders": 1188,
+    "aov": 861.6,
+    "units": 0
+  },
+  "storesIncluded": [
+    "etsy:bellecouturegifts",
+    "trendyol",
+    "ebay",
+    "amazon"
+  ],
+  "availableStores": [
+    {
+      "key": "etsy:bellecouturegifts",
+      "marketplace": "etsy",
+      "shopName": "BelleCoutureGifts"
+    },
+    {
+      "key": "trendyol",
+      "marketplace": "trendyol",
+      "shopName": null
+    },
+    {
+      "key": "ebay",
+      "marketplace": "ebay",
+      "shopName": null
+    },
+    {
+      "key": "amazon",
+      "marketplace": "amazon",
+      "shopName": null
+    },
+    {
+      "key": "manual",
+      "marketplace": "manual",
+      "shopName": null
+    }
+  ],
+  "fx": {
+    "source": "exchangerate-api.com",
+    "asOf": "2026-10-15T07:00:00.000Z",
+    "stale": false,
+    "rates": {
+      "USD": 41.25,
+      "EUR": 44.1
+    },
+    "excluded": [
+      {
+        "currency": "CAD",
+        "orders": 12
+      }
+    ]
+  },
+  "series": [
+    {
+      "bucketStart": "2026-09-16",
+      "bucketEnd": "2026-09-16",
+      "orders": 30,
+      "revenue": 25023.6
+    },
+    {
+      "bucketStart": "2026-09-17",
+      "bucketEnd": "2026-09-17",
+      "orders": 37,
+      "revenue": 30862.44
+    },
+    {
+      "bucketStart": "2026-09-18",
+      "bucketEnd": "2026-09-18",
+      "orders": 44,
+      "revenue": 36701.28
+    },
+    {
+      "bucketStart": "2026-09-19",
+      "bucketEnd": "2026-09-19",
+      "orders": 0,
+      "revenue": 0.0
+    },
+    {
+      "bucketStart": "2026-09-20",
+      "bucketEnd": "2026-09-20",
+      "orders": 0,
+      "revenue": 0.0
+    },
+    {
+      "bucketStart": "2026-09-21",
+      "bucketEnd": "2026-09-21",
+      "orders": 40,
+      "revenue": 33364.8
+    },
+    {
+      "bucketStart": "2026-09-22",
+      "bucketEnd": "2026-09-22",
+      "orders": 47,
+      "revenue": 39203.64
+    },
+    {
+      "bucketStart": "2026-09-23",
+      "bucketEnd": "2026-09-23",
+      "orders": 54,
+      "revenue": 45042.48
+    },
+    {
+      "bucketStart": "2026-09-24",
+      "bucketEnd": "2026-09-24",
+      "orders": 36,
+      "revenue": 30028.32
+    },
+    {
+      "bucketStart": "2026-09-25",
+      "bucketEnd": "2026-09-25",
+      "orders": 43,
+      "revenue": 35867.16
+    },
+    {
+      "bucketStart": "2026-09-26",
+      "bucketEnd": "2026-09-26",
+      "orders": 50,
+      "revenue": 41706.0
+    },
+    {
+      "bucketStart": "2026-09-27",
+      "bucketEnd": "2026-09-27",
+      "orders": 32,
+      "revenue": 26691.84
+    },
+    {
+      "bucketStart": "2026-09-28",
+      "bucketEnd": "2026-09-28",
+      "orders": 39,
+      "revenue": 32530.68
+    },
+    {
+      "bucketStart": "2026-09-29",
+      "bucketEnd": "2026-09-29",
+      "orders": 46,
+      "revenue": 38369.52
+    },
+    {
+      "bucketStart": "2026-09-30",
+      "bucketEnd": "2026-09-30",
+      "orders": 53,
+      "revenue": 44208.36
+    },
+    {
+      "bucketStart": "2026-10-01",
+      "bucketEnd": "2026-10-01",
+      "orders": 35,
+      "revenue": 29194.2
+    },
+    {
+      "bucketStart": "2026-10-02",
+      "bucketEnd": "2026-10-02",
+      "orders": 42,
+      "revenue": 35033.04
+    },
+    {
+      "bucketStart": "2026-10-03",
+      "bucketEnd": "2026-10-03",
+      "orders": 49,
+      "revenue": 40871.88
+    },
+    {
+      "bucketStart": "2026-10-04",
+      "bucketEnd": "2026-10-04",
+      "orders": 31,
+      "revenue": 25857.72
+    },
+    {
+      "bucketStart": "2026-10-05",
+      "bucketEnd": "2026-10-05",
+      "orders": 38,
+      "revenue": 31696.56
+    },
+    {
+      "bucketStart": "2026-10-06",
+      "bucketEnd": "2026-10-06",
+      "orders": 45,
+      "revenue": 37535.4
+    },
+    {
+      "bucketStart": "2026-10-07",
+      "bucketEnd": "2026-10-07",
+      "orders": 52,
+      "revenue": 43374.24
+    },
+    {
+      "bucketStart": "2026-10-08",
+      "bucketEnd": "2026-10-08",
+      "orders": 34,
+      "revenue": 28360.08
+    },
+    {
+      "bucketStart": "2026-10-09",
+      "bucketEnd": "2026-10-09",
+      "orders": 41,
+      "revenue": 34198.92
+    },
+    {
+      "bucketStart": "2026-10-10",
+      "bucketEnd": "2026-10-10",
+      "orders": 48,
+      "revenue": 40037.76
+    },
+    {
+      "bucketStart": "2026-10-11",
+      "bucketEnd": "2026-10-11",
+      "orders": 30,
+      "revenue": 25023.6
+    },
+    {
+      "bucketStart": "2026-10-12",
+      "bucketEnd": "2026-10-12",
+      "orders": 37,
+      "revenue": 30862.44
+    },
+    {
+      "bucketStart": "2026-10-13",
+      "bucketEnd": "2026-10-13",
+      "orders": 44,
+      "revenue": 36701.28
+    },
+    {
+      "bucketStart": "2026-10-14",
+      "bucketEnd": "2026-10-14",
+      "orders": 51,
+      "revenue": 42540.12
+    },
+    {
+      "bucketStart": "2026-10-15",
+      "bucketEnd": "2026-10-15",
+      "orders": 33,
+      "revenue": 27525.96
+    }
+  ],
+  "previousSeries": [
+    {
+      "bucketStart": "2026-08-17",
+      "bucketEnd": "2026-08-17",
+      "orders": 25,
+      "revenue": 21262.5
+    },
+    {
+      "bucketStart": "2026-08-18",
+      "bucketEnd": "2026-08-18",
+      "orders": 30,
+      "revenue": 25515.0
+    },
+    {
+      "bucketStart": "2026-08-19",
+      "bucketEnd": "2026-08-19",
+      "orders": 35,
+      "revenue": 29767.5
+    },
+    {
+      "bucketStart": "2026-08-20",
+      "bucketEnd": "2026-08-20",
+      "orders": 40,
+      "revenue": 34020.0
+    },
+    {
+      "bucketStart": "2026-08-21",
+      "bucketEnd": "2026-08-21",
+      "orders": 25,
+      "revenue": 21262.5
+    },
+    {
+      "bucketStart": "2026-08-22",
+      "bucketEnd": "2026-08-22",
+      "orders": 30,
+      "revenue": 25515.0
+    },
+    {
+      "bucketStart": "2026-08-23",
+      "bucketEnd": "2026-08-23",
+      "orders": 35,
+      "revenue": 29767.5
+    },
+    {
+      "bucketStart": "2026-08-24",
+      "bucketEnd": "2026-08-24",
+      "orders": 40,
+      "revenue": 34020.0
+    },
+    {
+      "bucketStart": "2026-08-25",
+      "bucketEnd": "2026-08-25",
+      "orders": 25,
+      "revenue": 21262.5
+    },
+    {
+      "bucketStart": "2026-08-26",
+      "bucketEnd": "2026-08-26",
+      "orders": 30,
+      "revenue": 25515.0
+    },
+    {
+      "bucketStart": "2026-08-27",
+      "bucketEnd": "2026-08-27",
+      "orders": 35,
+      "revenue": 29767.5
+    },
+    {
+      "bucketStart": "2026-08-28",
+      "bucketEnd": "2026-08-28",
+      "orders": 40,
+      "revenue": 34020.0
+    },
+    {
+      "bucketStart": "2026-08-29",
+      "bucketEnd": "2026-08-29",
+      "orders": 25,
+      "revenue": 21262.5
+    },
+    {
+      "bucketStart": "2026-08-30",
+      "bucketEnd": "2026-08-30",
+      "orders": 30,
+      "revenue": 25515.0
+    },
+    {
+      "bucketStart": "2026-08-31",
+      "bucketEnd": "2026-08-31",
+      "orders": 35,
+      "revenue": 29767.5
+    },
+    {
+      "bucketStart": "2026-09-01",
+      "bucketEnd": "2026-09-01",
+      "orders": 40,
+      "revenue": 34020.0
+    },
+    {
+      "bucketStart": "2026-09-02",
+      "bucketEnd": "2026-09-02",
+      "orders": 25,
+      "revenue": 21262.5
+    },
+    {
+      "bucketStart": "2026-09-03",
+      "bucketEnd": "2026-09-03",
+      "orders": 30,
+      "revenue": 25515.0
+    },
+    {
+      "bucketStart": "2026-09-04",
+      "bucketEnd": "2026-09-04",
+      "orders": 35,
+      "revenue": 29767.5
+    },
+    {
+      "bucketStart": "2026-09-05",
+      "bucketEnd": "2026-09-05",
+      "orders": 40,
+      "revenue": 34020.0
+    },
+    {
+      "bucketStart": "2026-09-06",
+      "bucketEnd": "2026-09-06",
+      "orders": 25,
+      "revenue": 21262.5
+    },
+    {
+      "bucketStart": "2026-09-07",
+      "bucketEnd": "2026-09-07",
+      "orders": 30,
+      "revenue": 25515.0
+    },
+    {
+      "bucketStart": "2026-09-08",
+      "bucketEnd": "2026-09-08",
+      "orders": 35,
+      "revenue": 29767.5
+    },
+    {
+      "bucketStart": "2026-09-09",
+      "bucketEnd": "2026-09-09",
+      "orders": 40,
+      "revenue": 34020.0
+    },
+    {
+      "bucketStart": "2026-09-10",
+      "bucketEnd": "2026-09-10",
+      "orders": 25,
+      "revenue": 21262.5
+    },
+    {
+      "bucketStart": "2026-09-11",
+      "bucketEnd": "2026-09-11",
+      "orders": 30,
+      "revenue": 25515.0
+    },
+    {
+      "bucketStart": "2026-09-12",
+      "bucketEnd": "2026-09-12",
+      "orders": 35,
+      "revenue": 29767.5
+    },
+    {
+      "bucketStart": "2026-09-13",
+      "bucketEnd": "2026-09-13",
+      "orders": 40,
+      "revenue": 34020.0
+    },
+    {
+      "bucketStart": "2026-09-14",
+      "bucketEnd": "2026-09-14",
+      "orders": 25,
+      "revenue": 21262.5
+    },
+    {
+      "bucketStart": "2026-09-15",
+      "bucketEnd": "2026-09-15",
+      "orders": 30,
+      "revenue": 25515.0
+    }
+  ],
+  "stores": [
+    {
+      "key": "etsy:bellecouturegifts",
+      "marketplace": "etsy",
+      "shopName": "BelleCoutureGifts",
+      "orders": 612,
+      "units": 901,
+      "revenue": 611300.0,
+      "byCurrency": {
+        "USD": 14820.4
+      },
+      "aov": 998.86,
+      "share": 0.571,
+      "excludedOrders": 0
+    },
+    {
+      "key": "trendyol",
+      "marketplace": "trendyol",
+      "shopName": null,
+      "orders": 402,
+      "units": 618,
+      "revenue": 281400.0,
+      "byCurrency": {
+        "TRY": 281400.0
+      },
+      "aov": 700.0,
+      "share": 0.263,
+      "excludedOrders": 0
+    },
+    {
+      "key": "ebay",
+      "marketplace": "ebay",
+      "shopName": null,
+      "orders": 170,
+      "units": 240,
+      "revenue": 137900.0,
+      "byCurrency": {
+        "USD": 2910.1,
+        "EUR": 410.0
+      },
+      "aov": 811.18,
+      "share": 0.129,
+      "excludedOrders": 0
+    },
+    {
+      "key": "amazon",
+      "marketplace": "amazon",
+      "shopName": null,
+      "orders": 100,
+      "units": 153,
+      "revenue": 40260.03,
+      "byCurrency": {
+        "CAD": 540.0,
+        "USD": 980.0
+      },
+      "aov": 402.6,
+      "share": 0.038,
+      "excludedOrders": 12
+    }
+  ],
+  "products": [
+    {
+      "key": "bb-01",
+      "name": "Personalized Baby Blanket",
+      "sku": "BB-01",
+      "image": "https://example.com/bb.jpg",
+      "units": 318,
+      "orders": 290,
+      "revenue": 265300.0
+    },
+    {
+      "key": "nn-g",
+      "name": "Name Necklace Gold",
+      "sku": "NN-G",
+      "image": null,
+      "units": 201,
+      "orders": 199,
+      "revenue": 120600.0
+    },
+    {
+      "key": "wooden keepsake box",
+      "name": "Wooden Keepsake Box",
+      "sku": null,
+      "image": null,
+      "units": 144,
+      "orders": 140,
+      "revenue": 69120.0
+    }
+  ],
+  "statuses": [
+    {
+      "raw": "paid",
+      "marketplace": "etsy",
+      "count": 30
+    },
+    {
+      "raw": "Created",
+      "marketplace": "trendyol",
+      "count": 12
+    },
+    {
+      "raw": "shipped",
+      "marketplace": "etsy",
+      "count": 1000
+    },
+    {
+      "raw": "Shipped",
+      "marketplace": "trendyol",
+      "count": 120
+    },
+    {
+      "raw": "Delivered",
+      "marketplace": "trendyol",
+      "count": 88
+    },
+    {
+      "raw": "Cancelled",
+      "marketplace": "trendyol",
+      "count": 21
+    },
+    {
+      "raw": "refunded",
+      "marketplace": "etsy",
+      "count": 13
+    }
+  ]
+}

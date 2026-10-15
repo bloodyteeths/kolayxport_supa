@@ -215,7 +215,10 @@
       "invoices": "Invoices",
       "guides": "Integrations & guides",
       "etsyActivity": "Etsy activity",
-      "overview": "Overview"
+      "overview": "Overview",
+      "reportsProfit": "Profit report",
+      "reportsPayouts": "Payouts report",
+      "reportsTransactions": "Transactions report"
     },
     "groups": {
       "listings": "Listings"
@@ -11095,7 +11098,10 @@
       "linkNoTitle": "Couldn't read a title from this link: type what it sells",
       "notServed": "Product finder doesn't cover {marketplace} yet",
       "noResults": "No {marketplace} listings match \"{q}\"",
-      "broader": "Try a broader phrase"
+      "broader": "Try a broader phrase",
+      "keywords": "Type a keyword or pick one of your listings",
+      "tracked": "Track a keyword to see your listing's position every day",
+      "notServedKw": "Keyword explorer doesn't cover {marketplace} yet"
     },
     "guard": {
       "small": "Small sample: {n} listings",
@@ -11144,7 +11150,11 @@
       "healthEbay": "eBay listings · health",
       "ownLabels": "Your {carrier} labels to {country}",
       "rateCard": "{carrier} rate-card transit to {country}",
-      "ai": "AI suggestion"
+      "ai": "AI suggestion",
+      "autocomplete": "Search suggestions",
+      "etsyKeywords": "Etsy search and tags",
+      "myShopTags": "Your shop's tags",
+      "rankTracker": "KolayXport rank tracker"
     },
     "explain": {
       "failed": "The explanation didn't come out right",
@@ -11169,7 +11179,9 @@
       "export": "Export results",
       "copyLink": "Copy link",
       "stageFixes": "Stage {count, plural, one {# fix} other {# fixes}}",
-      "openBulkGrid": "Open in bulk editor"
+      "openBulkGrid": "Open in bulk editor",
+      "addToTitle": "Add to title",
+      "track": "Track"
     },
     "home": {
       "rankChange": "rank {from} → {to}",
@@ -11223,7 +11235,8 @@
       "note": "The change is staged as a draft. It goes live only when you send it from Listings.",
       "ctaPrice": "Stage price",
       "pickFirst": "Choose a listing first",
-      "variations": "Has variations: change prices in the editor"
+      "variations": "Has variations: change prices in the editor",
+      "stagedTitle": "Has an unsent title change: edit it in the listing"
     },
     "compare": {
       "budgetColumn": "Not loaded: Etsy's daily limit is close",
@@ -11366,7 +11379,140 @@
       "searchApiOrder": "{marketplace} search (API order, not personalized)"
     },
     "kw": {
-      "notInTop500": "Not in top 500"
+      "notInTop500": "Not in top 500",
+      "salesCollecting": "Collecting data: {days} of 7 days so far",
+      "amazonNoSearch": "Amazon doesn't share search results here",
+      "mineEtsyOnly": "\"Used in my shop\" works with your Etsy tags only",
+      "mktUnavailable": "Keyword research isn't available for this marketplace yet",
+      "detailEtsyOnly": "Listing details are available for Etsy keywords",
+      "volumeUnavailable": "Saving Etsy volume is not available yet",
+      "budgetNoCache": "Etsy's daily limit is reached. Try again later.",
+      "searchPlaceholder": "Search a keyword, e.g. wooden jewelry box",
+      "or": "or",
+      "forListing": "For listing…",
+      "viewLabel": "View",
+      "view": {
+        "suggested": "Suggested",
+        "longtail": "Long-tail",
+        "seasonal": "Seasonal",
+        "mine": "Used in my shop",
+        "tracked": "Tracked"
+      },
+      "col": {
+        "keyword": "Keyword",
+        "demand": "Demand",
+        "competition": "Competition",
+        "top48": "Top-48 use",
+        "priceBand": "Price band",
+        "inMyShop": "In my shop",
+        "etsyVolume": "Etsy volume",
+        "rank": "Rank",
+        "peak": "Peak"
+      },
+      "tcol": {
+        "listing": "Listing",
+        "position": "Position (today)",
+        "delta7": "7-day change",
+        "best": "Best",
+        "sales14": "Sales 14 d"
+      },
+      "filter": {
+        "notInTitle": "Not in title",
+        "maxLen": "20 characters or less",
+        "competition": "Competition",
+        "band": {
+          "lt1k": "Under 1,000",
+          "1to10k": "1,000–10,000",
+          "gt10k": "Over 10,000"
+        },
+        "demand": "Demand",
+        "demandAtLeast": "At least {tier} of 5"
+      },
+      "current": "Current tags {count} / 13 · {overlap} repeat title words · {long} over 20 characters",
+      "top48Value": "{count} of 48",
+      "usedByTop": "Used by {count} of top 48",
+      "priceRange": "{low}–{high}",
+      "competitionCard": "{count} listings",
+      "competitionTip": "Listings matching this keyword in marketplace search",
+      "inMyShopValue": "{count, plural, one {# listing} other {# listings}}",
+      "inCurrent": "in your tags",
+      "chars": "{count} characters",
+      "tooLongTag": "Etsy tags can have at most 20 characters",
+      "rankValue": "#{rank}",
+      "rankUp": "▲{n}",
+      "rankDown": "▼{n}",
+      "noChange": "No change",
+      "notCheckedYet": "Not checked yet",
+      "checkedAt": "Checked {time}",
+      "peakValue": "Peaks in {month} · in {days, plural, one {# day} other {# days}}",
+      "peakTip": "Google Trends peak month (US, last 12 months)",
+      "building": "Checking {done} of {total} keywords…",
+      "resultCount": "{count, plural, one {# keyword} other {# keywords}}",
+      "trackedCount": "{count, plural, one {# tracked keyword} other {# tracked keywords}}",
+      "selected": "{count} selected",
+      "selectFirst": "Select keywords first",
+      "selectMax": "You can select up to {max} keywords",
+      "addToListing": "Add to listing",
+      "addTagsCta": "Add {count, plural, one {# tag} other {# tags}}",
+      "addTagsToListing": "Add {count, plural, one {# tag} other {# tags}} to {title}",
+      "autoTrackNote": "Tags you add from here are tracked daily",
+      "tagsAddedTracked": "{count, plural, one {# tag} other {# tags}} added to \"{title}\" · tracked · Not sent yet",
+      "replaceHint": "Weakest first (fewest top-48 listings use them)",
+      "tagsInTitle": "Not added: these words are already in the title of \"{title}\"",
+      "previewTitle": "Preview title",
+      "titlePreviewTitle": "New title",
+      "titleNew": "{count} / {max} characters",
+      "titleSkipped": "Left out: {list}",
+      "titleNothingNew": "The title already has these words, or there is no room left",
+      "stageTitle": "Stage title",
+      "titleStaged": "Title with {count, plural, one {# new phrase} other {# new phrases}} staged for \"{title}\" · Not sent yet",
+      "trackTitle": "Track {count, plural, one {# keyword} other {# keywords}}",
+      "trackNote": "We check your listing's position in Etsy search every day. Nothing changes on Etsy.",
+      "trackedToast": "{count, plural, one {# keyword} other {# keywords}} tracked for \"{title}\"",
+      "trackFailed": "Couldn't start tracking. Try again",
+      "untrackedToast": "{count, plural, one {Stopped tracking # keyword} other {Stopped tracking # keywords}}",
+      "untrackFailed": "Couldn't stop tracking. Try again",
+      "stopTracking": "Stop tracking",
+      "findBetter": "Find better keywords",
+      "seeExperiment": "See SEO experiment",
+      "trackForListing": "Track keywords for a listing",
+      "salesTip": "14 days before the last send: {before} · after ({days, plural, one {# day} other {# days}}): {after}",
+      "rankNote": "Position in Etsy API search (not personalized, ads excluded)",
+      "rankHistory": "Rank history",
+      "historyAria": "Position for \"{keyword}\" over time",
+      "historyFirst": "The chart appears after the second daily check",
+      "historyFailed": "Couldn't load the rank history",
+      "markerSend": "Sent",
+      "markerExperiment": "SEO experiment",
+      "cooccurring": "Tags used together",
+      "topListings": "Top listings ({count})",
+      "showAll": "Show all {count}",
+      "usedInListings": "Used in {count} of your listings",
+      "detailFailed": "Couldn't load this keyword",
+      "loadFailed": "Couldn't load keywords",
+      "noKeywords": "No keyword ideas for \"{q}\"",
+      "noMatches": "No keywords match these filters",
+      "clearFilters": "Clear filters",
+      "firstUseBody": "Picking a listing shows which of its tags to replace and what to add",
+      "connectTitle": "Connect Etsy to see the tags in your shop",
+      "connectBody": "Used in my shop and Tracked read your own Etsy listings",
+      "listingNotFound": "Couldn't find this listing in your shop",
+      "clearListing": "Search a keyword instead",
+      "trustEtsy": "Our signal differs from Etsy's number: trust Etsy's",
+      "volumeAdd": "add",
+      "volumeAddAria": "Add Etsy search volume for \"{keyword}\"",
+      "volumeEdit": "Edit Etsy search volume for \"{keyword}\"",
+      "volumePrompt": "Searches in the last 30 days (from Etsy)",
+      "volumeHelper": "Find it in Etsy Marketplace Insights",
+      "volumeInvalid": "Enter a whole number from 0 to 10,000,000",
+      "volumeSave": "Save",
+      "volumeClear": "Remove",
+      "volumeFailed": "Couldn't save. Try again",
+      "openInsights": "Open Etsy Marketplace Insights",
+      "panelTitle": "Keyword ideas · {title}",
+      "panelAria": "Keyword ideas",
+      "openFull": "Open full Keyword explorer",
+      "showMore": "Show more"
     }
   },
   "ds": {
@@ -12048,7 +12194,8 @@
       },
       "attributes": {
         "pass": "Enough attributes filled",
-        "low": "{count, plural, one {# attribute} other {# attributes}} filled: aim for {min} or more"
+        "low": "{count, plural, one {# attribute} other {# attributes}} filled: aim for {min} or more",
+        "requiredMissing": "{count, plural, one {# required attribute is} other {# required attributes are}} empty"
       },
       "priceSanity": {
         "pass": "Discount is shown on the price",
@@ -12115,6 +12262,13 @@
       "tagsCount": {
         "pass": "Enough tags",
         "low": "{count, plural, one {# tag} other {# tags}}: aim for {min} or more"
+      }
+    },
+    "listingScore": {
+      "trendyol": {
+        "attributes": {
+          "requiredMissing": "{count, plural, one {# required attribute is} other {# required attributes are}} empty"
+        }
       }
     }
   },
@@ -12912,7 +13066,36 @@
       "batchFailedReason": "Trendyol rejected this change: {reason}",
       "batchTimeout": "Trendyol didn't confirm this change. Refresh to check it",
       "noLocation": "This product has no stock location on Shopify",
-      "multiLocation": "Stock is split across several Shopify locations. Change it on Shopify"
+      "multiLocation": "Stock is split across several Shopify locations. Change it on Shopify",
+      "actionUnavailable": "This change can't be sent to the marketplace yet",
+      "archived": "Archived products can't be changed",
+      "contentIncomplete": "This product is missing its brand, category or price on Trendyol. Refresh the list and try again",
+      "createDraft": "A new product has nothing to compare yet",
+      "createIncomplete": "Fill in the required fields before creating this product",
+      "inStockTracked": "While stock is tracked, the quantity decides whether it's in stock",
+      "invalidAttributes": "Check the product details: each one needs a single value",
+      "invalidCollections": "Check the collections and try again",
+      "invalidCreate": "The new product's settings couldn't be saved",
+      "invalidDiscount": "Enter a discount below the price",
+      "invalidImages": "Add up to {max} photos with valid https links",
+      "invalidMedia": "These photo changes couldn't be saved. Add up to {max} photos at a time",
+      "invalidNumber": "Enter a number from 0 to {max}",
+      "invalidTextFields": "Check the personalization fields (up to {max})",
+      "invalidVariants": "These variant changes couldn't be saved (up to {max} variants)",
+      "invalidVat": "Pick a VAT rate of 0, 1, 10 or 20%",
+      "listBelowSale": "The list price can't be below the sale price",
+      "textTooLong": "Keep this text to {max} characters or fewer",
+      "variantsFailed": "Some variants couldn't be updated. Check the marked rows and try again",
+      "imagesFailed": "Some photo changes couldn't be sent. Try again",
+      "partial": {
+        "inventory": "The other changes were sent, but the stock couldn't be updated. Retry to finish",
+        "collections": "The other changes were sent, but the collections couldn't be updated. Retry to finish",
+        "media": "The other changes were sent, but the photos couldn't be updated. Retry to finish",
+        "images": "The other changes were sent, but some photos couldn't be updated. Retry to finish",
+        "seo": "The other changes were sent, but the search engine listing couldn't be updated. Retry to finish",
+        "variants": "The other changes were sent, but some variants couldn't be updated. Retry to finish",
+        "price": "The other changes were sent, but the price couldn't be updated. Retry to finish"
+      }
     },
     "send": {
       "confirmExcluded": "Send {count, plural, one {# change} other {# changes}} to {to}? Waiting for you: {waiting}.",
@@ -13388,7 +13571,11 @@
       "personalization": "Personalization",
       "shipping": "Shipping",
       "seo": "Search engine listing",
-      "photosEbay": "Photos"
+      "photosEbay": "Photos",
+      "categoryBrand": "Category & brand",
+      "priceStock": "Price & stock",
+      "tagsOrg": "Tags & organization",
+      "variants": "Variants"
     },
     "rail": {
       "label": "Listing summary"
@@ -13411,7 +13598,14 @@
       "categoryId": "Category",
       "fulfillmentPolicyId": "Shipping policy",
       "returnPolicyId": "Return policy",
-      "paymentPolicyId": "Payment policy"
+      "paymentPolicyId": "Payment policy",
+      "barcode": "Barcode",
+      "brandId": "Brand",
+      "stockCode": "Stock code",
+      "listPrice": "List price",
+      "vatRate": "VAT rate",
+      "cargoCompanyId": "Cargo company",
+      "dimensionalWeight": "Desi"
     },
     "footer": {
       "label": "Listing actions"
@@ -13605,7 +13799,9 @@
       "limitReached": "You've used all AI credits on your plan",
       "noMarketData": "Not enough similar {marketplace} listings to compare prices",
       "fillNeedsSeed": "Describe what you're selling in a few words first",
-      "fillNeedsSeedOrPhoto": "Add a photo or describe what you're selling first"
+      "fillNeedsSeedOrPhoto": "Add a photo or describe what you're selling first",
+      "attributesNeedCategory": "Choose a category first: attributes depend on it",
+      "noAttributeIdeas": "No confident values for the remaining attributes. Fill them yourself"
     },
     "price": {
       "bandTitle": "What similar listings sell for",
@@ -14046,6 +14242,175 @@
       "emptyBody": "Save a listing's tags, details or shipping as a profile, then fill new listings in one click",
       "draftOnly": "Applying fills the draft only. You can undo it right after",
       "storageFailed": "Couldn't save on this device. Check that the browser allows site storage"
+    },
+    "media": {
+      "invalidUrl": "This image link can't be used. Use a public https link",
+      "imageMissing": "This photo is no longer on the product, so it was skipped",
+      "tooMany": "A product can have at most {max} photos",
+      "orderStale": "The photos changed since you loaded them. Refresh and try the new order again",
+      "choiceLinked": "Some photos are linked to options (for example a color). Reorder these photos in Wix",
+      "restoreFailed": "Reordering failed and the photos could not be put back. Check this product's photos in Wix"
+    },
+    "wix": {
+      "collectionProtected": "The \"All products\" collection can't be changed",
+      "notFound": "We couldn't find this product in your Wix store",
+      "discountUnknown": "This product has a discount we can't read. Set the discount type and amount before changing the price.",
+      "otherSite": "This product is on another Wix site. For now the editor opens products of your first Wix site.",
+      "variantPrice": "Price is set per option in Wix",
+      "discount": "Discount",
+      "amount": "Amount",
+      "percent": "Percent",
+      "customerPays": "Customers pay {price}",
+      "trackInventory": "Track inventory",
+      "inStock": "In stock",
+      "weight": "Weight",
+      "variantStock": "Stock is set per option in Wix",
+      "collections": "Collections",
+      "collectionsPlaceholder": "Add to collections",
+      "collectionsLoadFailed": "Couldn't load your Wix collections",
+      "collectionUnknown": "Unknown collection",
+      "ribbon": "Ribbon",
+      "ribbonHelper": "A short label on the product, e.g. New",
+      "visible": "Visible in store",
+      "combinations": "{count, plural, one {# combination} other {# combinations}}",
+      "editOptions": "Edit options in Wix",
+      "textFields": "{count, plural, one {# text field} other {# text fields}}",
+      "textFieldsHelp": "Ask buyers for text, such as a name to engrave",
+      "textFieldTitle": "Text field {index}",
+      "textFieldPlaceholder": "e.g. Name to engrave",
+      "textFieldTitleRequired": "Give the text field a title",
+      "addTextField": "Add a text field",
+      "removeTextField": "Remove text field {index}",
+      "textFieldsMax": "Up to {max} text fields per product"
+    },
+    "common": {
+      "newProduct": "New product",
+      "cancel": "Cancel",
+      "done": "Done",
+      "edit": "Edit",
+      "show": "Show",
+      "hide": "Hide",
+      "open": "Open",
+      "use": "Use",
+      "dismiss": "Dismiss",
+      "revertAll": "Revert all",
+      "openIn": "Open in {marketplace}",
+      "copyProduct": "Copy one of your products…",
+      "copyProductBody": "Brings photos, price, title and description. You review every field."
+    },
+    "trendyol": {
+      "notFound": "We couldn't find this product in your Trendyol catalog",
+      "marginDefault": "You get ≈ {net} after {rate} commission and VAT (Estimate, default rate: category not matched)",
+      "marginHelpDefault": "Your category didn't match a Trendyol commission group, so this uses the default rate and the VAT inside the price. Your contract rate, shipping and fees can differ.",
+      "barcodeTaken": "One of your Trendyol products already uses this barcode",
+      "siblingsNotLoaded": "Product group {id}. Other colors and sizes in this group aren't listed here yet",
+      "listPrice": "List price",
+      "salePrice": "Sale price",
+      "vat": "VAT",
+      "stockCode": "Stock code",
+      "barcode": "Barcode",
+      "productMainId": "Product main ID",
+      "productMainIdHelper": "Groups colors and sizes of one product. Leave empty to use the stock code",
+      "desi": "Desi (dimensional weight)",
+      "cargo": "Cargo company",
+      "shipAddress": "Shipment address",
+      "returnAddress": "Returning address",
+      "brand": "Brand",
+      "brandHelper": "The brand must already exist on Trendyol",
+      "brandSearch": "Search brands",
+      "category": "Category",
+      "categoryLeaf": "Pick the most specific category",
+      "categoryFirst": "Start with the category: it decides which attributes Trendyol asks for",
+      "chooseCategoryFirst": "Choose a category first to see its attributes",
+      "attributesCleared": "Attributes cleared for the new category",
+      "attributeRequired": "Required by Trendyol",
+      "requiredGroup": "Required",
+      "requiredMissing": "{count, plural, one {# required attribute missing} other {# required attributes missing}}",
+      "optionalCount": "Optional ({count}) · Show",
+      "optionalHide": "Optional ({count}) · Hide",
+      "suggestAttributes": "Suggest attributes",
+      "discount": "{pct} off on Trendyol",
+      "margin": "You get ≈ {net} after {rate} commission and VAT (Estimate, {category} rate)",
+      "estimate": "Estimate",
+      "marginHelp": "Uses Trendyol's usual commission for the {category} group and the VAT inside the price. Your contract rate, shipping and fees can differ.",
+      "listBelowSale": "List price can't be lower than the sale price",
+      "fixedAfterCreate": "Can't be changed after the product is created",
+      "generateBarcode": "Generate",
+      "listLoadFailed": "Couldn't load the list from Trendyol",
+      "rejected": "Rejected by Trendyol: {reasons} · Fix and send again",
+      "noReason": "no reason given",
+      "archived": "Archived products can't be changed. Unarchive on Trendyol first",
+      "blacklisted": "Trendyol has blocked this product, so it can't be changed. Contact Trendyol seller support",
+      "inReview": "Waiting for Trendyol approval",
+      "waiting": "Waiting for Trendyol · sent {time}",
+      "siblings": "{count} products in this product group",
+      "noSiblings": "This product has no other colors or sizes",
+      "inStockCount": "{count} in stock",
+      "copyListing": "Copy an Etsy or eBay listing…",
+      "copyListingBody": "Brings photos, price and a Turkish draft of the title and description (AI). You review every field."
+    },
+    "shopify": {
+      "notFound": "We couldn't find this product in your Shopify store",
+      "seoUnavailable": "We couldn't read this product's SEO. Reload the page before editing it.",
+      "vendor": "Vendor",
+      "productType": "Product type",
+      "statusLabel": "Status",
+      "status": {
+        "active": "Active",
+        "draft": "Draft",
+        "archived": "Archived"
+      },
+      "statusActiveHelp": "Visible in your online store",
+      "statusDraftHelp": "Hidden until you make it active",
+      "compareAt": "Compare-at price",
+      "seoTitle": "Page title",
+      "seoDescription": "Meta description",
+      "seoHelp": "How this product shows up in Google results",
+      "seoFallback": "Empty fields use the product title and description",
+      "tagsHelper": "Comma to split. Tags help you filter and build collections",
+      "tagsPlaceholder": "Type a tag, comma to split",
+      "collections": "Collections",
+      "collectionsReadOnly": "Change collections in Shopify",
+      "option": "Option",
+      "variantsCount": "{count, plural, one {# variant} other {# variants}}",
+      "variantsEdited": "{count, plural, one {# variant changed} other {# variants changed}}",
+      "multiLocation": "This shop keeps stock in {count} locations. Change quantities in Shopify",
+      "notTracked": "Shopify doesn't track stock for this variant",
+      "readOnlySending": "Can't be changed while sending",
+      "priceRequired": "Enter a price above 0",
+      "quantityInvalid": "Enter a whole number, 0 or more",
+      "weightPerVariant": "Weight is set per variant in Shopify",
+      "addOptionsLater": "Add options in Shopify after creating"
+    },
+    "catalog": {
+      "connectTitle": "Connect {marketplace, select, trendyol {Trendyol} wix {Wix} shopify {Shopify} other {your store}} to edit your products",
+      "connectBody": "Your products and staged changes appear here once the store is connected.",
+      "storeFailed": "Couldn't load your {marketplace} store",
+      "crosslistFailed": "Couldn't load the listing to copy",
+      "required": "Required",
+      "barcodeInvalid": "Use up to {max} letters, digits, dots, dashes or underscores",
+      "confirmRemoval": "Confirm the removal before sending it",
+      "sendPending": "Sent. Trendyol is still processing it; this page updates when it is done.",
+      "archiveInGrid": "Archiving is confirmed from the product list. Send it there, or remove it from this draft.",
+      "createdReload": "This product was already sent. Reload the page to edit it.",
+      "crosslistPriceCleared": "Price not copied: the listing is in another currency. Set a price in {currency}.",
+      "descriptionPreview": "Description preview",
+      "copyPickerCrosslistTitle": "Copy an Etsy or eBay listing",
+      "copyPickerProductTitle": "Copy one of your products",
+      "copyPickerSearch": "Search by title or ID",
+      "copyPickerLoading": "Loading listings…",
+      "copyPickerEmpty": "No listings match your search",
+      "copyPickerFailed": "Couldn't load your listings",
+      "copyPickerRetry": "Try again",
+      "copyPickerNotConnected": "{marketplace} is not connected",
+      "copyPickerCopy": "Copy",
+      "copyPickerChoose": "Choose a listing first"
+    },
+    "listingEditor": {
+      "ai": {
+        "attributesNeedCategory": "Choose a category first: attributes depend on it",
+        "noAttributeIdeas": "No confident values for the remaining attributes. Fill them yourself"
+      }
     }
   },
   "bulk": {
@@ -14525,6 +14890,299 @@
     "subscriptionActivated": "Your subscription is active",
     "subtitle": {
       "allStores": "All stores"
+    }
+  },
+  "reports": {
+    "profit": {
+      "line": {
+        "cogsUnverified": "{count} costs saved as {currency} are counted as {base}: check their currency",
+        "ledgerConverted": "{count} rows in {currency} converted to {base} (approximate)",
+        "ledgerExcluded": "{count} rows in {currency} left out: no exchange rate",
+        "gross": "Gross sales",
+        "refunds": "Refunds",
+        "discounts": "Discounts",
+        "fees": "Marketplace fees",
+        "ads": "Ads",
+        "shipping": "Shipping",
+        "otherFees": "Other fees",
+        "productCost": "Product cost",
+        "productCostCoverage": "Product cost ({with} of {total})",
+        "net": "Net profit",
+        "cogsExcluded": "{count} costs in {currency} left out: no exchange rate"
+      },
+      "kpi": {
+        "netSales": "Net sales",
+        "costs": "Fees and costs",
+        "costsShare": "{value} of net sales",
+        "netProfit": "Net profit",
+        "margin": "Margin",
+        "orders": "{count, plural, one {# order} other {# orders}}",
+        "costMissing": "Excludes product cost for {count, plural, one {# product} other {# products}}"
+      },
+      "statement": {
+        "title": "Profit and loss",
+        "share": "% of gross sales"
+      },
+      "chart": {
+        "title": "Net sales and net profit",
+        "netSales": "Net sales",
+        "netProfit": "Net profit"
+      },
+      "banner": {
+        "costMissing": "Product cost is missing for {count} of {total} products, so net profit is too high.",
+        "pending": "{count, plural, one {# order isn't} other {# orders aren't}} settled by {name} yet. They appear here once {name} books them, usually in 1–3 days.",
+        "cancelPending": "{count, plural, one {# cancellation has} other {# cancellations have}} no refund yet."
+      },
+      "products": {
+        "title": "Profit by product",
+        "product": "Product",
+        "sold": "Sold",
+        "returned": "{count} returned",
+        "returnedHeader": "Returned",
+        "revenue": "Revenue",
+        "fees": "Fees",
+        "shipping": "Shipping",
+        "unitCost": "Unit cost",
+        "profit": "Profit",
+        "margin": "Margin",
+        "addCost": "Add cost",
+        "noCode": "This product has no barcode or SKU, so a cost can't be saved.",
+        "costSaved": "Cost saved",
+        "costSaveFailed": "Couldn't save cost",
+        "costCurrencyConflict": "Shipping for this product is saved in {from}. Enter unit cost and shipping in {to} in Product costs."
+      },
+      "notSupported": "Profit reports are available for Etsy, eBay, Amazon and Trendyol.",
+      "connect": "Connect {name} to see your profit",
+      "never": {
+        "title": "Get your {name} payments",
+        "body": "We read fees, refunds and payouts from {name}. Nothing is changed on {name}."
+      },
+      "empty": "No payments in this period"
+    },
+    "error": {
+      "rangeTooLong": "Choose a range of up to 2 years",
+      "sales": "Couldn't load your sales",
+      "profit": "Couldn't load {name} payments",
+      "refresh": "Couldn't refresh from {name}",
+      "transactions": "Couldn't load transactions"
+    },
+    "sales": {
+      "kpi": {
+        "excludes": "Excludes {count, plural, one {# order} other {# orders}}",
+        "revenue": "Revenue",
+        "orders": "Orders",
+        "aov": "Average order",
+        "units": "Units sold",
+        "source": "Orders · {count, plural, one {# store} other {# stores}}"
+      },
+      "chart": {
+        "revenueTitle": "Revenue over time",
+        "ordersTitle": "Orders over time",
+        "hourlyTitle": "Orders by hour",
+        "metricRevenue": "Revenue",
+        "metricOrders": "Orders"
+      },
+      "stores": {
+        "title": "Sales by store",
+        "store": "Store",
+        "orders": "Orders",
+        "units": "Units",
+        "revenueOriginal": "Revenue (original)",
+        "revenueConverted": "Revenue ({symbol})",
+        "share": "Share",
+        "aov": "Avg order",
+        "manual": "Manual orders"
+      },
+      "products": {
+        "title": "Top products",
+        "search": "Search product or SKU",
+        "product": "Product",
+        "units": "Units",
+        "revenue": "Revenue"
+      },
+      "status": {
+        "title": "Orders by status"
+      }
+    },
+    "page": {
+      "title": "Reports"
+    },
+    "tabs": {
+      "sales": "Sales",
+      "profit": "Profit",
+      "payouts": "Payouts",
+      "transactions": "Transactions"
+    },
+    "meta": {
+      "ordersAsOf": "Orders as of {time}",
+      "updating": "Updating…",
+      "refresh": "Refresh",
+      "fxNote": "≈ converted at {source} rates, {date}",
+      "ledgerSource": "{name} payments ledger",
+      "amountsIn": "Amounts in {symbol}",
+      "refreshFrom": "Refresh from {name}",
+      "refreshingFrom": "Refreshing from {name}…",
+      "ledgerSourceNotRefreshed": "{name} payments ledger (not refreshed yet)"
+    },
+    "actions": {
+      "exportCsv": "Export CSV",
+      "nothingToExport": "Nothing to export for this period",
+      "exportFailed": "Couldn't export. Try again.",
+      "exportCap": "Export the first {count} transactions?",
+      "openOrders": "Open Orders for this period",
+      "showLast90": "Show last 90 days",
+      "clearFilters": "Clear filters",
+      "clearSearch": "Clear search",
+      "addCosts": "Add product costs",
+      "manageCosts": "Manage product costs",
+      "openTransactions": "Open Transactions",
+      "exporting": "Exporting…"
+    },
+    "toolbar": {
+      "store": "Store",
+      "all": "All",
+      "showIn": "Show in",
+      "notConnected": "{name} · not connected",
+      "type": "Type"
+    },
+    "granularity": {
+      "label": "Chart interval",
+      "hour": "Hourly",
+      "day": "Daily",
+      "week": "Weekly",
+      "month": "Monthly"
+    },
+    "delta": {
+      "vsRange": "vs {range}",
+      "noBaseline": "No data in the previous period",
+      "points": "{value} pts"
+    },
+    "chart": {
+      "thisPeriod": "This period",
+      "previousPeriod": "Previous period ({range})",
+      "previousDay": "Previous day"
+    },
+    "fx": {
+      "unconverted": "{count, plural, one {# order} other {# orders}} in {currencies} left out of totals: no exchange rate.",
+      "stale": "Exchange rates couldn't be updated. Using rates from {date}.",
+      "approx": "Converted from {currencies} at {source} rates ({date})"
+    },
+    "csv": {
+      "marketplace": "Marketplace",
+      "currency": "Currency",
+      "sku": "SKU",
+      "bucket": "Period",
+      "previousOrders": "Orders (previous period)",
+      "previousRevenue": "Revenue (previous period)"
+    },
+    "empty": {
+      "connect": {
+        "title": "Connect a store to see your sales",
+        "body": "Orders from every store you connect show up here together.",
+        "action": "Connect a store"
+      },
+      "noOrders": {
+        "title": "No orders in this period",
+        "body": "Try a longer date range."
+      },
+      "noMatch": "No stores match this filter",
+      "noProducts": "No products sold in this period",
+      "noProductMatch": "No products match \"{q}\""
+    },
+    "costs": {
+      "title": "Product costs",
+      "subtitle": "{name} · used to work out net profit",
+      "mode": {
+        "one": "One product",
+        "list": "Paste a list"
+      },
+      "field": {
+        "product": "Product",
+        "productHelp": "Pick a product you sold, or type a name",
+        "code": "Barcode or SKU",
+        "unitCost": "Unit cost",
+        "currency": "Currency",
+        "shipping": "Shipping per item",
+        "note": "Note",
+        "list": "Costs"
+      },
+      "listHelp": "One product per line: barcode or SKU, name, unit cost, shipping (optional). Paste from Excel or Google Sheets.",
+      "listPreview": "{valid} rows ready · {invalid} rows skipped",
+      "listRowInvalid": "Row {row}: {reason}",
+      "reason": {
+        "noCode": "no barcode or SKU",
+        "badCost": "unit cost isn't a number",
+        "reenterShipping": "shipping is saved in {from}; enter shipping in {to} too",
+        "saveFailed": "couldn't be saved"
+      },
+      "importPartial": "{imported} imported · {failed} not imported",
+      "importIssue": "{code}: {reason}",
+      "add": "Add cost",
+      "import": "Import {count} costs",
+      "saved": "Saved costs",
+      "none": "No costs saved yet",
+      "added": "Cost added",
+      "imported": "{count} costs imported",
+      "failed": "Couldn't save costs",
+      "soldLoadFailed": "Couldn't load sold products"
+    },
+    "tx": {
+      "amount": "Amount",
+      "count": "{count, plural, one {# transaction} other {# transactions}}",
+      "date": "Date",
+      "type": "Type",
+      "product": "Product",
+      "order": "Order",
+      "fee": "Fee",
+      "rawType": "{name}: {raw}",
+      "cat": {
+        "revenue": "Sale",
+        "commission": "Fee",
+        "commission_invoice": "Commission invoice",
+        "fees": "Other fee",
+        "adspend": "Ads",
+        "shipping": "Shipping",
+        "return": "Refund",
+        "discount": "Discount",
+        "disbursement": "Payout",
+        "passthrough": "Sales tax",
+        "other": "Other"
+      },
+      "empty": "No transactions in this period",
+      "connect": "Connect {name} to see your transactions"
+    },
+    "toast": {
+      "newTransactions": "{count} new transactions from {name}"
+    },
+    "finance": {
+      "notSupported": "Finance reports are available for Etsy, eBay, Amazon and Trendyol."
+    },
+    "payouts": {
+      "kpi": {
+        "paid": "Paid to bank",
+        "count": "{count, plural, one {# payout} other {# payouts}}",
+        "balance": "Balance on {name}",
+        "balanceHint": "Not paid out yet",
+        "held": "Held by {name}",
+        "heldHint": "Not available yet",
+        "noBalance": "{name} hasn't reported a balance yet"
+      },
+      "balanceNote": {
+        "etsy": "Etsy’s API does not expose reserve (held) amounts or release dates, so they can’t be shown. “Current balance” is the total not yet disbursed to your bank.",
+        "amazon": "This is the total of the open, not-yet-paid settlement period (approximate). Amazon’s API does not expose a real-time balance or reserve amount.",
+        "trendyol": "Trendyol’s API does not expose a live balance. This is the estimated total of matured-but-not-yet-paid earnings (pending payout)."
+      },
+      "chart": {
+        "title": "Payouts over time"
+      },
+      "table": {
+        "title": "Payouts",
+        "date": "Date",
+        "amount": "Amount",
+        "currency": "Currency"
+      },
+      "empty": "No payouts in this period",
+      "connect": "Connect {name} to see your payouts"
     }
   }
 }

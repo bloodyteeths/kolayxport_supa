@@ -26,6 +26,12 @@ import {
  *      → { drafts: CatalogDraftDTO[] } (open drafts; + synced in the last 24 h with includeSynced)
  * POST /api/catalog-drafts { marketplace, storeId?, externalId, fields?, queuedActions?, removeQueuedActions?, scheduledSendAt? }
  *      → { draft: CatalogDraftDTO } (merges into the open draft; never touches the marketplace)
+ *      `fields`: v1 + v2 keys of `ALLOWED_FIELDS[marketplace]` (lib/catalogDrafts/schemas.ts; aliases such as
+ *      Trendyol `salePrice` or Shopify `body_html` are normalised), `null` drops a key.
+ *      Create (marketplace-editors §5): externalId `new` (or omitted) + queuedActions [{ type: 'create', payload? }]
+ *      starts a new-product draft whose externalId is `new:<id>` (read it from the response); later stages
+ *      send that `new:<id>`, and a repeated create action merges its payload. Nothing is created on the
+ *      marketplace until POST /api/catalog-drafts/send.
  * POST /api/catalog-drafts { marketplace, storeId?, items: { externalId, fields? }[] }   (bulk grid, 1..50 items)
  *      → { results: BatchStageResult[] } (`listingId` = externalId; per-item errors never fail the batch;
  *        items never carry queued actions or a schedule, so nothing is deleted or sent from here;
@@ -40,7 +46,12 @@ function errorParams(body: Record<string, unknown>): Record<string, string | num
 function toBatchIssue(field: string, err: unknown): BatchStageIssue | null {
   if (!isCatalogDraftError(err)) return null;
   const { body } = catalogDraftErrorResponse(err);
-  const params = errorParams(body);
+  // `params.field` repeats the issue's own `field` (v2 validation adds it to every field error): dropped here,
+  // except for FIELD_NOT_SUPPORTED whose message interpolates {field}.
+  const all = errorParams(body) || {};
+  const { field: _field, ...rest } = all;
+  const kept = body.code === 'FIELD_NOT_SUPPORTED' ? all : rest;
+  const params = Object.keys(kept).length ? kept : undefined;
   return { field, key: String(body.key || 'listings.draftError.internal'), ...(params ? { params } : {}) };
 }
 
@@ -129,7 +140,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         userId: user.id,
         marketplace: body.marketplace,
         storeId: typeof body.storeId === 'string' ? body.storeId : null,
-        externalId: String(body.externalId ?? ''),
+        externalId: typeof body.externalId === 'string' || typeof body.externalId === 'number' ? String(body.externalId) : '',
         fields: body.fields,
         queuedActions: body.queuedActions,
         removeQueuedActions: body.removeQueuedActions,

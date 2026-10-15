@@ -215,7 +215,10 @@
       "invoices": "Faturalar",
       "guides": "Entegrasyonlar ve rehberler",
       "etsyActivity": "Etsy etkinliği",
-      "overview": "Genel bakış"
+      "overview": "Genel bakış",
+      "reportsProfit": "Kâr raporu",
+      "reportsPayouts": "Ödemeler raporu",
+      "reportsTransactions": "İşlemler raporu"
     },
     "groups": {
       "listings": "İlanlar"
@@ -11095,7 +11098,10 @@
       "linkNoTitle": "Bu linkten bir başlık okunamadı: ne sattığını yazın",
       "notServed": "Ürün bulucu {marketplace} için henüz kullanılamıyor",
       "noResults": "\"{q}\" ile eşleşen {marketplace} ilanı yok",
-      "broader": "Daha genel bir ifade deneyin"
+      "broader": "Daha genel bir ifade deneyin",
+      "keywords": "Bir anahtar kelime yazın veya ilanlarınızdan birini seçin",
+      "tracked": "İlanınızın sırasını her gün görmek için bir anahtar kelimeyi takip edin",
+      "notServedKw": "Anahtar kelime gezgini henüz {marketplace} için çalışmıyor"
     },
     "guard": {
       "small": "Küçük örnek: {n} ilan",
@@ -11144,7 +11150,11 @@
       "healthEbay": "eBay ilanları · sağlık",
       "ownLabels": "{country} için {carrier} gönderileriniz",
       "rateCard": "{country} için {carrier} tarife teslim süresi",
-      "ai": "Yapay zekâ önerisi"
+      "ai": "Yapay zekâ önerisi",
+      "autocomplete": "Arama önerileri",
+      "etsyKeywords": "Etsy araması ve etiketleri",
+      "myShopTags": "Mağazanızın etiketleri",
+      "rankTracker": "KolayXport sıralama takibi"
     },
     "explain": {
       "failed": "Açıklama düzgün oluşturulamadı",
@@ -11169,7 +11179,9 @@
       "export": "Sonuçları dışa aktar",
       "copyLink": "Linki kopyala",
       "stageFixes": "{count} düzeltmeyi hazırla",
-      "openBulkGrid": "Toplu düzenleyicide aç"
+      "openBulkGrid": "Toplu düzenleyicide aç",
+      "addToTitle": "Başlığa ekle",
+      "track": "Takip et"
     },
     "home": {
       "rankChange": "sıra {from} → {to}",
@@ -11223,7 +11235,8 @@
       "note": "Değişiklik taslak olarak hazırlanır. Yalnızca İlanlar sayfasından gönderdiğinizde yayına girer.",
       "ctaPrice": "Fiyatı hazırla",
       "pickFirst": "Önce bir ilan seçin",
-      "variations": "Varyasyonlu ilan: fiyatları düzenleyicide değiştirin"
+      "variations": "Varyasyonlu ilan: fiyatları düzenleyicide değiştirin",
+      "stagedTitle": "Gönderilmemiş bir başlık değişikliği var: ilanda düzenleyin"
     },
     "compare": {
       "budgetColumn": "Yüklenmedi: Etsy'nin günlük sınırına yaklaşıldı",
@@ -11366,7 +11379,140 @@
       "searchApiOrder": "{marketplace} araması (API sırası, kişiselleştirilmemiş)"
     },
     "kw": {
-      "notInTop500": "İlk 500'de değil"
+      "notInTop500": "İlk 500'de değil",
+      "salesCollecting": "Veri toplanıyor: şu ana kadar 7 günün {days} günü",
+      "amazonNoSearch": "Amazon burada arama sonuçlarını paylaşmıyor",
+      "mineEtsyOnly": "\"Mağazamda kullanılan\" yalnızca Etsy etiketlerinizle çalışır",
+      "mktUnavailable": "Bu pazaryeri için anahtar kelime araştırması henüz kullanılamıyor",
+      "detailEtsyOnly": "İlan ayrıntıları Etsy anahtar kelimeleri için gösterilir",
+      "volumeUnavailable": "Etsy hacmini kaydetme henüz kullanılamıyor",
+      "budgetNoCache": "Etsy'nin günlük limiti doldu. Daha sonra tekrar deneyin.",
+      "searchPlaceholder": "Bir anahtar kelime arayın, ör. wooden jewelry box",
+      "or": "veya",
+      "forListing": "İlan seçin…",
+      "viewLabel": "Görünüm",
+      "view": {
+        "suggested": "Önerilen",
+        "longtail": "Uzun kuyruk",
+        "seasonal": "Sezonluk",
+        "mine": "Mağazamda kullanılan",
+        "tracked": "Takip edilen"
+      },
+      "col": {
+        "keyword": "Anahtar kelime",
+        "demand": "Talep",
+        "competition": "Rekabet",
+        "top48": "İlk 48'de kullanım",
+        "priceBand": "Fiyat aralığı",
+        "inMyShop": "Mağazamda",
+        "etsyVolume": "Etsy hacmi",
+        "rank": "Sıra",
+        "peak": "Zirve"
+      },
+      "tcol": {
+        "listing": "İlan",
+        "position": "Sıra (bugün)",
+        "delta7": "7 günlük değişim",
+        "best": "En iyi",
+        "sales14": "14 günlük satış"
+      },
+      "filter": {
+        "notInTitle": "Başlıkta olmayanlar",
+        "maxLen": "20 karakter veya daha kısa",
+        "competition": "Rekabet",
+        "band": {
+          "lt1k": "1.000'den az",
+          "1to10k": "1.000–10.000",
+          "gt10k": "10.000'den fazla"
+        },
+        "demand": "Talep",
+        "demandAtLeast": "En az 5'te {tier}"
+      },
+      "current": "Mevcut etiketler {count} / 13 · {overlap} tanesi başlık kelimelerini tekrar ediyor · {long} tanesi 20 karakteri aşıyor",
+      "top48Value": "48'de {count}",
+      "usedByTop": "İlk 48'in {count} tanesi kullanıyor",
+      "priceRange": "{low}–{high}",
+      "competitionCard": "{count} ilan",
+      "competitionTip": "Pazaryeri aramasında bu anahtar kelimeyle eşleşen ilanlar",
+      "inMyShopValue": "{count} ilan",
+      "inCurrent": "etiketlerinizde",
+      "chars": "{count} karakter",
+      "tooLongTag": "Etsy etiketleri en fazla 20 karakter olabilir",
+      "rankValue": "{rank}.",
+      "rankUp": "▲{n}",
+      "rankDown": "▼{n}",
+      "noChange": "Değişim yok",
+      "notCheckedYet": "Henüz kontrol edilmedi",
+      "checkedAt": "{time} kontrol edildi",
+      "peakValue": "{month} ayında zirve · {days} gün sonra",
+      "peakTip": "Google Trends zirve ayı (ABD, son 12 ay)",
+      "building": "{total} anahtar kelimeden {done} tanesi kontrol ediliyor…",
+      "resultCount": "{count} anahtar kelime",
+      "trackedCount": "{count} takip edilen anahtar kelime",
+      "selected": "{count} seçildi",
+      "selectFirst": "Önce anahtar kelime seçin",
+      "selectMax": "En fazla {max} anahtar kelime seçebilirsiniz",
+      "addToListing": "İlana ekle",
+      "addTagsCta": "{count} etiket ekle",
+      "addTagsToListing": "{count} etiketi {title} ilanına ekle",
+      "autoTrackNote": "Buradan eklediğiniz etiketler her gün takip edilir",
+      "tagsAddedTracked": "{count} etiket \"{title}\" ilanına eklendi · takip ediliyor · Henüz gönderilmedi",
+      "replaceHint": "En zayıflar önce (ilk 48 ilanın en az kullandıkları)",
+      "tagsInTitle": "Eklenmedi: bu kelimeler \"{title}\" başlığında zaten var",
+      "previewTitle": "Başlığı önizle",
+      "titlePreviewTitle": "Yeni başlık",
+      "titleNew": "{count} / {max} karakter",
+      "titleSkipped": "Eklenmeyenler: {list}",
+      "titleNothingNew": "Başlıkta bu kelimeler zaten var veya yer kalmadı",
+      "stageTitle": "Başlığı hazırla",
+      "titleStaged": "{count} yeni ifadeli başlık \"{title}\" için hazırlandı · Henüz gönderilmedi",
+      "trackTitle": "{count} anahtar kelimeyi takip et",
+      "trackNote": "İlanınızın Etsy aramasındaki sırasını her gün kontrol ederiz. Etsy'de hiçbir şey değişmez.",
+      "trackedToast": "\"{title}\" için {count} anahtar kelime takip ediliyor",
+      "trackFailed": "Takip başlatılamadı. Tekrar deneyin",
+      "untrackedToast": "{count} anahtar kelimenin takibi bırakıldı",
+      "untrackFailed": "Takip bırakılamadı. Tekrar deneyin",
+      "stopTracking": "Takibi bırak",
+      "findBetter": "Daha iyi anahtar kelimeler bul",
+      "seeExperiment": "SEO deneyini gör",
+      "trackForListing": "Bir ilan için anahtar kelime takip et",
+      "salesTip": "Son gönderimden önceki 14 gün: {before} · sonrası ({days} gün): {after}",
+      "rankNote": "Etsy API aramasındaki sıra (kişiselleştirilmemiş, reklamlar hariç)",
+      "rankHistory": "Sıra geçmişi",
+      "historyAria": "\"{keyword}\" için zaman içindeki sıra",
+      "historyFirst": "Grafik ikinci günlük kontrolden sonra görünür",
+      "historyFailed": "Sıra geçmişi yüklenemedi",
+      "markerSend": "Gönderildi",
+      "markerExperiment": "SEO deneyi",
+      "cooccurring": "Birlikte kullanılan etiketler",
+      "topListings": "En iyi ilanlar ({count})",
+      "showAll": "{count} ilanın tamamını göster",
+      "usedInListings": "{count} ilanınızda kullanılıyor",
+      "detailFailed": "Bu anahtar kelime yüklenemedi",
+      "loadFailed": "Anahtar kelimeler yüklenemedi",
+      "noKeywords": "\"{q}\" için anahtar kelime önerisi yok",
+      "noMatches": "Bu filtrelerle eşleşen anahtar kelime yok",
+      "clearFilters": "Filtreleri temizle",
+      "firstUseBody": "Bir ilan seçtiğinizde hangi etiketlerin değişmesi ve neyin eklenmesi gerektiğini görürsünüz",
+      "connectTitle": "Mağazanızdaki etiketleri görmek için Etsy bağlayın",
+      "connectBody": "Mağazamda kullanılan ve Takip edilen görünümleri kendi Etsy ilanlarınızı okur",
+      "listingNotFound": "Bu ilan mağazanızda bulunamadı",
+      "clearListing": "Bunun yerine anahtar kelime arayın",
+      "trustEtsy": "Sinyalimiz Etsy'nin sayısından farklı: Etsy'ninkine güvenin",
+      "volumeAdd": "ekle",
+      "volumeAddAria": "\"{keyword}\" için Etsy arama hacmi ekle",
+      "volumeEdit": "\"{keyword}\" için Etsy arama hacmini düzenle",
+      "volumePrompt": "Son 30 gündeki aramalar (Etsy'den)",
+      "volumeHelper": "Etsy Marketplace Insights'ta bulabilirsiniz",
+      "volumeInvalid": "0 ile 10.000.000 arasında bir tam sayı girin",
+      "volumeSave": "Kaydet",
+      "volumeClear": "Kaldır",
+      "volumeFailed": "Kaydedilemedi. Tekrar deneyin",
+      "openInsights": "Etsy Marketplace Insights'ı aç",
+      "panelTitle": "Anahtar kelime fikirleri · {title}",
+      "panelAria": "Anahtar kelime fikirleri",
+      "openFull": "Anahtar kelime gezginini tam aç",
+      "showMore": "Daha fazla göster"
     }
   },
   "ds": {
@@ -12048,7 +12194,8 @@
       },
       "attributes": {
         "pass": "Yeterli özellik dolu",
-        "low": "{count} özellik dolu: en az {min} hedefleyin"
+        "low": "{count} özellik dolu: en az {min} hedefleyin",
+        "requiredMissing": "{count} zorunlu özellik boş"
       },
       "priceSanity": {
         "pass": "Fiyatta indirim görünüyor",
@@ -12115,6 +12262,13 @@
       "tagsCount": {
         "pass": "Yeterli etiket var",
         "low": "{count} etiket: en az {min} hedefleyin"
+      }
+    },
+    "listingScore": {
+      "trendyol": {
+        "attributes": {
+          "requiredMissing": "{count} zorunlu özellik boş"
+        }
       }
     }
   },
@@ -12912,7 +13066,36 @@
       "batchFailedReason": "Trendyol bu değişikliği kabul etmedi: {reason}",
       "batchTimeout": "Trendyol bu değişikliği onaylamadı. Kontrol etmek için yenileyin",
       "noLocation": "Bu ürünün Shopify'da stok konumu yok",
-      "multiLocation": "Stok birden fazla Shopify konumuna dağılmış. Shopify'da değiştirin"
+      "multiLocation": "Stok birden fazla Shopify konumuna dağılmış. Shopify'da değiştirin",
+      "actionUnavailable": "Bu değişiklik henüz pazaryerine gönderilemiyor",
+      "archived": "Arşivlenmiş ürünler değiştirilemez",
+      "contentIncomplete": "Bu ürünün Trendyol'da markası, kategorisi veya fiyatı eksik. Listeyi yenileyip tekrar dene",
+      "createDraft": "Yeni bir ürünün karşılaştırılacak bir hali henüz yok",
+      "createIncomplete": "Bu ürünü oluşturmadan önce zorunlu alanları doldur",
+      "inStockTracked": "Stok takibi açıkken stokta olup olmadığını miktar belirler",
+      "invalidAttributes": "Ürün özelliklerini kontrol et: her biri tek bir değer almalı",
+      "invalidCollections": "Koleksiyonları kontrol edip tekrar dene",
+      "invalidCreate": "Yeni ürünün ayarları kaydedilemedi",
+      "invalidDiscount": "Fiyatın altında bir indirim gir",
+      "invalidImages": "Geçerli https bağlantılı en fazla {max} fotoğraf ekle",
+      "invalidMedia": "Bu fotoğraf değişiklikleri kaydedilemedi. Tek seferde en fazla {max} fotoğraf ekle",
+      "invalidNumber": "0 ile {max} arasında bir sayı gir",
+      "invalidTextFields": "Kişiselleştirme alanlarını kontrol et (en fazla {max})",
+      "invalidVariants": "Bu varyant değişiklikleri kaydedilemedi (en fazla {max} varyant)",
+      "invalidVat": "KDV oranı olarak %0, %1, %10 veya %20 seç",
+      "listBelowSale": "Liste fiyatı satış fiyatının altında olamaz",
+      "textTooLong": "Bu metni en fazla {max} karakterle sınırla",
+      "variantsFailed": "Bazı varyantlar güncellenemedi. İşaretli satırları kontrol edip tekrar dene",
+      "imagesFailed": "Bazı fotoğraf değişiklikleri gönderilemedi. Tekrar dene",
+      "partial": {
+        "inventory": "Diğer değişiklikler gönderildi ancak stok güncellenemedi. Tamamlamak için yeniden dene",
+        "collections": "Diğer değişiklikler gönderildi ancak koleksiyonlar güncellenemedi. Tamamlamak için yeniden dene",
+        "media": "Diğer değişiklikler gönderildi ancak fotoğraflar güncellenemedi. Tamamlamak için yeniden dene",
+        "images": "Diğer değişiklikler gönderildi ancak bazı fotoğraflar güncellenemedi. Tamamlamak için yeniden dene",
+        "seo": "Diğer değişiklikler gönderildi ancak arama motoru görünümü güncellenemedi. Tamamlamak için yeniden dene",
+        "variants": "Diğer değişiklikler gönderildi ancak bazı varyantlar güncellenemedi. Tamamlamak için yeniden dene",
+        "price": "Diğer değişiklikler gönderildi ancak fiyat güncellenemedi. Tamamlamak için yeniden dene"
+      }
     },
     "send": {
       "confirmExcluded": "{count} değişiklik {to} gönderilsin mi? Sizi bekleyenler: {waiting}.",
@@ -13388,7 +13571,11 @@
       "personalization": "Kişiselleştirme",
       "shipping": "Kargo",
       "seo": "Arama motoru görünümü",
-      "photosEbay": "Fotoğraflar"
+      "photosEbay": "Fotoğraflar",
+      "categoryBrand": "Kategori ve marka",
+      "priceStock": "Fiyat ve stok",
+      "tagsOrg": "Etiketler ve düzen",
+      "variants": "Varyantlar"
     },
     "rail": {
       "label": "İlan özeti"
@@ -13411,7 +13598,14 @@
       "categoryId": "Kategori",
       "fulfillmentPolicyId": "Kargo politikası",
       "returnPolicyId": "İade politikası",
-      "paymentPolicyId": "Ödeme politikası"
+      "paymentPolicyId": "Ödeme politikası",
+      "barcode": "Barkod",
+      "brandId": "Marka",
+      "stockCode": "Stok kodu",
+      "listPrice": "Liste fiyatı",
+      "vatRate": "KDV oranı",
+      "cargoCompanyId": "Kargo firması",
+      "dimensionalWeight": "Desi"
     },
     "footer": {
       "label": "İlan işlemleri"
@@ -13605,7 +13799,9 @@
       "limitReached": "Planınızdaki AI kredileri bitti",
       "noMarketData": "Fiyat karşılaştırmak için yeterli benzer {marketplace} ilanı yok",
       "fillNeedsSeed": "Önce ne sattığınızı birkaç kelimeyle yazın",
-      "fillNeedsSeedOrPhoto": "Önce bir fotoğraf ekleyin veya ne sattığınızı yazın"
+      "fillNeedsSeedOrPhoto": "Önce bir fotoğraf ekleyin veya ne sattığınızı yazın",
+      "attributesNeedCategory": "Önce kategori seçin: özellikler kategoriye göre değişir",
+      "noAttributeIdeas": "Kalan özellikler için emin olunan bir değer yok. Bunları kendiniz doldurun"
     },
     "price": {
       "bandTitle": "Benzer ilanların satış fiyatı",
@@ -14046,6 +14242,175 @@
       "emptyBody": "Bir ilanın etiketlerini, detaylarını veya kargo bilgisini profil olarak kaydedin, yeni ilanları tek tıkla doldurun",
       "draftOnly": "Uygulamak yalnızca taslağı doldurur. Hemen ardından geri alabilirsiniz",
       "storageFailed": "Bu cihaza kaydedilemedi. Tarayıcının site depolamasına izin verdiğini kontrol edin"
+    },
+    "media": {
+      "invalidUrl": "Bu görsel bağlantısı kullanılamıyor. Herkese açık bir https bağlantısı kullanın",
+      "imageMissing": "Bu fotoğraf artık üründe yok, bu yüzden atlandı",
+      "tooMany": "Bir üründe en fazla {max} fotoğraf olabilir",
+      "orderStale": "Fotoğraflar siz yükledikten sonra değişti. Yenileyip yeni sıralamayı tekrar deneyin",
+      "choiceLinked": "Bazı fotoğraflar seçeneklere (örneğin renk) bağlı. Bu fotoğrafları Wix'te sıralayın",
+      "restoreFailed": "Sıralama başarısız oldu ve fotoğraflar geri eklenemedi. Bu ürünün fotoğraflarını Wix'te kontrol edin"
+    },
+    "wix": {
+      "collectionProtected": "\"Tüm ürünler\" koleksiyonu değiştirilemez",
+      "notFound": "Bu ürünü Wix mağazanızda bulamadık",
+      "discountUnknown": "Bu üründe okuyamadığımız bir indirim var. Fiyatı değiştirmeden önce indirim türünü ve tutarını girin.",
+      "otherSite": "Bu ürün başka bir Wix sitenizde. Düzenleyici şimdilik yalnızca ilk Wix sitenizin ürünlerini açar.",
+      "variantPrice": "Fiyat Wix'te seçenek bazında ayarlanır",
+      "discount": "İndirim",
+      "amount": "Tutar",
+      "percent": "Yüzde",
+      "customerPays": "Müşterinin ödediği {price}",
+      "trackInventory": "Stok takibi",
+      "inStock": "Stokta",
+      "weight": "Ağırlık",
+      "variantStock": "Stok Wix'te seçenek bazında ayarlanır",
+      "collections": "Koleksiyonlar",
+      "collectionsPlaceholder": "Koleksiyonlara ekle",
+      "collectionsLoadFailed": "Wix koleksiyonlarınız yüklenemedi",
+      "collectionUnknown": "Bilinmeyen koleksiyon",
+      "ribbon": "Şerit",
+      "ribbonHelper": "Ürünün üstünde kısa bir etiket, ör. Yeni",
+      "visible": "Mağazada görünür",
+      "combinations": "{count, plural, one {# kombinasyon} other {# kombinasyon}}",
+      "editOptions": "Seçenekleri Wix'te düzenle",
+      "textFields": "{count, plural, one {# metin alanı} other {# metin alanı}}",
+      "textFieldsHelp": "Alıcıdan metin isteyin, ör. kazınacak isim",
+      "textFieldTitle": "Metin alanı {index}",
+      "textFieldPlaceholder": "ör. Kazınacak isim",
+      "textFieldTitleRequired": "Metin alanına bir başlık verin",
+      "addTextField": "Metin alanı ekle",
+      "removeTextField": "Metin alanı {index} kaldır",
+      "textFieldsMax": "Ürün başına en fazla {max} metin alanı"
+    },
+    "common": {
+      "newProduct": "Yeni ürün",
+      "cancel": "Vazgeç",
+      "done": "Tamam",
+      "edit": "Düzenle",
+      "show": "Göster",
+      "hide": "Gizle",
+      "open": "Aç",
+      "use": "Kullan",
+      "dismiss": "Kapat",
+      "revertAll": "Tümünü geri al",
+      "openIn": "{marketplace} içinde aç",
+      "copyProduct": "Ürünlerinizden birini kopyala…",
+      "copyProductBody": "Fotoğrafları, fiyatı, başlığı ve açıklamayı getirir. Her alanı siz kontrol edersiniz."
+    },
+    "trendyol": {
+      "notFound": "Bu ürünü Trendyol kataloğunuzda bulamadık",
+      "marginDefault": "{rate} komisyon ve KDV sonrası eline geçen ≈ {net} (Tahmin, varsayılan oran: kategori eşleşmedi)",
+      "marginHelpDefault": "Kategoriniz bir Trendyol komisyon grubuyla eşleşmedi; bu yüzden varsayılan oran ve fiyatın içindeki KDV kullanılıyor. Sözleşme oranınız, kargo ve diğer kesintiler farklı olabilir.",
+      "barcodeTaken": "Bu barkod Trendyol ürünlerinizden birinde zaten kullanılıyor",
+      "siblingsNotLoaded": "Ürün grubu {id}. Bu gruptaki diğer renk ve bedenler henüz burada listelenmiyor",
+      "listPrice": "Liste fiyatı",
+      "salePrice": "Satış fiyatı",
+      "vat": "KDV",
+      "stockCode": "Stok kodu",
+      "barcode": "Barkod",
+      "productMainId": "Ana ürün kodu",
+      "productMainIdHelper": "Bir ürünün renk ve bedenlerini gruplar. Boş bırakırsanız stok kodu kullanılır",
+      "desi": "Desi",
+      "cargo": "Kargo firması",
+      "shipAddress": "Sevkiyat adresi",
+      "returnAddress": "İade adresi",
+      "brand": "Marka",
+      "brandHelper": "Marka Trendyol'da kayıtlı olmalı",
+      "brandSearch": "Marka arayın",
+      "category": "Kategori",
+      "categoryLeaf": "En alt kategoriyi seçin",
+      "categoryFirst": "Kategoriyle başlayın: Trendyol'un istediği özellikleri kategori belirler",
+      "chooseCategoryFirst": "Özellikleri görmek için önce bir kategori seçin",
+      "attributesCleared": "Yeni kategori için özellikler temizlendi",
+      "attributeRequired": "Trendyol bu alanı zorunlu tutuyor",
+      "requiredGroup": "Zorunlu",
+      "requiredMissing": "{count, plural, one {# zorunlu özellik eksik} other {# zorunlu özellik eksik}}",
+      "optionalCount": "İsteğe bağlı ({count}) · Göster",
+      "optionalHide": "İsteğe bağlı ({count}) · Gizle",
+      "suggestAttributes": "Özellik öner",
+      "discount": "Trendyol'da {pct} indirim",
+      "margin": "{rate} komisyon ve KDV sonrası eline geçen ≈ {net} (Tahmin, {category} oranı)",
+      "estimate": "Tahmin",
+      "marginHelp": "Trendyol'un {category} grubu için olağan komisyonunu ve fiyatın içindeki KDV'yi kullanır. Sözleşme oranınız, kargo ve diğer kesintiler farklı olabilir.",
+      "listBelowSale": "Liste fiyatı satış fiyatından düşük olamaz",
+      "fixedAfterCreate": "Ürün oluşturulduktan sonra değiştirilemez",
+      "generateBarcode": "Oluştur",
+      "listLoadFailed": "Liste Trendyol'dan yüklenemedi",
+      "rejected": "Trendyol tarafından reddedildi: {reasons} · Düzeltip tekrar gönderin",
+      "noReason": "neden belirtilmedi",
+      "archived": "Arşivlenmiş ürünler değiştirilemez. Önce Trendyol'da arşivden çıkarın",
+      "blacklisted": "Trendyol bu ürünü engelledi, bu yüzden değiştirilemez. Trendyol satıcı desteğiyle iletişime geçin",
+      "inReview": "Trendyol onayı bekleniyor",
+      "waiting": "Trendyol bekleniyor · {time} gönderildi",
+      "siblings": "Bu ürün grubunda {count} ürün",
+      "noSiblings": "Bu ürünün başka renk veya bedeni yok",
+      "inStockCount": "Stokta {count}",
+      "copyListing": "Bir Etsy veya eBay ilanını kopyala…",
+      "copyListingBody": "Fotoğrafları, fiyatı ve başlık ile açıklamanın Türkçe taslağını getirir (AI). Her alanı siz kontrol edersiniz."
+    },
+    "shopify": {
+      "notFound": "Bu ürünü Shopify mağazanızda bulamadık",
+      "seoUnavailable": "Bu ürünün SEO bilgileri okunamadı. Düzenlemeden önce sayfayı yenileyin.",
+      "vendor": "Satıcı",
+      "productType": "Ürün türü",
+      "statusLabel": "Durum",
+      "status": {
+        "active": "Aktif",
+        "draft": "Taslak",
+        "archived": "Arşivlendi"
+      },
+      "statusActiveHelp": "Online mağazanızda görünür",
+      "statusDraftHelp": "Aktif yapana kadar gizli",
+      "compareAt": "Karşılaştırma fiyatı",
+      "seoTitle": "Sayfa başlığı",
+      "seoDescription": "Meta açıklama",
+      "seoHelp": "Ürünün Google sonuçlarında nasıl göründüğü",
+      "seoFallback": "Boş alanlarda ürün başlığı ve açıklaması kullanılır",
+      "tagsHelper": "Ayırmak için virgül. Etiketler filtrelemeye ve koleksiyon oluşturmaya yardımcı olur",
+      "tagsPlaceholder": "Etiket yazın, ayırmak için virgül",
+      "collections": "Koleksiyonlar",
+      "collectionsReadOnly": "Koleksiyonları Shopify'da değiştirin",
+      "option": "Seçenek",
+      "variantsCount": "{count, plural, one {# varyant} other {# varyant}}",
+      "variantsEdited": "{count, plural, one {# varyant değişti} other {# varyant değişti}}",
+      "multiLocation": "Bu mağaza stoku {count} konumda tutuyor. Adetleri Shopify'da değiştirin",
+      "notTracked": "Shopify bu varyantın stokunu takip etmiyor",
+      "readOnlySending": "Gönderim sırasında değiştirilemez",
+      "priceRequired": "0'dan büyük bir fiyat girin",
+      "quantityInvalid": "0 veya daha büyük bir tam sayı girin",
+      "weightPerVariant": "Ağırlık Shopify'da varyant bazında ayarlanır",
+      "addOptionsLater": "Seçenekleri oluşturduktan sonra Shopify'da ekleyin"
+    },
+    "catalog": {
+      "connectTitle": "Ürünlerinizi düzenlemek için {marketplace, select, trendyol {Trendyol'u} wix {Wix'i} shopify {Shopify'ı} other {mağazanızı}} bağlayın",
+      "connectBody": "Mağaza bağlandığında ürünleriniz ve gönderilmemiş değişiklikleriniz burada görünür.",
+      "storeFailed": "{marketplace} mağazanız yüklenemedi",
+      "crosslistFailed": "Kopyalanacak ilan yüklenemedi",
+      "required": "Zorunlu",
+      "barcodeInvalid": "En fazla {max} harf, rakam, nokta, tire veya alt çizgi kullanın",
+      "confirmRemoval": "Göndermeden önce kaldırma işlemini onaylayın",
+      "sendPending": "Gönderildi. Trendyol hâlâ işliyor; tamamlanınca bu sayfa güncellenir.",
+      "archiveInGrid": "Arşivleme ürün listesinden onaylanır. Oradan gönderin veya bu taslaktan kaldırın.",
+      "createdReload": "Bu ürün zaten gönderildi. Düzenlemek için sayfayı yenileyin.",
+      "crosslistPriceCleared": "Fiyat kopyalanmadı: ilan başka bir para biriminde. {currency} cinsinden fiyat girin.",
+      "descriptionPreview": "Açıklama önizlemesi",
+      "copyPickerCrosslistTitle": "Bir Etsy veya eBay ilanını kopyala",
+      "copyPickerProductTitle": "Ürünlerinizden birini kopyala",
+      "copyPickerSearch": "Başlık veya kimlikle arayın",
+      "copyPickerLoading": "İlanlar yükleniyor…",
+      "copyPickerEmpty": "Aramanızla eşleşen ilan yok",
+      "copyPickerFailed": "İlanlarınız yüklenemedi",
+      "copyPickerRetry": "Tekrar dene",
+      "copyPickerNotConnected": "{marketplace} bağlı değil",
+      "copyPickerCopy": "Kopyala",
+      "copyPickerChoose": "Önce bir ilan seçin"
+    },
+    "listingEditor": {
+      "ai": {
+        "attributesNeedCategory": "Önce kategori seçin: özellikler kategoriye göre değişir",
+        "noAttributeIdeas": "Kalan özellikler için emin olunan bir değer yok. Bunları kendiniz doldurun"
+      }
     }
   },
   "bulk": {
@@ -14525,6 +14890,299 @@
     "subscriptionActivated": "Aboneliğiniz aktif",
     "subtitle": {
       "allStores": "Tüm mağazalar"
+    }
+  },
+  "reports": {
+    "profit": {
+      "line": {
+        "cogsUnverified": "{currency} olarak kaydedilen {count} maliyet {base} sayıldı: para birimini kontrol edin",
+        "ledgerConverted": "{currency} cinsinden {count} satır {base} birimine çevrildi (yaklaşık)",
+        "ledgerExcluded": "{currency} cinsinden {count} satır dahil edilmedi: döviz kuru yok",
+        "gross": "Brüt satış",
+        "refunds": "İadeler",
+        "discounts": "İndirimler",
+        "fees": "Pazaryeri kesintileri",
+        "ads": "Reklam",
+        "shipping": "Kargo",
+        "otherFees": "Diğer kesintiler",
+        "productCost": "Ürün maliyeti",
+        "productCostCoverage": "Ürün maliyeti ({total} üründen {with})",
+        "net": "Net kâr",
+        "cogsExcluded": "{currency} cinsinden {count} maliyet dahil edilmedi: döviz kuru yok"
+      },
+      "kpi": {
+        "netSales": "Net satış",
+        "costs": "Kesinti ve maliyetler",
+        "costsShare": "Net satışın {value} kadarı",
+        "netProfit": "Net kâr",
+        "margin": "Kâr marjı",
+        "orders": "{count} sipariş",
+        "costMissing": "{count} ürünün maliyeti hariç"
+      },
+      "statement": {
+        "title": "Kâr ve zarar",
+        "share": "Brüt satışa oranı"
+      },
+      "chart": {
+        "title": "Net satış ve net kâr",
+        "netSales": "Net satış",
+        "netProfit": "Net kâr"
+      },
+      "banner": {
+        "costMissing": "{total} ürünün {count} tanesinde maliyet eksik, bu yüzden net kâr olduğundan yüksek görünüyor.",
+        "pending": "{count} sipariş henüz {name} tarafından hesaba geçirilmedi. Kayda geçtiğinde, genellikle 1–3 gün içinde, burada görünür.",
+        "cancelPending": "{count} iptalin iadesi henüz kayda geçmedi."
+      },
+      "products": {
+        "title": "Ürüne göre kâr",
+        "product": "Ürün",
+        "sold": "Satılan",
+        "returned": "{count} iade",
+        "returnedHeader": "İade edilen",
+        "revenue": "Ciro",
+        "fees": "Kesinti",
+        "shipping": "Kargo",
+        "unitCost": "Birim maliyet",
+        "profit": "Kâr",
+        "margin": "Marj",
+        "addCost": "Maliyet ekle",
+        "noCode": "Bu ürünün barkodu veya SKU’su yok, maliyet kaydedilemez.",
+        "costSaved": "Maliyet kaydedildi",
+        "costSaveFailed": "Maliyet kaydedilemedi",
+        "costCurrencyConflict": "Bu ürünün kargo maliyeti {from} olarak kayıtlı. Birim maliyeti ve kargoyu Ürün maliyetleri’nde {to} olarak girin."
+      },
+      "notSupported": "Kâr raporları Etsy, eBay, Amazon ve Trendyol için kullanılabilir.",
+      "connect": "Kârınızı görmek için {name} hesabınızı bağlayın",
+      "never": {
+        "title": "{name} ödemelerinizi alın",
+        "body": "Kesintileri, iadeleri ve ödemeleri {name} hesabınızdan okuruz. {name} tarafında hiçbir şey değişmez."
+      },
+      "empty": "Bu dönemde ödeme kaydı yok"
+    },
+    "error": {
+      "rangeTooLong": "En fazla 2 yıllık bir aralık seçin",
+      "sales": "Satışlarınız yüklenemedi",
+      "profit": "{name} ödemeleri yüklenemedi",
+      "refresh": "{mp, select, etsy {Etsy’den} ebay {eBay’den} amazon {Amazon’dan} trendyol {Trendyol’dan} other {{name} kaynağından}} yenilenemedi",
+      "transactions": "İşlemler yüklenemedi"
+    },
+    "sales": {
+      "kpi": {
+        "excludes": "{count} sipariş hariç",
+        "revenue": "Ciro",
+        "orders": "Siparişler",
+        "aov": "Ortalama sipariş",
+        "units": "Satılan adet",
+        "source": "Siparişler · {count} mağaza"
+      },
+      "chart": {
+        "revenueTitle": "Zaman içinde ciro",
+        "ordersTitle": "Zaman içinde siparişler",
+        "hourlyTitle": "Saate göre siparişler",
+        "metricRevenue": "Ciro",
+        "metricOrders": "Siparişler"
+      },
+      "stores": {
+        "title": "Mağazaya göre satışlar",
+        "store": "Mağaza",
+        "orders": "Sipariş",
+        "units": "Adet",
+        "revenueOriginal": "Ciro (orijinal)",
+        "revenueConverted": "Ciro ({symbol})",
+        "share": "Pay",
+        "aov": "Ort. sipariş",
+        "manual": "Manuel siparişler"
+      },
+      "products": {
+        "title": "En çok satan ürünler",
+        "search": "Ürün veya SKU ara",
+        "product": "Ürün",
+        "units": "Adet",
+        "revenue": "Ciro"
+      },
+      "status": {
+        "title": "Duruma göre siparişler"
+      }
+    },
+    "page": {
+      "title": "Raporlar"
+    },
+    "tabs": {
+      "sales": "Satışlar",
+      "profit": "Kâr",
+      "payouts": "Ödemeler",
+      "transactions": "İşlemler"
+    },
+    "meta": {
+      "ordersAsOf": "Siparişler {time} itibarıyla",
+      "updating": "Güncelleniyor…",
+      "refresh": "Yenile",
+      "fxNote": "≈ {source} kurlarıyla çevrildi, {date}",
+      "ledgerSource": "{name} ödeme kayıtları",
+      "amountsIn": "Tutarlar {symbol} cinsinden",
+      "refreshFrom": "{mp, select, etsy {Etsy’den} ebay {eBay’den} amazon {Amazon’dan} trendyol {Trendyol’dan} other {{name} kaynağından}} yenile",
+      "refreshingFrom": "{mp, select, etsy {Etsy’den} ebay {eBay’den} amazon {Amazon’dan} trendyol {Trendyol’dan} other {{name} kaynağından}} yenileniyor…",
+      "ledgerSourceNotRefreshed": "{name} ödeme kayıtları (henüz yenilenmedi)"
+    },
+    "actions": {
+      "exportCsv": "CSV indir",
+      "nothingToExport": "Bu dönem için indirilecek veri yok",
+      "exportFailed": "İndirilemedi. Tekrar deneyin.",
+      "exportCap": "İlk {count} işlem indirilsin mi?",
+      "openOrders": "Bu dönemin siparişlerini aç",
+      "showLast90": "Son 90 günü göster",
+      "clearFilters": "Filtreleri temizle",
+      "clearSearch": "Aramayı temizle",
+      "addCosts": "Ürün maliyeti ekle",
+      "manageCosts": "Ürün maliyetlerini yönet",
+      "openTransactions": "İşlemleri aç",
+      "exporting": "İndiriliyor…"
+    },
+    "toolbar": {
+      "store": "Mağaza",
+      "all": "Tümü",
+      "showIn": "Para birimi",
+      "notConnected": "{name} · bağlı değil",
+      "type": "Tür"
+    },
+    "granularity": {
+      "label": "Grafik aralığı",
+      "hour": "Saatlik",
+      "day": "Günlük",
+      "week": "Haftalık",
+      "month": "Aylık"
+    },
+    "delta": {
+      "vsRange": "{range} dönemine göre",
+      "noBaseline": "Önceki dönemde veri yok",
+      "points": "{value} puan"
+    },
+    "chart": {
+      "thisPeriod": "Bu dönem",
+      "previousPeriod": "Önceki dönem ({range})",
+      "previousDay": "Önceki gün"
+    },
+    "fx": {
+      "unconverted": "{currencies} cinsinden {count} sipariş toplamlara dahil edilmedi: döviz kuru yok.",
+      "stale": "Döviz kurları güncellenemedi. {date} tarihli kurlar kullanılıyor.",
+      "approx": "{currencies} tutarları {source} kurlarıyla çevrildi ({date})"
+    },
+    "csv": {
+      "marketplace": "Pazaryeri",
+      "currency": "Para birimi",
+      "sku": "SKU",
+      "bucket": "Dönem",
+      "previousOrders": "Sipariş (önceki dönem)",
+      "previousRevenue": "Ciro (önceki dönem)"
+    },
+    "empty": {
+      "connect": {
+        "title": "Satışlarınızı görmek için bir mağaza bağlayın",
+        "body": "Bağladığınız tüm mağazaların siparişleri burada bir arada görünür.",
+        "action": "Mağaza bağla"
+      },
+      "noOrders": {
+        "title": "Bu dönemde sipariş yok",
+        "body": "Daha uzun bir tarih aralığı deneyin."
+      },
+      "noMatch": "Bu filtreye uyan mağaza yok",
+      "noProducts": "Bu dönemde ürün satılmadı",
+      "noProductMatch": "\"{q}\" ile eşleşen ürün yok"
+    },
+    "costs": {
+      "title": "Ürün maliyetleri",
+      "subtitle": "{name} · net kârı hesaplamak için kullanılır",
+      "mode": {
+        "one": "Tek ürün",
+        "list": "Liste yapıştır"
+      },
+      "field": {
+        "product": "Ürün",
+        "productHelp": "Sattığınız bir ürünü seçin veya ad yazın",
+        "code": "Barkod veya SKU",
+        "unitCost": "Birim maliyet",
+        "currency": "Para birimi",
+        "shipping": "Ürün başına kargo",
+        "note": "Not",
+        "list": "Maliyetler"
+      },
+      "listHelp": "Her satıra bir ürün: barkod veya SKU, ad, birim maliyet, kargo (isteğe bağlı). Excel veya Google E-Tablolar’dan yapıştırabilirsiniz.",
+      "listPreview": "{valid} satır hazır · {invalid} satır atlandı",
+      "listRowInvalid": "{row}. satır: {reason}",
+      "reason": {
+        "noCode": "barkod veya SKU yok",
+        "badCost": "birim maliyet sayı değil",
+        "reenterShipping": "kargo {from} olarak kayıtlı; kargoyu da {to} olarak girin",
+        "saveFailed": "kaydedilemedi"
+      },
+      "importPartial": "{imported} içe aktarıldı · {failed} aktarılamadı",
+      "importIssue": "{code}: {reason}",
+      "add": "Maliyet ekle",
+      "import": "{count} maliyeti içe aktar",
+      "saved": "Kayıtlı maliyetler",
+      "none": "Henüz kayıtlı maliyet yok",
+      "added": "Maliyet eklendi",
+      "imported": "{count} maliyet içe aktarıldı",
+      "failed": "Maliyetler kaydedilemedi",
+      "soldLoadFailed": "Satılan ürünler yüklenemedi"
+    },
+    "tx": {
+      "amount": "Tutar",
+      "count": "{count} işlem",
+      "date": "Tarih",
+      "type": "Tür",
+      "product": "Ürün",
+      "order": "Sipariş",
+      "fee": "Kesinti",
+      "rawType": "{name}: {raw}",
+      "cat": {
+        "revenue": "Satış",
+        "commission": "Kesinti",
+        "commission_invoice": "Komisyon faturası",
+        "fees": "Diğer kesinti",
+        "adspend": "Reklam",
+        "shipping": "Kargo",
+        "return": "İade",
+        "discount": "İndirim",
+        "disbursement": "Ödeme",
+        "passthrough": "Satış vergisi",
+        "other": "Diğer"
+      },
+      "empty": "Bu dönemde işlem yok",
+      "connect": "İşlemlerinizi görmek için {name} hesabınızı bağlayın"
+    },
+    "toast": {
+      "newTransactions": "{mp, select, etsy {Etsy’den} ebay {eBay’den} amazon {Amazon’dan} trendyol {Trendyol’dan} other {{name} kaynağından}} {count} yeni işlem"
+    },
+    "finance": {
+      "notSupported": "Finans raporları Etsy, eBay, Amazon ve Trendyol için kullanılabilir."
+    },
+    "payouts": {
+      "kpi": {
+        "paid": "Bankaya ödenen",
+        "count": "{count} ödeme",
+        "balance": "{name} bakiyesi",
+        "balanceHint": "Henüz ödenmedi",
+        "held": "{name} tarafından tutulan",
+        "heldHint": "Henüz kullanılamaz",
+        "noBalance": "{name} henüz bakiye bildirmedi"
+      },
+      "balanceNote": {
+        "etsy": "Etsy API’si tutulan bakiye (reserve) miktarını ve serbest bırakılma tarihlerini paylaşmaz; bu yüzden gösterilemiyor. “Güncel bakiye” henüz bankaya geçmemiş toplam tutardır.",
+        "amazon": "Bu tutar, henüz ödenmemiş açık mutabakat döneminin toplamıdır (yaklaşık). Amazon API’si gerçek zamanlı bakiye veya rezerve tutulan tutarı paylaşmaz.",
+        "trendyol": "Trendyol API’si güncel bakiye vermez. Bu tutar, vadesi henüz gelmemiş (bankaya aktarılmayı bekleyen) hakedişlerin tahmini toplamıdır."
+      },
+      "chart": {
+        "title": "Zaman içinde ödemeler"
+      },
+      "table": {
+        "title": "Ödemeler",
+        "date": "Tarih",
+        "amount": "Tutar",
+        "currency": "Para birimi"
+      },
+      "empty": "Bu dönemde ödeme yok",
+      "connect": "Ödemelerinizi görmek için {name} hesabınızı bağlayın"
     }
   }
 }

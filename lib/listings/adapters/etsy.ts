@@ -50,6 +50,21 @@ export function etsyDraftOverlay(d: DbRow): DraftOverlay {
   return { changedFields: Array.from(changed), draft };
 }
 
+/**
+ * A listing's SKUs, de-duplicated in order: the offerings cache (`EtsyListingOffering.sku`, selected as `offerings`)
+ * first, then the planned `EtsyListing.skus` column when a build has it. EtsyListing itself has no SKU column today.
+ */
+export function etsySkus(r: DbRow, caps: SchemaCaps): string[] {
+  const out: string[] = [];
+  const add = (v: unknown) => {
+    const s = typeof v === 'string' ? v.trim() : '';
+    if (s && !out.includes(s)) out.push(s);
+  };
+  if (caps.offeringSkus && Array.isArray(r.offerings)) for (const o of r.offerings) add(o && typeof o === 'object' ? (o as { sku?: unknown }).sku : null);
+  if (caps.skus && Array.isArray(r.skus)) for (const s of r.skus) add(s);
+  return out;
+}
+
 export const etsyAdapter: ListingsAdapter = {
   marketplace: 'etsy',
   model: 'EtsyListing',
@@ -103,6 +118,9 @@ export const etsyAdapter: ListingsAdapter = {
     const id = bigId(q);
     if (id !== undefined) or.push({ etsyListingId: id });
     if (caps.skus) or.push({ skus: { has: q } });
+    // Partial, case-insensitive SKU match (ILIKE '%q%' on EtsyListingOffering.sku). Not index-backed: the
+    // (etsyShopId, skuNormalized) index does not cover it; scoped to the shop's offerings by the listing join.
+    if (caps.offeringSkus) or.push({ offerings: { some: { sku: { contains: q, mode: 'insensitive' } } } });
     return { OR: or };
   },
 
@@ -181,7 +199,7 @@ export const etsyAdapter: ListingsAdapter = {
 
   toRow(r, _ctx, caps) {
     const id = String(r.etsyListingId);
-    const skus: string[] = caps.skus && Array.isArray(r.skus) ? r.skus.filter((s: unknown): s is string => typeof s === 'string' && !!s) : [];
+    const skus = etsySkus(r, caps);
     const divisor = toNumber(r.priceDivisor) || 100;
     const amount = toNumber(r.priceAmount);
     const variations = !!r.hasVariations;
@@ -212,9 +230,8 @@ export const etsyAdapter: ListingsAdapter = {
   },
 
   exportFields(r, caps) {
-    const skus: string[] = caps.skus && Array.isArray(r.skus) ? r.skus : [];
     return {
-      sku: skus.find((s) => typeof s === 'string' && s) ?? null,
+      sku: etsySkus(r, caps)[0] ?? null,
       tags: decodeEntityList(r.tags),
       description: typeof r.description === 'string' ? decodeEntities(r.description) : null,
     };
@@ -228,5 +245,6 @@ export const etsyAdapter: ListingsAdapter = {
     where: (ctx) => ({ userId: ctx.userId, etsyShopId: ctx.store.id }),
     toDbId: bigId,
     overlay: etsyDraftOverlay,
+    attemptsRelation: 'syncAttempts',
   },
 };

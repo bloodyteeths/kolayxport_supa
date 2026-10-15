@@ -24,6 +24,7 @@ import { ErrorState } from '@/components/ds/state/ErrorState';
 import { useConfirm } from '@/components/ds/overlay/ConfirmDialog';
 import { useUrlState } from '@/lib/ds/useUrlState';
 import { useUiFlag } from '@/lib/ds/uiFlags';
+import { renderSendError, type SendErrorTranslator } from '@/lib/listings/sendError';
 import { listQueryForEditor, writeEditorNav } from '@/lib/listingEditor/editorNav';
 import { useCommands, type Command } from '@/lib/ds/useCommand';
 import { icons } from '@/lib/ds/icons';
@@ -223,6 +224,22 @@ function legacyScheduleKey(mp: ListingMarketplace): string | null {
   return (LEGACY_SCHEDULE_KEYS as readonly string[]).includes(key) ? key : null;
 }
 
+/**
+ * True when the row "click" ended a text selection (the user dragged across the title to copy it), same rule as the
+ * Orders grid. Keyboard opens (Enter) never count: only a mouse click with a non-empty selection does.
+ */
+export function rowClickIsTextSelection(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const ev = (window as unknown as { event?: Event }).event;
+    if (ev && ev.type !== 'click') return false;
+    const sel = window.getSelection?.();
+    return Boolean(sel && !sel.isCollapsed && sel.toString().trim().length > 0);
+  } catch {
+    return false;
+  }
+}
+
 function withQuery(href: string, key: string, value: string): string {
   return `${href}${href.includes('?') ? '&' : '?'}${key}=${encodeURIComponent(value)}`;
 }
@@ -311,13 +328,14 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
     },
     [format],
   );
+  // Stored keys (etsy.draftSync.* / ebay.draftSync.* / listings.*) come from the server already resolved; a key the
+  // catalog lacks, or whose ICU params the attempt did not record, renders the generic cause (never raw text).
   const errorText = React.useCallback(
     (row: ListingRow) => {
       const key = row.sync?.errorKey;
-      const params = row.sync?.errorParams;
-      if (key && t.has?.(key)) return t(key, params);
-      if (key && t.has?.(`etsy.${key}`)) return t(`etsy.${key}`, params);
-      return t('listings.sendError.generic');
+      if (!key) return t('listings.sendError.generic');
+      const errorKey = !t.has || t.has(key) || !t.has(`etsy.${key}`) ? key : `etsy.${key}`;
+      return renderSendError(t as SendErrorTranslator, { errorKey, errorParams: row.sync?.errorParams });
     },
     [t],
   );
@@ -425,17 +443,31 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
       // ‹ › / j k and Back in the editor read the list's current page and URL state (listing-editor §1).
       writeEditorNav({
         marketplace,
-        shopId: marketplace === 'etsy' ? storeId : null,
+        // Store-scoped marketplaces (Etsy `shop`, Wix `site`, Shopify `shop`) keep ‹ › inside the same store.
+        shopId: config.storeParam ? storeId : null,
         ids: rows.map((x) => x.id),
         query: listQueryForEditor(),
       });
       void router.push(href);
     },
-    [editorHref, router, openQuick, marketplace, storeId, rows],
+    [editorHref, router, openQuick, marketplace, storeId, rows, config.storeParam],
+  );
+  // Row click / Enter (founder follow-up, supersedes listings-grid §2 "row click = quick view"): the whole row opens
+  // the listing — the full editor while this marketplace's editor flag is on, else the quick view. The checkbox,
+  // ✎ / ⋯ buttons and the inline price/qty cells stop the click in DataTable. A drag that selects title text does not
+  // navigate.
+  const openFromRow = React.useCallback(
+    (r: ListingRow) => {
+      if (rowClickIsTextSelection()) return;
+      openEditor(r);
+    },
+    [openEditor],
   );
   const newHref = editorOn ? config.newListingHref(storeId) : null;
   const bulkHref = bulkOn && config.bulkEditHref ? config.bulkEditHref(storeId) : null;
-  const quickSize: 'md' | 'xl' = config.editorHref('x', storeId) === null ? 'xl' : 'md';
+  // CRITIQUE X3: the CatalogDraft marketplaces' quick view is the `xl` editing surface while their full editor (M6b)
+  // is off; with it on (and on Etsy/eBay) the quick view is the `md` peek.
+  const quickSize: 'md' | 'xl' = config.drafts === 'catalog' && !editorOn ? 'xl' : 'md';
 
   // ── stage helpers ────────────────────────────────────────────────────────────────────────────────────
   const stageOne = React.useCallback(
@@ -582,7 +614,8 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
       for (const key of config.rowActions as RowActionKey[]) {
         switch (key) {
           case 'quickView':
-            out.push({ id: key, label: t('listings.action.openQuick'), shortcut: 'enter', onClick: () => openQuick(r) });
+            // Enter opens the editor while it is on, so the hint only shows when Enter opens this quick view.
+            out.push({ id: key, label: t('listings.action.openQuick'), ...(editorHref(r.id) ? {} : { shortcut: 'enter' }), onClick: () => openQuick(r) });
             break;
           case 'viewExternal': {
             const href = config.externalUrl(r);
@@ -1183,7 +1216,7 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
             if (!ids.length) setSelectAllInView(false);
           },
         }}
-        onRowOpen={openQuick}
+        onRowOpen={openFromRow}
         onRowEdit={openEditor}
         inlineAction={inlineAction}
         rowActions={rowActions}

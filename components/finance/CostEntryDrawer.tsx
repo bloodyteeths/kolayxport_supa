@@ -104,7 +104,8 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
         productName: parts[1] || parts[0],
         costAmount: parseFloat(parts[2] || '0'),
         shippingCost: parts[3] ? parseFloat(parts[3]) : null,
-        costCurrency: 'TRY',
+        // B15: the marketplace's currency (was a hard-coded 'TRY' on every tab).
+        costCurrency: marketplace === 'trendyol' ? 'TRY' : 'USD',
       };
     }).filter(item => item.barcode && !isNaN(item.costAmount));
 

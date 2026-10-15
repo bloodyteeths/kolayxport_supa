@@ -167,7 +167,7 @@ export interface SendHistoryState {
  * Loads the last sent drafts for one Etsy listing. Disabled (no request) for eBay, create mode (no listing id)
  * or when `enabled` is false. Call `retry` after a send to refresh.
  */
-export function useSendHistory(opts: { marketplace: 'etsy' | 'ebay'; shopId?: string | null; listingId?: string | null; enabled?: boolean; limit?: number }): SendHistoryState {
+export function useSendHistory(opts: { marketplace: 'etsy' | 'ebay' | 'trendyol' | 'wix' | 'shopify'; shopId?: string | null; listingId?: string | null; enabled?: boolean; limit?: number }): SendHistoryState {
   const { marketplace, shopId, listingId, enabled = true, limit = 3 } = opts;
   const active = enabled && marketplace === 'etsy' && !!shopId && !!listingId && !String(listingId).startsWith('-');
   const [state, setState] = useState<{ sent: RailSentDraft[]; loading: boolean; error: boolean }>({ sent: [], loading: active, error: false });
@@ -199,7 +199,7 @@ export function useSendHistory(opts: { marketplace: 'etsy' | 'ebay'; shopId?: st
 }
 
 export interface RailHistoryProps {
-  marketplace: 'etsy' | 'ebay';
+  marketplace: 'etsy' | 'ebay' | 'trendyol' | 'wix' | 'shopify';
   /** The open draft's attempts (newest first or any order). */
   attempts?: RailSyncAttempt[];
   /** Closed sent drafts (`useSendHistory().sent`). */
@@ -212,7 +212,7 @@ export interface RailHistoryProps {
   'data-testid'?: string;
 }
 
-const MP_NAME = { etsy: 'Etsy', ebay: 'eBay' } as const;
+const MP_NAME = { etsy: 'Etsy', ebay: 'eBay', trendyol: 'Trendyol', wix: 'Wix', shopify: 'Shopify' } as const;
 const TONE = { sent: 'success', failed: 'danger', conflict: 'warning', running: 'info' } as const;
 
 export function RailHistory({ marketplace, attempts, sent, loading, error, onRetry, limit = 3, 'data-testid': testId }: RailHistoryProps) {

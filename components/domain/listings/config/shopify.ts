@@ -1,6 +1,8 @@
 // components/domain/listings/config/shopify.ts — listings-grid §3 Shopify column of the config table.
-// Staging goes through CatalogDraft (G4). No full editor until M6b: `e` opens the quick view `xl` (CRITIQUE X3).
+// Staging goes through CatalogDraft (G4). Full editor (M6b) at `/app/shopify-urunler/[id]` and `/new` while `editor-shopify` is on
+// (EDITOR_FLAG; ListingsPage reads the flag); off → `e` / row click open the quick view `xl` (CRITIQUE X3).
 import type { ListingsConfig } from './types';
+import { editorHref as catalogEditorHref, newListingHref as catalogNewListingHref } from '@/lib/listingEditor/editorNav';
 import { PHOTOS_FILTER, PRICE_FILTER, STOCK_FILTER, healthFilter, statusFilter } from './shared';
 
 export const shopifyConfig: ListingsConfig = {
@@ -32,8 +34,8 @@ export const shopifyConfig: ListingsConfig = {
   validation: {},
   tags: { max: null, maxLength: 255 },
   drafts: 'catalog',
-  editorHref: () => null,
-  newListingHref: () => null,
+  editorHref: (id, storeId) => catalogEditorHref('shopify', id, storeId),
+  newListingHref: (storeId) => catalogNewListingHref('shopify', storeId),
   bulkEditHref: () => '/app/shopify-urunler/bulk', // M7 BulkGrid (bulk-grid §1.2 v1: title/price/qty via CatalogDraft); flag `bulk`
   externalUrl: (row) => row.externalUrl,
   pull: () => ({ url: '/api/shopify/products?action=sync', method: 'POST' }),

@@ -301,3 +301,35 @@ describe('path matching', () => {
     expect(normalizePath('/ayarlar/?tab=billing#a')).toBe('/ayarlar');
   });
 });
+
+describe('reports flag (M9: Home is the Reports overview)', () => {
+  it('flag off: the legacy Finance row stays and Reports tabs are not destinations', () => {
+    const m = build({ path: '/app/analytics' });
+    expect(ids(m)).toContain('finance');
+    expect(m.destinations.map((d) => d.id)).not.toContain('reports-profit');
+  });
+
+  it('flag on: no Finance row, no Reports row, `g f` gone, Home active on every Reports tab', () => {
+    for (const path of ['/app/analytics', '/app/reports', '/app/reports/profit', '/app/reports/payouts?mp=ebay', '/app/reports/transactions']) {
+      const m = build({ path, reportsV2: true });
+      expect(ids(m)).not.toContain('finance');
+      expect(ids(m)).not.toContain('reports');
+      expect(m.activeId, path).toBe('home');
+      expect(m.tabs.find((x) => x.id === 'home')?.active, path).toBe(true);
+      expect(m.goShortcuts.map((g) => g.key)).not.toContain('f');
+    }
+  });
+
+  it('flag on: Profit/Payouts/Transactions are ⌘K destinations and crumbs under Home (hidden for shopify_free)', () => {
+    const m = build({ path: '/app/reports/profit', reportsV2: true, billingProvider: 'stripe' });
+    const dest = m.destinations.filter((d) => d.id.startsWith('reports-'));
+    expect(dest.map((d) => [d.id, d.href, d.label])).toEqual([
+      ['reports-profit', '/app/reports/profit', 'nav.items.reportsProfit'],
+      ['reports-payouts', '/app/reports/payouts', 'nav.items.reportsPayouts'],
+      ['reports-transactions', '/app/reports/transactions', 'nav.items.reportsTransactions'],
+    ]);
+    expect(m.breadcrumbs.map((c) => c.label)).toEqual(['nav.items.home', 'reports.tabs.profit']);
+    const free = build({ path: '/app/reports', reportsV2: true, billingProvider: 'shopify_free' });
+    expect(free.destinations.some((d) => d.id.startsWith('reports-'))).toBe(false);
+  });
+});

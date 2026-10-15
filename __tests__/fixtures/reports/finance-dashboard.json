@@ -1,0 +1,535 @@
+{
+  "marketplace": "etsy",
+  "startDate": "2026-08-31T21:00:00.000Z",
+  "endDate": "2026-09-30T20:59:59.999Z",
+  "from": "2026-09-01",
+  "to": "2026-09-30",
+  "tz": "Europe/Istanbul",
+  "groupBy": "day",
+  "granularity": "day",
+  "summary": {
+    "currency": "USD",
+    "grossRevenue": 14820.4,
+    "commissions": 2104.22,
+    "shipping": 2380,
+    "returns": 608.1,
+    "discounts": 0,
+    "adSpend": 812.4,
+    "otherFees": 0,
+    "cogs": 607.5,
+    "netProfit": 8308.18,
+    "margin": 56.06,
+    "orderCount": 603,
+    "returnCount": 7,
+    "pendingCancellationCount": 4,
+    "totalOrderCount": 612,
+    "pendingSettlementCount": 9,
+    "totalOrderRevenue": 15210.4,
+    "banked": 9120,
+    "disbursementCount": 4,
+    "currentBalance": 1204.55,
+    "balanceCurrency": "USD",
+    "heldFunds": null
+  },
+  "previousSummary": {
+    "currency": "USD",
+    "grossRevenue": 13500,
+    "commissions": 1950,
+    "shipping": 2200,
+    "returns": 560,
+    "discounts": 0,
+    "adSpend": 760,
+    "otherFees": 0,
+    "cogs": 560,
+    "netProfit": 7470,
+    "margin": 58.17,
+    "orderCount": 549,
+    "returnCount": 6,
+    "pendingCancellationCount": 0,
+    "totalOrderCount": 551,
+    "pendingSettlementCount": 2,
+    "totalOrderRevenue": 13900
+  },
+  "previous": {
+    "startDate": "2026-08-01T21:00:00.000Z",
+    "endDate": "2026-08-31T20:59:59.999Z",
+    "from": "2026-08-02",
+    "to": "2026-08-31"
+  },
+  "lastSyncedAt": "2026-10-15T07:00:00.000Z",
+  "costCoverage": {
+    "products": 32,
+    "productsWithCost": 18,
+    "unitsWithoutCost": 210
+  },
+  "cogsExcluded": [
+    {
+      "currency": "GBP",
+      "products": 2
+    }
+  ],
+  "timeSeries": [
+    {
+      "period": "2026-09-01",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-02",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-03",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-04",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-05",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-06",
+      "revenue": 0,
+      "commissions": 0,
+      "shipping": 0,
+      "returns": 0,
+      "discounts": 0,
+      "adSpend": 0,
+      "otherFees": 0,
+      "cogs": 0,
+      "netProfit": 0
+    },
+    {
+      "period": "2026-09-07",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-08",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-09",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-10",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-11",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-12",
+      "revenue": 0,
+      "commissions": 0,
+      "shipping": 0,
+      "returns": 0,
+      "discounts": 0,
+      "adSpend": 0,
+      "otherFees": 0,
+      "cogs": 0,
+      "netProfit": 0
+    },
+    {
+      "period": "2026-09-13",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-14",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-15",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-16",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-17",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-18",
+      "revenue": 0,
+      "commissions": 0,
+      "shipping": 0,
+      "returns": 0,
+      "discounts": 0,
+      "adSpend": 0,
+      "otherFees": 0,
+      "cogs": 0,
+      "netProfit": 0
+    },
+    {
+      "period": "2026-09-19",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-20",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-21",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-22",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-23",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-24",
+      "revenue": 0,
+      "commissions": 0,
+      "shipping": 0,
+      "returns": 0,
+      "discounts": 0,
+      "adSpend": 0,
+      "otherFees": 0,
+      "cogs": 0,
+      "netProfit": 0
+    },
+    {
+      "period": "2026-09-25",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-26",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-27",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-28",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-29",
+      "revenue": 592.82,
+      "commissions": 84.17,
+      "shipping": 95.2,
+      "returns": 24.32,
+      "discounts": 0,
+      "adSpend": 32.5,
+      "otherFees": 0,
+      "cogs": 24.3,
+      "netProfit": 332.33
+    },
+    {
+      "period": "2026-09-30",
+      "revenue": 0,
+      "commissions": 0,
+      "shipping": 0,
+      "returns": 0,
+      "discounts": 0,
+      "adSpend": 0,
+      "otherFees": 0,
+      "cogs": 0,
+      "netProfit": 0
+    }
+  ],
+  "productBreakdown": [
+    {
+      "barcode": "BB-01",
+      "sku": "BB-01",
+      "productName": "Personalized Baby Blanket",
+      "revenue": 5902,
+      "quantity": 118,
+      "returnedQuantity": 1,
+      "commissions": 812.1,
+      "shipping": 930,
+      "cogs": 1357,
+      "unitCost": 11.5,
+      "netProfit": 2802.9
+    },
+    {
+      "barcode": "NN-G",
+      "sku": null,
+      "productName": "Name Necklace Gold",
+      "revenue": 2111.36,
+      "quantity": 64,
+      "returnedQuantity": 0,
+      "commissions": 290,
+      "shipping": 420,
+      "cogs": 0,
+      "unitCost": 0,
+      "netProfit": 1401.36
+    },
+    {
+      "barcode": "WKB-1",
+      "sku": "WKB-1",
+      "productName": "Wooden Keepsake Box",
+      "revenue": 480,
+      "quantity": 12,
+      "returnedQuantity": 0,
+      "commissions": 66,
+      "shipping": 310,
+      "cogs": 168,
+      "unitCost": 14,
+      "netProfit": -64
+    },
+    {
+      "barcode": null,
+      "sku": "SKU-ONLY",
+      "productName": "Sku Only Bib",
+      "revenue": 120,
+      "quantity": 6,
+      "returnedQuantity": 0,
+      "commissions": 16,
+      "shipping": 40,
+      "cogs": 0,
+      "unitCost": 0,
+      "netProfit": 64
+    },
+    {
+      "barcode": null,
+      "sku": null,
+      "productName": "Mystery Item",
+      "revenue": 60,
+      "quantity": 2,
+      "returnedQuantity": 0,
+      "commissions": 8,
+      "shipping": 20,
+      "cogs": 0,
+      "unitCost": 0,
+      "netProfit": 32
+    }
+  ],
+  "transactionTypeSummary": {
+    "Sale": {
+      "count": 603,
+      "total": 14820.4,
+      "category": "revenue"
+    },
+    "EtsyFee": {
+      "count": 611,
+      "total": -2104.22,
+      "category": "commission"
+    },
+    "Disbursement": {
+      "count": 4,
+      "total": -9120,
+      "category": "disbursement"
+    }
+  },
+  "disbursements": [
+    {
+      "date": "2026-09-05",
+      "amount": 2280
+    },
+    {
+      "date": "2026-09-12",
+      "amount": 2280
+    },
+    {
+      "date": "2026-09-19",
+      "amount": 2280
+    },
+    {
+      "date": "2026-09-26",
+      "amount": 2280
+    }
+  ]
+}

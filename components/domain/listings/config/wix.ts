@@ -1,6 +1,8 @@
 // components/domain/listings/config/wix.ts — listings-grid §3 Wix column of the config table.
-// Staging goes through CatalogDraft (G4). No full editor until M6b: `e` opens the quick view `xl` (CRITIQUE X3).
+// Staging goes through CatalogDraft (G4). Full editor (M6b) at `/app/wix-urunler/[id]` and `/new` while `editor-wix` is on
+// (EDITOR_FLAG; ListingsPage reads the flag); off → `e` / row click open the quick view `xl` (CRITIQUE X3).
 import type { ListingsConfig } from './types';
+import { editorHref as catalogEditorHref, newListingHref as catalogNewListingHref } from '@/lib/listingEditor/editorNav';
 import { PHOTOS_FILTER, PRICE_FILTER, STOCK_FILTER, booleanFilter, healthFilter, statusFilter } from './shared';
 
 export const wixConfig: ListingsConfig = {
@@ -30,8 +32,8 @@ export const wixConfig: ListingsConfig = {
   inlineEdit: { price: true, qty: true },
   validation: {},
   drafts: 'catalog',
-  editorHref: () => null,
-  newListingHref: () => null,
+  editorHref: (id, storeId) => catalogEditorHref('wix', id, storeId),
+  newListingHref: (storeId) => catalogNewListingHref('wix', storeId),
   bulkEditHref: () => '/app/wix-urunler/bulk', // M7 BulkGrid (bulk-grid §1.2 v1: title/price/qty via CatalogDraft); flag `bulk`
   externalUrl: (row) => row.externalUrl,
   pull: () => ({ url: '/api/wix/products?action=sync', method: 'POST' }),

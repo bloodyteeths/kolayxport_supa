@@ -24,7 +24,13 @@ import type { MarketplaceKey } from '@/components/ds/data/types';
 /** Research hub landing (flipped by the R1 PR, shell-nav §2.1). With the `research` flag off, /app/research forwards to the legacy page (ResearchRouteGate). */
 export const RESEARCH_HOME = '/app/research';
 
-/** Reports hub landing. `null` = no Reports row (founder: analytics is Home). M9 sets '/app/reports'. */
+/**
+ * Reports hub landing. `null` = no Reports row. M9 (integrator) keeps it `null`: founder decision "analytics is Home"
+ * makes Home the Reports overview (the Sales tab), so a second "Reports" row would point at the same page. With the
+ * `reports` flag on, `buildNavModel({ reportsV2: true })` drops the legacy "Finance" row, makes the Home row active on
+ * every `/app/reports/*` tab (and the legacy `/app/financials` redirect), and adds `REPORTS_EXTRA_DESTINATIONS` to ⌘K
+ * (finance-analytics §0.2 A1 adapted: one nav item for the whole Reports area, and it is Home).
+ */
 export const REPORTS_HOME: string | null = null;
 
 /** Home landing: the analytics dashboard (founder decision; `/app` redirects here). */
@@ -118,7 +124,7 @@ export type NavGroupConfig = {
  * prefixes their breadcrumb.
  */
 export type NavExtraDestination = {
-  id: 'etsy-activity' | 'invoices' | 'guides';
+  id: 'etsy-activity' | 'invoices' | 'guides' | 'reports-profit' | 'reports-payouts' | 'reports-transactions';
   /** Palette label key. */
   labelKey: string;
   /** Breadcrumb label key (defaults to `labelKey`). */
@@ -311,6 +317,55 @@ export const NAV_EXTRA_DESTINATIONS: readonly NavExtraDestination[] = [
     match: ['/app/entegrasyonlar-ve-rehberler'],
   },
 ];
+
+/**
+ * Reports › Profit / Payouts / Transactions as ⌘K "Go to" entries and breadcrumbs under Home, used only with the
+ * `reports` flag on (finance-analytics §10 F "⌘K tab commands"). They are the `financials` Pro feature: hidden for
+ * Shopify-free accounts (pro-gating §2 neutral rule); Stripe accounts without the feature reach the locked tab.
+ */
+export const REPORTS_EXTRA_DESTINATIONS: readonly NavExtraDestination[] = [
+  {
+    id: 'reports-profit',
+    labelKey: 'nav.items.reportsProfit',
+    crumbKey: 'reports.tabs.profit',
+    href: '/app/reports/profit',
+    icon: 'finance',
+    parentId: 'home',
+    match: ['/app/reports/profit', '/app/financials'],
+    hideForShopifyFree: true,
+  },
+  {
+    id: 'reports-payouts',
+    labelKey: 'nav.items.reportsPayouts',
+    crumbKey: 'reports.tabs.payouts',
+    href: '/app/reports/payouts',
+    icon: 'finance',
+    parentId: 'home',
+    match: ['/app/reports/payouts'],
+    hideForShopifyFree: true,
+  },
+  {
+    id: 'reports-transactions',
+    labelKey: 'nav.items.reportsTransactions',
+    crumbKey: 'reports.tabs.transactions',
+    href: '/app/reports/transactions',
+    icon: 'finance',
+    parentId: 'home',
+    match: ['/app/reports/transactions'],
+    hideForShopifyFree: true,
+  },
+];
+
+/** Nav config with the `reports` flag applied: no Finance row; Home also matches the Reports area. Pure. */
+export function navConfigFor(opts: { reportsV2?: boolean } = {}): readonly NavGroupConfig[] {
+  if (!opts.reportsV2) return NAV_CONFIG;
+  return NAV_CONFIG.map((g) => ({
+    ...g,
+    items: g.items
+      .filter((i) => i.id !== 'finance')
+      .map((i) => (i.id === 'home' ? { ...i, match: [...i.match, '/app/reports', '/app/reports/*'] } : i)),
+  }));
+}
 
 /** `g l` target id: resolved to `listingsHref` at runtime (first visible listing row). */
 export const G_LISTINGS_KEY = 'l';

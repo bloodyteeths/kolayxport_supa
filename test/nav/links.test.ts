@@ -85,6 +85,13 @@ describe('listing links', () => {
     expect(listingHref('ebay', '9', OFF)).toBe('/app/ebay-listings?open=9');
     expect(listingHref('etsy', '123', { 'listings-etsy': true })).toBe('/app/etsy-listings?open=123');
   });
+  it('listingHref: Trendyol/Wix/Shopify full editor (M6b) only with their editor flag', () => {
+    const cat: LinkFlags = { ...ON, 'editor-trendyol': true, 'editor-wix': true, 'editor-shopify': true };
+    expect(listingHref('trendyol', 'BC-1', cat)).toBe('/app/trendyol-urunler/BC-1');
+    expect(listingHref('wix', 'a1b2', cat)).toBe('/app/wix-urunler/a1b2');
+    expect(listingHref('shopify', '42', cat)).toBe('/app/shopify-urunler/42');
+    expect(listingHref('trendyol', 'BC-1', ON)).toBe('/app/trendyol-urunler?open=BC-1');
+  });
   it('listingHref: Etsy shop scope', () => {
     expect(listingHref('etsy', '123', ON, { shop: '77' })).toBe('/app/etsy-listings/123?shop=77');
     expect(listingHref('etsy', '123', OFF, { shop: '77' })).toBe('/app/etsy-listings?shop=77&open=123');

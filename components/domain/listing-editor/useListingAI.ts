@@ -10,6 +10,12 @@
 //              identify_product
 //         GET  /api/clawd/ebay-research?action=niche_analyze, /api/clawd/ebay?action=category_suggestions|item_aspects
 //   Both  POST /api/ai/generate-image (returns base64; the caller stages it as a draft photo)
+//   Trendyol (M6b-E, marketplace-editors §1 AI) POST /api/ai/trendyol?action=optimize_title | optimize_description |
+//              suggest_attributes. Titles and descriptions come back in TURKISH (the marketplace language, P5);
+//              attribute values are only ever ids from the category's own value list. `analyze_listing` is not used
+//              (ScorePanel replaces it). No research search, no price check, no photo generation for Trendyol in v1.
+//   Wix / Shopify: no AI in v1 (no endpoint). Every action is a no-op and `supports(key)` is false, so no section
+//              renders an AI button for them (no fake buttons).
 //
 // Guards (feedback_ai_response_safety): coerceAiString / looksGarbled / normalizeTitle / normalizeTags from
 // lib/etsy/seoRules; HTML entities are decoded on the way in (decodeEntities) so "one&#39;s" never reaches a field
@@ -35,15 +41,61 @@ import type { FieldSuggestionProps } from '@/components/ds/inputs/FieldSuggestio
 import type { FieldAiState, MarketBand } from './sections/sectionTypes';
 import { normalizeCondition } from '@/lib/ebay/payloadRules';
 import { decodeAspects } from './adapters/ebay';
+import {
+  TITLE_MAX as CATALOG_TITLE_MAX,
+  normalizeTrendyolAttributes,
+  type TrendyolAttributeValue as CatalogTrendyolAttributeValue,
+} from '@/lib/catalogDrafts/schemas';
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-export type AiMarketplace = 'etsy' | 'ebay';
+export type AiMarketplace = 'etsy' | 'ebay' | 'trendyol' | 'wix' | 'shopify';
 
-/** Proposal slots. Alt text proposals are keyed `alt:<imageId>`. */
-export type AiKey = 'title' | 'description' | 'tags' | 'specifics' | 'price' | 'category' | 'condition' | 'photo' | `alt:${string}`;
+/** Proposal slots. Alt text proposals are keyed `alt:<imageId>`. `attributes` = Trendyol category attributes. */
+export type AiKey = 'title' | 'description' | 'tags' | 'specifics' | 'price' | 'category' | 'condition' | 'photo' | 'attributes' | `alt:${string}`;
+
+/** What each marketplace's AI can do in v1 (`alt` = alt text, `fill` = Start faster / copy-to-Turkish). */
+export type AiCapability = 'title' | 'description' | 'tags' | 'specifics' | 'price' | 'category' | 'condition' | 'photo' | 'attributes' | 'alt' | 'fill';
+
+export const AI_CAPABILITIES: Record<AiMarketplace, readonly AiCapability[]> = {
+  etsy: ['title', 'description', 'tags', 'price', 'photo', 'alt', 'fill'],
+  ebay: ['title', 'description', 'specifics', 'price', 'category', 'condition', 'photo', 'fill'],
+  trendyol: ['title', 'description', 'attributes', 'fill'],
+  wix: [],
+  shopify: [],
+};
+
+/** True when `marketplace` has a real AI endpoint for `key` (render the ✦ button only then). */
+export function aiSupports(marketplace: AiMarketplace, key: AiKey | AiCapability): boolean {
+  const cap: AiCapability = typeof key === 'string' && key.startsWith('alt:') ? 'alt' : (key as AiCapability);
+  return (AI_CAPABILITIES[marketplace] ?? []).includes(cap);
+}
+
+/** Trendyol category attribute as the AI reads it (from `metadata?action=category_attributes`). */
+export interface TrendyolAiAttribute {
+  attributeId: number;
+  name: string;
+  required: boolean;
+  allowedValues: Array<{ id: number; name: string }>;
+}
+
+/** One staged Trendyol attribute (`fieldPatch.attributes[]`, marketplace-editors §6.1). The catalog-draft type. */
+export type TrendyolAttributeValue = CatalogTrendyolAttributeValue;
+
+/** One AI attribute proposal (value id always from the category's list). */
+export interface TrendyolAttributeProposal {
+  attributeId: number;
+  attributeName: string;
+  attributeValueId: number;
+  valueName: string;
+  required: boolean;
+  /** The value it would replace (display name), when the attribute already has one. */
+  replaces?: string;
+  /** Model reason (Turkish), shown only in the TR UI. */
+  reason?: string;
+}
 
 /** Keys that "Use all" (Start faster card) applies. */
 export const FILL_KEYS = ['title', 'description', 'tags', 'category', 'specifics', 'price', 'condition'] as const;
@@ -107,13 +159,19 @@ export interface AiListingInput {
   materials?: readonly string[];
   /** Category display name (Etsy taxonomy path leaf / eBay category name). */
   categoryName?: string | null;
-  /** eBay category id (aspects lookup). */
+  /** eBay category id (aspects lookup); Trendyol category id (attributes lookup, `suggestAttributes()`). */
   categoryId?: string | null;
   price?: number | null;
   /** Shop / listing currency (ISO 4217). */
   currency?: string | null;
   condition?: string | null;
   aspects?: Record<string, readonly string[]>;
+  /** Trendyol: brand name (the title prompt puts it first). */
+  brandName?: string | null;
+  /** Trendyol: current attributes as display pairs, for the description prompt. */
+  attributeLines?: ReadonlyArray<{ name: string; value: string }>;
+  /** Trendyol: competitor titles the caller already has (optional prompt context). */
+  competitorTitles?: readonly string[];
 }
 
 /** Research the caller already has (session prefill from Research, `writeListingPrefill`). */
@@ -152,9 +210,14 @@ export interface UseListingAIOptions {
   /** Engine write (marks dirty, schedules autosave). Group A: `useListingEditor().setField`. */
   setField?(key: string, value: unknown): void;
   /** Field key per proposal when the adapter names it differently (eBay: category → 'categoryId', specifics → 'aspects'). */
-  fieldKeys?: Partial<Record<FillKey, string>>;
-  /** Custom writers (e.g. eBay category id + name). Return value of getField before the write is used for Undo. */
-  appliers?: Partial<Record<FillKey, (value: unknown) => void>>;
+  fieldKeys?: Partial<Record<FillKey | 'attributes', string>>;
+  /**
+   * Custom writers (e.g. eBay category id + name). Return value of getField before the write is used for Undo.
+   * `attributes` receives the merged `TrendyolAttributeValue[]` (Trendyol attributes section).
+   */
+  appliers?: Partial<Record<FillKey | 'attributes', (value: unknown) => void>>;
+  /** Title limit of the marketplace's title field (Trendyol: the section's limit; default TRENDYOL_AI_TITLE_MAX). */
+  titleMax?: number;
   research?: AiResearchPrefill | null;
   /** Test seam. */
   fetcher?: typeof fetch;
@@ -167,6 +230,8 @@ export interface AiButtonState {
   disabledReason?: string;
   /** "Suggest a title · 1 credit" (CRITIQUE X6) for the button tooltip / aria-label. */
   costLabel: string;
+  /** False when the marketplace has no AI for this action: do not render the button at all. */
+  supported: boolean;
 }
 
 export interface UseListingAI {
@@ -189,8 +254,31 @@ export interface UseListingAI {
   writeAltText(images: Array<{ id: string; url: string }>): Promise<void>;
   /** Returns the image to stage (Group C stages it with an "AI" badge); never stages by itself. */
   generatePhoto(opts: { prompt: string; referenceUrls?: string[]; whiteBackground?: boolean }): Promise<GeneratedPhoto | null>;
-  /** Start faster: Etsy = seed text → title → description → tags; eBay = photos/seed → research → title → category → specifics → price → description. */
-  fillListing(opts: { seed?: string; imageUrls?: string[] }): Promise<void>;
+  /**
+   * Start faster: Etsy = seed text → title → description → tags; eBay = photos/seed → research → title → category →
+   * specifics → price → description; Trendyol (copy an Etsy/eBay listing) = source title → Turkish title →
+   * Turkish description (from `sourceDescription`). Wix/Shopify: no-op.
+   */
+  fillListing(opts: { seed?: string; imageUrls?: string[]; sourceDescription?: string }): Promise<void>;
+  /**
+   * Trendyol: value proposals for the category's attributes (missing / required first). Proposals only. Without
+   * `categoryAttributes` the hook loads them (`GET /api/trendyol/metadata?action=category_attributes`) for the
+   * category in `input.categoryId` (else the `categoryId` field).
+   */
+  suggestAttributes(categoryAttributes?: readonly TrendyolAiAttribute[] | unknown): Promise<void>;
+  /**
+   * M6b-D hand-off: `<TrendyolAttributesSection aiAttributes={ai.attributesState()} />` (FieldAiState, `run()` takes
+   * no argument). `value` = pending proposals as `{ attributeId, attributeValueId }`, minus the ones already staged
+   * (the section writes accepted values itself through `setField('attributes', …)`).
+   */
+  attributesState(categoryAttributes?: readonly TrendyolAiAttribute[] | unknown): FieldAiState<TrendyolAttributeValue[]>;
+  /** Trendyol: write one attribute proposal into the draft / drop it. */
+  acceptAttribute(attributeId: number): void;
+  skipAttribute(attributeId: number): void;
+  /** Trendyol: write every attribute proposal (one toast, one Undo). Returns the count written. */
+  acceptAllAttributes(): number;
+  /** Whether this marketplace has AI for the action (render the ✦ button only when true). */
+  supports(key: AiKey | AiCapability): boolean;
 
   dismiss(key: AiKey): void;
   /** Writes a ready proposal into its field (dirty marker, autosave) with a 6s "… replaced · Undo" toast. */
@@ -226,6 +314,12 @@ export interface UseListingAI {
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 export const EBAY_TITLE_MAX = 80;
+/**
+ * Trendyol AI title cap = the limit the catalog draft accepts (`TITLE_MAX.trendyol`, 100; a longer title is a
+ * `block_save` error) and the title section's counter. marketplace-editors §3 row 2 marks the Trendyol limit
+ * "verify": when it is confirmed the one constant in lib/catalogDrafts/schemas changes, and this follows.
+ */
+export const TRENDYOL_AI_TITLE_MAX = CATALOG_TITLE_MAX.trendyol;
 export const ALT_TEXT_MAX = 250;
 export const DESCRIPTION_MIN = 80;
 /** AI credits per call (tiers.md AI_ACTION_COST: text 1, image 10). */
@@ -237,6 +331,9 @@ export const AI_CREDITS = { text: 1, image: 10 } as const;
  */
 export function fillCredits(marketplace: AiMarketplace, readsPhotos = marketplace === 'ebay'): number {
   if (marketplace === 'etsy') return 3 * AI_CREDITS.text;
+  // Trendyol copy: Turkish title + Turkish description (marketplace-editors §5.1 "AI, 2 credits").
+  if (marketplace === 'trendyol') return 2 * AI_CREDITS.text;
+  if (marketplace !== 'ebay') return 0;
   return (4 + (readsPhotos ? 1 : 0)) * AI_CREDITS.text;
 }
 
@@ -246,7 +343,12 @@ export function creditsFor(key: AiKey | 'fill', ctx?: { marketplace?: AiMarketpl
   return key === 'photo' ? AI_CREDITS.image : AI_CREDITS.text;
 }
 
-const NAMES: Record<AiMarketplace, string> = { etsy: 'Etsy', ebay: 'eBay' };
+const NAMES: Record<AiMarketplace, string> = { etsy: 'Etsy', ebay: 'eBay', trendyol: 'Trendyol', wix: 'Wix', shopify: 'Shopify' };
+
+/** Trendyol attributes asked per call (the endpoint reads the first 15). */
+export const TRENDYOL_AI_ATTRIBUTES_MAX = 15;
+/** Reason line limit (TR UI only). */
+const REASON_MAX = 200;
 
 /** Cuts at the last space that fits (never mid-word). */
 export function fitWords(text: string, max: number): string {
@@ -256,8 +358,18 @@ export function fitWords(text: string, max: number): string {
   return (at > max * 0.5 ? cut.slice(0, at) : text.slice(0, max)).replace(/[\s,]+$/, '');
 }
 
-/** AI title → field value, or '' when it is garbled / empty. */
-export function sanitizeTitle(marketplace: AiMarketplace, raw: unknown): string {
+/** AI title → field value, or '' when it is garbled / empty. `max` overrides the marketplace limit (Trendyol). */
+export function sanitizeTitle(marketplace: AiMarketplace, raw: unknown, max?: number): string {
+  if (marketplace === 'trendyol') {
+    const t = decodeEntities(coerceAiString(raw))
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(/^["'“”‘’«»\s]+|["'“”‘’«»\s]+$/g, '')
+      .trim();
+    // The endpoint falls back to the raw model text when its JSON does not parse: never let that reach the field.
+    if (!t || /^[[{]/.test(t) || /"optimizedTitle"/.test(t) || looksGarbled(t)) return '';
+    return fitWords(t, max && max > 0 ? max : TRENDYOL_AI_TITLE_MAX);
+  }
   if (marketplace === 'etsy') {
     const t = normalizeTitle(decodeEntities(coerceAiString(raw)));
     if (!t || looksGarbled(t)) return '';
@@ -268,8 +380,92 @@ export function sanitizeTitle(marketplace: AiMarketplace, raw: unknown): string 
   return fitWords(t, EBAY_TITLE_MAX);
 }
 
-/** Etsy descriptions are plain text (entities decoded); eBay descriptions are HTML and kept as returned. */
+/** The title field limit the AI writes to (Trendyol: the caller's `titleMax`, default TRENDYOL_AI_TITLE_MAX). */
+export function titleLimit(marketplace: AiMarketplace, max?: number): number {
+  if (marketplace === 'etsy') return TITLE_MAX;
+  if (marketplace === 'trendyol') return max && max > 0 ? max : TRENDYOL_AI_TITLE_MAX;
+  return EBAY_TITLE_MAX;
+}
+
+const HTML_ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' };
+const escapeHtml = (s: string) => s.replace(/[&<>"]/g, (c) => HTML_ESCAPES[c]);
+/** Tags a Trendyol AI description may keep (attributes are always dropped). */
+const TRENDYOL_ALLOWED_TAGS = new Set(['p', 'br', 'ul', 'ol', 'li', 'strong', 'b', 'em', 'i']);
+const BULLET = /^\s*(?:[-*•·▪✓✔]|\d+[.)])\s+/;
+
+/** A real tag: `<` or `</` directly followed by a letter (so "5 < 10" is text, not markup). */
+const TAG_RE = /<\/?([a-z][a-z0-9]*)\b[^>]*>/gi;
+const HAS_TAG = /<\/?[a-z][a-z0-9]*\b[^>]*>/i;
+/** Text between tags: decoded once (entities from the model), then escaped, so it can never become markup. */
+const escapeText = (s: string) => escapeHtml(decodeEntities(s));
+
+/**
+ * Trendyol descriptions are HTML. Model output that already has markup keeps only a small allowlist of tags with
+ * no attributes (scripts, links, styles are removed) and its text is escaped (a literal `&lt;b&gt;`, `&` or `5 < 10`
+ * stays text); plain text becomes `<p>` paragraphs and `<ul><li>` bullets, escaped the same way. Input may carry
+ * HTML entities (they are decoded once per text run, never twice). Pure (exported for tests).
+ */
+export function toTrendyolHtml(text: string): string {
+  let src = text.replace(/\r\n?/g, '\n').trim();
+  if (!src) return '';
+  // A wholly entity-encoded HTML answer ("&lt;p&gt;…", it STARTS with a tag) is still HTML: decode it once and treat
+  // it as markup. An encoded tag inside plain text ("use &lt;b&gt; for…") stays text.
+  if (!HAS_TAG.test(src)) {
+    const decoded = decodeEntities(src);
+    if (/^<[a-z][a-z0-9]*\b[^>]*>/i.test(decoded)) src = decoded;
+  }
+  if (HAS_TAG.test(src)) {
+    const cleaned = src.replace(/<(script|style|iframe|object|embed)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '');
+    const mapTag = (m: string, tag: string) => {
+      const name = tag.toLowerCase();
+      if (!TRENDYOL_ALLOWED_TAGS.has(name)) return name === 'div' || /^h\d$/.test(name) ? (m.startsWith('</') ? '</p>' : '<p>') : '';
+      return m.startsWith('</') ? `</${name}>` : name === 'br' ? '<br>' : `<${name}>`;
+    };
+    let html = '';
+    let last = 0;
+    for (const m of cleaned.matchAll(TAG_RE)) {
+      const at = m.index ?? 0;
+      html += escapeText(cleaned.slice(last, at)) + mapTag(m[0], m[1]);
+      last = at + m[0].length;
+    }
+    html += escapeText(cleaned.slice(last));
+    return html.replace(/<p>\s*<\/p>/g, '').trim();
+  }
+  const out: string[] = [];
+  for (const block of src.split(/\n\s*\n/)) {
+    const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
+    let para: string[] = [];
+    let list: string[] = [];
+    const flushPara = () => { if (para.length) out.push(`<p>${para.map(escapeText).join('<br>')}</p>`); para = []; };
+    const flushList = () => { if (list.length) out.push(`<ul>${list.map((l) => `<li>${escapeText(l)}</li>`).join('')}</ul>`); list = []; };
+    for (const line of lines) {
+      if (BULLET.test(line)) {
+        flushPara();
+        list.push(line.replace(BULLET, '').trim());
+      } else {
+        flushList();
+        para.push(line);
+      }
+    }
+    flushPara();
+    flushList();
+  }
+  return out.join('');
+}
+
+/**
+ * Etsy descriptions are plain text (entities decoded); eBay descriptions are HTML and kept as returned; Trendyol
+ * descriptions are entity-decoded, then turned into allowlisted HTML (`toTrendyolHtml`).
+ */
 export function sanitizeDescription(marketplace: AiMarketplace, raw: unknown): string {
+  if (marketplace === 'trendyol') {
+    const arr = Array.isArray(raw) && raw.every((p) => typeof p === 'string') ? (raw as string[]) : null;
+    // Not entity-decoded here: toTrendyolHtml decodes each text run once, so a literal "&lt;b&gt;" stays text.
+    const text = (arr ? arr.map((p) => p.trim()).filter(Boolean).join('\n\n') : coerceAiString(raw)).trim();
+    const plain = decodeEntities(text.replace(/<[^>]+>/g, ' ')).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (/^[[{]/.test(text) || plain.length < DESCRIPTION_MIN || looksGarbled(plain)) return '';
+    return toTrendyolHtml(text);
+  }
   const arr = Array.isArray(raw) && raw.every((p) => typeof p === 'string') ? (raw as string[]) : null;
   const text = arr ? arr.map((p) => p.trim()).filter(Boolean).join('\n\n') : coerceAiString(raw);
   const out = marketplace === 'etsy' ? decodeEntities(text).trim() : text.trim();
@@ -450,7 +646,142 @@ export function ownImageUrls(urls: readonly string[] | undefined): string[] {
 const DEFAULT_FIELD_KEYS: Record<AiMarketplace, Record<FillKey, string>> = {
   etsy: { title: 'title', description: 'description', tags: 'tags', category: 'taxonomy_id', specifics: 'aspects', price: 'price', condition: 'condition' },
   ebay: { title: 'title', description: 'description', tags: 'tags', category: 'categoryId', specifics: 'aspects', price: 'price', condition: 'condition' },
+  // marketplace-editors §6 `fieldPatch` v2 keys. Wix/Shopify have no AI writer in v1 (listed for completeness).
+  trendyol: { title: 'title', description: 'description', tags: 'tags', category: 'categoryId', specifics: 'attributes', price: 'salePrice', condition: 'condition' },
+  wix: { title: 'name', description: 'description', tags: 'tags', category: 'collectionIds', specifics: 'customTextFields', price: 'price', condition: 'condition' },
+  shopify: { title: 'title', description: 'body_html', tags: 'tags', category: 'product_type', specifics: 'tags', price: 'price', condition: 'condition' },
 };
+
+// ── Trendyol attributes (pure; exported for tests) ──────────────────────────────────────────────────────────
+
+const toInt = (v: unknown): number | null => {
+  const n = typeof v === 'string' && v.trim() !== '' ? Number(v) : typeof v === 'number' ? v : NaN;
+  return Number.isInteger(n) && n > 0 ? n : null;
+};
+
+/**
+ * `GET /api/trendyol/metadata?action=category_attributes` JSON (or its `categoryAttributes[]`, rows already in
+ * `TrendyolAiAttribute` shape, or the section's parsed `TrendyolCategoryAttribute` defs) → the AI's attribute list. Only attributes with a value list are kept: the model
+ * may only pick ids from that list (free-text `allowCustom` attributes stay the seller's).
+ */
+export function toAiAttributes(raw: unknown): TrendyolAiAttribute[] {
+  const list = Array.isArray(raw)
+    ? raw
+    : raw && typeof raw === 'object' && Array.isArray((raw as { categoryAttributes?: unknown }).categoryAttributes)
+      ? (raw as { categoryAttributes: unknown[] }).categoryAttributes
+      : [];
+  const out: TrendyolAiAttribute[] = [];
+  const seen = new Set<number>();
+  for (const row of list) {
+    if (!row || typeof row !== 'object') continue;
+    const r = row as Record<string, any>;
+    const attributeId = toInt(r.attributeId ?? r.attribute?.id ?? r.id);
+    const name = decodeEntities(String(r.name ?? r.attribute?.name ?? '')).trim();
+    if (!attributeId || !name || seen.has(attributeId)) continue;
+    // `allowedValues` (normalised rows), `attributeValues` (metadata API), `values` (TrendyolAttributesSection defs).
+    const rawValues: unknown[] = Array.isArray(r.allowedValues)
+      ? r.allowedValues
+      : Array.isArray(r.attributeValues)
+        ? r.attributeValues
+        : Array.isArray(r.values)
+          ? r.values
+          : [];
+    const allowedValues = rawValues
+      .map((v) => {
+        const o = (v ?? {}) as Record<string, unknown>;
+        const id = toInt(o.id ?? o.attributeValueId);
+        const vn = decodeEntities(String(o.name ?? o.value ?? '')).trim();
+        return id && vn ? { id, name: vn } : null;
+      })
+      .filter((v): v is { id: number; name: string } => v !== null);
+    if (!allowedValues.length) continue;
+    seen.add(attributeId);
+    out.push({ attributeId, name, required: r.required === true, allowedValues });
+  }
+  return out;
+}
+
+/**
+ * Staged attributes from the engine field (array, or the JSON string an adapter may store). Never throws. Same
+ * codec as the sections (`marketplaceSectionShared` decodeAttributes → `normalizeTrendyolAttributes`): sorted by id.
+ */
+export function decodeTrendyolAttributes(v: unknown): TrendyolAttributeValue[] {
+  let arr: unknown = v;
+  if (typeof v === 'string') {
+    try { arr = v.trim() ? JSON.parse(v) : []; } catch { arr = []; }
+  }
+  return normalizeTrendyolAttributes(arr);
+}
+
+/** Canonical form value (sorted by id, same as `encodeAttributes`), so equal sets compare equal. */
+export function encodeTrendyolAttributes(list: readonly TrendyolAttributeValue[]): string {
+  return JSON.stringify(normalizeTrendyolAttributes(list));
+}
+
+/**
+ * Attributes to ask about: only the ones without a value (required before optional); ≤ 15. Filled attributes are
+ * never re-asked (the seller's values stay theirs), so `replaces` on a proposal only appears when the seller filled
+ * the attribute while the request was running.
+ */
+export function attributesToAsk(all: readonly TrendyolAiAttribute[], current: readonly TrendyolAttributeValue[]): TrendyolAiAttribute[] {
+  const filled = new Set(current.filter((c) => c.attributeValueId || c.customAttributeValue).map((c) => c.attributeId));
+  const missing = all.filter((a) => !filled.has(a.attributeId));
+  const rank = (a: TrendyolAiAttribute) => (a.required ? 0 : 1);
+  return [...missing].sort((a, b) => rank(a) - rank(b)).slice(0, TRENDYOL_AI_ATTRIBUTES_MAX);
+}
+
+/**
+ * `suggest_attributes` JSON → proposals. A suggestion survives only when its attribute was asked and its value id is
+ * in that attribute's list; one per attribute; values equal to what is staged are dropped.
+ */
+export function sanitizeAttributeSuggestions(
+  raw: unknown,
+  asked: readonly TrendyolAiAttribute[],
+  current: readonly TrendyolAttributeValue[],
+  opts?: { keepReason?: boolean },
+): TrendyolAttributeProposal[] {
+  const list = Array.isArray(raw) ? raw : raw && typeof raw === 'object' && Array.isArray((raw as { suggestions?: unknown }).suggestions) ? (raw as { suggestions: unknown[] }).suggestions : [];
+  const byId = new Map(asked.map((a) => [a.attributeId, a]));
+  const cur = new Map(current.map((c) => [c.attributeId, c]));
+  const out: TrendyolAttributeProposal[] = [];
+  const seen = new Set<number>();
+  for (const row of list) {
+    if (!row || typeof row !== 'object') continue;
+    const r = row as Record<string, unknown>;
+    const attr = byId.get(toInt(r.attributeId) ?? -1);
+    const valueId = toInt(r.attributeValueId);
+    if (!attr || !valueId || seen.has(attr.attributeId)) continue;
+    const value = attr.allowedValues.find((v) => v.id === valueId);
+    if (!value) continue;
+    const have = cur.get(attr.attributeId);
+    if (have?.attributeValueId === valueId) continue;
+    seen.add(attr.attributeId);
+    const reason = opts?.keepReason ? decodeEntities(coerceAiString(r.reason)).replace(/\s+/g, ' ').trim().slice(0, REASON_MAX) : '';
+    const replaced = have?.attributeValueId ? attr.allowedValues.find((v) => v.id === have.attributeValueId)?.name : have?.customAttributeValue;
+    out.push({
+      attributeId: attr.attributeId,
+      attributeName: attr.name,
+      attributeValueId: valueId,
+      valueName: value.name,
+      required: attr.required,
+      ...(replaced ? { replaces: replaced } : {}),
+      ...(reason ? { reason } : {}),
+    });
+  }
+  return out.sort((a, b) => Number(b.required) - Number(a.required));
+}
+
+/** Staged attributes with the accepted proposals on top (replaced by attribute id; nothing else is dropped). */
+export function mergeTrendyolAttributes(current: readonly TrendyolAttributeValue[], accepted: readonly TrendyolAttributeProposal[]): TrendyolAttributeValue[] {
+  const next = current.map((c) => ({ ...c }));
+  for (const a of accepted) {
+    const row: TrendyolAttributeValue = { attributeId: a.attributeId, attributeValueId: a.attributeValueId };
+    const at = next.findIndex((c) => c.attributeId === a.attributeId);
+    if (at >= 0) next[at] = row;
+    else next.push(row);
+  }
+  return next;
+}
 
 /** Field label (full i18n key) per proposal. */
 export const FILL_LABEL_KEY: Record<FillKey, string> = {
@@ -465,6 +796,7 @@ export const FILL_LABEL_KEY: Record<FillKey, string> = {
 
 const ETSY_STEPS = ['research', 'title', 'description', 'tags'];
 const EBAY_STEPS = ['identify', 'research', 'title', 'category', 'specifics', 'price', 'description'];
+const TRENDYOL_STEPS = ['title', 'description'];
 
 type Resp = { ok: boolean; status: number; data: unknown };
 
@@ -542,6 +874,14 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
     return r.data as Record<string, unknown>;
   }, [http]);
 
+  const trendyolAi = useCallback(async (action: 'optimize_title' | 'optimize_description' | 'suggest_attributes', body: Record<string, unknown>) => {
+    const r = await http(`/api/ai/trendyol?action=${action}`, { method: 'POST', body });
+    if (!r.ok || !r.data || typeof r.data !== 'object') throw new AiCallError(r.ok ? 502 : r.status, r.data);
+    return r.data as Record<string, unknown>;
+  }, [http]);
+
+  const supports = useCallback((key: AiKey | AiCapability) => aiSupports(marketplace, key), [marketplace]);
+
   /** Error → proposal fields. Raw model / server text is never shown (only i18n keys). */
   const failure = useCallback((err: unknown): Pick<AiProposal, 'error' | 'limited'> => {
     const status = err instanceof AiCallError ? err.status : 0;
@@ -564,6 +904,8 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
   /** Research context: prefill → cached lazy search on the title's first phrase. Never throws. */
   const ensureResearch = useCallback(async (seed?: string): Promise<AiResearchPrefill | null> => {
     if (opts.current.research) return opts.current.research;
+    // Research search exists for Etsy and eBay only (Trendyol prompts take `competitorTitles` from the input).
+    if (marketplace !== 'etsy' && marketplace !== 'ebay') return null;
     const query = researchQuery(seed ?? opts.current.input.title ?? '');
     if (query.length < (marketplace === 'etsy' ? 10 : 3)) return null;
     let p = researchCache.current.get(query);
@@ -616,6 +958,18 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
   // ── Title ──────────────────────────────────────────────────────────────────────────────────────────────
   const titleFrom = useCallback(async (seedTitle: string, r: AiResearchPrefill | null): Promise<{ value: string; rationale?: string }> => {
     const input = opts.current.input;
+    if (marketplace === 'trendyol') {
+      const data = await trendyolAi('optimize_title', {
+        title: seedTitle,
+        brand: input.brandName || undefined,
+        categoryName: input.categoryName || undefined,
+        competitorTitles: input.competitorTitles?.length ? input.competitorTitles.slice(0, 5) : undefined,
+      });
+      const value = sanitizeTitle('trendyol', data.optimizedTitle ?? data.title, opts.current.titleMax);
+      // `tips` are written in Turkish: shown only in the TR UI (like the Etsy explanation).
+      const tip = Array.isArray(data.tips) ? decodeEntities(coerceAiString(data.tips[0])).slice(0, REASON_MAX) : '';
+      return { value, rationale: locale === 'tr' && tip && !looksGarbled(tip) ? tip : undefined };
+    }
     if (marketplace === 'etsy') {
       const data = await etsyAi('optimize_title', {
         title: seedTitle,
@@ -634,9 +988,10 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
       marketResearch: ebayResearch.current ?? undefined,
     });
     return { value: sanitizeTitle('ebay', data.optimizedTitle) };
-  }, [marketplace, etsyAi, ebayAi, locale]);
+  }, [marketplace, etsyAi, ebayAi, trendyolAi, locale]);
 
   const suggestTitle = useCallback(() => run('title', async (isCurrent) => {
+    if (!supports('title')) return;
     const title = opts.current.input.title.trim();
     if (!title) {
       set('title', { status: 'error', error: t('etsy.aiErrors.missing_title') });
@@ -651,11 +1006,22 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
     } catch (err) {
       if (isCurrent()) set('title', { status: 'error', ...failure(err) });
     }
-  }), [run, set, t, ensureResearch, titleFrom, basisFor, failure]);
+  }), [run, supports, set, t, ensureResearch, titleFrom, basisFor, failure]);
 
   // ── Description ────────────────────────────────────────────────────────────────────────────────────────
-  const descriptionFrom = useCallback(async (title: string, r: AiResearchPrefill | null): Promise<string> => {
+  const descriptionFrom = useCallback(async (title: string, r: AiResearchPrefill | null, sourceDescription?: string): Promise<string> => {
     const input = opts.current.input;
+    if (marketplace === 'trendyol') {
+      const existing = decodeEntities((sourceDescription ?? input.description ?? '').replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+      const data = await trendyolAi('optimize_description', {
+        title,
+        description: existing || undefined,
+        brand: input.brandName || undefined,
+        categoryName: input.categoryName || undefined,
+        attributes: input.attributeLines?.length ? input.attributeLines.slice(0, 10) : undefined,
+      });
+      return sanitizeDescription('trendyol', data.description);
+    }
     if (marketplace === 'etsy') {
       const data = await etsyAi('generate_description', {
         title,
@@ -675,9 +1041,10 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
       marketResearch: ebayResearch.current ?? undefined,
     });
     return sanitizeDescription('ebay', data.description);
-  }, [marketplace, etsyAi, ebayAi]);
+  }, [marketplace, etsyAi, ebayAi, trendyolAi]);
 
   const writeDescription = useCallback(() => run('description', async (isCurrent) => {
+    if (!supports('description')) return;
     const title = opts.current.input.title.trim();
     if (!title) {
       set('description', { status: 'error', error: t('etsy.aiErrors.missing_title') });
@@ -692,7 +1059,7 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
     } catch (err) {
       if (isCurrent()) set('description', { status: 'error', ...failure(err) });
     }
-  }), [run, set, t, ensureResearch, descriptionFrom, basisFor, failure]);
+  }), [run, supports, set, t, ensureResearch, descriptionFrom, basisFor, failure]);
 
   // ── Tags (Etsy) ────────────────────────────────────────────────────────────────────────────────────────
   const tagsFrom = useCallback(async (title: string, description: string, r: AiResearchPrefill | null): Promise<string[]> => {
@@ -780,6 +1147,7 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
   }, [marketplace, ebayAi]);
 
   const checkPrice = useCallback(() => run('price', async (isCurrent) => {
+    if (!supports('price')) return;
     const title = opts.current.input.title.trim();
     if (!title) {
       set('price', { status: 'error', error: t('etsy.aiErrors.missing_title') });
@@ -794,7 +1162,7 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
     } catch (err) {
       if (isCurrent()) set('price', { status: 'error', ...failure(err) });
     }
-  }), [run, set, t, mp, ensureResearch, priceFrom, basisFor, failure]);
+  }), [run, supports, set, t, mp, ensureResearch, priceFrom, basisFor, failure]);
 
   // ── Alt text (Etsy) ────────────────────────────────────────────────────────────────────────────────────
   const writeAltText = useCallback(async (images: Array<{ id: string; url: string }>) => {
@@ -826,6 +1194,7 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
   // ── Photo ──────────────────────────────────────────────────────────────────────────────────────────────
   const generatePhoto = useCallback(async (o: { prompt: string; referenceUrls?: string[]; whiteBackground?: boolean }): Promise<GeneratedPhoto | null> => {
     let out: GeneratedPhoto | null = null;
+    if (!supports('photo')) return null;
     await run('photo', async (isCurrent) => {
       const prompt = o.prompt.trim();
       if (!prompt) {
@@ -861,12 +1230,13 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
       }
     });
     return out;
-  }, [run, set, t, http, marketplace, failure]);
+  }, [run, supports, set, t, http, marketplace, failure]);
 
   // ── Start faster: fill the whole listing (proposals only) ─────────────────────────────────────────────
-  const fillListing = useCallback(async (o: { seed?: string; imageUrls?: string[] }) => {
+  const fillListing = useCallback(async (o: { seed?: string; imageUrls?: string[]; sourceDescription?: string }) => {
+    if (!supports('fill')) return undefined;
     if (inFlight.current.has('fill' as AiKey)) return inFlight.current.get('fill' as AiKey);
-    const steps = (marketplace === 'etsy' ? ETSY_STEPS : EBAY_STEPS).map((id) => ({ id, status: 'pending' as FillStepState['status'] }));
+    const steps = (marketplace === 'etsy' ? ETSY_STEPS : marketplace === 'trendyol' ? TRENDYOL_STEPS : EBAY_STEPS).map((id) => ({ id, status: 'pending' as FillStepState['status'] }));
     const mark = (id: string, status: FillStepState['status']) => {
       const s = steps.find((x) => x.id === id);
       if (s) s.status = status;
@@ -924,9 +1294,12 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
         return;
       }
 
-      mark('research', 'running');
-      const r = await ensureResearch(seed);
-      mark('research', r ? 'done' : 'error');
+      let r: AiResearchPrefill | null = null;
+      if (marketplace !== 'trendyol') {
+        mark('research', 'running');
+        r = await ensureResearch(seed);
+        mark('research', r ? 'done' : 'error');
+      }
       const basis = basisFor(r);
 
       let workingTitle = seed;
@@ -1006,7 +1379,7 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
       put('description', { status: 'loading' });
       let description = '';
       try {
-        description = await descriptionFrom(workingTitle, r);
+        description = await descriptionFrom(workingTitle, r, marketplace === 'trendyol' ? o.sourceDescription : undefined);
         put('description', description ? { status: 'ready', value: description, basis } : { status: 'error', error: true });
         mark('description', description ? 'done' : 'error');
       } catch (err) {
@@ -1036,7 +1409,109 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
     } finally {
       inFlight.current.delete('fill' as AiKey);
     }
-  }, [marketplace, set, t, mp, failure, ebayAi, ensureResearch, basisFor, titleFrom, http, specificsFrom, priceFrom, descriptionFrom, tagsFrom]);
+  }, [marketplace, supports, set, t, mp, failure, ebayAi, ensureResearch, basisFor, titleFrom, http, specificsFrom, priceFrom, descriptionFrom, tagsFrom]);
+
+  // ── Attributes (Trendyol) ──────────────────────────────────────────────────────────────────────────────
+  const attrAsked = useRef<TrendyolAiAttribute[]>([]);
+  const attrKey = useCallback(() => opts.current.fieldKeys?.attributes ?? 'attributes', []);
+  const currentAttributes = useCallback((): TrendyolAttributeValue[] => {
+    const o = opts.current;
+    return decodeTrendyolAttributes(o.getField ? o.getField(attrKey()) : undefined);
+  }, [attrKey]);
+
+  /** The Trendyol category the attributes belong to: `input.categoryId`, else the `categoryId` field. */
+  const attrCategoryId = useCallback((): number | null => {
+    const o = opts.current;
+    const fromInput = toInt(o.input.categoryId ?? undefined);
+    if (fromInput) return fromInput;
+    return o.getField ? toInt(o.getField(o.fieldKeys?.category ?? DEFAULT_FIELD_KEYS[marketplace].category)) : null;
+  }, [marketplace]);
+
+  const suggestAttributes = useCallback((categoryAttributes?: readonly TrendyolAiAttribute[] | unknown) => run('attributes', async (isCurrent) => {
+    if (!supports('attributes')) return;
+    const title = opts.current.input.title.trim();
+    if (!title) {
+      set('attributes', { status: 'error', error: t('etsy.aiErrors.missing_title') });
+      return;
+    }
+    let source: unknown = categoryAttributes;
+    if (source === undefined) {
+      const categoryId = attrCategoryId();
+      if (!categoryId) {
+        set('attributes', { status: 'error', error: t('listingEditor.ai.attributesNeedCategory') });
+        return;
+      }
+      set('attributes', { status: 'loading' });
+      try {
+        const r = await http(`/api/trendyol/metadata?action=category_attributes&categoryId=${encodeURIComponent(String(categoryId))}`);
+        if (!r.ok) throw new AiCallError(r.status, r.data);
+        source = r.data;
+      } catch (err) {
+        if (isCurrent()) set('attributes', { status: 'error', ...failure(err) });
+        return;
+      }
+      if (!isCurrent()) return;
+    }
+    const all = toAiAttributes(source);
+    const asked = attributesToAsk(all, currentAttributes());
+    attrAsked.current = all;
+    if (!asked.length) {
+      set('attributes', { status: 'error', error: t(all.length ? 'listingEditor.ai.noAttributeIdeas' : 'listingEditor.ai.attributesNeedCategory') });
+      return;
+    }
+    set('attributes', { status: 'loading' });
+    try {
+      const data = await trendyolAi('suggest_attributes', {
+        title,
+        categoryAttributes: asked.map((a) => ({ attributeId: a.attributeId, name: a.name, allowedValues: a.allowedValues })),
+      });
+      if (!isCurrent()) return;
+      const value = sanitizeAttributeSuggestions(data.suggestions, asked, currentAttributes(), { keepReason: locale === 'tr' });
+      set('attributes', value.length ? { status: 'ready', value } : { status: 'error', error: t('listingEditor.ai.noAttributeIdeas') });
+    } catch (err) {
+      if (isCurrent()) set('attributes', { status: 'error', ...failure(err) });
+    }
+  }), [run, supports, set, t, locale, currentAttributes, trendyolAi, failure, attrCategoryId, http]);
+
+  /** Writes the given proposals; returns the undo (or null when nothing could be written). */
+  const writeAttributes = useCallback((accepted: readonly TrendyolAttributeProposal[]): { undo?: () => void } | null => {
+    const o = opts.current;
+    if (!accepted.length) return null;
+    const key = attrKey();
+    const prev = o.getField ? o.getField(key) : undefined;
+    const merged = mergeTrendyolAttributes(currentAttributes(), accepted);
+    const custom = o.appliers?.attributes;
+    // Keep the adapter's encoding: a JSON-string field stays a (canonical) string, an array field stays an array.
+    const encoded: unknown = typeof prev === 'string' ? encodeTrendyolAttributes(merged) : normalizeTrendyolAttributes(merged);
+    if (custom) custom(normalizeTrendyolAttributes(merged));
+    else if (o.setField) o.setField(key, encoded);
+    else return null;
+    if (!o.getField) return {};
+    return { undo: () => (custom ? custom(decodeTrendyolAttributes(prev)) : o.setField?.(key, prev)) };
+  }, [attrKey, currentAttributes]);
+
+  const dropAttributes = useCallback((ids: readonly number[]) => {
+    setProposals((prev) => {
+      const cur = prev.attributes;
+      if (!cur || !Array.isArray(cur.value)) return prev;
+      const rest = (cur.value as TrendyolAttributeProposal[]).filter((p) => !ids.includes(p.attributeId));
+      const next = { ...prev };
+      if (rest.length) next.attributes = { ...cur, value: rest };
+      else delete next.attributes;
+      return next;
+    });
+  }, []);
+
+  const acceptAttribute = useCallback((attributeId: number) => {
+    const p = proposalsRef.current.attributes;
+    const one = p?.status === 'ready' && Array.isArray(p.value) ? (p.value as TrendyolAttributeProposal[]).find((x) => x.attributeId === attributeId) : undefined;
+    if (!one) return;
+    writeAttributes([one]);
+    dropAttributes([attributeId]);
+  }, [writeAttributes, dropAttributes]);
+
+  const skipAttribute = useCallback((attributeId: number) => dropAttributes([attributeId]), [dropAttributes]);
+
 
   // ── Applying proposals ─────────────────────────────────────────────────────────────────────────────────
   const dismiss = useCallback((key: AiKey) => {
@@ -1159,6 +1634,17 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
     });
   }, [write]);
 
+  const acceptAllAttributes = useCallback((): number => {
+    const p = proposalsRef.current.attributes;
+    if (!p || p.status !== 'ready' || !Array.isArray(p.value)) return 0;
+    const all = p.value as TrendyolAttributeProposal[];
+    const done = writeAttributes(all);
+    dismiss('attributes');
+    if (!done) return 0;
+    toast.success(t('listingEditor.ai.usedAll', { count: all.length }), done.undo ? { undo: done.undo } : undefined);
+    return all.length;
+  }, [writeAttributes, dismiss, toast, t]);
+
   const skipAspect = useCallback((name: string) => {
     setProposals((prev) => {
       const cur = prev.specifics;
@@ -1181,6 +1667,7 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
     if (key === 'tags') return () => void getTagIdeas();
     if (key === 'price') return () => void checkPrice();
     if (key === 'specifics') return () => void fillSpecifics(Object.keys((proposalsRef.current.specifics?.value ?? {}) as object));
+    if (key === 'attributes') return () => void suggestAttributes(attrAsked.current.length ? attrAsked.current : undefined);
     if (key.startsWith('alt:')) {
       return () => {
         const id = key.slice(4);
@@ -1189,7 +1676,7 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
       };
     }
     return () => undefined;
-  }, [suggestTitle, writeDescription, getTagIdeas, checkPrice, fillSpecifics, writeAltText]);
+  }, [suggestTitle, writeDescription, getTagIdeas, checkPrice, fillSpecifics, suggestAttributes, writeAltText]);
 
   const suggestionProps = useCallback((key: AiKey, o?: { onUse?: (value: unknown) => void; useLabel?: string }): FieldSuggestionProps | null => {
     const p = proposals[key];
@@ -1199,7 +1686,7 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
     let counter: FieldSuggestionProps['counter'];
     if (typeof v === 'string') {
       value = v;
-      if (key === 'title') counter = { value: v.length, max: marketplace === 'etsy' ? TITLE_MAX : EBAY_TITLE_MAX };
+      if (key === 'title') counter = { value: v.length, max: titleLimit(marketplace, opts.current.titleMax) };
       if (key.startsWith('alt:')) counter = { value: v.length, max: ALT_TEXT_MAX };
     } else if (Array.isArray(v)) {
       value = v as string[];
@@ -1207,6 +1694,9 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
       value = Object.entries(v as Record<string, string[]>).map(([n, vals]) => `${n}: ${vals.join(', ')}`);
     } else if (key === 'category' && v && typeof v === 'object') {
       value = (v as AiCategory).name;
+    }
+    if (key === 'attributes' && Array.isArray(v)) {
+      value = (v as TrendyolAttributeProposal[]).map((a) => `${a.attributeName}: ${a.valueName}`);
     }
     const fillable = (FILL_KEYS as readonly string[]).includes(key);
     return {
@@ -1222,6 +1712,8 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
         if (o?.onUse) {
           o.onUse(p.value);
           dismiss(key);
+        } else if (key === 'attributes') {
+          acceptAllAttributes();
         } else if (fillable) {
           apply(key as FillKey);
         }
@@ -1230,7 +1722,7 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
       onRetry: p.limited ? () => undefined : retryFor(key),
       'data-testid': `ai-suggestion-${key.replace(':', '-')}`,
     };
-  }, [proposals, marketplace, dismiss, apply, retryFor]);
+  }, [proposals, marketplace, dismiss, apply, acceptAllAttributes, retryFor]);
 
   const tagSuggestionProps = useCallback(() => {
     const p = proposals.tags;
@@ -1247,6 +1739,7 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
       disabled: limitReached,
       disabledReason: limitedReason,
       costLabel: t('listingEditor.ai.cost', { count: creditsFor(key, { marketplace }) }),
+      supported: aiSupports(marketplace, key === 'fill' ? 'fill' : key),
     };
   }, [isBusy, limitReached, t, marketplace]);
 
@@ -1275,6 +1768,29 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
     return { market, marketLoading: p?.status === 'loading', onCheckPrice: () => void checkPrice() };
   }, [proposals.price, checkPrice]);
 
+  const attributesState = useCallback((categoryAttributes?: readonly TrendyolAiAttribute[] | unknown): FieldAiState<TrendyolAttributeValue[]> => {
+    const p = proposals.attributes;
+    const limited = !!p?.limited || limitReached;
+    let value: TrendyolAttributeValue[] | null = null;
+    if (p?.status === 'ready' && Array.isArray(p.value)) {
+      const staged = new Map(currentAttributes().map((c) => [c.attributeId, c.attributeValueId]));
+      const pending = (p.value as TrendyolAttributeProposal[])
+        .filter((x) => staged.get(x.attributeId) !== x.attributeValueId)
+        .map((x) => ({ attributeId: x.attributeId, attributeValueId: x.attributeValueId }));
+      value = pending.length ? pending : null;
+    }
+    return {
+      run: limited || !supports('attributes') ? () => undefined : () => void suggestAttributes(categoryAttributes),
+      loading: p?.status === 'loading',
+      value,
+      error: p?.status === 'error' ? p.error ?? true : undefined,
+      basis: p?.basis,
+      rationale: p?.rationale,
+      dismiss: () => dismiss('attributes'),
+      credits: creditsFor('attributes'),
+    };
+  }, [proposals, limitReached, currentAttributes, supports, suggestAttributes, dismiss]);
+
   const get = useCallback(<T,>(key: AiKey): AiProposal<T> => (proposals[key] as AiProposal<T> | undefined) ?? { status: 'idle' }, [proposals]);
 
   return useMemo<UseListingAI>(() => ({
@@ -1292,6 +1808,12 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
     writeAltText,
     generatePhoto,
     fillListing,
+    suggestAttributes,
+    acceptAttribute,
+    skipAttribute,
+    acceptAllAttributes,
+    attributesState,
+    supports,
     dismiss,
     apply,
     applyAll,
@@ -1307,9 +1829,30 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
     isBusy,
   }), [
     marketplace, proposals, get, limitReached, research, fill, suggestTitle, writeDescription, getTagIdeas, fillSpecifics,
-    checkPrice, writeAltText, generatePhoto, fillListing, dismiss, apply, applyAll, acceptTag, acceptAllTags, acceptAspect,
+    checkPrice, writeAltText, generatePhoto, fillListing, suggestAttributes, acceptAttribute, skipAttribute,
+    acceptAllAttributes, attributesState, supports, dismiss, apply, applyAll, acceptTag, acceptAllTags, acceptAspect,
     skipAspect, suggestionProps, tagSuggestionProps, fieldState, priceSectionProps, buttonState, isBusy,
   ]);
+}
+
+/**
+ * TitleSection AI props for any marketplace: `{ aiTitle, aiDescription }` only where the marketplace has AI
+ * (Etsy, eBay, Trendyol), `{}` for Wix / Shopify so the section renders no ✦ button.
+ */
+export function titleSectionAiProps(ai: UseListingAI): { aiTitle?: FieldAiState<string>; aiDescription?: FieldAiState<string> } {
+  return {
+    ...(ai.supports('title') ? { aiTitle: ai.fieldState('title') } : {}),
+    ...(ai.supports('description') ? { aiDescription: ai.fieldState('description') } : {}),
+  };
+}
+
+/**
+ * `useListingAI('trendyol')` → `TrendyolAttributesSection`'s `aiAttributes` (FieldAiState<TrendyolAttributeValue[]>);
+ * null when the marketplace has no attribute AI (Wix / Shopify: render no button). Pass the category attributes when
+ * the caller already has them (raw metadata JSON or the section's parsed defs); otherwise `run()` loads them.
+ */
+export function attributesAiFrom(ai: UseListingAI, categoryAttributes?: readonly TrendyolAiAttribute[] | unknown): FieldAiState<TrendyolAttributeValue[]> | null {
+  return ai.supports('attributes') ? ai.attributesState(categoryAttributes) : null;
 }
 
 export default useListingAI;

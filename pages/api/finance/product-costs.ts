@@ -216,6 +216,12 @@ async function handleUpdate(userId: string, body: any, res: NextApiResponse) {
 
 async function handleUpsertByBarcode(userId: string, body: any, res: NextApiResponse) {
   const { marketplace, barcode, productName, costAmount } = body;
+  // Optional (finance-analytics §4.6): the currency the amount was typed in (the Profit
+  // dashboard's `summary.currency`). Without it the legacy behaviour is kept.
+  const costCurrency =
+    typeof body.costCurrency === 'string' && /^[A-Za-z]{2,3}$/.test(body.costCurrency.trim())
+      ? body.costCurrency.trim().toUpperCase()
+      : undefined;
 
   if (!marketplace || !barcode || costAmount === undefined) {
     return res.status(400).json({ error: 'marketplace, barcode, and costAmount are required.' });
@@ -228,7 +234,7 @@ async function handleUpsertByBarcode(userId: string, body: any, res: NextApiResp
   if (existing) {
     const updated = await prisma.productCost.update({
       where: { id: existing.id },
-      data: { costAmount: parseFloat(costAmount) },
+      data: { costAmount: parseFloat(costAmount), ...(costCurrency ? { costCurrency } : {}) },
     });
     return res.status(200).json(updated);
   }
@@ -240,7 +246,7 @@ async function handleUpsertByBarcode(userId: string, body: any, res: NextApiResp
       barcode,
       productName: productName || barcode,
       costAmount: parseFloat(costAmount),
-      costCurrency: marketplace === 'trendyol' ? 'TRY' : 'USD',
+      costCurrency: costCurrency || (marketplace === 'trendyol' ? 'TRY' : 'USD'),
     },
   });
 

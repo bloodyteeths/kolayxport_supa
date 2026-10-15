@@ -75,11 +75,11 @@ function draft(extra: Obj = {}) {
   return { id: 'd1', status: 'draft', etsyListingId: '111', fieldPatch: {}, queuedActions: [], media: [], syncAttempts: [], updatedAt: '2026-10-15T09:00:00Z', ...extra };
 }
 
-function mount(locale: 'en' | 'tr' = 'en') {
+function mount(locale: 'en' | 'tr' = 'en', marketplace: 'etsy' | 'trendyol' = 'etsy') {
   return render(
     <NextIntlClientProvider locale={locale} messages={MESSAGES[locale]} timeZone="Europe/Istanbul" onError={() => {}}>
       <ThemeProvider theme={theme}>
-        <ListingEditor marketplace="etsy" adapter={etsyAdapter} shopId="42" shopName="Belle" mode="edit" listingId="111" backHref="/app/etsy-listings?shop=42" sections={SECTIONS} />
+        <ListingEditor marketplace={marketplace} adapter={etsyAdapter} shopId="42" shopName="Belle" mode="edit" listingId="111" backHref="/app/etsy-listings?shop=42" sections={SECTIONS} />
       </ThemeProvider>
     </NextIntlClientProvider>,
   );
@@ -146,6 +146,18 @@ describe('ListingEditor frame', () => {
     expect(screen.queryByRole('button', { name: /Send changes/ })).toBeNull();
   });
 
+  it('conflict: a specific stored cause shows under the title; the generic one does not repeat it', async () => {
+    drafts = [draft({ status: 'conflict', fieldPatch: { title: 'Mine' }, lastSyncErrorKey: 'etsy.draftSync.deletedOnEtsy' })];
+    const { unmount } = mount();
+    await screen.findByDisplayValue('Mine');
+    expect(screen.getByTestId('le-banner-conflict').textContent).toContain('This listing was deleted on Etsy');
+    unmount();
+    drafts = [draft({ status: 'conflict', fieldPatch: { title: 'Mine' }, lastSyncErrorKey: 'etsy.draftSync.remoteChanged' })];
+    mount();
+    await screen.findByDisplayValue('Mine');
+    expect(screen.getByTestId('le-banner-conflict').textContent).not.toContain('after you staged these edits');
+  });
+
   it('queued delete: danger banner first with Remove delete', async () => {
     drafts = [draft({ queuedActions: [{ type: 'delete' }] })];
     mount();
@@ -170,6 +182,25 @@ describe('ListingEditor frame', () => {
     await screen.findByDisplayValue('Draft title');
     expect(screen.getByRole('button', { name: 'Send to Etsy' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Preview' })).toBeTruthy();
+  });
+
+  // Integrator frame delta (M6b): the catalog marketplaces use the same frame with their brand name, and no
+  // MarketplacePreview (marketplace-editors §1). The adapter is irrelevant to these labels.
+  it('catalog marketplace (Trendyol): brand-named primary, no Preview button on mobile', async () => {
+    setViewport('mobile');
+    drafts = [draft({ fieldPatch: { title: 'Draft title' } })];
+    mount('en', 'trendyol');
+    await screen.findByDisplayValue('Draft title');
+    expect(screen.getByRole('button', { name: 'Send to Trendyol' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Preview' })).toBeNull();
+  });
+
+  it('catalog marketplace (Trendyol) on desktop: "Send changes to Trendyol", no preview in the rail', async () => {
+    drafts = [draft({ fieldPatch: { title: 'Draft title' } })];
+    mount('en', 'trendyol');
+    await screen.findByDisplayValue('Draft title');
+    expect(screen.getAllByRole('button', { name: 'Send changes to Trendyol' })).toHaveLength(1);
+    expect(screen.queryByTestId('marketplace-preview')).toBeNull();
   });
 
   it('load failure (404) shows the page error with a way back', async () => {

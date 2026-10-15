@@ -124,7 +124,7 @@ beforeEach(() => {
 describe('validation', () => {
   it('normalizes price and quantity and rejects fields the marketplace cannot stage', () => {
     expect(validateFieldPatch('shopify', { price: '19,999', quantity: 3, title: '  New  ' }).set).toEqual({ price: 20, quantity: 3, title: 'New' });
-    expect(() => validateFieldPatch('trendyol', { title: 'x' })).toThrow(CatalogDraftError);
+    expect(() => validateFieldPatch('trendyol', { tags: ['x'] })).toThrow(CatalogDraftError);
     expect(() => validateFieldPatch('wix', { tags: ['a'] })).toThrow(/cannot be staged/);
     expect(() => validateFieldPatch('shopify', { price: 0 })).toThrow(CatalogDraftError);
     expect(() => validateFieldPatch('shopify', { quantity: 1.5 })).toThrow(CatalogDraftError);

@@ -1,5 +1,5 @@
 // M7-E PhotoStudio i18n: every `photoStudio.*` key the components use exists in EN and TR (the newI18nKeys handed
-// to the integrator), EN/TR have the same keys, the namespace is new (no collision with messages/*.json), and the
+// to the integrator), EN/TR have the same keys, the namespace is merged into messages/*.json, and the
 // Turkish copy has no ASCII-Turkish (BUILD_PLAN §0.2 check).
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
@@ -20,8 +20,9 @@ describe('photoStudio i18n keys', () => {
     expect([...enKeys].sort()).toEqual([...trKeys].sort());
   });
 
-  it('the namespace is new (the integrator adds it as a whole)', () => {
-    expect((en as Obj).photoStudio).toBeUndefined();
+  it('is merged into messages/en.json', () => {
+    const merged = new Set(flat(((en as Obj).photoStudio ?? {}) as Obj));
+    for (const k of enKeys) expect(merged.has(k), k).toBe(true);
   });
 
   it('every literal key used in the components exists', () => {

@@ -52,6 +52,7 @@ import {
   type ChangeSummary,
   type CopySourceData,
   type DraftRow,
+  type EditorMarketplace,
   type EditorMode,
   type EtsyEditorFields,
   type FieldMap,
@@ -81,6 +82,8 @@ import { PersonalizationSection } from './sections/PersonalizationSection';
 import { useEtsyShopMeta } from './sections/etsyShared';
 import { ProfilesModal } from './ProfilesModal';
 import { AiFillCard } from './AiFillCard';
+import { storedDraftSendError, storedDraftSendErrorParams } from './draftSendError';
+import { renderSendError, type SendErrorTranslator } from '@/lib/listings/sendError';
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 // Props
@@ -90,7 +93,8 @@ export type EditorPanel = 'health' | 'preview' | 'review' | 'history' | 'profile
 export type SectionComponents = Partial<Record<SectionId, React.ComponentType<ListingSectionProps & Record<string, unknown>>>>;
 
 export interface ListingEditorProps<F extends FieldMap> {
-  marketplace: 'etsy' | 'ebay';
+  /** Etsy/eBay (M6) or the CatalogDraft marketplaces Trendyol/Wix/Shopify (M6b, `CatalogEditorRoute`). */
+  marketplace: EditorMarketplace;
   adapter: ListingEditorAdapter<F>;
   shopId: string;
   /** Shop display name (preview, delete type-to-confirm). */
@@ -134,7 +138,19 @@ export interface EditorSlots<F extends FieldMap> {
   onFixAction?: (action: string, c: EditorSlotContext<F>) => boolean;
 }
 
-const MP_NAME = { etsy: 'Etsy', ebay: 'eBay' } as const;
+const MP_NAME: Record<EditorMarketplace, string> = { etsy: 'Etsy', ebay: 'eBay', trendyol: 'Trendyol', wix: 'Wix', shopify: 'Shopify' };
+
+/** The CatalogDraft marketplaces (marketplace-editors §1): no preview, no profiles, one create primary. */
+const isCatalogMarketplace = (m: EditorMarketplace): m is 'trendyol' | 'wix' | 'shopify' => m === 'trendyol' || m === 'wix' || m === 'shopify';
+
+/** Conflict causes that only restate the conflict banner's title (not shown under it). */
+const GENERIC_CONFLICT_KEYS = new Set([
+  'listings.sendError.conflict',
+  'listings.draftError.conflict',
+  'etsy.draftSync.remoteChanged',
+  'ebay.draftSync.conflict',
+]);
+const CONFLICT_FALLBACK_KEY = 'listings.sendError.conflict';
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 // Etsy defaults (health + preview mapping)
@@ -310,6 +326,11 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
   const isNarrow = useIsNarrow(); // < 1200: no rail
   const mpName = MP_NAME[marketplace];
   const mp = { marketplace: mpName, mp: marketplace };
+  // Trendyol / Wix / Shopify (marketplace-editors §1): no MarketplacePreview (no verified rendering reference), no
+  // Etsy/eBay profiles, one create primary "Send to {marketplace}" (no publish / draft split).
+  const catalog = isCatalogMarketplace(marketplace);
+  // Etsy/eBay-only children (preview, profiles) take the narrowed marketplace; never rendered for the catalog three.
+  const etsyEbay: 'etsy' | 'ebay' = marketplace === 'ebay' ? 'ebay' : 'etsy';
 
   const engine: UseListingDraft<F> = useListingDraft<F>({
     adapter,
@@ -419,7 +440,8 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
   const goTo = React.useCallback(
     (id: string | null | undefined) => {
       if (!id) return;
-      void router.push(editorHref(marketplace, id, marketplace === 'etsy' ? shopId : null));
+      // editorNav adds the store param only where the marketplace has one (Etsy `shop`, Wix `site`, Shopify `shop`).
+      void router.push(editorHref(marketplace, id, shopId));
     },
     [router, marketplace, shopId],
   );
@@ -685,7 +707,18 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
 
   let primary: ActionSpec | undefined;
   let primarySlot: React.ReactNode = null;
-  if (mode === 'create') {
+  if (mode === 'create' && catalog) {
+    primary = {
+      id: 'publish',
+      label: t('action.sendShort', mp),
+      onClick: () => void doSend(),
+      loading: sending,
+      loadingLabel: t('action.sending'),
+      disabled: Boolean(sendDisabledReason) || readOnly,
+      disabledReason: sendDisabledReason,
+      shortcut: '⌘↵',
+    };
+  } else if (mode === 'create') {
     const publishSpec: ActionSpec = {
       id: 'publish',
       label: marketplace === 'etsy' ? t('action.publishEtsy') : t('action.listEbay'),
@@ -746,7 +779,7 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
       id: 'copy',
       label: t('action.copy'),
       icon: icons.copy,
-      onClick: () => void router.push(newListingHref(marketplace, marketplace === 'etsy' ? shopId : null, { copy: listingIdForLinks })),
+      onClick: () => void router.push(newListingHref(marketplace, shopId, { copy: listingIdForLinks })),
     });
     if (marketplace === 'etsy') {
       overflow.push({
@@ -756,8 +789,10 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
       });
     }
   }
-  overflow.push({ id: 'profiles', label: t('action.applyProfile'), onClick: () => openProfiles('apply') });
-  overflow.push({ id: 'saveProfile', label: t('action.saveProfile'), onClick: () => openProfiles('save') });
+  if (!catalog) {
+    overflow.push({ id: 'profiles', label: t('action.applyProfile'), onClick: () => openProfiles('apply') });
+    overflow.push({ id: 'saveProfile', label: t('action.saveProfile'), onClick: () => openProfiles('save') });
+  }
   if (mode === 'edit' && draft && !queuedDelete && draftStatus === 'draft') {
     overflow.push({ id: 'schedule', label: t('action.schedule'), icon: icons.schedule, onClick: () => setPanel('schedule') });
   }
@@ -885,7 +920,11 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
   }
   if (draftStatus === 'failed' && draft) {
     const causeKey = adapter.failureCauseKey(draft);
-    const cause = tRoot.has(causeKey) ? tRoot(causeKey) : t('banner.rejected', mp);
+    // ICU params of the stored key come from the attempt that recorded it (also when the adapter added the
+    // `etsy.` / `ebay.` namespace to a bare key); missing params render the generic cause.
+    const cause = tRoot.has(causeKey)
+      ? renderSendError(tRoot as unknown as SendErrorTranslator, { errorKey: causeKey, errorParams: storedDraftSendErrorParams(draft, causeKey) })
+      : t('banner.rejected', mp);
     banners.push(
       <Banner
         key="failed"
@@ -897,6 +936,19 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
     );
   }
   if (draftStatus === 'conflict') {
+    // A specific stored conflict cause (e.g. `ebay.draftSync.itemMissing`, `etsy.draftSync.deletedOnEtsy`) is shown
+    // under the title; the generic "changed remotely" keys would only repeat it.
+    const conflictKey = draft && storedDraftSendError(draft) ? adapter.failureCauseKey(draft) : null;
+    let conflictCause = '';
+    if (conflictKey && !GENERIC_CONFLICT_KEYS.has(conflictKey) && tRoot.has(conflictKey)) {
+      const text = renderSendError(
+        tRoot as unknown as SendErrorTranslator,
+        { errorKey: conflictKey, errorParams: storedDraftSendErrorParams(draft, conflictKey) },
+        CONFLICT_FALLBACK_KEY,
+      );
+      // Params the attempt did not record → renderSendError fell back to the generic conflict text: show nothing.
+      if (text !== tRoot(CONFLICT_FALLBACK_KEY)) conflictCause = text;
+    }
     banners.push(
       <Banner
         key="conflict"
@@ -904,7 +956,9 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
         title={t('banner.conflict', mp)}
         action={{ id: 'review', label: t('action.review'), onClick: () => setPanel('review') }}
         data-testid="le-banner-conflict"
-      />,
+      >
+        {conflictCause || undefined}
+      </Banner>,
     );
   }
   if (syncingOnServer && !sending) {
@@ -1003,9 +1057,11 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
     isNarrow && !isMobile ? (
       <>
         <ScoreMeter score={health.score} afterScore={health.afterScore} variant="cell" checksUsed={health.result.checksUsed} checksTotal={health.result.checksTotal} onClick={() => setPanel('health')} />
-        <Button variant="secondary" size="sm" onClick={() => setPanel('preview')}>
-          {t('action.preview')}
-        </Button>
+        {catalog ? null : (
+          <Button variant="secondary" size="sm" onClick={() => setPanel('preview')}>
+            {t('action.preview')}
+          </Button>
+        )}
       </>
     ) : null;
   const navArrows = neighbors ? (
@@ -1072,7 +1128,7 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
       }}
     >
       <RailHealth health={health} onFix={onFix} />
-      <MarketplacePreview marketplace={marketplace} listing={previewModel} headingLevel={3} />
+      {catalog ? null : <MarketplacePreview marketplace={etsyEbay} listing={previewModel} headingLevel={3} />}
       {changesList()}
       {mode === 'edit' ? (
         <RailHistory marketplace={marketplace} attempts={toRailAttempts(draft)} sent={history.sent} loading={history.loading} error={history.error} onRetry={history.retry} />
@@ -1175,13 +1231,13 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
       <RailHealth health={health} onFix={onFix} />
     </SidePanel>
   );
-  const previewPanel = isMobile ? (
+  const previewPanel = catalog ? null : isMobile ? (
     <BottomSheet open={panel === 'preview'} onClose={closePanel} title={t('preview.title')} fullHeight>
-      <MarketplacePreview marketplace={marketplace} listing={previewModel} forceDevice="mobile" />
+      <MarketplacePreview marketplace={etsyEbay} listing={previewModel} forceDevice="mobile" />
     </BottomSheet>
   ) : (
     <SidePanel open={panel === 'preview'} onClose={closePanel} size="md" title={t('preview.title')}>
-      <MarketplacePreview marketplace={marketplace} listing={previewModel} showHeader />
+      <MarketplacePreview marketplace={etsyEbay} listing={previewModel} showHeader />
     </SidePanel>
   );
   const historyPanel =
@@ -1234,7 +1290,7 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
             status={statusNode}
             primary={primarySlot ? undefined : primary}
             primarySlot={primarySlot || undefined}
-            secondary={isMobile ? previewSpec : discardSpec}
+            secondary={isMobile ? (catalog ? undefined : previewSpec) : discardSpec}
             overflow={isMobile ? [] : overflow}
             ariaLabel={t('footer.label')}
             data-testid="le-footer"
@@ -1299,12 +1355,12 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
       ) : null}
       {props.slots?.profiles ? (
         props.slots.profiles(slotCtx)
-      ) : (
+      ) : catalog ? null : (
         <ProfilesModal
           open={panel === 'profiles'}
           onClose={closePanel}
           mode={profileMode}
-          marketplace={marketplace}
+          marketplace={etsyEbay}
           fields={view.fields as Readonly<Record<string, unknown>>}
           setField={(key, value) => engine.setField(key as keyof F & string, value as F[keyof F])}
           getField={(key) => (engine.view.fields as FieldMap)[key]}

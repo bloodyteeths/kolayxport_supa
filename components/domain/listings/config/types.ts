@@ -143,8 +143,8 @@ export type ListingsConfig = {
   /** Which staging adapter (§9.4). */
   drafts: 'etsy' | 'ebay' | 'catalog';
   /**
-   * Full editor route. `null` = no full editor yet: `e`/✎ open the quick view in SidePanel `xl`
-   * (CRITIQUE X3 step 1, Trendyol/Wix/Shopify until M6b).
+   * Full editor route (used only while the marketplace's `EDITOR_FLAG` is on). `null` = no full editor: `e`/✎ open
+   * the quick view (CatalogDraft marketplaces in SidePanel `xl`, CRITIQUE X3).
    */
   editorHref(id: string, storeId: string | null): string | null;
   /** `null` = no create route on this marketplace yet. */

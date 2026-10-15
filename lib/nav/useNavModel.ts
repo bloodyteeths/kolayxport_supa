@@ -16,6 +16,7 @@ import * as React from 'react';
 import { useRouter } from 'next/router';
 import { useTranslations } from 'next-intl';
 import { useConnections, type ConnectionsMap } from '@/lib/hooks/useConnections';
+import { useUiFlag } from '@/lib/ds/uiFlags';
 import useMessageCountStore from '@/lib/stores/useMessageCountStore';
 import { icons, type IconKey, type LucideIcon } from '@/lib/ds/icons';
 import { LOGOS } from '@/lib/ds/logos';
@@ -24,9 +25,10 @@ import type { PageBreadcrumb } from '@/components/ds/page/types';
 import {
   CONNECTIONS_HREF,
   G_LISTINGS_KEY,
-  NAV_CONFIG,
   NAV_EXTRA_DESTINATIONS,
+  REPORTS_EXTRA_DESTINATIONS,
   STORE_PROVIDERS,
+  navConfigFor,
   matchPath,
   matchScore,
   normalizePath,
@@ -179,6 +181,11 @@ export type BuildNavModelInput = {
   billingProvider?: string | null;
   /** Stock sync has been configured (shows the row even with < 2 stores). */
   stockSyncConfigured?: boolean;
+  /**
+   * The `reports` UI flag (M9): Home is the Reports overview, the Finance row is dropped, and Reports › Profit /
+   * Payouts / Transactions become ⌘K destinations and breadcrumbs under Home (`navConfigFor`).
+   */
+  reportsV2?: boolean;
 };
 
 /**
@@ -283,6 +290,10 @@ function bestMatch<T extends { match: readonly string[] }>(entries: readonly T[]
 export function buildNavModel(input: BuildNavModelInput): NavModel {
   const { t, connections } = input;
   const path = normalizePath(input.path);
+  const navConfig = navConfigFor({ reportsV2: input.reportsV2 });
+  const extras: readonly NavExtraDestination[] = input.reportsV2
+    ? [...NAV_EXTRA_DESTINATIONS, ...REPORTS_EXTRA_DESTINATIONS]
+    : NAV_EXTRA_DESTINATIONS;
   const known = knownFn(connections, input.cachedFlags);
 
   const storeStates = STORE_PROVIDERS.map(known);
@@ -301,16 +312,16 @@ export function buildNavModel(input: BuildNavModelInput): NavModel {
   const counts = input.counts ?? null;
 
   // Active row: most specific match over rows and extras (extras resolve to their parent).
-  const visibleExtras = NAV_EXTRA_DESTINATIONS.filter((x) => {
+  const visibleExtras = extras.filter((x) => {
     // Unknown provider (undefined) hides it too, so a Shopify-free account never sees it flash in.
     if (x.hideForShopifyFree && (input.billingProvider === undefined || input.billingProvider === 'shopify_free')) {
       return false;
     }
     return isVisible(x.requires, known, ctx);
   });
-  const allRows = NAV_CONFIG.flatMap((g) => g.items.filter((i) => !i.neverActive));
+  const allRows = navConfig.flatMap((g) => g.items.filter((i) => !i.neverActive));
   const rowHit = bestMatch(allRows, path);
-  const extraHit = bestMatch(NAV_EXTRA_DESTINATIONS, path);
+  const extraHit = bestMatch(extras, path);
   let activeId: NavItemId | null = null;
   let activeExtra: NavExtraDestination | null = null;
   if (extraHit && (!rowHit || extraHit.score > rowHit.score)) {
@@ -340,7 +351,7 @@ export function buildNavModel(input: BuildNavModelInput): NavModel {
   };
 
   const groups: NavGroup[] = [];
-  for (const g of NAV_CONFIG as readonly NavGroupConfig[]) {
+  for (const g of navConfig as readonly NavGroupConfig[]) {
     const items = g.items.filter((i) => isVisible(i.requires, known, ctx)).map(resolveItem);
     if (items.length === 0) continue;
     groups.push({ id: g.id, label: g.labelKey ? t(g.labelKey) : undefined, bottom: Boolean(g.bottom), items });
@@ -355,7 +366,7 @@ export function buildNavModel(input: BuildNavModelInput): NavModel {
   const listingRows = flat.filter((i) => i.listingRow);
   const firstKnownConnected = listingRows.find((i) => i.brand && known(i.brand) === true);
   const listingsHref = (firstKnownConnected ?? listingRows[0])?.href ?? CONNECTIONS_HREF;
-  const listingsGroupIds = new Set(NAV_CONFIG.find((g) => g.id === 'listings')?.items.map((i) => i.id) ?? []);
+  const listingsGroupIds = new Set(navConfig.find((g) => g.id === 'listings')?.items.map((i) => i.id) ?? []);
   const listingsActive = activeId !== null && listingsGroupIds.has(activeId);
 
   const messagesAvailable = byId.has('messages');
@@ -388,7 +399,7 @@ export function buildNavModel(input: BuildNavModelInput): NavModel {
   // Breadcrumbs (shell-nav §2.3).
   const breadcrumbs: NavCrumb[] = [];
   if (activeId) {
-    const groupCfg = NAV_CONFIG.find((g) => g.items.some((i) => i.id === activeId));
+    const groupCfg = navConfig.find((g) => g.items.some((i) => i.id === activeId));
     const rowCfg = groupCfg?.items.find((i) => i.id === activeId);
     if (groupCfg?.labelKey) breadcrumbs.push({ label: t(groupCfg.labelKey) });
     if (rowCfg) {
@@ -424,7 +435,7 @@ export function buildNavModel(input: BuildNavModelInput): NavModel {
   // source yet): legacy AppLayout showed it for any connected store, and a one-store user may already use
   // Etsy-managed stock. Gated like the legacy row (any store, unknown shows).
   if (!byId.has('stock-sync') && providersUnlocked(STORE_PROVIDERS, known)) {
-    const cfg = NAV_CONFIG.flatMap((g) => g.items).find((i) => i.id === 'stock-sync');
+    const cfg = navConfig.flatMap((g) => g.items).find((i) => i.id === 'stock-sync');
     if (cfg) {
       const { label } = itemLabel(cfg, t);
       destinations.push({
@@ -581,6 +592,7 @@ export function useNavModel(options: UseNavModelOptions = {}): NavModel {
   const uid = options.userId ?? null;
   const { connections } = useConnections();
   const messagesUnread = useMessageCountStore((s) => s.counts.total);
+  const reportsV2 = useUiFlag('reports');
 
   const [cachedFlags, setCachedFlags] = React.useState<Record<string, boolean> | null>(null);
   useIsomorphicLayoutEffect(() => {
@@ -619,8 +631,9 @@ export function useNavModel(options: UseNavModelOptions = {}): NavModel {
         messagesUnread,
         billingProvider: options.billingProvider,
         stockSyncConfigured: options.stockSyncConfigured,
+        reportsV2,
       }),
-    [t, path, connections, cachedFlags, countsKey, messagesUnread, options.billingProvider, options.stockSyncConfigured],
+    [t, path, connections, cachedFlags, countsKey, messagesUnread, options.billingProvider, options.stockSyncConfigured, reportsV2],
   );
 }
 

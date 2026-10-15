@@ -1,7 +1,16 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { createWixClient } from '@/lib/integrations/wixClient';
+import { createWixClient, wixProductMediaIds, type WixApiClient } from '@/lib/integrations/wixClient';
+import {
+  WIX_COLLECTIONS_MAX,
+  applyWixCollectionChange,
+  applyWixMediaOps,
+  parseIdList,
+  parseWixMediaInputs,
+  type WixMediaOp,
+} from '@/lib/integrations/wixProductOps';
+import { OP_KEYS, type ProductOpCode } from '@/lib/integrations/productOpResults';
 import { logger } from '@/lib/logger';
 import { refreshHealth } from '@/lib/listings/refreshHealth';
 
@@ -357,10 +366,95 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ succeeded, failed });
     }
 
+    // ── COLLECTIONS ADD / REMOVE (M6b-B, marketplace-editors §7.2) ──
+    // Body: { productId, collectionIds: string[] } (≤ 50). One Wix call per
+    // collection; per-collection results, the cache row is re-read after.
+    if ((action === 'collections_add' || action === 'collections_remove') && req.method === 'POST') {
+      const productId = typeof req.body?.productId === 'string' ? req.body.productId.trim() : '';
+      const ids = parseIdList(req.body?.collectionIds, WIX_COLLECTIONS_MAX);
+      if (!productId || !ids.ok) return badOpRequest(res, ids.ok ? 'Missing productId' : ids.error);
+      const mode = action === 'collections_add' ? 'add' : 'remove';
+      const results = await applyWixCollectionChange(client, productId, mode, ids.value);
+      const product = await refreshWixCache(client, userId, wixSiteDbId, productId);
+      return res.status(200).json({ ok: results.every((r) => r.ok), results, product });
+    }
+
+    // ── MEDIA ADD / REMOVE / REORDER (M6b-B) ─────────────
+    // media_add    POST { productId, media: ({ url } | { mediaId })[] } (≤ 15; product total ≤ 15)
+    // media_remove POST { productId, mediaIds: string[] }
+    // media_reorder PUT { productId, ids: string[] }  (exactly the current media ids)
+    // All three run through applyWixMediaOps (skips stale ids, checks capacity
+    // before adds counting only removes that succeeded; a reorder is refused
+    // when option choices have linked media).
+    if (
+      (action === 'media_add' && req.method === 'POST') ||
+      (action === 'media_remove' && req.method === 'POST') ||
+      (action === 'media_reorder' && req.method === 'PUT')
+    ) {
+      const productId = typeof req.body?.productId === 'string' ? req.body.productId.trim() : '';
+      if (!productId) return badOpRequest(res, 'Missing productId');
+
+      let ops: WixMediaOp[];
+      if (action === 'media_add') {
+        const media = parseWixMediaInputs(req.body?.media);
+        if (!media.ok) return badOpRequest(res, media.error, media.code ?? 'INVALID_INPUT');
+        ops = media.value.map((m): WixMediaOp => ('url' in m ? { op: 'add', url: m.url } : { op: 'add', mediaId: m.mediaId }));
+      } else if (action === 'media_remove') {
+        const ids = parseIdList(req.body?.mediaIds, 100);
+        if (!ids.ok) return badOpRequest(res, ids.error);
+        ops = ids.value.map((mediaId) => ({ op: 'remove' as const, mediaId }));
+      } else {
+        const ids = parseIdList(req.body?.ids, 500);
+        if (!ids.ok) return badOpRequest(res, ids.error);
+        const current = wixProductMediaIds(await client.getProduct(productId));
+        const sameSet = ids.value.length === current.length && ids.value.every((id) => current.includes(id));
+        if (!sameSet) return badOpRequest(res, 'Reorder ids must match the product media', 'MEDIA_SET_MISMATCH', undefined, 409);
+        ops = [{ op: 'reorder', ids: ids.value }];
+      }
+
+      const { results, mediaIds } = ops.length
+        ? await applyWixMediaOps(client, productId, ops)
+        : { results: [], mediaIds: [] as string[] };
+      const lost = results.find((r) => r.code === 'MEDIA_RESTORE_FAILED');
+      if (lost) {
+        // The product may have been left with no media: keep the original ids for recovery.
+        logger.error('[WIX PRODUCTS] Media reorder restore failed; product media may be missing', undefined, {
+          userId,
+          productId,
+          originalMediaIds: lost.params?.mediaIds,
+        });
+      }
+      const product = await refreshWixCache(client, userId, wixSiteDbId, productId);
+      return res.status(200).json({ ok: results.every((r) => r.ok), results, mediaIds: product ? wixProductMediaIds(product) : mediaIds, product });
+    }
+
     return res.status(400).json({ error: `Unknown action: ${action}` });
   } catch (err: any) {
     logger.error('[WIX PRODUCTS] Handler error', err);
     return res.status(500).json({ error: err.message || 'Internal server error' });
+  }
+}
+
+/** 400/409 for the M6b-B action blocks: `{ error, code, key, params? }` (key = next-intl key). */
+function badOpRequest(
+  res: NextApiResponse,
+  error: string,
+  code: ProductOpCode = 'INVALID_INPUT',
+  params?: Record<string, string | number>,
+  status = 400,
+) {
+  return res.status(status).json({ error, code, key: OP_KEYS[code], ...(params ? { params } : {}) });
+}
+
+/** Re-read a product after a write and refresh its cache row. Best effort: returns null on failure. */
+async function refreshWixCache(client: WixApiClient, userId: string, wixSiteDbId: string, productId: string): Promise<any | null> {
+  try {
+    const product = await client.getProduct(productId);
+    if (product?.id) await upsertWixProduct(userId, wixSiteDbId, product);
+    return product ?? null;
+  } catch (err: any) {
+    logger.warn('[WIX PRODUCTS] Cache refresh after write failed', { productId, error: String(err?.message || err).substring(0, 300) });
+    return null;
   }
 }
 

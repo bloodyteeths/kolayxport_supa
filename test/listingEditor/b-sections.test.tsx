@@ -188,10 +188,10 @@ describe.each<Locale>(['en', 'tr'])('TagsSection (%s)', (locale) => {
 });
 
 describe('TagsSection explorer link', () => {
-  it('hides the Keyword explorer link until R2 ships the route', () => {
+  it('links the Keyword explorer now that R2 shipped the route', () => {
     const { value } = makeCtx();
     renderIn(<TagsSection />, value);
-    expect(document.querySelector('a[href*="/app/research/keywords"]')).toBeNull();
+    expect(document.querySelector('a[href*="/app/research/keywords"]')).not.toBeNull();
   });
 });
 

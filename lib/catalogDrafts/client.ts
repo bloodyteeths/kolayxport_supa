@@ -7,14 +7,26 @@
  * local draft; `sendCatalogDrafts` is the explicit send.
  */
 import type {
+  CatalogDraftDiff,
+  CatalogDiffField,
   CatalogDraftDTO,
-  CatalogFieldPatch,
-  CatalogMarketplace,
-  CatalogQueuedActionType,
+  SendResult,
   SendSummary,
 } from './service';
+import type { CatalogFieldPatch, CatalogMarketplace, CatalogQueuedActionType } from './schemas';
 
-export type { CatalogDraftDTO, CatalogFieldPatch, CatalogMarketplace, CatalogQueuedActionType, SendSummary };
+export type { CatalogDraftDiff, CatalogDiffField, CatalogDraftDTO, CatalogFieldPatch, CatalogMarketplace, CatalogQueuedActionType, SendResult, SendSummary };
+export type {
+  ShopifyImageOp,
+  ShopifySeo,
+  ShopifyVariantEdit,
+  TrendyolAttributeValue,
+  TrendyolCreatePayload,
+  WixCreatePayload,
+  WixCustomTextField,
+  WixDiscount,
+  WixMediaOp,
+} from './schemas';
 
 export class CatalogDraftClientError extends Error {
   status: number;
@@ -58,7 +70,8 @@ export async function stageCatalogDraft(input: {
   storeId?: string;
   externalId: string;
   fields?: { [K in keyof CatalogFieldPatch]?: CatalogFieldPatch[K] | null };
-  queuedActions?: { type: CatalogQueuedActionType }[];
+  /** `create` takes `payload` (create-only values; `null` drops a key) and needs externalId `new` / `new:<id>`. */
+  queuedActions?: { type: CatalogQueuedActionType; payload?: Record<string, unknown> }[];
   removeQueuedActions?: CatalogQueuedActionType[];
   scheduledSendAt?: string | null;
 }): Promise<CatalogDraftDTO> {
@@ -82,6 +95,33 @@ export async function fetchCatalogDrafts(params: {
   const res = await fetch(`/api/catalog-drafts?${qs}`);
   const data = await parseOrThrow(res);
   return data.drafts || [];
+}
+
+/** One draft by id (e.g. `?draft=` in the editor, or to read a create's new externalId after send). */
+export async function fetchCatalogDraft(draftId: string): Promise<CatalogDraftDTO> {
+  const res = await fetch(`/api/catalog-drafts/${encodeURIComponent(draftId)}`);
+  const data = await parseOrThrow(res);
+  return data.draft;
+}
+
+/** Review differences data (read-only, never sends). 409 CREATE_DRAFT for a new product. */
+export async function fetchCatalogDraftDiff(draftId: string): Promise<CatalogDraftDiff> {
+  const res = await fetch(`/api/catalog-drafts/${encodeURIComponent(draftId)}/diff`, { credentials: 'same-origin' });
+  return parseOrThrow(res);
+}
+
+/**
+ * "Keep my choices": staged keys in `keep` stay, other remotely-changed keys are dropped, the draft is
+ * re-based on the live product and returns to `draft`. Never sends; never touches queued actions.
+ */
+export async function resolveCatalogDraft(draftId: string, keep: string[]): Promise<CatalogDraftDTO> {
+  const res = await fetch(`/api/catalog-drafts/${encodeURIComponent(draftId)}/resolve`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ keep }),
+  });
+  const data = await parseOrThrow(res);
+  return data.draft;
 }
 
 export async function discardCatalogDraft(draftId: string): Promise<CatalogDraftDTO> {

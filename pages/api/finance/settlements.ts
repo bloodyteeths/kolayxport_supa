@@ -7,6 +7,13 @@ import { mapEtsyReceiptFinance } from '@/lib/etsy/receiptFinance';
 import type { EtsyCredentials } from '../../../lib/integrations/etsyClient';
 import { getUserAccessToken, EbayNotConnectedError } from '../../../lib/integrations/ebayClient';
 import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
+import {
+  classifyTransactionType,
+  isTransactionCategory,
+  rawTypesForCategory,
+  TRANSACTION_CATEGORIES,
+} from '@/lib/finance/classifyTransaction';
+import { localDateKey, parseTz, windowFromKeys } from '@/lib/finance/periods';
 
 const TRENDYOL_API_BASE = 'https://apigw.trendyol.com/integration';
 const EBAY_FINANCES_BASE = 'https://apiz.ebay.com';
@@ -1028,24 +1035,131 @@ export async function handleEtsySync(userId: string, body: any, res: NextApiResp
 // GET — query cached transactions from DB
 // ---------------------------------------------------------------------------
 
+/** Max rows in one `format=csv` export (finance-analytics §6.2). */
+export const SETTLEMENTS_CSV_MAX_ROWS = 50_000;
+const CSV_CHUNK = 5_000;
+export const SETTLEMENTS_CSV_COLUMNS = ['date', 'category', 'type', 'product', 'order', 'barcode', 'quantity', 'amount', 'commission', 'currency'] as const;
+
+/** RFC 4180 field; text cells that start like a formula are prefixed with ' (CSV injection). */
+export function csvCell(v: unknown, text = false): string {
+  if (v == null) return '';
+  let s = String(v);
+  if (text && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+/** Machine CSV number: dot decimal, 2 places, no grouping, locale-independent (§4.8). */
+export function csvDecimal(n: number): string {
+  if (!Number.isFinite(n)) return '';
+  const c = Math.round(Math.abs(n) * 100);
+  const sign = n < 0 && c > 0 ? '-' : '';
+  return `${sign}${Math.floor(c / 100)}.${String(c % 100).padStart(2, '0')}`;
+}
+
+const qFirst = (v: string | string[] | undefined): string | undefined => (Array.isArray(v) ? v[0] : v);
+
 async function handleGet(userId: string, query: NextApiRequest['query'], res: NextApiResponse) {
-  const marketplace = (query.marketplace as string) || 'trendyol';
-  const startDate = query.startDate as string | undefined;
-  const endDate = query.endDate as string | undefined;
-  const transactionType = query.transactionType as string | undefined;
-  const page = Math.max(0, parseInt(query.page as string) || 0);
-  const size = Math.min(500, Math.max(1, parseInt(query.size as string) || 50));
+  const marketplace = qFirst(query.marketplace) || qFirst(query.mp) || 'trendyol';
+  const startDate = qFirst(query.startDate);
+  const endDate = qFirst(query.endDate);
+  const transactionType = qFirst(query.transactionType);
+  const categoryRaw = qFirst(query.category);
+  const fromQ = qFirst(query.from);
+  const toQ = qFirst(query.to);
+  const tz = parseTz(query.tz);
+  const page = Math.max(0, parseInt(qFirst(query.page) as string) || 0);
+  const size = Math.min(500, Math.max(1, parseInt(qFirst(query.size) as string) || 50));
 
   const where: any = { userId, marketplace };
 
-  if (startDate || endDate) {
+  let rangeKeys: { from: string; to: string } | null = null;
+  if (fromQ || toQ) {
+    // New UI: local days in the seller's time zone, same window as /api/finance/dashboard.
+    const w = fromQ && toQ ? windowFromKeys(fromQ, toQ, tz) : null;
+    if (!w) return res.status(400).json({ error: 'from and to must be YYYY-MM-DD dates with from <= to' });
+    where.transactionDate = { gte: w.start, lte: w.end };
+    rangeKeys = { from: w.from, to: w.to };
+  } else if (startDate || endDate) {
     where.transactionDate = {};
     if (startDate) where.transactionDate.gte = new Date(Number(startDate) || startDate);
     if (endDate) where.transactionDate.lte = new Date(Number(endDate) || endDate);
   }
 
-  if (transactionType) {
+  if (categoryRaw) {
+    if (!isTransactionCategory(categoryRaw)) {
+      return res.status(400).json({ error: `category must be one of: ${TRANSACTION_CATEGORIES.join(', ')}` });
+    }
+    // Every raw type of this category that exists for the user + marketplace.
+    const distinct = await prisma.financialTransaction.groupBy({
+      by: ['transactionType'],
+      where: { userId, marketplace },
+    });
+    let types = rawTypesForCategory(distinct.map((d) => d.transactionType), categoryRaw);
+    if (transactionType) types = types.filter((t) => t === transactionType);
+    where.transactionType = { in: types };
+  } else if (transactionType) {
     where.transactionType = transactionType;
+  }
+
+  if (qFirst(query.format) === 'csv') {
+    const total = await prisma.financialTransaction.count({ where });
+    const label = rangeKeys ? `${rangeKeys.from}_${rangeKeys.to}` : localDateKey(new Date(), tz);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="kolayxport-transactions-${marketplace.replace(/[^a-z0-9_-]/gi, '')}-${label}.csv"`);
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Total-Count', String(total));
+    res.setHeader('X-Truncated', total > SETTLEMENTS_CSV_MAX_ROWS ? 'true' : 'false');
+    res.status(200);
+    res.write('\uFEFF' + SETTLEMENTS_CSV_COLUMNS.join(',') + '\r\n');
+    let written = 0;
+    let cursorId: string | undefined;
+    // Headers are already sent: a failed chunk must abort the download (the client sees a network error)
+    // instead of ending a cut-off file that looks complete. Never reply with JSON from here on.
+    try {
+      while (written < SETTLEMENTS_CSV_MAX_ROWS) {
+        const take = Math.min(CSV_CHUNK, SETTLEMENTS_CSV_MAX_ROWS - written);
+        const rows = await prisma.financialTransaction.findMany({
+          where,
+          orderBy: [{ transactionDate: 'desc' }, { id: 'desc' }],
+          take,
+          ...(cursorId ? { skip: 1, cursor: { id: cursorId } } : {}),
+          select: {
+            id: true, transactionDate: true, transactionType: true, productName: true, orderNumber: true,
+            barcode: true, quantity: true, amount: true, commission: true, currency: true,
+          },
+        });
+        if (rows.length === 0) break;
+        let chunk = '';
+        for (const r of rows) {
+          chunk += [
+            csvCell(localDateKey(r.transactionDate, tz)),
+            csvCell(classifyTransactionType(r.transactionType)),
+            csvCell(r.transactionType, true),
+            csvCell(r.productName, true),
+            csvCell(r.orderNumber, true),
+            csvCell(r.barcode, true),
+            csvCell(r.quantity),
+            csvCell(csvDecimal(Number(r.amount))),
+            csvCell(r.commission != null ? csvDecimal(Number(r.commission)) : ''),
+            csvCell(r.currency),
+          ].join(',') + '\r\n';
+        }
+        res.write(chunk);
+        written += rows.length;
+        cursorId = rows[rows.length - 1].id;
+        if (rows.length < take) break;
+      }
+    } catch (err) {
+      logger.error('Finance settlements CSV export failed mid-stream', err instanceof Error ? err : new Error(String(err)), {
+        userId,
+        marketplace,
+        written,
+      });
+      res.destroy(err instanceof Error ? err : new Error(String(err)));
+      return;
+    }
+    res.end();
+    return;
   }
 
   const [transactions, total] = await Promise.all([
@@ -1064,7 +1178,7 @@ async function handleGet(userId: string, query: NextApiRequest['query'], res: Ne
   });
 
   return res.status(200).json({
-    transactions,
+    transactions: transactions.map((t) => ({ ...t, category: classifyTransactionType(t.transactionType) })),
     total,
     page,
     size,
@@ -2184,6 +2298,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(405).json({ error: `Method ${req.method} not allowed` });
   } catch (err: any) {
+    if (res.headersSent) {
+      // A streamed response (CSV export) already started: a JSON reply would throw ERR_HTTP_HEADERS_SENT.
+      logger.error('Finance settlements API error after headers were sent', err instanceof Error ? err : new Error(String(err)));
+      if (!res.writableEnded) res.destroy(err instanceof Error ? err : new Error(String(err)));
+      return;
+    }
     // Structured API errors
     if (err.status && err.message) {
       return res.status(err.status).json({ error: err.message, details: err.details });

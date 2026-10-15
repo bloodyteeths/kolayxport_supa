@@ -201,5 +201,6 @@ export const ebayAdapter: ListingsAdapter = {
     where: (ctx) => ({ userId: ctx.userId }),
     toDbId: sku,
     overlay: ebayDraftOverlay,
+    attemptsRelation: 'syncAttempts',
   },
 };

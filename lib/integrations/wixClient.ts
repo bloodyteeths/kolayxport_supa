@@ -15,6 +15,55 @@ export interface WixCredentials {
 
 export type TokenRefreshCallback = (creds: { accessToken: string; tokenExpiresAt: Date; instanceId: string; siteId: string }) => Promise<void>;
 
+/** Media to attach: a public https URL, or an existing Wix Media Manager id. */
+export type WixProductMediaInput = { url: string } | { mediaId: string };
+
+/** Wix's automatic "All products" collection; membership is managed by Wix. */
+export const WIX_ALL_PRODUCTS_COLLECTION_ID = '00000000-000000-000000-000000000001';
+
+/** Refused before any request is sent (bad input for a Wix write). */
+export class WixClientInputError extends Error {
+  code: 'MEDIA_SET_MISMATCH' | 'COLLECTION_PROTECTED' | 'MEDIA_CHOICE_LINKED' | 'MEDIA_RESTORE_FAILED';
+  /** Extra detail for recovery (e.g. the original media ids when a reorder restore failed). */
+  params?: Record<string, string | number>;
+  constructor(code: WixClientInputError['code'], message: string, params?: Record<string, string | number>) {
+    super(message);
+    this.name = 'WixClientInputError';
+    this.code = code;
+    if (params) this.params = params;
+  }
+}
+
+/**
+ * True when any product option choice has its own media (Wix "media linked to
+ * choices", e.g. a colour swatch showing its own photo). Detaching and
+ * re-attaching product media would drop those links, so reorder refuses.
+ */
+export function wixHasChoiceLinkedMedia(product: any): boolean {
+  const options: any[] = Array.isArray(product?.productOptions) ? product.productOptions : [];
+  for (const opt of options) {
+    const choices: any[] = Array.isArray(opt?.choices) ? opt.choices : [];
+    for (const c of choices) {
+      const m = c?.media;
+      if (!m) continue;
+      if (Array.isArray(m.items) && m.items.length > 0) return true;
+      if (m.mainMedia && typeof m.mainMedia === 'object' && Object.keys(m.mainMedia).length > 0) return true;
+    }
+  }
+  return false;
+}
+
+/** Ordered media ids of a Stores v1 product (`media.items[].id`). */
+export function wixProductMediaIds(product: any): string[] {
+  const items: any[] = Array.isArray(product?.media?.items) ? product.media.items : [];
+  const ids: string[] = [];
+  for (const it of items) {
+    const id = typeof it?.id === 'string' ? it.id : '';
+    if (id && !ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
 const BASE_URL = 'https://www.wixapis.com';
 const MIN_GAP_MS = 200;
 const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000; // Refresh 5 min before expiry
@@ -275,6 +324,80 @@ export class WixApiClient {
     await this.request(`/stores/v1/products/${productId}`, { method: 'DELETE' });
   }
 
+  // ─── Product media (Stores Catalog V1) ────────────────────
+  // VERIFY on a test product before `editor-wix` goes default-on
+  // (marketplace-editors §6.2 / §11): the endpoint paths and body shapes below
+  // follow the Wix Stores v1 "Add/Remove Product Media" reference.
+
+  /**
+   * Attach media to a product. Each item is either a public `url` (Wix fetches
+   * and imports it) or the `mediaId` of a file already in the site's Media
+   * Manager (used to re-attach existing product media, e.g. on reorder).
+   * New items are appended after the existing media.
+   */
+  async addProductMedia(productId: string, media: WixProductMediaInput[]): Promise<void> {
+    if (media.length === 0) return;
+    await this.request<any>(`/stores/v1/products/${encodeURIComponent(productId)}/media`, {
+      method: 'POST',
+      body: JSON.stringify({ media: media.map((m) => ('mediaId' in m ? { mediaId: m.mediaId } : { url: m.url })) }),
+    });
+  }
+
+  /** Detach media items (ids from `product.media.items[].id`) from a product. */
+  async removeProductMedia(productId: string, mediaIds: string[]): Promise<void> {
+    if (mediaIds.length === 0) return;
+    await this.request<any>(`/stores/v1/products/${encodeURIComponent(productId)}/media/delete`, {
+      method: 'POST',
+      body: JSON.stringify({ mediaIds }),
+    });
+  }
+
+  /**
+   * Put a product's media in the given order. Stores v1 has no reorder call, so
+   * this detaches every current item and re-attaches them by `mediaId` in the
+   * new order. Guards, all checked before any write:
+   * - `orderedMediaIds` must be exactly the product's current media ids (same
+   *   set, any order), else `WixClientInputError('MEDIA_SET_MISMATCH')`.
+   * - If any option choice has linked media, the detach/re-attach would drop
+   *   those links (the re-add carries no choice link), so it refuses with
+   *   `WixClientInputError('MEDIA_CHOICE_LINKED')` and writes nothing.
+   * If re-attaching fails, the original order is restored. If the restore also
+   * fails, the product may have no media: a `WixClientInputError('MEDIA_RESTORE_FAILED')`
+   * is thrown carrying the original ids (`params.mediaIds`, comma separated)
+   * and the first error message, so the caller can log it and recover.
+   * VERIFY on a test product before `editor-wix` goes default-on.
+   */
+  async reorderProductMedia(productId: string, orderedMediaIds: string[]): Promise<{ order: string[]; changed: boolean }> {
+    const product = await this.getProduct(productId);
+    const current = wixProductMediaIds(product);
+    const wanted = Array.from(new Set(orderedMediaIds));
+    const sameSet = wanted.length === current.length && wanted.every((id) => current.includes(id));
+    if (!sameSet) {
+      throw new WixClientInputError('MEDIA_SET_MISMATCH', 'Reorder ids must match the product media exactly');
+    }
+    if (wanted.every((id, i) => id === current[i])) return { order: current, changed: false };
+    if (wixHasChoiceLinkedMedia(product)) {
+      throw new WixClientInputError('MEDIA_CHOICE_LINKED', 'Product has media linked to option choices; reorder would drop those links');
+    }
+
+    await this.removeProductMedia(productId, current);
+    try {
+      await this.addProductMedia(productId, wanted.map((mediaId) => ({ mediaId })));
+    } catch (err: any) {
+      try {
+        await this.addProductMedia(productId, current.map((mediaId) => ({ mediaId })));
+      } catch (restoreErr: any) {
+        throw new WixClientInputError(
+          'MEDIA_RESTORE_FAILED',
+          `Wix media reorder failed and the original media could not be re-attached (product ${productId}): ${err?.message || err}; restore: ${restoreErr?.message || restoreErr}`,
+          { productId, mediaIds: current.join(',') },
+        );
+      }
+      throw err;
+    }
+    return { order: wanted, changed: true };
+  }
+
   // ─── Inventory ────────────────────────────────────────────
 
   async getInventoryItem(productId: string): Promise<any> {
@@ -335,6 +458,33 @@ export class WixApiClient {
       collections: data.collections || [],
       totalResults: data.totalResults || 0,
     };
+  }
+
+  /**
+   * Add products to a manual collection (Stores v1 "Add Products to
+   * Collection"). The automatic "All products" collection cannot be changed.
+   */
+  async addProductsToCollection(collectionId: string, productIds: string[]): Promise<void> {
+    if (collectionId === WIX_ALL_PRODUCTS_COLLECTION_ID) {
+      throw new WixClientInputError('COLLECTION_PROTECTED', 'The "All products" collection cannot be changed');
+    }
+    if (productIds.length === 0) return;
+    await this.request<any>(`/stores/v1/collections/${encodeURIComponent(collectionId)}/productIds`, {
+      method: 'POST',
+      body: JSON.stringify({ productIds }),
+    });
+  }
+
+  /** Remove products from a manual collection (Stores v1 "Remove Products from Collection"). */
+  async removeProductsFromCollection(collectionId: string, productIds: string[]): Promise<void> {
+    if (collectionId === WIX_ALL_PRODUCTS_COLLECTION_ID) {
+      throw new WixClientInputError('COLLECTION_PROTECTED', 'The "All products" collection cannot be changed');
+    }
+    if (productIds.length === 0) return;
+    await this.request<any>(`/stores/v1/collections/${encodeURIComponent(collectionId)}/productIds/delete`, {
+      method: 'POST',
+      body: JSON.stringify({ productIds }),
+    });
   }
 
   // ─── Inbox / Conversations ────────────────────────────────

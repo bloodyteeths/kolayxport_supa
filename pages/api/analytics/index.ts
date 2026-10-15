@@ -1,8 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { withUsageLimiter } from '@/lib/middleware/withUsageLimiter';
 import { convertToBase, getExchangeRates } from '@/lib/fx';
+import { getSalesReport, isSalesReportQuery, parseSalesQuery } from '@/lib/reports/salesApi';
 
 interface AnalyticsQuery {
   dateRange: string;
@@ -31,6 +31,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const dbUserLookup = await prisma.user.findUnique({ where: { email: supabaseUser.email } });
       if (!dbUserLookup) return res.status(404).json({ error: 'User not found in database' });
       resolvedUserId = dbUserLookup.id;
+    }
+
+    // Reports › Sales (finance-analytics §6.1): `from`/`to` select the new response shape
+    // (lib/reports/salesTypes.ts). Requests without them keep the legacy shape below
+    // (pages/app/analytics.tsx) until the §8 cleanup.
+    if (isSalesReportQuery(req.query)) {
+      const parsed = parseSalesQuery(req.query);
+      if (parsed.ok === false) return res.status(400).json({ error: parsed.error });
+      const report = await getSalesReport(resolvedUserId!, parsed.params);
+      res.setHeader('Cache-Control', 'private, no-store');
+      return res.status(200).json(report);
     }
 
     const dateRange = (req.query.dateRange as string) || '7days';

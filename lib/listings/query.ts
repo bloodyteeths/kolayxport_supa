@@ -29,6 +29,7 @@ import type {
   ListingsStore,
 } from './types';
 import { splitSortKey } from './types';
+import { draftSendError, type SendError } from './sendError';
 
 // ─── Prisma plumbing ────────────────────────────────────────────────────────
 
@@ -71,8 +72,13 @@ export function modelHasField(model: string, field: string): boolean {
 export type SchemaCaps = {
   /** healthScore / healthChecksUsed / healthChecksTotal / healthFails exist on the cache model. */
   health: boolean;
-  /** EtsyListing.skus exists. */
+  /** EtsyListing.skus exists (planned BR-1a column; not in the current schema). */
   skus: boolean;
+  /**
+   * Etsy SKUs come from the offerings cache (`EtsyListing.offerings` → `EtsyListingOffering.sku`), the only place the
+   * current schema stores them. Optional so older callers / test literals stay valid (absent = false).
+   */
+  offeringSkus?: boolean;
   /** The draft model has scheduledSendAt. */
   scheduledSendAt: boolean;
   /** The draft model exists (CatalogDraft is new in BR-1a). */
@@ -83,16 +89,32 @@ export function schemaCaps(adapter: Pick<ListingsAdapter, 'model' | 'drafts'>): 
   return {
     health: modelHasField(adapter.model, 'healthScore'),
     skus: adapter.model === 'EtsyListing' && modelHasField('EtsyListing', 'skus'),
+    offeringSkus: adapter.model === 'EtsyListing' && modelHasField('EtsyListingOffering', 'sku'),
     scheduledSendAt: modelHasField(adapter.drafts.model, 'scheduledSendAt'),
     drafts: modelHasField(adapter.drafts.model, 'id'),
   };
 }
 
-/** Extra scalar columns to select when the schema has them. */
-export function capsSelect(caps: SchemaCaps): Record<string, true> {
-  const s: Record<string, true> = {};
+/** Most SKUs read per listing (meta line shows the first; export / duplicates use the first non-empty). */
+export const OFFERING_SKU_TAKE = 10;
+
+/** Prisma `select` for a listing's offering SKUs (non-empty, stable order). */
+export const OFFERING_SKUS_SELECT = {
+  select: { sku: true },
+  where: { AND: [{ sku: { not: null } }, { NOT: { sku: '' } }] },
+  orderBy: { variantKey: 'asc' },
+  take: OFFERING_SKU_TAKE,
+} as const;
+
+/** A Prisma `select` value: a scalar flag or a relation sub-select. */
+export type SelectValue = true | Record<string, unknown>;
+
+/** Extra columns (and the offerings relation) to select when the schema has them. */
+export function capsSelect(caps: SchemaCaps): Record<string, SelectValue> {
+  const s: Record<string, SelectValue> = {};
   if (caps.health) Object.assign(s, { healthScore: true, healthChecksUsed: true, healthChecksTotal: true, healthFails: true });
   if (caps.skus) s.skus = true;
+  if (caps.offeringSkus) s.offerings = OFFERING_SKUS_SELECT;
   return s;
 }
 
@@ -144,6 +166,12 @@ export interface DraftSourceSpec {
    * `archive` (Trendyol's only queued action), matching lib/catalogDrafts/service.ts hasQueuedDelete.
    */
   destructiveActions?: readonly string[];
+  /**
+   * Relation holding the draft's sync attempts (`syncAttempts` on EtsyListingDraft / EbayListingDraft). When set, the
+   * row loader includes the latest failed / conflict attempts so a stored error key gets the `result.errorParams` of
+   * the attempt that recorded it (`result.errorKey`).
+   */
+  attemptsRelation?: 'syncAttempts';
 }
 
 /** Destructive queued action types for CatalogDraft sources (trendyol / wix / shopify). */
@@ -251,27 +279,19 @@ export function syncCountsFrom(drafts: Map<string, DraftLite>, now: Date): Listi
   return c;
 }
 
-/** A stored value that is already a full i18n key (CatalogDraft writes e.g. `listings.draftError.multiLocation`). */
-const I18N_KEY_RE = /^[a-z][A-Za-z0-9]*(\.[A-Za-z0-9_]+)+$/;
-
 /**
- * `lastSyncError` → i18n key, so raw error text never reaches the client (§4 cell rules). CatalogDraft already stores
- * a precise key (`listings.validate.*`, `listings.draftError.*`, …), which passes through unchanged. Only the Etsy /
- * eBay draft services store English text; that is mapped to a coarse `listings.sendError.*` family.
+ * `lastSyncError` → i18n key, so raw error text never reaches the client (§4 cell rules). The draft tables store a
+ * full key (`etsy.draftSync.<code>`, `ebay.draftSync.<code>`, CatalogDraft `listings.*`; see
+ * docs/integration/draft-sync-error-codes.md), which passes through with the matching failed attempt's
+ * `result.errorParams` (the attempt whose `result.errorKey` equals the stored key). Rows written before the code
+ * migration hold English text, mapped to `listings.sendError.*`.
  */
-export function sendErrorKey(status: string, lastSyncError: unknown): { errorKey: string; errorParams?: Record<string, string | number> } | null {
-  if (status !== 'failed' && status !== 'conflict') return null;
-  if (typeof lastSyncError === 'string' && I18N_KEY_RE.test(lastSyncError.trim())) return { errorKey: lastSyncError.trim() };
-  if (status === 'conflict') return { errorKey: 'listings.sendError.conflict' };
-  const msg = typeof lastSyncError === 'string' ? lastSyncError.toLowerCase() : '';
-  if (!msg) return { errorKey: 'listings.sendError.generic' };
-  if (/server restart|interrupted/.test(msg)) return { errorKey: 'listings.sendError.interrupted' };
-  if (/token|unauthori[sz]ed|reconnect|invalid_grant|\b401\b|\b403\b|forbidden/.test(msg)) return { errorKey: 'listings.sendError.reconnect' };
-  if (/rate limit|too many requests|\b429\b/.test(msg)) return { errorKey: 'listings.sendError.rateLimited' };
-  if (/not found|\b404\b|no longer exists|deleted/.test(msg)) return { errorKey: 'listings.sendError.notFound' };
-  if (/price|quantity|title|tag|invalid|validation|must|required|\b400\b/.test(msg)) return { errorKey: 'listings.sendError.rejected' };
-  return { errorKey: 'listings.sendError.generic' };
+export function sendErrorKey(status: string, lastSyncError: unknown, syncAttempts?: unknown): SendError | null {
+  return draftSendError({ status, lastSyncError, syncAttempts });
 }
+
+/** Failed / conflict attempts the row loader reads to find the one that recorded the draft's stored error key. */
+export const ATTEMPTS_FOR_PARAMS = 3;
 
 /** Full drafts for the given marketplace ids → row `sync` objects. */
 export async function loadRowSync(
@@ -288,6 +308,12 @@ export async function loadRowSync(
   if (!delegate || dbIds.length === 0) return out;
   const rows = await delegate.findMany({
     where: { AND: [spec.where(ctx), { [spec.idField]: { in: dbIds } }, draftWindowWhere(now)] },
+    // ICU params for the stored error key live on the failed / conflict attempt whose `result.errorKey` matches it
+    // (Etsy / eBay only). A few attempts, since the newest failed one may be an unrelated concurrent-send / stale
+    // recovery attempt with no `errorKey`.
+    ...(spec.attemptsRelation
+      ? { include: { [spec.attemptsRelation]: { where: { status: { in: ['failed', 'conflict'] } }, orderBy: { startedAt: 'desc' }, take: ATTEMPTS_FOR_PARAMS, select: { status: true, result: true } } } }
+      : {}),
   });
   const effective = pickEffectiveDrafts(
     rows.map((r) => ({ row: r, extId: String(r[spec.idField]), status: String(r.status), updatedAt: asDate(r.updatedAt), syncedAt: asDate(r.syncedAt) })),
@@ -297,7 +323,7 @@ export async function loadRowSync(
     if (!key) continue;
     const r = e.row;
     const { changedFields, draft } = spec.overlay(r);
-    const err = sendErrorKey(e.status, r.lastSyncError);
+    const err = sendErrorKey(e.status, r.lastSyncError, spec.attemptsRelation ? r[spec.attemptsRelation] : undefined);
     out.set(extId, {
       draftId: String(r.id),
       status: key,
@@ -524,7 +550,7 @@ export async function planListingsQuery(db: ListingsDb, adapter: ListingsAdapter
   return { adapter, ctx, caps, drafts, where: { AND: and }, now };
 }
 
-function selectFor(plan: ListingsPlan, extra?: Record<string, true>): Record<string, true> {
+function selectFor(plan: ListingsPlan, extra?: Record<string, true>): Record<string, SelectValue> {
   return { ...plan.adapter.select, ...capsSelect(plan.caps), ...(extra ?? {}) };
 }
 

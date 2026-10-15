@@ -41,11 +41,11 @@ export const RESEARCH_TOOL_PATH: Record<ResearchTab, string> = {
   shops: '/app/research/shops',
 };
 
-/** Which tools have their hub route live. R2-B flips `keywords`, R3-B flips `shops`. */
+/** Which tools have their hub route live. R2 integrator flipped `keywords` (pages/app/research/keywords.tsx); R3-B flips `shops`. */
 export const RESEARCH_TOOL_SHIPPED: Record<ResearchTab, boolean> = {
   home: true,
   products: true,
-  keywords: false,
+  keywords: true,
   listings: true,
   shops: false,
 };

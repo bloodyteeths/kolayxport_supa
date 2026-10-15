@@ -7,7 +7,7 @@
 //                                   v2     `view=…`, `store`, `q`, `in`, `open=<orderId>`, `panel=label`
 //   listings-<mp>     listing grid  legacy route only (the legacy pages read no view key)
 //                                   v2     `view=…`, `open=<listingId>` (QuickView)
-//   editor-etsy|ebay  full editor   `/app/{etsy|ebay}-listings/<id>`
+//   editor-<mp>       full editor   `/app/{etsy|ebay}-listings/<id>`, `/app/{trendyol|wix|shopify}-urunler/<id>` (M6b)
 //   reports           `/app/reports` (else `/app/analytics`, CRITIQUE C3)
 //   research          `/app/research/listings` (Listing doctor, R1)
 //
@@ -31,6 +31,9 @@ export const LINK_FLAG_KEYS = [
   'listings-shopify',
   'editor-etsy',
   'editor-ebay',
+  'editor-trendyol',
+  'editor-wix',
+  'editor-shopify',
   'reports',
   'research',
 ] as const satisfies readonly UiFlagKey[];
@@ -175,10 +178,13 @@ const LISTINGS_FLAG: Record<ListingsLinkMarketplace, UiFlagKey> = {
   shopify: 'listings-shopify',
 };
 
-/** Marketplaces with a full-page editor route (pages/app/{etsy,ebay}-listings/[id].tsx). */
+/** Full-page editor routes (pages/app/{etsy,ebay}-listings/[id].tsx, pages/app/{trendyol,wix,shopify}-urunler/[id].tsx). */
 const EDITOR_FLAG: Partial<Record<ListingsLinkMarketplace, UiFlagKey>> = {
   etsy: 'editor-etsy',
   ebay: 'editor-ebay',
+  trendyol: 'editor-trendyol',
+  wix: 'editor-wix',
+  shopify: 'editor-shopify',
 };
 
 /** Listing grid, optionally on a view. Legacy pages read no view key, so they get the bare route. */
@@ -194,7 +200,7 @@ export function listingsHref(
 }
 
 /**
- * One listing: the full editor when its flag is on (Etsy/eBay), else the grid with `?open=<id>` (v2 QuickView;
+ * One listing: the full editor when its flag is on (any marketplace), else the grid with `?open=<id>` (v2 QuickView;
  * the legacy pages land on the list). `shop` scopes an Etsy link to a shop (`?shop=`), optional.
  * `listingId` is the Etsy listing id (BigInt as string) or the eBay `listingId ?? sku` (overview §4 `DraftRef`).
  */
@@ -264,6 +270,9 @@ export function useNavLinks(): NavLinks {
   const ls = useUiFlag('listings-shopify');
   const ee = useUiFlag('editor-etsy');
   const eb = useUiFlag('editor-ebay');
+  const et = useUiFlag('editor-trendyol');
+  const ew = useUiFlag('editor-wix');
+  const es = useUiFlag('editor-shopify');
   const reports = useUiFlag('reports');
   const research = useUiFlag('research');
   return useMemo<NavLinks>(() => {
@@ -276,6 +285,9 @@ export function useNavLinks(): NavLinks {
       'listings-shopify': ls,
       'editor-etsy': ee,
       'editor-ebay': eb,
+      'editor-trendyol': et,
+      'editor-wix': ew,
+      'editor-shopify': es,
       reports,
       research,
     };
@@ -289,5 +301,5 @@ export function useNavLinks(): NavLinks {
       reportsHref: () => reportsHref(flags),
       settingsHref,
     };
-  }, [orders, le, lb, lt, lw, ls, ee, eb, reports, research]);
+  }, [orders, le, lb, lt, lw, ls, ee, eb, et, ew, es, reports, research]);
 }

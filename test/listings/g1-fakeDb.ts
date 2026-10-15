@@ -70,6 +70,11 @@ export function matches(row: Row, where: any): boolean {
       const list = Array.isArray(cond) ? cond : [cond];
       // SQL NOT over a NULL comparison is NULL (row excluded): emulate for equality on null fields.
       if (list.some((w) => matches(row, w) || touchesNull(row, w))) return false;
+    } else if (cond && typeof cond === 'object' && !Array.isArray(cond) && Object.keys(cond).length === 1 && ('some' in cond || 'none' in cond)) {
+      // To-many relation filter: the fixture stores child rows inline (e.g. EtsyListing.offerings).
+      const children: Row[] = Array.isArray(row[k]) ? row[k] : [];
+      const hit = children.some((c) => matches(c, (cond as any).some ?? (cond as any).none));
+      if ('some' in cond ? !hit : hit) return false;
     } else if (!fieldMatch(row[k], cond)) {
       return false;
     }
@@ -109,6 +114,24 @@ function sortRows(rows: Row[], orderBy: any): Row[] {
   });
 }
 
+/**
+ * Applies relation sub-specs (`{ rel: { where, orderBy, take, select } }`, from `select` or `include`) to inline child
+ * arrays; scalars pass.
+ */
+function projectRelations(row: Row, select: any): Row {
+  const out: Row = { ...row };
+  if (!select || typeof select !== 'object') return out;
+  for (const [k, spec] of Object.entries(select)) {
+    if (!spec || spec === true || typeof spec !== 'object') continue;
+    let kids: Row[] = Array.isArray(row[k]) ? row[k].filter((c: Row) => matches(c, (spec as any).where)) : [];
+    if ((spec as any).orderBy) kids = sortRows(kids, (spec as any).orderBy);
+    if ((spec as any).take !== undefined) kids = kids.slice(0, (spec as any).take);
+    const sel = (spec as any).select;
+    out[k] = kids.map((c) => (sel ? Object.fromEntries(Object.keys(sel).map((f) => [f, c[f]])) : { ...c }));
+  }
+  return out;
+}
+
 export function makeDelegate(rows: Row[]) {
   return {
     rows,
@@ -117,7 +140,7 @@ export function makeDelegate(rows: Row[]) {
       if (args.orderBy) out = sortRows(out, args.orderBy);
       if (args.skip) out = out.slice(args.skip);
       if (args.take !== undefined) out = out.slice(0, args.take);
-      return out.map((r) => ({ ...r }));
+      return out.map((r) => projectRelations(projectRelations(r, args.select), args.include));
     },
     findFirst: async (args: any = {}) => rows.find((r) => matches(r, args.where)) ?? null,
     findUnique: async (args: any = {}) => rows.find((r) => matches(r, args.where)) ?? null,

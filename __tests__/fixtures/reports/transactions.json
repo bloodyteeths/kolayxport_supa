@@ -1,0 +1,41 @@
+{
+  "_comment": "M9 Group E fixture. settlements = GET /api/finance/settlements (B shape: rows gain category; Decimal columns serialize as strings). dashboard = the GET /api/finance/dashboard fields Payouts/Transactions read (finance-analytics 6.2).",
+  "settlements": {
+    "transactions": [
+      { "id": "tx1", "userId": "u1", "marketplace": "etsy", "externalId": "r-3891204455", "transactionType": "Sale", "category": "revenue", "orderNumber": "3891204455", "barcode": "BB-01", "productName": "Personalized Baby Blanket", "quantity": 1, "amount": "49.00", "currency": "USD", "commission": "6.37", "shippingAmount": "0.00", "transactionDate": "2026-09-14T09:12:00.000Z", "syncedAt": "2026-10-15T07:42:00.000Z" },
+      { "id": "tx2", "userId": "u1", "marketplace": "etsy", "externalId": "l-1", "transactionType": "EtsyFee", "category": "commission", "orderNumber": null, "barcode": null, "productName": null, "quantity": 1, "amount": "-0.20", "currency": "USD", "commission": null, "shippingAmount": null, "transactionDate": "2026-09-14T08:00:00.000Z", "syncedAt": "2026-10-15T07:42:00.000Z" },
+      { "id": "tx3", "userId": "u1", "marketplace": "etsy", "externalId": "l-2", "transactionType": "Disbursement", "category": "disbursement", "orderNumber": null, "barcode": null, "productName": null, "quantity": 1, "amount": "-2280.00", "currency": "USD", "commission": null, "shippingAmount": null, "transactionDate": "2026-09-12T06:00:00.000Z", "syncedAt": "2026-10-15T07:42:00.000Z" }
+    ],
+    "total": 1284,
+    "page": 0,
+    "size": 50,
+    "totalPages": 26,
+    "syncCursor": { "lastSyncedTo": "2026-10-15T07:40:00.000Z", "totalSynced": 1290, "updatedAt": "2026-10-15T07:42:00.000Z" }
+  },
+  "settlementsEmptyNever": { "transactions": [], "total": 0, "page": 0, "size": 50, "totalPages": 0, "syncCursor": null },
+  "dashboard": {
+    "marketplace": "etsy",
+    "summary": {
+      "currency": "USD",
+      "grossRevenue": 14820.4, "commissions": 2104.22, "shipping": 2380, "returns": 608.1, "discounts": 0, "adSpend": 812.4, "otherFees": 0, "cogs": 607.5,
+      "netProfit": 8308.18, "margin": 56.1, "orderCount": 603, "returnCount": 4, "pendingCancellationCount": 0, "totalOrderCount": 612,
+      "pendingSettlementCount": 9, "totalOrderRevenue": 15100,
+      "banked": 9120, "disbursementCount": 4, "currentBalance": 1204.55, "balanceCurrency": "USD", "heldFunds": null
+    },
+    "lastSyncedAt": "2026-10-15T07:42:00.000Z",
+    "disbursements": [
+      { "date": "2026-09-02", "amount": 2400 },
+      { "date": "2026-09-09", "amount": 2280 },
+      { "date": "2026-09-16", "amount": 2140 },
+      { "date": "2026-09-23", "amount": 2300 }
+    ],
+    "transactionTypeSummary": {
+      "Sale": { "count": 603, "total": 14820.4, "category": "revenue" },
+      "EtsyFee": { "count": 611, "total": -2104.22, "category": "commission" },
+      "Disbursement": { "count": 4, "total": -9120, "category": "disbursement" },
+      "SalesTax": { "count": 66, "total": 0, "category": "passthrough" }
+    },
+    "timeSeries": [],
+    "productBreakdown": []
+  }
+}

@@ -5,6 +5,13 @@ import prisma from '../../../lib/prisma';
 import { ShopifyClient, getValidAccessToken } from '../../../lib/integrations/shopifyClient';
 import { logger } from '../../../lib/logger';
 import { refreshHealth } from '@/lib/listings/refreshHealth';
+import {
+  applyShopifyImageOps,
+  parseShopifyImageAdd,
+  parseShopifyImageOps,
+  type ShopifyImageOp,
+} from '@/lib/integrations/shopifyImageOps';
+import { OP_KEYS, type ProductOpCode } from '@/lib/integrations/productOpResults';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '4mb' } },
@@ -377,6 +384,67 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // ================================================================
+    // PRODUCT IMAGES (M6b-B, marketplace-editors §7.2)
+    //   GET    ?action=images&id=                        → { images }
+    //   POST   ?action=images&id=  { src | attachment, filename?, alt?, position? }
+    //          or                  { ops: ShopifyImageOp[] }  (staged batch)
+    //   PUT    ?action=images&id=&imageId=  { alt?, position? }
+    //   DELETE ?action=images&id=&imageId=
+    // Writes answer { ok, results, images, product }; per-op failures are 200
+    // with `results[].ok === false` and an i18n `key`.
+    // ================================================================
+    if (action === 'images') {
+      const productId = String(req.query.id || '');
+      if (!/^\d{1,20}$/.test(productId)) return badImageRequest(res, 'Missing product id');
+
+      if (req.method === 'GET') {
+        const images = await client.getProductImages(productId);
+        return res.status(200).json({ images });
+      }
+
+      let ops: ShopifyImageOp[];
+      if (req.method === 'POST') {
+        if (Array.isArray(req.body?.ops)) {
+          const parsed = parseShopifyImageOps(req.body.ops);
+          if (!parsed.ok) return badImageRequest(res, parsed.error, parsed.code ?? 'INVALID_INPUT');
+          ops = parsed.value;
+        } else {
+          const parsed = parseShopifyImageAdd(req.body);
+          if (!parsed.ok) return badImageRequest(res, parsed.error, parsed.code ?? 'INVALID_INPUT');
+          ops = [parsed.value];
+        }
+      } else if (req.method === 'PUT' || req.method === 'DELETE') {
+        const imageId = String(req.query.imageId || '');
+        if (!/^\d{1,20}$/.test(imageId)) return badImageRequest(res, 'Missing image id');
+        if (req.method === 'DELETE') {
+          ops = [{ op: 'delete', id: imageId }];
+        } else {
+          const raw: unknown[] = [];
+          if (req.body?.alt !== undefined) raw.push({ op: 'alt', id: imageId, alt: req.body.alt });
+          if (req.body?.position !== undefined) raw.push({ op: 'reorder', id: imageId, position: req.body.position });
+          const parsed = raw.length ? parseShopifyImageOps(raw) : { ok: false as const, error: 'Nothing to update (alt or position)' };
+          if (!parsed.ok) return badImageRequest(res, parsed.error);
+          ops = parsed.value;
+        }
+      } else {
+        return res.status(405).json({ error: 'Method not allowed' });
+      }
+
+      const { results, images } = await applyShopifyImageOps(client, productId, ops);
+
+      // Refresh the cache row (thumbnail, image count). Best effort.
+      let product: any = null;
+      try {
+        product = await client.getProduct(productId);
+        if (product?.id) await upsertProductCache(userId, shop.id, product);
+      } catch (err: any) {
+        logger.error('Shopify cache refresh after image write failed', err as Error, { productId });
+      }
+
+      return res.status(200).json({ ok: results.every((r) => r.ok), results, images, product });
+    }
+
+    // ================================================================
     // UPDATE VARIANT
     // ================================================================
     if (action === 'updateVariant' && req.method === 'PUT') {
@@ -554,6 +622,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     logger.error('Shopify products API error', error as Error, { action });
     return res.status(500).json({ error: error.message || 'Internal server error' });
   }
+}
+
+/** 400 for the `images` action: `{ error, code, key }` (key = next-intl key). */
+function badImageRequest(res: NextApiResponse, error: string, code: ProductOpCode = 'INVALID_INPUT') {
+  return res.status(400).json({ error, code, key: OP_KEYS[code] });
 }
 
 /**

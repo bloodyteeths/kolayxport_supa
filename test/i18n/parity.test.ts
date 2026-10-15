@@ -45,6 +45,10 @@ const ICU_ARG_EXCEPTIONS: Record<string, string> = {
   'ebayListings.bulk.deleteDialogDesc': 'missing:b|extra:',
   'integrations.trendyolStep3Desc': 'missing:|extra:settingsLink',
   // Turkish picks the dative/locative suffix per marketplace with {mp, select, …}
+  'reports.error.refresh': 'missing:|extra:mp',
+  'reports.meta.refreshFrom': 'missing:|extra:mp',
+  'reports.meta.refreshingFrom': 'missing:|extra:mp',
+  'reports.toast.newTransactions': 'missing:|extra:mp',
   // (Etsy'ye / eBay'e); English just names it with {marketplace}.
   'listingEditor.action.deactivate': 'missing:marketplace|extra:mp',
   'listingEditor.action.publish': 'missing:marketplace|extra:mp',

@@ -56,7 +56,7 @@ export interface RailNeededItem {
 }
 
 export interface RailChangesProps {
-  marketplace: 'etsy' | 'ebay';
+  marketplace: 'etsy' | 'ebay' | 'trendyol' | 'wix' | 'shopify';
   changes: RailChangeItem[];
   onRevert?: (item: RailChangeItem) => void;
   /** Rows whose revert is in flight. */
@@ -68,7 +68,7 @@ export interface RailChangesProps {
   'data-testid'?: string;
 }
 
-const MP_NAME = { etsy: 'Etsy', ebay: 'eBay' } as const;
+const MP_NAME = { etsy: 'Etsy', ebay: 'eBay', trendyol: 'Trendyol', wix: 'Wix', shopify: 'Shopify' } as const;
 
 const QUEUED_ALIASES: Record<string, QueuedActionKind> = {
   create_listing: 'create',

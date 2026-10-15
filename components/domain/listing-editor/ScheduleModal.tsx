@@ -47,7 +47,7 @@ function toDate(v: Date | string | null | undefined): Date | null {
 export interface ScheduleModalProps {
   open: boolean;
   onClose: () => void;
-  marketplace: 'etsy' | 'ebay';
+  marketplace: 'etsy' | 'ebay' | 'trendyol' | 'wix' | 'shopify';
   /** The listing's open draft (EtsyListingDraft / EbayListingDraft id). */
   draftId: string | null;
   /** The draft's current `scheduledSendAt` (null = not scheduled). */

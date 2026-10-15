@@ -36,6 +36,7 @@ import type {
   RemoteImage,
 } from '@/lib/listingEditor/types';
 import { diffKeys, fieldEquals } from '../changeSummary';
+import { storedDraftSendError } from '../draftSendError';
 import type { AdapterContext, AdapterErrorInfo, ListingEditorAdapter, LoadedListing, StageFieldsInput } from './types';
 
 /** eBay's photo limit per listing. */
@@ -916,8 +917,13 @@ export function ebayErrorInfo(err: unknown): AdapterErrorInfo {
   return { status: null, network, conflict: false, key: null };
 }
 
-/** `lastSyncError` (English, server) → full i18n key for the failed banner. */
-export function ebayFailureCauseKey(draft: Pick<DraftRow, 'status' | 'lastSyncError'>): string {
+/**
+ * Failed-banner cause key. The API's `lastSyncErrorKey` (`ebay.draftSync.<code>`) wins; old rows that still hold
+ * English `lastSyncError` text are classified from the text.
+ */
+export function ebayFailureCauseKey(draft: Pick<DraftRow, 'status' | 'lastSyncError' | 'raw'>): string {
+  const stored = storedDraftSendError(draft, 'ebay.');
+  if (stored) return stored.errorKey;
   const raw = typeof draft.lastSyncError === 'string' ? draft.lastSyncError.trim() : '';
   if (draft.status === 'conflict') return 'ebay.draftSync.conflict';
   if (!raw) return 'listings.sendError.generic';

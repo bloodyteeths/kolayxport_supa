@@ -292,8 +292,12 @@ describe('configs (§3, §15)', () => {
     expect(LISTINGS_CONFIGS.etsy.defaultView).toBe('active');
     expect(LISTINGS_CONFIGS.trendyol.views).toContain('review');
   });
-  it('the three CatalogDraft marketplaces have no full editor yet (quick view xl bridge)', () => {
-    for (const mp of ['trendyol', 'wix', 'shopify'] as const) expect(LISTINGS_CONFIGS[mp].editorHref('1', null)).toBeNull();
+  it('the three CatalogDraft marketplaces route to their M6b editors (used only while editor-<mp> is on)', () => {
+    expect(LISTINGS_CONFIGS.trendyol.editorHref('BC-1', null)).toBe('/app/trendyol-urunler/BC-1');
+    expect(LISTINGS_CONFIGS.wix.editorHref('a1', 'S7')).toBe('/app/wix-urunler/a1?site=S7');
+    expect(LISTINGS_CONFIGS.shopify.editorHref('42', 'S9')).toBe('/app/shopify-urunler/42?shop=S9');
+    expect(LISTINGS_CONFIGS.wix.newListingHref('S7')).toBe('/app/wix-urunler/new?site=S7');
+    expect(LISTINGS_CONFIGS.trendyol.newListingHref(null)).toBe('/app/trendyol-urunler/new');
     expect(LISTINGS_CONFIGS.etsy.editorHref('5', 'S')).toBe('/app/etsy-listings/5?shop=S');
   });
   it('Etsy links its Activity page and pulls with its shop id', () => {

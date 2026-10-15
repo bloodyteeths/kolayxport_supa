@@ -1,15 +1,29 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
-import prisma from '../../../lib/prisma';
-import { logger } from '../../../lib/logger';
+import prisma from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 import { refreshFinancialsIfStale } from '@/lib/finance/financialAutoSync';
-import { convertCurrency } from '@/lib/finance/fx';
+import { getExchangeRates, convertToBase, normalizeCurrency, type FxRates } from '@/lib/fx';
+import { canonicalStore } from '@/lib/marketplaces/canonical';
+import { classifyTransactionType, type TransactionCategory } from '@/lib/finance/classifyTransaction';
+import {
+  bucketKey,
+  bucketKeys,
+  isGranularity,
+  localDateKey,
+  parseTz,
+  previousKeys,
+  windowFromKeys,
+  type Granularity,
+} from '@/lib/finance/periods';
 
 // ---------------------------------------------------------------------------
-// Types
+// Types (finance-analytics §6.2)
 // ---------------------------------------------------------------------------
 
-interface DashboardSummary {
+export interface DashboardSummary {
+  /** Settlement currency of every amount in this response (B12). */
+  currency: string;
   grossRevenue: number;
   commissions: number;
   shipping: number;
@@ -27,9 +41,7 @@ interface DashboardSummary {
   // i.e., money already returned to the buyer. NOT a count of cancelled rows.
   returnCount: number;
   // Cancellations whose refund event hasn't posted yet (Amazon lags 14-30
-  // days). UI surfaces this as a separate badge under Returns so users don't
-  // think they refunded $0 across 8 orders when reality is "0 settled, 8
-  // pending". Zero for marketplaces where settlement posts immediately.
+  // days). Zero for marketplaces where settlement posts immediately.
   pendingCancellationCount: number;
   // Orders the labels page counts (Order table). Includes receipts that
   // haven't settled yet. >= orderCount; the delta is "pending settlement".
@@ -37,6 +49,7 @@ interface DashboardSummary {
   pendingSettlementCount: number;
   totalOrderRevenue: number;
   // Banked money paid to bank in the period + current not-yet-disbursed balance.
+  // Absent on `previousSummary`.
   banked?: number;
   disbursementCount?: number;
   currentBalance?: number | null;
@@ -44,18 +57,24 @@ interface DashboardSummary {
   heldFunds?: number | null;
 }
 
-interface TimeSeriesPoint {
+/** One zero-filled bucket. `netProfit` uses the same formula as `summary.netProfit` (B10). */
+export interface TimeSeriesPoint {
   period: string;
   revenue: number;
   commissions: number;
   shipping: number;
   returns: number;
+  discounts: number;
+  adSpend: number;
+  otherFees: number;
   cogs: number;
   netProfit: number;
 }
 
-interface ProductBreakdownItem {
+export interface ProductBreakdownItem {
   barcode: string | null;
+  /** SKU of the matched ProductCost row, else null. */
+  sku: string | null;
   productName: string | null;
   revenue: number;
   quantity: number;
@@ -65,371 +84,463 @@ interface ProductBreakdownItem {
   commissions: number;
   shipping: number;
   cogs: number;
+  /** Unit cost converted to `summary.currency` (0 when none or not convertible). */
   unitCost: number;
   netProfit: number;
+}
+
+export interface CostCoverage {
+  /** Distinct products (by barcode) sold in the period. */
+  products: number;
+  /** Of those, products whose cost was applied (has a ProductCost row that could be converted). */
+  productsWithCost: number;
+  /** Sold units whose cost is unknown: uncosted products, rows without a barcode, unconvertible costs. */
+  unitsWithoutCost: number;
+}
+
+export interface CogsExcluded {
+  currency: string;
+  /** ProductCost rows left out of COGS because there is no `currency → summary.currency` rate. */
+  products: number;
+}
+
+/**
+ * ProductCost rows saved as TRY on a non-Trendyol marketplace. The legacy bulk import (and the schema
+ * default) wrote 'TRY' whatever the tab, so the label is not trusted: these rows keep the legacy behaviour
+ * (amount used as is, in `summary.currency`) until the founder confirms the real currency (data audit).
+ */
+export interface CogsUnverified {
+  currency: string;
+  products: number;
+}
+
+/** Ledger rows whose `FinancialTransaction.currency` differs from `summary.currency`. */
+export interface LedgerCurrencyCount {
+  currency: string;
+  rows: number;
+}
+
+export interface TransactionTypeSummaryItem {
+  count: number;
+  total: number;
+  category: TransactionCategory;
+}
+
+// ---------------------------------------------------------------------------
+// Cent accumulator: one formula for the summary and every bucket (B10)
+// ---------------------------------------------------------------------------
+
+interface Lines {
+  revenue: number;
+  commissions: number;
+  shipping: number;
+  returns: number;
+  discounts: number;
+  adSpend: number;
+  otherFees: number;
+  cogs: number;
+}
+
+const emptyLines = (): Lines => ({
+  revenue: 0,
+  commissions: 0,
+  shipping: 0,
+  returns: 0,
+  discounts: 0,
+  adSpend: 0,
+  otherFees: 0,
+  cogs: 0,
+});
+
+const toCents = (n: number) => Math.round((Number.isFinite(n) ? n : 0) * 100);
+const fromCents = (c: number) => c / 100;
+
+const netCents = (l: Lines) =>
+  l.revenue - l.commissions - l.shipping - l.returns - l.discounts - l.adSpend - l.otherFees - l.cogs;
+
+interface TxCents {
+  category: TransactionCategory;
+  amount: number;
+  commission: number;
+  shipping: number;
+  isTrendyol: boolean;
+  quantity: number;
+  /** (unit cost + unit shipping cost) in cents, converted; null when there is no usable cost. */
+  unitCogs: number | null;
+}
+
+/** Apply one ledger row to `l`. Same sign rules the summary always used. */
+function applyTx(l: Lines, tx: TxCents): void {
+  const { amount, commission } = tx;
+  switch (tx.category) {
+    case 'revenue':
+      l.revenue += amount;
+      l.commissions += commission;
+      // Trendyol headline shipping comes from Kargo Fatura invoice rows
+      // (statement-exact); the per-sale shippingAmount is a partial cargo
+      // line-item mapping kept for the product breakdown only.
+      if (!tx.isTrendyol) l.shipping += tx.shipping;
+      break;
+    case 'commission':
+      // Signed: a positive amount is a commission refund.
+      if (amount > 0) l.commissions -= amount;
+      else l.commissions += Math.abs(amount);
+      break;
+    case 'shipping':
+      l.shipping += Math.abs(amount);
+      break;
+    case 'return':
+      l.returns += Math.abs(amount);
+      // Trendyol stores commissionAmount as positive even on returns — refunded.
+      if (commission > 0) l.commissions -= commission;
+      break;
+    case 'discount':
+      // Sign-aware: charges are negative (add), cancellations positive (reduce).
+      l.discounts -= amount;
+      // Trendyol: each İndirim/Kupon row gives back the discount's commission share.
+      if (commission) l.commissions += amount < 0 ? -commission : commission;
+      break;
+    case 'adspend':
+      l.adSpend += Math.abs(amount);
+      break;
+    case 'fees':
+      // Cost rows are negative; credits (stopaj corrections) positive.
+      l.otherFees -= amount;
+      break;
+    case 'commission_invoice':
+      // Already represented by per-sale commission; kept in transactionTypeSummary only.
+      break;
+    case 'disbursement':
+      // Bank transfer — not a P&L event.
+      break;
+    case 'passthrough':
+      // Sales tax: a tax REFUND (positive) offsets the tax inside refund_gross.
+      if (amount > 0) l.returns -= amount;
+      break;
+    default:
+      if (amount > 0) l.revenue += amount;
+      break;
+  }
+  // COGS for sales; a return puts the unit back in stock, so its cost comes back out.
+  if ((tx.category === 'revenue' || tx.category === 'return') && tx.unitCogs != null) {
+    const c = tx.unitCogs * tx.quantity;
+    l.cogs += tx.category === 'return' ? -c : c;
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function getDateTruncExpression(groupBy: string): string {
-  switch (groupBy) {
-    case 'day':
-      return `DATE_TRUNC('day', "transactionDate")`;
-    case 'week':
-      return `DATE_TRUNC('week', "transactionDate")`;
-    case 'month':
-    default:
-      return `DATE_TRUNC('month', "transactionDate")`;
-  }
+const FINANCE_MARKETPLACES = new Set(['etsy', 'trendyol', 'ebay', 'amazon']);
+const CANCELLED_STATUSES = new Set(['CANCELLED', 'cancelled', 'Cancelled', 'canceled', 'Canceled']);
+
+function countList<K extends string>(m: Map<string, number>, field: K): Array<{ currency: string } & Record<K, number>> {
+  return Array.from(m.entries())
+    .map(([c, n]) => ({ currency: c, [field]: n }) as { currency: string } & Record<K, number>)
+    .sort((a, b) => a.currency.localeCompare(b.currency));
 }
 
-/**
- * Classify Trendyol transaction types into financial categories.
- */
-function classifyTransactionType(type: string): 'revenue' | 'commission' | 'shipping' | 'return' | 'discount' | 'adspend' | 'fees' | 'commission_invoice' | 'disbursement' | 'passthrough' | 'other' {
-  // Normalize: strip diacritics so Turkish İ→i, ş→s, etc. work with plain includes()
-  const t = (type || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-  // Also check original for exact Turkish matches
-  const orig = (type || '').trim();
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
 
-  // Order matters — more specific patterns first
+/** trendyol → TRY; else the cursor's balance currency; else the most frequent ledger currency; else USD. */
+export function pickDashboardCurrency(
+  marketplace: string,
+  balanceCurrency: string | null | undefined,
+  txCurrencies: Iterable<string | null | undefined>,
+): string {
+  if (marketplace.toLowerCase() === 'trendyol') return 'TRY';
+  if (balanceCurrency && balanceCurrency.trim()) return normalizeCurrency(balanceCurrency);
+  const counts = new Map<string, number>();
+  for (const c of txCurrencies) {
+    if (!c || !String(c).trim()) continue;
+    const k = normalizeCurrency(c);
+    counts.set(k, (counts.get(k) || 0) + 1);
+  }
+  let best: string | null = null;
+  let bestN = 0;
+  for (const [k, n] of counts) {
+    if (n > bestN) {
+      best = k;
+      bestN = n;
+    }
+  }
+  return best || 'USD';
+}
 
-  // Trendyol otherfinancials deduction invoices & withholdings (Turkish labels
-  // from the Cari Hesap Ekstresi). Must precede the generic komisyon/kargo
-  // rules below.
-  // Weekly commission invoice — commissions are already counted per-sale;
-  // counting the invoice too would double them.
-  if (t.includes('komisyon') && t.includes('fatura')) return 'commission_invoice';
-  if (t.includes('stopaj') || t.includes('stoppage')) return 'fees'; // E-ticaret Stopajı
-  if (t.includes('reklam')) return 'adspend'; // Reklam Bedeli
-  if (t.includes('hizmet')) return 'fees'; // Platform / Uluslararası Hizmet Bedeli
-  // Kusurlu Ürün / Yanlış Ürün / Tedarik Edememe / Erken Ödeme Kesinti / Fatura Kontör
-  if (t.includes('kusurlu') || t.includes('yanl') || t.includes('tedarik') || t.includes('kesinti') || t.includes('kontor')) return 'fees';
+/** Order-table `where` for the marketplace tab; Etsy shop names come from `EtsyShop` (B8). */
+function orderMarketplaceOr(marketplace: string, etsyShopNames: readonly string[]) {
+  const m = marketplace.toLowerCase();
+  const ors: Array<{ marketplace: { contains?: string; equals?: string; mode: 'insensitive' } }> = [
+    { marketplace: { contains: m, mode: 'insensitive' } },
+  ];
+  if (m === 'etsy') {
+    for (const name of etsyShopNames) ors.push({ marketplace: { equals: name, mode: 'insensitive' } });
+  }
+  return ors;
+}
 
-  // Etsy real ledger types (from settlements Phase 4). EtsyFee amounts are
-  // SIGNED (charge<0, refund>0) — the 'commission' switch case handles the
-  // sign. Disbursements are bank transfers (excluded from P&L). SellerCredit
-  // is a positive revenue adjustment handled by the default case.
-  if (t === 'etsyfee') return 'commission';
-  if (t === 'disbursement' || t.includes('disburse')) return 'disbursement';
-  if (t === 'salestax') return 'passthrough'; // remitted tax — excluded from P&L entirely
-  if (t === 'sellercredit') return 'other';
+type RatesLoader = () => Promise<FxRates>;
 
-  if (t.includes('sale') || orig === 'Satış' || t.includes('satis')) return 'revenue';
-  if (t.includes('shipping') || t.includes('cargo') || t.includes('kargo')) return 'shipping';
-  if (t.includes('commission') || t.includes('komisyon') || t.includes('service')) return 'commission';
-  // Discount cancel (İndirim İptal / DiscountCancel) reverses an earlier
-  // discount (it follows a return). It's a discount-bucket credit, NOT a sale —
-  // as 'revenue' it counted as an extra order and picked up full COGS/shipping.
-  if (orig === 'İndirim İptal' || t.includes('discountcancel') || (t.includes('indirim') && t.includes('iptal'))) return 'discount';
-  // Returns (İade / Return / Refund)
-  if (orig.startsWith('İade') || t.includes('return') || t.includes('iade') || t.includes('refund')) return 'return';
-  // Discounts/coupons (İndirim / Kupon)
-  if (orig.startsWith('İndirim') || t.includes('discount') || t.includes('indirim') || t.includes('coupon') || t.includes('kupon')) return 'discount';
-  // Provision (weight/deci adjustments) — treat as shipping adjustment
-  if (t.includes('provision')) return 'shipping';
-  if (t.includes('adspend') || t.includes('promoted') || t.includes('offsite ads') || t.includes('etsy ads')) return 'adspend';
-  // eBay-specific types
-  if (t.includes('shippinglabel')) return 'shipping';
-  if (t.includes('credit')) return 'revenue'; // eBay credits = revenue adjustment
-  // eBay store subscription / insertion / regulatory / dispute fees
-  // (NON_SALE_CHARGE OTHER_FEES). These are real selling costs — count them as
-  // commission so they reduce net profit (they were silently ignored before).
-  if (t.includes('storefee')) return 'commission';
-  if (t.includes('sellerrevenue') || t.includes('manualrefund')) return 'other';
-  // Amazon-specific types
-  if (t.includes('productcharges') || t.includes('productcharge')) return 'revenue';
-  if (t.includes('referralfee') || t.includes('amazoncommission')) return 'commission';
-  // FBA storage / removal / disposal / return-processing are inventory costs,
-  // not shipping — they land in the fees bucket (Platform Fees card).
-  if (t.includes('fbastorage') || t.includes('fbainventoryfee')) return 'fees';
-  if (t.includes('fbafee') || t.includes('fulfillmentfee') || t.includes('fbainbound')) return 'shipping';
-  if (t.includes('refundcommission') || t.includes('amazonrefund')) return 'return';
-  if (t.includes('sponsoredproduct') || t.includes('sponsoredbrand') || t.includes('sponsoreddisplay') || t.includes('amazonadspend')) return 'adspend';
-  if (t.includes('amazoncoupon') || t.includes('amazondiscount')) return 'discount';
-  // Amazon misc events (service fees w/o a reason, adjustments, chargebacks).
-  // Sign-aware via the 'fees' bucket: negative = real cost, positive = credit —
-  // so they affect net profit correctly instead of being silently dropped.
-  if (t.includes('amazonother')) return 'fees';
-  return 'other';
+function lazyRates(): RatesLoader {
+  let p: Promise<FxRates> | null = null;
+  return () => {
+    if (!p) p = getExchangeRates().then((s) => s.rates).catch(() => ({}) as FxRates);
+    return p;
+  };
+}
+
+class HttpError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Main aggregation
 // ---------------------------------------------------------------------------
 
-async function buildDashboard(
-  userId: string,
-  marketplace: string,
-  startDate: Date,
-  endDate: Date,
-  groupBy: string
-): Promise<{
+interface BuildOptions {
+  userId: string;
+  marketplace: string;
+  startDate: Date;
+  endDate: Date;
+  granularity: Granularity;
+  tz: string;
+  etsyShopNames: readonly string[];
+  rates: RatesLoader;
+  /** Previous-period pass: forced currency, no cursor/balance, no disbursement list. */
+  previous?: { currency: string };
+}
+
+interface BuildResult {
   summary: DashboardSummary;
   disbursements: Array<{ date: string; amount: number }>;
   timeSeries: TimeSeriesPoint[];
   productBreakdown: ProductBreakdownItem[];
-  transactionTypeSummary: Record<string, { count: number; total: number }>;
-}> {
-  // Fetch all transactions in the date range
+  transactionTypeSummary: Record<string, TransactionTypeSummaryItem>;
+  costCoverage: CostCoverage;
+  cogsExcluded: CogsExcluded[];
+  cogsUnverified: CogsUnverified[];
+  /** Converted to `summary.currency` (the amounts are approximate, ≈). */
+  ledgerConverted: LedgerCurrencyCount[];
+  /** Left out: no `currency → summary.currency` rate. Never summed raw (DS §3.12). */
+  ledgerExcluded: LedgerCurrencyCount[];
+  lastSyncedAt: string | null;
+}
+
+interface CostEntry {
+  /** Converted unit cost, cents. */
+  unitCost: number;
+  /** Converted unit cost + unit shipping cost, cents. */
+  unitCogs: number;
+  sku: string | null;
+}
+
+async function buildDashboard(opts: BuildOptions): Promise<BuildResult> {
+  const { userId, marketplace, startDate, endDate, granularity, tz, etsyShopNames } = opts;
+  const mpLower = marketplace.toLowerCase();
+
+  // Zero-filled, ascending buckets (B1/B10). Fails fast before any DB work.
+  const keys = bucketKeys(startDate, endDate, granularity, tz);
+  if (!keys) throw new HttpError(400, `Range too long for granularity "${granularity}"`);
+
   const transactions = await prisma.financialTransaction.findMany({
-    where: {
-      userId,
-      marketplace,
-      transactionDate: { gte: startDate, lte: endDate },
-    },
+    where: { userId, marketplace, transactionDate: { gte: startDate, lte: endDate } },
     orderBy: { transactionDate: 'asc' },
   });
 
-  // Order-table totals for the same window. Etsy/Trendyol/eBay/Amazon hold
-  // payments 1-3 days before they post as ledger entries, so the
-  // `FinancialTransaction` Sale count is always behind the labels page.
-  // Cross-reference the Order table — it gets the receipt the moment the
-  // marketplace fires the webhook — so we can show the user the real order
-  // total and a "X pending settlement" delta.
-  // Match the same shop-name family that the marketplace tab represents
-  // (Etsy can land as "BelleCoutureGifts", "Decorsweetart", etc. — see
-  // reference_etsy_marketplace_detection memory).
-  const marketplaceMatchers: Record<string, string[]> = {
-    etsy: ['etsy', 'bellecouture', 'decorsweet', 'mybabybymerry', 'outletemporium'],
-    trendyol: ['trendyol'],
-    ebay: ['ebay'],
-    amazon: ['amazon'],
-  };
-  const orderMarketplacePatterns =
-    marketplaceMatchers[marketplace.toLowerCase()] || [marketplace.toLowerCase()];
-  const orderRows = await prisma.order
+  // Order-table totals for the same window (labels-page truth; ledger lags 1–3 days).
+  const orderRowsRaw = await prisma.order
     .findMany({
       where: {
         userId,
-        OR: orderMarketplacePatterns.map(p => ({
-          marketplace: { contains: p, mode: 'insensitive' as const },
-        })),
+        OR: orderMarketplaceOr(marketplace, etsyShopNames),
         AND: [
           {
             OR: [
               { uiOrderDate: { gte: startDate, lte: endDate } },
-              {
-                AND: [
-                  { uiOrderDate: null },
-                  { createdAt: { gte: startDate, lte: endDate } },
-                ],
-              },
+              { AND: [{ uiOrderDate: null }, { createdAt: { gte: startDate, lte: endDate } }] },
             ],
           },
         ],
       },
-      select: { id: true, status: true, totalPrice: true, manualShippingCost: true, manualShippingCostCurrency: true },
+      select: {
+        id: true,
+        marketplace: true,
+        status: true,
+        totalPrice: true,
+        manualShippingCost: true,
+        manualShippingCostCurrency: true,
+        uiOrderDate: true,
+        createdAt: true,
+      },
     })
-    .catch(() => [] as Array<{ id: string; status: string | null; totalPrice: number | null; manualShippingCost: any; manualShippingCostCurrency: string | null }>);
-  const cancelledStatuses = new Set(['CANCELLED', 'cancelled', 'Cancelled', 'canceled', 'Canceled']);
-  const orderRowsActive = orderRows.filter(r => !cancelledStatuses.has(r.status || ''));
-  const orderRowsCancelled = orderRows.filter(r => cancelledStatuses.has(r.status || ''));
+    .catch(() => [] as Array<{
+      id: string;
+      marketplace: string | null;
+      status: string | null;
+      totalPrice: number | null;
+      manualShippingCost: unknown;
+      manualShippingCostCurrency: string | null;
+      uiOrderDate: Date | null;
+      createdAt: Date;
+    }>);
+  // canonicalStore decides store identity (B8): "Amazon" inside an Etsy shop name stays Etsy.
+  const orderRows = FINANCE_MARKETPLACES.has(mpLower)
+    ? orderRowsRaw.filter((r) => canonicalStore(r.marketplace, etsyShopNames).marketplace === mpLower)
+    : orderRowsRaw;
+  const orderRowsActive = orderRows.filter((r) => !CANCELLED_STATUSES.has(r.status || ''));
+  const refundedOrderCount = orderRows.length - orderRowsActive.length;
   const orderTableCount = orderRowsActive.length;
-  const orderTableRevenue = orderRowsActive.reduce(
-    (acc, r) => acc + Number(r.totalPrice || 0),
-    0,
-  );
-  // Distinct refunded orders, NOT individual refund ledger events. Etsy emits
-  // multiple refund entries per order (partial refund + return-shipping refund
-  // + commission refund), so counting Refund FinancialTransaction rows shows
-  // misleadingly high "X orders refunded" badges. The Order table is the
-  // single source of truth for distinct-order counts.
-  const refundedOrderCount = orderRowsCancelled.length;
+  const orderTableRevenue = orderRowsActive.reduce((acc, r) => acc + Number(r.totalPrice || 0), 0);
 
-  // Fetch product costs for COGS lookup
-  const productCosts = await prisma.productCost.findMany({
-    where: { userId, marketplace },
-  });
+  // Cursor: balance (current pass only) and freshness.
+  const cursor = opts.previous
+    ? null
+    : await prisma.financialSyncCursor
+        .findUnique({
+          where: { userId_marketplace: { userId, marketplace } },
+          select: { currentBalance: true, balanceCurrency: true, heldFunds: true, updatedAt: true },
+        })
+        .catch(() => null);
 
-  const costMap = new Map<string, { costAmount: number; shippingCost: number }>();
+  const currency =
+    opts.previous?.currency ?? pickDashboardCurrency(marketplace, cursor?.balanceCurrency, transactions.map((t) => t.currency));
+
+  // Product costs, converted to `currency` (B11). No rate → left out and counted.
+  // A 'TRY' label on a non-Trendyol tab is not trusted (legacy bulk import / schema default): used as is.
+  const productCosts = await prisma.productCost.findMany({ where: { userId, marketplace } });
+  const costCurrencyOf = (pc: { costCurrency: string | null }) => {
+    const c = normalizeCurrency(pc.costCurrency);
+    return mpLower !== 'trendyol' && c === 'TRY' && currency !== 'TRY' ? null : c;
+  };
+  // Ledger rows: `null` currency = the dashboard currency.
+  const txCurrencyOf = (tx: { currency?: string | null }) =>
+    tx.currency && String(tx.currency).trim() ? normalizeCurrency(tx.currency) : currency;
+  const needsRates =
+    productCosts.some((pc) => { const c = costCurrencyOf(pc); return c != null && c !== currency; }) ||
+    transactions.some((tx) => txCurrencyOf(tx) !== currency) ||
+    orderRows.some((r) => r.manualShippingCost != null && normalizeCurrency(r.manualShippingCostCurrency || currency) !== currency);
+  const rates: FxRates = needsRates ? await opts.rates() : {};
+
+  const costMap = new Map<string, CostEntry>();
+  const excluded = new Map<string, number>();
+  const unverified = new Map<string, number>();
   for (const pc of productCosts) {
     const key = pc.barcode || pc.sku || '';
-    if (key) {
-      costMap.set(key, {
-        costAmount: Number(pc.costAmount),
-        shippingCost: Number(pc.shippingCost || 0),
-      });
+    if (!key) continue;
+    const from = costCurrencyOf(pc);
+    if (from == null) {
+      const c = normalizeCurrency(pc.costCurrency);
+      unverified.set(c, (unverified.get(c) || 0) + 1);
     }
+    const cost = from == null ? Number(pc.costAmount) || 0 : convertToBase(Number(pc.costAmount), from, rates, currency);
+    const ship = from == null ? Number(pc.shippingCost || 0) || 0 : convertToBase(Number(pc.shippingCost || 0), from, rates, currency);
+    if (cost == null || ship == null) {
+      const c = normalizeCurrency(pc.costCurrency);
+      excluded.set(c, (excluded.get(c) || 0) + 1);
+      costMap.delete(key);
+      continue;
+    }
+    const unitCost = toCents(cost);
+    costMap.set(key, { unitCost, unitCogs: unitCost + toCents(ship), sku: pc.sku || null });
   }
 
-  // Aggregate summary
-  let grossRevenue = 0;
-  let commissions = 0;
-  let shipping = 0;
-  let returns = 0;
-  let discounts = 0;
-  let adSpend = 0;
-  // Trendyol deduction invoices that fit no other bucket: platform service
-  // fee, stopaj withholding, penalty invoices, early-payment deduction, etc.
-  let otherFees = 0;
-  // Etsy bank disbursements in the period (money actually paid out). NOT a P&L
-  // figure — reported separately in the "banked" panel.
-  let banked = 0;
-  const disbursements: Array<{ date: string; amount: number }> = [];
-  let cogs = 0;
+  const total = emptyLines();
+  const buckets = new Map<string, Lines>(keys.map((k) => [k, emptyLines()]));
+  const bucketFor = (d: Date) => {
+    const k = bucketKey(d, granularity, tz);
+    let b = buckets.get(k);
+    if (!b) {
+      b = emptyLines();
+      buckets.set(k, b);
+    }
+    return b;
+  };
+
   let orderCount = 0;
-  // Distinct orderNumbers with at least one finalized refund event in the
-  // period. Some marketplaces emit several refund ledger rows per order
-  // (partial refund + commission refund + return-shipping refund) so a raw
-  // increment overcounts; this Set gives us "real orders refunded".
+  let bankedCents = 0;
+  const disbursements: Array<{ date: string; amount: number }> = [];
+  // Distinct orderNumbers with a finalized refund event (several rows per order are common).
   const refundedOrderNumbers = new Set<string>();
-
-  // Transaction type summary
-  const transactionTypeSummary: Record<string, { count: number; total: number }> = {};
-
-  // Time series buckets
-  const timeMap = new Map<string, { revenue: number; commissions: number; shipping: number; returns: number; cogs: number }>();
-
-  // Product breakdown
+  const transactionTypeSummary: Record<string, TransactionTypeSummaryItem> = {};
   const productMap = new Map<string, ProductBreakdownItem>();
+  let unitsNoBarcode = 0;
 
-  // orderNumber → distinct products sold in it, to split an order's cargo
-  // cost across its products instead of charging the full cost to each.
-  const orderBarcodes = new Map<string, Set<string>>();
+  // Ledger currency (DS §3.12): a foreign-currency row is converted (≈) or, with no rate, left out and counted.
+  const ledgerConverted = new Map<string, number>();
+  const ledgerExcluded = new Map<string, number>();
+  const ledger: Array<{ tx: (typeof transactions)[number]; amount: number; commission: number; shipping: number }> = [];
   for (const tx of transactions) {
+    const from = txCurrencyOf(tx);
+    const raw = { amount: Number(tx.amount), commission: Number(tx.commission || 0), shipping: Number(tx.shippingAmount || 0) };
+    if (from === currency) {
+      ledger.push({ tx, ...raw });
+      continue;
+    }
+    const amount = convertToBase(raw.amount, from, rates, currency);
+    const commission = convertToBase(raw.commission, from, rates, currency);
+    const shipping = convertToBase(raw.shipping, from, rates, currency);
+    if (amount == null || commission == null || shipping == null) {
+      ledgerExcluded.set(from, (ledgerExcluded.get(from) || 0) + 1);
+      continue;
+    }
+    ledgerConverted.set(from, (ledgerConverted.get(from) || 0) + 1);
+    ledger.push({ tx, amount, commission, shipping });
+  }
+
+  // orderNumber → distinct products, to split an order's cargo cost across its products.
+  const orderBarcodes = new Map<string, Set<string>>();
+  for (const { tx } of ledger) {
     if (!tx.orderNumber || !tx.barcode || classifyTransactionType(tx.transactionType) !== 'revenue') continue;
     if (!orderBarcodes.has(tx.orderNumber)) orderBarcodes.set(tx.orderNumber, new Set());
     orderBarcodes.get(tx.orderNumber)!.add(tx.barcode);
   }
   const shippingCounted = new Set<string>();
 
-  for (const tx of transactions) {
-    const amount = Number(tx.amount);
-    const commissionAmt = Number(tx.commission || 0);
-    const shippingAmt = Number(tx.shippingAmount || 0);
+  for (const { tx, amount, commission: commissionAmt, shipping: shippingAmt } of ledger) {
     const category = classifyTransactionType(tx.transactionType);
     const quantity = tx.quantity || 1;
+    const cost = tx.barcode ? costMap.get(tx.barcode) : undefined;
 
-    // Transaction type summary
-    if (!transactionTypeSummary[tx.transactionType]) {
-      transactionTypeSummary[tx.transactionType] = { count: 0, total: 0 };
-    }
-    transactionTypeSummary[tx.transactionType].count++;
-    transactionTypeSummary[tx.transactionType].total += amount;
+    const row = transactionTypeSummary[tx.transactionType] ?? { count: 0, total: 0, category };
+    row.count++;
+    row.total += amount;
+    transactionTypeSummary[tx.transactionType] = row;
 
-    // Aggregate by category
-    switch (category) {
-      case 'revenue':
-        grossRevenue += amount;
-        commissions += commissionAmt;
-        // Trendyol headline shipping comes from Kargo Fatura invoice rows
-        // (statement-exact); the per-sale shippingAmount is a partial cargo
-        // line-item mapping kept for the product breakdown only.
-        if (tx.marketplace !== 'trendyol') shipping += shippingAmt;
-        orderCount++;
-        break;
-      case 'commission':
-        // CommissionPositive = refund (subtract), CommissionNegative = charge (add)
-        // But since amount sign already reflects this, just add the signed amount
-        if (amount > 0) {
-          commissions -= amount; // commission refund reduces commissions
-        } else {
-          commissions += Math.abs(amount);
-        }
-        break;
-      case 'shipping':
-        shipping += Math.abs(amount);
-        break;
-      case 'return':
-        returns += Math.abs(amount);
-        if (tx.orderNumber) refundedOrderNumbers.add(tx.orderNumber);
-        // Return transactions carry commission that should be refunded — subtract from total
-        // Trendyol stores commissionAmount as positive even on returns
-        if (commissionAmt > 0) {
-          commissions -= commissionAmt;
-        }
-        break;
-      case 'discount':
-        // Sign-aware: discount/coupon charges are negative (add to the total),
-        // cancellations (Kupon İptal / CouponCancel) come in positive and
-        // reduce it. abs() here used to inflate discounts by every
-        // cancellation.
-        discounts -= amount;
-        // Trendyol charges commission on the pre-discount price in the Satış
-        // row; each İndirim/Kupon row carries the commission share of the
-        // discount (positive) that it gives back, and each İptal takes it
-        // back again.
-        if (commissionAmt) commissions += amount < 0 ? -commissionAmt : commissionAmt;
-        break;
-      case 'adspend':
-        adSpend += Math.abs(amount);
-        break;
-      case 'fees':
-        // Cost rows carry negative amounts (credit − debt); credits (e.g.
-        // stopaj corrections) come in positive and reduce the total.
-        otherFees -= amount;
-        break;
-      case 'commission_invoice':
-        // Official commission invoice — already represented by per-sale
-        // commission amounts; kept visible in transactionTypeSummary only.
-        break;
-      case 'disbursement':
-        // Bank transfer of already-earned money — NOT a P&L event. Summed for
-        // the "banked" panel only. Stored negative (money out to bank).
-        banked += Math.abs(amount);
-        disbursements.push({ date: tx.transactionDate.toISOString().slice(0, 10), amount: round2(Math.abs(amount)) });
-        break;
-      case 'passthrough':
-        // Sales tax Etsy collects and remits. The tax CHARGE (negative) offsets
-        // tax already excluded from revenue — ignore it. But a tax REFUND
-        // (positive: sales_tax_refund) returns to the seller the tax portion
-        // that's baked into refund_gross (counted in returns); net it out so
-        // returns reflect the real business loss, tax-consistent with revenue.
-        if (amount > 0) returns -= amount;
-        break;
-      default:
-        // Other types — add to revenue if positive, ignore if negative
-        if (amount > 0) grossRevenue += amount;
-        break;
-    }
+    const c: TxCents = {
+      category,
+      amount: toCents(amount),
+      commission: toCents(commissionAmt),
+      shipping: toCents(shippingAmt),
+      isTrendyol: tx.marketplace === 'trendyol',
+      quantity,
+      unitCogs: cost ? cost.unitCogs : null,
+    };
+    applyTx(total, c);
+    applyTx(bucketFor(tx.transactionDate), c);
 
-    // COGS for revenue transactions; a return puts the unit back in stock,
-    // so its cost comes back out.
-    if ((category === 'revenue' || category === 'return') && tx.barcode) {
-      const cost = costMap.get(tx.barcode);
-      if (cost) {
-        const unitCogs = (cost.costAmount + cost.shippingCost) * quantity;
-        cogs += category === 'return' ? -unitCogs : unitCogs;
-      }
-    }
-
-    // Time series
-    const period = formatPeriod(tx.transactionDate, groupBy);
-    if (!timeMap.has(period)) {
-      timeMap.set(period, { revenue: 0, commissions: 0, shipping: 0, returns: 0, cogs: 0 });
-    }
-    const bucket = timeMap.get(period)!;
     if (category === 'revenue') {
-      bucket.revenue += amount;
-      bucket.commissions += commissionAmt;
-      if (tx.marketplace !== 'trendyol') bucket.shipping += shippingAmt;
-      if (tx.barcode) {
-        const cost = costMap.get(tx.barcode);
-        if (cost) bucket.cogs += (cost.costAmount + cost.shippingCost) * quantity;
-      }
-    } else if (category === 'commission') {
-      bucket.commissions += Math.abs(amount);
-    } else if (category === 'shipping') {
-      bucket.shipping += Math.abs(amount);
+      orderCount++;
+      if (!tx.barcode) unitsNoBarcode += quantity;
     } else if (category === 'return') {
-      bucket.returns += Math.abs(amount);
-      if (tx.barcode) {
-        const cost = costMap.get(tx.barcode);
-        if (cost) bucket.cogs -= (cost.costAmount + cost.shippingCost) * quantity;
-      }
+      if (tx.orderNumber) refundedOrderNumbers.add(tx.orderNumber);
+    } else if (category === 'disbursement') {
+      bankedCents += Math.abs(c.amount);
+      disbursements.push({ date: localDateKey(tx.transactionDate, tz), amount: round2(Math.abs(amount)) });
     }
 
-    // Product breakdown (only for transactions with barcode). Net per product:
-    // sales minus returns and discounts, so a sold-then-returned order nets
-    // to zero instead of showing as profit.
+    // Product breakdown (barcode rows). Net per product: sales − returns − discounts.
     if (tx.barcode && (category === 'revenue' || category === 'return' || category === 'discount')) {
       const key = tx.barcode;
-      if (!productMap.has(key)) {
-        productMap.set(key, {
+      let p = productMap.get(key);
+      if (!p) {
+        p = {
           barcode: tx.barcode,
+          sku: cost?.sku ?? null,
           productName: tx.productName,
           revenue: 0,
           quantity: 0,
@@ -439,23 +550,21 @@ async function buildDashboard(
           cogs: 0,
           unitCost: 0,
           netProfit: 0,
-        });
+        };
+        productMap.set(key, p);
       }
-      const p = productMap.get(key)!;
-      const cost = costMap.get(key);
-      if (cost) p.unitCost = cost.costAmount;
-      const unitCogs = cost ? (cost.costAmount + cost.shippingCost) * quantity : 0;
+      if (cost) p.unitCost = fromCents(cost.unitCost);
+      const unitCogs = cost ? fromCents(cost.unitCogs) * quantity : 0;
       p.revenue += amount;
       if (category === 'revenue') {
         p.quantity += quantity;
         p.commissions += commissionAmt;
         p.cogs += unitCogs;
-        // shippingAmount is the whole order's cargo cost and sits on every row
-        // of the order — count it once per order, split across its products.
+        // shippingAmount is the whole order's cargo and sits on every row — once per order, split.
         const orderKey = tx.orderNumber ? `${tx.orderNumber}|${key}` : null;
         if (shippingAmt && (!orderKey || !shippingCounted.has(orderKey))) {
           if (orderKey) shippingCounted.add(orderKey);
-          p.shipping += shippingAmt / (tx.orderNumber ? (orderBarcodes.get(tx.orderNumber)?.size || 1) : 1);
+          p.shipping += shippingAmt / (tx.orderNumber ? orderBarcodes.get(tx.orderNumber)?.size || 1 : 1);
         }
       } else if (category === 'return') {
         p.returnedQuantity += quantity;
@@ -467,47 +576,44 @@ async function buildDashboard(
     }
   }
 
-  // Manually-logged carrier costs (entered on the labels page from UPS/MNG
-  // invoices) — the only source of real label costs for carriers that bill
-  // after the fact. Converted into this dashboard's display currency;
-  // unconvertible entries are skipped rather than mis-summed. Cancelled
-  // orders included: a purchased label is a real cost either way.
-  const targetCurrency = marketplace === 'trendyol' ? 'TRY' : 'USD';
+  // Manually-logged carrier costs (labels page), converted to `currency`, in the order's bucket.
+  // Unconvertible entries are skipped, never mis-summed. Cancelled orders included.
   for (const r of orderRows) {
     const manualCost = r.manualShippingCost != null ? Number(r.manualShippingCost) : null;
     if (!manualCost) continue;
-    const converted = await convertCurrency(manualCost, r.manualShippingCostCurrency || targetCurrency, targetCurrency);
+    const converted = convertToBase(manualCost, r.manualShippingCostCurrency || currency, rates, currency);
     if (converted == null) {
-      logger.warn('Manual shipping cost skipped — FX rate unavailable', { orderId: r.id, currency: r.manualShippingCostCurrency, targetCurrency });
+      logger.warn('Manual shipping cost skipped — FX rate unavailable', {
+        orderId: r.id,
+        currency: r.manualShippingCostCurrency,
+        targetCurrency: currency,
+      });
       continue;
     }
-    shipping += converted;
+    const cents = toCents(converted);
+    total.shipping += cents;
+    bucketFor(r.uiOrderDate ?? r.createdAt).shipping += cents;
   }
 
-  const netProfit = grossRevenue - commissions - shipping - returns - discounts - adSpend - otherFees - cogs;
-  const margin = grossRevenue > 0 ? (netProfit / grossRevenue) * 100 : 0;
-
-  // Current marketplace account balance (money earned, not yet paid to bank).
-  const cursor = await prisma.financialSyncCursor.findUnique({
-    where: { userId_marketplace: { userId, marketplace } },
-    select: { currentBalance: true, balanceCurrency: true, heldFunds: true },
-  }).catch(() => null);
+  const netProfitC = netCents(total);
+  const margin = total.revenue > 0 ? (netProfitC / total.revenue) * 100 : 0;
   disbursements.sort((a, b) => a.date.localeCompare(b.date));
 
-  // Build time series array
-  const timeSeries: TimeSeriesPoint[] = Array.from(timeMap.entries())
+  const timeSeries: TimeSeriesPoint[] = Array.from(buckets.entries())
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([period, data]) => ({
+    .map(([period, l]) => ({
       period,
-      revenue: round2(data.revenue),
-      commissions: round2(data.commissions),
-      shipping: round2(data.shipping),
-      returns: round2(data.returns),
-      cogs: round2(data.cogs),
-      netProfit: round2(data.revenue - data.commissions - data.shipping - data.returns - data.cogs),
+      revenue: fromCents(l.revenue),
+      commissions: fromCents(l.commissions),
+      shipping: fromCents(l.shipping),
+      returns: fromCents(l.returns),
+      discounts: fromCents(l.discounts),
+      adSpend: fromCents(l.adSpend),
+      otherFees: fromCents(l.otherFees),
+      cogs: fromCents(l.cogs),
+      netProfit: fromCents(netCents(l)),
     }));
 
-  // Build product breakdown
   const productBreakdown: ProductBreakdownItem[] = Array.from(productMap.values())
     .map((p) => ({
       ...p,
@@ -519,74 +625,63 @@ async function buildDashboard(
     }))
     .sort((a, b) => b.revenue - a.revenue);
 
+  const costCoverage: CostCoverage = { products: 0, productsWithCost: 0, unitsWithoutCost: unitsNoBarcode };
+  for (const [key, p] of productMap) {
+    if (p.quantity <= 0) continue;
+    costCoverage.products++;
+    if (costMap.has(key)) costCoverage.productsWithCost++;
+    else costCoverage.unitsWithoutCost += p.quantity;
+  }
+
+  const summary: DashboardSummary = {
+    currency,
+    grossRevenue: fromCents(total.revenue),
+    commissions: fromCents(total.commissions),
+    shipping: fromCents(total.shipping),
+    returns: fromCents(total.returns),
+    discounts: fromCents(total.discounts),
+    adSpend: fromCents(total.adSpend),
+    otherFees: fromCents(total.otherFees),
+    cogs: fromCents(total.cogs),
+    netProfit: fromCents(netProfitC),
+    margin: round2(margin),
+    orderCount,
+    returnCount: refundedOrderNumbers.size,
+    pendingCancellationCount: Math.max(0, refundedOrderCount - refundedOrderNumbers.size),
+    totalOrderCount: orderTableCount,
+    pendingSettlementCount: Math.max(0, orderTableCount - orderCount),
+    totalOrderRevenue: round2(orderTableRevenue),
+  };
+  if (!opts.previous) {
+    summary.banked = fromCents(bankedCents);
+    summary.disbursementCount = disbursements.length;
+    summary.currentBalance = cursor?.currentBalance != null ? Number(cursor.currentBalance) : null;
+    summary.balanceCurrency = cursor?.balanceCurrency || null;
+    summary.heldFunds = cursor?.heldFunds != null ? Number(cursor.heldFunds) : null;
+  }
+
   return {
-    summary: {
-      grossRevenue: round2(grossRevenue),
-      commissions: round2(commissions),
-      shipping: round2(shipping),
-      returns: round2(returns),
-      discounts: round2(discounts),
-      adSpend: round2(adSpend),
-      otherFees: round2(otherFees),
-      cogs: round2(cogs),
-      netProfit: round2(netProfit),
-      margin: round2(margin),
-      orderCount,
-      // Number of distinct orders whose refund event has actually posted in
-      // the period. Drives the Returns card's "X refunds" subtitle.
-      returnCount: refundedOrderNumbers.size,
-      // Orders cancelled in the period but with no matching refund event yet
-      // — Amazon settlement lags 14-30 days, so these will mature later.
-      // Surfaced as a separate "+N cancellations pending settlement" badge
-      // so the user understands why "$0 refunded across 8 cancellations".
-      pendingCancellationCount: Math.max(
-        0,
-        refundedOrderCount - refundedOrderNumbers.size,
-      ),
-      totalOrderCount: orderTableCount,
-      pendingSettlementCount: Math.max(0, orderTableCount - orderCount),
-      totalOrderRevenue: round2(orderTableRevenue),
-      // Banked = money disbursed to bank in the period; currentBalance = money
-      // earned but not yet paid out (as of last sync). Powers the banked panel.
-      banked: round2(banked),
-      disbursementCount: disbursements.length,
-      currentBalance: cursor?.currentBalance != null ? Number(cursor.currentBalance) : null,
-      balanceCurrency: cursor?.balanceCurrency || null,
-      heldFunds: cursor?.heldFunds != null ? Number(cursor.heldFunds) : null,
-    },
-    disbursements,
+    summary,
+    disbursements: opts.previous ? [] : disbursements,
     timeSeries,
     productBreakdown,
     transactionTypeSummary,
+    costCoverage,
+    cogsExcluded: Array.from(excluded.entries())
+      .map(([c, products]) => ({ currency: c, products }))
+      .sort((a, b) => a.currency.localeCompare(b.currency)),
+    cogsUnverified: countList(unverified, 'products'),
+    ledgerConverted: countList(ledgerConverted, 'rows'),
+    ledgerExcluded: countList(ledgerExcluded, 'rows'),
+    lastSyncedAt: cursor?.updatedAt ? new Date(cursor.updatedAt).toISOString() : null,
   };
-}
-
-function formatPeriod(date: Date, groupBy: string): string {
-  const d = new Date(date);
-  switch (groupBy) {
-    case 'day':
-      return d.toISOString().slice(0, 10);
-    case 'week': {
-      // ISO week start (Monday)
-      const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-      const monday = new Date(d);
-      monday.setDate(diff);
-      return monday.toISOString().slice(0, 10);
-    }
-    case 'month':
-    default:
-      return d.toISOString().slice(0, 7);
-  }
-}
-
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
 }
 
 // ---------------------------------------------------------------------------
 // Main handler
 // ---------------------------------------------------------------------------
+
+const first = (v: string | string[] | undefined): string | undefined => (Array.isArray(v) ? v[0] : v);
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -608,62 +703,77 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!user) return res.status(401).json({ error: 'Unauthorized. Please sign in.' });
       userId = user.id;
     }
-    const marketplace = (req.query.marketplace as string) || 'trendyol';
-    const groupBy = (req.query.groupBy as string) || 'month';
-
-    if (!['day', 'week', 'month'].includes(groupBy)) {
-      return res.status(400).json({ error: 'groupBy must be one of: day, week, month' });
+    const marketplace = first(req.query.marketplace) || first(req.query.mp) || 'trendyol';
+    const granularityRaw = first(req.query.granularity) || first(req.query.groupBy) || 'month';
+    if (!isGranularity(granularityRaw)) {
+      return res.status(400).json({ error: 'groupBy must be one of: hour, day, week, month' });
     }
+    const granularity: Granularity = granularityRaw;
+    const compare = first(req.query.compare) === 'previous';
+    const fromQ = first(req.query.from);
+    const toQ = first(req.query.to);
+    // New UI (from/to): seller tz, default Europe/Istanbul. Legacy calls without `tz` keep their
+    // UTC windows and UTC buckets, so the legacy page sees no shifted/extra bucket.
+    const tz = fromQ || toQ || req.query.tz ? parseTz(req.query.tz) : 'UTC';
 
-    // Default: last 30 days
-    const now = new Date();
-    const defaultStart = new Date(now);
-    defaultStart.setDate(defaultStart.getDate() - 30);
+    let startDate: Date;
+    let endDate: Date;
+    let fromKey: string | undefined;
+    let toKey: string | undefined;
+    let prevWindow: { startDate: Date; endDate: Date; from?: string; to?: string } | null = null;
 
-    const startDateRaw = req.query.startDate as string | undefined;
-    const endDateRaw = req.query.endDate as string | undefined;
-
-    const startDate = startDateRaw
-      ? new Date(Number(startDateRaw) || startDateRaw)
-      : defaultStart;
-    let endDate = endDateRaw
-      ? new Date(Number(endDateRaw) || endDateRaw)
-      : now;
-
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-      return res.status(400).json({ error: 'Invalid date format. Use epoch ms or ISO string.' });
-    }
-
-    // Date-only inputs (YYYY-MM-DD) parse to midnight UTC on that day. Without
-    // this fix the dashboard misses everything placed *during* the last day of
-    // the range — labels page already does the same end-of-day bump so without
-    // it, the two views report different counts. (Off-by-one between "9
-    // orders" on financials and "10 orders" on labels was this exact issue.)
-    if (
-      typeof endDateRaw === 'string' &&
-      /^\d{4}-\d{2}-\d{2}$/.test(endDateRaw) &&
-      endDate.getUTCHours() === 0 &&
-      endDate.getUTCMinutes() === 0
-    ) {
-      endDate = new Date(endDate.getTime() + 24 * 60 * 60 * 1000 - 1);
+    if (fromQ || toQ) {
+      // New UI: local calendar days in the seller's time zone (B2/B13).
+      const w = fromQ && toQ ? windowFromKeys(fromQ, toQ, tz) : null;
+      if (!w) return res.status(400).json({ error: 'from and to must be YYYY-MM-DD dates with from <= to' });
+      startDate = w.start;
+      endDate = w.end;
+      fromKey = w.from;
+      toKey = w.to;
+      if (compare) {
+        const p = previousKeys(w.from, w.to);
+        const pw = windowFromKeys(p.from, p.to, tz)!;
+        prevWindow = { startDate: pw.start, endDate: pw.end, from: pw.from, to: pw.to };
+      }
+    } else {
+      // Legacy: epoch ms or ISO; default last 30 days.
+      const now = new Date();
+      const defaultStart = new Date(now);
+      defaultStart.setDate(defaultStart.getDate() - 30);
+      const startDateRaw = first(req.query.startDate);
+      const endDateRaw = first(req.query.endDate);
+      startDate = startDateRaw ? new Date(Number(startDateRaw) || startDateRaw) : defaultStart;
+      endDate = endDateRaw ? new Date(Number(endDateRaw) || endDateRaw) : now;
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        return res.status(400).json({ error: 'Invalid date format. Use epoch ms or ISO string.' });
+      }
+      // Date-only end (YYYY-MM-DD) parses to midnight UTC: include the whole day (labels parity).
+      if (
+        typeof endDateRaw === 'string' &&
+        /^\d{4}-\d{2}-\d{2}$/.test(endDateRaw) &&
+        endDate.getUTCHours() === 0 &&
+        endDate.getUTCMinutes() === 0
+      ) {
+        endDate = new Date(endDate.getTime() + 24 * 60 * 60 * 1000 - 1);
+      }
+      if (compare) {
+        const len = endDate.getTime() - startDate.getTime() + 1;
+        prevWindow = { startDate: new Date(startDate.getTime() - len), endDate: new Date(startDate.getTime() - 1) };
+      }
     }
 
     // Debug mode: show raw transaction type distribution
     if (req.query.debug === 'true') {
       const txTypes = await prisma.financialTransaction.groupBy({
         by: ['transactionType'],
-        where: {
-          userId,
-          marketplace,
-          transactionDate: { gte: startDate, lte: endDate },
-        },
+        where: { userId, marketplace, transactionDate: { gte: startDate, lte: endDate } },
         _count: true,
         _sum: { amount: true, commission: true, shippingAmount: true },
       });
       return res.status(200).json({
         debug: true,
         dateRange: { start: startDate.toISOString(), end: endDate.toISOString() },
-        transactionTypes: txTypes.map(t => ({
+        transactionTypes: txTypes.map((t) => ({
           type: t.transactionType,
           count: t._count,
           totalAmount: t._sum.amount ? Number(t._sum.amount) : 0,
@@ -674,20 +784,52 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Staleness fallback: the sync-financials cron keeps ledgers current every
-    // 6h; if it missed (deploy, outage), refresh here so the user never sees
-    // stale numbers. Bounded by a 20s race — a slow marketplace API can't hang
-    // the dashboard; the sync finishes in the background for the next load.
+    // Staleness fallback (bounded 20s race inside); never blocks on failure.
     await refreshFinancialsIfStale(userId, marketplace).catch(() => undefined);
 
-    const dashboard = await buildDashboard(userId, marketplace, startDate, endDate, groupBy);
+    // Every finance tab needs the Etsy shop names: canonicalStore keeps an Etsy shop called
+    // "…amazon…" out of the Amazon tab, not only inside the Etsy tab (B8).
+    const etsyShopNames =
+      FINANCE_MARKETPLACES.has(marketplace.toLowerCase())
+        ? await prisma.etsyShop
+            .findMany({ where: { userId }, select: { shopName: true } })
+            .then((shops) => shops.map((s) => s.shopName).filter((n): n is string => typeof n === 'string' && n.trim() !== ''))
+            .catch(() => [] as string[])
+        : [];
+    const rates = lazyRates();
+    const base = { userId, marketplace, granularity, tz, etsyShopNames, rates };
+
+    const dashboard = await buildDashboard({ ...base, startDate, endDate });
+    let previousSummary: DashboardSummary | undefined;
+    if (prevWindow) {
+      const prev = await buildDashboard({
+        ...base,
+        startDate: prevWindow.startDate,
+        endDate: prevWindow.endDate,
+        previous: { currency: dashboard.summary.currency },
+      });
+      previousSummary = prev.summary;
+    }
 
     return res.status(200).json({
       marketplace,
       startDate: startDate.toISOString(),
       endDate: endDate.toISOString(),
-      groupBy,
+      ...(fromKey ? { from: fromKey, to: toKey } : {}),
+      tz,
+      groupBy: granularity,
+      granularity,
       ...dashboard,
+      ...(prevWindow
+        ? {
+            previous: {
+              startDate: prevWindow.startDate.toISOString(),
+              endDate: prevWindow.endDate.toISOString(),
+              ...(prevWindow.from ? { from: prevWindow.from, to: prevWindow.to } : {}),
+            },
+            previousSummary,
+          }
+        : {}),
     });
   } catch (err: any) {
     if (err.status && err.message) {

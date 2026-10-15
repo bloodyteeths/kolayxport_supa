@@ -1,0 +1,32 @@
+{
+  "en": {
+    "listingEditor": {
+      "media": {
+        "invalidUrl": "This image link can't be used. Use a public https link",
+        "imageMissing": "This photo is no longer on the product, so it was skipped",
+        "tooMany": "A product can have at most {max} photos",
+        "orderStale": "The photos changed since you loaded them. Refresh and try the new order again",
+        "choiceLinked": "Some photos are linked to options (for example a color). Reorder these photos in Wix",
+        "restoreFailed": "Reordering failed and the photos could not be put back. Check this product's photos in Wix"
+      },
+      "wix": {
+        "collectionProtected": "The \"All products\" collection can't be changed"
+      }
+    }
+  },
+  "tr": {
+    "listingEditor": {
+      "media": {
+        "invalidUrl": "Bu görsel bağlantısı kullanılamıyor. Herkese açık bir https bağlantısı kullanın",
+        "imageMissing": "Bu fotoğraf artık üründe yok, bu yüzden atlandı",
+        "tooMany": "Bir üründe en fazla {max} fotoğraf olabilir",
+        "orderStale": "Fotoğraflar siz yükledikten sonra değişti. Yenileyip yeni sıralamayı tekrar deneyin",
+        "choiceLinked": "Bazı fotoğraflar seçeneklere (örneğin renk) bağlı. Bu fotoğrafları Wix'te sıralayın",
+        "restoreFailed": "Sıralama başarısız oldu ve fotoğraflar geri eklenemedi. Bu ürünün fotoğraflarını Wix'te kontrol edin"
+      },
+      "wix": {
+        "collectionProtected": "\"Tüm ürünler\" koleksiyonu değiştirilemez"
+      }
+    }
+  }
+}

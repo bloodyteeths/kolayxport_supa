@@ -15,6 +15,12 @@ export interface TrendyolScoreInput {
   description?: string | null;
   /** Number of filled category attributes. null/undefined → `na`. */
   attributeCount?: number | null;
+  /**
+   * Required category attributes still empty (editor only: the section knows the category's required set from
+   * `metadata?action=category_attributes`). > 0 fails the attributes check whatever the count; undefined/null =
+   * unknown (cache rows), the count rule applies. M6b-E.
+   */
+  requiredAttributesMissing?: number | null;
   listPrice?: number | null;
   salePrice?: number | null;
   quantity?: number | null;
@@ -108,7 +114,14 @@ export function trendyolChecks(input: TrendyolScoreInput): Check[] {
   }
 
   // Attributes: legacy ≥ 5 → 15, ≥ 3 → 12, ≥ 1 → 8.
-  if (typeof input.attributeCount !== 'number') {
+  const reqMissing = typeof input.requiredAttributesMissing === 'number' && input.requiredAttributesMissing > 0
+    ? Math.round(input.requiredAttributesMissing)
+    : 0;
+  if (reqMissing > 0) {
+    // Trendyol refuses a product without its category's required attributes: a hard fail, not "add more".
+    checks.push(check('attributes', I.attributes, 'fail', `${K}.attributes.requiredMissing`, { count: reqMissing },
+      { label: `${FIX}.fillDetails`, field: 'attributes' }));
+  } else if (typeof input.attributeCount !== 'number') {
     checks.push(naCheck('attributes', I.attributes, `${K}.attributes.pass`, `${NA}.noData`, { label: `${FIX}.fillDetails`, field: 'attributes' }));
   } else {
     const n = input.attributeCount;
@@ -206,4 +219,13 @@ export function trendyolInputFromCache(row: TrendyolCacheRow): TrendyolScoreInpu
     blacklisted: row.blacklisted,
     dimensionalWeight: row.dimensionalWeight,
   };
+}
+
+/**
+ * Editor facts (`ListingFacts.attributes`: required count + filled required count, reported by the Trendyol
+ * attributes section) → `requiredAttributesMissing`. undefined when the category attributes are not loaded.
+ */
+export function trendyolRequiredMissing(facts: { required: number; filled: number } | null | undefined): number | undefined {
+  if (!facts || !Number.isFinite(facts.required) || !Number.isFinite(facts.filled)) return undefined;
+  return Math.max(0, Math.round(facts.required - facts.filled));
 }

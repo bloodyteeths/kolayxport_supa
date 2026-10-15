@@ -122,7 +122,7 @@ describe('marketplace eligibility (§3.2) and defaults', () => {
   });
   it('hrefs: shipped tools on the hub, unshipped tools on their legacy page', () => {
     expect(researchToolHref('products', 'ebay', { q: 'a b' })).toBe('/app/research/products?mkt=ebay&q=a+b');
-    expect(researchToolHref('keywords', 'etsy')).toBe('/app/etsy-research?tab=research');
+    expect(researchToolHref('keywords', 'etsy')).toBe('/app/research/keywords?mkt=etsy');
     expect(researchToolHref('shops', 'ebay')).toBe('/app/ebay-research?sub=seller_tracker');
     expect(legacyResearchHref('trendyol')).toBe('/app/trendyol-arastirma');
     expect(toShippedHref('/app/research/shops?mkt=etsy&add=WoodAndWords', 'ebay')).toBe('/app/etsy-research?tab=shopIntel');
@@ -141,7 +141,7 @@ describe('smart search routing (§4.3)', () => {
     const r = await routeResearchSearch('etsy.com/listing/1490012234/x', { mkt: 'etsy', isOwnEtsyListing: async () => { throw new Error('x'); } });
     expect(r.startsWith('/app/research/products')).toBe(true);
     expect(await routeResearchSearch('wooden box', { mkt: 'etsy', question: 'price' })).toBe('/app/research/products?mkt=etsy&q=wooden+box#price');
-    expect(await routeResearchSearch('wooden box', { mkt: 'etsy', question: 'tags' })).toBe('/app/etsy-research?tab=research');
+    expect(await routeResearchSearch('wooden box', { mkt: 'etsy', question: 'tags' })).toBe('/app/research/keywords?mkt=etsy&q=wooden+box');
   });
 });
 

@@ -34,7 +34,8 @@ import { decodeEntities } from '@/lib/text/decodeEntities';
 // Types + pure helpers (exported for tests)
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-export type ReviewMarketplace = 'etsy' | 'ebay';
+/** Etsy/eBay drafts, or the Trendyol/Wix/Shopify CatalogDraft (same diff/resolve contract, marketplace-editors §7.1). */
+export type ReviewMarketplace = 'etsy' | 'ebay' | 'trendyol' | 'wix' | 'shopify';
 export type ReviewChoice = 'mine' | 'remote';
 
 /** One field of GET …/diff (pages/api/etsy-drafts/[id]/diff.ts `DraftDiffField`). */
@@ -285,8 +286,14 @@ type LoadState =
   | { status: 'unavailable' }
   | { status: 'error'; message?: string };
 
-const BASE: Record<ReviewMarketplace, string> = { etsy: '/api/etsy-drafts', ebay: '/api/ebay-drafts' };
-const NAMES: Record<ReviewMarketplace, string> = { etsy: 'Etsy', ebay: 'eBay' };
+const BASE: Record<ReviewMarketplace, string> = {
+  etsy: '/api/etsy-drafts',
+  ebay: '/api/ebay-drafts',
+  trendyol: '/api/catalog-drafts',
+  wix: '/api/catalog-drafts',
+  shopify: '/api/catalog-drafts',
+};
+const NAMES: Record<ReviewMarketplace, string> = { etsy: 'Etsy', ebay: 'eBay', trendyol: 'Trendyol', wix: 'Wix', shopify: 'Shopify' };
 
 export function ReviewDifferencesPanel({
   open, onClose, marketplace, draftId, draftStartedAt, currency, shopName, describeValue, onResolved, onRemoveQueuedAction,

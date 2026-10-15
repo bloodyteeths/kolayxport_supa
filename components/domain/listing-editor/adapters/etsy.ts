@@ -31,6 +31,7 @@ import type {
   RemoteImage,
 } from '@/lib/listingEditor/types';
 import { diffKeys, fieldEquals } from '../changeSummary';
+import { storedDraftSendError } from '../draftSendError';
 import type { AdapterContext, AdapterErrorInfo, ListingEditorAdapter, LoadedListing, StageFieldsInput } from './types';
 
 /** Etsy's photo limit per listing. */
@@ -466,8 +467,13 @@ export function etsyErrorInfo(err: unknown): AdapterErrorInfo {
   return { status: null, network, conflict: false, key: null };
 }
 
-/** `lastSyncError` → full i18n key (same families as the listings grid, `listings.sendError.*`). */
-export function etsyFailureCauseKey(draft: Pick<DraftRow, 'status' | 'lastSyncError'>): string {
+/**
+ * Failed-banner cause key. The API's `lastSyncErrorKey` (`etsy.draftSync.<code>`) wins; old rows that still hold
+ * English `lastSyncError` text fall back to the listings grid families (`listings.sendError.*`).
+ */
+export function etsyFailureCauseKey(draft: Pick<DraftRow, 'status' | 'lastSyncError' | 'raw'>): string {
+  const stored = storedDraftSendError(draft, 'etsy.');
+  if (stored) return stored.errorKey;
   const raw = typeof draft.lastSyncError === 'string' ? draft.lastSyncError.trim() : '';
   if (raw && I18N_KEY_RE.test(raw)) return raw.startsWith('etsy.') || raw.startsWith('listings.') ? raw : `etsy.${raw}`;
   if (draft.status === 'conflict') return 'listings.sendError.conflict';

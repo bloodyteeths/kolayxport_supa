@@ -86,7 +86,7 @@
       e.preventDefault();
       e.stopPropagation();
       const targetAsin = e.target.getAttribute('data-asin');
-      window.open(`https://kolayxport.com/app/amazon-research?asin=${targetAsin}`, '_blank');
+      window.open(`https://kolayxport.com/app/research/products?mkt=amazon&q=${targetAsin}`, '_blank');
     });
   }
 
@@ -150,7 +150,7 @@
         <span class="kx-sep">|</span>
         <span>Competition: <strong class="${compColor}">${competitionLabel}</strong></span>
         <span class="kx-sep">|</span>
-        <button class="kx-ai-btn" onclick="window.open('https://kolayxport.com/app/amazon-research?q=' + encodeURIComponent(new URLSearchParams(window.location.search).get('k') || ''), '_blank')">
+        <button class="kx-ai-btn" onclick="window.open('https://kolayxport.com/app/research/keywords?mkt=amazon&q=' + encodeURIComponent(new URLSearchParams(window.location.search).get('k') || ''), '_blank')">
           🤖 Deep AI Analysis
         </button>
       </div>

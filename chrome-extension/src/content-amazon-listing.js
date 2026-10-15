@@ -141,10 +141,10 @@
       ` : ''}
 
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="kx-ai-btn" onclick="window.open('https://kolayxport.com/app/amazon-research?asin=${asin}', '_blank')">
+        <button class="kx-ai-btn" onclick="window.open('https://kolayxport.com/app/research/products?mkt=amazon&q=${asin}', '_blank')">
           🤖 AI Analysis
         </button>
-        <button class="kx-ai-btn" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)" onclick="window.open('https://kolayxport.com/app/amazon-research?q=' + encodeURIComponent(document.title.split('-')[0]?.trim() || '${asin}'), '_blank')">
+        <button class="kx-ai-btn" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)" onclick="window.open('https://kolayxport.com/app/research/products?mkt=amazon&q=' + encodeURIComponent(document.title.split('-')[0]?.trim() || '${asin}'), '_blank')">
           🔍 Market Research
         </button>
       </div>

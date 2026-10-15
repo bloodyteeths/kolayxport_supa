@@ -100,7 +100,7 @@
 
       const right = S.el('div', null, null, 'margin-left:auto;');
       const link = S.el('a', 'kx-btn kx-btn-sm', S.t('fullAnalysis'), 'background:rgba(255,255,255,0.2);text-decoration:none;color:#fff;');
-      link.href = S.API_BASE + '/app/etsy-research';
+      link.href = S.API_BASE + '/app/research/keywords?mkt=etsy&q=' + encodeURIComponent(query || '');
       link.target = '_blank';
       link.rel = 'noopener';
       right.appendChild(link);

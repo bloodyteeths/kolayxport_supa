@@ -273,9 +273,10 @@ describe('Sales helpers', () => {
     expect(baseSalesCurrency('en')).toBe('USD');
     // The account base wins over the UI locale (a TR seller on the EN UI sees TRY); locale only as the fallback.
     expect(defaultSalesCurrency({ state: 'ready', hasSender: true, baseCurrency: 'TRY' }, 'en')).toBe('TRY');
-    expect(defaultSalesCurrency({ state: 'ready', hasSender: true, baseCurrency: 'GBP' }, 'en')).toBe('USD');
+    expect(defaultSalesCurrency({ state: 'ready', hasSender: true, baseCurrency: 'GBP' }, 'en')).toBe('TRY');
     expect(defaultSalesCurrency({ state: 'ready', hasSender: false, baseCurrency: 'USD' }, 'tr')).toBe('TRY');
-    expect(defaultSalesCurrency({ state: 'error', hasSender: false, baseCurrency: 'USD' }, 'en')).toBe('USD');
+    expect(defaultSalesCurrency({ state: 'error', hasSender: false, baseCurrency: 'USD' }, 'en')).toBe('TRY');
+    expect(defaultSalesCurrency({ state: 'ready', hasSender: true, baseCurrency: 'USD' }, 'tr')).toBe('TRY');
     expect(isRangeRejected({ status: 400 })).toBe(true);
     expect(isRangeRejected({ status: 500 })).toBe(false);
     const blocks = salesCsvBlocks(r, { currency: 'TRY', t: (k) => k, manualLabel: 'Manual orders' });

@@ -83,8 +83,11 @@ export function defaultSalesCurrency(
   profile: { state: 'loading' | 'ready' | 'error'; hasSender: boolean; baseCurrency: string },
   locale: string,
 ): SalesCurrency {
-  if (profile.state === 'ready' && profile.hasSender) return asSalesCurrency(profile.baseCurrency) ?? baseSalesCurrency(locale);
-  return baseSalesCurrency(locale);
+  // Founder decision (2026-10-16): Turkish sellers read their business in TL. A USD sender currency (set for
+  // international labels) must not make Home open in dollars; the ₺/$/€ switch is one click away.
+  void profile;
+  void locale;
+  return 'TRY';
 }
 
 export interface StoreChoice {

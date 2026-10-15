@@ -1,6 +1,7 @@
 import { Box, Button, Checkbox, FormControlLabel, Paper, Typography } from '@mui/material';
 import { useTranslations } from 'next-intl';
 import CopyButton from '@/components/ui/CopyButton';
+import ExportMenu from '@/components/labels/ExportMenu';
 
 interface LabelsBulkBarProps {
   count: number;
@@ -13,6 +14,17 @@ interface LabelsBulkBarProps {
   onEtgb: () => void;
   /** Computed at click time. */
   getAddressesTsv: () => string;
+  /** Selected Order.id values (for "Export selected"). */
+  selectedIds?: string[];
+  /** The filter object passed to useOrders (for "Export all matching filters"). */
+  exportFilters?: Record<string, unknown>;
+  /** Orders matching exportFilters. */
+  matchingTotal?: number;
+  /**
+   * With nothing selected, show a compact floating Export pill so exporting
+   * by filters stays reachable. Default false.
+   */
+  showIdleExport?: boolean;
 }
 
 /** Sticky bottom bar shown while orders are selected on the labels page. */
@@ -26,9 +38,27 @@ export default function LabelsBulkBar({
   processingEtgb,
   onEtgb,
   getAddressesTsv,
+  selectedIds,
+  exportFilters,
+  matchingTotal,
+  showIdleExport = false,
 }: LabelsBulkBarProps) {
   const t = useTranslations('labels');
-  if (count === 0) return null;
+  const canExport = !!selectedIds || !!exportFilters;
+  if (count === 0) {
+    if (!showIdleExport || !exportFilters) return null;
+    return (
+      // pointer-events only on the pill so the strip never blocks the cards
+      // under it (the page's sticky wrapper also sets pointer-events:none while
+      // nothing is selected). The strip keeps its height on purpose: at the end
+      // of the list it gives the pill its own row below the pagination.
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', px: { xs: 1.5, sm: 2 }, pb: { xs: 'calc(8px + env(safe-area-inset-bottom))', sm: 1 }, pointerEvents: 'none' }}>
+        <Box sx={{ pointerEvents: 'auto' }}>
+          <ExportMenu variant="chip" selectedIds={[]} filters={exportFilters} matchingTotal={matchingTotal} />
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Paper
@@ -68,6 +98,9 @@ export default function LabelsBulkBar({
         {t('selectedCount', { count })}
       </Typography>
       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', ml: 'auto', flexWrap: 'wrap' }}>
+        {canExport && (
+          <ExportMenu selectedIds={selectedIds || []} filters={exportFilters} matchingTotal={matchingTotal} />
+        )}
         <CopyButton
           variant="chip"
           size="medium"

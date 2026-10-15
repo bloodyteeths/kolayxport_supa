@@ -17,7 +17,6 @@ import {
   ChevronDown,
   LogOut as LogOutIcon,
   LayoutDashboard,
-  ShoppingCart,
   FileText,
   LifeBuoy,
   Info,
@@ -125,8 +124,6 @@ function getNavGroups(t) {
       label: t('labelsNav'),
       items: [
         { href: '/app/labels', icon: FileText, label: t('allOrders') },
-        // Senkron stays reachable as the production / packing list.
-        { href: '/app/senkron', icon: ShoppingCart, label: t('productionList') },
       ],
     },
     {

@@ -19,6 +19,7 @@ import ManualOrderButton from '@/components/ManualOrderButton';
 import ShippingCostCell from '@/components/labels/ShippingCostCell';
 import PrintLabelButton from '@/components/labels/PrintLabelButton';
 import CopyAddressControl from '@/components/labels/CopyAddressControl';
+import OrderNoteField from '@/components/labels/OrderNoteField';
 import LabelsBulkBar from '@/components/labels/LabelsBulkBar';
 import PrintSelectionActions from '@/components/print/PrintSelectionActions';
 import { getLatestLabel, getTrackingPair, carrierToVeeqoId, openLabelUrl } from '@/components/labels/labelLinks';
@@ -1719,6 +1720,20 @@ function LabelsPage(props: { source?: string; channel?: string }) {
   const lastFilterSignatureRef = useRef(filterSignature);
   const effectivePage = lastFilterSignatureRef.current === filterSignature ? paginationModel.page : 0;
 
+  // Shared by the list query and "Export all matching filters" (LabelsBulkBar).
+  const orderListFilters = useMemo(() => ({
+    search: debouncedSearch,
+    searchType: searchType,
+    startDate: filterStartDate,
+    endDate: filterEndDate,
+    marketplace: marketplaceFilter.length > 0 ? marketplaceFilter : undefined,
+    status: statusFilter,
+    labelFilter: effectiveLabelFilter === 'failed' ? undefined : effectiveLabelFilter,
+    labelStatus: effectiveLabelFilter === 'failed' ? 'failed' : undefined,
+    sortBy: SORT_PARAMS[sortOption].sortBy,
+    sort: SORT_PARAMS[sortOption].sort,
+  }), [debouncedSearch, searchType, filterStartDate, filterEndDate, marketplaceFilter, statusFilter, effectiveLabelFilter, sortOption]);
+
   const {
     orders: fetchedOrders,
     total,
@@ -1728,18 +1743,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
   } = useOrders(
     effectivePage + 1,
     paginationModel.pageSize,
-    {
-      search: debouncedSearch,
-      searchType: searchType,
-      startDate: filterStartDate,
-      endDate: filterEndDate,
-      marketplace: marketplaceFilter.length > 0 ? marketplaceFilter : undefined,
-      status: statusFilter,
-      labelFilter: effectiveLabelFilter === 'failed' ? undefined : effectiveLabelFilter,
-      labelStatus: effectiveLabelFilter === 'failed' ? 'failed' : undefined,
-      sortBy: SORT_PARAMS[sortOption].sortBy,
-      sort: SORT_PARAMS[sortOption].sort,
-    },
+    orderListFilters,
     'labelsPage'
   );
 
@@ -2823,6 +2827,24 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                         {row.variantInfo && row.variantInfo !== '—' ? ` · ${row.variantInfo}` : ''}
                         {group.items.length > 1 ? ` (+${group.items.length - 1})` : ''}
                       </Typography>
+                      {/* Private per-order note (SenkronOrderData.internalNote); never sent to a marketplace. */}
+                      <OrderNoteField
+                        orderId={group.orderId}
+                        note={(row.originalOrder as any)?.senkronData?.internalNote ?? null}
+                        showEmpty={isExpanded}
+                        onSaved={(savedNote) => {
+                          // Patch the cached list in place so a re-mounted card shows the saved note without a refetch.
+                          mutate((current: any) => {
+                            if (!current) return current;
+                            const patch = (list: any) => Array.isArray(list)
+                              ? list.map((o: any) => (o && o.id === group.orderId
+                                ? { ...o, senkronData: { ...(o.senkronData || {}), internalNote: savedNote } }
+                                : o))
+                              : list;
+                            return { ...current, orders: patch(current.orders), data: patch(current.data) };
+                          }, { revalidate: false });
+                        }}
+                      />
                     </Box>
                   </Box>
 
@@ -3081,7 +3103,9 @@ function LabelsPage(props: { source?: string; channel?: string }) {
         )}
         {/* Sticky wrapper so the print actions ride on top of the bulk bar.
             TODO: move into LabelsBulkBar once it exposes an actions slot. */}
-        <Box sx={{ position: 'sticky', bottom: 0, zIndex: 5 }}>
+        {/* With nothing selected only the floating Export pill takes taps; the
+            strip itself must not block the cards scrolling under it. */}
+        <Box sx={{ position: 'sticky', bottom: 0, zIndex: 5, pointerEvents: selectedOrderIds.length > 0 ? 'auto' : 'none' }}>
         {selectedOrderIds.length > 0 && (
           <Box
             sx={{
@@ -3114,6 +3138,10 @@ function LabelsPage(props: { source?: string; channel?: string }) {
           processingEtgb={processingEtgb}
           onEtgb={handleProcessEtgb}
           getAddressesTsv={buildAddressesTsv}
+          selectedIds={selectedOrderIds}
+          exportFilters={orderListFilters}
+          matchingTotal={total}
+          showIdleExport
         />
         </Box>
       </Box>

@@ -1,8 +1,16 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../../lib/prisma';
 import { getAuthUser } from '@/lib/auth';
-import { executeStatusUpdateHook } from '../../../../lib/hooks/statusUpdateHook';
 
+/** Private per-order note (never pushed to a marketplace). Keep in sync with components/labels/OrderNoteField.tsx. */
+const ORDER_NOTE_MAX_LENGTH = 1000;
+
+/**
+ * POST { not?: string | null, durum?: string | null }
+ *
+ * Partial update: only the fields present in the body are written, so saving
+ * a note never clears customStatus (and vice versa).
+ */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -15,50 +23,65 @@ export default async function handler(
   const user = await getAuthUser(req, res);
   if (!user) return res.status(401).json({ error: 'Not authenticated' });
 
-  const { not, durum } = req.body;
+  const body = (req.body && typeof req.body === 'object') ? req.body : {};
   const { orderId } = req.query;
 
-  if (!orderId) {
+  if (!orderId || typeof orderId !== 'string') {
     return res.status(400).json({ error: 'Order ID is required' });
+  }
+
+  const hasNote = Object.prototype.hasOwnProperty.call(body, 'not');
+  const hasStatus = Object.prototype.hasOwnProperty.call(body, 'durum');
+  if (!hasNote && !hasStatus) {
+    return res.status(400).json({ error: 'Nothing to update' });
+  }
+
+  const data: { internalNote?: string | null; customStatus?: string | null } = {};
+  if (hasNote) {
+    const raw = body.not;
+    if (raw != null && typeof raw !== 'string') {
+      return res.status(400).json({ error: 'Note must be a string' });
+    }
+    const note = typeof raw === 'string' ? raw.trim() : '';
+    if (note.length > ORDER_NOTE_MAX_LENGTH) {
+      return res.status(400).json({ error: `Note must be at most ${ORDER_NOTE_MAX_LENGTH} characters` });
+    }
+    data.internalNote = note || null;
+  }
+  if (hasStatus) {
+    const raw = body.durum;
+    if (raw != null && typeof raw !== 'string') {
+      return res.status(400).json({ error: 'Status must be a string' });
+    }
+    data.customStatus = (typeof raw === 'string' && raw.trim()) || null;
   }
 
   try {
     // Verify order exists and belongs to user
     const order = await prisma.order.findUnique({
-      where: { id: orderId as string, userId: user.id },
+      where: { id: orderId, userId: user.id },
+      select: { id: true },
     });
 
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    // Upsert SenkronOrderData record
-    await prisma.senkronOrderData.upsert({
-      where: { orderId: orderId as string },
-      update: {
-        internalNote: not || null,
-        customStatus: durum || null,
-        updatedAt: new Date(),
-      },
+    const saved = await prisma.senkronOrderData.upsert({
+      where: { orderId },
+      update: { ...data, updatedAt: new Date() },
       create: {
-        orderId: orderId as string,
+        orderId,
         userId: user.id,
-        internalNote: not || null,
-        customStatus: durum || null,
+        internalNote: data.internalNote ?? null,
+        customStatus: data.customStatus ?? null,
       },
+      select: { internalNote: true, customStatus: true },
     });
 
-    // Execute status update hook to check if cargo status requires auto-update
-    try {
-      await executeStatusUpdateHook(orderId as string, user.id);
-    } catch (hookError) {
-      console.warn(`Status update hook failed for order ${orderId}:`, hookError);
-      // Don't fail the entire request if hook fails
-    }
-
-    return res.status(200).json({ success: true });
+    return res.status(200).json({ success: true, internalNote: saved.internalNote, customStatus: saved.customStatus });
   } catch (error: any) {
     console.error('Error updating note and status:', error);
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: 'Failed to update order note' });
   }
 }

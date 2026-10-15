@@ -29,7 +29,7 @@ interface MobileTabBarProps {
   onMore: () => void;
 }
 
-const ORDERS_PATHS = ['/app/labels', '/app/senkron'];
+const ORDERS_PATHS = ['/app/labels'];
 const RESEARCH_PATHS = ['/app/etsy-research', '/app/ebay-research', '/app/trendyol-arastirma', '/app/amazon-research'];
 
 interface Tab {

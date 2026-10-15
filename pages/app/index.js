@@ -187,7 +187,7 @@ const DashboardLandingContent = ({ user }) => {
       color: { bg: 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)', icon: '#e11d48' },
     },
     {
-      href: '/app/senkron',
+      href: '/app/labels',
       icon: ShoppingCart,
       label: t('features.syncLabel'),
       description: t('features.syncDesc'),

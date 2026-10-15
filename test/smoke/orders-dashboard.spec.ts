@@ -16,7 +16,7 @@ test.describe('Orders Dashboard Smoke Test', () => {
     // Trigger sync via API
     await triggerSync(page);
     // Go to dashboard
-    await page.goto('/app/senkron');
+    await page.goto('/app/labels');
     // Wait for table to load
     await page.waitForSelector(TABLE_ROW);
     // Assert at least one row has an image, variant, and note

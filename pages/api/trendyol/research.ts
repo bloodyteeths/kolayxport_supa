@@ -7,6 +7,7 @@ import {
   TRENDYOL_CATEGORIES,
 } from '../../../lib/integrations/trendyolSearch';
 import type { TrendyolProduct } from '../../../lib/arbitrage/types';
+import { summarizeAmounts, groupMedian, type PriceSummary } from '../../../lib/research/stats';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const action = req.query.action as string;
@@ -163,8 +164,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 Veriler:
 - Toplam ürün: ${products.length}
 - Fiyat aralığı: ${analysis.priceStats.min}₺ - ${analysis.priceStats.max}₺
-- Ortalama fiyat: ${analysis.priceStats.avg.toFixed(0)}₺
-- Medyan fiyat: ${analysis.priceStats.median.toFixed(0)}₺
+- Medyan fiyat: ${analysis.priceStats.median != null ? analysis.priceStats.median.toFixed(0) + '₺' : 'yetersiz veri'}
+- Tipik fiyat aralığı (P25–P75): ${analysis.priceStats.p25 ?? '-'}₺ - ${analysis.priceStats.p75 ?? '-'}₺ (n=${analysis.priceStats.n})
 - Benzersiz satıcı sayısı: ${analysis.uniqueMerchants}
 - Benzersiz marka sayısı: ${analysis.uniqueBrands}
 - Ücretsiz kargo oranı: ${analysis.freeShippingPct.toFixed(0)}%
@@ -203,22 +204,16 @@ Kısa ve öz tut. Rakamlarla destekle.`;
 // ================================================================
 
 interface ProductAnalysis {
-  priceStats: {
-    min: number;
-    max: number;
-    avg: number;
-    median: number;
-    p25: number;
-    p75: number;
-  };
+  /** R0: robust summary in TRY (median, P25–P75, Tukey-trimmed min/max, n). No mean. */
+  priceStats: PriceSummary;
   priceHistogram: Array<{ range: string; min: number; max: number; count: number }>;
   uniqueMerchants: number;
   uniqueBrands: number;
   freeShippingPct: number;
   avgRating: number;
   avgDiscount: number;
-  topBrands: Array<{ name: string; count: number; avgPrice: number }>;
-  topMerchants: Array<{ id: number; count: number; avgPrice: number; avgRating: number }>;
+  topBrands: Array<{ name: string; count: number; medianPrice: number | null }>;
+  topMerchants: Array<{ id: number; count: number; medianPrice: number | null; avgRating: number }>;
   socialProofSummary: {
     withFavorites: number;
     withOrders: number;
@@ -230,7 +225,7 @@ interface ProductAnalysis {
 function analyzeProducts(products: TrendyolProduct[]): ProductAnalysis {
   if (products.length === 0) {
     return {
-      priceStats: { min: 0, max: 0, avg: 0, median: 0, p25: 0, p75: 0 },
+      priceStats: summarizeAmounts([], 'TRY'),
       priceHistogram: [],
       uniqueMerchants: 0,
       uniqueBrands: 0,
@@ -244,15 +239,12 @@ function analyzeProducts(products: TrendyolProduct[]): ProductAnalysis {
     };
   }
 
-  const prices = products.map(p => p.priceTry).filter(p => p > 0).sort((a, b) => a - b);
-
-  // Price stats
-  const min = prices[0] || 0;
-  const max = prices[prices.length - 1] || 0;
-  const avg = prices.reduce((s, p) => s + p, 0) / prices.length;
-  const median = prices[Math.floor(prices.length / 2)] || 0;
-  const p25 = prices[Math.floor(prices.length * 0.25)] || 0;
-  const p75 = prices[Math.floor(prices.length * 0.75)] || 0;
+  // R0: robust price stats in TRY. No FX bounds are applied (no rate is
+  // guessed); Tukey trimming removes placeholder/wholesale outliers.
+  const priceStats = summarizeAmounts(products.map(p => p.priceTry), 'TRY');
+  const min = priceStats.min ?? 0;
+  const max = priceStats.max ?? 0;
+  const prices = products.map(p => p.priceTry).filter(p => p > 0 && p >= min && p <= max).sort((a, b) => a - b);
 
   // Price histogram (10 buckets)
   const bucketSize = Math.max(1, Math.ceil((max - min) / 10));
@@ -272,23 +264,23 @@ function analyzeProducts(products: TrendyolProduct[]): ProductAnalysis {
   }
 
   // Merchants
-  const merchantMap = new Map<number, { count: number; totalPrice: number; totalRating: number }>();
+  const merchantMap = new Map<number, { count: number; prices: number[]; totalRating: number }>();
   for (const p of products) {
     if (!p.merchantId) continue;
-    const m = merchantMap.get(p.merchantId) || { count: 0, totalPrice: 0, totalRating: 0 };
+    const m = merchantMap.get(p.merchantId) || { count: 0, prices: [], totalRating: 0 };
     m.count++;
-    m.totalPrice += p.priceTry;
+    m.prices.push(p.priceTry);
     m.totalRating += p.ratingScore;
     merchantMap.set(p.merchantId, m);
   }
 
   // Brands
-  const brandMap = new Map<string, { count: number; totalPrice: number }>();
+  const brandMap = new Map<string, { count: number; prices: number[] }>();
   for (const p of products) {
     if (!p.brand) continue;
-    const b = brandMap.get(p.brand) || { count: 0, totalPrice: 0 };
+    const b = brandMap.get(p.brand) || { count: 0, prices: [] };
     b.count++;
-    b.totalPrice += p.priceTry;
+    b.prices.push(p.priceTry);
     brandMap.set(p.brand, b);
   }
 
@@ -309,7 +301,7 @@ function analyzeProducts(products: TrendyolProduct[]): ProductAnalysis {
   }
 
   return {
-    priceStats: { min, max, avg, median, p25, p75 },
+    priceStats,
     priceHistogram: histogram,
     uniqueMerchants: merchantMap.size,
     uniqueBrands: brandMap.size,
@@ -317,14 +309,14 @@ function analyzeProducts(products: TrendyolProduct[]): ProductAnalysis {
     avgRating: products.reduce((s, p) => s + p.ratingScore, 0) / products.length,
     avgDiscount,
     topBrands: Array.from(brandMap.entries())
-      .map(([name, data]) => ({ name, count: data.count, avgPrice: data.totalPrice / data.count }))
+      .map(([name, data]) => ({ name, count: data.count, medianPrice: groupMedian(data.prices) }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 20),
     topMerchants: Array.from(merchantMap.entries())
       .map(([id, data]) => ({
         id,
         count: data.count,
-        avgPrice: data.totalPrice / data.count,
+        medianPrice: groupMedian(data.prices),
         avgRating: data.totalRating / data.count,
       }))
       .sort((a, b) => b.count - a.count)

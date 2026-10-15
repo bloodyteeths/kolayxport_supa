@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import { formatMoney } from '@/lib/research/stats';
 
 interface AiOptimizationHubProps {
   userId: string;
@@ -21,8 +22,9 @@ interface AiOptimizationHubProps {
 }
 
 interface MarketContext {
-  avgPrice?: number;
+  /** R0: robust median (no mean); undefined when the sample failed the checks. */
   medianPrice?: number;
+  currency?: string;
   totalResults?: number;
   topKeywords?: string[];
   competitorPrices?: number[];
@@ -53,8 +55,8 @@ async function fetchMarketContext(keyword: string, userId: string, marketplace: 
     if (!res.ok) return null;
     const data = await res.json();
     return {
-      avgPrice: data.priceStats?.avg,
-      medianPrice: data.priceStats?.median,
+      medianPrice: data.priceStats?.quality === 'ok' ? data.priceStats.median ?? undefined : undefined,
+      currency: data.priceStats?.currency,
       totalResults: data.total,
       topKeywords: data.topKeywords?.map((k: any) => k.keyword),
       competitorPrices: data.items?.map((i: any) => parseFloat(i.price?.value || '0')).filter(Boolean),
@@ -445,15 +447,12 @@ function PriceAdvisor({ userId, marketplace }: { userId: string; marketplace: st
             </Box>
           )}
 
-          {marketCtx && (marketCtx.avgPrice || marketCtx.medianPrice) && (
+          {marketCtx && marketCtx.medianPrice != null && (
             <Box sx={{ p: 1.5, bgcolor: '#f8faff', borderRadius: 2, border: '1px solid rgba(99,102,241,0.08)' }}>
               <Typography variant="subtitle2" sx={{ mb: 0.5, fontWeight: 700, color: '#1e1b4b' }}>{t('marketData')}</Typography>
               <Stack direction="row" spacing={3}>
-                {marketCtx.avgPrice != null && (
-                  <Typography variant="body2">{t('average')}: <b>${marketCtx.avgPrice.toFixed(2)}</b></Typography>
-                )}
                 {marketCtx.medianPrice != null && (
-                  <Typography variant="body2">{t('median')}: <b>${marketCtx.medianPrice.toFixed(2)}</b></Typography>
+                  <Typography variant="body2">{t('median')}: <b>{formatMoney(marketCtx.medianPrice, marketCtx.currency || 'USD')}</b></Typography>
                 )}
                 {marketCtx.totalResults != null && (
                   <Typography variant="body2">{t('results')}: <b>{marketCtx.totalResults}</b></Typography>

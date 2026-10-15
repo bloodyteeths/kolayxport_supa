@@ -1,3 +1,4 @@
+import type { PriceSummary } from '@/lib/research/stats';
 import { create } from 'zustand';
 import { toast } from 'react-hot-toast';
 
@@ -29,10 +30,12 @@ export interface AmazonProductItem {
 }
 
 export interface MarketStats {
-  avgPrice: number;
+  /** R0: robust median; min/max are Tukey-trimmed. No average price. */
   medianPrice: number;
   minPrice: number;
   maxPrice: number;
+  /** Robust summary (median, P25–P75, n, quality, currency). */
+  priceStats?: PriceSummary;
   avgBsr: number;
   avgReviews: number;
   avgRating: number;
@@ -83,7 +86,9 @@ export interface SavedNiche {
   marketplace: string;
   demandScore: number | null;
   competitionScore: number | null;
-  avgPrice: number | null;
+  /** Legacy mean from older saves; not displayed (R0). */
+  avgPrice?: number | null;
+  medianPrice?: number | null;
   createdAt: string;
 }
 
@@ -534,8 +539,7 @@ export const useAmazonResearchStore = create<AmazonResearchState>((set, get) => 
           categoryName: nicheData.items[0]?.categoryName,
           marketplace,
           totalResults: nicheData.totalResults,
-          avgPrice: nicheData.stats.avgPrice,
-          medianPrice: nicheData.stats.medianPrice,
+          medianPrice: nicheData.stats.priceStats?.quality === 'ok' || !nicheData.stats.priceStats ? nicheData.stats.medianPrice : null,
           avgReviews: nicheData.stats.avgReviews,
           avgRating: nicheData.stats.avgRating,
           demandScore: nicheData.demand.score,

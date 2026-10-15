@@ -15,6 +15,7 @@ import {
   Pencil, Hammer, Dumbbell, FilePlus2,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { priceDisplay } from '@/lib/research/stats';
 import { useRouter } from 'next/router';
 import { toast } from 'react-hot-toast';
 import { useConnections } from '@/lib/hooks/useConnections';
@@ -85,7 +86,9 @@ const glassCard = {
 // HELPERS
 // ================================================================
 
-function formatTRY(value: number): string {
+function formatTRY(value: number | null | undefined): string {
+  // R0: "—" when a robust value is unavailable.
+  if (value == null || !Number.isFinite(value)) return '—';
   return new Intl.NumberFormat('tr-TR', {
     style: 'currency',
     currency: 'TRY',
@@ -249,7 +252,7 @@ function ProductCard({ product, isMobile, expanded, onToggle, t, listingTargets,
       <Box sx={{ p: 1.5 }}>
         {/* Brand */}
         {product.brand && (
-          <Typography variant="caption" sx={{ fontWeight: 700, color: '#667eea', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          <Typography variant="caption" sx={{ fontWeight: 700, color: '#667eea' }}>
             {product.brand}
           </Typography>
         )}
@@ -457,6 +460,7 @@ function ProductCard({ product, isMobile, expanded, onToggle, t, listingTargets,
 
 export default function CategoryExplorer() {
   const t = useTranslations('trendyolResearch');
+  const tR = useTranslations('research');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -813,8 +817,8 @@ export default function CategoryExplorer() {
               />
               <StatBadge
                 icon={<TrendingUp size={14} />}
-                label={t('avgPrice')}
-                value={formatTRY(analysis.priceStats.avg)}
+                label={tR('stats.medianPrice')}
+                value={priceDisplay(analysis.priceStats, 'tr-TR', 'TRY').value}
                 color="#f2994a"
               />
               <StatBadge

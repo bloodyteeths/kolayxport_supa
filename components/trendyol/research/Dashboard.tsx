@@ -9,6 +9,7 @@ import {
   BookOpen, Gamepad2, Pencil, Wrench, Hammer, Car, Dumbbell, Store,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { priceDisplay } from '@/lib/research/stats';
 
 import { useTrendyolResearchStore } from '@/lib/stores/useTrendyolResearchStore';
 
@@ -60,7 +61,9 @@ const TRENDYOL_ORANGE = '#F27A1A';
 // HELPERS
 // ================================================================
 
-function formatTRY(value: number): string {
+function formatTRY(value: number | null | undefined): string {
+  // R0: "—" when a robust value is unavailable.
+  if (value == null || !Number.isFinite(value)) return '—';
   return new Intl.NumberFormat('tr-TR', {
     style: 'currency',
     currency: 'TRY',
@@ -91,6 +94,7 @@ interface DashboardProps {
 
 export default function Dashboard({ onNavigate }: DashboardProps) {
   const t = useTranslations('trendyolResearch');
+  const tR = useTranslations('research');
   const {
     savedSearches,
     products,
@@ -130,9 +134,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     return {
       totalProducts: products.length,
       uniqueBrands: analysis.uniqueBrands,
-      avgPrice: analysis.priceStats.avg,
-      minPrice: analysis.priceStats.min,
-      maxPrice: analysis.priceStats.max,
+      // R0: robust summary only — median + P25–P75 + n; no average.
+      price: priceDisplay(analysis.priceStats, 'tr-TR', 'TRY'),
+      minPrice: analysis.priceStats.quality === 'ok' ? analysis.priceStats.min : null,
+      maxPrice: analysis.priceStats.quality === 'ok' ? analysis.priceStats.max : null,
     };
   }, [products, analysis]);
 
@@ -362,10 +367,13 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                   <Tag size={24} />
                 </Box>
                 <Typography variant="h5" fontWeight={700}>
-                  {formatTRY(stats.avgPrice)}
+                  {stats.price.value}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  {tR('stats.medianPrice')}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {t('avgPrice')}
+                  {stats.price.band ? `${stats.price.band} · ` : ''}{tR('stats.nShort', { n: stats.price.n })}
                 </Typography>
               </Box>
             </Grid>

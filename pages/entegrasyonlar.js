@@ -143,7 +143,7 @@ export default function EntegrasyonlarPage() {
                   <p className="text-sm text-slate-500 mb-4 h-16 line-clamp-3">{t(`items.${integration.key}.description`)}</p>
 
                   <div className="mt-auto">
-                    <h4 className="text-xs font-semibold text-slate-400 uppercase mb-2">{t('setupStepsLabel')}</h4>
+                    <h4 className="text-xs font-semibold text-slate-400 mb-2">{t('setupStepsLabel')}</h4>
                     <ul className="space-y-1.5">
                       {t.raw(`items.${integration.key}.steps`).map((step, i) => (
                         <li key={i} className="flex items-center text-xs text-slate-600">

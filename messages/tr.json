@@ -5918,7 +5918,11 @@
       "points": "puan",
       "clickAnalyze": "Listelemenizi AI ile analiz etmek için \"Analiz Et\" e tıklayın",
       "analyzingBtn": "Analiz Ediliyor...",
-      "analyzeBtn": "Analiz Et"
+      "analyzeBtn": "Analiz Et",
+      "benchmarkTableTitle": "İlanınız ve rakipler",
+      "colMetric": "Metrik",
+      "colCompetitors": "Rakipler",
+      "colStatus": "Durum"
     },
     "arbitrage": {
       "selectAtLeastOne": "Lütfen en az bir kategori seçin",
@@ -6515,7 +6519,8 @@
     "automation": "Otomasyon",
     "blog": "Blog",
     "termsOfService": "Kullanım Şartları",
-    "termsOfServiceEN": "Terms of Service"
+    "termsOfServiceEN": "Terms of Service",
+    "trademarkNotice": "Etsy, eBay, Amazon, Shopify, Wix, Trendyol, Hepsiburada, FedEx, UPS, DHL ve diğer markalar ilgili sahiplerinin markalarıdır. KolayXport bağımsızdır ve bu şirketler tarafından onaylanmamıştır."
   },
   "howToUse": {
     "title": "KolayXport Nasıl Kullanılır?",
@@ -6913,7 +6918,14 @@
     "exportCsv": "CSV İndir",
     "alphabetSoup": "Alfabe Çorbası",
     "searchVolume": "Arama Hacmi",
-    "trending": "Trend"
+    "trending": "Trend",
+    "generateNicheReport": "Niş raporu oluştur",
+    "nicheReport": "Niş raporu",
+    "entryStrategy": "Giriş stratejisi",
+    "investment": "Yatırım",
+    "timeToProfit": "Kâra geçiş süresi",
+    "topKeywords": "Öne çıkan anahtar kelimeler",
+    "products": "Ürünler"
   },
   "amazonSettings": {
     "title": "Amazon Bağlantısı",
@@ -10055,6 +10067,108 @@
       "already_restored": "Bu kayıt zaten geri yüklendi.",
       "invalid_quantity": "Geçerli bir sayı gir.",
       "invalid_value": "Geçerli bir değer gir."
+    }
+  },
+  "research": {
+    "stats": {
+      "yourMedianListPrice": "Medyan liste fiyatınız: {price}",
+      "medianPrice": "Medyan fiyat",
+      "medianShort": "Medyan",
+      "typicalRange": "Tipik aralık (P25–P75)",
+      "sampleN": "{n} ilan incelendi",
+      "nShort": "n = {n}",
+      "excluded": "{count} hariç tutuldu (aykırı değer, kur yok veya makul dışı)",
+      "notEnoughData": "Yeterli veri yok",
+      "smallSample": "Küçük örneklem: {n} ilan, yalnızca aralık",
+      "implausible": "Kontrol edin: olağandışı fiyat aralığı",
+      "medianFavorites": "Medyan favori",
+      "medianIs": "medyan fiyat {price}",
+      "basePrice": "Baz fiyat",
+      "topTitleWords": "En çok kullanılan başlık kelimeleri",
+      "priceAboveMedian": "Fiyatınız rakip medyanının ({median}) %15'ten fazla üzerinde. "
+    },
+    "ebay": {
+      "listingsStillLoading": "eBay ilanlarınız hâlâ yükleniyor…",
+      "listingsTimeout": "eBay ilanlarınız yüklenemedi: eBay çok geç yanıt verdi."
+    },
+    "ebayNiche": {
+      "demandHigh": "Yüksek talep: bu niş aktif olarak satılıyor",
+      "demandMedium": "Orta talep: satış potansiyeli var ama rekabete dikkat edin",
+      "demandLow": "Düşük talep: bu niş çok az satış yapıyor, girmeden önce iyi düşünün",
+      "competitionHigh": "Yüksek rekabet: birçok güçlü satıcı var, giriş zor",
+      "competitionMedium": "Orta rekabet: alan var ama fark yaratmanız gerekir",
+      "competitionLow": "Düşük rekabet: az satıcı, giriş fırsatı yüksek",
+      "opportunityExcellent": "Mükemmel fırsat: yüksek talep, düşük rekabet",
+      "opportunityGood": "İyi fırsat: potansiyel var, stratejik giriş gerekir",
+      "opportunityRisky": "Riskli: talep/rekabet dengesi olumsuz",
+      "opportunityPoor": "Düşük fırsat: bu nişe girmek önerilmez"
+    },
+    "ebayOptimizer": {
+      "title": "İlan iyileştirici",
+      "analyze": "Analiz et",
+      "tip1": "Herhangi bir ilanı analiz etmek için eBay bağlantısını yapıştırın",
+      "tip2": "Başlık uzunluğu, açıklama kalitesi, fotoğraf sayısı ve ürün özellikleri puanlanır",
+      "tip3": "Her sorun için \"AI ile iyileştir\" ile otomatik düzeltme yapın",
+      "tip4": "Kendi ilanlarınız yüklendiyse hepsini tek tıkla tarayın"
+    },
+    "seoTips": {
+      "missingKeywords": "Şu eksik anahtar kelimeleri eklemeyi deneyin: {keywords}",
+      "missingTags": "Rakiplerin kullandığı şu etiketleri ekleyin: {tags}",
+      "shortTitle": "Başlığınız kısa ({length} karakter). Etsy için en az 100 karakter önerilir.",
+      "moreTags": "{count} etiket daha ekleyin. Etsy'de 13 etiket kullanın.",
+      "titleShorterThanCompetitors": "Başlığınız rakiplere göre kısa ({mine} / tipik {typical} karakter). Daha uzun bir başlık deneyin.",
+      "fewTopKeywords": "Rakiplerin en popüler anahtar kelimelerinden yalnızca {count} tanesini kullanıyorsunuz. Eksik kelimeleri eklemeyi deneyin.",
+      "topKeywords": "En popüler anahtar kelimeler: {keywords}"
+    },
+    "tips": {
+      "m1": {
+        "a": "Yeni yıl hediye talebi sürüyor: kişiselleştirilmiş ürünler iyi satıyor.",
+        "b": "Kış dekoru için son fırsat: Şubat'tan önce stok yapın."
+      },
+      "m2": {
+        "a": "Sevgililer Günü yaklaşıyor: kişiselleştirilmiş takılar klasik bir tercih.",
+        "b": "El yapımı kartlar ve hediye kutuları bu dönemde genelde artar."
+      },
+      "m3": {
+        "a": "Bahar dekoru sezonu: çiçekli ve pastel ürünler.",
+        "b": "Paskalya hediyeleri: stok ve kargo sürelerinizi kontrol edin."
+      },
+      "m4": {
+        "a": "Anneler Günü yaklaşıyor: kişiselleştirilmiş hediyeler.",
+        "b": "Bahar düğün sezonu: düğün hediyesi nişlerine göz atın."
+      },
+      "m5": {
+        "a": "Düğün sezonu: gelin ve nedime hediyeleri.",
+        "b": "Yaz ve açık hava ürünleri öne çıkmaya başlar."
+      },
+      "m6": {
+        "a": "Babalar Günü yaklaşıyor: erkek aksesuarları ve kişisel hediyeler.",
+        "b": "Tatil sezonu: plaj ve seyahat ürünleri."
+      },
+      "m7": {
+        "a": "Yaz düğünleri: nedime hediyeleri.",
+        "b": "Okul dönemi yaklaşıyor: öğretmen hediyelerini planlayın."
+      },
+      "m8": {
+        "a": "Okul sezonu: öğretmen hediyeleri ve yurt dekoru.",
+        "b": "Sonbahar ürünleri için stok hazırlığı zamanı."
+      },
+      "m9": {
+        "a": "Sonbahar dekoru: çelenkler ve mumlar.",
+        "b": "Halloween kostüm ve dekor satışları başlıyor."
+      },
+      "m10": {
+        "a": "Halloween: son dakika ürünleri hâlâ satılabilir.",
+        "b": "Noel ilanlarına şimdi hazırlanın; Türkiye'den kargo zaman alır."
+      },
+      "m11": {
+        "a": "Yılbaşı alışveriş sezonu başladı.",
+        "b": "Black Friday / Cyber Monday kampanyalarınızı hazırlayın."
+      },
+      "m12": {
+        "a": "Son dakika Noel hediyeleri: dijital ürünler ve hızlı kargo öne çıkar.",
+        "b": "Yeni yıl ilanlarına şimdiden hazırlanın."
+      }
     }
   }
 }

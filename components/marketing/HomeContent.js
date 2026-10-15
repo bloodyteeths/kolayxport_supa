@@ -133,7 +133,7 @@ export default function HomeContent({ locale = 'tr' }) {
         transition={{ duration: 0.5, delay: 0.2 }}
       >
         <div className="container max-w-5xl mx-auto px-6 lg:px-8">
-          <h3 className="text-center text-sm font-semibold text-slate-500 uppercase tracking-wider mb-10">
+          <h3 className="text-center text-sm font-semibold text-slate-500 mb-10">
             {t('trust.heading')}
           </h3>
           <div className="flex flex-wrap justify-center items-center gap-x-8 gap-y-6 md:gap-x-12 lg:gap-x-16">
@@ -223,7 +223,7 @@ export default function HomeContent({ locale = 'tr' }) {
                   ) : (
                     <span className={card.textClass}>{card.text}</span>
                   )}
-                  <span className={`text-xs font-semibold ${card.badge} px-2.5 py-1 rounded-full uppercase tracking-wider`}>
+                  <span className={`text-xs font-semibold ${card.badge} px-2.5 py-1 rounded-full`}>
                     {t('powerTools.fullIntegration')}
                   </span>
                 </div>
@@ -252,7 +252,7 @@ export default function HomeContent({ locale = 'tr' }) {
         <div className="container max-w-7xl mx-auto px-6 lg:px-8">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
-              <span className="text-xs font-semibold text-emerald-600 bg-emerald-100 px-3 py-1 rounded-full uppercase tracking-wider">{t('arbitrage.badge')}</span>
+              <span className="text-xs font-semibold text-emerald-600 bg-emerald-100 px-3 py-1 rounded-full">{t('arbitrage.badge')}</span>
               <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mt-4 mb-4">
                 {t('arbitrage.heading')}
               </h2>
@@ -375,7 +375,7 @@ export default function HomeContent({ locale = 'tr' }) {
               </div>
             </motion.div>
             <div className="order-1 md:order-2">
-              <span className="text-xs font-semibold text-indigo-600 bg-indigo-100 px-3 py-1 rounded-full uppercase tracking-wider">{t('extension.badge')}</span>
+              <span className="text-xs font-semibold text-indigo-600 bg-indigo-100 px-3 py-1 rounded-full">{t('extension.badge')}</span>
               <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mt-4 mb-4">
                 {t('extension.heading')}
               </h2>

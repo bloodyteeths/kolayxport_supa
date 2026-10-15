@@ -12,8 +12,11 @@ import { useTranslations } from 'next-intl';
 
 import { useTrendyolResearchStore } from '@/lib/stores/useTrendyolResearchStore';
 import { StatCard, GradientBar, GRADIENTS, glassCard } from '@/components/etsy/research/shared/ui';
+import { RobustPriceCard } from '@/components/etsy/research/shared/RobustPrice';
 
-function fmtTry(n: number): string {
+function fmtTry(n: number | null | undefined): string {
+  // R0: "—" when a robust value is unavailable (small/implausible sample).
+  if (n == null || !Number.isFinite(n)) return '—';
   return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(n);
 }
 
@@ -53,13 +56,13 @@ export default function TrendyolPriceAnalyzer() {
   return (
     <Box>
       {/* Stats grid */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(6, 1fr)', gap: 1.5, mb: 2 }}>
-        <StatCard label={t('minPrice')} value={fmtTry(priceStats.min)} color="#11998e" icon={<TrendingDown size={18} />} />
-        <StatCard label={t('avgPrice')} value={fmtTry(priceStats.avg)} color="#2196F3" icon={<BarChart2 size={18} />} />
-        <StatCard label={t('medianPrice')} value={fmtTry(priceStats.median)} color="#ff9800" icon={<Target size={18} />} />
-        <StatCard label={t('maxPrice')} value={fmtTry(priceStats.max)} color="#f44336" icon={<TrendingUp size={18} />} />
-        <StatCard label="P25" value={fmtTry(priceStats.p25)} color="#7B1FA2" icon={<DollarSign size={18} />} />
-        <StatCard label="P75" value={fmtTry(priceStats.p75)} color="#E040FB" icon={<DollarSign size={18} />} />
+      <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5, 1fr)', gap: 1.5, mb: 2 }}>
+        {/* R0: median + P25–P75 + n (no average); min/max after Tukey trim. */}
+        <RobustPriceCard summary={priceStats} currency="TRY" color="#ff9800" icon={<Target size={18} />} />
+        <StatCard label={t('minPrice')} value={fmtTry(priceStats.quality === 'ok' ? priceStats.min : null)} color="#11998e" icon={<TrendingDown size={18} />} />
+        <StatCard label={t('maxPrice')} value={fmtTry(priceStats.quality === 'ok' ? priceStats.max : null)} color="#f44336" icon={<TrendingUp size={18} />} />
+        <StatCard label="P25" value={fmtTry(priceStats.quality === 'insufficient' ? null : priceStats.p25)} color="#7B1FA2" icon={<DollarSign size={18} />} />
+        <StatCard label="P75" value={fmtTry(priceStats.quality === 'insufficient' ? null : priceStats.p75)} color="#E040FB" icon={<DollarSign size={18} />} />
       </Box>
 
       {/* Sweet spot */}

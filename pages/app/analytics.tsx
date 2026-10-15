@@ -677,12 +677,12 @@ export default function DashboardPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-t border-b border-slate-100 bg-slate-50/60">
-                    <th className="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">{t('marketplace')}</th>
-                    <th className="px-5 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">{t('orders')}</th>
-                    <th className="px-5 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">{t('nativeCurrency')}</th>
-                    <th className="px-5 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">{t('revenueTRY')}</th>
-                    <th className="px-5 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">{t('avgOrder')}</th>
-                    <th className="px-5 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">%</th>
+                    <th className="px-5 py-3 text-left text-xs font-medium text-slate-500">{t('marketplace')}</th>
+                    <th className="px-5 py-3 text-right text-xs font-medium text-slate-500">{t('orders')}</th>
+                    <th className="px-5 py-3 text-right text-xs font-medium text-slate-500">{t('nativeCurrency')}</th>
+                    <th className="px-5 py-3 text-right text-xs font-medium text-slate-500">{t('revenueTRY')}</th>
+                    <th className="px-5 py-3 text-right text-xs font-medium text-slate-500">{t('avgOrder')}</th>
+                    <th className="px-5 py-3 text-right text-xs font-medium text-slate-500">%</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -16,6 +16,7 @@ import { useTranslations } from 'next-intl';
 import useLocaleStore from '@/lib/stores/useLocaleStore';
 import useEbayResearchStore from '@/lib/stores/useEbayResearchStore';
 import { formatMoney, marketplaceCurrency } from './marketplaces';
+import { groupMedian } from '@/lib/research/stats';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 
 // ---------------------------------------------------------------------------
@@ -161,13 +162,14 @@ function TabPanel({ children, value, index }: { children: React.ReactNode; value
 
 function RevenueCalculator({ userListings }: { userListings?: any[] }) {
   const t = useTranslations('ebay.research.financial');
+  const tR = useTranslations('research');
+  // R0: median of the seller's own list prices (never a mean).
   const avgUserPrice = useMemo(() => {
     if (!userListings?.length) return 0;
-    const prices = userListings
-      .map(l => parseFloat(l.price?.value || '0'))
-      .filter(p => p > 0);
-    return prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
+    return groupMedian(userListings.map(l => parseFloat(l.price?.value || '0'))) ?? 0;
   }, [userListings]);
+  const userPriceCurrency = userListings?.find(l => l.price?.currency)?.price?.currency || 'USD';
+  const userPriceLocale = (() => { try { return useLocaleStore.getState().locale || 'en'; } catch { return 'en'; } })();
 
   const [sellingPrice, setSellingPrice] = useState<string>(avgUserPrice > 0 ? avgUserPrice.toFixed(2) : '29.99');
   const [selectedListingId, setSelectedListingId] = useState<string>('');
@@ -356,7 +358,7 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
             {avgUserPrice > 0 && (
               <Chip
                 icon={<Info size={12} />}
-                label={t('avgListPrice', { price: avgUserPrice.toFixed(2) })}
+                label={tR('stats.yourMedianListPrice', { price: formatMoney(avgUserPrice, userPriceCurrency, userPriceLocale) })}
                 size="small"
                 variant="outlined"
                 color="info"
@@ -562,14 +564,16 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
 
 function SourcingCalculator({ marketplace }: { marketplace: string }) {
   const t = useTranslations('ebay.research.financial');
+  const tR = useTranslations('research');
   const [keyword, setKeyword] = useState('');
   const [loading, setLoading] = useState(false);
   const [marketData, setMarketData] = useState<{
-    avgPrice: number;
     medianPrice: number;
     p25Price: number;
     p75Price: number;
     totalResults: number;
+    /** Listings kept in the robust sample. */
+    n: number;
   } | null>(null);
 
   const [sourcingCost, setSourcingCost] = useState<string>('');
@@ -585,34 +589,32 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
     if (!keyword.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/clawd/ebay?action=search_market&q=${encodeURIComponent(keyword)}&marketplace=${marketplace}&limit=50`);
+      // R0: the API returns `items` and takes `marketplace_id` (this read
+      // `itemSummaries`/`marketplace` before, so it always reported no results).
+      const res = await fetch(`/api/clawd/ebay?action=search_market&q=${encodeURIComponent(keyword)}&marketplace_id=${marketplace}&limit=50`);
       if (!res.ok) throw new Error(t('searchFailed'));
       const data = await res.json();
-      const items = data.itemSummaries || [];
-      if (items.length === 0) {
+      const items = data.items || data.itemSummaries || [];
+      const ps = data.priceStats;
+      if (items.length === 0 || !ps || ps.median == null) {
         toast.error(t('noResults'));
         setMarketData(null);
         setLoading(false);
         return;
       }
-      const prices = items
-        .map((i: any) => parseFloat(i.price?.value || '0'))
-        .filter((p: number) => p > 0)
-        .sort((a: number, b: number) => a - b);
-
-      const sum = prices.reduce((s: number, p: number) => s + p, 0);
-      const avg = sum / prices.length;
-      const mid = Math.floor(prices.length / 2);
-      const median = prices.length % 2 === 0 ? (prices[mid - 1] + prices[mid]) / 2 : prices[mid];
-      const p25 = prices[Math.floor(prices.length * 0.25)];
-      const p75 = prices[Math.floor(prices.length * 0.75)];
-
+      // Robust server summary: FX-normalized, trimmed median and P25–P75.
+      if (ps.quality === 'insufficient' || ps.quality === 'implausible') {
+        toast.error(tR(ps.quality === 'insufficient' ? 'stats.notEnoughData' : 'stats.implausible'));
+        setMarketData(null);
+        setLoading(false);
+        return;
+      }
       setMarketData({
-        avgPrice: avg,
-        medianPrice: median,
-        p25Price: p25,
-        p75Price: p75,
+        medianPrice: ps.median,
+        p25Price: ps.p25 ?? ps.median,
+        p75Price: ps.p75 ?? ps.median,
         totalResults: data.total || items.length,
+        n: ps.n,
       });
     } catch (err: any) {
       toast.error(err.message || t('dataFetchFailed'));
@@ -759,11 +761,11 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
 
         {marketData && (
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-            <Chip label={`${t('avgPriceChip')}: ${fmt(marketData.avgPrice)}`} color="primary" variant="outlined" />
             <Chip label={`${t('medianChip')}: ${fmt(marketData.medianPrice)}`} color="primary" />
             <Chip label={`25p: ${fmt(marketData.p25Price)}`} variant="outlined" />
             <Chip label={`75p: ${fmt(marketData.p75Price)}`} variant="outlined" />
             <Chip label={t('totalResultsCount', { count: marketData.totalResults })} variant="outlined" />
+            <Chip label={tR('stats.sampleN', { n: marketData.n })} variant="outlined" />
           </Box>
         )}
       </Paper>

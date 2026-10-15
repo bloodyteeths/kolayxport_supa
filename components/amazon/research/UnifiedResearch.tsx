@@ -6,12 +6,16 @@ import {
 import { TrendingUp, TrendingDown, Star, ShoppingCart, DollarSign, BarChart, Sparkles, BookmarkPlus, Package } from 'lucide-react';
 import { useAmazonResearchStore, type AmazonProductItem } from '@/lib/stores/useAmazonResearchStore';
 import { useTranslations } from 'next-intl';
+import { priceDisplay, formatMoney } from '@/lib/research/stats';
+import { useResearchLocale } from '@/components/etsy/research/shared/RobustPrice';
 import ProductCard from './ProductCard';
 import NicheAnalyzer from './NicheAnalyzer';
 import AiInsightsPanel from './AiInsightsPanel';
 
 export default function UnifiedResearch() {
   const t = useTranslations('amazonResearch');
+  const tR = useTranslations('research');
+  const locale = useResearchLocale();
   const {
     items, totalResults, stats, opportunity, topKeywords, loading,
     nicheData, nicheLoading,
@@ -40,10 +44,15 @@ export default function UnifiedResearch() {
           <Grid item xs={6} sm={3}>
             <Card variant="outlined" sx={{ textAlign: 'center' }}>
               <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-                <Typography variant="caption" color="text.secondary">{t('avgPrice')}</Typography>
-                <Typography variant="h6" fontWeight={700}>${stats.avgPrice}</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  ${stats.minPrice} – ${stats.maxPrice}
+                {/* R0: median + P25–P75 + n; no average price. */}
+                <Typography variant="caption" color="text.secondary">{tR('stats.medianPrice')}</Typography>
+                <Typography variant="h6" fontWeight={700}>
+                  {stats.priceStats ? priceDisplay(stats.priceStats, locale).value : formatMoney(stats.medianPrice || null, 'USD', locale)}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  {stats.priceStats
+                    ? `${priceDisplay(stats.priceStats, locale).band ?? '—'} · ${tR('stats.nShort', { n: stats.priceStats.n })}`
+                    : `${formatMoney(stats.minPrice || null, 'USD', locale)} – ${formatMoney(stats.maxPrice || null, 'USD', locale)}`}
                 </Typography>
               </CardContent>
             </Card>

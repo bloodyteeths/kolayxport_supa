@@ -16,7 +16,7 @@ import { stageEtsyDraft } from '@/lib/etsy/draftClient';
 import { notify } from '@/lib/notify';
 import { coerceAiString, coerceAiStringArray, normalizeTags, normalizeTitle, checkTitle, TITLE_MAX } from '@/lib/etsy/seoRules';
 import { GRADIENTS, glassCard, BeforeAfter, pillTabsSx } from './shared/ui';
-import { prefillHref, writeListingPrefill, dominantCurrency } from './shared/listingPrefill';
+import { prefillHref, writeListingPrefill, prefillPriceStats, prefillPrice } from './shared/listingPrefill';
 
 interface OwnListingOption {
   listing_id: string;
@@ -138,20 +138,20 @@ export default function AiOptimizePanel({ shopId, userListings }: AiOptimizePane
   const handleUseInNewListing = () => {
     const s = useEtsyResearchStore.getState();
     const inputTags = tagsInput.split(',').map(x => x.trim()).filter(Boolean);
-    const currency = dominantCurrency(items);
+    const currency = priceStats ? priceStats.currency : undefined;
     const ok = writeListingPrefill({
       target: 'etsy',
       source: 'etsy-research',
       title: safeTitle || titleInput.trim() || descTitleInput.trim(),
       description: safeDescription || undefined,
       tags: normalizeTags(safeTags.length ? safeTags : inputTags).tags,
-      price: currency && priceStats ? priceStats.median : undefined,
+      price: currency ? prefillPrice(priceStats) : undefined,
       currency,
       research: items.length > 0 ? {
         query: s.query,
         topTags: s.serverTagFreq.slice(0, 20),
         topKeywords: s.serverKeywords.slice(0, 15),
-        priceStats: priceStats && currency ? { min: priceStats.min, avg: priceStats.avg, median: priceStats.median, max: priceStats.max } : null,
+        priceStats: currency ? prefillPriceStats(priceStats) : null,
       } : undefined,
     });
     if (!ok) { toast.error(t('ur_prefillFailed')); return; }

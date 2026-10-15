@@ -2786,7 +2786,7 @@ export default function ListingEditorDrawer({
                 return (
                   <Box key={label} sx={{ mb: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                      <Typography variant="caption" fontWeight={700} color={color} sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      <Typography variant="caption" fontWeight={700} color={color}>
                         {label}
                       </Typography>
                       <Chip
@@ -2966,7 +2966,7 @@ export default function ListingEditorDrawer({
                   </Box>
                   <Collapse in={detailsSections.shipping}>
                     <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      <Typography variant="caption" fontWeight={700} color="text.secondary">
                         {t('processingProfile.title')}
                       </Typography>
                       {/* Etsy replaced listing processing_min/max with per-offering
@@ -3026,7 +3026,7 @@ export default function ListingEditorDrawer({
 
                       <Divider />
 
-                      <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      <Typography variant="caption" fontWeight={700} color="text.secondary">
                         {t('editor.weightTitle')}
                       </Typography>
                       <Box sx={{ display: 'flex', gap: 1.5 }}>
@@ -3041,7 +3041,7 @@ export default function ListingEditorDrawer({
 
                       <Divider />
 
-                      <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      <Typography variant="caption" fontWeight={700} color="text.secondary">
                         {t('editor.dimensionsTitle')}
                       </Typography>
                       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: '1fr 1fr 1fr auto' }, gap: 1.5 }}>

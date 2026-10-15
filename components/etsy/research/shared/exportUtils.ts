@@ -103,7 +103,7 @@ export function exportToPDF(elementId: string, title: string) {
 
 export function formatNicheDataForExport(
   items: EtsyMarketItem[],
-  summary?: { priceStats?: { min: number; avg: number; median: number; max: number } | null },
+  summary?: { priceStats?: { min: number | null; median: number | null; max: number | null } | null },
 ): Record<string, any>[] {
   return items.map((item) => ({
     title: item.title,
@@ -153,7 +153,7 @@ export function getTagCsvColumns(t: (key: string) => string) {
 }
 
 export function formatShopDataForExport(
-  shops: (ShopData & { avgPrice?: number; listingCount?: number })[],
+  shops: (ShopData & { medianPrice?: number | null; listingCount?: number })[],
 ): Record<string, any>[] {
   return shops.map((s) => ({
     shopName: s.shop_name,
@@ -161,7 +161,6 @@ export function formatShopDataForExport(
     rating: s.review_average,
     reviewCount: s.review_count,
     listingCount: s.listingCount ?? s.listing_active_count,
-    avgPrice: s.avgPrice != null ? Number(s.avgPrice).toFixed(2) : '',
     url: s.url,
   }));
 }
@@ -173,7 +172,7 @@ export function getShopCsvColumns(t: (key: string) => string) {
     { key: 'rating', label: t('csvColumns.rating') },
     { key: 'reviewCount', label: t('csvColumns.reviewCount') },
     { key: 'listingCount', label: t('csvColumns.listingCount') },
-    { key: 'avgPrice', label: t('csvColumns.avgPrice') },
+    // R0: per-shop average price column removed (means are not shown in research).
     { key: 'url', label: t('csvColumns.url') },
   ];
 }

@@ -575,7 +575,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
       )}
       {group.label && showLabels && (
         <div className="px-3 mb-1.5">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">{group.label}</span>
+          <span className="text-[11px] font-semibold text-slate-400">{group.label}</span>
         </div>
       )}
       {renderNavItems(group.items)}

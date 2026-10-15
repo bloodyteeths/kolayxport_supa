@@ -1,3 +1,5 @@
+import type { PriceSummary } from '@/lib/research/stats';
+
 export interface MarketResearchData {
   query: string;
   topTags: Array<{ tag: string; count: number; pct: number }>;
@@ -30,7 +32,7 @@ export interface ShopData {
   shop_id: number; shop_name: string; num_sales: number;
   review_count: number; review_average: number; listing_active_count: number;
   url: string; icon_url: string; icon_url_fullxfull?: string;
-  created_timestamp?: number; avgPrice?: number; listingCount?: number;
+  created_timestamp?: number; medianPrice?: number | null; listingCount?: number;
 }
 
 export interface SavedSearch {
@@ -79,8 +81,13 @@ export interface DemandScore {
   breakdown: { supplyScore: number; compScore: number; demandPts: number; engScore: number; spreadScore: number };
 }
 
-export interface PriceStats {
-  min: number; max: number; avg: number; median: number; count: number;
+/**
+ * Robust price summary (lib/research/stats PriceSummary). No arithmetic mean:
+ * median + P25–P75 over an FX-normalized, plausibility-bounded, Tukey-trimmed
+ * sample. `count` = n kept. Values are null when the sample is too small.
+ */
+export interface PriceStats extends PriceSummary {
+  count: number;
 }
 
 export interface PriceRangeItem {
@@ -100,13 +107,15 @@ export interface TagCombo {
 }
 
 export interface ShopStats {
-  shops: (ShopData & { avgPrice: number; listingCount: number })[];
+  shops: (ShopData & { medianPrice: number | null; listingCount: number })[];
   totalSales: number; avgRating: number; top5Sales: number; totalListings: number;
 }
 
 export interface DeepDiveStats {
   count: number;
-  priceMin: number; priceMax: number; priceAvg: number; priceMedian: number;
+  priceMin: number; priceMax: number; priceMedian: number;
+  /** Robust summary of the shop's prices (median, P25–P75, n, quality). */
+  priceSummary: PriceSummary;
   avgFav: number; avgViews: number;
   topTags: TagData[];
   bestListings: EtsyMarketItem[];
@@ -114,7 +123,9 @@ export interface DeepDiveStats {
 
 export interface SeoResult {
   score: number; kwScore: number; tagScore: number; lengthScore: number; hasTagsScore: number;
-  recommendations: string[]; avgLen: number;
+  /** i18n-ready tips: render with t(`research.seoTips.${key}`, params). */
+  recommendations: { key: 'missingKeywords' | 'missingTags' | 'shortTitle' | 'moreTags'; params: Record<string, string | number> }[];
+  avgLen: number;
   coveredKw: number; totalKw: number;
   coveredTags: number; totalTags: number;
 }

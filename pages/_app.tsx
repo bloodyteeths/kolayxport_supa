@@ -1,4 +1,5 @@
 import { AppProps } from 'next/app';
+import { Inter } from 'next/font/google';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import theme from '../lib/theme';
@@ -23,6 +24,10 @@ import { ConfirmProvider } from '@/lib/hooks/useConfirm';
 import LimitReachedDialog from '@/components/billing/LimitReachedDialog';
 import { installLimitInterceptor } from '@/lib/http/limitInterceptor';
 import LiveAppMount from '@/components/live/LiveAppMount';
+import { zIndex as dsZ, neutral as dsN, radius as dsRadius } from '@/lib/ds/tokens';
+
+// Inter via next/font (self-hosted). latin-ext covers ğ ş ı İ. Exposed as --font-inter at :root below.
+const inter = Inter({ subsets: ['latin', 'latin-ext'], display: 'swap', variable: '--font-inter' });
 
 // Module scope (client only) so the 402 interceptor is active before any page
 // effect issues a request. Idempotent.
@@ -40,10 +45,27 @@ type AppPropsWithLayout = AppProps & {
 
 const messages = { tr: trMessages, en: enMessages } as const;
 
+// Untyped on purpose: stale ambient shims in types/*.d.ts declare toastOptions without the per-type keys
+// (error/success) that react-hot-toast 2.6 supports at runtime.
+const TOAST_OPTIONS = {
+  duration: 4000,
+  style: { background: dsN[900], color: dsN[0], fontSize: 13, lineHeight: '18px', borderRadius: dsRadius.md, padding: '10px 12px', maxWidth: 420 },
+  // TODO(M1 useToast): switch to `error: { duration: Infinity }` (tokens.md §4, DS §3.14 — errors persist
+  // until dismissed) once useToast ships a dismiss control + one-visible queueing. Legacy toast.error()
+  // calls have no close button, so M0 keeps them finite (known M0 spec gap).
+  error: { duration: 8000 },
+};
+
 function MyApp({ Component, pageProps }: AppProps) {
   const router = useRouter();
   const locale = useLocaleStore((s) => s.locale);
   const hydrate = useLocaleStore((s) => s.hydrate);
+
+  useEffect(() => {
+    // _document hard-codes lang="tr"; the UI locale is client-side, so keep <html lang> in sync
+    // (CSS case mapping and hyphenation follow it — fixes "FAİLED" in the EN UI).
+    if (typeof document !== 'undefined') document.documentElement.lang = locale;
+  }, [locale]);
 
   // Hydrate locale from localStorage after mount to avoid SSR mismatch
   useEffect(() => {
@@ -64,6 +86,10 @@ function MyApp({ Component, pageProps }: AppProps) {
       <NextIntlClientProvider locale={locale} messages={messages[locale]} timeZone="Europe/Istanbul">
       <ThemeProvider theme={theme}>
       <ConfirmProvider>
+        {/* defines the font var at :root so MUI portals (dialogs, menus) get Inter too */}
+        <style jsx global>{`
+          :root { --font-inter: ${inter.style.fontFamily}; }
+        `}</style>
         <CssBaseline />
         <Head>
           <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -110,7 +136,12 @@ function MyApp({ Component, pageProps }: AppProps) {
           }}
         />
         <Component {...pageProps} />
-        <Toaster position="top-center" />
+        <Toaster
+          position="bottom-center"
+          gutter={8}
+          containerStyle={{ zIndex: dsZ.toast, bottom: 'calc(var(--kx-bottom-nav, 0px) + var(--kx-action-bar, 0px) + 8px)' }}
+          toastOptions={TOAST_OPTIONS}
+        />
         {/* Live events: SSE stream, new-order chime + toast, live SWR refresh. Signed-in /app/* only. */}
         <LiveAppMount ordersPath="/app/labels" />
         <LimitReachedDialog />

@@ -15,7 +15,9 @@ import {
 import { toast } from 'react-hot-toast';
 import { useRouter } from 'next/router';
 import { normalizeTags } from '@/lib/etsy/seoRules';
-import { prefillHref, writeListingPrefill, dominantCurrency } from './shared/listingPrefill';
+import { prefillHref, writeListingPrefill, prefillPriceStats, prefillPrice } from './shared/listingPrefill';
+import { RobustPriceCard, useResearchLocale } from './shared/RobustPrice';
+import { formatMoney } from '@/lib/research/stats';
 
 import { useTranslations } from 'next-intl';
 import { useEtsyResearchStore, useComputedShopStats, useComputedDeepDive } from '@/lib/stores/useEtsyResearchStore';
@@ -38,11 +40,8 @@ function shopAge(createdTimestamp: number): string {
   return `${months}m`;
 }
 
-function estimateMonthlySales(listing: any): number {
-  if (!listing.created_timestamp) return 0;
-  const ageMonths = Math.max(1, (Date.now() / 1000 - listing.created_timestamp) / (30 * 86400));
-  return Math.round((listing.num_favorers / ageMonths) * 0.03 * 10) / 10;
-}
+// R0: the client-side "sales/mo" and "revenue/mo" estimates (lifetime favorites ÷ age × 0.03)
+// were removed: lifetime counters presented as rates are not measurements.
 
 function listingAgeLabel(ts: number): string {
   if (!ts) return '-';
@@ -80,6 +79,7 @@ function buildPriceBuckets(listings: any[]): { range: string; count: number; rev
 
 export default function CompetitorIntelligence() {
   const t = useTranslations('etsy.competitor');
+  const researchLocale = useResearchLocale();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [expandedShopIdx, setExpandedShopIdx] = useState<number | null>(null);
@@ -110,8 +110,6 @@ export default function CompetitorIntelligence() {
   const fetchShopSpyReport = useEtsyResearchStore(s => s.fetchShopSpyReport);
   const fetchShopReviews = useEtsyResearchStore(s => s.fetchShopReviews);
   const fetchReviewSentiment = useEtsyResearchStore(s => s.fetchReviewSentiment);
-  const discoveryData = useEtsyResearchStore(s => s.discoveryData);
-  const discoveryLoading = useEtsyResearchStore(s => s.discoveryLoading);
   const setQuery = useEtsyResearchStore(s => s.setQuery);
   const searchMarket = useEtsyResearchStore(s => s.searchMarket);
 
@@ -119,26 +117,24 @@ export default function CompetitorIntelligence() {
   const deepDiveStats = useComputedDeepDive();
   const router = useRouter();
   const tResearch = useTranslations('etsyResearch');
+  const tR = useTranslations('research');
 
   // Open the Etsy creator prefilled with this shop's top tags + price data.
   // Competitor titles/images are NOT copied; nothing is published.
   const handleCreateFromShop = () => {
     if (!deepDiveStats) return;
-    const currency = dominantCurrency(deepDiveListings || []);
+    const currency = deepDiveStats.priceSummary.currency;
     const ok = writeListingPrefill({
       target: 'etsy',
       source: 'etsy-research',
       tags: normalizeTags(deepDiveStats.topTags.map(tg => tg.tag)).tags,
-      price: currency && deepDiveStats.priceMedian > 0 ? Math.round(deepDiveStats.priceMedian * 100) / 100 : undefined,
+      price: prefillPrice(deepDiveStats.priceSummary),
       currency,
       research: {
         query: deepDiveShop?.shop_name || '',
         topTags: deepDiveStats.topTags,
         topKeywords: [],
-        priceStats: currency && deepDiveStats.priceMax > 0 ? {
-          min: deepDiveStats.priceMin, avg: deepDiveStats.priceAvg,
-          median: deepDiveStats.priceMedian, max: deepDiveStats.priceMax,
-        } : null,
+        priceStats: prefillPriceStats(deepDiveStats.priceSummary),
       },
     });
     if (!ok) { toast.error(tResearch('ur_prefillFailed')); return; }
@@ -169,8 +165,7 @@ export default function CompetitorIntelligence() {
   // All listings (not top 10), sorted + paginated
   const allListingsSorted = useMemo(() => {
     if (!deepDiveListings || deepDiveListings.length === 0) return [];
-    const withEstSales = deepDiveListings.map(l => ({ ...l, estMonthlySales: estimateMonthlySales(l) }));
-    return sortArray(withEstSales, bestListingSortKey, bestListingSortDir);
+    return sortArray(deepDiveListings, bestListingSortKey, bestListingSortDir);
   }, [deepDiveListings, bestListingSortKey, bestListingSortDir]);
 
   const totalListingPages = Math.ceil(allListingsSorted.length / LISTINGS_PER_PAGE);
@@ -206,18 +201,6 @@ export default function CompetitorIntelligence() {
 
   // Price distribution buckets
   const priceBuckets = useMemo(() => buildPriceBuckets(deepDiveListings || []), [deepDiveListings]);
-
-  // Estimated monthly revenue
-  const estMonthlyRevenue = useMemo(() => {
-    if (!deepDiveListings || deepDiveListings.length === 0 || !deepDiveShop) return 0;
-    const totalEstSales = allListingsSorted.reduce((s, l) => s + Math.max(0, l.estMonthlySales || 0), 0);
-    const avgPrice = deepDiveListings.reduce((s, l) => s + l.price, 0) / deepDiveListings.length;
-    return Math.max(0, Math.round(totalEstSales * avgPrice));
-  }, [deepDiveListings, deepDiveShop, allListingsSorted]);
-
-  const estMonthlySales = useMemo(() => {
-    return Math.max(0, Math.round(allListingsSorted.reduce((s, l) => s + Math.max(0, l.estMonthlySales || 0), 0)));
-  }, [allListingsSorted]);
 
   // Handle analyze with scroll
   const handleAnalyzeShop = useCallback(async (shopId: string) => {
@@ -260,7 +243,7 @@ export default function CompetitorIntelligence() {
           views: drawerData.views,
           imageCount: drawerData.imageCount,
           seoScore: drawerData.seoScore?.total,
-          marketAvgPrice: deepDiveStats?.priceAvg || null,
+          marketAvgPrice: deepDiveStats?.priceSummary.median ?? null, // median (R0); legacy field name
           marketAvgFavorites: deepDiveStats?.avgFav || null,
         }),
       });
@@ -322,7 +305,7 @@ export default function CompetitorIntelligence() {
                             <Star size={10} color="#ff9800" fill="#ff9800" />
                             <Typography variant="caption">{s.review_average.toFixed(1)}</Typography>
                           </Box>
-                          {s.avgPrice && <Typography variant="caption" color="text.secondary">{fmt(s.avgPrice)}</Typography>}
+                          {s.medianPrice != null && <Typography variant="caption" color="text.secondary">{tR('stats.medianShort')} {formatMoney(s.medianPrice, 'USD')}</Typography>}
                         </Box>
                       </Box>
                       <Typography variant="caption" sx={{ fontWeight: 700, color: i < 3 ? '#667eea' : '#999' }}>#{i + 1}</Typography>
@@ -358,7 +341,7 @@ export default function CompetitorIntelligence() {
                     <TableCell align="center"><TableSortLabel active={shopSortKey==='review_average'} direction={shopSortKey==='review_average'?shopSortDir:'desc'} onClick={()=>toggleSort('review_average',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>{t('rating')}</TableSortLabel></TableCell>
                     <TableCell align="center"><TableSortLabel active={shopSortKey==='review_count'} direction={shopSortKey==='review_count'?shopSortDir:'desc'} onClick={()=>toggleSort('review_count',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>{t('reviews')}</TableSortLabel></TableCell>
                     <TableCell align="center"><TableSortLabel active={shopSortKey==='listingCount'} direction={shopSortKey==='listingCount'?shopSortDir:'desc'} onClick={()=>toggleSort('listingCount',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>{t('products')}</TableSortLabel></TableCell>
-                    <TableCell align="center"><TableSortLabel active={shopSortKey==='avgPrice'} direction={shopSortKey==='avgPrice'?shopSortDir:'desc'} onClick={()=>toggleSort('avgPrice',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>{t('avgPrice')}</TableSortLabel></TableCell>
+                    <TableCell align="center"><TableSortLabel active={shopSortKey==='medianPrice'} direction={shopSortKey==='medianPrice'?shopSortDir:'desc'} onClick={()=>toggleSort('medianPrice',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>{tR('stats.medianPrice')}</TableSortLabel></TableCell>
                     <TableCell sx={{ width: 40 }} />
                   </TableRow>
                 </TableHead>
@@ -389,7 +372,7 @@ export default function CompetitorIntelligence() {
                       </TableCell>
                       <TableCell align="center">{s.review_count.toLocaleString()}</TableCell>
                       <TableCell align="center">{s.listing_active_count}</TableCell>
-                      <TableCell align="center">{s.avgPrice ? fmt(s.avgPrice) : '-'}</TableCell>
+                      <TableCell align="center">{formatMoney(s.medianPrice, 'USD')}</TableCell>
                       <TableCell>
                         <IconButton size="small" onClick={() => window.open(s.url, '_blank')}>
                           <ExternalLink size={14} />
@@ -414,60 +397,11 @@ export default function CompetitorIntelligence() {
             ? <Alert severity="info" sx={{ borderRadius: '12px' }}>{t('shopInfoLoading')}</Alert>
             : (
               <>
-                {/* Discovery: top items from trending niches as competitor preview */}
-                {discoveryLoading && (
-                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 2 }}>
-                    {[1, 2, 3, 4].map(i => (
-                      <Skeleton key={i} variant="rounded" height={120} sx={{ borderRadius: '16px' }} />
-                    ))}
-                  </Box>
-                )}
-
-                {discoveryData?.trendingNiches?.length > 0 ? (
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Flame size={18} color="#f44336" /> {t('topListingsTrending')}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-                      {t('clickNicheCompetitor')}
-                    </Typography>
-                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
-                      {discoveryData.trendingNiches.map((niche: any) => (
-                        <Card key={niche.query} sx={{
-                          ...glassCard, cursor: 'pointer',
-                          '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 8px 24px rgba(0,0,0,0.1)' },
-                          transition: 'all 0.2s',
-                        }} onClick={() => { setQuery(niche.query); setTimeout(() => searchMarket(), 50); }}>
-                          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 700, textTransform: 'capitalize', mb: 1 }}>
-                              {niche.query}
-                            </Typography>
-                            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 1 }}>
-                              <Chip label={`${niche.totalResults?.toLocaleString()} ${t('resultsLabel')}`} size="small" variant="outlined" sx={{ fontSize: '0.85rem', height: 26 }} />
-                              <Chip label={`$${niche.priceStats?.avg?.toFixed(2)} ${t('avgLabel')}`} size="small" variant="outlined" sx={{ fontSize: '0.85rem', height: 26 }} />
-                            </Box>
-                            {niche.topItems?.slice(0, 3).map((item: any) => (
-                              <Box key={item.listing_id} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                                {item.image_url && (
-                                  <Box component="img" src={item.image_url} alt="" sx={{ width: 28, height: 28, borderRadius: '6px', objectFit: 'cover' }} />
-                                )}
-                                <Typography variant="caption" sx={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {item.title}
-                                </Typography>
-                                <Typography variant="caption" sx={{ fontWeight: 600, color: '#667eea' }}>${item.price}</Typography>
-                              </Box>
-                            ))}
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </Box>
-                  </Box>
-                ) : !discoveryLoading && (
+                {/* R0: "trending niches" preview removed (hardcoded queries, not trends). */}
                   <PremiumEmptyState icon={<Users size={48} />} title={t('shopAnalysis')}
                     desc={t('shopAnalysisDesc')}
                     steps={[t('shopStep1'), t('shopStep2'), t('shopStep3')]}
                   />
-                )}
               </>
             )
       )}
@@ -531,14 +465,6 @@ export default function CompetitorIntelligence() {
                   <Chip size="small" icon={<Clock size={12} />} label={shopAge(deepDiveShop.created_timestamp)}
                     variant="outlined" sx={{ fontSize: '0.85rem', height: 26 }} />
                 )}
-                {estMonthlyRevenue > 0 && (
-                  <Chip size="small" icon={<TrendingUp size={12} />} label={`~$${estMonthlyRevenue.toLocaleString()}/mo`}
-                    sx={{ fontSize: '0.85rem', height: 26, bgcolor: 'rgba(76,175,80,0.1)', color: '#4caf50', fontWeight: 700 }} />
-                )}
-                {estMonthlySales > 0 && (
-                  <Chip size="small" icon={<ShoppingCart size={12} />} label={`~${estMonthlySales} sales/mo`}
-                    sx={{ fontSize: '0.85rem', height: 26, bgcolor: 'rgba(33,150,243,0.1)', color: '#2196F3', fontWeight: 700 }} />
-                )}
               </Box>
             </Box>
           </Box>
@@ -554,9 +480,10 @@ export default function CompetitorIntelligence() {
       {deepDiveStats && (
         <>
           <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5, 1fr)', gap: 1.5, mb: 2 }}>
-            <StatCard label={t('minPrice')} value={fmt(deepDiveStats.priceMin)} color="#11998e" />
-            <StatCard label={t('avgPriceLabel')} value={fmt(deepDiveStats.priceAvg)} color="#2196F3" />
-            <StatCard label={t('maxPrice')} value={fmt(deepDiveStats.priceMax)} color="#f44336" />
+            {/* R0: median + P25–P75 + n in the shop's currency; no average. */}
+            <RobustPriceCard summary={deepDiveStats.priceSummary} color="#2196F3" />
+            <StatCard label={t('minPrice')} value={formatMoney(deepDiveStats.priceSummary.min, deepDiveStats.priceSummary.currency)} color="#11998e" />
+            <StatCard label={t('maxPrice')} value={formatMoney(deepDiveStats.priceSummary.max, deepDiveStats.priceSummary.currency)} color="#f44336" />
             <StatCard label={t('avgFavorites')} value={String(deepDiveStats.avgFav)} color="#e91e63" icon={<Heart size={18} />} />
             <StatCard label={t('avgViews')} value={String(deepDiveStats.avgViews)} color="#ff9800" icon={<Eye size={18} />} />
           </Box>
@@ -675,9 +602,6 @@ export default function CompetitorIntelligence() {
                               <Heart size={10} color="#e91e63" />
                               <Typography variant="caption" sx={{ fontWeight: 600 }}>{l.num_favorers.toLocaleString()}</Typography>
                             </Box>
-                            {l.estMonthlySales > 0 && (
-                              <Typography variant="caption" sx={{ color: '#4caf50', fontWeight: 600 }}>~{l.estMonthlySales}/mo</Typography>
-                            )}
                           </Box>
                         </Box>
                         <Typography variant="caption" sx={{ fontWeight: 700, color: globalIdx < 3 ? '#667eea' : '#999' }}>#{globalIdx + 1}</Typography>
@@ -729,7 +653,6 @@ export default function CompetitorIntelligence() {
                     <TableCell align="right"><TableSortLabel active={bestListingSortKey==='price'} direction={bestListingSortKey==='price'?bestListingSortDir:'desc'} onClick={()=>toggleSort('price',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>{t('priceCol')}</TableSortLabel></TableCell>
                     <TableCell align="center"><TableSortLabel active={bestListingSortKey==='num_favorers'} direction={bestListingSortKey==='num_favorers'?bestListingSortDir:'desc'} onClick={()=>toggleSort('num_favorers',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>{t('favoriteCol')}</TableSortLabel></TableCell>
                     <TableCell align="center"><TableSortLabel active={bestListingSortKey==='views'} direction={bestListingSortKey==='views'?bestListingSortDir:'desc'} onClick={()=>toggleSort('views',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>{t('viewsCol')}</TableSortLabel></TableCell>
-                    <TableCell align="center"><TableSortLabel active={bestListingSortKey==='estMonthlySales'} direction={bestListingSortKey==='estMonthlySales'?bestListingSortDir:'desc'} onClick={()=>toggleSort('estMonthlySales',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>{t('estSales')}</TableSortLabel></TableCell>
                     <TableCell align="center"><TableSortLabel active={bestListingSortKey==='created_timestamp'} direction={bestListingSortKey==='created_timestamp'?bestListingSortDir:'desc'} onClick={()=>toggleSort('created_timestamp',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>{t('listingAge')}</TableSortLabel></TableCell>
                     <TableCell sx={{ width: 40 }} />
                   </TableRow>
@@ -768,11 +691,6 @@ export default function CompetitorIntelligence() {
                           </Typography>
                         </TableCell>
                         <TableCell align="center">{l.views.toLocaleString()}</TableCell>
-                        <TableCell align="center">
-                          <Typography variant="body2" sx={{ color: '#4caf50', fontWeight: 600 }}>
-                            {l.estMonthlySales > 0 ? l.estMonthlySales : '-'}
-                          </Typography>
-                        </TableCell>
                         <TableCell align="center">
                           <Typography variant="caption" color="text.secondary">{listingAgeLabel(l.created_timestamp)}</Typography>
                         </TableCell>
@@ -845,7 +763,7 @@ export default function CompetitorIntelligence() {
                   <Divider orientation="vertical" flexItem />
                   <Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                      {t('estMonthlyRevenue')}: ${shopSpyReport.estimated_monthly_revenue?.toLocaleString()}
+                      {t('estMonthlyRevenue')}: {typeof shopSpyReport.estimated_monthly_revenue === 'number' ? formatMoney(shopSpyReport.estimated_monthly_revenue, 'USD', researchLocale) : '—'}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">{shopSpyReport.revenue_reasoning}</Typography>
                   </Box>
@@ -1169,7 +1087,7 @@ export default function CompetitorIntelligence() {
               {drawerData.velocity && (
                 <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1, mb: 2 }}>
                   <StatCard label={t('favRate')} value={String(drawerData.velocity.favRate)} color="#e91e63" />
-                  <StatCard label={t('estSalesMonth')} value={String(drawerData.velocity.estMonthlySales)} color="#4caf50" />
+                  <StatCard label={t('estSalesMonth')} value={drawerData.velocity.estMonthlySales != null ? String(drawerData.velocity.estMonthlySales) : '—'} color="#4caf50" />
                   <StatCard label={t('listingAgeMonths')} value={`${drawerData.ageMonths}m`} color="#9e9e9e" icon={<Clock size={14} />} />
                 </Box>
               )}

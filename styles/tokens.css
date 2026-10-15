@@ -1,0 +1,84 @@
+/* styles/tokens.css — mirrors lib/ds/tokens.ts (parity-tested). Additive: Tailwind defaults stay until M10. */
+@theme {
+  /* font: --font-inter is defined at :root by pages/_app.tsx (next/font) */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* neutral = Tailwind slate values, so legacy slate-* and new neutral-* render identically */
+  --color-neutral-0: #FFFFFF;   --color-neutral-25: #FBFCFD;  --color-neutral-50: #F8FAFC;
+  --color-neutral-100: #F1F5F9; --color-neutral-200: #E2E8F0; --color-neutral-300: #CBD5E1;
+  --color-neutral-400: #94A3B8; --color-neutral-500: #64748B; --color-neutral-600: #475569;
+  --color-neutral-700: #334155; --color-neutral-800: #1E293B; --color-neutral-900: #0F172A;
+
+  --color-accent-50: #EFF6FF;  --color-accent-100: #DBEAFE; --color-accent-200: #BFDBFE;
+  --color-accent-500: #3B82F6; --color-accent-600: #2563EB; --color-accent-700: #1D4ED8;
+  --color-accent-800: #1E40AF;
+
+  --color-success-bg: #F0FDF4;   --color-success-border: #BBF7D0;   --color-success-fg: #15803D;   --color-success: #16A34A;
+  --color-warning-bg: #FFFBEB;   --color-warning-border: #FDE68A;   --color-warning-fg: #B45309;   --color-warning: #D97706;
+  --color-danger-bg: #FEF2F2;    --color-danger-border: #FECACA;    --color-danger-fg: #B91C1C;    --color-danger: #DC2626;
+  --color-info-bg: #EFF6FF;      --color-info-border: #BFDBFE;      --color-info-fg: #1D4ED8;      --color-info: #3B82F6;
+  --color-attention-bg: #FFF7ED; --color-attention-border: #FED7AA; --color-attention-fg: #C2410C; --color-attention: #EA580C;
+
+  /* type scale (new names; Tailwind text-xs…text-9xl stay for legacy) */
+  --text-display: 28px;  --text-display--line-height: 36px;  --text-display--font-weight: 600;  --text-display--letter-spacing: -0.02em;
+  --text-title-lg: 20px; --text-title-lg--line-height: 28px; --text-title-lg--font-weight: 600; --text-title-lg--letter-spacing: -0.015em;
+  --text-title-md: 16px; --text-title-md--line-height: 24px; --text-title-md--font-weight: 600; --text-title-md--letter-spacing: -0.01em;
+  --text-title-sm: 14px; --text-title-sm--line-height: 20px; --text-title-sm--font-weight: 600;
+  --text-body: 14px;     --text-body--line-height: 20px;
+  --text-dense: 13px;    --text-dense--line-height: 18px;
+  --text-label: 13px;    --text-label--line-height: 18px;    --text-label--font-weight: 500;
+  --text-caption: 12px;  --text-caption--line-height: 16px;
+  --text-micro: 11px;    --text-micro--line-height: 14px;    --text-micro--font-weight: 500;    --text-micro--letter-spacing: 0.01em;
+
+  /* elevation (new names; shadow-sm/md/lg stay for legacy until M10) */
+  --shadow-e1: 0 1px 2px rgb(15 23 42 / .06);
+  --shadow-e2: 0 4px 12px rgb(15 23 42 / .08), 0 1px 3px rgb(15 23 42 / .06);
+  --shadow-e3: 0 12px 32px rgb(15 23 42 / .12), 0 2px 6px rgb(15 23 42 / .06);
+  --shadow-e4: 0 24px 64px rgb(15 23 42 / .18);
+  --shadow-focus: 0 0 0 3px rgb(37 99 235 / .28);
+
+  --ease-standard: cubic-bezier(.2, 0, 0, 1);
+
+  /* NOT redefined on purpose:
+     --spacing (v4 default 4px = DS grid), --radius-* (v4 defaults sm4/md6/lg8/xl12 = DS scale),
+     --breakpoint-* (aligned to MUI 600/900/1200/1536 in M10 only; 39 legacy files use md:/lg:). */
+}
+
+:root {
+  /* layout */
+  --kx-sidebar: 240px; --kx-sidebar-rail: 64px;
+  --kx-topbar: 52px; --kx-topbar-mobile: 48px; --kx-tabbar: 56px;
+  /* --kx-topbar-current is set on <html> by the shell (52 or 48 by breakpoint, CRITIQUE X7); default for SSR: */
+  --kx-topbar-current: 52px;
+  /* --kx-bottom-nav is set at runtime by MobileTabBar (keep); default for SSR: */
+  --kx-bottom-nav: 0px;
+  /* --kx-action-bar: height of a visible fixed bottom bulk/action bar (legacy bulk bars set it on <html>
+     while shown, like MobileTabBar sets --kx-bottom-nav) so bottom-center toasts clear it. Default: */
+  --kx-action-bar: 0px;
+  --kx-max-list: 1600px; --kx-max-detail: 1280px; --kx-max-form: 880px; --kx-max-reading: 720px;
+  --kx-field-max: 480px; --kx-long-field-max: 720px;
+
+  /* controls */
+  --kx-control-sm: 32px; --kx-control-md: 40px; --kx-control-lg: 44px; --kx-control-xl: 48px;
+  --kx-row-h: 44px; --kx-row-h-compact: 36px;
+
+  /* z-index (matches MUI theme.zIndex) */
+  --kx-z-sticky-header: 2; --kx-z-sticky-toolbar: 20; --kx-z-action-bar: 1040; --kx-z-tabbar: 1050;
+  --kx-z-topbar: 1100; --kx-z-sidebar: 1150; --kx-z-drawer: 1200; --kx-z-modal: 1500;
+  --kx-z-modal-nested: 1550; --kx-z-popover: 1600; --kx-z-palette: 1650; --kx-z-toast: 1700; --kx-z-tooltip: 1800;
+
+  /* motion */
+  --kx-dur-instant: 80ms; --kx-dur-fast: 140ms; --kx-dur-base: 200ms; --kx-dur-slow: 280ms;
+}
+
+@media (pointer: coarse) {
+  :root { --kx-control-sm: 44px; --kx-control-md: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --kx-dur-fast: 0ms; --kx-dur-base: 0ms; --kx-dur-slow: 0ms; }
+  *, *::before, *::after { animation-duration: 0ms !important; scroll-behavior: auto !important; }
+}
+
+.tnum { font-variant-numeric: tabular-nums; }

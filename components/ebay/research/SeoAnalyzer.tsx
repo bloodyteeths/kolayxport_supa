@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import { priceDisplay, formatMoney, type PriceSummary } from '@/lib/research/stats';
+import { useRobustPriceLabel, useResearchLocale } from '@/components/etsy/research/shared/RobustPrice';
 
 interface SeoAnalyzerProps {
   userId: string;
@@ -37,11 +39,13 @@ interface SeoResult {
   totalCompetitors: number;
   seoScore: number;
   keywordCoverage: KeywordCoverage[];
-  priceStats: { min: number; max: number; avg: number; median: number };
+  /** R0 robust summary (median, P25–P75, n); no mean. Null when no prices. */
+  priceStats: PriceSummary | null;
   avgTitleLength: number;
   myTitleLength: number;
   aspectAnalysis: AspectAnalysis[];
-  recommendations: string[];
+  /** i18n tips: research.seoTips.<key>. Older API versions returned plain strings. */
+  recommendations: Array<{ key: string; params?: Record<string, string | number> } | string>;
 }
 
 const MARKETPLACES = [
@@ -143,6 +147,9 @@ function KeywordCard({ kw, expanded, onToggle }: { kw: KeywordCoverage; expanded
 export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, onNavigate, navigateData, onConsumeNavigateData }: SeoAnalyzerProps) {
   const t = useTranslations('ebay.research.seoAnalyzer');
   const tA = useTranslations('ebayResearch');
+  const tR = useTranslations('research');
+  const priceLabel = useRobustPriceLabel();
+  const locale = useResearchLocale();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -205,7 +212,8 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
         title: myTitle.trim(),
         keywords: topKeywords,
         marketResearch: {
-          avgPrice: result.priceStats.avg,
+          // R0: median only, and only when the sample passed the checks.
+          medianPrice: result.priceStats?.quality === 'ok' ? result.priceStats.median : undefined,
           totalCompetitors: result.totalCompetitors,
         },
       });
@@ -235,49 +243,38 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
     ? [...result.keywordCoverage].sort((a, b) => b.percentage - a.percentage)
     : [];
 
+  // R0: price positioning shows the trimmed range, the P25–P75 band and the
+  // median — never an average — and only when the sample passed the checks.
   const renderPriceBar = () => {
-    if (!result) return null;
-    const { min, max, avg, median } = result.priceStats;
+    const ps = result?.priceStats;
+    if (!ps || ps.quality !== 'ok' || ps.min == null || ps.max == null || ps.median == null || ps.p25 == null || ps.p75 == null) return null;
+    const { min, max, median, p25, p75, currency } = ps;
     const range = max - min || 1;
-    const avgPos = ((avg - min) / range) * 100;
-    const medianPos = ((median - min) / range) * 100;
+    const pos = (v: number) => ((v - min) / range) * 100;
+    const money = (v: number) => formatMoney(v, currency, locale);
 
     return (
-      <Paper variant="outlined" sx={{
-        p: 2.5,
-        bgcolor: '#fff',
-        border: '1px solid rgba(99,102,241,0.08)',
-        boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-        borderRadius: 3,
-      }}>
-        <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ color: '#1e1b4b' }}>
-          <DollarSign size={16} style={{ verticalAlign: 'middle', marginRight: 4, color: '#6366f1' }} />
+      <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
+        <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+          <DollarSign size={16} style={{ verticalAlign: 'middle', marginRight: 4 }} />
           {t('pricePositioning')}
         </Typography>
         <Box sx={{ position: 'relative', height: 40, mt: 2, mb: 3 }}>
-          <Box sx={{ position: 'absolute', top: 12, left: 0, right: 0, height: 8, background: 'linear-gradient(90deg, #e5e7eb, #f0edff)', borderRadius: 4 }} />
-          <Tooltip title={`Min: $${min.toFixed(2)}`}>
-            <Box sx={{ position: 'absolute', top: 8, left: 0, width: 16, height: 16, bgcolor: '#6366f1', borderRadius: '50%', boxShadow: '0 0 6px rgba(99,102,241,0.4)' }} />
+          <Box sx={{ position: 'absolute', top: 12, left: 0, right: 0, height: 8, bgcolor: 'grey.200', borderRadius: 4 }} />
+          <Tooltip title={`${tR('stats.typicalRange')}: ${money(p25)}–${money(p75)}`}>
+            <Box sx={{ position: 'absolute', top: 12, left: `${pos(p25)}%`, width: `${Math.max(pos(p75) - pos(p25), 1)}%`, height: 8, bgcolor: 'primary.light', borderRadius: 4 }} />
           </Tooltip>
-          <Tooltip title={`${t('avg')}: $${avg.toFixed(2)}`}>
-            <Box sx={{ position: 'absolute', top: 4, left: `${avgPos}%`, transform: 'translateX(-50%)', textAlign: 'center' }}>
-              <Box sx={{ width: 20, height: 20, bgcolor: '#10b981', borderRadius: '50%', mx: 'auto', boxShadow: '0 0 6px rgba(16,185,129,0.4)' }} />
-              <Typography variant="caption" sx={{ mt: 0.5, display: 'block', fontWeight: 600 }}>{t('avg')}</Typography>
-            </Box>
-          </Tooltip>
-          <Tooltip title={`Medyan: $${median.toFixed(2)}`}>
-            <Box sx={{ position: 'absolute', top: 4, left: `${medianPos}%`, transform: 'translateX(-50%)', textAlign: 'center' }}>
-              <Box sx={{ width: 20, height: 20, bgcolor: '#f59e0b', borderRadius: '50%', mx: 'auto', boxShadow: '0 0 6px rgba(245,158,11,0.4)' }} />
+          <Tooltip title={`${t('median')}: ${money(median)}`}>
+            <Box sx={{ position: 'absolute', top: 4, left: `${pos(median)}%`, transform: 'translateX(-50%)', textAlign: 'center' }}>
+              <Box sx={{ width: 20, height: 20, bgcolor: 'primary.main', borderRadius: '50%', mx: 'auto' }} />
               <Typography variant="caption" sx={{ mt: 0.5, display: 'block', fontWeight: 600 }}>{t('median')}</Typography>
             </Box>
           </Tooltip>
-          <Tooltip title={`Max: $${max.toFixed(2)}`}>
-            <Box sx={{ position: 'absolute', top: 8, right: 0, width: 16, height: 16, bgcolor: '#ef4444', borderRadius: '50%', boxShadow: '0 0 6px rgba(239,68,68,0.4)' }} />
-          </Tooltip>
         </Box>
         <Stack direction="row" justifyContent="space-between">
-          <Typography variant="caption" color="text.secondary">${min.toFixed(2)}</Typography>
-          <Typography variant="caption" color="text.secondary">${max.toFixed(2)}</Typography>
+          <Typography variant="caption" color="text.secondary">{money(min)}</Typography>
+          <Typography variant="caption" color="text.secondary">{tR('stats.sampleN', { n: ps.n })}</Typography>
+          <Typography variant="caption" color="text.secondary">{money(max)}</Typography>
         </Stack>
       </Paper>
     );
@@ -331,18 +328,7 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
           />
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <FormControl size={isMobile ? 'small' : 'medium'} sx={{ minWidth: 180 }}>
-              <InputLabel>{t('marketplace')}</InputLabel>
-              <Select
-                value={selectedMarketplace}
-                label={t('marketplace')}
-                onChange={e => setSelectedMarketplace(e.target.value)}
-              >
-                {MARKETPLACES.map(m => (
-                  <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            {/* R0: duplicate marketplace selector removed — follows the page header picker. */}
 
             <Button
               variant="contained"
@@ -443,8 +429,8 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
             <StatCard
               icon={<DollarSign size={20} />}
               label={t('priceRange')}
-              value={`$${result.priceStats.min.toFixed(0)}-${result.priceStats.max.toFixed(0)}`}
-              subtitle={`${t('avg')}: ${result.priceStats.avg.toFixed(2)}`}
+              value={priceDisplay(result.priceStats, locale).band ?? '—'}
+              subtitle={priceLabel(result.priceStats)}
             />
             <StatCard
               icon={<TrendingUp size={20} />}
@@ -584,7 +570,7 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
                     borderLeftWidth: '3px',
                     '& .MuiAlert-icon': { color: '#6366f1' },
                   }}>
-                    {rec}
+                    {typeof rec === 'string' ? rec : tR(`seoTips.${rec.key}`, rec.params)}
                   </Alert>
                 ))}
               </Stack>

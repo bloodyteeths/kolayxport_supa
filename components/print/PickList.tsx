@@ -83,7 +83,7 @@ export default function PickList({ data }: { data: PrintDataResponse }) {
           </div>
         )}
 
-        <div style={{ marginTop: 16, borderTop: '2px solid #111', display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+        <div style={{ marginTop: 16, borderTop: '2px solid #111', display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '0.75rem', fontWeight: 700 }}>
           <span>{t('items')}</span>
           <span>{t('totalQty')}</span>
         </div>

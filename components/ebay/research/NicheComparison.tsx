@@ -1,5 +1,9 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
+import { useNicheVerdicts } from './nicheLabels';
+import { formatMoney } from '@/lib/research/stats';
+import { marketplaceCurrency } from './marketplaces';
+import { useResearchLocale } from '@/components/etsy/research/shared/RobustPrice';
 import {
   Box, Typography, TextField, Button, Paper, Chip, Autocomplete,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -18,7 +22,6 @@ interface NicheComparisonProps {
 interface NicheData {
   query: string;
   totalResults: number;
-  avgPrice: number;
   medianPrice: number;
   demandScore: number;
   competitionScore: number;
@@ -99,20 +102,21 @@ function ScoreBadge({ score, label }: { score: number; label?: string }) {
   );
 }
 
-type MetricKey = 'totalResults' | 'avgPrice' | 'medianPrice' | 'demandScore' | 'competitionScore' | 'opportunityScore' | 'uniqueSellers' | 'freeShippingPct' | 'sellerConcentration';
+type MetricKey = 'totalResults' | 'medianPrice' | 'demandScore' | 'competitionScore' | 'opportunityScore' | 'uniqueSellers' | 'freeShippingPct' | 'sellerConcentration';
 
 interface MetricDef {
   key: MetricKey;
   label: string;
-  format: (v: number) => string;
+  /** `d` is the niche row (for its currency), `locale` a full BCP-47 tag. */
+  format: (v: number, d: NicheData, locale: string) => string;
   higherIsBetter: boolean;
   isScore: boolean;
 }
 
 const METRICS: MetricDef[] = [
   { key: 'totalResults', label: 'metricTotalResults', format: v => v.toLocaleString(), higherIsBetter: true, isScore: false },
-  { key: 'avgPrice', label: 'metricAvgPrice', format: v => `$${v.toFixed(2)}`, higherIsBetter: true, isScore: false },
-  { key: 'medianPrice', label: 'metricMedianPrice', format: v => `$${v.toFixed(2)}`, higherIsBetter: true, isScore: false },
+  // R0: no average price row; median only ("—" when unknown).
+  { key: 'medianPrice', label: 'metricMedianPrice', format: (v, d, locale) => (v > 0 ? formatMoney(v, nicheCurrency(d), locale) : '—'), higherIsBetter: true, isScore: false },
   { key: 'demandScore', label: 'metricDemandScore', format: v => String(v), higherIsBetter: true, isScore: true },
   { key: 'competitionScore', label: 'metricCompetitionScore', format: v => String(v), higherIsBetter: false, isScore: true },
   { key: 'opportunityScore', label: 'metricOpportunityScore', format: v => String(v), higherIsBetter: true, isScore: true },
@@ -120,6 +124,11 @@ const METRICS: MetricDef[] = [
   { key: 'freeShippingPct', label: 'metricFreeShippingPct', format: v => `%${v.toFixed(1)}`, higherIsBetter: true, isScore: false },
   { key: 'sellerConcentration', label: 'metricSellerConcentration', format: v => `%${v.toFixed(1)}`, higherIsBetter: false, isScore: false },
 ];
+
+/** Currency the niche's prices were summarized in (server summary first, then marketplace). */
+function nicheCurrency(d: NicheData): string {
+  return d?.priceStats?.currency || marketplaceCurrency(d?.marketplace || 'EBAY_US');
+}
 
 function getWinnerIndex(values: (number | undefined)[], higherIsBetter: boolean): number {
   let bestIdx = -1;
@@ -138,7 +147,6 @@ function savedNicheToData(n: SavedNiche): NicheData {
   return {
     query: n.query,
     totalResults: n.totalResults ?? 0,
-    avgPrice: n.avgPrice ?? 0,
     medianPrice: n.medianPrice ?? 0,
     demandScore: n.demandScore ?? 0,
     competitionScore: n.competitionScore ?? 0,
@@ -149,12 +157,15 @@ function savedNicheToData(n: SavedNiche): NicheData {
     demandLabel: n.demandLabel,
     competitionLabel: n.competitionLabel,
     opportunityLabel: n.opportunityLabel,
+    marketplace: n.marketplace,
   };
 }
 
 export default function NicheComparison({ userId, onNavigate }: NicheComparisonProps) {
   const t = useTranslations('ebay.nicheComparison');
   const tA = useTranslations('ebayResearch');
+  const researchLocale = useResearchLocale();
+  const verdict = useNicheVerdicts();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -233,6 +244,8 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
 
     try {
       const data = await apiCall('niche_analyze', userId, { q });
+      // R0: hide a median that failed the sanity checks (small/implausible sample).
+      if (data?.priceStats && data.priceStats.quality !== 'ok') data.medianPrice = 0;
       updateSlot(index, { data, loading: false });
     } catch (err: any) {
       updateSlot(index, { loading: false });
@@ -447,7 +460,7 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
                                 {metric.isScore ? (
                                   <ScoreBadge score={val} label={tooltipLabel} />
                                 ) : (
-                                  metric.format(val ?? 0)
+                                  metric.format(val ?? 0, slot.data, researchLocale)
                                 )}
                               </TableCell>
                             );
@@ -506,7 +519,7 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
                               <ScoreBadge score={val} label={tooltipLabel} />
                             ) : (
                               <Typography variant="body2" sx={{ fontWeight: isWinner ? 700 : 400 }}>
-                                {metric.format(val ?? 0)}
+                                {metric.format(val ?? 0, slot.data, researchLocale)}
                               </Typography>
                             )}
                           </Box>
@@ -536,13 +549,13 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
                 <ScoreBadge score={bestNiche.data.opportunityScore} label={t('opportunityScore')} />
               </Box>
               <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-                {bestNiche.data.opportunityLabel || t('verdictFallback', {
+                {verdict.opportunity(bestNiche.data.opportunityScore) || t('verdictFallback', {
                   query: bestNiche.data.query,
                   demandLevel: bestNiche.data.demandScore >= 50 ? t('highDemand') : t('medDemand'),
                   demandScore: bestNiche.data.demandScore,
                   competitionLevel: bestNiche.data.competitionScore < 50 ? t('lowCompetition') : t('medCompetition'),
                   competitionScore: bestNiche.data.competitionScore,
-                  avgPrice: bestNiche.data.avgPrice.toFixed(2),
+                  avgPrice: bestNiche.data.medianPrice > 0 ? formatMoney(bestNiche.data.medianPrice, nicheCurrency(bestNiche.data), researchLocale) : '—',
                 })}
               </Typography>
 

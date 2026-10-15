@@ -43,7 +43,7 @@ function PackingSlip({ order, sender }: { order: PrintOrder; sender: PrintSender
           )}
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '.06em' }} className="kxp-muted">
+          <div style={{ fontSize: '0.75rem' }} className="kxp-muted">
             {t('packingSlip')}
           </div>
           <div style={{ fontWeight: 700, fontSize: '1.05rem', wordBreak: 'break-all' }}>
@@ -59,14 +59,14 @@ function PackingSlip({ order, sender }: { order: PrintOrder; sender: PrintSender
 
       <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginTop: 20 }}>
         <div style={{ flex: '1 1 220px', minWidth: 0 }}>
-          <div className="kxp-muted" style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+          <div className="kxp-muted" style={{ fontSize: '0.75rem', fontWeight: 700 }}>
             {t('shipTo')}
           </div>
           <div className="kxp-pre" style={{ marginTop: 4, fontSize: '0.95rem', lineHeight: 1.4 }}>{shipTo || '—'}</div>
         </div>
         {(from.name || from.address) && (
           <div style={{ flex: '1 1 220px', minWidth: 0 }}>
-            <div className="kxp-muted" style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+            <div className="kxp-muted" style={{ fontSize: '0.75rem', fontWeight: 700 }}>
               {t('from')}
             </div>
             <div className="kxp-pre" style={{ marginTop: 4, fontSize: '0.85rem', lineHeight: 1.4 }}>
@@ -76,7 +76,7 @@ function PackingSlip({ order, sender }: { order: PrintOrder; sender: PrintSender
         )}
       </div>
 
-      <div style={{ marginTop: 20, borderTop: '2px solid #111', display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+      <div style={{ marginTop: 20, borderTop: '2px solid #111', display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '0.75rem', fontWeight: 700 }}>
         <span>{t('items')}</span>
         <span>{t('qty')}</span>
       </div>

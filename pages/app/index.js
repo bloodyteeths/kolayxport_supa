@@ -317,7 +317,7 @@ const DashboardLandingContent = ({ user }) => {
 
       {/* Quick Actions */}
       <div>
-        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">{t('quickAccess')}</h2>
+        <h2 className="text-sm font-semibold text-slate-400 mb-3">{t('quickAccess')}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {quickActions.map((action) => (
             <QuickActionCard key={action.href} {...action} />

@@ -37,6 +37,9 @@ import useEbayResearchStore from '@/lib/stores/useEbayResearchStore';
 import useLocaleStore from '@/lib/stores/useLocaleStore';
 import { EBAY_RESEARCH_MARKETPLACES, formatMoney, currencySymbol, marketplaceCurrency, marketplaceDomain, isEbayResearchMarketplace } from '@/components/ebay/research/marketplaces';
 import useCreateListingPrefill, { keywordsFromTitle } from '@/components/ebay/research/useCreateListingPrefill';
+import { useNicheVerdicts } from '@/components/ebay/research/nicheLabels';
+import { RobustPriceCard, useRobustPriceLabel } from '@/components/etsy/research/shared/RobustPrice';
+import { decodeEntities, type PriceSummary } from '@/lib/research/stats';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -70,13 +73,8 @@ interface ProductResult {
   location: string;
 }
 
-interface PriceStats {
-  min: number;
-  max: number;
-  avg: number;
-  median: number;
-  totalResults: number;
-}
+/** R0: robust summary from the API (median, P25–P75, trimmed min/max, n). No mean. */
+type PriceStats = PriceSummary & { totalResults?: number };
 
 interface TrackedProduct {
   id: string;
@@ -103,8 +101,9 @@ interface NicheReport {
   competitionScore: number;
   totalListings: number;
   uniqueSellers: number;
-  avgPrice: number;
   medianPrice: number;
+  /** Robust price summary (fresh analyses only; saved niches carry the median alone). */
+  priceStats?: PriceSummary | null;
   priceMin: number;
   priceMax: number;
   freeShippingPct: number;
@@ -412,14 +411,16 @@ function StatCard({ icon, label, value, sub }: { icon: React.ReactNode; label: s
 function PriceStatsBar({ stats, currency = 'USD' }: { stats: PriceStats | null; currency?: string }) {
   const t = useTranslations('ebayResearch');
   const locale = useLocaleStore(s => s.locale);
-  const money = (n: number) => formatMoney(n, currency, locale);
+  const priceLabel = useRobustPriceLabel();
+  const money = (n: number | null) => (n == null ? '—' : formatMoney(n, stats?.currency || currency, locale));
   if (!stats) return null;
+  // R0: median + P25–P75 + n; min/max after Tukey trim, hidden when the sample is weak.
+  const showRange = stats.quality === 'ok';
   return (
-    <Paper sx={{ p: 1.5, mb: 2, display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', alignItems: 'center', background: 'linear-gradient(135deg, #fafbff 0%, #f5f0ff 100%)', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
-      <Chip icon={<DollarSign size={14} />} label={`${t('minShort')}: ${money(stats.min)}`} size="small" variant="outlined" />
-      <Chip icon={<BarChart2 size={14} />} label={`${t('avg')}: ${money(stats.avg)}`} size="small" color="primary" variant="outlined" />
-      <Chip icon={<Target size={14} />} label={`${t('median')}: ${money(stats.median)}`} size="small" variant="outlined" />
-      <Chip icon={<DollarSign size={14} />} label={`${t('maxShort')}: ${money(stats.max)}`} size="small" variant="outlined" />
+    <Paper variant="outlined" sx={{ p: 1.5, mb: 2, display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', alignItems: 'center', borderRadius: 3 }}>
+      <Chip icon={<Target size={14} />} label={priceLabel(stats, stats.currency || currency)} size="small" color="primary" variant="outlined" />
+      {showRange && <Chip icon={<DollarSign size={14} />} label={`${t('minShort')}: ${money(stats.min)}`} size="small" variant="outlined" />}
+      {showRange && <Chip icon={<DollarSign size={14} />} label={`${t('maxShort')}: ${money(stats.max)}`} size="small" variant="outlined" />}
       <Chip icon={<Package size={14} />} label={`${(stats.totalResults ?? 0).toLocaleString()} ${t('results')}`} size="small" color="secondary" />
     </Paper>
   );
@@ -502,7 +503,7 @@ function mapEbayItem(item: any): ProductResult {
   return {
     itemId: item.itemId || item.legacyItemId || '',
     legacyItemId: item.legacyItemId,
-    title: item.title || '',
+    title: decodeEntities(item.title || ''),
     price: typeof item.price === 'number' ? item.price : parseFloat(item.price?.value || '0'),
     currency: item.price?.currency || item.currency || 'USD',
     imageUrl: item.image?.imageUrl || item.thumbnailImages?.[0]?.imageUrl || item.imageUrl || '',
@@ -523,7 +524,7 @@ function mapNicheProduct(p: any): ProductResult {
   return {
     itemId: p.legacyItemId || p.itemId || '',
     legacyItemId: p.legacyItemId,
-    title: p.title || '',
+    title: decodeEntities(p.title || ''),
     price: typeof p.price === 'number' ? p.price : parseFloat(p.price?.value || '0'),
     currency: typeof p.currency === 'string' ? p.currency : '',
     imageUrl: p.imageUrl || p.image?.imageUrl || '',
@@ -579,6 +580,7 @@ function TabPanel({ children, value, index }: { children: React.ReactNode; value
 
 function ProductDatabase({ userId, userListings = [], userListingsLoading = false, onNavigate, navigateData, onConsumeNavigateData }: { userId: string; userListings?: any[]; userListingsLoading?: boolean; onNavigate?: (tool: string, data?: any) => void; navigateData?: any; onConsumeNavigateData?: () => void }) {
   const t = useTranslations('ebayResearch');
+  const tR = useTranslations('research');
   const { formatDate, formatDateTime, formatNumber } = useLocale();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -635,15 +637,8 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
     }
   }, [navigateData, onConsumeNavigateData]);
 
-  // Auto-load trending products on mount
-  useEffect(() => {
-    if (results.length > 0 || navigateData?.keyword) return;
-    const trendingKeywords = ['wireless earbuds', 'phone case', 'led lights', 'yoga mat', 'bluetooth speaker', 'watch band'];
-    const randomKeyword = trendingKeywords[Math.floor(Math.random() * trendingKeywords.length)];
-    setFilters(prev => ({ ...prev, keyword: randomKeyword }));
-    setAutoLoaded(true);
-    setAutoLoadTrigger(1);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // R0: the random "trending products" auto-search on mount was removed — the
+  // keyword list was hardcoded, not measured. The tool starts empty instead.
 
   const handleSearch = useCallback(async (append = false) => {
     if (!filters.keyword.trim() && !filters.categoryId.trim()) {
@@ -863,15 +858,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
         {/* Extended Filters */}
         <Collapse in={showFilters || !isMobile}>
           <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
-            {/* Marketplace */}
-            <FormControl size="small" sx={{ minWidth: { xs: '48%', sm: 130 } }}>
-              <InputLabel>{t('marketplace')}</InputLabel>
-              <Select value={marketplace} label={t('marketplace')} onChange={e => setMarketplace(String(e.target.value))}>
-                {MARKETPLACES_DATA.map(m => (
-                  <MenuItem key={m.value} value={m.value}>{m.flag} {t(m.labelKey)}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            {/* R0: duplicate marketplace selector removed — the page header picker is the only one. */}
 
             {/* Condition */}
             <FormControl size="small" sx={{ minWidth: { xs: '48%', sm: 120 } }}>
@@ -916,15 +903,6 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
         </Collapse>
       </Paper>
 
-      {/* Auto-loaded trending banner */}
-      {autoLoaded && results.length > 0 && (
-        <Paper sx={{ p: 1.5, mb: 2, background: 'linear-gradient(135deg, #f8faff 0%, #f0edff 100%)', borderRadius: 2, border: '1px solid rgba(99,102,241,0.08)', display: 'flex', alignItems: 'center', gap: 1 }}>
-          <TrendingUp size={16} color="#6366f1" />
-          <Typography variant="body2" color="text.secondary">
-            {t('trendingShown')}
-          </Typography>
-        </Paper>
-      )}
 
       {/* Price Stats */}
       <PriceStatsBar stats={priceStats} currency={mpCurrency} />
@@ -939,7 +917,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
           boxShadow: '0 1px 8px rgba(99,102,241,0.06)',
         }}>
           <Typography variant="caption" fontWeight={700} sx={{ mb: 0.5, display: 'block', color: '#6366f1' }}>
-            {t('trendingKeywords')}:
+            {tR('stats.topTitleWords')}:
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
             {topKeywords.slice(0, 15).map((kw, i) => (
@@ -1847,6 +1825,7 @@ function TrackedProductMobileCard({ product, onRemove, onEditNotes, onOpenTags, 
 
 function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsumeNavigateData }: { userId: string; userListings?: any[]; onNavigate?: (tool: string, data?: any) => void; navigateData?: any; onConsumeNavigateData?: () => void }) {
   const t = useTranslations('ebayResearch');
+  const verdict = useNicheVerdicts();
   const { formatDate } = useLocale();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -1879,7 +1858,8 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
       source: 'ebay-research',
       title: report.keyword,
       keywords: keywordsFromTitle(`${report.keyword} ${titles}`),
-      price: report.medianPrice > 0 ? report.medianPrice : undefined,
+      // R0: suggest the median only when the sample passed the sanity checks.
+      price: report.medianPrice > 0 && (!report.priceStats || report.priceStats.quality === 'ok') ? report.medianPrice : undefined,
       currency: mpCurrency,
       research: {
         tool: 'niche_finder',
@@ -1888,7 +1868,6 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
         demandScore: report.demandScore,
         competitionScore: report.competitionScore,
         opportunityScore: report.opportunityScore,
-        avgPrice: report.avgPrice,
         medianPrice: report.medianPrice,
         priceMin: report.priceMin,
         priceMax: report.priceMax,
@@ -1905,15 +1884,8 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
     }
   }, [navigateData, onConsumeNavigateData]);
 
-  // Auto-load a trending niche on mount
-  useEffect(() => {
-    if (report || navigateData?.keyword) return;
-    const trendingKeywords = ['wireless earbuds', 'phone case iphone', 'led strip lights', 'yoga accessories', 'car accessories'];
-    const randomKeyword = trendingKeywords[Math.floor(Math.random() * trendingKeywords.length)];
-    setKeyword(randomKeyword);
-    setAutoLoaded(true);
-    setAutoLoadTrigger(1);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // R0: the random "trending niche" auto-analysis on mount was removed
+  // (hardcoded keywords presented as trending).
 
   const fetchSavedNiches = useCallback(async () => {
     setLoadingNiches(true);
@@ -1945,8 +1917,8 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
         competitionScore: data.competitionScore || 0,
         totalListings: data.totalResults || 0,
         uniqueSellers: data.uniqueSellers || 0,
-        avgPrice: data.avgPrice || 0,
         medianPrice: data.medianPrice || 0,
+        priceStats: data.priceStats || null,
         priceMin: data.priceSpread?.min || 0,
         priceMax: data.priceSpread?.max || 0,
         freeShippingPct: data.freeShippingPct || 0,
@@ -1958,9 +1930,6 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
         }),
         priceDistribution: data.priceDistribution || [],
         opportunityScore: data.opportunityScore || 0,
-        demandLabel: data.demandLabel || '',
-        competitionLabel: data.competitionLabel || '',
-        opportunityLabel: data.opportunityLabel || '',
         avgSoldPerItem: data.avgSoldPerItem,
         sellThroughRate: data.sellThroughRate,
         listingsPerSeller: data.listingsPerSeller,
@@ -1995,8 +1964,8 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
         competitionScore: data.competitionScore || 0,
         totalListings: data.totalResults || 0,
         uniqueSellers: data.uniqueSellers || 0,
-        avgPrice: data.avgPrice || 0,
         medianPrice: data.medianPrice || 0,
+        priceStats: data.priceStats || null,
         priceMin: data.priceSpread?.min || 0,
         priceMax: data.priceSpread?.max || 0,
         freeShippingPct: data.freeShippingPct || 0,
@@ -2008,9 +1977,6 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
         }),
         priceDistribution: data.priceDistribution || [],
         opportunityScore: data.opportunityScore || 0,
-        demandLabel: data.demandLabel || '',
-        competitionLabel: data.competitionLabel || '',
-        opportunityLabel: data.opportunityLabel || '',
         avgSoldPerItem: data.avgSoldPerItem,
         sellThroughRate: data.sellThroughRate,
         listingsPerSeller: data.listingsPerSeller,
@@ -2032,7 +1998,6 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
         query: report.keyword,
         marketplace: report.marketplace || marketplace,
         totalResults: report.totalListings,
-        avgPrice: report.avgPrice,
         medianPrice: report.medianPrice,
         uniqueSellers: report.uniqueSellers,
         demandScore: report.demandScore,
@@ -2068,8 +2033,8 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
       competitionScore: niche.competitionScore || 0,
       totalListings: niche.totalListings || niche.totalResults || 0,
       uniqueSellers: niche.uniqueSellers || 0,
-      avgPrice: niche.avgPrice || 0,
       medianPrice: niche.medianPrice || 0,
+      priceStats: niche.priceStats || null,
       priceMin: niche.priceMin || niche.priceSpread?.min || 0,
       priceMax: niche.priceMax || niche.priceSpread?.max || 0,
       freeShippingPct: niche.freeShippingPct || 0,
@@ -2079,9 +2044,6 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
       priceDistribution: niche.priceDistribution || [],
       savedAt: niche.savedAt || niche.createdAt,
       opportunityScore: niche.opportunityScore || 0,
-      demandLabel: niche.demandLabel || '',
-      competitionLabel: niche.competitionLabel || '',
-      opportunityLabel: niche.opportunityLabel || '',
       avgSoldPerItem: niche.avgSoldPerItem,
       sellThroughRate: niche.sellThroughRate,
       listingsPerSeller: niche.listingsPerSeller,
@@ -2121,14 +2083,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
               startAdornment: <InputAdornment position="start"><Search size={16} /></InputAdornment>,
             }}
           />
-          <FormControl size="small" sx={{ minWidth: 130 }}>
-            <InputLabel>{t('marketplace')}</InputLabel>
-            <Select value={marketplace} label={t('marketplace')} onChange={e => setMarketplace(String(e.target.value))}>
-              {MARKETPLACES_DATA.map(m => (
-                <MenuItem key={m.value} value={m.value}>{m.flag} {t(m.labelKey)}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          {/* R0: duplicate marketplace selector removed — the page header picker is the only one. */}
           <Button variant="contained" onClick={() => { setAutoLoaded(false); handleAnalyze(); }} disabled={loading} sx={{
             minWidth: 110,
             background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
@@ -2174,15 +2129,6 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
         </Collapse>
       </Paper>
 
-      {/* Auto-loaded trending banner */}
-      {autoLoaded && report && (
-        <Paper sx={{ p: 1.5, mb: 2, background: 'linear-gradient(135deg, #f8faff 0%, #f0edff 100%)', borderRadius: 2, border: '1px solid rgba(99,102,241,0.08)', display: 'flex', alignItems: 'center', gap: 1 }}>
-          <TrendingUp size={16} color="#6366f1" />
-          <Typography variant="body2" color="text.secondary">
-            {t('sampleNicheAnalysis')}
-          </Typography>
-        </Paper>
-      )}
 
       {/* Trending Categories — shown when no report */}
       {!report && !loading && (
@@ -2298,30 +2244,29 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
 
             {/* Score Explanations */}
             <Box sx={{ mt: 2, mb: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {report.demandLabel && (
-                <Alert severity={report.demandScore >= 70 ? 'success' : report.demandScore >= 40 ? 'warning' : 'error'} sx={{ py: 0 }}>
-                  <Typography variant="body2"><strong>{t('demand')}:</strong> {report.demandLabel}</Typography>
-                </Alert>
-              )}
-              {report.competitionLabel && (
-                <Alert severity={report.competitionScore <= 30 ? 'success' : report.competitionScore <= 60 ? 'warning' : 'error'} sx={{ py: 0 }}>
-                  <Typography variant="body2"><strong>{t('competition')}:</strong> {report.competitionLabel}</Typography>
-                </Alert>
-              )}
-              {report.opportunityLabel && (
-                <Alert severity={(report.opportunityScore || 0) >= 70 ? 'success' : (report.opportunityScore || 0) >= 50 ? 'info' : (report.opportunityScore || 0) >= 30 ? 'warning' : 'error'} sx={{ py: 0 }}>
-                  <Typography variant="body2"><strong>{t('result')}:</strong> {report.opportunityLabel}</Typography>
-                </Alert>
-              )}
+              {/* R0: explanations localized from the score (no API Turkish strings). */}
+              <Alert severity={report.demandScore >= 70 ? 'success' : report.demandScore >= 40 ? 'warning' : 'error'} sx={{ py: 0 }}>
+                <Typography variant="body2"><strong>{t('demand')}:</strong> {verdict.demand(report.demandScore)}</Typography>
+              </Alert>
+              <Alert severity={report.competitionScore <= 30 ? 'success' : report.competitionScore <= 60 ? 'warning' : 'error'} sx={{ py: 0 }}>
+                <Typography variant="body2"><strong>{t('competition')}:</strong> {verdict.competition(report.competitionScore)}</Typography>
+              </Alert>
+              <Alert severity={(report.opportunityScore || 0) >= 70 ? 'success' : (report.opportunityScore || 0) >= 50 ? 'info' : (report.opportunityScore || 0) >= 30 ? 'warning' : 'error'} sx={{ py: 0 }}>
+                <Typography variant="body2"><strong>{t('result')}:</strong> {verdict.opportunity(report.opportunityScore || 0)}</Typography>
+              </Alert>
             </Box>
 
             {/* Stats Grid */}
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'center' }}>
               <StatCard icon={<Package size={16} />} label={t('totalListings')} value={report.totalListings.toLocaleString()} />
               <StatCard icon={<Users size={16} />} label={t('uniqueSellers')} value={report.uniqueSellers.toLocaleString()} />
-              <StatCard icon={<DollarSign size={16} />} label={t('avgPrice')} value={money(report.avgPrice)} />
-              <StatCard icon={<Target size={16} />} label={t('medianPrice')} value={money(report.medianPrice)} />
-              <StatCard icon={<ArrowUpDown size={16} />} label={t('priceRange')} value={`${money(report.priceMin, 0)} - ${money(report.priceMax, 0)}`} />
+              {/* R0: median + P25–P75 + n; no average price. */}
+              {report.priceStats
+                ? <RobustPriceCard summary={report.priceStats} currency={mpCurrency} icon={<Target size={16} />} />
+                : <StatCard icon={<Target size={16} />} label={t('medianPrice')} value={report.medianPrice > 0 ? money(report.medianPrice) : '—'} />}
+              {(!report.priceStats || report.priceStats.quality === 'ok') && report.priceMax > 0 && (
+                <StatCard icon={<ArrowUpDown size={16} />} label={t('priceRange')} value={`${money(report.priceMin, 0)} - ${money(report.priceMax, 0)}`} />
+              )}
               <StatCard icon={<ShoppingBag size={16} />} label={t('freeShipping')} value={`%${report.freeShippingPct.toFixed(0)}`} />
               <StatCard icon={<Users size={16} />} label={t('sellerDensity')} value={`%${report.sellerConcentration.toFixed(0)}`} sub={t('top10SellerShare')} />
               {report.avgSoldPerItem !== undefined && (
@@ -2952,8 +2897,15 @@ function findTool(id: unknown) {
   return typeof id === 'string' ? TOOLS.find(tool => tool.id === id) : undefined;
 }
 
+// R0: the "Loading your eBay listings…" banner must never spin forever.
+// Per CRITIQUE V6 (useAsyncState semantics): "Still loading" + Retry at 15s,
+// ErrorState-like message with Retry at 30s (and the request is abandoned).
+const LISTINGS_SLOW_MS = 15_000;
+const LISTINGS_TIMEOUT_MS = 30_000;
+
 function EbayResearchPage() {
   const t = useTranslations('ebayResearch');
+  const tR = useTranslations('research');
   const router = useRouter();
   const { user } = useAuth() as any;
   const userId = user?.id as string | undefined;
@@ -2982,9 +2934,15 @@ function EbayResearchPage() {
   const [userListings, setUserListings] = useState<any[]>([]);
   const [userListingsLoading, setUserListingsLoading] = useState(true);
   const [userListingsError, setUserListingsError] = useState<string | null>(null);
+  const [userListingsSlow, setUserListingsSlow] = useState(false);
+  // Bumped on timeout/retry so a stale in-flight load cannot overwrite newer state.
+  const listingsGenRef = useRef(0);
+  const [listingsAttempt, setListingsAttempt] = useState(0);
 
-  const loadUserListings = useCallback(async (useCache: boolean, isCancelled: () => boolean = () => false) => {
+  const loadUserListings = useCallback(async (useCache: boolean, isCancelledOuter: () => boolean = () => false) => {
     if (!userId) return;
+    const gen = ++listingsGenRef.current;
+    const isCancelled = () => isCancelledOuter() || gen !== listingsGenRef.current;
     const CACHE_KEY = `kolayxport_ebay_listings_${userId}_${marketplace}`;
     if (useCache) {
       // localStorage cache first (1-hour TTL)
@@ -3004,6 +2962,8 @@ function EbayResearchPage() {
 
     setUserListingsLoading(true);
     setUserListingsError(null);
+    setUserListingsSlow(false);
+    setListingsAttempt(a => a + 1); // restarts the 15s/30s guard on every (re)try
     const maxAttempts = 3;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
@@ -3041,6 +3001,20 @@ function EbayResearchPage() {
       }
     }
   }, [userId, marketplace]);
+
+  // Stuck-banner guard: a slow hint at 15s, then give up at 30s with a retry.
+  useEffect(() => {
+    if (!userListingsLoading) { setUserListingsSlow(false); return; }
+    const slow = setTimeout(() => setUserListingsSlow(true), LISTINGS_SLOW_MS);
+    const stop = setTimeout(() => {
+      listingsGenRef.current++; // abandon the in-flight attempt
+      setUserListingsSlow(false);
+      setUserListingsError('timeout');
+      setUserListings([]);
+      setUserListingsLoading(false);
+    }, LISTINGS_TIMEOUT_MS);
+    return () => { clearTimeout(slow); clearTimeout(stop); };
+  }, [userListingsLoading, listingsAttempt]);
 
   useEffect(() => {
     // Wait for the remembered marketplace so we don't fetch (or flash) EBAY_US listings first.
@@ -3174,8 +3148,10 @@ function EbayResearchPage() {
         </FormControl>
       </Box>
 
-      {/* Global Search Bar */}
-      <Paper sx={{ p: 2, mb: 2, display: 'flex', gap: 1, alignItems: 'center', background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', borderRadius: 3, boxShadow: '0 4px 20px rgba(99,102,241,0.15)' }}>
+      {/* Global Search Bar — R0: hidden on Product database, which has its own
+          keyword search (two stacked search bars). Plain surface, no gradient. */}
+      {activeTool !== 'product_database' && (
+      <Paper variant="outlined" sx={{ p: 2, mb: 2, display: 'flex', gap: 1, alignItems: 'flex-start', borderRadius: 3 }}>
         <TextField
           size="small"
           fullWidth
@@ -3188,18 +3164,20 @@ function EbayResearchPage() {
           InputProps={{
             startAdornment: <InputAdornment position="start"><Search size={18} style={{ color: '#6366f1' }} /></InputAdornment>,
           }}
-          sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: '#fff', '& fieldset': { border: 'none' } }, '& .MuiFormHelperText-root': { color: 'rgba(255,255,255,0.7)' } }}
+          sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
         />
+        {/* R0: always labelled and never a washed-out empty box when disabled. */}
         <Button
           variant="contained"
           onClick={handleGlobalSearch}
           disabled={!globalSearch.trim()}
-          aria-label={t('searchBtn')}
-          sx={{ minWidth: isMobile ? 44 : 80, minHeight: 44, borderRadius: 2, bgcolor: '#fff', color: '#6366f1', fontWeight: 700, '&:hover': { bgcolor: '#f0edff' }, '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.5)', color: 'rgba(99,102,241,0.4)' } }}
+          startIcon={<Search size={16} />}
+          sx={{ minWidth: 80, minHeight: 40, borderRadius: 2, fontWeight: 700, flexShrink: 0 }}
         >
-          {isMobile ? <Search size={18} /> : t('searchBtn')}
+          {t('searchBtn')}
         </Button>
       </Paper>
+      )}
 
       {/* Tool picker: primary tools + "More tools" */}
       <Box
@@ -3256,11 +3234,16 @@ function EbayResearchPage() {
 
       {/* User listings status bar */}
       {userListingsLoading && (
-        <Paper sx={{ p: 1.5, mb: 2, display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#f0f7ff', overflow: 'hidden', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+        <Paper sx={{ p: 1.5, mb: 2, display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#f0f7ff', overflow: 'hidden', width: '100%', maxWidth: '100%', boxSizing: 'border-box', flexWrap: 'wrap' }}>
           <CircularProgress size={16} sx={{ flexShrink: 0 }} />
-          <Typography variant="body2" color="text.secondary" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {t('listingsLoading')}
+          <Typography variant="body2" color="text.secondary" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+            {userListingsSlow ? tR('ebay.listingsStillLoading') : t('listingsLoading')}
           </Typography>
+          {userListingsSlow && (
+            <Button size="small" variant="outlined" sx={{ minHeight: { xs: 44, md: 32 } }} onClick={() => { loadUserListings(false); }}>
+              {t('retry')}
+            </Button>
+          )}
         </Paper>
       )}
       {!userListingsLoading && userListings.length > 0 && (
@@ -3275,7 +3258,9 @@ function EbayResearchPage() {
           <Typography variant="body2" color={userListingsError === 'auth' ? 'error.main' : 'warning.main'} sx={{ wordBreak: 'break-word', flex: 1, minWidth: 0 }}>
             {userListingsError === 'auth'
               ? t('listingsAuthError')
-              : t('listingsLoadError')}
+              : userListingsError === 'timeout'
+                ? tR('ebay.listingsTimeout')
+                : t('listingsLoadError')}
           </Typography>
           <Button size="small" variant="outlined" sx={{ minHeight: { xs: 44, md: 36 } }} onClick={() => { loadUserListings(false); }}>
             {t('retry')}

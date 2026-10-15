@@ -10,6 +10,23 @@ import {
 } from '../../../lib/integrations/ebayClient';
 import { callEbayRateLimited } from '../../../lib/integrations/ebayRateLimiter';
 import { sanitizeInventoryItemPayload } from '../../../lib/ebay/payloadRules';
+import { summarizePrices, buildFxTable, decodeEntities, type PriceSummary } from '../../../lib/research/stats';
+import { convertCurrency } from '../../../lib/finance/fx';
+
+/**
+ * R0 honesty patch: robust price summary for Browse API results in their
+ * majority currency (median, P25–P75, Tukey-trimmed min/max, n, quality).
+ * No arithmetic mean; other currencies FX-converted or excluded.
+ */
+async function researchPriceSummary(items: any[]): Promise<PriceSummary> {
+  const points = items.map((item: any) => ({ amount: parseFloat(item?.price?.value || '0'), currency: item?.price?.currency || 'USD' }));
+  const counts: Record<string, number> = {};
+  for (const p of points) counts[p.currency] = (counts[p.currency] || 0) + 1;
+  const currency = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'USD';
+  const fx = await buildFxTable(points.map((p) => p.currency), currency, convertCurrency).catch(() => ({}));
+  const usdToTarget = currency === 'USD' ? 1 : await convertCurrency(1, 'USD', currency).catch(() => null);
+  return summarizePrices(points, { currency, fx, usdToTarget });
+}
 
 // eBay REST API base URL
 const EBAY_API_BASE = 'https://api.ebay.com';
@@ -1539,21 +1556,9 @@ export default async function handler(
       const data = await response.json();
       const items = data.itemSummaries || [];
 
-      // Compute price statistics
-      const prices = items
-        .map((item: any) => parseFloat(item.price?.value || '0'))
-        .filter((p: number) => p > 0)
-        .sort((a: number, b: number) => a - b);
-
-      const priceStats = prices.length > 0 ? {
-        min: prices[0],
-        max: prices[prices.length - 1],
-        avg: Math.round((prices.reduce((a: number, b: number) => a + b, 0) / prices.length) * 100) / 100,
-        median: prices.length % 2 === 0
-          ? Math.round(((prices[prices.length / 2 - 1] + prices[prices.length / 2]) / 2) * 100) / 100
-          : prices[Math.floor(prices.length / 2)],
-        count: prices.length,
-      } : null;
+      // R0: robust price statistics (no mean)
+      const summary = items.length > 0 ? await researchPriceSummary(items) : null;
+      const priceStats = summary && summary.n > 0 ? { ...summary, count: summary.n } : null;
 
       // Extract keyword frequency from titles
       const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
@@ -1582,7 +1587,7 @@ export default async function handler(
         limit: data.limit || limit,
         items: items.map((item: any) => ({
           itemId: item.itemId,
-          title: item.title,
+          title: decodeEntities(item.title || ''),
           price: item.price,
           condition: item.condition,
           conditionId: item.conditionId,
@@ -1678,20 +1683,9 @@ export default async function handler(
         ? Math.round(items.reduce((sum: number, i: any) => sum + (i.title || '').length, 0) / items.length)
         : 0;
 
-      // Price stats
-      const prices = items
-        .map((item: any) => parseFloat(item.price?.value || '0'))
-        .filter((p: number) => p > 0)
-        .sort((a: number, b: number) => a - b);
-
-      const priceStats = prices.length > 0 ? {
-        min: prices[0],
-        max: prices[prices.length - 1],
-        avg: Math.round((prices.reduce((a: number, b: number) => a + b, 0) / prices.length) * 100) / 100,
-        median: prices.length % 2 === 0
-          ? Math.round(((prices[prices.length / 2 - 1] + prices[prices.length / 2]) / 2) * 100) / 100
-          : prices[Math.floor(prices.length / 2)],
-      } : null;
+      // Price stats (R0: robust, no mean)
+      const seoSummary = items.length > 0 ? await researchPriceSummary(items) : null;
+      const priceStats = seoSummary && seoSummary.n > 0 ? seoSummary : null;
 
       // Most common aspects from results
       const aspectAnalysis = (data.refinement?.aspectDistributions || []).map((aspect: any) => ({
@@ -1709,15 +1703,16 @@ export default async function handler(
         avgTitleLength,
         myTitleLength: myTitle.length,
         aspectAnalysis,
+        // R0: tips are i18n keys (research.seoTips.*), localized client-side.
         recommendations: [
           ...(myTitle.length < avgTitleLength - 10
-            ? [`Başlığınız rakiplere göre kısa (${myTitle.length} vs ortalama ${avgTitleLength} karakter). Daha uzun başlık kullanmayı deneyin.`]
+            ? [{ key: 'titleShorterThanCompetitors', params: { mine: myTitle.length, typical: avgTitleLength } }]
             : []),
           ...(coveredCount < 5
-            ? [`Rakiplerin en popüler anahtar kelimelerinin sadece ${coveredCount} tanesini kullanıyorsunuz. Eksik kelimeleri eklemeyi deneyin.`]
+            ? [{ key: 'fewTopKeywords', params: { count: coveredCount } }]
             : []),
           ...(topKeywords.length > 0
-            ? [`En popüler anahtar kelimeler: ${topKeywords.slice(0, 5).map(k => k.keyword).join(', ')}`]
+            ? [{ key: 'topKeywords', params: { keywords: topKeywords.slice(0, 5).map(k => k.keyword).join(', ') } }]
             : []),
         ],
       });
@@ -2002,7 +1997,7 @@ export default async function handler(
           } catch { /* skip */ }
           return {
             itemId: item.itemId,
-            title: item.title,
+            title: decodeEntities(item.title || ''),
             price: item.price,
             condition: item.condition,
             image: item.image,
@@ -2024,7 +2019,7 @@ export default async function handler(
       // Append remaining items
       const remaining = items.slice(20).map((item: any) => ({
         itemId: item.itemId,
-        title: item.title,
+        title: decodeEntities(item.title || ''),
         price: item.price,
         condition: item.condition,
         image: item.image,
@@ -2038,20 +2033,9 @@ export default async function handler(
         estimatedSoldQuantity: 0,
       }));
 
-      // Price stats
-      const prices = items
-        .map((item: any) => parseFloat(item.price?.value || '0'))
-        .filter((p: number) => p > 0)
-        .sort((a: number, b: number) => a - b);
-
-      const priceStats = prices.length > 0 ? {
-        min: prices[0],
-        max: prices[prices.length - 1],
-        avg: Math.round((prices.reduce((a: number, b: number) => a + b, 0) / prices.length) * 100) / 100,
-        median: prices.length % 2 === 0
-          ? Math.round(((prices[prices.length / 2 - 1] + prices[prices.length / 2]) / 2) * 100) / 100
-          : prices[Math.floor(prices.length / 2)],
-      } : null;
+      // Price stats (R0: robust, no mean)
+      const catSummary = items.length > 0 ? await researchPriceSummary(items) : null;
+      const priceStats = catSummary && catSummary.n > 0 ? catSummary : null;
 
       return res.status(200).json({
         total: data.total || 0,

@@ -1,3 +1,4 @@
+import type { PriceSummary } from '@/lib/research/stats';
 import { create } from 'zustand';
 import { toast } from 'react-hot-toast';
 import type { TrendyolProduct } from '../arbitrage/types';
@@ -15,14 +16,8 @@ export interface FlatCategory {
   depth: number;
 }
 
-interface PriceStats {
-  min: number;
-  max: number;
-  avg: number;
-  median: number;
-  p25: number;
-  p75: number;
-}
+/** R0: robust summary (median, P25–P75, Tukey-trimmed min/max, n). No mean. */
+type PriceStats = PriceSummary;
 
 interface HistogramBucket {
   range: string;
@@ -34,13 +29,13 @@ interface HistogramBucket {
 interface BrandData {
   name: string;
   count: number;
-  avgPrice: number;
+  medianPrice: number | null;
 }
 
 interface MerchantData {
   id: number;
   count: number;
-  avgPrice: number;
+  medianPrice: number | null;
   avgRating: number;
 }
 

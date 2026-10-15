@@ -12,7 +12,9 @@ import { useTrendyolResearchStore } from '@/lib/stores/useTrendyolResearchStore'
 import { useTableSort } from '@/components/etsy/research/shared/ui';
 import { StatCard, GradientBar, GRADIENTS, glassCard } from '@/components/etsy/research/shared/ui';
 
-function fmtTry(n: number): string {
+function fmtTry(n: number | null | undefined): string {
+  // R0: "—" when a robust value is unavailable (small/implausible sample).
+  if (n == null || !Number.isFinite(n)) return '—';
   return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(n);
 }
 
@@ -22,6 +24,7 @@ function pct(n: number): string {
 
 export default function TrendyolBrandAnalyzer() {
   const t = useTranslations('trendyolResearch');
+  const tR = useTranslations('research');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const analysis = useTrendyolResearchStore(s => s.analysis);
@@ -139,7 +142,7 @@ export default function TrendyolBrandAnalyzer() {
                   {b.count} {t('products')}
                 </Typography>
                 <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                  {fmtTry(b.avgPrice)}
+                  {fmtTry(b.medianPrice)}
                 </Typography>
               </Box>
               <Box sx={{ mt: 0.5 }}>
@@ -165,8 +168,8 @@ export default function TrendyolBrandAnalyzer() {
                     </TableSortLabel>
                   </TableCell>
                   <TableCell align="center">
-                    <TableSortLabel active={sortKey === 'avgPrice'} direction={sortDir} onClick={() => handleSort('avgPrice')}>
-                      {t('avgPrice')}
+                    <TableSortLabel active={sortKey === 'medianPrice'} direction={sortDir} onClick={() => handleSort('medianPrice')}>
+                      {tR('stats.medianPrice')}
                     </TableSortLabel>
                   </TableCell>
                   <TableCell align="center">
@@ -184,7 +187,7 @@ export default function TrendyolBrandAnalyzer() {
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>{b.name}</Typography>
                     </TableCell>
                     <TableCell align="center">{b.count}</TableCell>
-                    <TableCell align="center">{fmtTry(b.avgPrice)}</TableCell>
+                    <TableCell align="center">{fmtTry(b.medianPrice)}</TableCell>
                     <TableCell align="center">{pct(b.marketShare)}</TableCell>
                     <TableCell>
                       <GradientBar value={b.marketShare} max={100} />

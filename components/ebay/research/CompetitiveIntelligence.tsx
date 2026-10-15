@@ -16,6 +16,7 @@ import { useTranslations } from 'next-intl';
 import useLocaleStore from '@/lib/stores/useLocaleStore';
 import useEbayResearchStore from '@/lib/stores/useEbayResearchStore';
 import { formatMoney, marketplaceCurrency } from './marketplaces';
+import { groupMedian } from '@/lib/research/stats';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -76,14 +77,16 @@ interface MarketSnapshot {
   marketplace: string;
   timestamp: number;
   totalListings: number;
-  avgPrice: number;
+  /** Legacy snapshots only (means are no longer computed or shown, R0). */
+  avgPrice?: number;
   medianPrice: number;
   uniqueSellers: number;
   freeShippingPct: number;
   newCount: number;
   usedCount: number;
-  newAvgPrice: number;
-  usedAvgPrice: number;
+  /** R0: medians (legacy snapshots carried means in newAvgPrice/usedAvgPrice; ignored). */
+  newMedianPrice?: number;
+  usedMedianPrice?: number;
   topSellers: { username: string; count: number; share: number }[];
 }
 
@@ -214,6 +217,7 @@ const PIE_COLORS = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4
 function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: string; marketplace: string; userListings?: any[]; onNavigate?: (tool: string, data?: any) => void }) {
   const t = useTranslations('ebay.research.competitive');
   const tA = useTranslations('ebayResearch');
+  const tR = useTranslations('research');
   const suggestedSellers = useMemo(() => {
     if (!userListings?.length) return [];
     const sellers = new Map<string, { username: string; feedback: number }>();
@@ -400,7 +404,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
     if (!prices.length) return null;
     return {
       total: items.length,
-      avgPrice: prices.reduce((s, p) => s + p, 0) / prices.length,
+      medianPrice: groupMedian(prices) ?? 0, // R0: median, never a mean
       minPrice: Math.min(...prices),
       maxPrice: Math.max(...prices),
       estSold: items.reduce((s, i) => s + (i.estimatedSold || 0), 0),
@@ -680,8 +684,8 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
               <Typography variant="h6">{inventoryStats.total}</Typography>
             </Box>
             <Box>
-              <Typography variant="caption" color="text.secondary">{t('avgPrice')}</Typography>
-              <Typography variant="h6">{fmt(inventoryStats.avgPrice)}</Typography>
+              <Typography variant="caption" color="text.secondary">{tR('stats.medianPrice')}</Typography>
+              <Typography variant="h6">{fmt(inventoryStats.medianPrice)}</Typography>
             </Box>
             <Box>
               <Typography variant="caption" color="text.secondary">{t("priceRange")}</Typography>
@@ -808,6 +812,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
 function ListingComparison({ marketplace }: { marketplace: string }) {
   const t = useTranslations('ebay.research.competitive');
   const tA = useTranslations('ebayResearch');
+  const tR = useTranslations('research');
   const [inputs, setInputs] = useState<string[]>(['']);
   const [listings, setListings] = useState<(ItemDetails | null)[]>([]);
   const [loading, setLoading] = useState<boolean[]>([]);
@@ -1128,6 +1133,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
 function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string; onNavigate?: (tool: string, data?: any) => void; userId?: string }) {
   const t = useTranslations('ebay.research.competitive');
   const tA = useTranslations('ebayResearch');
+  const tR = useTranslations('research');
   const [keyword, setKeyword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -1208,14 +1214,13 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
         marketplace,
         timestamp: Date.now(),
         totalListings: items.length,
-        avgPrice: prices.length ? prices.reduce((s, p) => s + p, 0) / prices.length : 0,
-        medianPrice: median(prices),
+        medianPrice: groupMedian(prices) ?? 0,
         uniqueSellers: sellers.size,
         freeShippingPct: items.length ? (freeShipCount / items.length) * 100 : 0,
         newCount: newItems.length,
         usedCount: usedItems.length,
-        newAvgPrice: newPrices.length ? newPrices.reduce((s, p) => s + p, 0) / newPrices.length : 0,
-        usedAvgPrice: usedPrices.length ? usedPrices.reduce((s, p) => s + p, 0) / usedPrices.length : 0,
+        newMedianPrice: groupMedian(newPrices) ?? 0,
+        usedMedianPrice: groupMedian(usedPrices) ?? 0,
         topSellers,
       };
       setCurrentSnapshot(snapshot);
@@ -1318,13 +1323,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
                   {latestPrevious && trendArrow(currentSnapshot.totalListings, latestPrevious.totalListings, true)}
                 </Box>
               </Box>
-              <Box>
-                <Typography variant="caption" color="text.secondary">{t('avgPriceLabel2')}</Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography variant="h6">{fmt(currentSnapshot.avgPrice)}</Typography>
-                  {latestPrevious && trendArrow(currentSnapshot.avgPrice, latestPrevious.avgPrice, false)}
-                </Box>
-              </Box>
+              {/* R0: average price removed; the median below is the price signal. */}
               <Box>
                 <Typography variant="caption" color="text.secondary">{t('medianPriceLabel2')}</Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -1353,15 +1352,15 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
               <Paper variant="outlined" sx={{ p: 1.5 }}>
                 <Typography variant="body2" fontWeight={600} color="success.main">{t('newConditionLabel')}</Typography>
                 <Typography variant="h6">{currentSnapshot.newCount} {t('listingCountLabel')}</Typography>
-                {currentSnapshot.newAvgPrice > 0 && (
-                  <Typography variant="caption" color="text.secondary">{t('avgLabel')}: {fmt(currentSnapshot.newAvgPrice)}</Typography>
+                {(currentSnapshot.newMedianPrice ?? 0) > 0 && (
+                  <Typography variant="caption" color="text.secondary">{tR('stats.medianShort')}: {fmt(currentSnapshot.newMedianPrice ?? 0)}</Typography>
                 )}
               </Paper>
               <Paper variant="outlined" sx={{ p: 1.5 }}>
                 <Typography variant="body2" fontWeight={600} color="warning.main">{t('usedCondition')}</Typography>
                 <Typography variant="h6">{currentSnapshot.usedCount} {t('listingCountLabel')}</Typography>
-                {currentSnapshot.usedAvgPrice > 0 && (
-                  <Typography variant="caption" color="text.secondary">{t('avgLabel')}: {fmt(currentSnapshot.usedAvgPrice)}</Typography>
+                {(currentSnapshot.usedMedianPrice ?? 0) > 0 && (
+                  <Typography variant="caption" color="text.secondary">{tR('stats.medianShort')}: {fmt(currentSnapshot.usedMedianPrice ?? 0)}</Typography>
                 )}
               </Paper>
             </Box>
@@ -1522,11 +1521,11 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
                   <Paper variant="outlined" sx={{ p: 1.5 }}>
                     <Typography variant="caption" color="text.secondary">{t('priceTrend')}</Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      {currentSnapshot.avgPrice > latestPrevious.avgPrice
+                      {currentSnapshot.medianPrice > latestPrevious.medianPrice
                         ? <TrendingUp size={18} color="#d32f2f" />
                         : <TrendingDown size={18} color="#2e7d32" />}
                       <Typography variant="body2">
-                        {fmt(latestPrevious.avgPrice)} → {fmt(currentSnapshot.avgPrice)}
+                        {fmt(latestPrevious.medianPrice)} → {fmt(currentSnapshot.medianPrice)}
                       </Typography>
                     </Box>
                   </Paper>
@@ -1556,7 +1555,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
                     <TableRow>
                       <TableCell>{t('date')}</TableCell>
                       <TableCell align="right">{t('listingsTableCol')}</TableCell>
-                      <TableCell align="right">{t('avgPrice')}</TableCell>
+                      <TableCell align="right">{tR('stats.medianPrice')}</TableCell>
                       <TableCell align="right">{t('medianPriceCol')}</TableCell>
                       <TableCell align="right">{t('uniqueSellers')}</TableCell>
                       <TableCell align="right">{t('freeShippingPct')}</TableCell>
@@ -1574,7 +1573,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
                             })}
                           </TableCell>
                           <TableCell align="right">{snap.totalListings}</TableCell>
-                          <TableCell align="right">{fmt(snap.avgPrice)}</TableCell>
+                          <TableCell align="right">{fmt(snap.medianPrice)}</TableCell>
                           <TableCell align="right">{fmt(snap.medianPrice)}</TableCell>
                           <TableCell align="right">{snap.uniqueSellers}</TableCell>
                           <TableCell align="right">{pct(snap.freeShippingPct)}</TableCell>
@@ -1609,7 +1608,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
                   <TableCell>{t('marketplaceCol')}</TableCell>
                   <TableCell>{t('dateCol')}</TableCell>
                   <TableCell align="right">{t('listingsTableCol')}</TableCell>
-                  <TableCell align="right">{t('avgPriceCol')}</TableCell>
+                  <TableCell align="right">{tR('stats.medianPrice')}</TableCell>
                   <TableCell align="center">{t('deleteCol')}</TableCell>
                 </TableRow>
               </TableHead>
@@ -1627,7 +1626,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
                       })}
                     </TableCell>
                     <TableCell align="right">{snap.totalListings}</TableCell>
-                    <TableCell align="right">{fmt(snap.avgPrice)}</TableCell>
+                    <TableCell align="right">{fmt(snap.medianPrice)}</TableCell>
                     <TableCell align="center">
                       <IconButton aria-label={tA('delete')} size="small" color="error" onClick={e => { e.stopPropagation(); deleteSnapshot(i); }}>
                         <Trash2 size={14} />

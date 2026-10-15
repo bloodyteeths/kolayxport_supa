@@ -15,6 +15,7 @@ function scoreColor(score: number) {
 
 export default function NicheAnalyzer({ data }: Props) {
   const t = useTranslations('amazonResearch');
+  const tR = useTranslations('research');
   const { stats, demand, competition, opportunity, priceDistribution, sellerAnalysis, feeEstimate } = data;
 
   return (
@@ -102,7 +103,7 @@ export default function NicheAnalyzer({ data }: Props) {
         {/* Fee estimate */}
         {feeEstimate && (
           <Box sx={{ mt: 1, p: 1, bgcolor: '#f5f5f5', borderRadius: 1 }}>
-            <Typography variant="caption" fontWeight={600}>{t('feeEstimate')} (FBA @ ${stats.avgPrice})</Typography>
+            <Typography variant="caption" fontWeight={600}>{t('feeEstimate')} (FBA @ {tR('stats.medianShort')} ${stats.medianPrice})</Typography>
             <Box sx={{ display: 'flex', gap: 2, mt: 0.5, flexWrap: 'wrap' }}>
               <Typography variant="caption">
                 {t('referralFee')}: ${feeEstimate.referralFee} ({feeEstimate.referralFeePercent}%)

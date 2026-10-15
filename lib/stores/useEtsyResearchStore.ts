@@ -3,7 +3,7 @@ import { toast } from 'react-hot-toast';
 import type {
   EtsyMarketItem, TagData, KeywordData, ShopData, AiAnalysis,
   TrendData, AutocompleteSuggestion, SeasonalData, SavedSearch,
-  EnrichedTag, EnrichedKeyword, DemandScore, PriceStats, HistogramBucket,
+  EnrichedTag, EnrichedKeyword, PriceStats, HistogramBucket,
   SweetSpot, TagCombo, ShopStats, DeepDiveStats, SeoResult, ProfitCalc,
   SortDir,
 } from '@/components/etsy/research/shared/types';
@@ -11,6 +11,14 @@ import {
   extractWords, extractNgrams, PRICE_RANGES, fmt,
   loadSavedSearches, saveSavedSearches, sortArray,
 } from '@/components/etsy/research/shared/utils';
+import { summarizePrices, decodeEntities, groupMedian, type PriceSummary } from '@/lib/research/stats';
+
+/** Most common currency among items (fallback USD). Used to summarize shop-level prices. */
+function majorityCurrency(items: Array<{ currency_code?: string }>): string {
+  const counts: Record<string, number> = {};
+  for (const i of items) { const c = (i.currency_code || 'USD').toUpperCase(); counts[c] = (counts[c] || 0) + 1; }
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'USD';
+}
 
 interface EtsyResearchState {
   // --- Search controls ---
@@ -28,6 +36,8 @@ interface EtsyResearchState {
   serverTagFreq: TagData[];
   serverKeywords: KeywordData[];
   serverShopIds: number[];
+  /** Robust USD price summary computed server-side (FX-normalized). */
+  serverPriceStats: PriceSummary | null;
 
   // --- Shops ---
   discoveredShops: ShopData[];
@@ -184,6 +194,7 @@ export const useEtsyResearchStore = create<EtsyResearchState>((set, get) => ({
   serverTagFreq: [],
   serverKeywords: [],
   serverShopIds: [],
+  serverPriceStats: null,
   discoveredShops: [],
   shopsLoading: false,
   shopDiscoveryFailed: false,
@@ -276,7 +287,8 @@ export const useEtsyResearchStore = create<EtsyResearchState>((set, get) => ({
       if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Arama basarisiz'); }
       const data = await res.json();
       set({
-        items: data.items || [],
+        items: (data.items || []).map((i: EtsyMarketItem) => ({ ...i, title: decodeEntities(i.title) })),
+        serverPriceStats: data.priceStats && typeof data.priceStats === 'object' && 'quality' in data.priceStats ? data.priceStats : null,
         totalResults: data.total || 0,
         serverTagFreq: data.tagFrequency || [],
         serverKeywords: data.titleKeywords || [],
@@ -337,18 +349,16 @@ export const useEtsyResearchStore = create<EtsyResearchState>((set, get) => ({
     try {
       const avgFavorites = items.reduce((s, i) => s + i.num_favorers, 0) / items.length;
       const avgViews = items.reduce((s, i) => s + i.views, 0) / items.length;
-      const prices = items.map(i => i.price).filter(p => p > 0).sort((a, b) => a - b);
-      const mid = Math.floor(prices.length / 2);
+      // R0: robust stats only (median, P25–P75); `avg` carries the median for the legacy prompt.
+      const ps = get().serverPriceStats ?? summarizePrices(items.map(i => ({ amount: i.price, currency: i.currency_code })), { currency: 'USD' });
 
       const res = await fetch('/api/ai/etsy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'market_analysis', query, totalResults,
-          priceStats: prices.length > 0 ? {
-            min: prices[0], max: prices[prices.length - 1],
-            avg: Math.round((prices.reduce((a, b) => a + b, 0) / prices.length) * 100) / 100,
-            median: prices.length % 2 === 0 ? (prices[mid - 1] + prices[mid]) / 2 : prices[mid],
+          priceStats: ps.median != null ? {
+            min: ps.min, max: ps.max, avg: ps.median, median: ps.median, p25: ps.p25, p75: ps.p75, n: ps.n,
           } : null,
           topTags: serverTagFreq.slice(0, 20),
           topKeywords: serverKeywords.slice(0, 15),
@@ -779,18 +789,22 @@ export const useEtsyResearchStore = create<EtsyResearchState>((set, get) => ({
 
 export function useComputedPrices() {
   const items = useEtsyResearchStore(s => s.items);
-  const prices = items.map(i => i.price).filter(p => p > 0).sort((a, b) => a - b);
+  const serverPriceStats = useEtsyResearchStore(s => s.serverPriceStats);
 
-  const priceStats: PriceStats | null = prices.length === 0 ? null : (() => {
-    const sum = prices.reduce((a, b) => a + b, 0);
-    const mid = Math.floor(prices.length / 2);
-    return {
-      min: prices[0], max: prices[prices.length - 1],
-      avg: Math.round((sum / prices.length) * 100) / 100,
-      median: prices.length % 2 === 0 ? Math.round(((prices[mid - 1] + prices[mid]) / 2) * 100) / 100 : prices[mid],
-      count: prices.length,
-    };
-  })();
+  // R0: robust summary only. Prefer the server's FX-normalized USD summary;
+  // fall back to a USD-only client summary (other currencies excluded, counted).
+  const summary: PriceSummary | null = items.length === 0 ? null
+    : serverPriceStats ?? summarizePrices(items.map(i => ({ amount: i.price, currency: i.currency_code })), { currency: 'USD' });
+  const priceStats: PriceStats | null = summary && summary.n > 0 ? { ...summary, count: summary.n } : null;
+
+  // Histogram / ranges use only USD prices inside the trimmed [min, max].
+  const lo0 = priceStats?.min ?? 0;
+  const hi0 = priceStats?.max ?? 0;
+  const prices = !priceStats ? [] : items
+    .filter(i => (i.currency_code || 'USD').toUpperCase() === 'USD')
+    .map(i => i.price)
+    .filter(p => p > 0 && p >= lo0 && p <= hi0)
+    .sort((a, b) => a - b);
 
   const histogram: HistogramBucket[] = prices.length === 0 ? [] : (() => {
     const bucketCount = 12;
@@ -813,9 +827,10 @@ export function useComputedPrices() {
     return { ...r, count, pct: prices.length ? (count / prices.length) * 100 : 0 };
   });
 
-  const sweetSpot: SweetSpot | null = items.length < 5 ? null : (() => {
+  const usdItems = items.filter(i => (i.currency_code || 'USD').toUpperCase() === 'USD');
+  const sweetSpot: SweetSpot | null = usdItems.length < 5 ? null : (() => {
     const ranges = PRICE_RANGES.map(r => {
-      const inRange = items.filter(i => i.price >= r.min && i.price < r.max);
+      const inRange = usdItems.filter(i => i.price >= r.min && i.price < r.max);
       if (inRange.length === 0) return { ...r, avgFav: 0, count: 0 };
       const avgFav = inRange.reduce((s, i) => s + i.num_favorers, 0) / inRange.length;
       return { ...r, avgFav: Math.round(avgFav), count: inRange.length };
@@ -892,34 +907,7 @@ export function useComputedTags(userListings?: any[]) {
   return { myTagsSet, enrichedTags, tagGaps, tagCombos };
 }
 
-export function useComputedDemandScore() {
-  const items = useEtsyResearchStore(s => s.items);
-  const totalResults = useEtsyResearchStore(s => s.totalResults);
-  const { priceStats } = useComputedPrices();
-
-  if (items.length === 0) return null;
-
-  const uniqueShops = new Set(items.map(i => i.shop_id).filter(Boolean)).size;
-  const avgFavorites = items.reduce((s, i) => s + i.num_favorers, 0) / items.length;
-  const avgViews = items.reduce((s, i) => s + i.views, 0) / items.length;
-  const priceSpread = priceStats ? (priceStats.max - priceStats.min) / Math.max(priceStats.avg, 1) : 0;
-  const avgEngagement = avgViews > 0 ? avgFavorites / avgViews : 0;
-
-  const supplyScore = totalResults < 1000 ? 25 : totalResults < 5000 ? 18 : totalResults < 20000 ? 12 : 5;
-  const compScore = uniqueShops < 10 ? 25 : uniqueShops < 20 ? 18 : uniqueShops < 40 ? 12 : 5;
-  const demandPts = avgFavorites > 100 ? 20 : avgFavorites > 30 ? 15 : avgFavorites > 10 ? 10 : 5;
-  const engScore = avgEngagement > 0.05 ? 15 : avgEngagement > 0.02 ? 10 : avgEngagement > 0.01 ? 7 : 3;
-  const spreadScore = priceSpread > 3 ? 15 : priceSpread > 1.5 ? 10 : priceSpread > 0.5 ? 7 : 3;
-  const total = Math.min(100, supplyScore + compScore + demandPts + engScore + spreadScore);
-
-  return {
-    score: total, totalResults, uniqueShops,
-    avgFavorites: Math.round(avgFavorites), avgViews: Math.round(avgViews),
-    avgEngagement: Math.round(avgEngagement * 10000) / 100,
-    priceSpread: Math.round(priceSpread * 100) / 100,
-    breakdown: { supplyScore, compScore, demandPts, engScore, spreadScore },
-  } as DemandScore;
-}
+// R0: useComputedDemandScore was removed — its 0–100 composite had no measured demand input.
 
 export function useComputedShopStats() {
   const discoveredShops = useEtsyResearchStore(s => s.discoveredShops);
@@ -929,8 +917,9 @@ export function useComputedShopStats() {
 
   const shops = discoveredShops.map(s => {
     const shopItems = items.filter(i => i.shop_id === s.shop_id);
-    const avgPrice = shopItems.length > 0 ? shopItems.reduce((sum, i) => sum + i.price, 0) / shopItems.length : 0;
-    return { ...s, avgPrice: Math.round(avgPrice * 100) / 100, listingCount: shopItems.length };
+    // Median of this shop's listings in the search (never a mean).
+    const usd = shopItems.filter(i => (i.currency_code || 'USD').toUpperCase() === 'USD');
+    return { ...s, medianPrice: groupMedian(usd.map(i => i.price)), listingCount: shopItems.length };
   }).sort((a, b) => b.num_sales - a.num_sales);
 
   const totalSales = shops.reduce((s, sh) => s + sh.num_sales, 0);
@@ -946,9 +935,11 @@ export function useComputedDeepDive() {
 
   if (deepDiveListings.length === 0) return null;
 
-  const ddPrices = deepDiveListings.map(l => l.price).filter(p => p > 0).sort((a, b) => a - b);
-  const sum = ddPrices.reduce((a, b) => a + b, 0);
-  const mid = Math.floor(ddPrices.length / 2);
+  // A shop prices in one currency; summarize in its majority currency (others excluded).
+  const priceSummary = summarizePrices(
+    deepDiveListings.map(l => ({ amount: l.price, currency: l.currency_code })),
+    { currency: majorityCurrency(deepDiveListings) },
+  );
   const avgFav = deepDiveListings.reduce((s, l) => s + l.num_favorers, 0) / deepDiveListings.length;
   const avgViews = deepDiveListings.reduce((s, l) => s + l.views, 0) / deepDiveListings.length;
 
@@ -961,9 +952,9 @@ export function useComputedDeepDive() {
 
   return {
     count: deepDiveListings.length,
-    priceMin: ddPrices[0] || 0, priceMax: ddPrices[ddPrices.length - 1] || 0,
-    priceAvg: ddPrices.length > 0 ? Math.round((sum / ddPrices.length) * 100) / 100 : 0,
-    priceMedian: ddPrices.length > 0 ? (ddPrices.length % 2 === 0 ? (ddPrices[mid - 1] + ddPrices[mid]) / 2 : ddPrices[mid]) : 0,
+    priceMin: priceSummary.min ?? 0, priceMax: priceSummary.max ?? 0,
+    priceMedian: priceSummary.median ?? 0,
+    priceSummary,
     avgFav: Math.round(avgFav), avgViews: Math.round(avgViews), topTags,
     bestListings: [...deepDiveListings].sort((a, b) => b.num_favorers - a.num_favorers).slice(0, 10),
   } as DeepDiveStats;
@@ -988,12 +979,13 @@ export function useComputedSeo(userListings?: any[]) {
   const score = Math.min(100, kwScore + tagScore + lengthScore + hasTagsScore);
   const avgLen = allTitles.length ? Math.round(allTitles.reduce((s, t) => s + t.length, 0) / allTitles.length) : 0;
 
-  const recommendations: string[] = [];
+  // Tips are i18n keys (research.seoTips.*); keywords/tags stay in English.
+  const recommendations: SeoResult['recommendations'] = [];
   const missingKw = top20kw.filter(k => !k.inMyTitle).slice(0, 5);
-  if (missingKw.length > 0) recommendations.push(`Su eksik anahtar kelimeleri eklemeyi deneyin: ${missingKw.map(k => k.keyword).join(', ')}`);
-  if (tagGaps.length > 0) recommendations.push(`Rakiplerin kullandigi su tagleri ekleyin: ${tagGaps.slice(0, 5).map(t => t.tag).join(', ')}`);
-  if (myTitle.length < 80) recommendations.push(`Basliginiz kisa (${myTitle.length} karakter). Etsy icin en az 100 karakter onerilir.`);
-  if (myTagsSet.size < 13) recommendations.push(`${13 - myTagsSet.size} tag daha ekleyin — Etsy'de 13 tag kullanin.`);
+  if (missingKw.length > 0) recommendations.push({ key: 'missingKeywords', params: { keywords: missingKw.map(k => k.keyword).join(', ') } });
+  if (tagGaps.length > 0) recommendations.push({ key: 'missingTags', params: { tags: tagGaps.slice(0, 5).map(t => t.tag).join(', ') } });
+  if (myTitle.length < 80) recommendations.push({ key: 'shortTitle', params: { length: myTitle.length } });
+  if (myTagsSet.size < 13) recommendations.push({ key: 'moreTags', params: { count: 13 - myTagsSet.size } });
 
   return {
     score, kwScore, tagScore, lengthScore, hasTagsScore,

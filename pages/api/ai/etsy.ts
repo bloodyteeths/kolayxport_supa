@@ -107,7 +107,8 @@ function buildMarketContextPrompt(mc: any): string {
   if (!mc) return '';
   const tags = Array.isArray(mc.topTags) ? mc.topTags.slice(0, 20).map((t: any) => `${t.tag} (${t.pct}%)`).join(', ') : 'N/A';
   const keywords = Array.isArray(mc.topKeywords) ? mc.topKeywords.slice(0, 15).map((k: any) => `${k.keyword} (${k.pct}%)`).join(', ') : 'N/A';
-  const priceRange = mc.priceStats ? `$${mc.priceStats.min} - $${mc.priceStats.max} (avg: $${mc.priceStats.avg})` : 'N/A';
+  // R0: median only (the legacy `avg` slot carries the median; no means are sent).
+  const priceRange = mc.priceStats ? `$${mc.priceStats.min} - $${mc.priceStats.max} (median: $${mc.priceStats.median ?? mc.priceStats.avg})` : 'N/A';
   return `
 
 MARKET RESEARCH DATA (real competitor analysis for "${mc.query || 'N/A'}"):
@@ -442,7 +443,7 @@ Bir satıcı "${query}" anahtar kelimesi ile pazar araştırması yaptı. İşte
 PAZAR VERİLERİ:
 - Toplam sonuç: ${totalResults || 'N/A'}
 - Benzersiz mağaza sayısı: ${shopCount || 'N/A'}
-- Fiyat istatistikleri: Min: $${priceStats?.min || 'N/A'}, Ort: $${priceStats?.avg || 'N/A'}, Medyan: $${priceStats?.median || 'N/A'}, Max: $${priceStats?.max || 'N/A'}
+- Fiyat istatistikleri: Min: $${priceStats?.min || 'N/A'}, Medyan: $${priceStats?.median || 'N/A'}, P25-P75: $${priceStats?.p25 ?? 'N/A'}-$${priceStats?.p75 ?? 'N/A'}, Max: $${priceStats?.max || 'N/A'}
 - Ortalama favori: ${avgFavorites || 'N/A'}
 - Ortalama görüntülenme: ${avgViews || 'N/A'}
 - En çok kullanılan etiketler: ${Array.isArray(topTags) ? topTags.slice(0, 20).map((t: any) => `${t.tag} (%${t.pct})`).join(', ') : 'N/A'}
@@ -618,7 +619,7 @@ NİŞ: "${query}"
 
 VERİLER:
 - Talep skoru: ${demandScore ?? 'N/A'}
-- Fiyat istatistikleri: Min: $${priceStats?.min ?? 'N/A'}, Ort: $${priceStats?.avg ?? 'N/A'}, Medyan: $${priceStats?.median ?? 'N/A'}, Max: $${priceStats?.max ?? 'N/A'}
+- Fiyat istatistikleri: Min: $${priceStats?.min ?? 'N/A'}, Medyan: $${priceStats?.median ?? 'N/A'}, P25-P75: $${priceStats?.p25 ?? 'N/A'}-$${priceStats?.p75 ?? 'N/A'}, Max: $${priceStats?.max ?? 'N/A'}
 - Rekabet seviyesi: ${competition ?? 'N/A'}
 - Satış hızı (velocity): ${velocity ?? 'N/A'}
 - Etkileşim (engagement): ${engagement ?? 'N/A'}
@@ -872,7 +873,6 @@ ${productDescription ? `Ürün açıklaması: ${productDescription.slice(0, 300)
 FİYAT VERİLERİ:
 - Mevcut fiyatım: ${myPrice ? `$${myPrice}` : 'Belirtilmedi'}
 - Pazar min: $${priceStats?.min ?? 'N/A'}
-- Pazar ort: $${priceStats?.avg ?? 'N/A'}
 - Pazar medyan: $${priceStats?.median ?? 'N/A'}
 - Pazar max: $${priceStats?.max ?? 'N/A'}
 - Sweet spot: $${sweetSpot ?? 'N/A'}

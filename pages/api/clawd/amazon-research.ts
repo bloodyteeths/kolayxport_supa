@@ -18,6 +18,22 @@ import {
   competitionScore,
 } from '../../../lib/amazon/salesEstimator';
 import { calculateFees, quickProfitEstimate } from '../../../lib/amazon/feeCalculator';
+import { summarizePrices, buildFxTable, decodeEntities, type PriceSummary } from '../../../lib/research/stats';
+import { convertCurrency } from '../../../lib/finance/fx';
+
+/**
+ * R0 honesty patch: robust price summary for Amazon results in their majority
+ * currency (median, P25–P75, Tukey-trimmed min/max, n). No arithmetic mean.
+ */
+async function amazonPriceSummary(items: Array<{ price: number | null; currency?: string }>): Promise<PriceSummary> {
+  const points = items.map((i) => ({ amount: i.price ?? 0, currency: i.currency || 'USD' }));
+  const counts: Record<string, number> = {};
+  for (const p of points) if (p.amount > 0) counts[p.currency] = (counts[p.currency] || 0) + 1;
+  const currency = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'USD';
+  const fx = await buildFxTable(points.map((p) => p.currency), currency, convertCurrency).catch(() => ({}));
+  const usdToTarget = currency === 'USD' ? 1 : await convertCurrency(1, 'USD', currency).catch(() => null);
+  return summarizePrices(points, { currency, fx, usdToTarget });
+}
 
 export const config = { runtime: 'nodejs', maxDuration: 60 };
 
@@ -57,7 +73,7 @@ function mapCreatorsItem(item: any) {
 
   return {
     asin: item.ASIN,
-    title: info.Title?.DisplayValue ?? '',
+    title: decodeEntities(info.Title?.DisplayValue ?? ''),
     imageUrl: item.Images?.Primary?.Large?.URL ?? item.Images?.Primary?.Medium?.URL ?? null,
     price,
     currency: offers.Price?.Currency ?? 'USD',
@@ -128,10 +144,9 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, userId: stri
         const ranks = items.map((i: any) => i.salesRank).filter(Boolean) as number[];
         const reviews = items.map((i: any) => i.reviewCount).filter(Boolean) as number[];
 
-        const avgPrice = prices.length ? prices.reduce((a: number, b: number) => a + b, 0) / prices.length : 0;
-        const medianPrice = prices.length
-          ? [...prices].sort((a, b) => a - b)[Math.floor(prices.length / 2)]
-          : 0;
+        // R0: robust price summary (no mean)
+        const priceStats = await amazonPriceSummary(items);
+        const medianPrice = priceStats.median ?? 0;
         const avgBsr = ranks.length ? ranks.reduce((a: number, b: number) => a + b, 0) / ranks.length : 0;
         const avgReviews = reviews.length ? reviews.reduce((a: number, b: number) => a + b, 0) / reviews.length : 0;
 
@@ -156,10 +171,12 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, userId: stri
           items,
           totalResults: data.SearchResult?.TotalResultCount || items.length,
           stats: {
-            avgPrice: Math.round(avgPrice * 100) / 100,
             medianPrice: Math.round(medianPrice * 100) / 100,
-            minPrice: prices.length ? Math.min(...prices) : 0,
-            maxPrice: prices.length ? Math.max(...prices) : 0,
+            // Legacy field read by pages/api/ai/amazon.ts; carries the median, never a mean.
+            avgPrice: Math.round(medianPrice * 100) / 100,
+            minPrice: priceStats.min ?? 0,
+            maxPrice: priceStats.max ?? 0,
+            priceStats,
             avgBsr: Math.round(avgBsr),
             avgReviews: Math.round(avgReviews),
           },
@@ -279,26 +296,24 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, userId: stri
         const reviews = items.map((i: any) => i.reviewCount).filter(Boolean) as number[];
         const ratings = items.map((i: any) => i.rating).filter(Boolean) as number[];
 
-        const avgPrice = prices.length ? prices.reduce((a: number, b: number) => a + b, 0) / prices.length : 0;
-        const sortedPrices = [...prices].sort((a, b) => a - b);
-        const medianPrice = sortedPrices.length
-          ? sortedPrices[Math.floor(sortedPrices.length / 2)]
-          : 0;
+        // R0: robust price summary (no mean); downstream estimates use the median.
+        const priceStats = await amazonPriceSummary(items);
+        const medianPrice = priceStats.median ?? 0;
         const avgBsr = ranks.length ? ranks.reduce((a: number, b: number) => a + b, 0) / ranks.length : 0;
         const avgReviews = reviews.length ? reviews.reduce((a: number, b: number) => a + b, 0) / reviews.length : 0;
         const avgRating = ratings.length ? ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length : 0;
 
         // Price distribution (10 buckets)
         const priceDist: { range: string; count: number }[] = [];
-        if (prices.length) {
-          const min = Math.min(...prices);
-          const max = Math.max(...prices);
+        if (prices.length && priceStats.min != null && priceStats.max != null) {
+          const min = priceStats.min;
+          const max = priceStats.max;
           const step = (max - min) / 10 || 1;
           for (let i = 0; i < 10; i++) {
             const lo = Math.round((min + step * i) * 100) / 100;
             const hi = Math.round((min + step * (i + 1)) * 100) / 100;
             priceDist.push({
-              range: `$${lo}-$${hi}`,
+              range: `${lo}-${hi} ${priceStats.currency}`,
               count: prices.filter(p => p >= lo && (i === 9 ? p <= hi : p < hi)).length,
             });
           }
@@ -321,12 +336,12 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, userId: stri
 
         // Revenue estimate for the niche
         const avgMonthlySales = ranks.length
-          ? ranks.reduce((sum, bsr) => sum + estimateMonthlySales(bsr, undefined, avgPrice).monthlySales, 0) / ranks.length
+          ? ranks.reduce((sum, bsr) => sum + estimateMonthlySales(bsr, undefined, medianPrice || undefined).monthlySales, 0) / ranks.length
           : 0;
 
-        // Fee estimate at average price
-        const avgFees = avgPrice
-          ? calculateFees({ price: avgPrice, category: 'General', fulfillment: 'FBA' })
+        // Fee estimate at the median price (only when the sample passed the checks)
+        const avgFees = medianPrice && priceStats.quality === 'ok'
+          ? calculateFees({ price: medianPrice, category: 'General', fulfillment: 'FBA' })
           : null;
 
         return res.json({
@@ -336,10 +351,12 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, userId: stri
           totalResults,
           items,
           stats: {
-            avgPrice: Math.round(avgPrice * 100) / 100,
             medianPrice: Math.round(medianPrice * 100) / 100,
-            minPrice: prices.length ? Math.min(...prices) : 0,
-            maxPrice: prices.length ? Math.max(...prices) : 0,
+            // Legacy field read by pages/api/ai/amazon.ts; carries the median, never a mean.
+            avgPrice: Math.round(medianPrice * 100) / 100,
+            minPrice: priceStats.min ?? 0,
+            maxPrice: priceStats.max ?? 0,
+            priceStats,
             avgBsr: Math.round(avgBsr),
             avgReviews: Math.round(avgReviews),
             avgRating: Math.round(avgRating * 10) / 10,

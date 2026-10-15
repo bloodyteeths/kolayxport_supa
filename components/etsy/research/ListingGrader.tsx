@@ -28,7 +28,8 @@ import {
 } from '@/lib/stores/useEtsyResearchStore';
 import type { FeeProfile, ProfitCalc } from './shared/types';
 import { fmt } from './shared/utils';
-import { prefillHref, writeListingPrefill, dominantCurrency } from './shared/listingPrefill';
+import { prefillHref, writeListingPrefill, prefillPriceStats, prefillPrice } from './shared/listingPrefill';
+import { useRobustPriceLabel } from './shared/RobustPrice';
 import {
   ScoreRing, glassCard, GRADIENTS, pillTabsSx, PremiumEmptyState, BeforeAfter,
 } from './shared/ui';
@@ -38,6 +39,8 @@ export default function ListingGrader({ shopId, userListings }: { shopId?: strin
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const t = useTranslations('etsy.research');
   const tGrader = useTranslations('etsyResearch');
+  const tR = useTranslations('research');
+  const priceLabel = useRobustPriceLabel();
   const { config, formatNumber } = useLocale();
 
   const [analyzeInput, setAnalyzeInput] = useState('');
@@ -131,7 +134,8 @@ export default function ListingGrader({ shopId, userListings }: { shopId?: strin
     setFixLoading('title');
     try {
       const market_context = items.length > 0 ? {
-        avgPrice: priceStats?.avg,
+        // R0: median (robust), never a mean
+        medianPrice: prefillPrice(priceStats),
         totalResults: items.length,
         topTags: listingAnalysis.listing.tags?.slice(0, 5),
       } : undefined;
@@ -301,8 +305,8 @@ export default function ListingGrader({ shopId, userListings }: { shopId?: strin
     const ownTitle = isOwnListing ? coerceAiString(analyzedListing.title) : '';
     // The analyzed listing's own price has no currency in the analysis, so
     // use the searched market's median when its currency is known.
-    const currency = dominantCurrency(items);
-    const price = currency && priceStats ? priceStats.median : undefined;
+    const currency = priceStats ? priceStats.currency : undefined;
+    const price = currency ? prefillPrice(priceStats) : undefined;
     const ok = writeListingPrefill({
       target: 'etsy',
       source: 'etsy-research',
@@ -316,7 +320,7 @@ export default function ListingGrader({ shopId, userListings }: { shopId?: strin
         topTags: useEtsyResearchStore.getState().serverTagFreq.slice(0, 20),
         topKeywords: useEtsyResearchStore.getState().serverKeywords.slice(0, 15),
         // Price stats only when the market currency is known.
-        priceStats: priceStats && currency ? { min: priceStats.min, avg: priceStats.avg, median: priceStats.median, max: priceStats.max } : null,
+        priceStats: currency ? prefillPriceStats(priceStats) : null,
       } : {
         // No search loaded: the analyzed title becomes the research query so
         // the creator's AI writes its own copy instead of copying it.
@@ -345,7 +349,7 @@ export default function ListingGrader({ shopId, userListings }: { shopId?: strin
   const profitCalc: ProfitCalc = useMemo(() => {
     const fees = FEE_PROFILES[shopRegion];
     const cost = parseFloat(purchaseCost) || 0;
-    const sell = parseFloat(sellingPrice) || (priceStats?.avg || 0);
+    const sell = parseFloat(sellingPrice) || (prefillPrice(priceStats) ?? 0);
     const ship = parseFloat(shippingCost) || 0;
     const roas = parseFloat(etsyAdsRoas) || 0;
     const listingFee = fees.listingFee;
@@ -365,10 +369,10 @@ export default function ListingGrader({ shopId, userListings }: { shopId?: strin
       const oa = includeOffsiteAds ? p * fees.offsiteAdsRate : 0;
       const adCost = roas > 0 ? p / roas : 0;
       const pr = p - cost - ship - fees.listingFee - tf - pp - rf - oa - adCost;
-      return { label: delta === 0 ? t('average') : delta < 0 ? `${delta}%` : `+${delta}%`, price: p, profit: pr, margin: p > 0 ? (pr / p) * 100 : 0 };
+      return { label: delta === 0 ? tR('stats.basePrice') : delta < 0 ? `${delta}%` : `+${delta}%`, price: p, profit: pr, margin: p > 0 ? (pr / p) * 100 : 0 };
     });
     return { cost, sell, ship, listingFee, transactionFee, paymentProcessing, regulatoryFee, offsiteAdsFee, etsyAdsCost, roas, totalFees, profit, margin, compare, fees };
-  }, [purchaseCost, sellingPrice, shippingCost, priceStats, includeOffsiteAds, shopRegion, FEE_PROFILES, etsyAdsRoas]);
+  }, [purchaseCost, sellingPrice, shippingCost, priceStats, includeOffsiteAds, shopRegion, FEE_PROFILES, etsyAdsRoas, tR]);
 
   return (
     <Box>
@@ -671,7 +675,7 @@ export default function ListingGrader({ shopId, userListings }: { shopId?: strin
             <TextField label={t('sellingPrice')} value={sellingPrice} onChange={e => setSellingPrice(e.target.value)}
               size="small" type="number" fullWidth
               InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-              helperText={priceStats ? `${t('avgMarket')}: ${fmt(priceStats.avg)}` : undefined} />
+              helperText={priceStats ? priceLabel(priceStats) : undefined} />
             <TextField label={t('shippingCost')} value={shippingCost} onChange={e => setShippingCost(e.target.value)}
               size="small" type="number" fullWidth
               InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }} />
@@ -755,10 +759,10 @@ export default function ListingGrader({ shopId, userListings }: { shopId?: strin
               })}
             </Box>
           </Box>
-          {seoResult.recommendations?.map((tip: string, i: number) => (
+          {seoResult.recommendations?.map((tip, i: number) => (
             <Box key={i} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 0.5 }}>
               <Lightbulb size={14} color="#ff9800" style={{ flexShrink: 0, marginTop: 3 }} />
-              <Typography variant="body2" sx={{ fontSize: '0.82rem' }}>{tip}</Typography>
+              <Typography variant="body2" sx={{ fontSize: '0.82rem' }}>{tR(`seoTips.${tip.key}`, tip.params)}</Typography>
             </Box>
           ))}
         </Paper>

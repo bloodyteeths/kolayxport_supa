@@ -659,9 +659,7 @@ function LeftSidebar({
   });
 
   const labelSx = {
-    textTransform: 'uppercase' as const,
-    letterSpacing: 0.5,
-    fontSize: 10,
+    fontSize: 11,
     mb: 0.5,
     display: 'block',
   };

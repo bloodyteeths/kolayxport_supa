@@ -17,6 +17,8 @@ import { useTranslations } from 'next-intl';
 import useLocaleStore from '@/lib/stores/useLocaleStore';
 import useEbayResearchStore from '@/lib/stores/useEbayResearchStore';
 import { formatMoney, marketplaceCurrency } from './marketplaces';
+import { summarizePrices, type PriceSummary } from '@/lib/research/stats';
+import { useRobustPriceLabel } from '@/components/etsy/research/shared/RobustPrice';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -96,7 +98,10 @@ interface AspectConstraint {
 
 interface CompetitorMetrics {
   avgTitleLength: number;
+  /** Median competitor price, or 0 when the sample failed the R0 quality checks (never headline it then). */
   avgPrice: number;
+  /** Robust summary behind avgPrice (n ≤ 10 here, so usually 'small' or 'insufficient'). */
+  priceStats: PriceSummary;
   avgImageCount: number;
   avgAspectCount: number;
   avgFeedbackScore: number;
@@ -113,6 +118,24 @@ const fmt = (n: number) => {
   try { locale = useLocaleStore.getState().locale || 'en'; } catch { /* store unavailable */ }
   return formatMoney(n, marketplaceCurrency(useEbayResearchStore.getState().marketplace), locale);
 };
+
+/** A listing's own price in its own currency (Intl, no "$" concatenation). */
+const fmtListingPrice = (price?: { value: string; currency: string }) => {
+  if (!price?.value) return '—';
+  let locale = 'en';
+  try { locale = useLocaleStore.getState().locale || 'en'; } catch { /* store unavailable */ }
+  return formatMoney(parseFloat(price.value), price.currency || 'USD', locale);
+};
+
+/** Robust price summary for market items, in the marketplace currency; other-currency items are excluded, not mixed. */
+function marketPriceSummary(items: MarketItem[], currency: string): PriceSummary {
+  return summarizePrices(
+    items
+      .map((i) => ({ amount: parseFloat(i.price?.value || '0'), currency: i.price?.currency || currency }))
+      .filter((p) => p.amount > 0),
+    { currency },
+  );
+}
 
 function calcTitleScore(len: number): number {
   if (len >= 80) return 25;
@@ -294,15 +317,17 @@ function DistributionBar({ good, warning, critical, total }: { good: number; war
 // Comparison Bar (for competitor benchmark)
 // ---------------------------------------------------------------------------
 
-function ComparisonBar({ label, myValue, avgValue, unit, higherIsBetter = true }: {
-  label: string; myValue: number; avgValue: number; unit?: string; higherIsBetter?: boolean;
+function ComparisonBar({ label, myValue, avgValue, unit, money = false, higherIsBetter = true, refLabel }: {
+  label: string; myValue: number; avgValue: number; unit?: string; money?: boolean; higherIsBetter?: boolean;
+  /** Label for the reference row (defaults to "avg"; prices pass "Median", R0). */
+  refLabel?: string;
 }) {
   const t = useTranslations('ebay.listingOptimizer');
   const max = Math.max(myValue, avgValue, 1);
   const myPct = (myValue / max) * 100;
   const avgPct = (avgValue / max) * 100;
   const isWinning = higherIsBetter ? myValue >= avgValue : myValue <= avgValue;
-  const formatVal = (v: number) => unit === '$' ? fmt(v) : `${Math.round(v)}${unit || ''}`;
+  const formatVal = (v: number) => money ? fmt(v) : `${Math.round(v)}${unit || ''}`;
 
   return (
     <Box sx={{ mb: 2 }}>
@@ -329,7 +354,7 @@ function ComparisonBar({ label, myValue, avgValue, unit, higherIsBetter = true }
         </Typography>
       </Box>
       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.3 }}>
-        <Typography variant="caption" sx={{ width: 50, fontSize: 11, color: '#666' }}>{t('avg')}</Typography>
+        <Typography variant="caption" sx={{ width: 50, fontSize: 11, color: '#666' }}>{refLabel ?? t('avg')}</Typography>
         <Box sx={{ flex: 1, bgcolor: 'rgba(99,102,241,0.06)', borderRadius: 1, height: 10, overflow: 'hidden' }}>
           <Box sx={{ width: `${avgPct}%`, height: '100%', bgcolor: 'rgba(99,102,241,0.25)', borderRadius: 1, transition: 'width 0.4s' }} />
         </Box>
@@ -347,6 +372,7 @@ function ComparisonBar({ label, myValue, avgValue, unit, higherIsBetter = true }
 
 export default function ListingOptimizer({ userId, marketplace, userListings, onNavigate }: ListingOptimizerProps) {
   const t = useTranslations('ebay.listingOptimizer');
+  const tR = useTranslations('research');
   const tA = useTranslations('ebayResearch');
   // ── State ──
   const [subTab, setSubTab] = useState(0);
@@ -367,7 +393,10 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
   const [suggestedTitle, setSuggestedTitle] = useState('');
   const [missingAspects, setMissingAspects] = useState<AspectConstraint[]>([]);
   const [marketAvgImages, setMarketAvgImages] = useState(0);
-  const [marketAvgPrice, setMarketAvgPrice] = useState(0);
+  const [marketPriceStats, setMarketPriceStats] = useState<PriceSummary | null>(null);
+  // Headline median only when the sample passed the R0 checks; otherwise 0 (band/reason shown instead).
+  const marketAvgPrice = marketPriceStats?.quality === 'ok' ? (marketPriceStats.median ?? 0) : 0;
+  const priceLabel = useRobustPriceLabel();
   const [optimizedScore, setOptimizedScore] = useState<HealthScore | null>(null);
   const [aspectsLoading, setAspectsLoading] = useState(false);
 
@@ -454,7 +483,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
     setSuggestedTitle('');
     setMissingAspects([]);
     setMarketAvgImages(0);
-    setMarketAvgPrice(0);
+    setMarketPriceStats(null);
     setOptimizedScore(null);
 
     try {
@@ -518,12 +547,9 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
         }, 0) / marketItems.length;
         setMarketAvgImages(Math.round(avgImgs));
 
-        const prices = marketItems
-          .map(item => parseFloat(item.price?.value || '0'))
-          .filter(p => p > 0);
-        if (prices.length > 0) {
-          setMarketAvgPrice(prices.reduce((a, b) => a + b, 0) / prices.length);
-        }
+        // R0: robust median + P25–P75 + quality, never a mean.
+        const summary = marketPriceSummary(marketItems, marketplaceCurrency(marketplace));
+        setMarketPriceStats(summary.n > 0 ? summary : null);
       }
 
       // Compute optimized score estimate
@@ -545,7 +571,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
     } finally {
       setOptimizing(false);
     }
-  }, [selectedListing, searchMarket, fetchItemAspects]);
+  }, [selectedListing, searchMarket, fetchItemAspects, marketplace]);
 
   // ── Competitor Benchmark logic ──
   const benchmarkListing = useMemo(
@@ -571,8 +597,10 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
         const avgTitleLength = Math.round(
           competitors.reduce((s, i) => s + (i.title?.length || 0), 0) / competitors.length
         );
-        const avgPrice =
-          competitors.reduce((s, i) => s + parseFloat(i.price?.value || '0'), 0) / competitors.length;
+        // R0: competitor price reference is a quality-gated median (field name kept).
+        // n ≤ 10, so this is normally 'small' (range only) or 'insufficient' ("—" + reason).
+        const priceStats = marketPriceSummary(competitors, marketplaceCurrency(marketplace));
+        const avgPrice = priceStats.quality === 'ok' ? (priceStats.median ?? 0) : 0;
         const avgImageCount = Math.round(
           competitors.reduce((s, i) => s + 1 + (i.additionalImages?.length || 0), 0) / competitors.length
         );
@@ -583,7 +611,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
           competitors.reduce((s, i) => s + (i.seller?.feedbackScore || 0), 0) / competitors.length
         );
 
-        setCompetitorMetrics({ avgTitleLength, avgPrice, avgImageCount, avgAspectCount, avgFeedbackScore, items: competitors });
+        setCompetitorMetrics({ avgTitleLength, avgPrice, priceStats, avgImageCount, avgAspectCount, avgFeedbackScore, items: competitors });
 
         // Calculate percentile
         const myPrice = parseFloat(benchmarkListing.price?.value || '0');
@@ -605,7 +633,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
     } finally {
       setBenchmarking(false);
     }
-  }, [benchmarkListing, searchMarket]);
+  }, [benchmarkListing, searchMarket, marketplace]);
 
   // ── Standalone: Analyze any eBay listing by URL ──
   const analyzeByUrl = useCallback(async () => {
@@ -681,18 +709,19 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
             InputProps={{ startAdornment: <InputAdornment position="start"><ExternalLink size={16} /></InputAdornment> }}
           />
           <Button variant="contained" onClick={analyzeByUrl} disabled={manualLoading || !manualUrl.trim()} sx={{ minWidth: 120, background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' } }}>
-            {manualLoading ? <CircularProgress size={20} /> : 'Analiz Et'}
+            {manualLoading ? <CircularProgress size={20} /> : tR('ebayOptimizer.analyze')}
           </Button>
         </Box>
         {!manualListing && !manualLoading && (
           <Paper sx={{ p: 2, mt: 2, bgcolor: '#f8faff', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
-            <Typography variant="subtitle2" fontWeight={700} gutterBottom>Listing Optimizer</Typography>
+            <Typography variant="subtitle2" fontWeight={700} gutterBottom>{tR('ebayOptimizer.title')}</Typography>
             <Typography variant="body2" color="text.secondary" component="div">
+              {/* R0: tips moved to i18n (were hardcoded Turkish). */}
               <ul style={{ margin: 0, paddingLeft: 16 }}>
-                <li>eBay URL yapistirarak herhangi bir listelemeyi analiz edin</li>
-                <li>Baslik uzunlugu, aciklama kalitesi, gorsel sayisi ve ozellikler puanlanir</li>
-                <li>Her sorun icin &quot;AI ile Duzelt&quot; butonu ile otomatik iyilestirme yapin</li>
-                <li>Kendi listeleriniz yuklendiyse, hepsini tek tikla tarayin</li>
+                <li>{tR('ebayOptimizer.tip1')}</li>
+                <li>{tR('ebayOptimizer.tip2')}</li>
+                <li>{tR('ebayOptimizer.tip3')}</li>
+                <li>{tR('ebayOptimizer.tip4')}</li>
               </ul>
             </Typography>
           </Paper>
@@ -876,7 +905,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                           </TableCell>
                           <TableCell sx={{ textAlign: 'right' }}>
                             <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 13 }}>
-                              {listing.price?.currency === 'USD' ? '$' : listing.price?.currency}{listing.price?.value}
+                              {fmtListingPrice(listing.price)}
                             </Typography>
                           </TableCell>
                           <TableCell sx={{ textAlign: 'right' }}>
@@ -1286,8 +1315,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                     <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#f8faff', borderRadius: 2, border: '1px solid rgba(99,102,241,0.08)', minWidth: 100 }}>
                       <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                        {selectedListing.price?.currency === 'USD' ? '$' : selectedListing.price?.currency}
-                        {selectedListing.price?.value}
+                        {fmtListingPrice(selectedListing.price)}
                       </Typography>
                       <Typography variant="caption" sx={{ fontSize: '0.8rem', color: '#666' }}>{t('yourPrice')}</Typography>
                     </Box>
@@ -1296,7 +1324,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                       <Typography variant="h6" sx={{ fontWeight: 700, color: '#6366f1' }}>
                         {fmt(marketAvgPrice)}
                       </Typography>
-                      <Typography variant="caption" sx={{ fontSize: '0.8rem', color: '#666' }}>{t('marketAverage')}</Typography>
+                      <Typography variant="caption" sx={{ fontSize: '0.8rem', color: '#666' }}>{tR('stats.medianPrice')}</Typography>
                     </Box>
                   </Box>
 
@@ -1352,7 +1380,8 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                 </>
               ) : (
                 <Typography variant="body2" sx={{ color: '#666', fontSize: 12 }}>
-                  {t('noMarketPriceData')}
+                  {/* R0: sample failed the checks → band or "—" with its reason, no verdict. */}
+                  {marketPriceStats ? `${tR('stats.medianPrice')}: ${priceLabel(marketPriceStats, marketPriceStats.currency, { prefix: false })}` : t('noMarketPriceData')}
                 </Typography>
               )}
             </Paper>
@@ -1413,8 +1442,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                   {benchmarkListing.title}
                 </Typography>
                 <Typography variant="caption" sx={{ color: '#666' }}>
-                  {benchmarkListing.price?.currency === 'USD' ? '$' : benchmarkListing.price?.currency}
-                  {benchmarkListing.price?.value} | {benchmarkListing.imageCount} {t('imagesLabel')} | {benchmarkListing.aspectCount} {t('aspectsLabel')}
+                  {fmtListingPrice(benchmarkListing.price)} | {benchmarkListing.imageCount} {t('imagesLabel')} | {benchmarkListing.aspectCount} {t('aspectsLabel')}
                 </Typography>
               </Box>
               <Button
@@ -1484,13 +1512,23 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                 higherIsBetter={true}
               />
 
-              <ComparisonBar
-                label={t('price')}
-                myValue={parseFloat(benchmarkListing.price?.value || '0')}
-                avgValue={competitorMetrics.avgPrice}
-                unit="$"
-                higherIsBetter={false}
-              />
+              {competitorMetrics.priceStats.quality === 'ok' ? (
+                <ComparisonBar
+                  label={t('price')}
+                  myValue={parseFloat(benchmarkListing.price?.value || '0')}
+                  avgValue={competitorMetrics.avgPrice}
+                  money
+                  higherIsBetter={false}
+                  refLabel={tR('stats.medianShort')}
+                />
+              ) : (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 13 }}>{t('price')}</Typography>
+                  <Typography variant="caption" display="block" color="text.secondary">
+                    {t('yours')}: {fmtListingPrice(benchmarkListing.price)} · {priceLabel(competitorMetrics.priceStats, competitorMetrics.priceStats.currency)}
+                  </Typography>
+                </Box>
+              )}
 
               <ComparisonBar
                 label={t('imageCountLabel')}
@@ -1517,17 +1555,17 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
             {/* Comparison Table */}
             <Paper sx={{ p: 2, mb: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
               <Typography variant="body2" sx={{ fontWeight: 700, mb: 1.5, fontSize: 14 }}>
-                Sizin Listeleme vs {t('marketAverage')}
+                {t('benchmarkTableTitle')}
               </Typography>
 
               <TableContainer>
                 <Table size="small">
                   <TableHead>
-                    <TableRow sx={{ '& th': { background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '2px solid rgba(99,102,241,0.12)' } }}>
-                      <TableCell sx={{ fontWeight: 700, fontSize: 12 }}>Metrik</TableCell>
-                      <TableCell sx={{ fontWeight: 700, fontSize: 12, textAlign: 'center' }}>Sizin</TableCell>
-                      <TableCell sx={{ fontWeight: 700, fontSize: 12, textAlign: 'center' }}>Pazar Ort.</TableCell>
-                      <TableCell sx={{ fontWeight: 700, fontSize: 12, textAlign: 'center' }}>Durum</TableCell>
+                    <TableRow sx={{ '& th': { bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider' } }}>
+                      <TableCell sx={{ fontWeight: 700, fontSize: 12 }}>{t('colMetric')}</TableCell>
+                      <TableCell sx={{ fontWeight: 700, fontSize: 12, textAlign: 'center' }}>{t('yourValue')}</TableCell>
+                      <TableCell sx={{ fontWeight: 700, fontSize: 12, textAlign: 'center' }}>{t('colCompetitors')}</TableCell>
+                      <TableCell sx={{ fontWeight: 700, fontSize: 12, textAlign: 'center' }}>{t('colStatus')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -1540,9 +1578,12 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                       },
                       {
                         label: t('price'),
-                        my: `${benchmarkListing.price?.currency === 'USD' ? '$' : ''}${benchmarkListing.price?.value}`,
-                        avg: fmt(competitorMetrics.avgPrice),
-                        win: parseFloat(benchmarkListing.price?.value || '0') <= competitorMetrics.avgPrice,
+                        my: fmtListingPrice(benchmarkListing.price),
+                        avg: priceLabel(competitorMetrics.priceStats, competitorMetrics.priceStats.currency),
+                        // No verdict when the competitor sample failed the R0 checks.
+                        win: competitorMetrics.priceStats.quality === 'ok'
+                          ? parseFloat(benchmarkListing.price?.value || '0') <= competitorMetrics.avgPrice
+                          : null,
                       },
                       {
                         label: t('imageCountLabel'),
@@ -1568,10 +1609,12 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                         <TableCell sx={{ fontSize: 12, textAlign: 'center', fontWeight: 600 }}>{row.my}</TableCell>
                         <TableCell sx={{ fontSize: 12, textAlign: 'center', color: '#666' }}>{row.avg}</TableCell>
                         <TableCell sx={{ textAlign: 'center' }}>
-                          {row.win ? (
+                          {row.win === null ? (
+                            <Typography variant="caption" color="text.secondary">—</Typography>
+                          ) : row.win ? (
                             <Chip label={t('winning')} size="small" sx={{ bgcolor: '#e8f5e9', color: '#2e7d32', fontSize: '0.8rem', fontWeight: 600, height: 26 }} />
                           ) : (
-                            <Chip label="Geride" size="small" sx={{ bgcolor: '#ffebee', color: '#c62828', fontSize: '0.8rem', fontWeight: 600, height: 26 }} />
+                            <Chip label={t('behind')} size="small" sx={{ bgcolor: '#ffebee', color: '#c62828', fontSize: '0.8rem', fontWeight: 600, height: 26 }} />
                           )}
                         </TableCell>
                       </TableRow>
@@ -1612,9 +1655,10 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                   </Alert>
                 )}
 
-                {parseFloat(benchmarkListing.price?.value || '0') > competitorMetrics.avgPrice * 1.15 && (
+                {competitorMetrics.priceStats.quality === 'ok' && competitorMetrics.avgPrice > 0 &&
+                 parseFloat(benchmarkListing.price?.value || '0') > competitorMetrics.avgPrice * 1.15 && (
                   <Alert severity="info" sx={{ fontSize: 12 }} icon={<TrendingUp size={16} />}>
-                    <strong>{t('price')}:</strong> {t('priceTooHigh', { avg: fmt(competitorMetrics.avgPrice) })}
+                    <strong>{t('price')}:</strong> {tR('stats.priceAboveMedian', { median: fmt(competitorMetrics.avgPrice) })}
                     {t('reviewPricing')}
                   </Alert>
                 )}
@@ -1671,8 +1715,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                         </TableCell>
                         <TableCell sx={{ textAlign: 'right' }}>
                           <Typography variant="body2" sx={{ fontSize: 12, fontWeight: 600 }}>
-                            {item.price?.currency === 'USD' ? '$' : item.price?.currency}
-                            {item.price?.value}
+                            {fmtListingPrice(item.price)}
                           </Typography>
                         </TableCell>
                         <TableCell sx={{ textAlign: 'center' }}>

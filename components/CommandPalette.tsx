@@ -391,7 +391,7 @@ export default function CommandPalette({ open, onOpenChange, destinations, canCr
               <X size={18} />
             </button>
           ) : (
-            <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 border border-slate-200 rounded">Esc</kbd>
+            <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[11px] font-semibold text-slate-400 border border-slate-200 rounded">Esc</kbd>
           )}
         </div>
 
@@ -401,7 +401,7 @@ export default function CommandPalette({ open, onOpenChange, destinations, canCr
           ) : (
             sections.map((section) => (
               <div key={section.id} className="mb-1">
-                <div className="px-4 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                <div className="px-4 pt-2 pb-1 text-[11px] font-semibold text-slate-400">
                   {section.title}
                 </div>
                 {section.entries.map((entry) => {

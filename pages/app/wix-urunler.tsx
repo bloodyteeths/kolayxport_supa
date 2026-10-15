@@ -386,7 +386,7 @@ function LeftSidebar({
   return (
     <Box sx={{ width: 220, flexShrink: 0, pr: 1.5 }}>
       {/* Status Filters */}
-      <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 0.5, display: 'block', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+      <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
         {t('columnStatus')}
       </Typography>
       {(['all', 'visible', 'hidden'] as const).map((status) => {
@@ -419,7 +419,7 @@ function LeftSidebar({
       <Divider sx={{ my: 1.5 }} />
 
       {/* Health Filter */}
-      <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 0.5, display: 'block', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+      <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
         {t('healthLabel')}
       </Typography>
       <FormControl size="small" fullWidth sx={{ mb: 1.5 }}>
@@ -446,7 +446,7 @@ function LeftSidebar({
         onClick={() => setCollectionsExpanded(!collectionsExpanded)}
         sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', mb: 0.5 }}
       >
-        <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5, flex: 1 }}>
+        <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ flex: 1 }}>
           {t('collectionsLabel')}
         </Typography>
         {collectionsExpanded ? <ExpandLessIcon sx={{ fontSize: 16 }} /> : <ExpandMoreIcon sx={{ fontSize: 16 }} />}
@@ -495,7 +495,7 @@ function LeftSidebar({
       <Divider sx={{ my: 1.5 }} />
 
       {/* Exclude */}
-      <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 0.5, display: 'block', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+      <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
         {t('excludeLabel')}
       </Typography>
       <TextField

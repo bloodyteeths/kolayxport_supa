@@ -12,6 +12,9 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import { formatMoney, type PriceSummary } from '@/lib/research/stats';
+import { useRobustPriceLabel, useResearchLocale } from '@/components/etsy/research/shared/RobustPrice';
+import { useNicheVerdicts } from './nicheLabels';
 
 interface MarketplaceComparisonProps {
   userId: string;
@@ -21,17 +24,15 @@ interface MarketplaceComparisonProps {
 interface MarketplaceResult {
   query: string;
   totalResults: number;
-  avgPrice: number;
   medianPrice: number;
+  /** R0 robust summary in this marketplace's currency (no mean). */
+  priceStats?: PriceSummary | null;
   uniqueSellers: number;
   demandScore: number;
   competitionScore: number;
   opportunityScore: number;
   freeShippingPct: number;
   sellThroughRate: number;
-  demandLabel: string;
-  competitionLabel: string;
-  opportunityLabel: string;
 }
 
 interface MarketplaceDef {
@@ -42,7 +43,7 @@ interface MarketplaceDef {
 
 type LoadState = 'idle' | 'loading' | 'done' | 'error';
 
-type SortKey = 'label' | 'totalResults' | 'avgPrice' | 'medianPrice' | 'demandScore' | 'competitionScore' | 'opportunityScore' | 'uniqueSellers' | 'freeShippingPct';
+type SortKey = 'label' | 'totalResults' | 'medianPrice' | 'demandScore' | 'competitionScore' | 'opportunityScore' | 'uniqueSellers' | 'freeShippingPct';
 
 const MARKETPLACES: MarketplaceDef[] = [
   { id: 'EBAY_US', flag: '\u{1F1FA}\u{1F1F8}', labelKey: 'mc_US' },
@@ -98,7 +99,14 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const t = useTranslations('ebayResearch');
   const tA = useTranslations('ebayResearch');
-
+  const tR = useTranslations('research');
+  const verdict = useNicheVerdicts();
+  const priceLabel = useRobustPriceLabel();
+  const locale = useResearchLocale();
+  // Median in the marketplace's own currency; "—" when the sample failed the checks.
+  const medianText = (d: MarketplaceResult, prefix = false) => d.priceStats
+    ? priceLabel(d.priceStats, d.priceStats.currency, { showN: false, prefix })
+    : formatMoney(d.medianPrice || null, 'USD', locale);
   const [keyword, setKeyword] = useState('');
   const [selectedMarkets, setSelectedMarkets] = useState<Set<string>>(new Set(MARKETPLACES.map(m => m.id)));
   const [results, setResults] = useState<Map<string, MarketplaceResult>>(new Map());
@@ -204,12 +212,6 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
     });
   };
 
-  const maxAvgPrice = useMemo(() => {
-    let max = 0;
-    results.forEach(r => { if (r.avgPrice > max) max = r.avgPrice; });
-    return max || 1;
-  }, [results]);
-
   const doneCount = useMemo(() => {
     let c = 0;
     loadStates.forEach(s => { if (s === 'done') c++; });
@@ -310,7 +312,7 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
             <ScoreBadge score={bestMarket.data.opportunityScore} label={t('mc_opportunityScore')} />
           </Box>
           <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1.5 }}>
-            {t('mc_highDemand', { demand: bestMarket.data.demandScore })}, {bestMarket.data.competitionScore < 50 ? t('mc_lowCompetition') : t('mc_midCompetition')} {t('mc_competitionScore', { score: bestMarket.data.competitionScore })}, {t('mc_goodPrice', { price: bestMarket.data.avgPrice.toFixed(2) })}
+            {t('mc_highDemand', { demand: bestMarket.data.demandScore })}, {bestMarket.data.competitionScore < 50 ? t('mc_lowCompetition') : t('mc_midCompetition')} {t('mc_competitionScore', { score: bestMarket.data.competitionScore })}, {tR('stats.medianIs', { price: medianText(bestMarket.data) })}
           </Typography>
           {onNavigate && (
             <Button
@@ -325,37 +327,8 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
         </Paper>
       )}
 
-      {/* Price Comparison Bar Chart */}
-      {hasResults && !isLoading && (
-        <Paper variant="outlined" sx={{ p: 2.5 }}>
-          <Typography variant="subtitle2" sx={{ mb: 1.5 }}>{t('mc_avgPriceComparison')}</Typography>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {sortedResults.map(({ id, market, data }) => (
-              <Box key={id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography variant="body2" sx={{ minWidth: 90, flexShrink: 0 }}>
-                  {market.flag} {t(market.labelKey as any)}
-                </Typography>
-                <Box sx={{ flex: 1, position: 'relative', height: 24, bgcolor: 'grey.100', borderRadius: 1, overflow: 'hidden' }}>
-                  <Box sx={{
-                    height: '100%',
-                    width: `${(data.avgPrice / maxAvgPrice) * 100}%`,
-                    bgcolor: scoreColor(data.opportunityScore),
-                    borderRadius: 1,
-                    transition: 'width 0.4s ease',
-                    opacity: 0.75,
-                  }} />
-                  <Typography variant="caption" sx={{
-                    position: 'absolute', top: '50%', left: 8, transform: 'translateY(-50%)',
-                    fontWeight: 600, color: (data.avgPrice / maxAvgPrice) > 0.3 ? '#fff' : 'text.primary',
-                  }}>
-                    ${data.avgPrice.toFixed(2)}
-                  </Typography>
-                </Box>
-              </Box>
-            ))}
-          </Box>
-        </Paper>
-      )}
+      {/* R0: the cross-marketplace "average price" bar chart was removed: it
+          compared means across different currencies. Medians are per row below. */}
 
       {/* Results Table (Desktop) */}
       {hasResults && !isLoading && !isMobile && (
@@ -367,7 +340,6 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
                   {([
                     ['label', t('mc_colMarket')],
                     ['totalResults', t('mc_colTotalProducts')],
-                    ['avgPrice', t('mc_colAvgPrice')],
                     ['medianPrice', t('mc_colMedianPrice')],
                     ['demandScore', t('mc_colDemand')],
                     ['competitionScore', t('mc_colCompetition')],
@@ -401,11 +373,10 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
                         </Box>
                       </TableCell>
                       <TableCell>{(data.totalResults ?? 0).toLocaleString()}</TableCell>
-                      <TableCell>${data.avgPrice.toFixed(2)}</TableCell>
-                      <TableCell>${data.medianPrice.toFixed(2)}</TableCell>
-                      <TableCell><ScoreBadge score={data.demandScore} label={data.demandLabel} /></TableCell>
-                      <TableCell><ScoreBadge score={data.competitionScore} label={data.competitionLabel} /></TableCell>
-                      <TableCell><ScoreBadge score={data.opportunityScore} label={data.opportunityLabel} /></TableCell>
+                      <TableCell>{medianText(data)}</TableCell>
+                      <TableCell><ScoreBadge score={data.demandScore} label={verdict.demand(data.demandScore)} /></TableCell>
+                      <TableCell><ScoreBadge score={data.competitionScore} label={verdict.competition(data.competitionScore)} /></TableCell>
+                      <TableCell><ScoreBadge score={data.opportunityScore} label={verdict.opportunity(data.opportunityScore)} /></TableCell>
                       <TableCell>{data.uniqueSellers}</TableCell>
                       <TableCell>%{data.freeShippingPct.toFixed(0)}</TableCell>
                     </TableRow>
@@ -442,7 +413,7 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
                 </Box>
 
                 <Box sx={{ px: 2, pb: 1.5, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                  <Chip size="small" label={`$${data.avgPrice.toFixed(2)}`} variant="outlined" />
+                  <Chip size="small" label={medianText(data, true)} variant="outlined" />
                   <Chip size="small" label={`${t('mc_demandLabel')}: ${data.demandScore}`} sx={{ color: scoreColor(data.demandScore), borderColor: scoreColor(data.demandScore) }} variant="outlined" />
                   <Chip size="small" label={`${t('mc_competitionLabel')}: ${data.competitionScore}`} sx={{ color: scoreColor(data.competitionScore), borderColor: scoreColor(data.competitionScore) }} variant="outlined" />
                 </Box>
@@ -450,14 +421,13 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
                 <Collapse in={expanded}>
                   <Box sx={{ px: 2, pb: 2, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
                     <MetricRow label={t('mc_totalProducts')} value={(data.totalResults ?? 0).toLocaleString()} />
-                    <MetricRow label={t('mc_avgPriceLabel')} value={`$${data.avgPrice.toFixed(2)}`} />
-                    <MetricRow label={t('mc_medianPriceLabel')} value={`$${data.medianPrice.toFixed(2)}`} />
-                    <MetricRow label={t('mc_demandLabel')} value={`${data.demandScore} (${data.demandLabel})`} />
-                    <MetricRow label={t('mc_competitionLabel')} value={`${data.competitionScore} (${data.competitionLabel})`} />
-                    <MetricRow label={t('mc_opportunityLabel')} value={`${data.opportunityScore} (${data.opportunityLabel})`} />
+                    <MetricRow label={t('mc_medianPriceLabel')} value={medianText(data)} />
+                    <MetricRow label={t('mc_demandLabel')} value={`${data.demandScore} (${verdict.demand(data.demandScore)})`} />
+                    <MetricRow label={t('mc_competitionLabel')} value={`${data.competitionScore} (${verdict.competition(data.competitionScore)})`} />
+                    <MetricRow label={t('mc_opportunityLabel')} value={`${data.opportunityScore} (${verdict.opportunity(data.opportunityScore)})`} />
                     <MetricRow label={t('mc_sellerCount')} value={String(data.uniqueSellers)} />
                     <MetricRow label={t('mc_freeShippingLabel')} value={`%${data.freeShippingPct.toFixed(0)}`} />
-                    <MetricRow label={t('mc_sellThroughRate')} value={`%${(data.sellThroughRate * 100).toFixed(1)}`} />
+                    <MetricRow label={t('mc_sellThroughRate')} value={`%${(data.sellThroughRate ?? 0).toFixed(1)}`} />
                   </Box>
                 </Collapse>
               </Paper>

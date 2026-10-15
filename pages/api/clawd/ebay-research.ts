@@ -5,6 +5,26 @@ import { getAuthUser } from '../../../lib/auth';
 import { hasValidInternalApiKeyHeader } from '../../../lib/security/internalApiKey';
 import { getEbayTokenFor } from '../../../lib/integrations/ebayClient';
 import { callEbayRateLimited } from '../../../lib/integrations/ebayRateLimiter';
+import { summarizePrices, buildFxTable, decodeEntities, type PriceSummary } from '../../../lib/research/stats';
+import { convertCurrency } from '../../../lib/finance/fx';
+
+/**
+ * R0 honesty patch: robust price summary for eBay search results in the
+ * results' majority currency (the marketplace currency). Other currencies are
+ * FX-converted or excluded; plausibility bounds are scaled from USD via FX.
+ */
+async function ebayPriceSummary(items: Array<Record<string, unknown>>): Promise<PriceSummary> {
+  const points = items.map((item) => {
+    const price = item.price as { value?: string; currency?: string } | undefined;
+    return { amount: parseFloat(price?.value || '0'), currency: price?.currency || 'USD' };
+  });
+  const counts: Record<string, number> = {};
+  for (const p of points) counts[p.currency] = (counts[p.currency] || 0) + 1;
+  const currency = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'USD';
+  const fx = await buildFxTable(points.map((p) => p.currency), currency, convertCurrency).catch(() => ({}));
+  const usdToTarget = currency === 'USD' ? 1 : await convertCurrency(1, 'USD', currency).catch(() => null);
+  return summarizePrices(points, { currency, fx, usdToTarget });
+}
 
 export const config = { runtime: 'nodejs' };
 
@@ -259,22 +279,8 @@ export default async function handler(
           const items = searchResult.itemSummaries || [];
           const totalCount = searchResult.total || 0;
 
-          // Extract prices for stats
-          const prices: number[] = items
-            .map((item: Record<string, unknown>) => {
-              const price = item.price as { value?: string } | undefined;
-              return parseFloat(price?.value || '0');
-            })
-            .filter((p: number) => p > 0);
-
-          const priceStats = {
-            avg: prices.length > 0
-              ? prices.reduce((a: number, b: number) => a + b, 0) / prices.length
-              : 0,
-            median: median(prices),
-            min: prices.length > 0 ? Math.min(...prices) : 0,
-            max: prices.length > 0 ? Math.max(...prices) : 0,
-          };
+          // R0: robust price stats (median, P25–P75, trimmed min/max, n). No mean.
+          const priceStats = { ...(await ebayPriceSummary(items)), totalResults: totalCount };
 
           // Keyword analysis: top words from titles
           const wordCounts: Record<string, number> = {};
@@ -364,23 +370,17 @@ export default async function handler(
           const items = searchResult.itemSummaries || [];
           const totalResults = searchResult.total || 0;
 
-          // Price analysis
+          // Price analysis (R0: robust summary; no arithmetic mean)
+          const priceSummary = await ebayPriceSummary(items);
+          const medianPrice = priceSummary.median ?? 0;
+          const priceSpread = { min: priceSummary.min ?? 0, max: priceSummary.max ?? 0 };
+          // Distribution over the trimmed range, in the summary currency only.
           const prices: number[] = items
             .map((item: Record<string, unknown>) => {
-              const price = item.price as { value?: string } | undefined;
-              return parseFloat(price?.value || '0');
+              const price = item.price as { value?: string; currency?: string } | undefined;
+              return (price?.currency || 'USD') === priceSummary.currency ? parseFloat(price?.value || '0') : 0;
             })
-            .filter((p: number) => p > 0);
-
-          const avgPrice =
-            prices.length > 0
-              ? prices.reduce((a: number, b: number) => a + b, 0) / prices.length
-              : 0;
-          const medianPrice = median(prices);
-          const priceSpread =
-            prices.length > 0
-              ? { min: Math.min(...prices), max: Math.max(...prices) }
-              : { min: 0, max: 0 };
+            .filter((p: number) => p > 0 && p >= priceSpread.min && p <= priceSpread.max);
 
           // Price distribution buckets
           const priceBuckets: { range: string; count: number; min: number; max: number }[] = [];
@@ -391,7 +391,7 @@ export default async function handler(
               const bucketMax = bucketMin + bucketSize;
               const count = prices.filter(p => p >= bucketMin && (i === 9 ? p <= bucketMax : p < bucketMax)).length;
               priceBuckets.push({
-                range: `$${Math.round(bucketMin)}-${Math.round(bucketMax)}`,
+                range: `${Math.round(bucketMin)}-${Math.round(bucketMax)} ${priceSummary.currency}`,
                 count,
                 min: bucketMin,
                 max: bucketMax,
@@ -523,17 +523,8 @@ export default async function handler(
             demandScore * 0.6 + (100 - competitionScore) * 0.4
           )));
 
-          // Score explanations
-          const demandLabel = demandScore >= 70 ? 'Yüksek talep — bu niş aktif olarak satılıyor'
-            : demandScore >= 40 ? 'Orta talep — satış potansiyeli var ama rekabetle dikkatli olun'
-            : 'Düşük talep — bu niş çok az satış yapıyor, girmeden önce iyi düşünün';
-          const competitionLabel = competitionScore >= 70 ? 'Yüksek rekabet — birçok güçlü satıcı mevcut, giriş zor'
-            : competitionScore >= 40 ? 'Orta rekabet — alan var ama fark yaratmanız gerekir'
-            : 'Düşük rekabet — az satıcı, giriş fırsatı yüksek';
-          const opportunityLabel = opportunityScore >= 70 ? 'Mükemmel fırsat! Yüksek talep, düşük rekabet'
-            : opportunityScore >= 50 ? 'İyi fırsat — potansiyel var, stratejik giriş gerekir'
-            : opportunityScore >= 30 ? 'Riskli — talep/rekabet dengesi olumsuz'
-            : 'Düşük fırsat — bu nişe girmek önerilmez';
+          // Score explanations are localized client-side from the score
+          // (research.ebayNiche.*); the API returns no hardcoded Turkish text.
 
           logger.info('Niche analysis completed', {
             userId,
@@ -551,8 +542,10 @@ export default async function handler(
             categoryId,
             marketplace: marketplaceId,
             totalResults,
-            avgPrice: Math.round(avgPrice * 100) / 100,
             medianPrice: Math.round(medianPrice * 100) / 100,
+            // Legacy field read by ListingEditorDrawer/ListingCreatorDialog/ebay-listings; carries the median, never a mean.
+            avgPrice: priceSummary.median != null ? Math.round(priceSummary.median * 100) / 100 : null,
+            priceStats: priceSummary,
             priceSpread,
             priceDistribution: priceBuckets,
             uniqueSellers,
@@ -563,11 +556,8 @@ export default async function handler(
             aspectDistributions: aspectCounts,
             topProducts,
             demandScore,
-            demandLabel,
             competitionScore,
-            competitionLabel,
             opportunityScore,
-            opportunityLabel,
             sellThroughRate: Math.round(sellThroughRate * 1000) / 10,
             avgSoldPerItem: Math.round(avgSold * 10) / 10,
             listingsPerSeller: Math.round(listingsPerSeller * 10) / 10,

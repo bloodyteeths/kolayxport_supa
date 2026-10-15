@@ -104,7 +104,8 @@ const PublicFooter = () => {
             &copy; {new Date().getFullYear()} {brandName}. {t('allRightsReserved')}
           </p>
           <p className="mt-2 text-xs text-slate-500">
-            The term &ldquo;Etsy&rdquo; is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed or certified by Etsy.
+            {t.has('trademarkNotice') ? `${t('trademarkNotice')} ` : ''}
+            The term &ldquo;Etsy&rdquo; is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed or certified by Etsy, Inc.
           </p>
         </div>
       </div>

@@ -5777,7 +5777,11 @@
       "points": "points",
       "clickAnalyze": "Click \"Optimize\" to analyze your listing with AI",
       "analyzingBtn": "Analyzing...",
-      "analyzeBtn": "Analyze"
+      "analyzeBtn": "Analyze",
+      "benchmarkTableTitle": "Your listing vs competitors",
+      "colMetric": "Metric",
+      "colCompetitors": "Competitors",
+      "colStatus": "Status"
     },
     "arbitrage": {
       "selectAtLeastOne": "Please select at least one category",
@@ -6515,7 +6519,8 @@
     "automation": "Automation",
     "blog": "Blog",
     "termsOfService": "Terms of Service",
-    "termsOfServiceEN": "Terms of Service"
+    "termsOfServiceEN": "Terms of Service",
+    "trademarkNotice": "Etsy, eBay, Amazon, Shopify, Wix, Trendyol, Hepsiburada, FedEx, UPS, DHL and other marks are trademarks of their respective owners. KolayXport is independent and not endorsed by them."
   },
   "howToUse": {
     "title": "How to Use KolayXport?",
@@ -6913,7 +6918,14 @@
     "exportCsv": "Export CSV",
     "alphabetSoup": "Alphabet Soup",
     "searchVolume": "Search Volume",
-    "trending": "Trending"
+    "trending": "Trending",
+    "generateNicheReport": "Generate niche report",
+    "nicheReport": "Niche report",
+    "entryStrategy": "Entry strategy",
+    "investment": "Investment",
+    "timeToProfit": "Time to profit",
+    "topKeywords": "Top keywords",
+    "products": "Products"
   },
   "amazonSettings": {
     "title": "Amazon Connection",
@@ -10055,6 +10067,108 @@
       "already_restored": "This was already restored.",
       "invalid_quantity": "Enter a valid number.",
       "invalid_value": "Enter a valid value."
+    }
+  },
+  "research": {
+    "stats": {
+      "yourMedianListPrice": "Your median list price: {price}",
+      "medianPrice": "Median price",
+      "medianShort": "Median",
+      "typicalRange": "Typical range (P25–P75)",
+      "sampleN": "{n} listings sampled",
+      "nShort": "n = {n}",
+      "excluded": "{count} excluded (outliers, no FX rate or implausible)",
+      "notEnoughData": "Not enough data",
+      "smallSample": "Small sample: {n} listings, range only",
+      "implausible": "Check: unusual price range",
+      "medianFavorites": "Median favorites",
+      "medianIs": "median price {price}",
+      "basePrice": "Base price",
+      "topTitleWords": "Most used title words",
+      "priceAboveMedian": "Your price is more than 15% above the competitor median ({median}). "
+    },
+    "ebay": {
+      "listingsStillLoading": "Still loading your eBay listings…",
+      "listingsTimeout": "Couldn't load your eBay listings: eBay took too long to answer."
+    },
+    "ebayNiche": {
+      "demandHigh": "High demand: this niche is actively selling",
+      "demandMedium": "Medium demand: there is sales potential, but watch the competition",
+      "demandLow": "Low demand: this niche sells very little; think carefully before entering",
+      "competitionHigh": "High competition: many strong sellers, hard to enter",
+      "competitionMedium": "Medium competition: there is room, but you need to stand out",
+      "competitionLow": "Low competition: few sellers, good chance to enter",
+      "opportunityExcellent": "Excellent opportunity: high demand, low competition",
+      "opportunityGood": "Good opportunity: potential is there, enter strategically",
+      "opportunityRisky": "Risky: the demand/competition balance is unfavorable",
+      "opportunityPoor": "Low opportunity: entering this niche is not recommended"
+    },
+    "ebayOptimizer": {
+      "title": "Listing optimizer",
+      "analyze": "Analyze",
+      "tip1": "Paste an eBay URL to analyze any listing",
+      "tip2": "Title length, description quality, photo count and item specifics are scored",
+      "tip3": "Use \"Improve with AI\" on any issue to fix it automatically",
+      "tip4": "If your own listings are loaded, scan them all in one click"
+    },
+    "seoTips": {
+      "missingKeywords": "Try adding these missing keywords: {keywords}",
+      "missingTags": "Add these tags competitors use: {tags}",
+      "shortTitle": "Your title is short ({length} characters). Etsy titles work best at 100+ characters.",
+      "moreTags": "Add {count} more tags. Etsy allows 13.",
+      "titleShorterThanCompetitors": "Your title is shorter than competitors' ({mine} vs a typical {typical} characters). Try a longer title.",
+      "fewTopKeywords": "You use only {count} of competitors' most popular keywords. Try adding the missing ones.",
+      "topKeywords": "Most popular keywords: {keywords}"
+    },
+    "tips": {
+      "m1": {
+        "a": "New-year gifting is still going: personalized items sell well.",
+        "b": "Last chance for winter decor: stock up before February."
+      },
+      "m2": {
+        "a": "Valentine's Day is close: personalized jewelry is a classic.",
+        "b": "Handmade cards and gift boxes usually pick up now."
+      },
+      "m3": {
+        "a": "Spring decor season: floral and pastel items.",
+        "b": "Easter gifts: check your stock and shipping times."
+      },
+      "m4": {
+        "a": "Mother's Day is coming: personalized gifts.",
+        "b": "Spring wedding season: look at wedding gift niches."
+      },
+      "m5": {
+        "a": "Wedding season: bridal party gifts.",
+        "b": "Summer and outdoor items start to matter."
+      },
+      "m6": {
+        "a": "Father's Day is coming: men's accessories and personalized gifts.",
+        "b": "Holiday season: beach and travel items."
+      },
+      "m7": {
+        "a": "Summer weddings: bridesmaid gifts.",
+        "b": "Back to school is next: plan teacher gifts."
+      },
+      "m8": {
+        "a": "School season: teacher gifts and dorm decor.",
+        "b": "Time to prepare autumn stock."
+      },
+      "m9": {
+        "a": "Autumn decor: wreaths and candles.",
+        "b": "Halloween costume and decor sales begin."
+      },
+      "m10": {
+        "a": "Halloween: last-minute items can still sell.",
+        "b": "Start preparing Christmas listings now; shipping from Türkiye takes time."
+      },
+      "m11": {
+        "a": "Holiday shopping season has started.",
+        "b": "Set up your Black Friday / Cyber Monday sales."
+      },
+      "m12": {
+        "a": "Last-minute Christmas gifts: digital products and fast shipping stand out.",
+        "b": "Get ready for new-year listings."
+      }
     }
   }
 }

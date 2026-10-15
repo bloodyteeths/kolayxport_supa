@@ -23,16 +23,16 @@ import {
   useComputedPrices,
   useComputedKeywords,
   useComputedTags,
-  useComputedDemandScore,
 } from '@/lib/stores/useEtsyResearchStore';
-import { fmt, pct } from './shared/utils';
 import {
   ScoreRing, StatCard, GradientBar, SourceBadge, Sparkline,
   TrendChart, PremiumEmptyState, GRADIENTS, glassCard,
   KeywordCard, DemandCompetitionGauge, StickyScoreBar, useTableSort,
 } from './shared/ui';
 import ComparisonPanel from './ComparisonPanel';
-import { prefillHref, writeListingPrefill, dominantCurrency } from './shared/listingPrefill';
+import { prefillHref, writeListingPrefill, prefillPriceStats, prefillPrice } from './shared/listingPrefill';
+import { RobustPriceCard, useRobustPriceLabel } from './shared/RobustPrice';
+import { formatMoney, groupMedian } from '@/lib/research/stats';
 import { normalizeTags } from '@/lib/etsy/seoRules';
 
 interface UnifiedResearchProps {
@@ -46,6 +46,8 @@ export default function UnifiedResearch({ userListings, onNavigateToShopIntel }:
   const tKw = useTranslations('etsy.keywordIntel');
   const tTrend = useTranslations('etsy.trendAnalyzer');
   const tDash = useTranslations('etsy.researchDashboard');
+  const tR = useTranslations('research');
+  const priceLabel = useRobustPriceLabel();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -73,8 +75,6 @@ export default function UnifiedResearch({ userListings, onNavigateToShopIntel }:
   const seasonalData = useEtsyResearchStore(s => s.seasonalData);
   const kwSuggestions = useEtsyResearchStore(s => s.kwSuggestions);
   const kwExplorerLoading = useEtsyResearchStore(s => s.kwExplorerLoading);
-  const discoveryData = useEtsyResearchStore(s => s.discoveryData);
-  const discoveryLoading = useEtsyResearchStore(s => s.discoveryLoading);
   const savedSearches = useEtsyResearchStore(s => s.savedSearches);
   const setQuery = useEtsyResearchStore(s => s.setQuery);
   const searchMarket = useEtsyResearchStore(s => s.searchMarket);
@@ -87,7 +87,6 @@ export default function UnifiedResearch({ userListings, onNavigateToShopIntel }:
 
   // Computed hooks
   const { priceStats, histogram, maxBucketCount, priceRangeBreakdown, sweetSpot } = useComputedPrices();
-  const demandScore = useComputedDemandScore();
   const { enrichedKeywords, bigrams, trigrams } = useComputedKeywords();
   const { enrichedTags, tagGaps, myTagsSet, tagCombos } = useComputedTags(userListings);
 
@@ -98,9 +97,8 @@ export default function UnifiedResearch({ userListings, onNavigateToShopIntel }:
 
   const hasData = items.length > 0;
 
-  // Quick stats
-  const avgFav = hasData ? Math.round(items.reduce((s, i) => s + i.num_favorers, 0) / items.length) : 0;
-  const avgPrice = hasData ? Math.round(items.reduce((s, i) => s + i.price, 0) / items.length * 100) / 100 : 0;
+  // Quick stats (R0: medians, never means)
+  const medianFav = hasData ? Math.round(groupMedian(items.map(i => i.num_favorers)) ?? 0) : 0;
   const uniqueShops = hasData ? new Set(items.map(i => i.shop_id)).size : 0;
 
   const sortedItems = useMemo(() => {
@@ -124,7 +122,8 @@ export default function UnifiedResearch({ userListings, onNavigateToShopIntel }:
   const handleCreateFromResearch = () => {
     const s = useEtsyResearchStore.getState();
     const searched = (s.query || query || '').trim();
-    const currency = dominantCurrency(items);
+    // Server price stats are FX-normalized to USD.
+    const currency = priceStats ? priceStats.currency : undefined;
     const topTags = enrichedTags.slice(0, 40).map(tg => tg.tag);
     const ok = writeListingPrefill({
       target: 'etsy',
@@ -133,7 +132,7 @@ export default function UnifiedResearch({ userListings, onNavigateToShopIntel }:
       title: searched,
       tags: normalizeTags(topTags).tags,
       keywords: enrichedKeywords.slice(0, 15).map(k => k.keyword),
-      price: currency && priceStats ? priceStats.median : undefined,
+      price: currency ? prefillPrice(priceStats) : undefined,
       currency,
       research: {
         query: searched,
@@ -141,7 +140,7 @@ export default function UnifiedResearch({ userListings, onNavigateToShopIntel }:
         topKeywords: s.serverKeywords.length > 0
           ? s.serverKeywords.slice(0, 15)
           : enrichedKeywords.slice(0, 15).map(k => ({ keyword: k.keyword, count: k.count, pct: k.pct })),
-        priceStats: priceStats && currency ? { min: priceStats.min, avg: priceStats.avg, median: priceStats.median, max: priceStats.max } : null,
+        priceStats: currency ? prefillPriceStats(priceStats) : null,
       },
     });
     if (!ok) { toast.error(t('ur_prefillFailed')); return; }
@@ -170,90 +169,24 @@ export default function UnifiedResearch({ userListings, onNavigateToShopIntel }:
           </Paper>
         )}
 
-        {/* Discovery: Trending Niches */}
-        {discoveryLoading && (
-          <Box sx={{ mb: 3 }}>
-            <Skeleton variant="text" width={200} height={32} sx={{ mb: 1.5 }} />
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: 'repeat(3, 1fr)' }, gap: 2 }}>
-              {[1, 2, 3].map(i => <Skeleton key={i} variant="rounded" height={220} sx={{ borderRadius: '16px' }} />)}
-            </Box>
+        {/* R0: "Trending Niches" and "Hot keywords" removed (hardcoded queries, not
+            measured trends). Seasonal tips come from i18n, not the API. */}
+        <Paper sx={{ ...glassCard, p: 2.5, mb: 3 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Lightbulb size={16} color="#ff9800" /> {tDash('seasonalTips')}
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {(['a', 'b'] as const).map((k) => (
+              <Typography key={k} variant="body2" sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                <Box component="span" sx={{ color: '#ff9800', fontWeight: 700, mt: '2px' }}>•</Box>
+                {tR(`tips.m${new Date().getMonth() + 1}.${k}`)}
+              </Typography>
+            ))}
           </Box>
-        )}
-
-        {discoveryData?.trendingNiches?.length > 0 && (
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Flame size={18} color="#f44336" /> {tDash('trendingNiches')}
-            </Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: 'repeat(3, 1fr)' }, gap: 2 }}>
-              {discoveryData.trendingNiches.map((niche: any) => (
-                <Card key={niche.query} sx={{
-                  ...glassCard, cursor: 'pointer', overflow: 'hidden',
-                  '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 12px 32px rgba(0,0,0,0.12)' },
-                  transition: 'all 0.2s',
-                }} onClick={() => { setQuery(niche.query); setTimeout(() => parallelSearch(), 50); }}>
-                  {niche.topItems?.[0]?.image_url && (
-                    <CardMedia component="img" height={140} image={niche.topItems[0].image_url}
-                      alt={niche.query} sx={{ objectFit: 'cover' }} />
-                  )}
-                  <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, textTransform: 'capitalize' }}>
-                      {niche.query}
-                    </Typography>
-                    <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-                      <Typography variant="caption" color="text.secondary">
-                        {niche.totalResults?.toLocaleString()} {tDash('results')}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        ${niche.priceStats?.avg?.toFixed(2)} {tDash('avgLabel')}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: '#e91e63', display: 'flex', alignItems: 'center', gap: 0.3 }}>
-                        <Star size={10} /> {niche.avgFavorites} {tDash('favLabel')}
-                      </Typography>
-                    </Box>
-                  </CardContent>
-                </Card>
-              ))}
-            </Box>
-          </Box>
-        )}
-
-        {/* Hot Keywords */}
-        {discoveryData?.hotKeywords?.length > 0 && (
-          <Paper sx={{ ...glassCard, p: 2.5, mb: 3 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <TrendingUp size={16} color="#667eea" /> {tDash('hotKeywords')}
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap' }}>
-              {discoveryData.hotKeywords.map((kw: any) => (
-                <Chip key={kw.keyword} label={`${kw.keyword} (${kw.count})`} size="small" variant="outlined"
-                  onClick={() => { setQuery(kw.keyword); setTimeout(() => parallelSearch(), 50); }}
-                  sx={{ cursor: 'pointer', borderRadius: '10px', fontWeight: 600, fontSize: '0.78rem', '&:hover': { bgcolor: 'rgba(102,126,234,0.08)', borderColor: '#667eea' } }}
-                />
-              ))}
-            </Box>
-          </Paper>
-        )}
-
-        {/* Seasonal Tips */}
-        {discoveryData?.seasonalTips?.length > 0 && (
-          <Paper sx={{ ...glassCard, p: 2.5, mb: 3 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Lightbulb size={16} color="#ff9800" /> {tDash('seasonalTips')}
-            </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {discoveryData.seasonalTips.map((tip: string, i: number) => (
-                <Typography key={i} variant="body2" sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-                  <Box component="span" sx={{ color: '#ff9800', fontWeight: 700, mt: '2px' }}>•</Box>
-                  {tip}
-                </Typography>
-              ))}
-            </Box>
-          </Paper>
-        )}
+        </Paper>
 
         {/* Empty state */}
-        {!discoveryLoading && !discoveryData && savedSearches.length === 0 && (
+        {savedSearches.length === 0 && (
           <PremiumEmptyState
             icon={<Search size={48} />}
             title={tDash('researchCenter')}
@@ -287,10 +220,9 @@ export default function UnifiedResearch({ userListings, onNavigateToShopIntel }:
       {/* ── Section 1: Score Summary Bar (sticky) ── */}
       <StickyScoreBar metrics={[
         { label: t('ur_results'), value: totalResults.toLocaleString(), color: '#9c27b0' },
-        { label: t('ur_avgPrice'), value: `$${avgPrice}`, color: '#11998e' },
-        { label: t('ur_avgFav'), value: String(avgFav), color: '#e91e63' },
+        { label: tR('stats.medianPrice'), value: priceLabel(priceStats, undefined, { showN: false, prefix: false }), color: '#11998e' },
+        { label: tR('stats.medianFavorites'), value: String(medianFav), color: '#e91e63' },
         { label: t('ur_shops'), value: String(uniqueShops), color: '#2196F3' },
-        ...(demandScore ? [{ label: t('ur_opportunity'), value: `${demandScore.score}/100`, color: demandScore.score >= 70 ? '#4caf50' : demandScore.score >= 40 ? '#ff9800' : '#f44336' }] : []),
       ]} />
 
       {/* ── Create listing from this research ── */}
@@ -302,37 +234,13 @@ export default function UnifiedResearch({ userListings, onNavigateToShopIntel }:
         <Button variant="contained" onClick={handleCreateFromResearch}
           disabled={loading || !hasData}
           startIcon={<FilePlus2 size={16} />}
-          sx={{ background: GRADIENTS.primary, borderRadius: '10px', minHeight: 44, textTransform: 'none', fontWeight: 700, ...(isMobile && { width: '100%' }) }}>
+          sx={{ borderRadius: '8px', minHeight: 44, textTransform: 'none', fontWeight: 700, ...(isMobile && { width: '100%' }) }}>
           {t('ur_createListing')}
         </Button>
       </Paper>
 
-      {/* ── Section 2: Demand vs Competition Gauges ── */}
-      {demandScore && (
-        <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <DemandCompetitionGauge
-              demand={demandScore.score}
-              competition={nicheAnalysis?.competition?.saturationIndex || Math.round((1 - demandScore.score / 100) * 70 + 10)}
-              size={isMobile ? 70 : 90}
-            />
-            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', flex: 1, minWidth: 200 }}>
-              {[
-                { label: tNiche('totalResults'), value: demandScore.totalResults.toLocaleString() },
-                { label: tNiche('uniqueShop'), value: String(demandScore.uniqueShops) },
-                { label: tNiche('avgFavorite'), value: String(demandScore.avgFavorites) },
-                { label: tNiche('engagement'), value: `${demandScore.avgEngagement}%` },
-                { label: tNiche('priceSpread'), value: `${demandScore.priceSpread}x` },
-              ].map(m => (
-                <Paper key={m.label} sx={{ ...glassCard, p: 1, flex: 1, minWidth: isMobile ? '45%' : 80, textAlign: 'center' }}>
-                  <Typography variant="caption" sx={{ opacity: 0.7, fontSize: '0.65rem' }}>{m.label}</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 800 }}>{m.value}</Typography>
-                </Paper>
-              ))}
-            </Box>
-          </Box>
-        </Paper>
-      )}
+      {/* R0: the Demand Score ring was removed. It was supply (result count) and
+          favorites mislabelled as demand; Etsy does not share search volume. */}
 
       {/* ── Section 3: Price Analysis ── */}
       {priceStats && (
@@ -341,11 +249,11 @@ export default function UnifiedResearch({ userListings, onNavigateToShopIntel }:
             <DollarSign size={18} color="#11998e" /> {tNiche('priceDistribution')}
           </Typography>
 
-          <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5, 1fr)', gap: 1, mb: 1.5 }}>
-            <StatCard label={tNiche('minimum')} value={fmt(priceStats.min)} color="#11998e" icon={<DollarSign size={16} />} />
-            <StatCard label={tNiche('average')} value={fmt(priceStats.avg)} color="#2196F3" icon={<BarChart2 size={16} />} />
-            <StatCard label={tNiche('median')} value={fmt(priceStats.median)} color="#ff9800" icon={<Target size={16} />} />
-            <StatCard label={tNiche('maximum')} value={fmt(priceStats.max)} color="#f44336" icon={<TrendingUp size={16} />} />
+          <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 1, mb: 1.5 }}>
+            {/* R0: median + P25–P75 + n; min/max are after Tukey trimming. No average. */}
+            <RobustPriceCard summary={priceStats} color="#ff9800" icon={<Target size={16} />} />
+            <StatCard label={tNiche('minimum')} value={formatMoney(priceStats.quality === 'ok' ? priceStats.min : null, priceStats.currency)} color="#11998e" icon={<DollarSign size={16} />} />
+            <StatCard label={tNiche('maximum')} value={formatMoney(priceStats.quality === 'ok' ? priceStats.max : null, priceStats.currency)} color="#f44336" icon={<TrendingUp size={16} />} />
             <StatCard label={tNiche('result')} value={`${priceStats.count}`} color="#9c27b0" icon={<ShoppingBag size={16} />} />
           </Box>
 
@@ -372,17 +280,17 @@ export default function UnifiedResearch({ userListings, onNavigateToShopIntel }:
                     <Box sx={{
                       flex: 1, minWidth: 0,
                       height: `${Math.max((b.count / maxBucketCount) * 100, 3)}%`,
-                      background: GRADIENTS.primary,
+                      bgcolor: 'primary.main',
                       borderRadius: '6px 6px 0 0',
                       transition: 'height 0.3s', cursor: 'pointer',
-                      '&:hover': { transform: 'scaleY(1.05)', opacity: 0.85 },
+                      '&:hover': { opacity: 0.85 },
                     }} />
                   </Tooltip>
                 ))}
               </Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                <Typography variant="caption" color="text.secondary">{fmt(priceStats.min)}</Typography>
-                <Typography variant="caption" color="text.secondary">{fmt(priceStats.max)}</Typography>
+                <Typography variant="caption" color="text.secondary">{formatMoney(priceStats.min, priceStats.currency)}</Typography>
+                <Typography variant="caption" color="text.secondary">{formatMoney(priceStats.max, priceStats.currency)}</Typography>
               </Box>
             </Paper>
           )}
@@ -642,34 +550,17 @@ export default function UnifiedResearch({ userListings, onNavigateToShopIntel }:
               <StatCard label={tNiche('saturation')} value={`${nicheAnalysis.competition.saturationIndex}/100`}
                 color={nicheAnalysis.competition.saturationIndex > 70 ? '#f44336' : nicheAnalysis.competition.saturationIndex > 40 ? '#ff9800' : '#4caf50'}
                 icon={<BarChart2 size={16} />} />
-              <StatCard label={tNiche('top5Concentration')} value={`%${nicheAnalysis.competition.topConcentration}`}
+              <StatCard label={tNiche('top5Concentration')} value={nicheAnalysis.competition.top5Concentration != null ? `%${nicheAnalysis.competition.top5Concentration}` : '—'}
                 color="#9c27b0" icon={<Target size={16} />} />
-              <StatCard label={tNiche('newSellerSuccess')} value={`%${nicheAnalysis.competition.newSellerSuccessRate}`}
+              <StatCard label={tNiche('newSellerSuccess')} value={(nicheAnalysis.competition.newSellerPct ?? nicheAnalysis.competition.newSellerSuccessRate) != null ? `%${nicheAnalysis.competition.newSellerPct ?? nicheAnalysis.competition.newSellerSuccessRate}` : '—'}
                 color="#2196F3" icon={<TrendingUp size={16} />} />
-              <StatCard label={tNiche('entryDifficulty')} value={`${nicheAnalysis.competition.entryDifficulty}/100`}
+              <StatCard label={tNiche('entryDifficulty')} value={nicheAnalysis.competition.entryDifficulty != null ? `${nicheAnalysis.competition.entryDifficulty}/100` : '—'}
                 color={nicheAnalysis.competition.entryDifficulty > 70 ? '#f44336' : '#4caf50'}
                 icon={<AlertTriangle size={16} />} />
             </Box>
           )}
 
-          {nicheAnalysis.velocity && (
-            <Paper sx={{ ...glassCard, p: 2, mb: 1.5 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{tNiche('salesVelocityEstimate')}</Typography>
-              <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-                {[
-                  { label: tNiche('avgMonthlySales'), value: nicheAnalysis.velocity.avgMonthlySales?.toFixed(1) || '0', color: '#11998e' },
-                  { label: tNiche('median'), value: nicheAnalysis.velocity.medianMonthlySales?.toFixed(1) || '0', color: '#2196F3' },
-                  { label: tNiche('highest'), value: nicheAnalysis.velocity.maxMonthlySales?.toFixed(1) || '0', color: '#ff9800' },
-                ].map(m => (
-                  <Paper key={m.label} sx={{ ...glassCard, p: 1.5, flex: 1, minWidth: 90, textAlign: 'center' }}>
-                    <Typography variant="caption" sx={{ opacity: 0.7 }}>{m.label}</Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 800, color: m.color }}>{m.value}</Typography>
-                    <Typography variant="caption" color="text.secondary">{tNiche('salesPerMonth')}</Typography>
-                  </Paper>
-                ))}
-              </Box>
-            </Paper>
-          )}
+          {/* R0: "sales velocity" block removed — it was favorites × 3%, not measured sales. */}
         </Box>
       )}
       {nicheAnalysisLoading && (
@@ -690,7 +581,7 @@ export default function UnifiedResearch({ userListings, onNavigateToShopIntel }:
           <Button variant="contained" size="small" onClick={fetchNicheAiReport}
             disabled={nicheAiReportLoading || !hasData}
             startIcon={nicheAiReportLoading ? <CircularProgress size={14} /> : <Zap size={14} />}
-            sx={{ background: GRADIENTS.primary, borderRadius: '10px' }}
+            sx={{ borderRadius: '8px', textTransform: 'none' }}
           >
             {nicheAiReport ? tNiche('reAnalyze') : tNiche('getAiReport')}
           </Button>
@@ -795,7 +686,7 @@ export default function UnifiedResearch({ userListings, onNavigateToShopIntel }:
                           {item.title}
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 1, mt: 0.5, alignItems: 'center', flexWrap: 'wrap' }}>
-                          <Typography variant="body2" sx={{ fontWeight: 700 }}>{fmt(item.price)}</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>{formatMoney(item.price, item.currency_code || 'USD')}</Typography>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3 }}>
                             <Heart size={12} color="#e91e63" />
                             <Typography variant="caption" sx={{ fontWeight: 600 }}>{item.num_favorers.toLocaleString()}</Typography>
@@ -871,7 +762,7 @@ export default function UnifiedResearch({ userListings, onNavigateToShopIntel }:
                             </Typography>
                           </TableCell>
                           <TableCell align="right">
-                            <Typography variant="body2" sx={{ fontWeight: 700 }}>{fmt(item.price)}</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 700 }}>{formatMoney(item.price, item.currency_code || 'USD')}</Typography>
                           </TableCell>
                           <TableCell align="center">
                             <Typography variant="body2" sx={{ fontWeight: 700, color: item.num_favorers > 100 ? '#11998e' : 'text.secondary' }}>

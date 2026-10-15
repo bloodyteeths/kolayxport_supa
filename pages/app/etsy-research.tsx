@@ -15,11 +15,6 @@ import { useRouter } from 'next/router';
 const UnifiedResearch = lazy(() => import('@/components/etsy/research/UnifiedResearch'));
 const ListingGrader = lazy(() => import('@/components/etsy/research/ListingGrader'));
 const CompetitorIntelligence = lazy(() => import('@/components/etsy/research/CompetitorIntelligence'));
-const AiOptimizePanel = lazy(() => import('@/components/etsy/research/AiOptimizePanel'));
-
-const GRADIENTS = {
-  primary: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-};
 
 const pillTabsSx = {
   mb: 2,
@@ -31,9 +26,8 @@ const pillTabsSx = {
     border: '1px solid #e0e0e0', color: '#666',
     transition: 'all 0.2s',
     '&.Mui-selected': {
-      background: GRADIENTS.primary, color: '#fff',
+      bgcolor: 'primary.main', color: 'primary.contrastText',
       border: '1px solid transparent', fontWeight: 700,
-      boxShadow: '0 2px 12px rgba(102,126,234,0.3)',
     },
   },
 };
@@ -56,7 +50,6 @@ function EtsyResearchPage() {
 
   const activeView = useEtsyResearchStore(s => s.activeView);
   const setActiveView = useEtsyResearchStore(s => s.setActiveView);
-  const { setQuery, parallelSearch, fetchDiscoveryData } = useEtsyResearchStore();
 
   // Map activeView to tab index
   const tabIndex = activeView === 'research' ? 0 : activeView === 'grader' ? 1 : 2;
@@ -84,8 +77,7 @@ function EtsyResearchPage() {
     changeView(newValue === 0 ? 'research' : newValue === 1 ? 'grader' : 'shopIntel');
   };
 
-  // Auto-fetch discovery data on mount
-  useEffect(() => { fetchDiscoveryData(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // R0: the "Trending Niches" discovery fetch was removed (hardcoded queries, not trends).
 
   // Fetch shops
   useEffect(() => {
@@ -177,10 +169,7 @@ function EtsyResearchPage() {
           )}
         </Suspense>
 
-        {/* Floating AI Panel */}
-        <Suspense fallback={null}>
-          <AiOptimizePanel shopId={selectedShopId} userListings={listings} />
-        </Suspense>
+        {/* R0 (research.md §14.1): AiOptimizePanel FAB removed; AI help lives in Cmd+K. */}
       </Box>
     </AppLayout>
   );
@@ -196,12 +185,9 @@ function SearchBar() {
   } = useEtsyResearchStore();
 
   return (
-    <Box sx={{
-      background: GRADIENTS.primary, borderRadius: '16px', p: { xs: 1.5, md: 2 }, mb: 2,
-      position: 'relative', overflow: 'hidden',
-    }}>
-      <Box sx={{ position: 'absolute', top: -30, right: -30, width: 80, height: 80, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.1)' }} />
-      <Box sx={{ p: { xs: 1.5, md: 2 }, borderRadius: '12px', bgcolor: '#fff', position: 'relative', zIndex: 1 }}>
+    <Box sx={{ mb: 2 }}>
+      {/* R0: gradient hero removed; plain bordered search surface. */}
+      <Box sx={{ p: { xs: 1.5, md: 2 }, borderRadius: '12px', bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider' }}>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <TextField
             label={t('whatAreYouSelling')}
@@ -236,8 +222,7 @@ function SearchBar() {
             disabled={loading || !query.trim()}
             startIcon={loading ? <CircularProgress size={16} /> : <Search size={16} />}
             sx={{
-              background: GRADIENTS.primary, borderRadius: '10px', px: 3,
-              boxShadow: '0 4px 12px rgba(102,126,234,0.4)',
+              borderRadius: '10px', px: 3,
               ...(isMobile && { width: '100%' }),
             }}
           >

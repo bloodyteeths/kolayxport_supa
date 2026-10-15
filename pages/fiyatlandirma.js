@@ -382,7 +382,7 @@ export default function FiyatlandirmaPage() {
                     <th
                       key={header}
                       scope="col"
-                      className={`px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap
+                      className={`px-6 py-4 text-xs font-semibold text-slate-500 whitespace-nowrap
                         ${index === 0 ? 'text-left sticky left-0 bg-slate-50 z-10' : 'text-center'}`}
                     >
                       {header}

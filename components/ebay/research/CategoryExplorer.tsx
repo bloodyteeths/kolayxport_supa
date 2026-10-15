@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
+import { priceDisplay, type PriceSummary } from '@/lib/research/stats';
+import { useResearchLocale } from '@/components/etsy/research/shared/RobustPrice';
 import {
   Box, Typography, Paper, Chip, CircularProgress, LinearProgress,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -141,6 +143,8 @@ function CategoryTreeNode({
 export default function CategoryExplorer({ userId, marketplace = 'EBAY_US', onNavigate }: CategoryExplorerProps) {
   const t = useTranslations('ebay.categoryExplorer');
   const tA = useTranslations('ebayResearch');
+  const tR = useTranslations('research');
+  const locale = useResearchLocale();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -165,14 +169,12 @@ export default function CategoryExplorer({ userId, marketplace = 'EBAY_US', onNa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // R0: robust server summary (median, P25–P75, n) instead of a client-side mean.
+  const [priceSummary, setPriceSummary] = useState<PriceSummary | null>(null);
   const stats = useMemo(() => {
     if (bestsellers.length === 0) return null;
-    const prices = bestsellers
-      .map(item => parseFloat(item.price?.value || '0'))
-      .filter(p => p > 0);
-    const avg = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
-    return { count: bestsellers.length, avgPrice: avg };
-  }, [bestsellers]);
+    return { count: bestsellers.length, price: priceDisplay(priceSummary, locale) };
+  }, [bestsellers, priceSummary, locale]);
 
   // Category tree and bestsellers are per marketplace: refetch when the picker changes (not on mount).
   const prevMarketplace = useRef(marketplace);
@@ -207,6 +209,7 @@ export default function CategoryExplorer({ userId, marketplace = 'EBAY_US', onNa
   const selectCategory = async (id: string, name: string) => {
     setSelectedCategory({ id, name });
     setBestsellers([]);
+    setPriceSummary(null);
     setBestsellersLoading(true);
     try {
       const data = await ebayApiCall('category_bestsellers', userId, {
@@ -214,6 +217,7 @@ export default function CategoryExplorer({ userId, marketplace = 'EBAY_US', onNa
         marketplace_id: marketplace,
       });
       setBestsellers(data.items || []);
+      setPriceSummary(data.priceStats && typeof data.priceStats === 'object' && 'quality' in data.priceStats ? data.priceStats : null);
     } catch (err: any) {
       toast.error(err.message || t('bestsellersLoadError'));
     } finally {
@@ -419,8 +423,11 @@ export default function CategoryExplorer({ userId, marketplace = 'EBAY_US', onNa
                 <Box sx={{ display: 'flex', justifyContent: 'center', mb: 0.5, color: '#6366f1' }}>
                   <DollarSign size={18} />
                 </Box>
-                <Typography variant="caption" color="text.secondary">{t('avgPrice')}</Typography>
-                <Typography variant="h6" fontWeight={700} sx={{ color: '#6366f1' }}>${stats.avgPrice.toFixed(2)}</Typography>
+                <Typography variant="caption" color="text.secondary">{tR('stats.medianPrice')}</Typography>
+                <Typography variant="h6" fontWeight={700} sx={{ color: '#6366f1' }}>{stats.price.value}</Typography>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  {stats.price.band ? `${stats.price.band} · ` : ''}{tR('stats.nShort', { n: stats.price.n })}
+                </Typography>
               </Paper>
             </Stack>
           )}

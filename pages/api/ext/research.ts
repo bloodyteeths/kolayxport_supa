@@ -3,6 +3,8 @@ import { getAuthUser } from '@/lib/auth';
 import { etsyFetch, etsyPublicHeaders } from '@/lib/etsy/http';
 import { EtsyPriority } from '@/lib/etsy/rateBudget';
 import { getBatchListingStats, getListingStats, getShopStats, EtsyPublicApiError } from '@/lib/etsy/listingStats';
+import { summarizePrices, buildFxTable } from '@/lib/research/stats';
+import { convertCurrency } from '@/lib/finance/fx';
 
 // Rate limiting per IP for anonymous users
 const anonLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -73,10 +75,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         const searchData = await etsyGet(`/listings/active?keywords=${encodeURIComponent(query.slice(0, 200))}&limit=100&sort_on=score`);
         const items = (searchData.results || []);
-        const prices = items.map((i: any) => (i.price?.amount || 0) / (i.price?.divisor || 100)).filter((p: number) => p > 0);
-        const avgPrice = prices.length > 0 ? prices.reduce((a: number, b: number) => a + b, 0) / prices.length : 0;
-        const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
-        const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+        // R0: robust USD summary (FX-normalized, Tukey-trimmed median + P25–P75).
+        // The extension's legacy `avgPrice` field now carries the median.
+        const points = items.map((i: any) => ({ amount: (i.price?.amount || 0) / (i.price?.divisor || 100), currency: i.price?.currency_code || 'USD' }));
+        const fx = await buildFxTable(points.map((p: any) => p.currency), 'USD', convertCurrency).catch(() => ({}));
+        const priceStats = summarizePrices(points, { currency: 'USD', fx });
+        const avgPrice = priceStats.median ?? 0;
+        const minPrice = priceStats.min ?? 0;
+        const maxPrice = priceStats.max ?? 0;
         const avgFav = items.length > 0 ? items.reduce((s: number, i: any) => s + (i.num_favorers || 0), 0) / items.length : 0;
         const uniqueShops = new Set(items.map((i: any) => i.shop_id)).size;
         const competition = uniqueShops > 50 ? 'high' : uniqueShops > 20 ? 'medium' : 'low';
@@ -88,8 +94,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             avgPrice: Math.round(avgPrice * 100) / 100,
             minPrice: Math.round(minPrice * 100) / 100,
             maxPrice: Math.round(maxPrice * 100) / 100,
-            // Mixed currencies make the price stats approximate — tell the client.
-            currency: currencies.size === 1 ? [...currencies][0] : null,
+            // Prices are FX-normalized to USD (R0), so the currency is USD.
+            currency: priceStats.currency,
+            priceStats,
             avgFavorites: Math.round(avgFav),
             uniqueShops,
             competition,

@@ -6,9 +6,21 @@ import {
 import { Trash2, RefreshCw, TrendingUp, Star, ExternalLink, Package } from 'lucide-react';
 import { useAmazonResearchStore } from '@/lib/stores/useAmazonResearchStore';
 import { useTranslations } from 'next-intl';
+import { formatMoney } from '@/lib/research/stats';
+import { useResearchLocale } from '@/components/etsy/research/shared/RobustPrice';
+
+/** Saved niches store only the marketplace code; map it to the currency prices were summarized in. */
+const AMAZON_MARKETPLACE_CURRENCY: Record<string, string> = {
+  US: 'USD', CA: 'CAD', MX: 'MXN', BR: 'BRL', UK: 'GBP', GB: 'GBP', DE: 'EUR', FR: 'EUR', IT: 'EUR',
+  ES: 'EUR', NL: 'EUR', BE: 'EUR', IE: 'EUR', SE: 'SEK', PL: 'PLN', TR: 'TRY', AE: 'AED', SA: 'SAR',
+  IN: 'INR', JP: 'JPY', AU: 'AUD', SG: 'SGD', EG: 'EGP',
+};
+const amazonCurrency = (marketplace?: string | null) => AMAZON_MARKETPLACE_CURRENCY[(marketplace || 'US').toUpperCase()] || 'USD';
 
 export default function CompetitorIntelligence() {
   const t = useTranslations('amazonResearch');
+  const tR = useTranslations('research');
+  const locale = useResearchLocale();
   const {
     trackedProducts, trackedLoading, fetchTrackedProducts, untrackProduct, refreshTracked,
     savedNiches, fetchSavedNiches, deleteNiche,
@@ -76,7 +88,7 @@ export default function CompetitorIntelligence() {
 
                   <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
                     {product.currentPrice != null && (
-                      <Chip label={`$${product.currentPrice}`} size="small" color="warning" variant="outlined" />
+                      <Chip label={formatMoney(product.currentPrice, product.currency || 'USD', locale)} size="small" color="warning" variant="outlined" />
                     )}
                     {product.currentRank != null && (
                       <Chip
@@ -149,8 +161,9 @@ export default function CompetitorIntelligence() {
                     {niche.competitionScore != null && (
                       <Chip label={`${t('competition')}: ${niche.competitionScore}`} size="small" variant="outlined" />
                     )}
-                    {niche.avgPrice != null && (
-                      <Chip label={`$${niche.avgPrice}`} size="small" variant="outlined" />
+                    {/* R0: median only (legacy saved means are not shown). */}
+                    {niche.medianPrice != null && niche.medianPrice > 0 && (
+                      <Chip label={`${tR('stats.medianShort')} ${formatMoney(niche.medianPrice, amazonCurrency(niche.marketplace), locale)}`} size="small" variant="outlined" />
                     )}
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 0.5 }}>

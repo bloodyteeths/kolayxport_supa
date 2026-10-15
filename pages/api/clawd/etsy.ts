@@ -12,6 +12,20 @@ import { withListingInventoryLock } from '@/lib/etsy/inventoryLock';
 import { isListingStockManaged } from '@/lib/stock/hooks';
 import { reconcileShopListings, syncListingsFailure } from '@/lib/etsy/listingReconcile';
 import { markKolayxportDelete } from '@/lib/etsy/listingAlerts';
+import { summarizePrices, buildFxTable, decodeEntities, groupMedian, type PriceSummary } from '@/lib/research/stats';
+import { convertCurrency } from '@/lib/finance/fx';
+
+/**
+ * Research price summary in USD (RESEARCH_REDESIGN §6.3): FX-normalized,
+ * plausibility-bounded, Tukey-trimmed median + P25–P75. Never a mean.
+ * `avg` is kept only for old readers and carries the median.
+ */
+async function researchPriceSummary(items: Array<{ price: number; currency_code?: string }>): Promise<PriceSummary & { avg: number | null; count: number }> {
+    const points = items.map((i) => ({ amount: i.price, currency: i.currency_code || 'USD' }));
+    const fx = await buildFxTable(points.map((p) => p.currency), 'USD', convertCurrency).catch(() => ({}));
+    const s = summarizePrices(points, { currency: 'USD', fx });
+    return { ...s, avg: s.median, count: s.n };
+}
 
 // Raise body size limit for image uploads (base64 encoding inflates by ~33%,
 // so a 10MB Etsy image arrives as ~14MB JSON body)
@@ -289,11 +303,11 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
             if (results.length < 100) break; // no more pages
         }
 
-        // Process items
+        // Process items (entities decoded on read; never written back)
         const items = allResults.map((l: any) => ({
             listing_id: l.listing_id,
-            title: l.title || '',
-            description: (l.description || '').slice(0, 300),
+            title: decodeEntities(l.title || ''),
+            description: decodeEntities((l.description || '').slice(0, 300)),
             price: l.price ? l.price.amount / l.price.divisor : 0,
             currency_code: l.price?.currency_code || 'USD',
             views: l.views || 0,
@@ -308,20 +322,9 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
             state: l.state || 'active',
         }));
 
-        // Compute price stats
-        const prices = items.map((i: any) => i.price).filter((p: number) => p > 0).sort((a: number, b: number) => a - b);
-        let priceStats: any = null;
-        if (prices.length > 0) {
-            const sum = prices.reduce((a: number, b: number) => a + b, 0);
-            const mid = Math.floor(prices.length / 2);
-            priceStats = {
-                min: prices[0],
-                max: prices[prices.length - 1],
-                avg: Math.round((sum / prices.length) * 100) / 100,
-                median: prices.length % 2 === 0 ? Math.round(((prices[mid - 1] + prices[mid]) / 2) * 100) / 100 : prices[mid],
-                count: prices.length,
-            };
-        }
+        // Price stats: robust, FX-normalized to USD (no arithmetic means)
+        const priceSummary = items.length > 0 ? await researchPriceSummary(items) : null;
+        const priceStats = priceSummary && priceSummary.n > 0 ? priceSummary : null;
 
         // Aggregate tag frequency
         const tagMap: Record<string, number> = {};
@@ -427,7 +430,7 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
             const results = data.results || [];
             allListings.push(...results.map((l: any) => ({
                 listing_id: l.listing_id,
-                title: l.title || '',
+                title: decodeEntities(l.title || ''),
                 price: l.price ? l.price.amount / l.price.divisor : 0,
                 currency_code: l.price?.currency_code || 'USD',
                 views: l.views || 0,
@@ -533,8 +536,9 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
 
         const items = allResults.map((l: any) => ({
             listing_id: l.listing_id,
-            title: l.title || '',
+            title: decodeEntities(l.title || ''),
             price: l.price ? l.price.amount / l.price.divisor : 0,
+            currency_code: l.price?.currency_code || 'USD',
             views: l.views || 0,
             num_favorers: l.num_favorers || 0,
             tags: l.tags || [],
@@ -543,9 +547,9 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
             created_timestamp: l.created_timestamp || 0,
         }));
 
-        const prices = items.map((i: any) => i.price).filter((p: number) => p > 0).sort((a: number, b: number) => a - b);
-        const avgPrice = prices.length > 0 ? prices.reduce((a: number, b: number) => a + b, 0) / prices.length : 0;
-        const medianPrice = prices.length > 0 ? prices[Math.floor(prices.length / 2)] : 0;
+        // Robust USD price summary (R0): FX-normalized, trimmed, median + P25–P75.
+        const priceSummary = await researchPriceSummary(items);
+        const medianPrice = priceSummary.median ?? 0;
 
         // Unique shops
         const uniqueShops = new Set(items.map((i: any) => i.shop_id).filter(Boolean));
@@ -566,24 +570,13 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
         const avgEstSales = velocities.length > 0
             ? velocities.reduce((s, v) => s + v.estMonthlySales, 0) / velocities.length : 0;
 
-        // Price spread
-        const priceSpread = avgPrice > 0 && prices.length > 0 ? (prices[prices.length - 1] - prices[0]) / avgPrice : 0;
+        // Price spread over the trimmed sample, relative to the median (never a mean)
+        const priceSpread = medianPrice > 0 && priceSummary.min != null && priceSummary.max != null
+            ? (priceSummary.max - priceSummary.min) / medianPrice : 0;
 
-        // Real Demand Score (weighted composite 0-100)
-        // 1. Search volume proxy (normalized by category baseline ~5000)
-        const searchVolumeScore = Math.min(25, Math.round((totalCount / 5000) * 25));
-        // 2. Engagement quality (favorites-to-views ratio vs 2% baseline)
-        const engagementScore = Math.min(20, Math.round((avgEngagement / 0.02) * 10));
-        // 3. Sales velocity (est monthly sales vs 1.0 baseline)
-        const velocityScore = Math.min(25, Math.round((avgEstSales / 1.0) * 12.5));
-        // 4. Competition ratio (inverted: fewer shops per result = less competition = better)
-        const competitionRatio = totalCount > 0 ? shopCount / Math.min(totalCount, 200) : 1;
-        const competitionScore = Math.min(15, Math.round((1 - competitionRatio) * 15));
-        // 5. Price room (margin opportunity from median to min)
-        const priceRoom = medianPrice > 0 ? (medianPrice - (prices[0] || 0)) / medianPrice : 0;
-        const priceRoomScore = Math.min(15, Math.round(priceRoom * 30));
-
-        const demandScore = Math.min(100, searchVolumeScore + engagementScore + velocityScore + competitionScore + priceRoomScore);
+        // R0: the 0-100 "Demand Score" composite was removed. It labelled supply
+        // (result count / 5000) as search volume and used an invented 3% favorites
+        // conversion. Etsy does not expose search volume; see RESEARCH_REDESIGN §6.2.
 
         // Saturation index: low ratio = dominated by few shops
         const saturationIndex = totalCount > 0 ? Math.round((shopCount / Math.min(totalCount, 200)) * 100) : 0;
@@ -604,22 +597,8 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
             query: keywords,
             totalResults: totalCount,
             itemCount: items.length,
-            demandScore: {
-                score: demandScore,
-                breakdown: {
-                    searchVolume: searchVolumeScore,
-                    engagement: engagementScore,
-                    velocity: velocityScore,
-                    competition: competitionScore,
-                    priceRoom: priceRoomScore,
-                },
-                level: demandScore >= 70 ? 'high' : demandScore >= 40 ? 'medium' : 'low',
-            },
             priceStats: {
-                min: prices[0] || 0,
-                max: prices[prices.length - 1] || 0,
-                avg: Math.round(avgPrice * 100) / 100,
-                median: Math.round(medianPrice * 100) / 100,
+                ...priceSummary,
                 spread: Math.round(priceSpread * 100) / 100,
             },
             competition: {
@@ -667,7 +646,7 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
 
             return {
                 listing_id: l.listing_id,
-                title: (l.title || '').slice(0, 80),
+                title: decodeEntities(l.title || '').slice(0, 80),
                 price: Math.round(price * 100) / 100,
                 favorites: l.num_favorers || 0,
                 views: l.views || 0,
@@ -740,7 +719,7 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
                 listingCount: data.count,
                 totalFavs: data.totalFavs,
                 totalViews: data.totalViews,
-                avgPrice: data.prices.length > 0 ? Math.round((data.prices.reduce((a, b) => a + b, 0) / data.prices.length) * 100) / 100 : 0,
+                medianPrice: groupMedian(data.prices) ?? 0,
             }))
             .sort((a, b) => b.totalFavs - a.totalFavs);
 
@@ -869,8 +848,8 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
 
         return res.status(200).json({
             listing_id: data.listing_id,
-            title: data.title || '',
-            description: (data.description || '').slice(0, 500),
+            title: decodeEntities(data.title || ''),
+            description: decodeEntities((data.description || '').slice(0, 500)),
             price: Math.round(price * 100) / 100,
             tags: data.tags || [],
             views: data.views || 0,
@@ -899,101 +878,17 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
         });
     }
 
-    // --- get_discovery_data: Pre-loaded trending data for empty states ---
+    // --- get_discovery_data (R0: retired) ---
+    // The old "Trending Niches" ran a hardcoded list of 3 queries per month and
+    // labelled them trending, averaged mixed-currency prices, and returned
+    // hardcoded Turkish tips. Nothing was measured, so it now returns no niches.
+    // Seasonal tips are client-side i18n (research.tips.*). Kept as an action
+    // so older clients get an empty, honest payload instead of a 400.
     if (action === 'get_discovery_data' && req.method === 'GET') {
-        // Seasonal query rotation
-        const SEASONAL_QUERIES: Record<number, string[]> = {
-            1: ['new year gifts', 'winter home decor', 'cozy blanket'],
-            2: ['valentines day gift', 'personalized jewelry', 'couple gifts'],
-            3: ['spring decor', 'easter gifts', 'garden planter'],
-            4: ['mothers day gift', 'spring jewelry', 'personalized necklace'],
-            5: ['summer decor', 'beach accessories', 'outdoor furniture'],
-            6: ['fathers day gift', 'mens accessories', 'grilling gifts'],
-            7: ['summer wedding', 'bridesmaid gifts', 'beach towel'],
-            8: ['back to school', 'teacher gifts', 'dorm decor'],
-            9: ['fall decor', 'halloween costume', 'autumn wreath'],
-            10: ['halloween decor', 'fall wedding', 'harvest centerpiece'],
-            11: ['thanksgiving decor', 'black friday deals', 'christmas ornament'],
-            12: ['christmas gift', 'holiday ornaments', 'winter wedding'],
-        };
-
-        const SEASONAL_TIPS: Record<number, string[]> = {
-            1: ['Yeni yıl hediye trendi hâlâ devam ediyor — kişiselleştirilmiş ürünler popüler', 'Kış dekorasyonu için son fırsat — Şubat\'a kadar stok yapın'],
-            2: ['Sevgililer Günü yaklaşıyor — kişiselleştirilmiş takılar en çok satanlar', 'El yapımı kartlar ve hediye kutuları talebinde artış bekleniyor'],
-            3: ['Bahar dekoru sezonu başladı — çiçekli ve pastel ürünler yükselişte', 'Paskalya hediyeleri için son 2 hafta — stokları kontrol edin'],
-            4: ['Anneler Günü yaklaşıyor — kişiselleştirilmiş ürünlerde talep artışı', 'Bahar düğün sezonu başladı — düğün hediyeleri nişini kontrol edin'],
-            5: ['Yaz düğün sezonu dorukta — gelin/damat hediyeleri popüler', 'Yaz dekorasyonu ve açık hava ürünleri talebi artıyor'],
-            6: ['Babalar Günü yaklaşıyor — erkek aksesuarları ve kişisel hediyeler trend', 'Yaz tatili sezonu — plaj ve seyahat ürünlerinde artış'],
-            7: ['Yaz düğünleri için son hazırlıklar — nedime hediyeleri popüler', 'Okul alışverişi sezonu yaklaşıyor — öğretmen hediyeleri planlayın'],
-            8: ['Okul sezonu başladı — öğretmen hediyeleri ve yurt dekoru trend', 'Sonbahar ürünleri için stok hazırlığı zamanı'],
-            9: ['Sonbahar dekoru en popüler dönemde — çelenkler ve mumlar yükselişte', 'Halloween kostüm ve dekor satışları başladı'],
-            10: ['Halloween en yoğun döneminde — son dakika ürünleri hâlâ satılır', 'Noel ürünleri için hazırlıklara HEMEN başlayın'],
-            11: ['Noel alışveriş sezonu BAŞLADI — en yoğun satış dönemi', 'Black Friday/Cyber Monday kampanyalarınızı aktif edin'],
-            12: ['Son dakika Noel hediyeleri — dijital ürünler ve hızlı kargo öne çıkıyor', 'Yeni yıl ürünleri için şimdiden hazırlanın'],
-        };
-
-        const month = new Date().getMonth() + 1;
-        const queries = SEASONAL_QUERIES[month] || SEASONAL_QUERIES[4];
-        const tips = SEASONAL_TIPS[month] || [];
-
-        // Fetch 3 niches in parallel (48 results each)
-        const nichePromises = queries.map(async (query) => {
-            try {
-                const params = new URLSearchParams({
-                    keywords: query, limit: '48', offset: '0',
-                    sort_on: 'score', sort_order: 'desc',
-                });
-                const data = await callEtsyPublicAPI(`/listings/active?${params}`);
-                const results = (data.results || []);
-                const items = results.map((l: any) => ({
-                    listing_id: l.listing_id,
-                    title: (l.title || '').slice(0, 80),
-                    price: l.price ? l.price.amount / l.price.divisor : 0,
-                    image_url: l.images?.[0]?.url_170x135 || '',
-                    num_favorers: l.num_favorers || 0,
-                    views: l.views || 0,
-                }));
-                const prices = items.map((i: any) => i.price).filter((p: number) => p > 0).sort((a: number, b: number) => a - b);
-                const avg = prices.length ? prices.reduce((a: number, b: number) => a + b, 0) / prices.length : 0;
-                const mid = Math.floor(prices.length / 2);
-                return {
-                    query,
-                    totalResults: data.count || 0,
-                    topItems: items.slice(0, 6),
-                    priceStats: {
-                        min: prices[0] || 0,
-                        max: prices[prices.length - 1] || 0,
-                        avg: Math.round(avg * 100) / 100,
-                        median: prices.length ? prices[mid] : 0,
-                    },
-                    avgFavorites: items.length ? Math.round(items.reduce((s: number, i: any) => s + i.num_favorers, 0) / items.length) : 0,
-                };
-            } catch (err) {
-                return { query, totalResults: 0, topItems: [], priceStats: { min: 0, avg: 0, median: 0, max: 0 }, avgFavorites: 0 };
-            }
-        });
-
-        const trendingNiches = await Promise.all(nichePromises);
-
-        // Extract hot keywords from all results
-        const kwMap: Record<string, number> = {};
-        for (const niche of trendingNiches) {
-            for (const item of niche.topItems) {
-                const words = item.title.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter((w: string) => w.length > 2);
-                words.forEach((w: string) => { kwMap[w] = (kwMap[w] || 0) + 1; });
-            }
-        }
-        const stopWords = new Set(['the', 'for', 'and', 'with', 'gift', 'her', 'him', 'set', 'new', 'day', 'best', 'custom', 'from']);
-        const hotKeywords = Object.entries(kwMap)
-            .filter(([kw]) => !stopWords.has(kw))
-            .sort(([, a], [, b]) => b - a)
-            .slice(0, 20)
-            .map(([keyword, count]) => ({ keyword, count }));
-
         return res.status(200).json({
-            trendingNiches,
-            hotKeywords,
-            seasonalTips: tips,
+            trendingNiches: [],
+            hotKeywords: [],
+            seasonalTips: [],
             lastUpdated: new Date().toISOString(),
         });
     }
@@ -3561,7 +3456,9 @@ export default async function handler(
 
             const avgViews = Math.round(top10.reduce((s: number, c: any) => s + c.views, 0) / (top10.length || 1));
             const avgFavorites = Math.round(top10.reduce((s: number, c: any) => s + c.favorites, 0) / (top10.length || 1));
-            const avgPrice = +(top10.reduce((s: number, c: any) => s + c.price, 0) / (top10.length || 1)).toFixed(2);
+            // R0: median, never a mean (one placeholder listing skewed the old average).
+            const medianPrice = groupMedian(top10.map((c: any) => Number(c.price))) ?? 0;
+            const avgPrice = medianPrice; // legacy field name read by ListingEditorDrawer; carries the median
 
             // 5. Build user listing summary
             const userPrice = userListing.price ? (userListing.price.amount / (userListing.price.divisor || 100)) : 0;
@@ -3598,7 +3495,7 @@ ${top10.map((c: any, i: number) => `#${i + 1}: "${c.title}" | $${c.price} | ${c.
 
 MARKET DATA:
 - Avg views (top 10): ${avgViews} | Avg favorites (top 10): ${avgFavorites}
-- Avg price (top 10): $${avgPrice}
+- Median price (top 10): $${medianPrice}
 - Total results: ${searchData.count || 0}
 - Top tags: ${topTags.slice(0, 10).map(t => `${t.tag} (${t.pct}%)`).join(', ')}
 - Top title keywords: ${topKeywords.slice(0, 10).map(k => `${k.keyword} (${k.pct}%)`).join(', ')}
@@ -3651,6 +3548,7 @@ Return JSON in Turkish (but keep all keywords/tags/titles in English):
                     avgViews,
                     avgFavorites,
                     avgPrice,
+                    medianPrice,
                     topTags: topTags.slice(0, 10),
                     topKeywords: topKeywords.slice(0, 10),
                     missingKeywords: missingKeywords.slice(0, 8).map(k => k.keyword),

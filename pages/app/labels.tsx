@@ -2854,7 +2854,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                       {/* Items list */}
                       {group.items.length > 0 && (
                         <Box sx={{ py: 0.75 }}>
-                          <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ textTransform: 'uppercase', fontSize: '0.6rem', letterSpacing: 0.5, mb: 0.5, display: 'block' }}>
+                          <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ fontSize: '0.6875rem', mb: 0.5, display: 'block' }}>
                             {t('itemCount', { count: group.items.length })}
                           </Typography>
                           {group.items.map((item, idx) => {
@@ -2914,7 +2914,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                       {/* Customer note / Personalization */}
                       {row.customerNote && row.customerNote.trim() !== '' && (
                         <Box sx={{ py: 0.75 }}>
-                          <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ textTransform: 'uppercase', fontSize: '0.6rem', letterSpacing: 0.5 }}>{t('customerNote')}</Typography>
+                          <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ fontSize: '0.6875rem' }}>{t('customerNote')}</Typography>
                           <Typography variant="body2" sx={{ fontSize: '0.78rem', mt: 0.25, bgcolor: '#fffde7', p: 0.75, borderRadius: 1, whiteSpace: 'pre-wrap' }}>{row.customerNote}</Typography>
                         </Box>
                       )}
@@ -2922,7 +2922,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                       {/* Gift message (Etsy gift_message) */}
                       {row.giftMessage && row.giftMessage.trim() !== '' && (
                         <Box sx={{ py: 0.75 }}>
-                          <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ textTransform: 'uppercase', fontSize: '0.6rem', letterSpacing: 0.5 }}>{t('giftMessage')}</Typography>
+                          <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ fontSize: '0.6875rem' }}>{t('giftMessage')}</Typography>
                           <Typography variant="body2" sx={{ fontSize: '0.78rem', mt: 0.25, bgcolor: '#fce4ec', p: 0.75, borderRadius: 1, whiteSpace: 'pre-wrap' }}>{row.giftMessage}</Typography>
                         </Box>
                       )}
@@ -2930,7 +2930,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                       {/* Address */}
                       <Box sx={{ py: 0.75, borderTop: '1px dashed', borderColor: 'divider' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
-                          <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ textTransform: 'uppercase', fontSize: '0.6rem', letterSpacing: 0.5 }}>{t('deliveryAddress')}</Typography>
+                          <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ fontSize: '0.6875rem' }}>{t('deliveryAddress')}</Typography>
                           <CopyAddressControl address={rowToCopyAddress(row)} />
                         </Box>
                         <Box sx={{ mt: 0.25 }}>

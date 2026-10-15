@@ -994,7 +994,7 @@ function LeftSidebar({
         <Paper sx={{ p: 1.5, mb: 1.5, borderRadius: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
             <StoreIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-            <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5, fontSize: 10 }}>
+            <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ fontSize: 11 }}>
               {t('shopLabel')}
             </Typography>
           </Box>
@@ -1022,7 +1022,7 @@ function LeftSidebar({
 
       {/* Etsy - Status Filters */}
       <Paper sx={{ p: 1.5, mb: 1.5, borderRadius: 2 }}>
-        <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5, mb: 0.5, display: 'block' }}>
+        <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
           Etsy
         </Typography>
         {(['active', 'draft', 'inactive', 'expired'] as const).map((state) => {
@@ -1065,7 +1065,7 @@ function LeftSidebar({
 
       {/* Score Filter */}
       <Paper sx={{ p: 1.5, mb: 1.5, borderRadius: 2 }}>
-        <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5, fontSize: 10, mb: 1, display: 'block' }}>
+        <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ fontSize: 11, mb: 1, display: 'block' }}>
           {t('listingScore')}
         </Typography>
         <FormControl size="small" fullWidth>
@@ -1094,7 +1094,7 @@ function LeftSidebar({
             sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', mb: 0.5 }}
             onClick={() => setSectionsExpanded(!sectionsExpanded)}
           >
-            <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5, fontSize: 10 }}>
+            <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ fontSize: 11 }}>
               {t('sectionLabel')}
             </Typography>
             {sectionsExpanded ? <ExpandLessIcon sx={{ fontSize: 16, color: 'text.secondary' }} /> : <ExpandMoreIcon sx={{ fontSize: 16, color: 'text.secondary' }} />}
@@ -1158,7 +1158,7 @@ function LeftSidebar({
 
       {/* Exclude term */}
       <Paper sx={{ p: 1.5, mb: 1.5, borderRadius: 2 }}>
-        <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5, fontSize: 10, mb: 1, display: 'block' }}>
+        <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ fontSize: 11, mb: 1, display: 'block' }}>
           {t('excludeLabel')}
         </Typography>
         <TextField

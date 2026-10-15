@@ -14,7 +14,9 @@ import { useTrendyolResearchStore } from '@/lib/stores/useTrendyolResearchStore'
 import { useTableSort } from '@/components/etsy/research/shared/ui';
 import { StatCard, GradientBar, GRADIENTS, glassCard } from '@/components/etsy/research/shared/ui';
 
-function fmtTry(n: number): string {
+function fmtTry(n: number | null | undefined): string {
+  // R0: "—" when a robust value is unavailable (small/implausible sample).
+  if (n == null || !Number.isFinite(n)) return '—';
   return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(n);
 }
 
@@ -38,6 +40,7 @@ const BADGE_COLORS: Record<string, string> = {
 
 export default function TrendyolSellerIntelligence() {
   const t = useTranslations('trendyolResearch');
+  const tR = useTranslations('research');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const analysis = useTrendyolResearchStore(s => s.analysis);
@@ -167,7 +170,7 @@ export default function TrendyolSellerIntelligence() {
                   {m.count} {t('products')}
                 </Typography>
                 <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                  {fmtTry(m.avgPrice)}
+                  {fmtTry(m.medianPrice)}
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
@@ -197,8 +200,8 @@ export default function TrendyolSellerIntelligence() {
                     </TableSortLabel>
                   </TableCell>
                   <TableCell align="center">
-                    <TableSortLabel active={sortKey === 'avgPrice'} direction={sortDir} onClick={() => handleSort('avgPrice')}>
-                      {t('avgPrice')}
+                    <TableSortLabel active={sortKey === 'medianPrice'} direction={sortDir} onClick={() => handleSort('medianPrice')}>
+                      {tR('stats.medianPrice')}
                     </TableSortLabel>
                   </TableCell>
                   <TableCell align="center">
@@ -221,7 +224,7 @@ export default function TrendyolSellerIntelligence() {
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>#{m.id}</Typography>
                     </TableCell>
                     <TableCell align="center">{m.count}</TableCell>
-                    <TableCell align="center">{fmtTry(m.avgPrice)}</TableCell>
+                    <TableCell align="center">{fmtTry(m.medianPrice)}</TableCell>
                     <TableCell align="center">
                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                         <Star size={14} color="#F2994A" />

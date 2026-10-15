@@ -1952,7 +1952,7 @@ export default function BulkEditor({
             >
               <Typography
                 variant="caption"
-                sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, fontSize: '0.82rem' }}
+                sx={{ color: 'text.secondary', fontWeight: 700, fontSize: '0.82rem' }}
               >
                 {t(group)}
               </Typography>

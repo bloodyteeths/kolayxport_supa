@@ -396,7 +396,7 @@ type GroupModeSelectorProps = {
 function GroupModeSelector({ mode, onChange, axes, label, t }: GroupModeSelectorProps) {
   return (
     <Paper variant="outlined" sx={{ p: 1.25, mb: 1.5, borderRadius: '8px', bgcolor: 'rgba(102,126,234,0.03)' }}>
-      <Typography variant="caption" fontWeight={700} sx={{ display: 'block', mb: 0.75, textTransform: 'uppercase', color: 'text.secondary' }}>
+      <Typography variant="caption" fontWeight={700} sx={{ display: 'block', mb: 0.75, color: 'text.secondary' }}>
         {label}
       </Typography>
       <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
@@ -1597,7 +1597,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
                 <Box key={group.propName}>
                   {group.propName && (
                     <Box sx={sectionHeaderSx}>
-                      <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      <Typography variant="caption" fontWeight={700} color="text.secondary">
                         {group.propName}
                       </Typography>
                     </Box>
@@ -1750,7 +1750,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
           {typeof priceGroupBy === 'number' && (
             <Paper variant="outlined" sx={{ borderRadius: '8px', overflow: 'hidden' }}>
               <Box sx={sectionHeaderSx}>
-                <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <Typography variant="caption" fontWeight={700} color="text.secondary">
                   {getPropertyName(priceGroupBy)}
                 </Typography>
               </Box>
@@ -1790,7 +1790,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
                 <Box key={group.propName}>
                   {group.propName && (
                     <Box sx={sectionHeaderSx}>
-                      <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      <Typography variant="caption" fontWeight={700} color="text.secondary">
                         {group.propName}
                       </Typography>
                     </Box>
@@ -1857,7 +1857,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
           {typeof quantityGroupBy === 'number' && (
             <Paper variant="outlined" sx={{ borderRadius: '8px', overflow: 'hidden' }}>
               <Box sx={sectionHeaderSx}>
-                <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <Typography variant="caption" fontWeight={700} color="text.secondary">
                   {getPropertyName(quantityGroupBy)}
                 </Typography>
               </Box>
@@ -1895,7 +1895,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
                 <Box key={group.propName}>
                   {group.propName && (
                     <Box sx={sectionHeaderSx}>
-                      <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      <Typography variant="caption" fontWeight={700} color="text.secondary">
                         {group.propName}
                       </Typography>
                     </Box>
@@ -1955,7 +1955,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
           {typeof skuGroupBy === 'number' && (
             <Paper variant="outlined" sx={{ borderRadius: '8px', overflow: 'hidden' }}>
               <Box sx={sectionHeaderSx}>
-                <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <Typography variant="caption" fontWeight={700} color="text.secondary">
                   {getPropertyName(skuGroupBy)}
                 </Typography>
               </Box>
@@ -1993,7 +1993,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
                 <Box key={group.propName}>
                   {group.propName && (
                     <Box sx={sectionHeaderSx}>
-                      <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      <Typography variant="caption" fontWeight={700} color="text.secondary">
                         {group.propName}
                       </Typography>
                     </Box>
@@ -2045,7 +2045,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
               <Box key={group.propName}>
                 {group.propName && (
                   <Box sx={sectionHeaderSx}>
-                    <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <Typography variant="caption" fontWeight={700} color="text.secondary">
                       {group.propName}
                     </Typography>
                   </Box>
@@ -2091,7 +2091,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
               <Paper variant="outlined" sx={{ borderRadius: '8px', overflow: 'hidden' }}>
                 {existingProperties[0] && (
                   <Box sx={sectionHeaderSx}>
-                    <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <Typography variant="caption" fontWeight={700} color="text.secondary">
                       {existingProperties[0].name}
                     </Typography>
                   </Box>
@@ -2240,7 +2240,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
 
           {/* Property type chips */}
           <Box>
-            <Typography variant="caption" fontWeight={700} sx={{ mb: 1, display: 'block', color: 'text.secondary', textTransform: 'uppercase' }}>
+            <Typography variant="caption" fontWeight={700} sx={{ mb: 1, display: 'block', color: 'text.secondary' }}>
               {t('propertyType')}
             </Typography>
             <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
@@ -2267,7 +2267,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
           {/* Scale selector in dialog */}
           {scalesForProperty.length > 0 && addPropertyId === primaryPropertyId && (
             <Box>
-              <Typography variant="caption" fontWeight={700} sx={{ mb: 0.5, display: 'block', color: 'text.secondary', textTransform: 'uppercase' }}>
+              <Typography variant="caption" fontWeight={700} sx={{ mb: 0.5, display: 'block', color: 'text.secondary' }}>
                 {t('scale')}
               </Typography>
               <Select

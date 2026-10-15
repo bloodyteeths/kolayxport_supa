@@ -14,6 +14,7 @@ import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import useLocaleStore from '@/lib/stores/useLocaleStore';
 import { formatMoney, marketplaceCurrency } from './marketplaces';
+import { groupMedian, decodeEntities } from '@/lib/research/stats';
 import useCreateListingPrefill from './useCreateListingPrefill';
 
 // ---------------------------------------------------------------------------
@@ -53,7 +54,7 @@ interface KeywordRow {
   keyword: string;
   count: number;
   usagePercent: number;
-  avgPrice: number;
+  medianPrice: number;
   competition: number; // unique seller count
   score: number;
 }
@@ -62,7 +63,7 @@ interface PhraseData {
   phrase: string;
   count: number;
   percentage: number;
-  avgPrice: number;
+  medianPrice: number;
   competition: number;
   score: number;
 }
@@ -83,7 +84,7 @@ interface ItemDetails {
   legacyItemId?: string;
 }
 
-type SortField = 'keyword' | 'usagePercent' | 'avgPrice' | 'competition' | 'score';
+type SortField = 'keyword' | 'usagePercent' | 'medianPrice' | 'competition' | 'score';
 type SortDir = 'asc' | 'desc';
 
 // ---------------------------------------------------------------------------
@@ -122,7 +123,7 @@ function extractNgrams(
   const sellerAcc: Record<string, Set<string>> = {};
 
   items.forEach((item) => {
-    const words = extractWords(item.title);
+    const words = extractWords(decodeEntities(item.title));
     const price = parseFloat(item.price?.value || '0');
     const seller = item.seller?.username || item.itemId;
     const seen = new Set<string>();
@@ -142,26 +143,26 @@ function extractNgrams(
   return Object.entries(freq)
     .filter(([, c]) => c >= 2)
     .map(([phrase, count]) => {
-      const avgPrice = priceAcc[phrase].reduce((s, v) => s + v, 0) / priceAcc[phrase].length;
+      const medianPrice = groupMedian(priceAcc[phrase]) ?? 0;
       const competition = sellerAcc[phrase].size;
       const usagePct = (count / total) * 100;
       return {
         phrase,
         count,
         percentage: Math.round(usagePct),
-        avgPrice,
+        medianPrice,
         competition,
-        score: calculateKeywordScore(usagePct, avgPrice, competition),
+        score: calculateKeywordScore(usagePct, medianPrice, competition),
       };
     })
     .sort((a, b) => b.score - a.score)
     .slice(0, 80);
 }
 
-function calculateKeywordScore(usage: number, avgPrice: number, competition: number): number {
+function calculateKeywordScore(usage: number, medianPrice: number, competition: number): number {
   // Normalize each factor to 0-100 range, then combine
   const usageScore = Math.min(usage, 100); // higher usage = better
-  const priceScore = Math.min((avgPrice / 5) * 10, 100); // higher avg price = better
+  const priceScore = Math.min((medianPrice / 5) * 10, 100); // higher median price = better (R0: median, not mean)
   const compScore = Math.max(100 - competition * 2, 0); // lower competition = better
 
   const raw = usageScore * 0.4 + priceScore * 0.35 + compScore * 0.25;
@@ -174,7 +175,7 @@ function buildKeywordRows(items: MarketItem[]): KeywordRow[] {
   const sellerAcc: Record<string, Set<string>> = {};
 
   items.forEach((item) => {
-    const words = extractWords(item.title);
+    const words = extractWords(decodeEntities(item.title));
     const price = parseFloat(item.price?.value || '0');
     const seller = item.seller?.username || item.itemId;
     const unique = new Set(words);
@@ -192,15 +193,15 @@ function buildKeywordRows(items: MarketItem[]): KeywordRow[] {
     .filter(([, c]) => c >= 2)
     .map(([keyword, count]) => {
       const usagePercent = (count / total) * 100;
-      const avgPrice = priceAcc[keyword].reduce((s, v) => s + v, 0) / priceAcc[keyword].length;
+      const medianPrice = groupMedian(priceAcc[keyword]) ?? 0;
       const competition = sellerAcc[keyword].size;
       return {
         keyword,
         count,
         usagePercent,
-        avgPrice,
+        medianPrice,
         competition,
-        score: calculateKeywordScore(usagePercent, avgPrice, competition),
+        score: calculateKeywordScore(usagePercent, medianPrice, competition),
       };
     })
     .sort((a, b) => b.score - a.score)
@@ -222,7 +223,7 @@ function generateTitleVariations(keywords: KeywordRow[], maxLen: number): string
   if (v1) variations.push(capitalize(v1));
 
   // Variation 2: group by high price first
-  const priceSort = [...keywords.slice(0, 15)].sort((a, b) => b.avgPrice - a.avgPrice);
+  const priceSort = [...keywords.slice(0, 15)].sort((a, b) => b.medianPrice - a.medianPrice);
   let v2 = '';
   for (const k of priceSort) {
     const candidate = v2 ? `${v2} ${k.keyword}` : k.keyword;
@@ -317,9 +318,9 @@ function titleLengthColor(len: number): string {
 }
 
 function toCSV(rows: KeywordRow[]): string {
-  const header = 'Keyword,Count,Usage %,Avg Price,Competition,Score';
+  const header = 'Keyword,Count,Usage %,Median Price,Competition,Score';
   const lines = rows.map(
-    (r) => `"${r.keyword}",${r.count},${r.usagePercent.toFixed(1)},${r.avgPrice.toFixed(2)},${r.competition},${r.score}`,
+    (r) => `"${r.keyword}",${r.count},${r.usagePercent.toFixed(1)},${r.medianPrice.toFixed(2)},${r.competition},${r.score}`,
   );
   return [header, ...lines].join('\n');
 }
@@ -345,6 +346,7 @@ function downloadCSV(content: string, filename: string) {
 export default function KeywordIntelligence({ userId, marketplace, userListings, onNavigate }: KeywordIntelligenceProps) {
   const t = useTranslations('ebay.research.keyword');
   const tr = useTranslations('ebayResearch');
+  const tR = useTranslations('research');
   const locale = useLocaleStore(s => s.locale);
   const createListing = useCreateListingPrefill();
   const [activeTab, setActiveTab] = useState(0);
@@ -631,7 +633,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
           <TableRow>
             <TableCell sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>{label}</TableCell>
             <TableCell align="right" sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>{t('colUsage')}</TableCell>
-            <TableCell align="right" sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>{t('colAvgPrice')}</TableCell>
+            <TableCell align="right" sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>{tR('stats.medianPrice')}</TableCell>
             <TableCell align="right" sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>{t('colCompetition')}</TableCell>
             <TableCell align="right" sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>{t('colScore')}</TableCell>
           </TableRow>
@@ -648,7 +650,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                 <Typography variant="body2" fontWeight={500}>{row.phrase}</Typography>
               </TableCell>
               <TableCell align="right">{pct(row.percentage)}</TableCell>
-              <TableCell align="right">{fmt(row.avgPrice)}</TableCell>
+              <TableCell align="right">{fmt(row.medianPrice)}</TableCell>
               <TableCell align="right">{row.competition}</TableCell>
               <TableCell align="right">
                 <Chip
@@ -802,7 +804,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                       {renderSortableHeader(t('colUsagePercent'), 'usagePercent')}
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>
-                      {renderSortableHeader(t('colAvgPrice'), 'avgPrice')}
+                      {renderSortableHeader(tR('stats.medianPrice'), 'medianPrice')}
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>
                       {renderSortableHeader(t('colCompetition'), 'competition')}
@@ -827,7 +829,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                         <Typography variant="body2" fontWeight={500}>{row.keyword}</Typography>
                       </TableCell>
                       <TableCell align="right">{pct(row.usagePercent)}</TableCell>
-                      <TableCell align="right">{fmt(row.avgPrice)}</TableCell>
+                      <TableCell align="right">{fmt(row.medianPrice)}</TableCell>
                       <TableCell align="right">{row.competition}</TableCell>
                       <TableCell align="right">
                         <Chip

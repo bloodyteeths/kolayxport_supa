@@ -175,3 +175,21 @@ export function dominantCurrency(items: Array<{ currency_code?: string }>): stri
   const total = entries.reduce((s, [, n]) => s + n, 0);
   return entries[0][1] / total >= 0.8 ? entries[0][0] : undefined;
 }
+
+/**
+ * R0: research → prefill price context from a robust summary. The legacy
+ * `avg` slot (read by the listing creator) carries the median, never a mean.
+ * Returns null when the sample is too small or implausible.
+ */
+export function prefillPriceStats(
+  ps: { min: number | null; max: number | null; median: number | null; quality?: string } | null | undefined,
+): MarketResearchData['priceStats'] {
+  if (!ps || ps.median == null || ps.min == null || ps.max == null) return null;
+  if (ps.quality === 'insufficient' || ps.quality === 'implausible') return null;
+  return { min: ps.min, avg: ps.median, median: ps.median, max: ps.max };
+}
+
+/** Suggested price from a robust summary: the median, only when the sample is ok. */
+export function prefillPrice(ps: { median: number | null; quality?: string } | null | undefined): number | undefined {
+  return ps && ps.median != null && (ps.quality === undefined || ps.quality === 'ok') ? ps.median : undefined;
+}

@@ -4,6 +4,8 @@ import prisma from '../../../lib/prisma';
 import { withPrismaRetry } from '../../../lib/prismaWithRetry';
 import { encryptCredentials, decryptCredentials, maskCredentials, stripMaskedSecrets } from '@/lib/encryption';
 import { getPlanLimits } from '@/lib/billing/planLimits';
+import { parsePreferencesPatch } from '@/lib/settings/accountTimezone';
+import { invalidateNotificationConfig } from '@/lib/notificationCenter/preferences';
 
 export default async function handler(
   req: NextApiRequest,
@@ -75,6 +77,18 @@ export default async function handler(
       // shopify_free only because of an active ShopifyShop / billingProvider is
       // still limited (trial or noSubscription) and must not be reported as
       // unlimited. The UI hides the meter for shopify_free (rule 1.2.1) anyway.
+      // Account preferences (settings §2.3 A6). The timezone is NotificationSettings.timezone
+      // (BUILD_PLAN BR-2): null = no row yet = Europe/Istanbul. A failed read leaves `preferences`
+      // out of the body, so the UI keeps Preferences read-only instead of saving over a value it never saw.
+      let preferences: { timezone: string | null } | undefined;
+      try {
+        const notif = await withPrismaRetry(() =>
+          prisma.notificationSettings.findUnique({ where: { userId }, select: { timezone: true } })
+        );
+        preferences = { timezone: notif?.timezone || null };
+      } catch (prefError: any) {
+        console.error('[/api/user/settings] Preferences read failed:', prefError?.message);
+      }
       const planLimits = getPlanLimits(
         userWithSettings.subscriptionPlan,
         userWithSettings.subscriptionStatus,
@@ -96,6 +110,7 @@ export default async function handler(
           limits: planLimits.limits,
           period: planLimits.period,
         },
+        ...(preferences ? { preferences } : {}),
       });
     } catch (error: any) {
       console.error('[/api/user/settings] Database error:', {
@@ -108,6 +123,11 @@ export default async function handler(
   } else if (req.method === 'PATCH') {
     try {
       const { shipperProfile, shippingSettings } = req.body;
+      // Validate before any write so an invalid timezone never leaves a half-saved request.
+      const prefs = parsePreferencesPatch(req.body?.preferences);
+      if (!prefs.ok) {
+        return res.status(400).json({ error: 'invalid_preferences', fields: prefs.fields });
+      }
       // The GET returns secrets masked; a mask sent back means "unchanged".
       const integrationSettings = req.body.integrationSettings
         ? stripMaskedSecrets(req.body.integrationSettings as Record<string, any>)
@@ -255,6 +275,15 @@ export default async function handler(
             defaultCountryOfMfg: shipperProfile.defaultCountryOfMfg,
           },
         });
+      }
+      // Account timezone (A6 / BR-2): the shared NotificationSettings row (User upserted above, FK safe).
+      if (prefs.patch) {
+        await prisma.notificationSettings.upsert({
+          where: { userId },
+          create: { userId, timezone: prefs.patch.timezone },
+          update: { timezone: prefs.patch.timezone },
+        });
+        invalidateNotificationConfig(userId);
       }
       return res.status(200).json({ message: 'Settings saved successfully.' });
     } catch (error: any) {

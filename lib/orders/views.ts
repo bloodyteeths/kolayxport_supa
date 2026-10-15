@@ -20,6 +20,18 @@
  *   offset is read in the DB session timezone by SQL and by JS `Date` rules in
  *   the twin; NORMALIZED status case-folding is SQL LOWER vs JS lowercasing.
  *
+ * OPEN ITEMS before the 'orders' UI flag is turned on (integrator, orders §1.3; G1 has no DB):
+ *   (a) execute VIEW_COUNTS_SQL, VIEW_COUNTS_FINGERPRINT_SQL, every `viewWhereSql(view)` and every
+ *       `statusKeyWhereSql(key)` inside a real `/api/orders` list query against Postgres (fixtures,
+ *       or read-only on prod). These clauses sit in the main list WHERE, so a SQL error is a 500 for
+ *       the whole list, not a missing count. Include a row whose shippingAddress is a jsonb string
+ *       (JSON.stringify writers) and assert it is not counted as address-incomplete.
+ *   (b) the To ship size check: run the four counts per account on prod; if any account has more
+ *       than 500 To ship rows, set ORDER_VIEWS.to_ship.defaultPreset to a 90-day window.
+ * Known residual address drift: the client reads the EtsyAddress fields, SQL treats the record as
+ * complete; when sources disagree on the country, SQL accepts a postal-free country from any source,
+ * the client only from the first one.
+ *
  * Rules (orders.md §4.2, first match wins for the pill; here as a set):
  *   To ship = listed by /api/orders (unpaid states hidden, NULL status hidden)
  *           ∧ open status (not shipped / delivered / cancelled / refunded)
@@ -32,6 +44,16 @@
  *   earliest Etsy transactions[].expected_ship_date (index.ts L789–816).
  */
 import { isClosedOrderStatus, orderStatus } from '@/lib/ds/status/orders';
+import { normalizeRaw } from '@/lib/ds/status/vocabulary';
+import type {
+  CountedOrderViewKey,
+  OrderDatePreset,
+  OrderSortKey,
+  OrderStatusFilterKey,
+  OrderViewKey,
+  SortDir,
+} from './types';
+
 
 /* ------------------------------------------------------------ constants */
 
@@ -263,4 +285,387 @@ export function countToShip(rows: readonly OrderViewRow[], now: Date = new Date(
     if (d && d.getTime() < now.getTime()) overdue++;
   }
   return { toShip, overdue };
+}
+
+/* =====================================================================
+ * M3 orders-G1 extension (orders.md §1.3 views, A1 status keys + counts).
+ * Everything above is the M2 shell-B definition and is not redefined here.
+ * ===================================================================== */
+
+/* ------------------------------------------------------- view registry */
+
+export const ORDER_VIEW_KEYS: readonly OrderViewKey[] = ['to_ship', 'overdue', 'label_created', 'shipped', 'problems', 'all'];
+export const COUNTED_VIEW_KEYS: readonly CountedOrderViewKey[] = ['to_ship', 'overdue', 'label_created', 'problems'];
+
+export interface OrderViewDef {
+  key: OrderViewKey;
+  /** Date preset when the URL has no `from`/`to`/`preset` (orders §1.3 "Default dates"). */
+  defaultPreset: OrderDatePreset;
+  sort: OrderSortKey;
+  dir: SortDir;
+  /** Whether the view shows a count (`counts[key]`). */
+  counted: boolean;
+}
+
+/** orders §1.3. "To ship" is undated: its status clause bounds it (G0 verification item, CRITIQUE X8). */
+export const ORDER_VIEWS: Readonly<Record<OrderViewKey, OrderViewDef>> = {
+  to_ship: { key: 'to_ship', defaultPreset: 'any', sort: 'shipBy', dir: 'asc', counted: true },
+  overdue: { key: 'overdue', defaultPreset: 'any', sort: 'shipBy', dir: 'asc', counted: true },
+  label_created: { key: 'label_created', defaultPreset: 'any', sort: 'orderedAt', dir: 'desc', counted: true },
+  shipped: { key: 'shipped', defaultPreset: 'last30', sort: 'orderedAt', dir: 'desc', counted: false },
+  problems: { key: 'problems', defaultPreset: 'any', sort: 'shipBy', dir: 'asc', counted: true },
+  all: { key: 'all', defaultPreset: 'last30', sort: 'orderedAt', dir: 'desc', counted: false },
+};
+
+export const DEFAULT_ORDER_VIEW: OrderViewKey = 'to_ship';
+
+export function isOrderViewKey(v: unknown): v is OrderViewKey {
+  return typeof v === 'string' && (ORDER_VIEW_KEYS as readonly string[]).includes(v);
+}
+
+/* ------------------------------------------- normalized raw status lists */
+
+/**
+ * Normalized raw values per closed/explicit key. Same members as the sets in
+ * `lib/ds/status/orders.ts` (test: each maps through `orderStatus()` to its key).
+ * Their union is CLOSED_ORDER_STATUSES (cancelled/refunded/delivered/shipped).
+ */
+export const RAW_STATUSES_BY_KEY = {
+  cancelled: ['cancelled', 'canceled', 'cancel', 'iptal', 'iptal_edildi', 'cancelled_by_seller', 'cancelled_by_buyer'],
+  refunded: ['refunded', 'fully_refunded', 'returned', 'iade', 'iade_edildi'],
+  delivered: ['delivered', 'completed', 'complete', 'teslim_edildi'],
+  shipped: ['shipped', 'partially_shipped', 'kargolandi', 'kargoda', 'is_shipped', 'fulfilled', 'partially_fulfilled', 'in_transit', 'at_collection_point'],
+  on_hold: ['on_hold', 'onhold', 'hold', 'held'],
+  problem: ['undelivered', 'un_delivered', 'unfulfillable', 'unsupplied', 'un_supplied', 'problem'],
+} as const;
+
+export const ORDER_STATUS_FILTER_KEYS: readonly OrderStatusFilterKey[] = [
+  'to_ship', 'overdue', 'label_created', 'shipped', 'delivered', 'on_hold', 'problem', 'cancelled', 'refunded', 'label_failed',
+];
+
+export function isOrderStatusFilterKey(v: unknown): v is OrderStatusFilterKey {
+  return typeof v === 'string' && (ORDER_STATUS_FILTER_KEYS as readonly string[]).includes(v);
+}
+
+const rawIn = (key: keyof typeof RAW_STATUSES_BY_KEY) => `${NORMALIZED_STATUS_SQL} IN (${sqlList(RAW_STATUSES_BY_KEY[key])})`;
+
+/* ------------------------------------------------------- more SQL rules */
+
+/**
+ * A label attempt failed and no label exists (orders §4.2 rule 4, §7.2). `Order.labelStatus =
+ * 'failed'` or the newest LabelJob of the order failed. A failure followed by any active label
+ * is history, not a failure. Never NULL.
+ */
+export const LABEL_FAILED_SQL = `(NOT ${HAS_LABEL_SQL} AND (
+    COALESCE(LOWER(o."labelStatus") = 'failed', false)
+    OR COALESCE((
+      SELECT LOWER(lj.status) FROM "OrderItem" li JOIN "LabelJob" lj ON lj."orderItemId" = li.id
+      WHERE li."orderId" = o.id ORDER BY lj."createdAt" DESC LIMIT 1
+    ) = 'failed', false)
+  ))`;
+
+/** The newest tracking push failed (marketplace API or the Etsy extension). Never NULL. */
+export const TRACKING_PUSH_FAILED_SQL = `COALESCE((
+    SELECT (LOWER(COALESCE(ts.status, '')) = 'failed' OR LOWER(COALESCE(ts."etsySubmitStatus", '')) = 'failed')
+    FROM "TrackingSubmission" ts WHERE ts."orderId" = o.id ORDER BY ts."submittedAt" DESC LIMIT 1
+  ), false)`;
+
+/**
+ * Countries without postal codes: the postal code is not a required field there.
+ * ISO2 codes plus the English names stores send instead of codes.
+ */
+export const NO_POSTAL_COUNTRIES = [
+  'AE', 'AG', 'AO', 'AW', 'BS', 'BZ', 'BJ', 'BW', 'BF', 'BI', 'CM', 'CF', 'KM', 'CG', 'CD', 'CK', 'CI', 'DJ', 'DM', 'GQ', 'ER',
+  'FJ', 'TF', 'GM', 'GH', 'GD', 'GN', 'GY', 'HK', 'KI', 'KP', 'MO', 'MW', 'ML', 'MR', 'NR', 'NU', 'QA', 'RW', 'KN', 'LC', 'ST',
+  'SC', 'SL', 'SB', 'SR', 'SY', 'TL', 'TG', 'TK', 'TO', 'TV', 'UG', 'VU', 'YE', 'ZW',
+] as const;
+/** English names stores send instead of the ISO2 code (toOrderRows COUNTRY_NAME_TO_ISO maps each to its code). */
+export const NO_POSTAL_NAMES = ['UNITED ARAB EMIRATES', 'UAE', 'HONG KONG', 'QATAR', 'MACAU', 'MACAO', 'BAHAMAS', 'THE BAHAMAS', 'BELIZE', 'FIJI', 'GHANA'] as const;
+
+/**
+ * Regex (Postgres ARE and JS alike) that captures a top-level string value of `key` from the JSON
+ * text of an address. Used for stringified `shippingAddress` values (below). Exported for the twin test.
+ */
+export const jsonStringFieldRe = (key: string) => String.raw`"${key}"[[:space:]]*:[[:space:]]*"((?:\\.|[^"\\])*)"`;
+
+/**
+ * `shippingAddress` is a Json column, but several writers store `JSON.stringify(address)` in it
+ * (lib/orderSync.ts address merge, etsyLifecycle, the extension's /api/integrations/etsy/addresses),
+ * which Postgres keeps as a jsonb STRING scalar; `->>` on a scalar is NULL. The client parses the
+ * string (`parseJsonObject`). So in SQL: an object reads with `->>`, a string reads the field from its
+ * JSON text with a regex. `substring … from` never throws on malformed text (a `::jsonb` cast would,
+ * and 500 the whole list because the view clause sits in the main WHERE).
+ */
+const SA = `o."shippingAddress"`;
+const saField = (key: string) =>
+  `(CASE jsonb_typeof(${SA}) WHEN 'object' THEN ${SA}->>'${key}' WHEN 'string' THEN substring(${SA} #>> '{}' from '${jsonStringFieldRe(key)}') END)`;
+const RD = `o."rawData"`;
+const WIX = `${RD}->'shippingInfo'->'logistics'->'shippingDestination'->'address'`;
+/** The API's flattening defaults a Trendyol shipmentAddress country to 'TR' (index.ts extractAddress); the client reads it as recipientCountry. */
+const TRENDYOL_DEFAULT_COUNTRY = `(CASE WHEN (o."source" = 'trendyol' OR o."marketplace" = 'Trendyol')
+    AND jsonb_typeof(${RD}->'shipmentAddress') = 'object'
+    AND COALESCE(jsonb_typeof(${RD}->'to_address'), 'null') = 'null' THEN 'TR' END)`;
+/** Address sources the client extraction reads (toOrderRows `extractShipTo`), in SQL. */
+const ADDRESS_SOURCES: Record<'street1' | 'city' | 'postal' | 'country', string[]> = {
+  street1: [
+    saField('recipientStreet1'), saField('recipient_street1'), saField('address1'), saField('street1'),
+    `${RD}->'deliver_to'->>'address1'`, `${RD}->'deliver_to'->>'street1'`, `${RD}->'billing_address'->>'address1'`,
+    `${RD}->>'address1'`, `${RD}->>'street1'`, `${RD}->'to_address'->>'street1'`,
+    `${WIX}->>'addressLine'`, `${WIX}->>'addressLine1'`, `${RD}->'shipmentAddress'->>'address1'`, `${RD}->'shipmentAddress'->>'address'`,
+  ],
+  city: [
+    saField('recipientCity'), saField('recipient_city'), saField('city'),
+    `${RD}->'deliver_to'->>'city'`, `${RD}->'billing_address'->>'city'`, `${RD}->>'city'`,
+    `${RD}->'to_address'->>'city'`, `${WIX}->>'city'`, `${RD}->'shipmentAddress'->>'city'`,
+  ],
+  postal: [
+    saField('recipientPostal'), saField('recipient_postal'), saField('postal'), saField('zip'), saField('postalCode'), saField('postcode'),
+    `${RD}->'deliver_to'->>'zip'`, `${RD}->'deliver_to'->>'postalCode'`, `${RD}->'deliver_to'->>'postcode'`,
+    `${RD}->'billing_address'->>'zip'`, `${RD}->'billing_address'->>'postalCode'`, `${RD}->'billing_address'->>'postcode'`,
+    `${RD}->>'zip'`, `${RD}->>'postalCode'`, `${RD}->>'postcode'`,
+    `${RD}->'to_address'->>'postal'`, `${RD}->'to_address'->>'zip'`, `${WIX}->>'postalCode'`,
+    `${RD}->'shipmentAddress'->>'postalCode'`, `${RD}->'shipmentAddress'->>'zipCode'`,
+  ],
+  country: [
+    saField('recipientCountry'), saField('recipient_country'), saField('country'),
+    `${RD}->'deliver_to'->>'country'`, `${RD}->'billing_address'->>'country'`, `${RD}->>'country'`,
+    `${RD}->'to_address'->>'country'`, `${WIX}->>'country'`, `${RD}->'shipmentAddress'->>'countryCode'`,
+    TRENDYOL_DEFAULT_COUNTRY,
+  ],
+};
+/** A usable value: non-blank, not the legacy '—' placeholder, not Amazon's "Anonymized" text. */
+const usable = (expr: string) => `(NULLIF(BTRIM(${expr}), '') IS NOT NULL AND BTRIM(${expr}) <> '—' AND ${expr} NOT ILIKE '%anonymized%')`;
+const anyUsable = (exprs: string[]) => `(${exprs.map(usable).join(' OR ')})`;
+const countryNoPostal = `(${ADDRESS_SOURCES.country
+  .map((e) => `UPPER(BTRIM(COALESCE(${e}, ''))) IN (${sqlList([...NO_POSTAL_COUNTRIES, ...NO_POSTAL_NAMES])})`)
+  .join(' OR ')})`;
+
+/**
+ * Ship-to incomplete (orders §4.2 rule 7): street, city, country or (where countries use
+ * them) postal code missing in every source, and the Chrome extension has not stored an
+ * EtsyAddress for the order. SQL twin of `shipToMissing()` (toOrderRows); the client also
+ * reads the EtsyAddress fields themselves, the SQL treats the record as complete. Never NULL.
+ */
+export const ADDRESS_INCOMPLETE_SQL = `(NOT EXISTS (
+    SELECT 1 FROM "EtsyAddress" ea WHERE ea."userId" = o."userId" AND ea."orderNumber" = o."orderNumber"
+  ) AND NOT (
+    ${anyUsable(ADDRESS_SOURCES.street1)}
+    AND ${anyUsable(ADDRESS_SOURCES.city)}
+    AND ${anyUsable(ADDRESS_SOURCES.country)}
+    AND (${anyUsable(ADDRESS_SOURCES.postal)} OR ${countryNoPostal})
+  ))`;
+
+/* ------------------------------------------------------- view clauses */
+
+/** "Label created": has a label, still open, tracking push not failed (a failed push is a Problem). */
+export const LABEL_CREATED_SQL = `(${LISTED_ORDER_SQL} AND ${OPEN_STATUS_SQL} AND ${HAS_LABEL_SQL} AND NOT ${TRACKING_PUSH_FAILED_SQL})`;
+
+/** "Shipped": shipped, partially shipped, delivered or completed. */
+export const SHIPPED_VIEW_SQL = `(${LISTED_ORDER_SQL} AND (${rawIn('shipped')} OR ${rawIn('delivered')}))`;
+
+/** "Problems": open, not FBA, and label failed OR tracking push failed OR (To ship ∧ address incomplete). */
+export const PROBLEMS_SQL = `(${LISTED_ORDER_SQL} AND ${OPEN_STATUS_SQL} AND NOT ${FBA_SQL} AND (
+    ${LABEL_FAILED_SQL}
+    OR ${TRACKING_PUSH_FAILED_SQL}
+    OR (${TO_SHIP_SQL} AND ${ADDRESS_INCOMPLETE_SQL})
+  ))`;
+
+/** WHERE fragment (over alias `o`, no params) for a built-in view. `all` = what the API lists anyway. */
+export function viewWhereSql(view: OrderViewKey): string {
+  switch (view) {
+    case 'to_ship':
+      return TO_SHIP_SQL;
+    case 'overdue':
+      return `(${TO_SHIP_SQL} AND ${OVERDUE_SQL})`;
+    case 'label_created':
+      return LABEL_CREATED_SQL;
+    case 'shipped':
+      return SHIPPED_VIEW_SQL;
+    case 'problems':
+      return PROBLEMS_SQL;
+    case 'all':
+    default:
+      return LISTED_ORDER_SQL;
+  }
+}
+
+/**
+ * Status filter key → WHERE fragment (A1). Each key means exactly what its StatusPill means: the
+ * clauses follow `orderRowStatus()` (lib/ds/status/orders.ts, orders §4.2, first match wins), so a
+ * row whose pill is `k` matches `statusKeyWhereSql(k)`. Pure twin: `matchesStatusKey`.
+ *   1–3 terminal raw  → shipped / delivered / cancelled / refunded
+ *   4   label failed  → label_failed
+ *   5   FBA           → to_ship (never overdue, never label_created)
+ *   6   has a label   → label_created (a failed tracking push keeps this pill; the Problems VIEW lists it)
+ *   7   address       → problem
+ *   8   raw on hold / problem
+ *   9   ship-by passed → overdue, else to_ship
+ * Views and status keys differ on purpose: the To ship VIEW is "needs a label" (includes rows whose
+ * pill is problem / on hold / overdue), the to_ship KEY is the pill.
+ */
+const PILL_ACTIVE_SQL = `(${OPEN_STATUS_SQL} AND NOT ${LABEL_FAILED_SQL})`;
+/** Rules 5–7 did not match: not FBA, no label, address complete. */
+const PILL_PAST_ADDRESS_SQL = `(${PILL_ACTIVE_SQL} AND NOT ${FBA_SQL} AND ${UNLABELED_SQL} AND NOT ${ADDRESS_INCOMPLETE_SQL})`;
+const PILL_UNHELD_SQL = `(${PILL_PAST_ADDRESS_SQL} AND NOT ${rawIn('on_hold')} AND NOT ${rawIn('problem')})`;
+const OVERDUE_KNOWN_SQL = `COALESCE(${OVERDUE_SQL}, false)`;
+
+export function statusKeyWhereSql(key: OrderStatusFilterKey): string {
+  switch (key) {
+    case 'to_ship':
+      return `(${PILL_ACTIVE_SQL} AND (${FBA_SQL} OR (${PILL_UNHELD_SQL} AND NOT ${OVERDUE_KNOWN_SQL})))`;
+    case 'overdue':
+      return `(${PILL_UNHELD_SQL} AND ${OVERDUE_KNOWN_SQL})`;
+    case 'label_created':
+      return `(${PILL_ACTIVE_SQL} AND NOT ${FBA_SQL} AND ${HAS_LABEL_SQL})`;
+    case 'label_failed':
+      return `(${OPEN_STATUS_SQL} AND ${LABEL_FAILED_SQL})`;
+    case 'problem':
+      return `(${PILL_ACTIVE_SQL} AND NOT ${FBA_SQL} AND ${UNLABELED_SQL} AND (${ADDRESS_INCOMPLETE_SQL} OR ${rawIn('problem')}))`;
+    case 'on_hold':
+      return `(${PILL_PAST_ADDRESS_SQL} AND ${rawIn('on_hold')})`;
+    default:
+      // shipped / delivered / cancelled / refunded: rules 1–3 come first, the raw value decides.
+      return rawIn(key);
+  }
+}
+
+/** OR of the status keys (empty → null = no clause). */
+export function statusKeysWhereSql(keys: readonly OrderStatusFilterKey[]): string | null {
+  const uniq = Array.from(new Set(keys));
+  if (uniq.length === 0) return null;
+  return `(${uniq.map(statusKeyWhereSql).join(' OR ')})`;
+}
+
+/**
+ * One query for all four view counts: `$1` = userId. Row `{ to_ship, overdue, label_created, problems }`
+ * (pg COUNT is bigint). Ignores search, store, status and dates (counts belong to the view, orders §1.3).
+ */
+export const VIEW_COUNTS_SQL = `SELECT
+    COUNT(*) FILTER (WHERE ${TO_SHIP_SQL}) AS "to_ship",
+    COUNT(*) FILTER (WHERE ${TO_SHIP_SQL} AND ${OVERDUE_SQL}) AS "overdue",
+    COUNT(*) FILTER (WHERE ${LABEL_CREATED_SQL}) AS "label_created",
+    COUNT(*) FILTER (WHERE ${PROBLEMS_SQL}) AS "problems"
+  FROM "Order" o
+  WHERE o."userId" = $1 AND ${LISTED_ORDER_SQL}`;
+
+/**
+ * Cheap change marker for the view-counts cache (`$1` = userId): one row `{ fp: text }`. It changes
+ * when an order is pulled, edited or deleted (Order count / updatedAt; index [userId, updatedAt, id]),
+ * when a label is created or voided (Shipment / LabelJob updatedAt, which do not always touch the
+ * Order), when tracking is pushed (TrackingSubmission submittedAt / etsySubmittedAt / closedAt) and
+ * when the extension stores an address (EtsyAddress updatedAt).
+ */
+export const VIEW_COUNTS_FINGERPRINT_SQL = `SELECT CONCAT_WS('|',
+    (SELECT COUNT(*) FROM "Order" WHERE "userId" = $1),
+    (SELECT MAX("updatedAt") FROM "Order" WHERE "userId" = $1),
+    (SELECT MAX(s."updatedAt") FROM "Shipment" s JOIN "Order" so ON so.id = s."orderId" WHERE so."userId" = $1),
+    (SELECT MAX(lj."updatedAt") FROM "LabelJob" lj JOIN "OrderItem" li ON li.id = lj."orderItemId" JOIN "Order" lo ON lo.id = li."orderId" WHERE lo."userId" = $1),
+    (SELECT MAX(GREATEST(ts."submittedAt", ts."etsySubmittedAt", ts."closedAt")) FROM "TrackingSubmission" ts JOIN "Order" tso ON tso.id = ts."orderId" WHERE tso."userId" = $1),
+    (SELECT MAX("updatedAt") FROM "EtsyAddress" WHERE "userId" = $1)
+  ) AS "fp"`;
+
+/** Effective ship-by sort for the new UI: earliest first, unknown last. */
+export function effectiveShipBySortSql(dir: SortDir): string {
+  return `(${EFFECTIVE_SHIP_BY_SQL}) ${dir === 'desc' ? 'DESC' : 'ASC'} NULLS LAST`;
+}
+
+/* ------------------------------------------------- pure twins (views) */
+
+/** Extra fields the view predicates read beyond `OrderViewRow`. */
+export interface OrderViewFacts extends OrderViewRow {
+  items?: ReadonlyArray<{
+    shipBy?: Date | string | null;
+    labelJobs?: ReadonlyArray<{ status?: string | null; createdAt?: Date | string | null }>;
+  }>;
+  trackingSubmissions?: ReadonlyArray<{ status?: string | null; etsySubmitStatus?: string | null; submittedAt?: Date | string | null }>;
+  /** `shipToMissing(...).length > 0` with no EtsyAddress record (toOrderRows). */
+  addressIncomplete?: boolean;
+}
+
+const time = (v: Date | string | null | undefined) => {
+  const d = validDate(v);
+  return d ? d.getTime() : Number.NEGATIVE_INFINITY;
+};
+
+/** Twin of LABEL_FAILED_SQL. */
+export function isLabelFailedOrder(row: OrderViewFacts): boolean {
+  if (orderHasLabel(row)) return false;
+  if (String(row.labelStatus ?? '').toLowerCase() === 'failed') return true;
+  let latest: { status?: string | null; createdAt?: Date | string | null } | null = null;
+  for (const item of row.items ?? []) {
+    for (const j of item.labelJobs ?? []) {
+      if (!latest || time(j.createdAt) > time(latest.createdAt)) latest = j;
+    }
+  }
+  return String(latest?.status ?? '').toLowerCase() === 'failed';
+}
+
+/** Twin of TRACKING_PUSH_FAILED_SQL. */
+export function isTrackingPushFailed(row: Pick<OrderViewFacts, 'trackingSubmissions'>): boolean {
+  let latest: { status?: string | null; etsySubmitStatus?: string | null; submittedAt?: Date | string | null } | null = null;
+  for (const s of row.trackingSubmissions ?? []) {
+    if (!latest || time(s.submittedAt) > time(latest.submittedAt)) latest = s;
+  }
+  if (!latest) return false;
+  return String(latest.status ?? '').toLowerCase() === 'failed' || String(latest.etsySubmitStatus ?? '').toLowerCase() === 'failed';
+}
+
+const inRaw = (key: keyof typeof RAW_STATUSES_BY_KEY, status: string | null | undefined) =>
+  (RAW_STATUSES_BY_KEY[key] as readonly string[]).includes(normalizeRaw(status));
+
+/** Twin of `viewWhereSql(view)`. */
+export function matchesOrderView(row: OrderViewFacts, view: OrderViewKey, now: Date = new Date()): boolean {
+  if (!isListedOrder(row)) return false;
+  switch (view) {
+    case 'to_ship':
+      return isToShipOrder(row);
+    case 'overdue':
+      return isOverdueOrder(row, now);
+    case 'label_created':
+      return isOpenOrder(row) && orderHasLabel(row) && !isTrackingPushFailed(row);
+    case 'shipped':
+      return inRaw('shipped', row.status) || inRaw('delivered', row.status);
+    case 'problems':
+      return (
+        isOpenOrder(row) &&
+        !isFbaOrder(row) &&
+        (isLabelFailedOrder(row) || isTrackingPushFailed(row) || (isToShipOrder(row) && row.addressIncomplete === true))
+      );
+    case 'all':
+    default:
+      return true;
+  }
+}
+
+/**
+ * Twin of `statusKeyWhereSql(key)`: the pill rules of `orderRowStatus()` over view facts (FBA from
+ * rawData, address from `addressIncomplete`). Unlisted rows match nothing.
+ */
+export function matchesStatusKey(row: OrderViewFacts, key: OrderStatusFilterKey, now: Date = new Date()): boolean {
+  if (!isListedOrder(row)) return false;
+  if (key === 'shipped' || key === 'delivered' || key === 'cancelled' || key === 'refunded') return inRaw(key, row.status);
+  if (!isOpenOrder(row)) return false;
+  const failed = isLabelFailedOrder(row);
+  if (key === 'label_failed') return failed;
+  if (failed) return false;
+  const fba = isFbaOrder(row);
+  if (fba) return key === 'to_ship';
+  const label = orderHasLabel(row);
+  if (key === 'label_created') return label;
+  if (label) return false;
+  const addr = row.addressIncomplete === true;
+  if (key === 'problem') return addr || inRaw('problem', row.status);
+  if (addr) return false;
+  if (key === 'on_hold') return inRaw('on_hold', row.status);
+  if (inRaw('on_hold', row.status) || inRaw('problem', row.status)) return false;
+  const d = effectiveShipBy(row);
+  const overdue = d !== null && d.getTime() < now.getTime();
+  return key === 'overdue' ? overdue : !overdue;
+}
+
+/** `{ to_ship, overdue, label_created, problems }` over loaded rows; same numbers as VIEW_COUNTS_SQL. */
+export function countViews(rows: readonly OrderViewFacts[], now: Date = new Date()): Record<CountedOrderViewKey, number> {
+  const out: Record<CountedOrderViewKey, number> = { to_ship: 0, overdue: 0, label_created: 0, problems: 0 };
+  for (const r of rows) for (const k of COUNTED_VIEW_KEYS) if (matchesOrderView(r, k, now)) out[k]++;
+  return out;
 }

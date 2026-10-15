@@ -1133,7 +1133,10 @@
     },
     "saveBar": {
       "unsaved": "Kaydedilmemiş değişiklikleriniz var",
-      "save": "Değişiklikleri kaydet"
+      "save": "Değişiklikleri kaydet",
+      "status": "Kaydedilmemiş değişiklikler",
+      "discard": "Vazgeç",
+      "saving": "Kaydediliyor…"
     },
     "credential": {
       "showValue": "Göster",
@@ -1344,6 +1347,301 @@
     "shippingChargesParty": {
       "SENDER": "Gönderici (Varsayılan)",
       "RECIPIENT": "Alıcı (Karşı ödemeli)"
+    },
+    "nav": {
+      "group": {
+        "workspace": "Çalışma alanı",
+        "shipping": "Gönderim",
+        "account": "Hesap",
+        "system": "Sistem"
+      },
+      "connections": "Bağlantılar",
+      "apiKeys": "Kargo ve API anahtarları",
+      "senderProfile": "Gönderici profili",
+      "billing": "Plan ve faturalandırma",
+      "billingShopify": "Plan",
+      "preferences": "Tercihler",
+      "syncAdvanced": "Yenileme geçmişi",
+      "summary": {
+        "connections": "{connected} bağlı{attention, plural, =0 {} other { · # dikkat gerektiriyor}}",
+        "apiKeys": "{total} servisten {done} tanesi kurulu",
+        "billing": "{plan} · siparişlerin %{percent} kullanıldı",
+        "billingShopify": "Shopify ile dahil"
+      },
+      "dot": {
+        "needsAttention": "Bir bağlantı dikkat gerektiriyor",
+        "unsaved": "Kaydedilmemiş değişiklikler",
+        "billing": "Planınız dikkat gerektiriyor",
+        "runFailed": "Son yenileme başarısız oldu"
+      }
+    },
+    "unsaved": {
+      "title": "Kaydedilmemiş değişiklikler silinsin mi?",
+      "keep": "Düzenlemeye devam et",
+      "discard": "Sil"
+    },
+    "sender": {
+      "saved": "Gönderici profili kaydedildi",
+      "title": "Gönderici profili",
+      "description": "Bu adres her etikette ve gümrük formunda yazdırılır.",
+      "group": {
+        "business": "İşletme",
+        "address": "Adres",
+        "customs": "Gümrük ve para birimi",
+        "importer": "Kayıtlı ithalatçı",
+        "etgb": "ETGB"
+      },
+      "field": {
+        "companyName": "Şirket adı",
+        "authorizedPerson": "Yetkili kişi",
+        "phone": "Telefon",
+        "taxNumber": "Vergi numarası",
+        "taxType": "Vergi numarası türü",
+        "address1": "Adres satırı 1",
+        "address2": "Adres satırı 2",
+        "city": "Şehir",
+        "stateRegion": "Eyalet veya bölge",
+        "postalCode": "Posta kodu",
+        "country": "Ülke",
+        "defaultCurrency": "Varsayılan para birimi",
+        "dutiesPaidBy": "Gümrük vergisini ödeyen",
+        "shippingPaidBy": "Kargo ücretini ödeyen",
+        "fedexFolderId": "FedEx klasör ID",
+        "etgbRecipientEmail": "Alıcı e-posta adresi"
+      },
+      "error": {
+        "required": "Kaydetmek için bu alanı doldurun",
+        "email": "Geçerli bir e-posta adresi girin"
+      },
+      "fixFields": "Kaydetmek için {count} alanı düzeltin",
+      "labelPreview": "Etiket önizlemesi",
+      "labelPreviewEmpty": "Gönderici adresiniz burada etikette yazdırıldığı gibi görünür.",
+      "currencyDefaultHelp": "Henüz seçilmedi. Siz seçene kadar etiketlerde {currency} kullanılır.",
+      "importerHelp": "Yalnızca ürünleri alıcıdan başka biri ithal ediyorsa.",
+      "etgbSwitch": "ETGB belgelerini otomatik gönder",
+      "etgbOn": "Açık · {email} adresine gönderilir",
+      "etgbOff": "Kapalı",
+      "edit": "Düzenle",
+      "loadFailed": "Gönderici profiliniz yüklenemedi"
+    },
+    "saveFailed": "Kaydedilemedi. Değişiklikleriniz duruyor.",
+    "credentials": {
+      "loadFailed": "Kayıtlı anahtarlarınız yüklenemedi",
+      "loadFailedReason": "Kayıtlı anahtarlarınız yüklenmedi. Önce tekrar deneyin.",
+      "title": "Kargo ve API anahtarları",
+      "description": "\"Bağla\" düğmesi olmayan servislerin anahtarları. Şifrelenmiş olarak saklanır.",
+      "configure": "Düzenle",
+      "whereToFind": "Bunları nerede bulurum?",
+      "save": "Kaydet",
+      "saving": "Kaydediliyor…",
+      "cancel": "Vazgeç",
+      "loading": "Kayıtlı anahtarlarınız yükleniyor…",
+      "saved": "{provider} anahtarları kaydedildi",
+      "saveFailed": "Kaydedilemedi. Anahtarlarınız değişmedi.",
+      "fixFields": "Devam etmek için {count} alanı düzeltin",
+      "requiredWith": "{field} alanını da girin",
+      "digitsOnly": "Yalnızca rakam kullanın",
+      "field": {
+        "apiKey": "API anahtarı",
+        "apiSecret": "API gizli anahtarı",
+        "supplierId": "Satıcı ID",
+        "token": "API token",
+        "accountNumber": "Hesap numarası",
+        "mngCustomerNumber": "Müşteri numarası",
+        "mngPassword": "Şifre",
+        "clientId": "İstemci ID",
+        "clientSecret": "İstemci gizli anahtarı",
+        "username": "Kullanıcı adı",
+        "password": "Şifre",
+        "companyId": "Firma ID"
+      }
+    },
+    "connections": {
+      "title": "Bağlantılar",
+      "description": "Mağazalarınızı, kargo firmalarınızı ve araçlarınızı bağlayın. KolayXport siparişleri bunlar üzerinden okur ve takip numaralarını bunlar üzerinden gönderir.",
+      "group": {
+        "marketplaces": "Mağazalar",
+        "shipping": "Kargo",
+        "accounting": "Muhasebe",
+        "tools": "Araçlar"
+      },
+      "storesUsed": "Mağazalar · {limit} haktan {used} tanesi kullanılıyor",
+      "comparePlans": "Planları karşılaştır",
+      "reauthBanner": {
+        "one": "{provider} yeniden bağlanmalı. {account} siparişleri {date} tarihinde durdu.",
+        "oneNoDate": "{provider} yeniden bağlanmalı. {account} siparişleri gelmiyor.",
+        "many": "{count} bağlantı dikkat gerektiriyor.",
+        "reconnect": "{provider} hesabını yeniden bağla",
+        "review": "{count} bağlantıyı incele"
+      },
+      "loadFailed": "Bağlantılarınız kontrol edilemedi",
+      "stale": "{time} itibarıyla durum gösteriliyor",
+      "action": {
+        "connect": "{provider} bağla",
+        "setUp": "Kur",
+        "finishSetup": "Kurulumu tamamla",
+        "reconnect": "Yeniden bağla",
+        "manage": "Yönet",
+        "contactSupport": "Destekle iletişime geç",
+        "checkAgain": "Tekrar kontrol et"
+      },
+      "menu": {
+        "more": "{provider} için diğer işlemler",
+        "refreshAll": "Tüm siparişleri yenile",
+        "guide": "Kurulum rehberini aç",
+        "disconnect": "{provider} bağlantısını kes…",
+        "removeCredentials": "Bilgileri kaldır…"
+      },
+      "disconnectConfirm": {
+        "title": "{provider} bağlantısı kesilsin mi?",
+        "confirm": "Bağlantıyı kes"
+      },
+      "refreshConfirm": {
+        "title": "Tüm siparişler yenilensin mi?",
+        "body": "KolayXport bağlı tüm mağazalarınızdan siparişleri aktarır. Bu birkaç dakika sürebilir."
+      },
+      "removeConfirm": {
+        "title": "{provider} bilgileri kaldırılsın mı?",
+        "body": "Tekrar ekleyene kadar KolayXport {provider} kullanmaz. Geçmiş verileriniz silinmez.",
+        "confirm": "Kaldır"
+      },
+      "toast": {
+        "disconnected": "{provider} bağlantısı kesildi",
+        "disconnectFailed": "{provider} bağlantısı kesilemedi. Tekrar deneyin.",
+        "refreshStarted": "Yenileme başladı. Yenileme geçmişinden takip edebilirsiniz.",
+        "refreshFailed": "Yenileme başlatılamadı",
+        "credentialsRemoved": "{provider} bilgileri kaldırıldı",
+        "removeFailed": "{provider} bilgileri kaldırılamadı"
+      },
+      "pageAction": {
+        "connectStore": "Mağaza bağla"
+      },
+      "panel": {
+        "close": "Kapat"
+      },
+      "meta": {
+        "shops": "{count} mağaza",
+        "refreshed": "{time} yenilendi",
+        "lastActivity": "Son etkinlik {time}",
+        "notDetected": "Bu tarayıcıda bulunamadı",
+        "installExtension": "Eklentiyi yükle",
+        "supportManaged": "Destek ekibimiz tarafından kurulur",
+        "missingField": "{field} eksik",
+        "wixWaiting": "Wix bekleniyor… {elapsed}"
+      },
+      "reason": {
+        "authExpired": "Yetki süresi doldu",
+        "incomplete": "Bilgiler eksik"
+      },
+      "blurb": {
+        "etsy": "Siparişler, ilanlar, araştırma",
+        "ebay": "Siparişler, ilanlar, araştırma",
+        "amazon": "Siparişler ve finans",
+        "shopify": "Siparişler ve ürünler",
+        "wix": "Siparişler, ürünler ve mesajlar",
+        "trendyol": "Siparişler, sorular ve finans",
+        "hepsiburada": "Siparişler",
+        "veeqo": "Veeqo kanallarından siparişler",
+        "shippo": "Siparişler ve etiketler",
+        "fedex": "Uluslararası etiketler ve fiyatlar",
+        "ups": "Uluslararası etiketler ve fiyatlar",
+        "mng": "Yurt içi etiketler",
+        "parasut": "Paraşüt'e faturalar",
+        "chrome": "Takip numarasını Etsy'ye gönderir, alıcı bilgilerini tamamlar"
+      },
+      "etsyPanel": {
+        "title": "Etsy mağazaları",
+        "shopId": "Mağaza ID {id}",
+        "connectAnother": "Başka bir mağaza bağla",
+        "limitReached": "Mağaza sınırına ulaşıldı",
+        "empty": "Henüz Etsy mağazası yok"
+      },
+      "amazonPanel": {
+        "connect": "Amazon bağla",
+        "save": "Pazaryerlerini kaydet"
+      },
+      "shopifyPanel": {
+        "storeAddress": "Mağaza adresi",
+        "connect": "Shopify bağla",
+        "enterAddress": "Önce mağaza adresinizi girin"
+      },
+      "storeLimit": {
+        "title": "{limit} mağaza hakkının tamamını kullandınız",
+        "body": "{plan} planı {limit} bağlı mağaza içerir. Bir mağazanın bağlantısını kesin ya da {nextLimit} mağaza için {nextPlan} planına geçin.",
+        "neutralTitle": "Mağaza sınırına ulaşıldı",
+        "neutralBody": "Yeni bir mağaza eklemek için bir mağazanın bağlantısını kesin.",
+        "notNow": "Şimdi değil",
+        "ok": "Tamam"
+      }
+    },
+    "preferences": {
+      "title": "Tercihler",
+      "description": "Dil ve kargo son tarihleri ile raporlarda kullanılan saat dilimi.",
+      "language": "Dil",
+      "languageHelp": "Bu tarayıcıda hemen uygulanır.",
+      "timezone": "Saat dilimi",
+      "timezoneHelp": "Kargo son tarihleri ve günlük raporlar bu saat dilimini kullanır.",
+      "saved": "Tercihler kaydedildi",
+      "saveFailed": "Saat diliminiz kaydedilemedi. Tekrar deneyin.",
+      "loadFailed": "Saat diliminiz yüklenemedi",
+      "notifications": "Bildirimler",
+      "notificationsLink": "Bildirim ayarları"
+    },
+    "refresh": {
+      "title": "Yenileme geçmişi",
+      "description": "KolayXport'un mağazalarınızdan sipariş aktardığı her seferi gösterir.",
+      "refreshAll": "Tüm siparişleri yenile",
+      "refreshing": "Yenileniyor…",
+      "alreadyRunning": "Zaten bir yenileme çalışıyor",
+      "lastSuccess": "Son başarılı yenileme: {time} · {sources}",
+      "lastSuccessNoSources": "Son başarılı yenileme: {time}",
+      "col": {
+        "type": "Tür",
+        "status": "Durum",
+        "started": "Başlangıç",
+        "duration": "Süre",
+        "orders": "Siparişler (işlenen / başarılı / hatalı)"
+      },
+      "ordersAria": "{processed} işlendi, {successful} başarılı, {failed} hatalı",
+      "viewErrors": "Hataları gör",
+      "retry": "Tekrar dene",
+      "retrying": "Tekrar deneniyor…",
+      "retryBusy": "Başka bir yeniden deneme başlatılıyor",
+      "copyErrors": "Hata ayrıntılarını kopyala",
+      "copied": "Hata ayrıntıları kopyalandı",
+      "copyFailed": "Kopyalanamadı. Metni seçerek kopyalayın.",
+      "errorsTitle": "Bu yenilemedeki hatalar",
+      "orderRef": "Sipariş #{id}",
+      "noErrors": "Bu yenilemede hata yok",
+      "empty": {
+        "title": "Henüz yenileme yok",
+        "body": "Bir mağaza bağlayın, ardından siparişlerinizi aktarmak için yenileyin."
+      },
+      "loadFailed": "Yenileme geçmişi yüklenemedi",
+      "loadMore": "Daha fazla göster",
+      "loadingMore": "Yükleniyor…",
+      "loadMoreFailed": "Daha fazlası yüklenemedi",
+      "confirm": {
+        "title": "Tüm siparişler yenilensin mi?",
+        "body": "KolayXport bağlı mağazalarınızdaki tüm siparişleri yeniden aktarır. Bu birkaç dakika sürebilir."
+      },
+      "started": "Yenileme başladı",
+      "startFailed": "Yenileme başlatılamadı. Tekrar deneyin.",
+      "retryConfirm": {
+        "title": "Bu yenileme tekrar denensin mi?",
+        "body": "KolayXport aynı yenilemeyi yeniden çalıştırır."
+      },
+      "retryStarted": "Yeniden deneme başladı",
+      "retryFailed": "Yeniden deneme başlatılamadı. Tekrar deneyin.",
+      "types": {
+        "full": "Tam yenileme",
+        "scheduled": "Zamanlanmış yenileme",
+        "manual": "Elle yenileme",
+        "recent": "Son siparişleri yenileme",
+        "product": "Ürün yenileme",
+        "store": "{store} yenilemesi",
+        "other": "Yenileme"
+      }
     }
   },
   "importer": {
@@ -9175,6 +9473,179 @@
         "notConfigured": "Ödemeler geçici olarak kullanılamıyor. Lütfen destek ile iletişime geçin.",
         "redirecting": "Ödemeye yönlendiriliyor…"
       }
+    },
+    "pricingV2": {
+      "seo": {
+        "descriptionNeutral": "Siparişler, etiketler, ilanlar ve araştırma için planlar. 14 gün ücretsiz, kart gerekmez.",
+        "title": "Fiyatlandırma · KolayXport",
+        "description": "Aylık {price} fiyatından başlayan planlar. 14 gün ücretsiz, kart gerekmez.",
+        "ogAlt": "KolayXport fiyat planları"
+      },
+      "accountError": {
+        "title": "Hesabınız kontrol edilemedi",
+        "cause": "Hesabınıza uygun planları görmek için sayfayı yenileyin.",
+        "reload": "Yenile"
+      },
+      "title": "Fiyatlandırma",
+      "subtitle": "Etsy, eBay, Amazon, Trendyol ve daha fazlası için siparişler, etiketler, ilanlar ve araştırma.",
+      "trialLine": "14 gün ücretsiz. Kart gerekmez.",
+      "interval": {
+        "label": "Ödeme dönemi",
+        "monthly": "Aylık",
+        "yearly": "Yıllık · 2 ay bedava"
+      },
+      "currency": {
+        "label": "Para birimi",
+        "try": "₺ TL",
+        "usd": "$ USD",
+        "locked": "Hesabınız {currency} ile faturalandırılıyor."
+      },
+      "founding": {
+        "offer": "Kurucu üye fırsatı: İlk {total} aboneye ömür boyu %{percent} indirim",
+        "count": "{total} yerden {remaining} tanesi kaldı",
+        "few": "Yalnızca {remaining} yer kaldı",
+        "priceNote": "Kurucu üye fiyatı, ömür boyu",
+        "priceNoteYearly": "Kurucu üye fiyatı, ömür boyu · Aylık {price} karşılığı",
+        "fullTitle": "Kurucu üye kontenjanı az önce doldu",
+        "fullBody": "{plan} planı {price}. Ödemeye devam edilsin mi?",
+        "fullPriceMonth": "aylık {price}",
+        "fullPriceYear": "yıllık {price}",
+        "continue": "Devam et",
+        "notNow": "Şimdi değil"
+      },
+      "mostPopular": "En çok tercih edilen",
+      "perMonth": "/ ay",
+      "perYear": "/ yıl",
+      "listPrice": "Normal fiyat {price}",
+      "monthlyEquivalent": "Aylık {price} karşılığı · 2 ay bedava",
+      "customPrice": "Size özel fiyat",
+      "plansRegion": "Planlar ve fiyatlar",
+      "plans": {
+        "starter": {
+          "name": "Starter",
+          "tagline": "Bir veya iki mağaza için"
+        },
+        "growth": {
+          "name": "Growth",
+          "tagline": "Her pazaryerinde büyüyen mağazalar için"
+        },
+        "pro": {
+          "name": "Pro",
+          "tagline": "Finans ve arbitraj ihtiyacı olan çok mağazalı ekipler için"
+        },
+        "enterprise": {
+          "name": "Enterprise",
+          "tagline": "Yüksek hacim ve özel kurulumlar için"
+        }
+      },
+      "limit": {
+        "orders": "Ayda {count} sipariş",
+        "labels": "Ayda {count} etiket",
+        "stores": "{n, plural, other {{count} bağlı mağaza}}",
+        "ai": "Ayda {count} AI kredisi",
+        "unlimitedOrders": "Sınırsız sipariş",
+        "unlimitedLabels": "Sınırsız etiket",
+        "unlimitedStores": "Sınırsız mağaza",
+        "unlimitedAi": "Sınırsız AI"
+      },
+      "feature": {
+        "listing": "İlan ve toplu düzenleme",
+        "labels": "Kargo etiketleri",
+        "research": "Araştırma araçları",
+        "everythingIn": "{plan} planındaki her şey",
+        "arbitrage": "Arbitraj tarayıcı",
+        "financials": "Finans",
+        "bulkPhotoStudio": "Toplu fotoğraf stüdyosu",
+        "prioritySupport": "Öncelikli destek",
+        "dedicatedContact": "Size özel iletişim kişisi"
+      },
+      "cta": {
+        "startTrial": "Ücretsiz denemeyi başlat",
+        "choose": "{plan} planını seç",
+        "switch": "{plan} planına geç",
+        "current": "Mevcut plan",
+        "currentReason": "Bu plandasınız",
+        "talk": "Bize ulaşın",
+        "opening": "Ödeme sayfası açılıyor…",
+        "openingPortal": "Stripe açılıyor…",
+        "busyReason": "Başka bir plan açılıyor. Biraz bekleyin.",
+        "updatePaymentFirst": "Önce ödemeyi güncelleyin",
+        "updatePaymentReason": "Son ödemeniz başarısız oldu. Önce ödeme yönteminizi güncelleyin.",
+        "unknown": "Plan seçin",
+        "unknownReason": "Hesabınız kontrol edilemedi. Devam etmek için sayfayı yenileyin.",
+        "trialCarry": "{date} tarihine kadar ücret alınmaz."
+      },
+      "pastDueBanner": "Son ödemeniz başarısız oldu.",
+      "updatePayment": "Ödeme yöntemini güncelle",
+      "taxIncluded": "Fiyatlara KDV dahildir.",
+      "taxExcluded": "Fiyatlara KDV dahil değildir.",
+      "compare": {
+        "title": "Planları karşılaştır",
+        "feature": "Özellik",
+        "orders": "Aylık sipariş",
+        "labels": "Aylık etiket",
+        "stores": "Bağlı mağaza",
+        "ai": "Aylık AI kredisi",
+        "marketplaces": "Pazaryerleri",
+        "all": "Tümü",
+        "carriers": "Kargo: FedEx, UPS, DHL eCommerce",
+        "listing": "İlan düzenleyici, toplu düzenleyici",
+        "support": "Destek",
+        "supportEmail": "E-posta",
+        "supportPriority": "Öncelikli",
+        "supportDedicated": "Özel",
+        "unlimited": "Sınırsız",
+        "included": "Dahil",
+        "notIncluded": "Dahil değil",
+        "pickPlan": "Planı göster"
+      },
+      "hint": {
+        "orders": "Bir sipariş, aktarıldığında bir kez sayılır.",
+        "stores": "Her Etsy mağazası, eBay hesabı, Amazon hesabı, Trendyol hesabı, Wix sitesi veya Shopify mağazası bir mağaza sayılır. Kargo firmaları sayılmaz.",
+        "ai": "Bir metin işlemi 1, bir görsel 10 kredi kullanır."
+      },
+      "faq": {
+        "title": "Sık sorulan sorular",
+        "trial": {
+          "q": "Ücretsiz deneme nasıl işler?",
+          "a": "Kart girmeden 14 gün boyunca Pro özelliklerini kullanırsınız. Deneme bitince plan seçmek için 3 gününüz daha olur. Sonrasında sipariş aktarımı, etiketler ve AI duraklar; verileriniz silinmez."
+        },
+        "limits": {
+          "q": "Bir sınırı aşarsam ne olur?",
+          "a": "%80'e geldiğinizde size haber veririz. Alıcılarınızın verdiği siparişler gelmeye devam eder. Zamanlanmış aktarımlar sipariş sınırınızın %110'unda, yeni etiketler ve AI ise %100'de bir sonraki aya veya plan değiştirene kadar durur."
+        },
+        "founding": {
+          "q": "Kurucu üye fırsatı nedir?",
+          "a": "İlk {total} abonemiz, abonelikleri devam ettiği sürece her planda ve her ödeme döneminde %{percent} daha az öder."
+        },
+        "change": {
+          "q": "Planımı değiştirebilir veya iptal edebilir miyim?",
+          "a": "Evet, Ayarlar'dan istediğiniz zaman. Yükseltmeler hemen geçerli olur. İptal ederseniz ödediğiniz dönemin sonuna kadar planınız devam eder."
+        },
+        "currency": {
+          "q": "Lira veya dolar ile ödeyebilir miyim?",
+          "a": "Evet. Ödemeden önce ₺ veya $ seçin. Hesabınız sonrasında bu para biriminde kalır."
+        },
+        "data": {
+          "q": "Verilerim nasıl korunuyor?",
+          "a": "Pazaryeri anahtarları şifrelenir ve verileriniz AB'deki sunucularımızda kalır. Verilerinizi asla satmayız."
+        }
+      },
+      "enterprise": {
+        "title": "Pro yetmiyor mu?",
+        "body": "Enterprise için bize ulaşın: sınırsız kullanım ve size özel bir iletişim kişisi."
+      },
+      "checkout": {
+        "failed": "Ödeme sayfası açılamadı. Tekrar deneyin.",
+        "forbidden": "Bu hesap buradan plan satın alamaz.",
+        "portalFailed": "Stripe açılamadı. Tekrar deneyin."
+      },
+      "reviewerSummary": {
+        "title": "Pricing summary (English)",
+        "plan": "{plan}: {monthTry}/month ({yearTry}/year) or {monthUsd}/month ({yearUsd}/year). {orders} orders, {labels} labels, {stores} connected stores and {ai} AI credits a month.",
+        "enterprise": "Enterprise: custom quote with unlimited usage, through our contact form.",
+        "footer": "Every plan starts with a 14-day free trial without a card. Every marketplace and carrier integration is included. No other fees."
+      }
     }
   },
   "ui": {
@@ -10656,6 +11127,41 @@
   "pro": {
     "preview": {
       "caption": "Örnek verilerle gösterim"
+    },
+    "locked": {
+      "seePlans": "Planları gör",
+      "trialEnded": "Deneme süreniz {date} tarihine kadar bunu içeriyordu.",
+      "paused": {
+        "title": "Planınız durduruldu"
+      },
+      "reactivate": "Yeniden etkinleştir",
+      "neutral": {
+        "title": "Bu özellik planınıza dahil değil",
+        "body": "Planınız siparişleri, etiketleri, ilanları, toplu düzenlemeyi ve araştırmayı kapsar."
+      }
+    },
+    "feature": {
+      "financials": {
+        "title": "Kâr raporu Pro planına dahildir",
+        "body": "Sipariş ve ürün bazında gerçek kârınızı görün: tüm pazaryerlerinden komisyonlar, reklam harcaması, kargo ve ürün maliyetleri.",
+        "p1": "Tüm kesintiler sonrası sipariş başına kâr",
+        "p2": "Siparişlerle eşleşen ödemeler",
+        "p3": "CSV dışa aktarma"
+      },
+      "bulkPhotoStudio": {
+        "title": "Fotoğraf stüdyosu Pro planına dahildir",
+        "body": "Birçok ilanda fotoğrafları tek seferde ekleyin, değiştirin, sıralayın ve alt metin yazın; AI kalite ve arka plan araçlarıyla.",
+        "p1": "100 ilanda tek adımda aynı değişiklik",
+        "p2": "Her fotoğraf için AI alt metin",
+        "p3": "Birçok ilana aynı anda video"
+      },
+      "arbitrage": {
+        "title": "Fiyat farkı analizi Pro planına dahildir",
+        "body": "eBay ve Etsy'de daha pahalıya satılan Trendyol ürünlerini, kendi kargo etiketlerinizden hesaplanan toplam maliyetle bulun.",
+        "p1": "Güven düzeyli eşleşmeler",
+        "p2": "Komisyon ve kargo sonrası marj",
+        "p3": "Tek tıkla eBay'de listeleme"
+      }
     }
   },
   "listingScore": {
@@ -10819,6 +11325,655 @@
       "searchError": "Siparişler aranamadı",
       "noOrders": "“{query}” ile eşleşen sipariş yok",
       "cancel": "Vazgeç"
+    }
+  },
+  "orders": {
+    "page": {
+      "title": "Siparişler"
+    },
+    "meta": {
+      "refreshed": "{time} yenilendi",
+      "refreshing": "Siparişler yenileniyor…",
+      "refreshFailed": "Siparişler yenilenemedi",
+      "stores": "{count} mağaza"
+    },
+    "actions": {
+      "refresh": "Siparişleri yenile",
+      "createLabels": "{count} etiket oluştur",
+      "createLabelsPartial": "{skipped} sipariş için burada etiket oluşturulamaz: {reason}",
+      "createLabel": "Etiket oluştur",
+      "printLabel": "Etiketi yazdır",
+      "printLabels": "Etiketler",
+      "print": "Yazdır",
+      "printPickListPage": "Bu sayfanın toplama listesini yazdır",
+      "printPackingSlip": "Paket fişini yazdır",
+      "printLabelsLimit": "İlk {max} etiket yazdırılıyor. Kalanlar için Yazdır'ı tekrar kullanın.",
+      "addManualOrder": "Manuel sipariş ekle",
+      "export": "Dışa aktar",
+      "copyAddresses": "Adresleri kopyala",
+      "addressesCopied": "{count} adres kopyalandı",
+      "sendEtgb": "ETGB belgelerini gönder",
+      "addTracking": "Takip numarası ekle",
+      "copyTracking": "Takip numarasını kopyala",
+      "openOrder": "Siparişi aç",
+      "openOn": "{marketplace} üzerinde aç",
+      "copyAddressIntl": "Adresi kopyala (uluslararası)",
+      "copyAddressTr": "Adresi kopyala (Türkiye formatı)",
+      "messageBuyer": "Alıcıya mesaj gönder",
+      "fixAddress": "Adresi düzelt",
+      "deleteLabel": "Etiketi sil…",
+      "deleteOrder": "Siparişi sil…"
+    },
+    "toolbar": {
+      "searchPlaceholder": "Sipariş no, alıcı, SKU, takip no ara…",
+      "store": "Mağaza",
+      "storeAll": "Tüm mağazalar",
+      "status": "Durum",
+      "orderDate": "Sipariş tarihi",
+      "anyDate": "Tüm tarihler",
+      "searchIn": "Arama alanı",
+      "sort": "Sırala",
+      "results": "{count} sonuç",
+      "updating": "Güncelleniyor…",
+      "searchAllDates": "Arama tüm tarihleri kapsar"
+    },
+    "searchIn": {
+      "all": "Tüm alanlar",
+      "customer": "Alıcı",
+      "order": "Sipariş numarası",
+      "tracking": "Takip numarası",
+      "product": "Ürün",
+      "sku": "SKU",
+      "city": "Şehir",
+      "phone": "Telefon",
+      "note": "Not"
+    },
+    "sort": {
+      "orderedAtDesc": "En yeni önce",
+      "orderedAtAsc": "En eski önce",
+      "shipByAsc": "Kargolama tarihi, en yakın",
+      "totalDesc": "Tutar, en yüksek",
+      "totalAsc": "Tutar, en düşük",
+      "customerAsc": "Alıcı, A–Z"
+    },
+    "views": {
+      "label": "Görünüm",
+      "toShip": "Gönderilecek",
+      "overdue": "Geciken",
+      "labelCreated": "Etiket hazır",
+      "shipped": "Kargoda",
+      "problems": "Sorunlu",
+      "all": "Tüm siparişler",
+      "goTo": "{view} görünümüne git"
+    },
+    "columns": {
+      "order": "Sipariş",
+      "store": "Mağaza",
+      "total": "Tutar",
+      "status": "Durum",
+      "shipBy": "Kargolama tarihi",
+      "orderedAt": "Sipariş tarihi",
+      "tracking": "Takip",
+      "carrierCost": "Kargo maliyeti"
+    },
+    "row": {
+      "moreItems": "+{count} ürün",
+      "buyerHidden": "İsim Amazon tarafından gizlendi",
+      "buyerHiddenHint": "Amazon alıcı isimlerini yalnızca SP-API uygulamanızda kişisel veri yetkisi varsa paylaşır.",
+      "manualStore": "Manuel sipariş",
+      "fba": "Amazon tarafından gönderilir",
+      "mcf": "Çok Kanallı Gönderim (MCF)",
+      "upgrade": "{upgrade} kargo",
+      "note": "Özel not",
+      "currencyUnknown": "Para birimi bilinmiyor",
+      "trackingSent": "Takip gönderildi ✓",
+      "trackingQueued": "Eklenti için sırada",
+      "trackingFailed": "Takip gönderilemedi",
+      "trackingCopied": "Takip numarası kopyalandı"
+    },
+    "problem": {
+      "addressIncomplete": "Adres eksik: {fields} yok",
+      "addressIncompleteShort": "adres eksik",
+      "field": {
+        "street1": "sokak adresi",
+        "city": "şehir",
+        "postal": "posta kodu",
+        "country": "ülke"
+      },
+      "etsyAddressHidden": "Etsy alıcı adreslerini API üzerinden paylaşmıyor. Adresi almak için siparişi Chrome eklentisi açıkken Etsy'de açın.",
+      "labelFailed": "Etiket oluşturulamadı: {reason}"
+    },
+    "bulk": {
+      "reasonClosed": "zaten kargoya verilmiş veya kapanmış",
+      "noLabels": "Seçili siparişlerin hiçbirinde henüz etiket yok",
+      "copyFailed": "Panoya kopyalanamadı",
+      "tsv": {
+        "orderNumber": "Sipariş numarası",
+        "name": "Ad",
+        "street1": "Adres satırı 1",
+        "street2": "Adres satırı 2",
+        "city": "Şehir",
+        "state": "Eyalet / bölge",
+        "postal": "Posta kodu",
+        "country": "Ülke",
+        "phone": "Telefon",
+        "email": "E-posta"
+      }
+    },
+    "export": {
+      "title": "Siparişleri dışa aktar",
+      "selected": "{count} seçili sipariş",
+      "allMatching": "Filtrelere uyan tümü",
+      "allMatchingCount": "Filtrelere uyan {count} siparişin tümü",
+      "csv": "CSV",
+      "excel": "Excel",
+      "pdf": "PDF",
+      "preparing": "{count} sipariş hazırlanıyor…",
+      "done": "{count} sipariş dışa aktarıldı",
+      "empty": "Dışa aktarılacak sipariş yok",
+      "tooMany": "Tek seferde en fazla {max} sipariş dışa aktarılabilir. Filtreleri daraltın.",
+      "failed": "Siparişler dışa aktarılamadı"
+    },
+    "etgb": {
+      "sending": "{count} sipariş için ETGB belgeleri gönderiliyor…",
+      "sent": "ETGB belgeleri {email} adresine gönderildi",
+      "noEmail": "Önce Ayarlar'dan ETGB e-posta adresini ekleyin",
+      "failed": "ETGB belgeleri gönderilemedi",
+      "openSettings": "Ayarları aç"
+    },
+    "empty": {
+      "firstUse": {
+        "title": "Siparişlerinizi görmek için bir mağaza bağlayın",
+        "body": "Etsy, eBay, Amazon, Trendyol ve diğer mağazalarınızın siparişleri burada görünür. Manuel sipariş de ekleyebilirsiniz.",
+        "action": "Mağaza bağla"
+      },
+      "noResults": {
+        "title": "Bu filtrelere uyan sipariş yok",
+        "action": "Filtreleri temizle"
+      },
+      "noResultsSearch": "\"{query}\" ile eşleşen sipariş yok",
+      "done": {
+        "toShip": "Tüm siparişlerin etiketi hazır",
+        "overdue": "Geciken sipariş yok",
+        "problems": "Düzeltilecek sorun yok"
+      },
+      "labelCreated": "Kargoya verilmeyi bekleyen etiket yok"
+    },
+    "error": {
+      "title": "Siparişler yüklenemedi"
+    },
+    "limit": {
+      "syncs": "Planınızdaki bu ayki {limit} sipariş senkronizasyon hakkının tamamını kullandınız",
+      "syncsReached": "Planınızdaki bu ayki sipariş senkronizasyon hakkının tamamını kullandınız",
+      "seePlans": "Planları gör"
+    },
+    "confirm": {
+      "deleteOrder": {
+        "title": "{number} numaralı sipariş silinsin mi?",
+        "body": "Sipariş yalnızca KolayXport'tan silinir. {marketplace} tarafında hiçbir şey değişmez.",
+        "confirm": "Siparişi sil",
+        "bodyManual": "Sipariş KolayXport'tan silinir.",
+        "failed": "Sipariş silinemedi"
+      },
+      "deleteLabel": {
+        "title": "{number} numaralı siparişin etiketi silinsin mi?",
+        "body": "Etiket KolayXport'tan kaldırılır, kargo firmasında iptal edilmez.",
+        "confirm": "Etiketi sil",
+        "failed": "Etiket silinemedi"
+      }
+    },
+    "panel": {
+      "addressSavedManual": "Adres kaydedildi.",
+      "trackingSentTo": "Takip numarası {mp, select, etsy {Etsy'ye} ebay {eBay'e} amazon {Amazon'a} trendyol {Trendyol'a} wix {Wix'e} shopify {Shopify'a} hepsiburada {Hepsiburada'ya} other {pazaryerine}} gönderildi",
+      "cancel": "Vazgeç",
+      "saving": "Kaydediliyor…",
+      "retry": "Tekrar dene",
+      "noteSaving": "Kaydediliyor…",
+      "noteSaved": "Kaydedildi",
+      "addressLocalOnly": "Yalnızca KolayXport'ta kaydedilir. Pazaryerindeki sipariş değişmez.",
+      "addressSaveFailed": "Adres kaydedilemedi",
+      "addressCopied": "Adres kopyalandı",
+      "copyFailed": "Kopyalanamadı",
+      "carrierCostSaveFailed": "Kargo maliyeti kaydedilemedi",
+      "carrierCostCurrency": "Kargo maliyeti para birimi",
+      "trackingPending": "{mp, select, etsy {Etsy'ye} ebay {eBay'e} amazon {Amazon'a} trendyol {Trendyol'a} wix {Wix'e} shopify {Shopify'a} hepsiburada {Hepsiburada'ya} other {pazaryerine}} gönderildi, onay bekleniyor",
+      "labelFailedNoReason": "Son etiket denemesi başarısız oldu",
+      "labelFileMissing": "Bu etiketin dosyası kayıtlı değil. Yalnızca takip numarası var.",
+      "lifecycle": "Pazaryeri güncellemeleri"
+    },
+    "history": {
+      "trackingSent": "Takip numarası {mp, select, etsy {Etsy'ye} ebay {eBay'e} amazon {Amazon'a} trendyol {Trendyol'a} wix {Wix'e} shopify {Shopify'a} hepsiburada {Hepsiburada'ya} other {pazaryerine}} gönderildi",
+      "orderedManual": "Manuel sipariş olarak eklendi",
+      "trackingQueued": "Takip numarası Chrome eklentisi için sıraya alındı",
+      "trackingFailed": "Takip numarası gönderilemedi"
+    },
+    "tracking": {
+      "submit": "{mp, select, etsy {Etsy'ye} ebay {eBay'e} amazon {Amazon'a} trendyol {Trendyol'a} wix {Wix'e} shopify {Shopify'a} hepsiburada {Hepsiburada'ya} other {pazaryerine}} gönder",
+      "sent": "Takip numarası {mp, select, etsy {Etsy'ye} ebay {eBay'e} amazon {Amazon'a} trendyol {Trendyol'a} wix {Wix'e} shopify {Shopify'a} hepsiburada {Hepsiburada'ya} other {pazaryerine}} gönderildi",
+      "invalid": "8 ile 40 arasında harf ve rakam girin",
+      "required": "Takip numarasını girin",
+      "savedNotSent": "KolayXport'ta kaydedildi, ancak {mp, select, etsy {Etsy'ye} ebay {eBay'e} amazon {Amazon'a} trendyol {Trendyol'a} wix {Wix'e} shopify {Shopify'a} hepsiburada {Hepsiburada'ya} other {pazaryerine}} gönderilemedi",
+      "notConnected": "Önce Ayarlar'dan {mp, select, etsy {Etsy} ebay {eBay} amazon {Amazon} trendyol {Trendyol} wix {Wix} shopify {Shopify} hepsiburada {Hepsiburada} other {pazaryeri}} hesabını bağlayın",
+      "network": "Bağlantınızı kontrol edip tekrar deneyin"
+    },
+    "messageBuyer": {
+      "title": "Amazon alıcısına mesaj gönder",
+      "order": "Sipariş {number}",
+      "outboundOnly": "Amazon satıcıların yalnızca şablon mesaj göndermesine izin verir. Alıcının yanıtları buraya gelmez.",
+      "mcf": "Bu bir Çok Kanallı Gönderim (MCF) siparişi. Amazon bu sipariş için mesaja izin vermez.",
+      "typeLabel": "Mesaj türü",
+      "type": {
+        "unexpectedProblem": "Beklenmeyen sorun",
+        "confirmDeliveryDetails": "Teslimat bilgilerini doğrula",
+        "confirmOrderDetails": "Sipariş bilgilerini doğrula",
+        "confirmCustomizationDetails": "Kişiselleştirme bilgilerini doğrula",
+        "confirmServiceDetails": "Hizmet bilgilerini doğrula",
+        "reviewRequest": "Değerlendirme iste"
+      },
+      "reviewHint": "Amazon alıcıya kendi değerlendirme isteğini gönderir. Metin gerekmez.",
+      "notAllowed": "Amazon bu sipariş için şu anda bu mesaja izin vermiyor",
+      "checking": "Amazon'un izin verdiği mesajlar kontrol ediliyor…",
+      "text": "Mesaj",
+      "textRequired": "Mesajı yazın",
+      "send": "Amazon'a gönder",
+      "requestReview": "Değerlendirme iste",
+      "sending": "Gönderiliyor…",
+      "sent": "Mesaj alıcıya gönderildi",
+      "reviewSent": "Değerlendirme isteği gönderildi",
+      "failed": "Mesaj gönderilemedi",
+      "failedCause": "Amazon kabul etmedi. Bu mesaj türüne sipariş için henüz izin verilmiyor olabilir."
+    },
+    "manual": {
+      "title": "Manuel sipariş ekle",
+      "customer": "Müşteri",
+      "name": "Müşteri adı",
+      "email": "E-posta",
+      "phone": "Telefon",
+      "orderNumber": "Sipariş numarası",
+      "orderNumberHint": "Kendi referansınız, örneğin bir Instagram siparişi",
+      "currency": "Para birimi",
+      "address": "Teslimat adresi",
+      "country": "Ülke",
+      "street1": "Adres satırı 1",
+      "street2": "Adres satırı 2",
+      "city": "Şehir",
+      "postal": "Posta kodu",
+      "state": "Eyalet",
+      "province": "Eyalet",
+      "stateProvince": "Eyalet veya bölge",
+      "items": "Ürünler",
+      "itemN": "Ürün {n}",
+      "productName": "Ürün adı",
+      "sku": "SKU",
+      "price": "Fiyat",
+      "quantity": "Adet",
+      "weight": "Ağırlık",
+      "addItem": "Ürün ekle",
+      "removeItem": "Ürünü kaldır",
+      "total": "Toplam {amount}",
+      "submit": "Siparişi oluştur",
+      "submitting": "Sipariş oluşturuluyor…",
+      "created": "{number} numaralı sipariş oluşturuldu",
+      "duplicate": "Bu sipariş numarası zaten var",
+      "failed": "Sipariş oluşturulamadı",
+      "failedBody": "Hiçbir şey kaydedilmedi. Tekrar deneyin.",
+      "sessionExpired": "Oturumunuz sona erdi. Tekrar giriş yapın.",
+      "discardTitle": "Sipariş kaydedilmeden kapatılsın mı?",
+      "validation": {
+        "positive": "0'dan büyük bir sayı girin",
+        "required": "Zorunlu",
+        "fixFields": "Devam etmek için {count} alanı düzeltin"
+      }
+    }
+  },
+  "createLabel": {
+    "terms": {
+      "fromProfile": "FedEx, gönderici profilinizdeki gümrük vergisi ayarını kullanır.",
+      "label": "Gümrük vergilerini ödeyen",
+      "dap": "Alıcı (DAP)",
+      "ddp": "Ben (DDP)"
+    },
+    "bulk": {
+      "printNext": "Sonraki {count} etiketi yazdır",
+      "pushFailed": "{count} takip numarası gönderilemedi",
+      "title": "{count} etiket oluştur",
+      "hint": "Tüm siparişlerde bu kargo firması, servis ve paket kullanılır. Ağırlık her siparişten alınır.",
+      "orders": "Siparişler",
+      "order": "Sipariş",
+      "status": "Durum",
+      "ready": "Hazır",
+      "problem": "Sorun",
+      "running": "Oluşturuluyor…",
+      "sent": "Oluşturuldu",
+      "failed": "Başarısız",
+      "notStarted": "Başlatılmadı",
+      "missing": "{fields} eksik",
+      "guardCancelled": "{mp, select, etsy {Etsy'de} ebay {eBay'de} amazon {Amazon'da} trendyol {Trendyol'da} wix {Wix'te} shopify {Shopify'da} hepsiburada {Hepsiburada'da} other {pazaryerinde}} iptal edildi",
+      "guardShipped": "{mp, select, etsy {Etsy'de} ebay {eBay'de} amazon {Amazon'da} trendyol {Trendyol'da} wix {Wix'te} shopify {Shopify'da} hepsiburada {Hepsiburada'da} other {pazaryerinde}} zaten kargolandı",
+      "createAnyway": "Yine de oluştur",
+      "summary": "{ready} hazır · {blocked} siparişte eksik bilgi var",
+      "fix": "Düzelt",
+      "retry": "Tekrar dene",
+      "submit": "{count} etiket oluştur",
+      "runningPrimary": "{total} etiketten {done}. oluşturuluyor…",
+      "stop": "Bu etiketten sonra durdur",
+      "stopConfirm": "Etiket oluşturma durdurulsun mu?",
+      "stopBody": "Şu an oluşturulan etiket tamamlanır. Kalanlar oluşturulmaz.",
+      "stopAction": "Durdur",
+      "keepRunning": "Devam et",
+      "done": "{ok} etiket oluşturuldu · {failed} başarısız",
+      "retryFailed": "Başarısızları tekrar dene",
+      "printAll": "{count} etiketi yazdır",
+      "dhlMixed": "DHL eCommerce yalnızca tüm siparişler Türkiye içine gönderiliyorsa kullanılabilir",
+      "presetDefault": "Ağırlık her siparişten",
+      "sendTracking": "Takip numarasını her pazaryerine gönder"
+    },
+    "title": "Etiket oluştur · Sipariş {number}",
+    "backToOrder": "Sipariş",
+    "from": "Gönderen",
+    "change": "Değiştir",
+    "senderMissing": {
+      "title": "Etiket oluşturmak için gönderici profilinizi tamamlayın",
+      "action": "Gönderici profilini aç",
+      "reason": "Önce gönderici profilinizi tamamlayın"
+    },
+    "shipTo": "Alıcı",
+    "edit": "Düzenle",
+    "done": "Tamam",
+    "field": {
+      "name": "Alıcı adı",
+      "phone": "Telefon",
+      "email": "E-posta",
+      "country": "Ülke",
+      "street1": "Adres satırı 1",
+      "street2": "Adres satırı 2",
+      "city": "Şehir",
+      "postal": "Posta kodu",
+      "state": "Eyalet / bölge",
+      "district": "İlçe",
+      "neighbourhood": "Mahalle",
+      "weight": "Ağırlık",
+      "length": "Uzunluk",
+      "width": "Genişlik",
+      "height": "Yükseklik",
+      "packaging": "Ambalaj",
+      "description": "Açıklama",
+      "hsCode": "GTİP kodu",
+      "origin": "Menşe ülke",
+      "quantity": "Adet",
+      "value": "Değer",
+      "currency": "Para birimi",
+      "ioss": "IOSS numarası",
+      "vat": "Alıcı KDV numarası",
+      "invoiceNumber": "Fatura numarası",
+      "signature": "İmza",
+      "labelFormat": "Etiket formatı"
+    },
+    "unit": {
+      "kg": "kg",
+      "cm": "cm"
+    },
+    "package": "Paket",
+    "presets": "Hazır paketler",
+    "presetNone": "Henüz hazır paket yok",
+    "presetPick": "Hazır paket seçin",
+    "savePreset": "Hazır paket olarak kaydet…",
+    "presetTitle": "Hazır paket olarak kaydet",
+    "presetName": "Hazır paket adı",
+    "presetDefault": "Varsayılan olarak kullan",
+    "presetSave": "Hazır paketi kaydet",
+    "presetSaved": "Hazır paket kaydedildi",
+    "presetFailed": "Hazır paket kaydedilemedi",
+    "dimsHint": "Pak ve zarf için isteğe bağlı",
+    "packagingOwn": "Kendi ambalajınız",
+    "carrier": "Kargo firması ve servis",
+    "refreshRates": "Fiyatları yenile",
+    "recommended": "Önerilen",
+    "transitDays": "{min}–{max} gün",
+    "noPrice": "Fiyat kargo faturasında görünür.",
+    "ratesFailed": "Fiyatlar alınamadı",
+    "unavailable": {
+      "domesticOnly": "Yalnızca Türkiye içi",
+      "notConnected": "{carrier} hesabını Ayarlar'dan bağlayın",
+      "incomplete": "{carrier} kurulumu eksik",
+      "checkFailed": "{carrier} kontrol edilemedi"
+    },
+    "openSettings": "Ayarları aç",
+    "noCarrier": {
+      "title": "Etiket oluşturmak için bir kargo firması bağlayın",
+      "action": "Kargo firması bağla"
+    },
+    "customs": "Gümrük",
+    "customsItems": "{count} ürün",
+    "exportReason": {
+      "label": "İhracat nedeni",
+      "sale": "Satış",
+      "gift": "Hediye",
+      "sample": "Numune",
+      "return": "İade",
+      "repair": "Onarım"
+    },
+    "sendEtgb": "Etiket oluşturulduktan sonra ETGB belgesini gönder",
+    "options": "Seçenekler",
+    "sendTracking": "Etiket oluşturulduktan sonra takip numarasını {mp, select, etsy {Etsy'ye} ebay {eBay'e} amazon {Amazon'a} trendyol {Trendyol'a} wix {Wix'e} shopify {Shopify'a} hepsiburada {Hepsiburada'ya} other {pazaryerine}} gönder",
+    "signature": {
+      "none": "Yok",
+      "indirect": "Dolaylı",
+      "direct": "Doğrudan",
+      "adult": "Yetişkin"
+    },
+    "dhl": {
+      "paymentType": "Kargo ücretini ödeyen",
+      "paymentSender": "Ben",
+      "paymentRecipient": "Alıcı",
+      "deliveryType": "Teslimat tipi",
+      "delivery": {
+        "address": "Adrese teslim",
+        "branch": "Şubeden teslim"
+      },
+      "service": {
+        "standard": "Standart",
+        "express": "Ekspres",
+        "sameDay": "Aynı gün"
+      },
+      "packaging": {
+        "parcel": "Koli / paket",
+        "envelope": "Zarf veya dosya",
+        "bag": "Poşet"
+      },
+      "cod": "Kapıda ödeme",
+      "codAmount": "Tahsil edilecek tutar",
+      "smsShipped": "Kargoya verilince alıcıya SMS gönder",
+      "smsDelivered": "Teslimatta alıcıya SMS gönder",
+      "content": "İçerik"
+    },
+    "saveWithoutCreating": "Oluşturmadan bilgileri kaydet",
+    "detailsSaved": "Bilgiler kaydedildi",
+    "detailsFailed": "Bilgiler kaydedilemedi",
+    "total": "Toplam {amount}",
+    "cancel": "İptal",
+    "submit": "Etiket oluştur",
+    "submitting": "Etiket oluşturuluyor…",
+    "fixFields": "Devam etmek için {count} alanı düzeltin",
+    "validation": {
+      "required": "Zorunlu",
+      "weight": "0'dan büyük bir ağırlık girin",
+      "phoneDhl": "DHL eCommerce için alıcının telefonu gerekli",
+      "districtDhl": "DHL eCommerce için ilçe gerekli",
+      "stateRequired": "{country} için zorunlu",
+      "maxChars": "En fazla {max} karakter",
+      "hsFormat": "6 ile 10 hane arasında girin"
+    },
+    "error": {
+      "title": "Etiket oluşturulamadı",
+      "carrierSaid": "{carrier} yanıtı: {message}",
+      "tryAgain": "Tekrar dene"
+    },
+    "settingsFailed": "Gönderim ayarlarınız yüklenemedi",
+    "limit": {
+      "title": "Bu dönem için planınızdaki tüm etiketleri kullandınız",
+      "action": "Planları gör",
+      "reason": "Etiket sınırına ulaşıldı"
+    },
+    "existing": {
+      "title": "Bu siparişin zaten bir etiketi var",
+      "another": "Başka bir etiket oluştur…",
+      "confirmTitle": "{number} numaralı sipariş için ikinci etiket oluşturulsun mu?",
+      "confirm": "Yine de oluştur",
+      "deleteLabel": "Etiketi sil…",
+      "deleteTitle": "{number} numaralı siparişin etiketi silinsin mi?",
+      "deleteBody": "Yalnızca KolayXport'tan kaldırılır. Kargo firmasında iptal edilmez.",
+      "deleteConfirm": "Etiketi sil",
+      "deleted": "Etiket silindi",
+      "deleteFailed": "Etiket silinemedi"
+    },
+    "success": {
+      "title": "Etiket oluşturuldu · {service}",
+      "tracking": "Takip numarası",
+      "trackingSending": "Takip numarası gönderiliyor…",
+      "trackingSent": "Takip numarası {mp, select, etsy {Etsy'ye} ebay {eBay'e} amazon {Amazon'a} trendyol {Trendyol'a} wix {Wix'e} shopify {Shopify'a} hepsiburada {Hepsiburada'ya} other {pazaryerine}} gönderildi",
+      "trackingQueued": "Chrome eklentisi için sıraya alındı · Göndermek için Etsy'yi açın",
+      "trackingFailed": "Takip numarası gönderilemedi",
+      "retry": "Tekrar dene",
+      "etgbSent": "ETGB belgesi {email} adresine gönderildi",
+      "etgbFailed": "ETGB belgesi gönderilemedi",
+      "alertTitle": "{carrier} bu etikete bir not ekledi",
+      "preview": "Etiket önizlemesi",
+      "previewUnavailable": "Bu dosya için önizleme yok. Etiketi yazdır'ı kullanın.",
+      "print": "Etiketi yazdır",
+      "download": "PDF indir",
+      "next": "Sonraki sipariş",
+      "openFailed": "Etiket açılamadı. KolayXport için açılır pencerelere izin verin."
+    }
+  },
+  "billing": {
+    "banner": {
+      "pastDueNoDate": "Son ödemeniz başarısız oldu. Sipariş aktarmaya devam etmek için kartınızı güncelleyin.",
+      "grace": "Denemeniz bitti. Sipariş aktarmaya ve etiket oluşturmaya devam etmek için {date} tarihine kadar bir plan seçin.",
+      "expired": "Hesabınız duraklatıldı.",
+      "pastDue": "Son ödemeniz başarısız oldu. Sipariş aktarmaya devam etmek için kartınızı {date} tarihine kadar güncelleyin.",
+      "confirming": "Ödemeniz Stripe ile doğrulanıyor…",
+      "confirmTimeout": "Ödeme alındı. Planınız birkaç dakika içinde güncellenecek."
+    },
+    "usage": {
+      "pausedLabels": "Sınıra ulaşıldı. Yeni etiketler {date} tarihine kadar duraklatıldı.",
+      "pausedAi": "Sınıra ulaşıldı. AI araçları {date} tarihine kadar duraklatıldı.",
+      "title": "Bu dönemdeki kullanım",
+      "titleTrial": "Deneme süresindeki kullanım",
+      "resets": "{date} tarihinde sıfırlanır · {days} gün sonra",
+      "meter": {
+        "orders": "Siparişler",
+        "ordersLegacy": "Sipariş aktarımları",
+        "labels": "Kargo etiketleri",
+        "connectedStores": "Bağlı mağazalar",
+        "aiCredits": "AI kredisi"
+      },
+      "noun": {
+        "orders": "Sipariş",
+        "labels": "Etiket",
+        "connectedStores": "Bağlı mağaza",
+        "aiCredits": "AI kredisi"
+      },
+      "near": "{meter} hakkınızın %{percent} kadarı kullanıldı.",
+      "nearUpsell": "{plan} planı ayda {limit} içerir.",
+      "nearUpsellStores": "{plan} planı {limit} mağaza içerir.",
+      "ordersOver": "Sınıra ulaşıldı. Zamanlanmış aktarımlar {cap} siparişte durur.",
+      "paused": "Sınıra ulaşıldı. {date} tarihine kadar duraklatıldı.",
+      "limitReached": "Sınıra ulaşıldı.",
+      "aiHelp": "Bir metin işlemi 1, bir görsel 10 kredi kullanır.",
+      "manageStores": "Mağazaları yönet",
+      "soon": "Ayrıntılı kullanım yakında burada görünecek.",
+      "loadFailed": "Kullanım bilgisi yüklenemedi"
+    },
+    "title": "Plan ve faturalandırma",
+    "titleShopify": "Plan",
+    "description": "Planınız, bu ayki kullanımınız ve faturalarınız.",
+    "planName": {
+      "trial": "Ücretsiz deneme",
+      "starter": "Starter",
+      "growth": "Growth",
+      "pro": "Pro",
+      "enterprise": "Enterprise",
+      "shopify_free": "Shopify planı",
+      "none": "Plan yok"
+    },
+    "plan": {
+      "billedMonthly": "Aylık, {currency} olarak faturalandırılır",
+      "billedYearly": "Yıllık, {currency} olarak faturalandırılır",
+      "perMonth": "{price} / ay",
+      "perYear": "{price} / yıl",
+      "founding": "Kurucu üye · ömür boyu %40 indirim",
+      "nextPayment": "Sonraki ödeme: {date} · {amount}",
+      "trialEnds": "{date} tarihinde bitiyor · {days} gün kaldı",
+      "trialIncludes": "Tüm Pro özellikleri dahil. Kayıtlı kart yok.",
+      "canceling": "{date} tarihinde iptal edilecek. O tarihe kadar {plan} planınız devam eder.",
+      "expired": "Verileriniz güvende. Sipariş aktarımı, etiketler ve AI duraklatıldı.",
+      "enterprise": "Hesap yöneticiniz tarafından yönetilir.",
+      "shopify": "KolayXport Shopify uygulamasına dahildir. Burada ödenecek bir şey yok."
+    },
+    "action": {
+      "choosePlan": "Plan seç",
+      "comparePlans": "Planları karşılaştır",
+      "changePlan": "Planı değiştir",
+      "keepPlan": "Planımı koru",
+      "updatePayment": "Ödeme yöntemini güncelle",
+      "manageInStripe": "Faturalandırmayı Stripe'ta yönet",
+      "cancel": "Aboneliği iptal et…",
+      "contactUs": "Bize ulaşın",
+      "refresh": "Yenile",
+      "opening": "Açılıyor…"
+    },
+    "paymentMethod": {
+      "label": "Ödeme yöntemi",
+      "card": "{brand} •••• {last4} · son kullanma {month}/{year}",
+      "update": "Güncelle"
+    },
+    "details": {
+      "label": "Fatura bilgileri",
+      "help": "Faturalarınızdaki ad, adres ve vergi numarası",
+      "edit": "Stripe'ta düzenle"
+    },
+    "features": {
+      "title": "Planınıza dahil olanlar",
+      "arbitrage": "Arbitraj tarayıcı",
+      "financials": "Finans",
+      "bulkPhotoStudio": "Toplu fotoğraf stüdyosu",
+      "core": "İlan düzenleyici, toplu düzenleyici, araştırma, kargo etiketleri",
+      "included": "Dahil",
+      "proOnly": "Pro planı",
+      "notIncluded": "Dahil değil",
+      "seePro": "Pro'yu incele"
+    },
+    "invoices": {
+      "title": "Faturalar",
+      "viewAll": "Tümünü gör",
+      "col": {
+        "date": "Tarih",
+        "number": "Fatura",
+        "plan": "Plan",
+        "amount": "Tutar",
+        "status": "Durum"
+      },
+      "download": "PDF indir",
+      "open": "Faturayı aç",
+      "payNow": "Şimdi öde",
+      "period": "{plan} · {start}–{end}",
+      "empty": {
+        "title": "Henüz fatura yok",
+        "body": "Faturalar ilk ödemenizden sonra burada görünür."
+      },
+      "loadFailed": "Faturalar yüklenemedi",
+      "loadMoreFailed": "Daha fazlası yüklenemedi"
+    },
+    "loadFailed": "Planınız yüklenemedi",
+    "toast": {
+      "planChanged": "Artık {plan} planındasınız.",
+      "portalFailed": "Stripe açılamadı. Tekrar deneyin.",
+      "managedElsewhere": "Bu hesabın faturalandırması başka bir yerden yönetiliyor."
+    },
+    "palette": {
+      "manage": "Aboneliği yönet",
+      "invoices": "Faturaları gör"
     }
   }
 }

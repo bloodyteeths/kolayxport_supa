@@ -1,42 +1,35 @@
-import React from 'react';
-import { Box, Button, Typography, CircularProgress } from '@mui/material';
-import SaveIcon from '@mui/icons-material/Save';
+// components/settings/SettingsSaveBar.tsx — shim (settings §17 Group A): the legacy props on the DS
+// `StickyActionBar` (desktop: sticky footer of the content column; mobile: fixed above the tab bar).
+// Rendered only while dirty, like every DS save bar. The integrator deletes it once the legacy settings
+// page is gone (settings §17 G).
+import * as React from 'react';
 import { useTranslations } from 'next-intl';
+import { StickyActionBar } from '@/components/ds/page';
 
 interface SettingsSaveBarProps {
   isDirty: boolean;
   isSubmitting: boolean;
   onSave: () => void;
+  /** Adds the "Discard" secondary. */
+  onDiscard?: () => void;
 }
 
-/** Sticky bottom save bar for the form tabs (API & Carriers, Sender Profile). */
-export default function SettingsSaveBar({ isDirty, isSubmitting, onSave }: SettingsSaveBarProps) {
-  const t = useTranslations('settings');
+export default function SettingsSaveBar({ isDirty, isSubmitting, onSave, onDiscard }: SettingsSaveBarProps) {
+  const t = useTranslations('settings.saveBar');
   return (
-    <Box
-      sx={{
-        position: 'sticky', bottom: 0, left: 0, right: 0, zIndex: 10, mt: 2,
-        py: 1.5, px: { xs: 1.5, sm: 2 },
-        display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2,
-        borderTop: '1px solid', borderColor: 'divider',
-        bgcolor: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(8px)',
-        borderBottomLeftRadius: 12, borderBottomRightRadius: 12,
+    <StickyActionBar
+      visible={isDirty || isSubmitting}
+      status={t('status')}
+      secondary={onDiscard ? { id: 'settings-discard', label: t('discard'), onClick: onDiscard, disabled: isSubmitting } : undefined}
+      primary={{
+        id: 'settings-save',
+        label: t('save'),
+        onClick: onSave,
+        loading: isSubmitting,
+        loadingLabel: t('saving'),
+        shortcut: 'mod+s',
       }}
-    >
-      {isDirty && (
-        <Typography variant="body2" color="warning.main" sx={{ mr: 'auto', fontWeight: 600 }}>
-          {t('saveBar.unsaved')}
-        </Typography>
-      )}
-      <Button
-        variant="contained"
-        onClick={onSave}
-        disabled={isSubmitting || !isDirty}
-        startIcon={isSubmitting ? <CircularProgress size={18} sx={{ color: 'white' }} /> : <SaveIcon />}
-        sx={{ minHeight: 44, px: 3, fontWeight: 700, textTransform: 'none', borderRadius: '10px' }}
-      >
-        {t('saveBar.save')}
-      </Button>
-    </Box>
+      data-testid="settings-save-bar"
+    />
   );
 }

@@ -1,225 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import {
-  Typography,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Chip,
-  IconButton,
-  Alert,
-  CircularProgress,
-  Box,
-  Button,
-} from '@mui/material';
-import {
-  GetApp,
-  Visibility,
-} from '@mui/icons-material';
-import { format } from 'date-fns';
-import { tr } from 'date-fns/locale';
-import { enUS } from 'date-fns/locale';
-import { Page, PageHeader } from '@/components/ds/page';
+// /faturalar — flag `settings` (lib/ds/uiFlags.ts): invoices live in Settings › Plan & billing
+// (settings §1.1), so the route only redirects to `/ayarlar?tab=billing&invoices=all` (replace, no history
+// entry; a shopify_free account lands on Billing without an invoices card). Flag off: the legacy page,
+// moved unchanged to components/legacy/settings/FaturalarLegacy.tsx (deleted one release after the flip).
+// The redirect is client-side because the flag has a client `?ui=` override (a server 302 could not see it).
+import { useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useTranslations } from 'next-intl';
-import useLocaleStore from '@/lib/stores/useLocaleStore';
-import { useLocale } from '@/lib/i18n/useLocale';
+import FaturalarLegacy from '@/components/legacy/settings/FaturalarLegacy';
+import { useUiFlag } from '@/lib/ds/uiFlags';
 
-/** Back target: Settings › Plan & billing (shell-nav §6.2). */
-const BILLING_SETTINGS_HREF = '/ayarlar?tab=billing';
+export const INVOICES_REDIRECT = '/ayarlar?tab=billing&invoices=all';
 
-interface Invoice {
-  id: string;
-  date: string;
-  amount: number;
-  currency: string;
-  status: string;
-  hostedInvoiceUrl: string;
-  invoicePdf: string;
-  description: string;
-  period: {
-    start: string | null;
-    end: string | null;
-  };
+function InvoicesRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    void router.replace(INVOICES_REDIRECT);
+  }, [router]);
+  return null;
 }
 
 export default function FaturalarPage() {
-  const router = useRouter();
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const t = useTranslations('invoices');
-  const tCommon = useTranslations('common');
-  const tNav = useTranslations('nav.items');
-  const locale = useLocaleStore((s) => s.locale);
-  const dateFnsLocale = locale === 'tr' ? tr : enUS;
-  const { formatCurrency: fmtCurrency } = useLocale();
-
-  useEffect(() => {
-    // Free Shopify-tier accounts have no Stripe invoices and must not see
-    // billing surfaces (App Store rule 1.2.1) — send them back to settings.
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/user/settings', { credentials: 'include' });
-        if (res.ok) {
-          const data = await res.json().catch(() => null);
-          if (!cancelled && data?.subscription?.billingProvider === 'shopify_free') {
-            router.replace('/ayarlar?tab=billing');
-            return;
-          }
-        }
-      } catch { /* fall through to normal billing history fetch */ }
-      if (!cancelled) fetchBillingHistory();
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  const fetchBillingHistory = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await axios.get('/api/stripe/billing-history');
-      setInvoices(response.data.invoices);
-    } catch (err: any) {
-      console.error('Failed to fetch billing history:', err);
-      setError(err.response?.data?.error || t('loadError'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const formatInvoiceCurrency = (amount: number, currency: string) => {
-    return fmtCurrency(amount, currency === 'TRY' ? 'TRY' : 'USD');
-  };
-
-  const formatDate = (dateString: string) => {
-    return format(new Date(dateString), 'dd MMMM yyyy', { locale: dateFnsLocale });
-  };
-
-  if (loading) {
-    return (
-      <Page title={tNav('invoices')} width="form" backHref={BILLING_SETTINGS_HREF}>
-        <PageHeader title={tNav('invoices')} backLabel={tNav('settings')} />
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-          <CircularProgress />
-        </Box>
-      </Page>
-    );
-  }
-
-  return (
-    <Page title={tNav('invoices')} width="form" backHref={BILLING_SETTINGS_HREF}>
-      <PageHeader title={tNav('invoices')} backLabel={tNav('settings')} />
-      <Box>
-
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error}
-          </Alert>
-        )}
-
-        <Paper elevation={3}>
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ px: { xs: 1, sm: 2 } }}><strong>{t('tableHeaders.date')}</strong></TableCell>
-                  <TableCell sx={{ px: { xs: 1, sm: 2 } }}><strong>{t('tableHeaders.description')}</strong></TableCell>
-                  <TableCell sx={{ px: { xs: 1, sm: 2 }, whiteSpace: 'nowrap' }}><strong>{t('tableHeaders.servicePeriod')}</strong></TableCell>
-                  <TableCell sx={{ px: { xs: 1, sm: 2 } }}><strong>{t('tableHeaders.amount')}</strong></TableCell>
-                  <TableCell sx={{ px: { xs: 1, sm: 2 } }}><strong>{t('tableHeaders.status')}</strong></TableCell>
-                  <TableCell sx={{ px: { xs: 1, sm: 2 } }}><strong>{t('tableHeaders.actions')}</strong></TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {invoices.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                      <Typography variant="body1" color="text.secondary">
-                        {t('noInvoices')}
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  invoices.map((invoice) => (
-                    <TableRow key={invoice.id}>
-                      <TableCell sx={{ px: { xs: 1, sm: 2 } }}>
-                        {formatDate(invoice.date)}
-                      </TableCell>
-                      <TableCell sx={{ px: { xs: 1, sm: 2 } }}>
-                        {invoice.description}
-                      </TableCell>
-                      <TableCell sx={{ px: { xs: 1, sm: 2 }, whiteSpace: 'nowrap' }}>
-                        {invoice.period.start && invoice.period.end ? (
-                          <>
-                            {formatDate(invoice.period.start)} - {formatDate(invoice.period.end)}
-                          </>
-                        ) : (
-                          '-'
-                        )}
-                      </TableCell>
-                      <TableCell sx={{ px: { xs: 1, sm: 2 } }}>
-                        <Typography variant="body2" fontWeight="bold">
-                          {formatInvoiceCurrency(invoice.amount, invoice.currency)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell sx={{ px: { xs: 1, sm: 2 } }}>
-                        <Chip
-                          label={invoice.status === 'paid' ? t('paid') : invoice.status}
-                          color={invoice.status === 'paid' ? 'success' : 'default'}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell sx={{ px: { xs: 1, sm: 2 } }}>
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                          {invoice.hostedInvoiceUrl && (
-                            <IconButton
-                              size="small"
-                              onClick={() => window.open(invoice.hostedInvoiceUrl, '_blank')}
-                              title={t('viewInvoice')}
-                            >
-                              <Visibility />
-                            </IconButton>
-                          )}
-                          {invoice.invoicePdf && (
-                            <IconButton
-                              size="small"
-                              onClick={() => window.open(invoice.invoicePdf, '_blank')}
-                              title={t('downloadPdf')}
-                            >
-                              <GetApp />
-                            </IconButton>
-                          )}
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
-
-        {invoices.length === 0 && !error && (
-          <Box sx={{ mt: 3, textAlign: 'center' }}>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              {t('noSubscription')}
-            </Typography>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={() => router.push('/fiyatlandirma')}
-            >
-              {tCommon('viewPlans')}
-            </Button>
-          </Box>
-        )}
-      </Box>
-    </Page>
-  );
+  const v2 = useUiFlag('settings');
+  return v2 ? <InvoicesRedirect /> : <FaturalarLegacy />;
 }

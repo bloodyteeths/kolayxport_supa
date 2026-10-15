@@ -3,6 +3,9 @@ import { getAuthUser } from '@/lib/auth';
 import prisma from '../../../lib/prisma';
 import { v4 as uuidv4 } from 'uuid';
 
+/** A8: machine-readable duplicate code so the UI shows its own i18n text (status stays 400). */
+export const DUPLICATE_ORDER_NUMBER = 'DUPLICATE_ORDER_NUMBER';
+
 interface OrderItem {
   productName: string;
   quantity: number;
@@ -88,7 +91,7 @@ export default async function handler(
     });
 
     if (existingOrder) {
-      return res.status(400).json({ error: 'Bu sipariş numarası zaten mevcut' });
+      return res.status(400).json({ error: 'Bu sipariş numarası zaten mevcut', code: DUPLICATE_ORDER_NUMBER });
     }
 
     // Calculate total price
@@ -223,7 +226,7 @@ export default async function handler(
     // Handle specific database errors
     if (error instanceof Error) {
       if (error.message.includes('Unique constraint')) {
-        return res.status(400).json({ error: 'Bu sipariş numarası zaten mevcut' });
+        return res.status(400).json({ error: 'Bu sipariş numarası zaten mevcut', code: DUPLICATE_ORDER_NUMBER });
       }
     }
 

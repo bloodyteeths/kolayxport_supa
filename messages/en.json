@@ -1215,7 +1215,10 @@
     },
     "saveBar": {
       "unsaved": "You have unsaved changes",
-      "save": "Save changes"
+      "save": "Save changes",
+      "status": "Unsaved changes",
+      "discard": "Discard",
+      "saving": "Saving…"
     },
     "credential": {
       "showValue": "Show",
@@ -1426,6 +1429,301 @@
     "shippingChargesParty": {
       "SENDER": "Sender (Default)",
       "RECIPIENT": "Recipient (Collect)"
+    },
+    "nav": {
+      "group": {
+        "workspace": "Workspace",
+        "shipping": "Shipping",
+        "account": "Account",
+        "system": "System"
+      },
+      "connections": "Connections",
+      "apiKeys": "Carriers & API keys",
+      "senderProfile": "Sender profile",
+      "billing": "Plan & billing",
+      "billingShopify": "Plan",
+      "preferences": "Preferences",
+      "syncAdvanced": "Refresh history",
+      "summary": {
+        "connections": "{connected} connected{attention, plural, =0 {} other { · # needs attention}}",
+        "apiKeys": "{done} of {total} set up",
+        "billing": "{plan} · {percent}% of orders used",
+        "billingShopify": "Included with Shopify"
+      },
+      "dot": {
+        "needsAttention": "A connection needs attention",
+        "unsaved": "Unsaved changes",
+        "billing": "Your plan needs attention",
+        "runFailed": "The last refresh failed"
+      }
+    },
+    "unsaved": {
+      "title": "Discard unsaved changes?",
+      "keep": "Keep editing",
+      "discard": "Discard"
+    },
+    "sender": {
+      "saved": "Sender profile saved",
+      "title": "Sender profile",
+      "description": "This address prints on every label and customs form.",
+      "group": {
+        "business": "Business",
+        "address": "Address",
+        "customs": "Customs & currency",
+        "importer": "Importer of record",
+        "etgb": "ETGB"
+      },
+      "field": {
+        "companyName": "Company name",
+        "authorizedPerson": "Authorized person",
+        "phone": "Phone",
+        "taxNumber": "Tax number",
+        "taxType": "Tax number type",
+        "address1": "Address line 1",
+        "address2": "Address line 2",
+        "city": "City",
+        "stateRegion": "State or region",
+        "postalCode": "Postal code",
+        "country": "Country",
+        "defaultCurrency": "Default currency",
+        "dutiesPaidBy": "Duties paid by",
+        "shippingPaidBy": "Shipping paid by",
+        "fedexFolderId": "FedEx folder ID",
+        "etgbRecipientEmail": "Recipient email"
+      },
+      "error": {
+        "required": "Fill this in to save",
+        "email": "Enter a valid email address"
+      },
+      "fixFields": "{count, plural, one {Fix 1 field to save} other {Fix # fields to save}}",
+      "labelPreview": "Label preview",
+      "labelPreviewEmpty": "Your sender address shows here as it prints on labels.",
+      "currencyDefaultHelp": "Not set yet. Labels use {currency} until you choose one.",
+      "importerHelp": "Only if someone other than the buyer imports the goods.",
+      "etgbSwitch": "Send ETGB documents automatically",
+      "etgbOn": "On · sent to {email}",
+      "etgbOff": "Off",
+      "edit": "Edit",
+      "loadFailed": "Couldn't load your sender profile"
+    },
+    "saveFailed": "Couldn't save. Your changes are still here.",
+    "credentials": {
+      "loadFailed": "Couldn't load your saved keys",
+      "loadFailedReason": "Your saved keys didn't load. Retry first.",
+      "title": "Carriers & API keys",
+      "description": "Keys for services that don't use a \"Connect\" button. They're stored encrypted.",
+      "configure": "Configure",
+      "whereToFind": "Where do I find these?",
+      "save": "Save",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "loading": "Loading your saved keys…",
+      "saved": "{provider} keys saved",
+      "saveFailed": "Couldn't save. Your keys weren't changed.",
+      "fixFields": "{count, plural, one {Fix 1 field to continue} other {Fix # fields to continue}}",
+      "requiredWith": "Enter the {field} too",
+      "digitsOnly": "Use digits only",
+      "field": {
+        "apiKey": "API key",
+        "apiSecret": "API secret",
+        "supplierId": "Supplier ID",
+        "token": "API token",
+        "accountNumber": "Account number",
+        "mngCustomerNumber": "Customer number",
+        "mngPassword": "Password",
+        "clientId": "Client ID",
+        "clientSecret": "Client secret",
+        "username": "Username",
+        "password": "Password",
+        "companyId": "Company ID"
+      }
+    },
+    "connections": {
+      "title": "Connections",
+      "description": "Connect stores, carriers and tools. KolayXport reads orders and sends tracking through these.",
+      "group": {
+        "marketplaces": "Stores",
+        "shipping": "Shipping",
+        "accounting": "Accounting",
+        "tools": "Tools"
+      },
+      "storesUsed": "Stores · {used} of {limit} used",
+      "comparePlans": "Compare plans",
+      "reauthBanner": {
+        "one": "{provider} needs reconnecting. Orders from {account} stopped on {date}.",
+        "oneNoDate": "{provider} needs reconnecting. Orders from {account} aren't coming in.",
+        "many": "{count} connections need attention.",
+        "reconnect": "Reconnect {provider}",
+        "review": "Review {count} connections"
+      },
+      "loadFailed": "Couldn't check your connections",
+      "stale": "Showing status from {time}",
+      "action": {
+        "connect": "Connect {provider}",
+        "setUp": "Set up",
+        "finishSetup": "Finish setup",
+        "reconnect": "Reconnect",
+        "manage": "Manage",
+        "contactSupport": "Contact support",
+        "checkAgain": "Check again"
+      },
+      "menu": {
+        "more": "More actions for {provider}",
+        "refreshAll": "Refresh all orders",
+        "guide": "View setup guide",
+        "disconnect": "Disconnect {provider}…",
+        "removeCredentials": "Remove credentials…"
+      },
+      "disconnectConfirm": {
+        "title": "Disconnect {provider}?",
+        "confirm": "Disconnect"
+      },
+      "refreshConfirm": {
+        "title": "Refresh all orders?",
+        "body": "KolayXport imports orders from every connected store. This can take a few minutes."
+      },
+      "removeConfirm": {
+        "title": "Remove {provider} credentials?",
+        "body": "KolayXport stops using {provider} until you add them again. Your past data stays.",
+        "confirm": "Remove"
+      },
+      "toast": {
+        "disconnected": "{provider} disconnected",
+        "disconnectFailed": "Couldn't disconnect {provider}. Try again.",
+        "refreshStarted": "Refresh started. Follow it in Refresh history.",
+        "refreshFailed": "Couldn't start the refresh",
+        "credentialsRemoved": "{provider} credentials removed",
+        "removeFailed": "Couldn't remove {provider} credentials"
+      },
+      "pageAction": {
+        "connectStore": "Connect a store"
+      },
+      "panel": {
+        "close": "Close"
+      },
+      "meta": {
+        "shops": "{count, plural, one {# shop} other {# shops}}",
+        "refreshed": "Refreshed {time}",
+        "lastActivity": "Last activity {time}",
+        "notDetected": "Not detected in this browser",
+        "installExtension": "Install extension",
+        "supportManaged": "Set up by our support team",
+        "missingField": "{field} missing",
+        "wixWaiting": "Waiting for Wix… {elapsed}"
+      },
+      "reason": {
+        "authExpired": "Authorization expired",
+        "incomplete": "Incomplete credentials"
+      },
+      "blurb": {
+        "etsy": "Orders, listings, research",
+        "ebay": "Orders, listings, research",
+        "amazon": "Orders and finance",
+        "shopify": "Orders and products",
+        "wix": "Orders, products and messages",
+        "trendyol": "Orders, questions and finance",
+        "hepsiburada": "Orders",
+        "veeqo": "Orders from Veeqo channels",
+        "shippo": "Orders and labels",
+        "fedex": "International labels and rates",
+        "ups": "International labels and rates",
+        "mng": "Turkey domestic labels",
+        "parasut": "Invoices to Paraşüt",
+        "chrome": "Sends tracking to Etsy and fills buyer details"
+      },
+      "etsyPanel": {
+        "title": "Etsy shops",
+        "shopId": "Shop ID {id}",
+        "connectAnother": "Connect another shop",
+        "limitReached": "Store limit reached",
+        "empty": "No Etsy shops yet"
+      },
+      "amazonPanel": {
+        "connect": "Connect Amazon",
+        "save": "Save marketplaces"
+      },
+      "shopifyPanel": {
+        "storeAddress": "Store address",
+        "connect": "Connect Shopify",
+        "enterAddress": "Enter your store address first"
+      },
+      "storeLimit": {
+        "title": "You've used all {limit} store slots",
+        "body": "{plan} includes {limit} connected stores. Disconnect a store or move to {nextPlan} for {nextLimit}.",
+        "neutralTitle": "Store limit reached",
+        "neutralBody": "Disconnect a store to add a new one.",
+        "notNow": "Not now",
+        "ok": "OK"
+      }
+    },
+    "preferences": {
+      "title": "Preferences",
+      "description": "Language and the timezone used for ship-by times and reports.",
+      "language": "Language",
+      "languageHelp": "Applies to this browser right away.",
+      "timezone": "Timezone",
+      "timezoneHelp": "Ship-by times and daily reports use this timezone.",
+      "saved": "Preferences saved",
+      "saveFailed": "Couldn't save your timezone. Try again.",
+      "loadFailed": "Couldn't load your timezone",
+      "notifications": "Notifications",
+      "notificationsLink": "Notification settings"
+    },
+    "refresh": {
+      "title": "Refresh history",
+      "description": "Every time KolayXport imported orders from your stores.",
+      "refreshAll": "Refresh all orders",
+      "refreshing": "Refreshing…",
+      "alreadyRunning": "A refresh is already running",
+      "lastSuccess": "Last successful refresh: {time} · {sources}",
+      "lastSuccessNoSources": "Last successful refresh: {time}",
+      "col": {
+        "type": "Type",
+        "status": "Status",
+        "started": "Started",
+        "duration": "Duration",
+        "orders": "Orders (processed / ok / failed)"
+      },
+      "ordersAria": "{processed} processed, {successful} ok, {failed} failed",
+      "viewErrors": "View errors",
+      "retry": "Retry",
+      "retrying": "Retrying…",
+      "retryBusy": "Another retry is starting",
+      "copyErrors": "Copy error details",
+      "copied": "Error details copied",
+      "copyFailed": "Couldn't copy. Select the text instead.",
+      "errorsTitle": "Errors in this refresh",
+      "orderRef": "Order #{id}",
+      "noErrors": "No errors in this refresh",
+      "empty": {
+        "title": "No refreshes yet",
+        "body": "Connect a store, then refresh to import your orders."
+      },
+      "loadFailed": "Couldn't load refresh history",
+      "loadMore": "Load more",
+      "loadingMore": "Loading…",
+      "loadMoreFailed": "Couldn't load more",
+      "confirm": {
+        "title": "Refresh all orders?",
+        "body": "KolayXport imports every order again from your connected stores. This can take a few minutes."
+      },
+      "started": "Refresh started",
+      "startFailed": "Couldn't start the refresh. Try again.",
+      "retryConfirm": {
+        "title": "Retry this refresh?",
+        "body": "KolayXport runs the same refresh again."
+      },
+      "retryStarted": "Retry started",
+      "retryFailed": "Couldn't start the retry. Try again.",
+      "types": {
+        "full": "Full refresh",
+        "scheduled": "Scheduled refresh",
+        "manual": "Manual refresh",
+        "recent": "Recent orders refresh",
+        "product": "Product refresh",
+        "store": "{store} refresh",
+        "other": "Refresh"
+      }
     }
   },
   "fedex": {
@@ -9175,6 +9473,179 @@
         "notConfigured": "Payments are temporarily unavailable. Please contact support.",
         "redirecting": "Redirecting to checkout…"
       }
+    },
+    "pricingV2": {
+      "seo": {
+        "descriptionNeutral": "Plans for orders, labels, listings and research. 14 days free, no card needed.",
+        "title": "Pricing · KolayXport",
+        "description": "From {price} a month. 14 days free, no card needed.",
+        "ogAlt": "KolayXport pricing plans"
+      },
+      "accountError": {
+        "title": "Couldn't check your account",
+        "cause": "Reload the page to see plans for your account.",
+        "reload": "Reload"
+      },
+      "title": "Pricing",
+      "subtitle": "Orders, labels, listings and research for Etsy, eBay, Amazon, Trendyol and more.",
+      "trialLine": "14 days free. No card needed.",
+      "interval": {
+        "label": "Billing period",
+        "monthly": "Monthly",
+        "yearly": "Yearly · 2 months free"
+      },
+      "currency": {
+        "label": "Currency",
+        "try": "₺ TRY",
+        "usd": "$ USD",
+        "locked": "Your account is billed in {currency}."
+      },
+      "founding": {
+        "offer": "Founding member offer: {percent}% off for life for our first {total} subscribers",
+        "count": "{remaining} of {total} spots left",
+        "few": "Only {remaining, plural, one {# spot} other {# spots}} left",
+        "priceNote": "Founding price, for life",
+        "priceNoteYearly": "Founding price, for life · {price} a month",
+        "fullTitle": "The founding spots just ran out",
+        "fullBody": "{plan} is {price}. Continue to checkout?",
+        "fullPriceMonth": "{price} a month",
+        "fullPriceYear": "{price} a year",
+        "continue": "Continue",
+        "notNow": "Not now"
+      },
+      "mostPopular": "Most popular",
+      "perMonth": "/ month",
+      "perYear": "/ year",
+      "listPrice": "Regular price {price}",
+      "monthlyEquivalent": "{price} a month · 2 months free",
+      "customPrice": "Custom pricing",
+      "plansRegion": "Plans and prices",
+      "plans": {
+        "starter": {
+          "name": "Starter",
+          "tagline": "For one or two stores"
+        },
+        "growth": {
+          "name": "Growth",
+          "tagline": "For growing shops on every marketplace"
+        },
+        "pro": {
+          "name": "Pro",
+          "tagline": "For multi-store teams that need finance and arbitrage"
+        },
+        "enterprise": {
+          "name": "Enterprise",
+          "tagline": "For high volume and custom setups"
+        }
+      },
+      "limit": {
+        "orders": "{count} orders a month",
+        "labels": "{count} labels a month",
+        "stores": "{n, plural, one {{count} connected store} other {{count} connected stores}}",
+        "ai": "{count} AI credits a month",
+        "unlimitedOrders": "Unlimited orders",
+        "unlimitedLabels": "Unlimited labels",
+        "unlimitedStores": "Unlimited stores",
+        "unlimitedAi": "Unlimited AI"
+      },
+      "feature": {
+        "listing": "Listing and bulk editing",
+        "labels": "Shipping labels",
+        "research": "Research tools",
+        "everythingIn": "Everything in {plan}",
+        "arbitrage": "Arbitrage scanner",
+        "financials": "Financials",
+        "bulkPhotoStudio": "Bulk photo studio",
+        "prioritySupport": "Priority support",
+        "dedicatedContact": "Dedicated contact"
+      },
+      "cta": {
+        "startTrial": "Start free trial",
+        "choose": "Choose {plan}",
+        "switch": "Switch to {plan}",
+        "current": "Current plan",
+        "currentReason": "You're on this plan",
+        "talk": "Talk to us",
+        "opening": "Opening checkout…",
+        "openingPortal": "Opening Stripe…",
+        "busyReason": "Another plan is opening. Wait a moment.",
+        "updatePaymentFirst": "Update payment first",
+        "updatePaymentReason": "Your last payment failed. Update your payment method first.",
+        "unknown": "Choose a plan",
+        "unknownReason": "Couldn't check your account. Reload to continue.",
+        "trialCarry": "You won't be charged until {date}."
+      },
+      "pastDueBanner": "Your last payment failed.",
+      "updatePayment": "Update payment method",
+      "taxIncluded": "Prices include KDV.",
+      "taxExcluded": "Prices exclude KDV.",
+      "compare": {
+        "title": "Compare plans",
+        "feature": "Feature",
+        "orders": "Orders a month",
+        "labels": "Labels a month",
+        "stores": "Connected stores",
+        "ai": "AI credits a month",
+        "marketplaces": "Marketplaces",
+        "all": "All",
+        "carriers": "Carriers: FedEx, UPS, DHL eCommerce",
+        "listing": "Listing editor, bulk editor",
+        "support": "Support",
+        "supportEmail": "Email",
+        "supportPriority": "Priority",
+        "supportDedicated": "Dedicated",
+        "unlimited": "Unlimited",
+        "included": "Included",
+        "notIncluded": "Not included",
+        "pickPlan": "Show plan"
+      },
+      "hint": {
+        "orders": "An order counts once, when it's imported.",
+        "stores": "Each Etsy shop, eBay account, Amazon account, Trendyol account, Wix site or Shopify store counts as one. Carriers don't count.",
+        "ai": "A text action uses 1 credit, an image uses 10."
+      },
+      "faq": {
+        "title": "Questions",
+        "trial": {
+          "q": "How does the free trial work?",
+          "a": "You get 14 days with Pro features and no card. When it ends you have 3 more days to choose a plan. After that, importing orders, labels and AI pause, and your data stays."
+        },
+        "limits": {
+          "q": "What happens if I go over a limit?",
+          "a": "We tell you at 80%. Orders your buyers place still arrive. Scheduled imports pause at 110% of your order limit, and new labels and AI pause at 100% until the next month or until you change plan."
+        },
+        "founding": {
+          "q": "What is the founding member offer?",
+          "a": "Our first {total} subscribers pay {percent}% less for as long as they stay subscribed, on any plan and either billing period."
+        },
+        "change": {
+          "q": "Can I change or cancel my plan?",
+          "a": "Yes, any time from Settings. Upgrades apply right away. If you cancel, you keep your plan until the end of the period you paid for."
+        },
+        "currency": {
+          "q": "Can I pay in lira or dollars?",
+          "a": "Yes. Pick ₺ or $ before checkout. Your account stays in that currency afterwards."
+        },
+        "data": {
+          "q": "How is my data protected?",
+          "a": "Marketplace keys are encrypted, and your data stays on our servers in the EU. We never sell it."
+        }
+      },
+      "enterprise": {
+        "title": "Need more than Pro?",
+        "body": "Talk to us about Enterprise: unlimited usage and a dedicated contact."
+      },
+      "checkout": {
+        "failed": "Couldn't open checkout. Try again.",
+        "forbidden": "This account can't buy a plan here.",
+        "portalFailed": "Couldn't open Stripe. Try again."
+      },
+      "reviewerSummary": {
+        "title": "Pricing summary (English)",
+        "plan": "{plan}: {monthTry}/month ({yearTry}/year) or {monthUsd}/month ({yearUsd}/year). {orders} orders, {labels} labels, {stores} connected stores and {ai} AI credits a month.",
+        "enterprise": "Enterprise: custom quote with unlimited usage, through our contact form.",
+        "footer": "Every plan starts with a 14-day free trial without a card. Every marketplace and carrier integration is included. No other fees."
+      }
     }
   },
   "ui": {
@@ -10656,6 +11127,41 @@
   "pro": {
     "preview": {
       "caption": "Example with sample data"
+    },
+    "locked": {
+      "seePlans": "See plans",
+      "trialEnded": "Your trial included it until {date}.",
+      "paused": {
+        "title": "Your plan is paused"
+      },
+      "reactivate": "Reactivate",
+      "neutral": {
+        "title": "This isn't included in your plan",
+        "body": "Your plan covers orders, labels, listings, bulk editing and research."
+      }
+    },
+    "feature": {
+      "financials": {
+        "title": "Profit is part of Pro",
+        "body": "See your real profit per order and per product: fees, ad spend, shipping and product costs from every marketplace.",
+        "p1": "Profit per order after every fee",
+        "p2": "Payouts matched to orders",
+        "p3": "CSV export"
+      },
+      "bulkPhotoStudio": {
+        "title": "Photo studio is part of Pro",
+        "body": "Add, replace, reorder and caption photos on many listings at once, with AI quality and background tools.",
+        "p1": "One change on 100 listings in one step",
+        "p2": "AI alt text for every photo",
+        "p3": "Videos on many listings at once"
+      },
+      "arbitrage": {
+        "title": "Price gap is part of Pro",
+        "body": "Find Trendyol products that sell for more on eBay and Etsy, with landed cost from your own shipping labels.",
+        "p1": "Matches with a confidence level",
+        "p2": "Margin after fees and shipping",
+        "p3": "List on eBay in one click"
+      }
     }
   },
   "listingScore": {
@@ -10819,6 +11325,655 @@
       "searchError": "Couldn't search orders",
       "noOrders": "No orders match “{query}”",
       "cancel": "Cancel"
+    }
+  },
+  "orders": {
+    "page": {
+      "title": "Orders"
+    },
+    "meta": {
+      "refreshed": "Refreshed {time}",
+      "refreshing": "Refreshing orders…",
+      "refreshFailed": "Couldn't refresh orders",
+      "stores": "{count, plural, one {# store} other {# stores}}"
+    },
+    "actions": {
+      "refresh": "Refresh orders",
+      "createLabels": "Create {count, plural, one {# label} other {# labels}}",
+      "createLabelsPartial": "{skipped, plural, one {# order can't get a label here} other {# orders can't get a label here}}: {reason}",
+      "createLabel": "Create label",
+      "printLabel": "Print label",
+      "printLabels": "Labels",
+      "print": "Print",
+      "printPickListPage": "Print pick list for this page",
+      "printPackingSlip": "Print packing slip",
+      "printLabelsLimit": "Printing the first {max}. Run Print again for the rest.",
+      "addManualOrder": "Add manual order",
+      "export": "Export",
+      "copyAddresses": "Copy addresses",
+      "addressesCopied": "{count, plural, one {# address copied} other {# addresses copied}}",
+      "sendEtgb": "Send ETGB documents",
+      "addTracking": "Add tracking number",
+      "copyTracking": "Copy tracking number",
+      "openOrder": "Open order",
+      "openOn": "Open on {marketplace}",
+      "copyAddressIntl": "Copy address (international)",
+      "copyAddressTr": "Copy address (Turkish format)",
+      "messageBuyer": "Message buyer",
+      "fixAddress": "Fix address",
+      "deleteLabel": "Delete label…",
+      "deleteOrder": "Delete order…"
+    },
+    "toolbar": {
+      "searchPlaceholder": "Search order #, buyer, SKU, tracking…",
+      "store": "Store",
+      "storeAll": "All stores",
+      "status": "Status",
+      "orderDate": "Order date",
+      "anyDate": "Any date",
+      "searchIn": "Search in",
+      "sort": "Sort",
+      "results": "{count, plural, one {# result} other {# results}}",
+      "updating": "Updating…",
+      "searchAllDates": "Search covers all dates"
+    },
+    "searchIn": {
+      "all": "All fields",
+      "customer": "Buyer",
+      "order": "Order number",
+      "tracking": "Tracking number",
+      "product": "Product",
+      "sku": "SKU",
+      "city": "City",
+      "phone": "Phone",
+      "note": "Note"
+    },
+    "sort": {
+      "orderedAtDesc": "Newest first",
+      "orderedAtAsc": "Oldest first",
+      "shipByAsc": "Ship by, soonest",
+      "totalDesc": "Total, highest",
+      "totalAsc": "Total, lowest",
+      "customerAsc": "Buyer, A–Z"
+    },
+    "views": {
+      "label": "View",
+      "toShip": "To ship",
+      "overdue": "Overdue",
+      "labelCreated": "Label created",
+      "shipped": "Shipped",
+      "problems": "Problems",
+      "all": "All orders",
+      "goTo": "Go to {view}"
+    },
+    "columns": {
+      "order": "Order",
+      "store": "Store",
+      "total": "Total",
+      "status": "Status",
+      "shipBy": "Ship by",
+      "orderedAt": "Ordered",
+      "tracking": "Tracking",
+      "carrierCost": "Carrier cost"
+    },
+    "row": {
+      "moreItems": "+{count, plural, one {# item} other {# items}}",
+      "buyerHidden": "Name hidden by Amazon",
+      "buyerHiddenHint": "Amazon shares buyer names only with the PII role on your SP-API app.",
+      "manualStore": "Manual order",
+      "fba": "Fulfilled by Amazon",
+      "mcf": "Multi-Channel Fulfillment",
+      "upgrade": "{upgrade} shipping",
+      "note": "Private note",
+      "currencyUnknown": "Currency unknown",
+      "trackingSent": "Tracking sent ✓",
+      "trackingQueued": "Queued for extension",
+      "trackingFailed": "Couldn't send tracking",
+      "trackingCopied": "Tracking number copied"
+    },
+    "problem": {
+      "addressIncomplete": "Address incomplete: {fields} missing",
+      "addressIncompleteShort": "address incomplete",
+      "field": {
+        "street1": "street address",
+        "city": "city",
+        "postal": "postal code",
+        "country": "country"
+      },
+      "etsyAddressHidden": "Etsy doesn't share buyer addresses through its API. Open the order on Etsy with the Chrome extension to import it.",
+      "labelFailed": "Label failed: {reason}"
+    },
+    "bulk": {
+      "reasonClosed": "already shipped or closed",
+      "noLabels": "None of the selected orders has a label yet",
+      "copyFailed": "Couldn't copy to the clipboard",
+      "tsv": {
+        "orderNumber": "Order number",
+        "name": "Name",
+        "street1": "Address line 1",
+        "street2": "Address line 2",
+        "city": "City",
+        "state": "State / region",
+        "postal": "Postal code",
+        "country": "Country",
+        "phone": "Phone",
+        "email": "Email"
+      }
+    },
+    "export": {
+      "title": "Export orders",
+      "selected": "{count, plural, one {# selected order} other {# selected orders}}",
+      "allMatching": "All matching filters",
+      "allMatchingCount": "All {count} matching filters",
+      "csv": "CSV",
+      "excel": "Excel",
+      "pdf": "PDF",
+      "preparing": "Preparing {count} orders…",
+      "done": "{count, plural, one {# order exported} other {# orders exported}}",
+      "empty": "No orders to export",
+      "tooMany": "Export up to {max} orders at a time. Narrow the filters.",
+      "failed": "Couldn't export orders"
+    },
+    "etgb": {
+      "sending": "Sending ETGB documents for {count} orders…",
+      "sent": "ETGB documents sent to {email}",
+      "noEmail": "Add an ETGB email in Settings first",
+      "failed": "Couldn't send ETGB documents",
+      "openSettings": "Open settings"
+    },
+    "empty": {
+      "firstUse": {
+        "title": "Connect a store to see your orders",
+        "body": "Orders from Etsy, eBay, Amazon, Trendyol and your other stores show up here. You can also add a manual order.",
+        "action": "Connect a store"
+      },
+      "noResults": {
+        "title": "No orders match these filters",
+        "action": "Clear filters"
+      },
+      "noResultsSearch": "No orders match \"{query}\"",
+      "done": {
+        "toShip": "Every order has a label",
+        "overdue": "Nothing is overdue",
+        "problems": "No problems to fix"
+      },
+      "labelCreated": "No labels waiting to ship"
+    },
+    "error": {
+      "title": "Couldn't load orders"
+    },
+    "limit": {
+      "syncs": "You've used all {limit} order syncs in your plan this month",
+      "syncsReached": "You've used all order syncs in your plan this month",
+      "seePlans": "See plans"
+    },
+    "confirm": {
+      "deleteOrder": {
+        "title": "Delete order {number}?",
+        "body": "It's removed from KolayXport only. Nothing changes on {marketplace}.",
+        "confirm": "Delete order",
+        "bodyManual": "It's removed from KolayXport.",
+        "failed": "Couldn't delete the order"
+      },
+      "deleteLabel": {
+        "title": "Delete the label for order {number}?",
+        "body": "It's removed from KolayXport. It isn't voided with the carrier.",
+        "confirm": "Delete label",
+        "failed": "Couldn't delete the label"
+      }
+    },
+    "panel": {
+      "addressSavedManual": "Address saved.",
+      "trackingSentTo": "Tracking sent to {mp, select, etsy {Etsy} ebay {eBay} amazon {Amazon} trendyol {Trendyol} wix {Wix} shopify {Shopify} hepsiburada {Hepsiburada} other {the marketplace}}",
+      "cancel": "Cancel",
+      "saving": "Saving…",
+      "retry": "Retry",
+      "noteSaving": "Saving…",
+      "noteSaved": "Saved",
+      "addressLocalOnly": "Saved in KolayXport only. The marketplace order doesn't change.",
+      "addressSaveFailed": "Couldn't save the address",
+      "addressCopied": "Address copied",
+      "copyFailed": "Couldn't copy",
+      "carrierCostSaveFailed": "Couldn't save the carrier cost",
+      "carrierCostCurrency": "Carrier cost currency",
+      "trackingPending": "Sent, waiting for {mp, select, etsy {Etsy} ebay {eBay} amazon {Amazon} trendyol {Trendyol} wix {Wix} shopify {Shopify} hepsiburada {Hepsiburada} other {the marketplace}} to confirm",
+      "labelFailedNoReason": "The last label attempt failed",
+      "labelFileMissing": "No label file is stored for this label. Only the tracking number is available.",
+      "lifecycle": "Marketplace updates"
+    },
+    "history": {
+      "trackingSent": "Tracking sent to {mp, select, etsy {Etsy} ebay {eBay} amazon {Amazon} trendyol {Trendyol} wix {Wix} shopify {Shopify} hepsiburada {Hepsiburada} other {the marketplace}}",
+      "orderedManual": "Added as a manual order",
+      "trackingQueued": "Tracking queued for the Chrome extension",
+      "trackingFailed": "Tracking couldn't be sent"
+    },
+    "tracking": {
+      "submit": "Send to {mp, select, etsy {Etsy} ebay {eBay} amazon {Amazon} trendyol {Trendyol} wix {Wix} shopify {Shopify} hepsiburada {Hepsiburada} other {marketplace}}",
+      "sent": "Tracking sent to {mp, select, etsy {Etsy} ebay {eBay} amazon {Amazon} trendyol {Trendyol} wix {Wix} shopify {Shopify} hepsiburada {Hepsiburada} other {the marketplace}}",
+      "invalid": "Use 8 to 40 letters and digits",
+      "required": "Enter the tracking number",
+      "savedNotSent": "Saved in KolayXport, but {mp, select, etsy {Etsy} ebay {eBay} amazon {Amazon} trendyol {Trendyol} wix {Wix} shopify {Shopify} hepsiburada {Hepsiburada} other {the marketplace}} didn't accept it",
+      "notConnected": "Connect {mp, select, etsy {Etsy} ebay {eBay} amazon {Amazon} trendyol {Trendyol} wix {Wix} shopify {Shopify} hepsiburada {Hepsiburada} other {marketplace}} in Settings first",
+      "network": "Check your connection and try again"
+    },
+    "messageBuyer": {
+      "title": "Message the Amazon buyer",
+      "order": "Order {number}",
+      "outboundOnly": "Amazon only lets sellers send template messages. Buyer replies don't come back here.",
+      "mcf": "This is a Multi-Channel Fulfillment order. Amazon doesn't allow messages for it.",
+      "typeLabel": "Message type",
+      "type": {
+        "unexpectedProblem": "Unexpected problem",
+        "confirmDeliveryDetails": "Confirm delivery details",
+        "confirmOrderDetails": "Confirm order details",
+        "confirmCustomizationDetails": "Confirm personalization details",
+        "confirmServiceDetails": "Confirm service details",
+        "reviewRequest": "Request a review"
+      },
+      "reviewHint": "Amazon sends the buyer its own review request. No text needed.",
+      "notAllowed": "Amazon doesn't allow this message for the order right now",
+      "checking": "Checking which messages Amazon allows…",
+      "text": "Message",
+      "textRequired": "Write the message",
+      "send": "Send to Amazon",
+      "requestReview": "Request review",
+      "sending": "Sending…",
+      "sent": "Message sent to the buyer",
+      "reviewSent": "Review request sent",
+      "failed": "Couldn't send the message",
+      "failedCause": "Amazon refused it. The message type may not be allowed for this order yet."
+    },
+    "manual": {
+      "title": "Add manual order",
+      "customer": "Customer",
+      "name": "Customer name",
+      "email": "Email",
+      "phone": "Phone",
+      "orderNumber": "Order number",
+      "orderNumberHint": "Your own reference, e.g. an Instagram order",
+      "currency": "Currency",
+      "address": "Delivery address",
+      "country": "Country",
+      "street1": "Address line 1",
+      "street2": "Address line 2",
+      "city": "City",
+      "postal": "Postal code",
+      "state": "State",
+      "province": "Province",
+      "stateProvince": "State or province",
+      "items": "Items",
+      "itemN": "Item {n}",
+      "productName": "Product name",
+      "sku": "SKU",
+      "price": "Price",
+      "quantity": "Quantity",
+      "weight": "Weight",
+      "addItem": "Add item",
+      "removeItem": "Remove item",
+      "total": "Total {amount}",
+      "submit": "Create order",
+      "submitting": "Creating order…",
+      "created": "Order {number} created",
+      "duplicate": "This order number already exists",
+      "failed": "Couldn't create the order",
+      "failedBody": "Nothing was saved. Try again.",
+      "sessionExpired": "Your session has ended. Sign in again.",
+      "discardTitle": "Discard this order?",
+      "validation": {
+        "positive": "Enter a number above 0",
+        "required": "Required",
+        "fixFields": "Fix {count, plural, one {# field} other {# fields}} to continue"
+      }
+    }
+  },
+  "createLabel": {
+    "terms": {
+      "fromProfile": "FedEx uses the duties setting in your sender profile.",
+      "label": "Duties & taxes paid by",
+      "dap": "Recipient (DAP)",
+      "ddp": "Me (DDP)"
+    },
+    "bulk": {
+      "printNext": "Print next {count, plural, one {# label} other {# labels}}",
+      "pushFailed": "{count, plural, one {# tracking push failed} other {# tracking pushes failed}}",
+      "title": "Create {count, plural, one {# label} other {# labels}}",
+      "hint": "Every order uses this carrier, service and package. Weight comes from each order.",
+      "orders": "Orders",
+      "order": "Order",
+      "status": "Status",
+      "ready": "Ready",
+      "problem": "Problem",
+      "running": "Creating…",
+      "sent": "Created",
+      "failed": "Failed",
+      "notStarted": "Not started",
+      "missing": "{fields} missing",
+      "guardCancelled": "Cancelled on {mp, select, etsy {Etsy} ebay {eBay} amazon {Amazon} trendyol {Trendyol} wix {Wix} shopify {Shopify} hepsiburada {Hepsiburada} other {the marketplace}}",
+      "guardShipped": "Already shipped on {mp, select, etsy {Etsy} ebay {eBay} amazon {Amazon} trendyol {Trendyol} wix {Wix} shopify {Shopify} hepsiburada {Hepsiburada} other {the marketplace}}",
+      "createAnyway": "Create anyway",
+      "summary": "{ready} ready · {blocked} need details",
+      "fix": "Fix",
+      "retry": "Retry",
+      "submit": "Create {count, plural, one {# label} other {# labels}}",
+      "runningPrimary": "Creating {done} of {total}…",
+      "stop": "Stop after current",
+      "stopConfirm": "Stop creating labels?",
+      "stopBody": "The label being created now finishes. The rest are not created.",
+      "stopAction": "Stop",
+      "keepRunning": "Keep creating",
+      "done": "{ok} labels created · {failed} failed",
+      "retryFailed": "Retry failed",
+      "printAll": "Print {count, plural, one {# label} other {# labels}}",
+      "dhlMixed": "DHL eCommerce only works when every order ships within Turkey",
+      "presetDefault": "Weight from each order",
+      "sendTracking": "Send tracking to each marketplace"
+    },
+    "title": "Create label · Order {number}",
+    "backToOrder": "Order",
+    "from": "From",
+    "change": "Change",
+    "senderMissing": {
+      "title": "Complete your sender profile to create labels",
+      "action": "Open sender profile",
+      "reason": "Complete your sender profile first"
+    },
+    "shipTo": "Ship to",
+    "edit": "Edit",
+    "done": "Done",
+    "field": {
+      "name": "Recipient name",
+      "phone": "Phone",
+      "email": "Email",
+      "country": "Country",
+      "street1": "Address line 1",
+      "street2": "Address line 2",
+      "city": "City",
+      "postal": "Postal code",
+      "state": "State / province",
+      "district": "District",
+      "neighbourhood": "Neighbourhood",
+      "weight": "Weight",
+      "length": "Length",
+      "width": "Width",
+      "height": "Height",
+      "packaging": "Packaging",
+      "description": "Description",
+      "hsCode": "HS code",
+      "origin": "Country of origin",
+      "quantity": "Quantity",
+      "value": "Value",
+      "currency": "Currency",
+      "ioss": "IOSS number",
+      "vat": "Recipient VAT number",
+      "invoiceNumber": "Invoice number",
+      "signature": "Signature",
+      "labelFormat": "Label format"
+    },
+    "unit": {
+      "kg": "kg",
+      "cm": "cm"
+    },
+    "package": "Package",
+    "presets": "Presets",
+    "presetNone": "No presets yet",
+    "presetPick": "Choose a preset",
+    "savePreset": "Save as preset…",
+    "presetTitle": "Save as preset",
+    "presetName": "Preset name",
+    "presetDefault": "Use by default",
+    "presetSave": "Save preset",
+    "presetSaved": "Preset saved",
+    "presetFailed": "Couldn't save the preset",
+    "dimsHint": "Optional for paks and envelopes",
+    "packagingOwn": "Your packaging",
+    "carrier": "Carrier & service",
+    "refreshRates": "Refresh rates",
+    "recommended": "Recommended",
+    "transitDays": "{min}–{max} days",
+    "noPrice": "The price shows on the carrier invoice.",
+    "ratesFailed": "Couldn't get rates",
+    "unavailable": {
+      "domesticOnly": "Turkey domestic only",
+      "notConnected": "Connect {carrier} in Settings",
+      "incomplete": "{carrier} setup is incomplete",
+      "checkFailed": "Couldn't check {carrier}"
+    },
+    "openSettings": "Open settings",
+    "noCarrier": {
+      "title": "Connect a carrier to create labels",
+      "action": "Connect a carrier"
+    },
+    "customs": "Customs",
+    "customsItems": "{count, plural, one {# item} other {# items}}",
+    "exportReason": {
+      "label": "Reason for export",
+      "sale": "Sale",
+      "gift": "Gift",
+      "sample": "Sample",
+      "return": "Return",
+      "repair": "Repair"
+    },
+    "sendEtgb": "Send ETGB document after the label is created",
+    "options": "Options",
+    "sendTracking": "Send tracking to {mp, select, etsy {Etsy} ebay {eBay} amazon {Amazon} trendyol {Trendyol} wix {Wix} shopify {Shopify} hepsiburada {Hepsiburada} other {the marketplace}} after the label is created",
+    "signature": {
+      "none": "None",
+      "indirect": "Indirect",
+      "direct": "Direct",
+      "adult": "Adult"
+    },
+    "dhl": {
+      "paymentType": "Shipping paid by",
+      "paymentSender": "Me",
+      "paymentRecipient": "Recipient",
+      "deliveryType": "Delivery type",
+      "delivery": {
+        "address": "To the address",
+        "branch": "Pick up at a branch"
+      },
+      "service": {
+        "standard": "Standard",
+        "express": "Express",
+        "sameDay": "Same day"
+      },
+      "packaging": {
+        "parcel": "Parcel",
+        "envelope": "Envelope or file",
+        "bag": "Bag"
+      },
+      "cod": "Cash on delivery",
+      "codAmount": "Amount to collect",
+      "smsShipped": "Text the recipient when shipped",
+      "smsDelivered": "Text the recipient on delivery",
+      "content": "Contents"
+    },
+    "saveWithoutCreating": "Save details without creating",
+    "detailsSaved": "Details saved",
+    "detailsFailed": "Couldn't save the details",
+    "total": "Total {amount}",
+    "cancel": "Cancel",
+    "submit": "Create label",
+    "submitting": "Creating label…",
+    "fixFields": "{count, plural, one {Fix # field to continue} other {Fix # fields to continue}}",
+    "validation": {
+      "required": "Required",
+      "weight": "Enter a weight above 0",
+      "phoneDhl": "DHL eCommerce needs the recipient's phone",
+      "districtDhl": "DHL eCommerce needs the district",
+      "stateRequired": "Required for {country}",
+      "maxChars": "Up to {max} characters",
+      "hsFormat": "Use 6 to 10 digits"
+    },
+    "error": {
+      "title": "Couldn't create the label",
+      "carrierSaid": "{carrier} said: {message}",
+      "tryAgain": "Try again"
+    },
+    "settingsFailed": "Couldn't load your shipping settings",
+    "limit": {
+      "title": "You've used all the labels in your plan for this period",
+      "action": "See plans",
+      "reason": "Label limit reached"
+    },
+    "existing": {
+      "title": "This order already has a label",
+      "another": "Create another label…",
+      "confirmTitle": "Create a second label for order {number}?",
+      "confirm": "Create another",
+      "deleteLabel": "Delete label…",
+      "deleteTitle": "Delete the label for order {number}?",
+      "deleteBody": "It is removed from KolayXport only. It is not voided with the carrier.",
+      "deleteConfirm": "Delete label",
+      "deleted": "Label deleted",
+      "deleteFailed": "Couldn't delete the label"
+    },
+    "success": {
+      "title": "Label created · {service}",
+      "tracking": "Tracking number",
+      "trackingSending": "Sending tracking…",
+      "trackingSent": "Tracking sent to {mp, select, etsy {Etsy} ebay {eBay} amazon {Amazon} trendyol {Trendyol} wix {Wix} shopify {Shopify} hepsiburada {Hepsiburada} other {the marketplace}}",
+      "trackingQueued": "Queued for the Chrome extension · Open Etsy to send it",
+      "trackingFailed": "Couldn't send tracking",
+      "retry": "Retry",
+      "etgbSent": "ETGB document sent to {email}",
+      "etgbFailed": "Couldn't send the ETGB document",
+      "alertTitle": "{carrier} added a note to this label",
+      "preview": "Label preview",
+      "previewUnavailable": "No preview for this file. Use Print label.",
+      "print": "Print label",
+      "download": "Download PDF",
+      "next": "Next order",
+      "openFailed": "Couldn't open the label. Allow pop-ups for KolayXport."
+    }
+  },
+  "billing": {
+    "banner": {
+      "pastDueNoDate": "Your last payment failed. Update your card to keep importing orders.",
+      "grace": "Your trial ended. Choose a plan by {date} to keep importing orders and creating labels.",
+      "expired": "Your account is paused.",
+      "pastDue": "Your last payment failed. Update your card by {date} to keep importing orders.",
+      "confirming": "Confirming your payment with Stripe…",
+      "confirmTimeout": "Payment received. Your plan will update within a few minutes."
+    },
+    "usage": {
+      "pausedLabels": "Limit reached. New labels are paused until {date}.",
+      "pausedAi": "Limit reached. AI tools are paused until {date}.",
+      "title": "Usage this period",
+      "titleTrial": "Usage this trial",
+      "resets": "Resets on {date} · in {days, plural, one {# day} other {# days}}",
+      "meter": {
+        "orders": "Orders",
+        "ordersLegacy": "Order imports",
+        "labels": "Labels",
+        "connectedStores": "Connected stores",
+        "aiCredits": "AI credits"
+      },
+      "noun": {
+        "orders": "orders",
+        "labels": "labels",
+        "connectedStores": "connected stores",
+        "aiCredits": "AI credits"
+      },
+      "near": "{percent}% of your {meter} are used.",
+      "nearUpsell": "{plan} includes {limit} a month.",
+      "nearUpsellStores": "{plan} includes {limit} stores.",
+      "ordersOver": "Limit reached. Scheduled imports pause at {cap}.",
+      "paused": "Limit reached. Paused until {date}.",
+      "limitReached": "Limit reached.",
+      "aiHelp": "A text action uses 1 credit, an image uses 10.",
+      "manageStores": "Manage stores",
+      "soon": "Detailed usage will appear here soon.",
+      "loadFailed": "Couldn't load usage"
+    },
+    "title": "Plan & billing",
+    "titleShopify": "Plan",
+    "description": "Your plan, usage this month and invoices.",
+    "planName": {
+      "trial": "Free trial",
+      "starter": "Starter",
+      "growth": "Growth",
+      "pro": "Pro",
+      "enterprise": "Enterprise",
+      "shopify_free": "Shopify plan",
+      "none": "No plan"
+    },
+    "plan": {
+      "billedMonthly": "Billed monthly in {currency}",
+      "billedYearly": "Billed yearly in {currency}",
+      "perMonth": "{price} / month",
+      "perYear": "{price} / year",
+      "founding": "Founding member · 40% off for life",
+      "nextPayment": "Next payment {amount} on {date}",
+      "trialEnds": "Ends {date} · {days, plural, one {# day left} other {# days left}}",
+      "trialIncludes": "All Pro features included. No card on file.",
+      "canceling": "Cancels on {date}. You keep {plan} until then.",
+      "expired": "Your data is safe. Importing orders, labels and AI are paused.",
+      "enterprise": "Managed by your account manager.",
+      "shopify": "Included with the KolayXport Shopify app. There's nothing to pay here."
+    },
+    "action": {
+      "choosePlan": "Choose a plan",
+      "comparePlans": "Compare plans",
+      "changePlan": "Change plan",
+      "keepPlan": "Keep my plan",
+      "updatePayment": "Update payment method",
+      "manageInStripe": "Manage billing in Stripe",
+      "cancel": "Cancel subscription…",
+      "contactUs": "Contact us",
+      "refresh": "Refresh",
+      "opening": "Opening…"
+    },
+    "paymentMethod": {
+      "label": "Payment method",
+      "card": "{brand} •••• {last4} · expires {month}/{year}",
+      "update": "Update"
+    },
+    "details": {
+      "label": "Billing details",
+      "help": "Name, address and tax ID on your invoices",
+      "edit": "Edit in Stripe"
+    },
+    "features": {
+      "title": "Included in your plan",
+      "arbitrage": "Arbitrage scanner",
+      "financials": "Financials",
+      "bulkPhotoStudio": "Bulk photo studio",
+      "core": "Listing editor, bulk editor, research, shipping labels",
+      "included": "Included",
+      "proOnly": "Pro plan",
+      "notIncluded": "Not included",
+      "seePro": "See Pro"
+    },
+    "invoices": {
+      "title": "Invoices",
+      "viewAll": "View all",
+      "col": {
+        "date": "Date",
+        "number": "Invoice",
+        "plan": "Plan",
+        "amount": "Amount",
+        "status": "Status"
+      },
+      "download": "Download PDF",
+      "open": "Open invoice",
+      "payNow": "Pay now",
+      "period": "{plan} · {start}–{end}",
+      "empty": {
+        "title": "No invoices yet",
+        "body": "Invoices appear here after your first payment."
+      },
+      "loadFailed": "Couldn't load invoices",
+      "loadMoreFailed": "Couldn't load more"
+    },
+    "loadFailed": "Couldn't load your plan",
+    "toast": {
+      "planChanged": "You're on {plan} now.",
+      "portalFailed": "Couldn't open Stripe. Try again.",
+      "managedElsewhere": "Billing is managed elsewhere for this account."
+    },
+    "palette": {
+      "manage": "Manage subscription",
+      "invoices": "View invoices"
     }
   }
 }

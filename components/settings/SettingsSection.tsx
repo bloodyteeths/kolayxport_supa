@@ -1,53 +1,50 @@
-import React from 'react';
-import { Paper, Box, Typography, Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+// components/settings/SettingsSection.tsx — shim (settings §17 Group A): the legacy props on the DS
+// `Section variant="card"`. Kept for the legacy panels until Groups B/C move them onto DS parts; the
+// integrator deletes it once nothing imports it (settings §17 G).
+import * as React from 'react';
+import { Section } from '@/components/ds/page';
+import { IconButton } from '@/components/ds/inputs';
+import { icons } from '@/lib/ds/icons';
 
 interface SettingsSectionProps {
   title: string;
   description?: string;
+  /** Free content right of the title (legacy: a Button). Rendered in the DS `headerSlot`. */
   action?: React.ReactNode;
+  /** Disclosure (legacy MUI Accordion): a ghost chevron toggles the body. */
   collapsible?: boolean;
   defaultExpanded?: boolean;
   children: React.ReactNode;
 }
 
-/**
- * Consistent settings card: theme border (no elevation), uniform padding/spacing.
- * Replaces the old `Paper elevation={3}` + `#ddd` header blocks.
- */
 export default function SettingsSection({
   title, description, action, collapsible, defaultExpanded = true, children,
 }: SettingsSectionProps) {
-  if (collapsible) {
-    return (
-      <Accordion
-        defaultExpanded={defaultExpanded}
-        disableGutters
-        elevation={0}
-        sx={{ mb: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2, '&:before': { display: 'none' }, overflow: 'hidden' }}
-      >
-        <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ px: { xs: 2, sm: 3 } }}>
-          <Box>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>{title}</Typography>
-            {description && <Typography variant="body2" color="text.secondary">{description}</Typography>}
-          </Box>
-        </AccordionSummary>
-        <AccordionDetails sx={{ px: { xs: 2, sm: 3 }, pb: { xs: 2, sm: 3 } }}>{children}</AccordionDetails>
-      </Accordion>
-    );
-  }
+  const [open, setOpen] = React.useState(defaultExpanded);
+  const bodyId = React.useId();
+  const expanded = !collapsible || open;
+
+  const toggle = collapsible ? (
+    <IconButton
+      icon={icons.disclosure}
+      label={title}
+      aria-expanded={open}
+      aria-controls={bodyId}
+      onClick={() => setOpen((v) => !v)}
+      data-testid="settings-section-toggle"
+    />
+  ) : null;
 
   return (
-    <Paper
-      elevation={0}
-      sx={{ p: { xs: 2, sm: 3 }, mb: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden', maxWidth: '100%' }}
+    <Section
+      variant="card"
+      title={title}
+      description={description}
+      headerSlot={action || toggle ? <>{action}{toggle}</> : undefined}
     >
-      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 1, mb: description ? 0.5 : 2 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</Typography>
-        {action && <Box sx={{ flexShrink: 0 }}>{action}</Box>}
-      </Box>
-      {description && <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>{description}</Typography>}
-      {children}
-    </Paper>
+      <div id={bodyId} hidden={!expanded}>
+        {expanded ? children : null}
+      </div>
+    </Section>
   );
 }

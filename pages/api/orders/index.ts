@@ -2,6 +2,107 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import prisma from '../../../lib/prisma';
 import { safeIsoDate, safeDate } from '../../../lib/utils/safeDate';
+import {
+  VIEW_COUNTS_FINGERPRINT_SQL,
+  VIEW_COUNTS_SQL,
+  effectiveShipBySortSql,
+  isOrderStatusFilterKey,
+  isOrderViewKey,
+  statusKeysWhereSql,
+  viewWhereSql,
+} from '../../../lib/orders/views';
+import type { OrderStatusFilterKey, ViewCounts } from '../../../lib/orders/types';
+
+/** A1: page size cap (the new UI offers 50 · 100 · 250). */
+export const MAX_ORDERS_PAGE_SIZE = 250;
+/** A3: at most this many ids per `?ids=` call. */
+export const MAX_ORDER_IDS = 50;
+/**
+ * A1: view counts are cached per user for at most this long, and only while the user's data
+ * fingerprint (lib/orders/views.ts VIEW_COUNTS_FINGERPRINT_SQL) is unchanged: a pull, a live order
+ * event, a label or a tracking push changes it, so the next list revalidation gets fresh counts.
+ * The TTL bounds the time-based drift (Overdue moves with NOW()).
+ */
+export const VIEW_COUNTS_TTL_MS = 30_000;
+
+const viewCountsCache = new Map<string, { at: number; fp: string; counts: ViewCounts }>();
+
+/** Test hook: forget cached view counts. */
+export function clearViewCountsCache(): void {
+  viewCountsCache.clear();
+}
+
+function toCount(v: unknown): number {
+  const n = typeof v === 'bigint' ? Number(v) : Number(v ?? 0);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+async function viewCountsFingerprint(userId: string): Promise<string | null> {
+  try {
+    const rows = (await prisma.$queryRawUnsafe(VIEW_COUNTS_FINGERPRINT_SQL, userId)) as Array<{ fp?: unknown }>;
+    const fp = rows?.[0]?.fp;
+    return typeof fp === 'string' ? fp : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A1 `include=counts`: one FILTER query (lib/orders/views.ts VIEW_COUNTS_SQL), cached while nothing changed. */
+export async function loadViewCounts(userId: string, now: number = Date.now()): Promise<ViewCounts> {
+  // No fingerprint (query failed) → no caching: stale counts are worse than one more query.
+  const fp = await viewCountsFingerprint(userId);
+  const hit = viewCountsCache.get(userId);
+  if (fp !== null && hit && hit.fp === fp && now - hit.at < VIEW_COUNTS_TTL_MS) return hit.counts;
+  const rows = (await prisma.$queryRawUnsafe(VIEW_COUNTS_SQL, userId)) as Array<Record<string, unknown>>;
+  const r = rows?.[0] ?? {};
+  const counts: ViewCounts = {
+    to_ship: toCount(r.to_ship),
+    overdue: toCount(r.overdue),
+    label_created: toCount(r.label_created),
+    problems: toCount(r.problems),
+  };
+  if (fp !== null) {
+    viewCountsCache.set(userId, { at: now, fp, counts });
+    if (viewCountsCache.size > 5000) viewCountsCache.clear();
+  } else {
+    viewCountsCache.delete(userId);
+  }
+  return counts;
+}
+
+/**
+ * A4: when the user's orders were last pulled. `User.lastSyncedAt` is only written by
+ * syncAllOrders when something changed and nothing failed, and never by the Trendyol / Wix /
+ * Shopify paths; every order pull path finishes a SyncOperation (lib/sync-status.ts completeSync
+ * sets updatedAt). Newest of both; product syncs are not order pulls.
+ */
+export async function loadLastPulledAt(userId: string): Promise<string | null> {
+  const [u, op] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { lastSyncedAt: true } }).catch(() => null),
+    prisma.syncOperation
+      .findFirst({
+        where: { userId, status: 'completed', type: { not: 'product' } },
+        orderBy: { updatedAt: 'desc' },
+        select: { updatedAt: true },
+      })
+      .catch(() => null),
+  ]);
+  const times = [u?.lastSyncedAt, op?.updatedAt]
+    .map((d) => (d ? new Date(d).getTime() : NaN))
+    .filter((t) => Number.isFinite(t));
+  return times.length > 0 ? new Date(Math.max(...times)).toISOString() : null;
+}
+
+/** Splits `status` values into normalized keys (A1) and legacy values (Turkish groups, raw statuses). */
+export function partitionStatusValues(values: string[]): { keys: OrderStatusFilterKey[]; legacy: string[] } {
+  const keys: OrderStatusFilterKey[] = [];
+  const legacy: string[] = [];
+  for (const v of values) {
+    if (isOrderStatusFilterKey(v)) keys.push(v);
+    else legacy.push(v);
+  }
+  return { keys, legacy };
+}
 
 /**
  * Normalise a query param that may arrive once, repeated (string[]), or — for
@@ -90,8 +191,16 @@ export default async function handler(
   const user = await getAuthUser(req, res);
   if (!user) return res.status(401).json({ error: 'Not authenticated' });
 
-  const page = parseInt(firstQueryValue(req.query.page) || '') || 1;
-  const pageSize = parseInt(firstQueryValue(req.query.limit) || '') || 15;
+  const page = Math.max(1, parseInt(firstQueryValue(req.query.page) || '') || 1);
+  // A1: capped at 250 (the new UI offers 50 · 100 · 250; the legacy page uses ≤ 100).
+  const pageSize = Math.min(MAX_ORDERS_PAGE_SIZE, Math.max(1, parseInt(firstQueryValue(req.query.limit) || '') || 15));
+  // A1/A3/A4: new-UI params. `view` = built-in saved view, `include=counts`, `ids=<id>[,<id>]`.
+  const viewRaw = firstQueryValue(req.query.view);
+  const view = isOrderViewKey(viewRaw) ? viewRaw : undefined;
+  const includeValues = queryValues(req.query.include, true);
+  const includeCounts = includeValues.includes('counts');
+  const idValues = queryValues(req.query.ids, true).slice(0, MAX_ORDER_IDS);
+  const newUi = view !== undefined || includeValues.length > 0 || idValues.length > 0;
   // Trim — pasted tracking numbers often carry trailing whitespace/newlines
   // that silently break the ILIKE pattern.
   const search = (firstQueryValue(req.query.search) || '').trim();
@@ -103,7 +212,12 @@ export default async function handler(
   // Whitelisted sort columns — sortBy/sort are interpolated into raw SQL, so
   // anything outside this map must fall back to the default order-date sort.
   const sortByRaw = firstQueryValue(req.query.sortBy) || 'orderDate';
+  const orderDateSort = `COALESCE(o."uiOrderDate", o."createdAt") ${sort}`;
   const orderByClauses: Record<string, string> = {
+    // New-UI aliases (orders §4.1 sort keys).
+    orderedAt: orderDateSort,
+    total: `o."totalPrice" ${sort} NULLS LAST`,
+    store: `o."marketplace" ${sort} NULLS LAST, COALESCE(o."uiOrderDate", o."createdAt") DESC`,
     orderDate: `COALESCE(o."uiOrderDate", o."createdAt") ${sort}`,
     // Ship-by sort is for "what do I need to ship next": orders that still
     // need a label come first (tier 0), already-shipped/labeled ones sink to
@@ -128,7 +242,12 @@ export default async function handler(
     price: `o."totalPrice" ${sort} NULLS LAST`,
     customer: `o."customerName" ${sort} NULLS LAST`,
   };
-  const orderByClause = orderByClauses[sortByRaw] || orderByClauses.orderDate;
+  // With a `view` (new UI), ship-by sorts by the effective ship-by of lib/orders/views.ts,
+  // unknown last; the legacy tiered ship-by sort stays for the legacy page.
+  const orderByClause =
+    view && sortByRaw === 'shipBy'
+      ? `${effectiveShipBySortSql(sort === 'ASC' ? 'asc' : 'desc')}, COALESCE(o."uiOrderDate", o."createdAt") DESC`
+      : orderByClauses[sortByRaw] || orderByClauses.orderDate;
 
   // Filters. Scalar filters take the first value if a param is repeated;
   // status and marketplace are multi-value (see queryValues).
@@ -281,18 +400,37 @@ export default async function handler(
           paramIndex++;
         });
       } else {
-        // Unified status filters (onaylandi / kargolandi / iptal / Delivered),
-        // matched case-insensitively against the stored marketplace status.
-        const mappedStatuses = expandStatusFilter(statusValues);
+        // A1: normalized keys (to_ship, shipped, cancelled, …) map to raw-status clauses
+        // (lib/orders/views.ts); legacy values keep working: unified status filters
+        // (onaylandi / kargolandi / iptal / Delivered) and raw statuses, matched
+        // case-insensitively against the stored marketplace status. Both kinds OR together.
+        const { keys, legacy } = partitionStatusValues(statusValues);
+        const parts: string[] = [];
+        const keySql = statusKeysWhereSql(keys);
+        if (keySql) parts.push(keySql);
+        const mappedStatuses = expandStatusFilter(legacy);
         if (mappedStatuses.length > 0) {
           const placeholders = mappedStatuses.map((_, index) => `$${paramIndex + index}`).join(', ');
-          whereClause += ` AND LOWER(o."status") IN (${placeholders})`;
+          parts.push(`LOWER(o."status") IN (${placeholders})`);
           mappedStatuses.forEach(mappedStatus => {
             params.push(mappedStatus);
             paramIndex++;
           });
         }
+        if (parts.length === 1) whereClause += ` AND ${parts[0]}`;
+        else if (parts.length > 1) whereClause += ` AND (${parts.join(' OR ')})`;
       }
+    }
+    if (view) {
+      // A1: built-in saved view (server clause on normalized status, lib/orders/views.ts).
+      whereClause += ` AND ${viewWhereSql(view)}`;
+    }
+    if (idValues.length > 0) {
+      // A3: specific orders (`?open=` for an order not on the current page). Ownership is
+      // enforced by the o."userId" = $1 clause above.
+      whereClause += ` AND o.id = ANY($${paramIndex}::text[])`;
+      params.push(idValues);
+      paramIndex++;
     }
     if (marketplaceValues.length > 0) {
       // Multi-select: useOrders sends one repeated `marketplace` param per store.
@@ -485,7 +623,9 @@ export default async function handler(
           lj.status as "labelJobStatus",
           lj."trackingNumber" as "labelJobTrackingNumber",
           lj.carrier as "labelJobCarrier",
-          lj."pdfUrl" as "labelJobPdfUrl"
+          lj."pdfUrl" as "labelJobPdfUrl",
+          lj."createdAt" as "labelJobCreatedAt",
+          lj."errorMessage" as "labelJobError"
         FROM "OrderItem" oi
         LEFT JOIN "LabelJob" lj ON lj."orderItemId" = oi.id
         WHERE oi."orderId" = ANY($1)
@@ -775,11 +915,18 @@ export default async function handler(
         labelJobStatus: item.labelJobStatus || '',
         trackingNumber: item.trackingNumber || '',
         shipBy: safeIsoDate(item.shipBy),
+        // Additive (orders G1): Etsy transaction id / Trendyol line id for item personalization
+        // and listing links in the new UI.
+        remoteLineId: item.remoteLineId || null,
+        listingRef: item.listingRef || null,
         labelJobs: item.labelJobStatus ? [{
           status: item.labelJobStatus,
           trackingNumber: item.labelJobTrackingNumber,
           carrier: item.labelJobCarrier,
           pdfUrl: item.labelJobPdfUrl,
+          // A2: History and "Label failed: reason".
+          createdAt: safeIsoDate(item.labelJobCreatedAt),
+          errorMessage: item.labelJobError || null,
         }] : [],
       };
       });
@@ -1024,13 +1171,33 @@ export default async function handler(
     const total = parseInt(countResult[0]?.total || '0', 10);
 
     const cleanedOrders = await dedupeAndFilter(processedOrders.filter(Boolean) as UIOrder[]);
-    
-    
+
+    // A1/A4 + store identity, only for new-UI calls (the legacy response shape is unchanged).
+    // Each is best-effort: a failure leaves the field out (counts) or null, never a 500.
+    const extras: Record<string, unknown> = {};
+    if (newUi) {
+      const [counts, lastPulledAt, etsyShopNames] = await Promise.all([
+        includeCounts ? loadViewCounts(user.id).catch((err) => { console.warn('[orders] view counts failed', err?.message); return undefined; }) : undefined,
+        // A4: newest of User.lastSyncedAt and the last completed order SyncOperation.
+        Promise.resolve()
+          .then(() => loadLastPulledAt(user.id))
+          .catch(() => null),
+        Promise.resolve()
+          .then(() => prisma.etsyShop.findMany({ where: { userId: user.id }, select: { shopName: true } }))
+          .then((shops) => shops.map((s) => s.shopName).filter((n): n is string => typeof n === 'string' && n.trim() !== ''))
+          .catch(() => [] as string[]),
+      ]);
+      if (counts) extras.counts = counts;
+      extras.lastPulledAt = lastPulledAt;
+      extras.etsyShopNames = etsyShopNames;
+    }
+
     return res.status(200).json({
       orders: cleanedOrders,
       total, // Use the correct total count from the count query
       page,
-      pageSize
+      pageSize,
+      ...extras,
     });
   } catch (e) {
     console.error(e);

@@ -11,7 +11,7 @@
 //   402 { error: 'Payment Required', limitType: 'feature', reason: 'featureLocked', feature, neutral }
 // `neutral` = use Shopify-safe wording (no plans, no prices).
 import prisma from '@/lib/prisma';
-import { entitlementFromSettings } from './useEntitlement';
+import { entitlementFromSettings } from './entitlementCore';
 import { isNeutralBilling } from './billingState';
 import type { Feature } from './types';
 

@@ -36,7 +36,7 @@ import { etsyFetch, etsyPublicHeaders, ETSY_API_BASE } from '@/lib/etsy/http';
 import { EtsyPriority, canSpend, withEtsyBudget } from '@/lib/etsy/rateBudget';
 import { notify, type NotificationType } from '@/lib/notifications';
 import { isKnownType } from '@/lib/notificationCenter/registry';
-import { entitlementFromSettings } from '@/lib/billing/useEntitlement';
+import { entitlementFromSettings } from '@/lib/billing/entitlementCore';
 import { isNeutralBilling } from '@/lib/billing/billingState';
 import { isFeatureLockedError, requireFeature } from '@/lib/billing/requireFeature';
 import type { PlanKey } from '@/lib/billing/types';

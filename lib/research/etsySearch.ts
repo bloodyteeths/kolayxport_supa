@@ -20,7 +20,7 @@ import { etsyFetch, etsyPublicHeaders, ETSY_API_BASE } from '@/lib/etsy/http';
 import { EtsyPriority, getBudgetSnapshot } from '@/lib/etsy/rateBudget';
 import { normalizeTags } from '@/lib/etsy/seoRules';
 import { convertCurrency } from '@/lib/finance/fx';
-import { fmtDate, fmtMoney, fmtNum, fmtPercent } from '@/lib/format';
+import { fmtDate, fmtMoney, fmtNum, fmtPercent } from '@/lib/formatCore';
 import { buildFxTable, decodeEntities, summarizePrices, MIN_SAMPLE, type FxTable, type PriceSummary } from './stats';
 import type { BuyerWord, Confidence, DemandInput, DemandSignal, Evidence, Fact, Guarded, TopListing } from './types';
 

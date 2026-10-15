@@ -12660,7 +12660,8 @@
       "messageBuyer": "Message buyer",
       "fixAddress": "Fix address",
       "deleteLabel": "Delete label…",
-      "deleteOrder": "Delete order…"
+      "deleteOrder": "Delete order…",
+      "copyAddress": "Copy"
     },
     "toolbar": {
       "searchPlaceholder": "Search order #, buyer, SKU, tracking…",
@@ -12727,7 +12728,10 @@
       "trackingSent": "Tracking sent ✓",
       "trackingQueued": "Queued for extension",
       "trackingFailed": "Couldn't send tracking",
-      "trackingCopied": "Tracking number copied"
+      "trackingCopied": "Tracking number copied",
+      "fbaNoLabel": "Amazon ships this order. No label needed.",
+      "upgradePaid": "Buyer paid for {upgrade} shipping",
+      "trendyolCargo": "Trendyol cargo number"
     },
     "problem": {
       "addressIncomplete": "Address incomplete: {fields} missing",
@@ -12736,7 +12740,8 @@
         "street1": "street address",
         "city": "city",
         "postal": "postal code",
-        "country": "country"
+        "country": "country",
+        "name": "name"
       },
       "etsyAddressHidden": "Etsy doesn't share buyer addresses through its API. Open the order on Etsy with the Chrome extension to import it.",
       "labelFailed": "Label failed: {reason}"
@@ -12798,7 +12803,10 @@
       "labelCreated": "No labels waiting to ship"
     },
     "error": {
-      "title": "Couldn't load orders"
+      "title": "Couldn't load orders",
+      "orderTitle": "Couldn't load this order",
+      "orderGone": "This order no longer exists",
+      "backToOrders": "Back to orders"
     },
     "limit": {
       "syncs": "You've used all {limit} order syncs in your plan this month",
@@ -12811,13 +12819,15 @@
         "body": "It's removed from KolayXport only. Nothing changes on {marketplace}.",
         "confirm": "Delete order",
         "bodyManual": "It's removed from KolayXport.",
-        "failed": "Couldn't delete the order"
+        "failed": "Couldn't delete the order",
+        "done": "Order {number} deleted"
       },
       "deleteLabel": {
         "title": "Delete the label for order {number}?",
         "body": "It's removed from KolayXport. It isn't voided with the carrier.",
         "confirm": "Delete label",
-        "failed": "Couldn't delete the label"
+        "failed": "Couldn't delete the label",
+        "done": "Label deleted"
       }
     },
     "panel": {
@@ -12837,13 +12847,46 @@
       "trackingPending": "Sent, waiting for {mp, select, etsy {Etsy} ebay {eBay} amazon {Amazon} trendyol {Trendyol} wix {Wix} shopify {Shopify} hepsiburada {Hepsiburada} other {the marketplace}} to confirm",
       "labelFailedNoReason": "The last label attempt failed",
       "labelFileMissing": "No label file is stored for this label. Only the tracking number is available.",
-      "lifecycle": "Marketplace updates"
+      "lifecycle": "Marketplace updates",
+      "title": "Order {number}",
+      "ordered": "Ordered {date}",
+      "items": "Items ({count})",
+      "qtyPrice": "{price} × {qty}",
+      "personalization": "Personalization",
+      "itemsSubtotal": "Items {amount}",
+      "orderTotal": "Total {amount}",
+      "giftMessage": "Gift message",
+      "buyerNote": "Note from buyer",
+      "shipTo": "Ship to",
+      "edit": "Edit",
+      "save": "Save",
+      "addressSaved": "Address saved in KolayXport. {marketplace} isn't changed.",
+      "labelTracking": "Label & tracking",
+      "noLabel": "No label yet",
+      "labelCreatedOn": "Created {date}",
+      "trackingQueued": "Queued for the Chrome extension",
+      "trackingNotSent": "Tracking not sent yet",
+      "note": "Private note",
+      "notePlaceholder": "Add a note for packing or production…",
+      "noteHint": "Only you see this. Never sent to a marketplace.",
+      "noteSaveFailed": "Couldn't save the note",
+      "costs": "Costs",
+      "carrierCost": "Carrier cost",
+      "carrierCostHint": "From the carrier invoice. Used in Finance.",
+      "carrierCostSaved": "Carrier cost saved",
+      "carrierCostInvalid": "Enter an amount of 0 or more",
+      "history": "History"
     },
     "history": {
       "trackingSent": "Tracking sent to {mp, select, etsy {Etsy} ebay {eBay} amazon {Amazon} trendyol {Trendyol} wix {Wix} shopify {Shopify} hepsiburada {Hepsiburada} other {the marketplace}}",
       "orderedManual": "Added as a manual order",
       "trackingQueued": "Tracking queued for the Chrome extension",
-      "trackingFailed": "Tracking couldn't be sent"
+      "trackingFailed": "Tracking couldn't be sent",
+      "ordered": "Ordered on {marketplace}",
+      "imported": "Imported into KolayXport",
+      "labelCreated": "Label created · {carrier}",
+      "labelFailed": "Label failed · {carrier}",
+      "shipped": "Shipped"
     },
     "tracking": {
       "submit": "Send to {mp, select, etsy {Etsy} ebay {eBay} amazon {Amazon} trendyol {Trendyol} wix {Wix} shopify {Shopify} hepsiburada {Hepsiburada} other {marketplace}}",
@@ -12852,7 +12895,15 @@
       "required": "Enter the tracking number",
       "savedNotSent": "Saved in KolayXport, but {mp, select, etsy {Etsy} ebay {eBay} amazon {Amazon} trendyol {Trendyol} wix {Wix} shopify {Shopify} hepsiburada {Hepsiburada} other {the marketplace}} didn't accept it",
       "notConnected": "Connect {mp, select, etsy {Etsy} ebay {eBay} amazon {Amazon} trendyol {Trendyol} wix {Wix} shopify {Shopify} hepsiburada {Hepsiburada} other {marketplace}} in Settings first",
-      "network": "Check your connection and try again"
+      "network": "Check your connection and try again",
+      "title": "Add tracking number",
+      "number": "Tracking number",
+      "carrier": "Carrier",
+      "carrierOther": "Other",
+      "notifyBuyer": "Notify the buyer",
+      "sending": "Sending…",
+      "queued": "Queued. The Chrome extension sends it the next time Etsy is open.",
+      "failed": "Couldn't send tracking"
     },
     "messageBuyer": {
       "title": "Message the Amazon buyer",
@@ -12922,6 +12973,9 @@
         "required": "Required",
         "fixFields": "Fix {count, plural, one {# field} other {# fields}} to continue"
       }
+    },
+    "status": {
+      "rawTooltip": "{marketplace}: {raw}"
     }
   },
   "createLabel": {

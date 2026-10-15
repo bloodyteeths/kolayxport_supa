@@ -12660,7 +12660,8 @@
       "messageBuyer": "Alıcıya mesaj gönder",
       "fixAddress": "Adresi düzelt",
       "deleteLabel": "Etiketi sil…",
-      "deleteOrder": "Siparişi sil…"
+      "deleteOrder": "Siparişi sil…",
+      "copyAddress": "Kopyala"
     },
     "toolbar": {
       "searchPlaceholder": "Sipariş no, alıcı, SKU, takip no ara…",
@@ -12727,7 +12728,10 @@
       "trackingSent": "Takip gönderildi ✓",
       "trackingQueued": "Eklenti için sırada",
       "trackingFailed": "Takip gönderilemedi",
-      "trackingCopied": "Takip numarası kopyalandı"
+      "trackingCopied": "Takip numarası kopyalandı",
+      "fbaNoLabel": "Bu siparişi Amazon gönderir. Etiket gerekmez.",
+      "upgradePaid": "Alıcı {upgrade} kargo için ödeme yaptı",
+      "trendyolCargo": "Trendyol kargo numarası"
     },
     "problem": {
       "addressIncomplete": "Adres eksik: {fields} yok",
@@ -12736,7 +12740,8 @@
         "street1": "sokak adresi",
         "city": "şehir",
         "postal": "posta kodu",
-        "country": "ülke"
+        "country": "ülke",
+        "name": "ad"
       },
       "etsyAddressHidden": "Etsy alıcı adreslerini API üzerinden paylaşmıyor. Adresi almak için siparişi Chrome eklentisi açıkken Etsy'de açın.",
       "labelFailed": "Etiket oluşturulamadı: {reason}"
@@ -12798,7 +12803,10 @@
       "labelCreated": "Kargoya verilmeyi bekleyen etiket yok"
     },
     "error": {
-      "title": "Siparişler yüklenemedi"
+      "title": "Siparişler yüklenemedi",
+      "orderTitle": "Bu sipariş yüklenemedi",
+      "orderGone": "Bu sipariş artık yok",
+      "backToOrders": "Siparişlere dön"
     },
     "limit": {
       "syncs": "Planınızdaki bu ayki {limit} sipariş senkronizasyon hakkının tamamını kullandınız",
@@ -12811,13 +12819,15 @@
         "body": "Sipariş yalnızca KolayXport'tan silinir. {marketplace} tarafında hiçbir şey değişmez.",
         "confirm": "Siparişi sil",
         "bodyManual": "Sipariş KolayXport'tan silinir.",
-        "failed": "Sipariş silinemedi"
+        "failed": "Sipariş silinemedi",
+        "done": "{number} numaralı sipariş silindi"
       },
       "deleteLabel": {
         "title": "{number} numaralı siparişin etiketi silinsin mi?",
         "body": "Etiket KolayXport'tan kaldırılır, kargo firmasında iptal edilmez.",
         "confirm": "Etiketi sil",
-        "failed": "Etiket silinemedi"
+        "failed": "Etiket silinemedi",
+        "done": "Etiket silindi"
       }
     },
     "panel": {
@@ -12837,13 +12847,46 @@
       "trackingPending": "{mp, select, etsy {Etsy'ye} ebay {eBay'e} amazon {Amazon'a} trendyol {Trendyol'a} wix {Wix'e} shopify {Shopify'a} hepsiburada {Hepsiburada'ya} other {pazaryerine}} gönderildi, onay bekleniyor",
       "labelFailedNoReason": "Son etiket denemesi başarısız oldu",
       "labelFileMissing": "Bu etiketin dosyası kayıtlı değil. Yalnızca takip numarası var.",
-      "lifecycle": "Pazaryeri güncellemeleri"
+      "lifecycle": "Pazaryeri güncellemeleri",
+      "title": "Sipariş {number}",
+      "ordered": "Sipariş tarihi: {date}",
+      "items": "Ürünler ({count})",
+      "qtyPrice": "{price} × {qty}",
+      "personalization": "Kişiselleştirme",
+      "itemsSubtotal": "Ürünler {amount}",
+      "orderTotal": "Toplam {amount}",
+      "giftMessage": "Hediye notu",
+      "buyerNote": "Alıcı notu",
+      "shipTo": "Teslimat adresi",
+      "edit": "Düzenle",
+      "save": "Kaydet",
+      "addressSaved": "Adres KolayXport'ta kaydedildi. {marketplace} tarafı değişmedi.",
+      "labelTracking": "Etiket ve takip",
+      "noLabel": "Henüz etiket yok",
+      "labelCreatedOn": "{date} tarihinde oluşturuldu",
+      "trackingQueued": "Chrome eklentisi için sıraya alındı",
+      "trackingNotSent": "Takip numarası henüz gönderilmedi",
+      "note": "Özel not",
+      "notePlaceholder": "Paketleme veya üretim için not ekleyin…",
+      "noteHint": "Bunu yalnızca siz görürsünüz. Pazaryerine asla gönderilmez.",
+      "noteSaveFailed": "Not kaydedilemedi",
+      "costs": "Maliyetler",
+      "carrierCost": "Kargo maliyeti",
+      "carrierCostHint": "Kargo faturasından girin. Finans raporunda kullanılır.",
+      "carrierCostSaved": "Kargo maliyeti kaydedildi",
+      "carrierCostInvalid": "0 veya daha büyük bir tutar girin",
+      "history": "Geçmiş"
     },
     "history": {
       "trackingSent": "Takip numarası {mp, select, etsy {Etsy'ye} ebay {eBay'e} amazon {Amazon'a} trendyol {Trendyol'a} wix {Wix'e} shopify {Shopify'a} hepsiburada {Hepsiburada'ya} other {pazaryerine}} gönderildi",
       "orderedManual": "Manuel sipariş olarak eklendi",
       "trackingQueued": "Takip numarası Chrome eklentisi için sıraya alındı",
-      "trackingFailed": "Takip numarası gönderilemedi"
+      "trackingFailed": "Takip numarası gönderilemedi",
+      "ordered": "{marketplace} üzerinden sipariş verildi",
+      "imported": "KolayXport'a aktarıldı",
+      "labelCreated": "Etiket oluşturuldu · {carrier}",
+      "labelFailed": "Etiket oluşturulamadı · {carrier}",
+      "shipped": "Kargoya verildi"
     },
     "tracking": {
       "submit": "{mp, select, etsy {Etsy'ye} ebay {eBay'e} amazon {Amazon'a} trendyol {Trendyol'a} wix {Wix'e} shopify {Shopify'a} hepsiburada {Hepsiburada'ya} other {pazaryerine}} gönder",
@@ -12852,7 +12895,15 @@
       "required": "Takip numarasını girin",
       "savedNotSent": "KolayXport'ta kaydedildi, ancak {mp, select, etsy {Etsy'ye} ebay {eBay'e} amazon {Amazon'a} trendyol {Trendyol'a} wix {Wix'e} shopify {Shopify'a} hepsiburada {Hepsiburada'ya} other {pazaryerine}} gönderilemedi",
       "notConnected": "Önce Ayarlar'dan {mp, select, etsy {Etsy} ebay {eBay} amazon {Amazon} trendyol {Trendyol} wix {Wix} shopify {Shopify} hepsiburada {Hepsiburada} other {pazaryeri}} hesabını bağlayın",
-      "network": "Bağlantınızı kontrol edip tekrar deneyin"
+      "network": "Bağlantınızı kontrol edip tekrar deneyin",
+      "title": "Takip numarası ekle",
+      "number": "Takip numarası",
+      "carrier": "Kargo firması",
+      "carrierOther": "Diğer",
+      "notifyBuyer": "Alıcıyı bilgilendir",
+      "sending": "Gönderiliyor…",
+      "queued": "Sıraya alındı. Chrome eklentisi Etsy bir sonraki açıldığında gönderecek.",
+      "failed": "Takip numarası gönderilemedi"
     },
     "messageBuyer": {
       "title": "Amazon alıcısına mesaj gönder",
@@ -12922,6 +12973,9 @@
         "required": "Zorunlu",
         "fixFields": "Devam etmek için {count} alanı düzeltin"
       }
+    },
+    "status": {
+      "rawTooltip": "{marketplace}: {raw}"
     }
   },
   "createLabel": {

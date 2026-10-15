@@ -192,10 +192,12 @@ export function Combobox(props: ComboboxProps) {
           }}
           sx={{
             ...outlinedInputSx(size),
-            flexWrap: 'wrap',
+            // Only multi-select wraps (chips). A single value must stay on one line: wrapping + minWidth 80
+            // pushed the chevron onto a second row in narrow pickers (phone country code).
+            flexWrap: multiple ? 'wrap' : 'nowrap',
             gap: '2px',
             pr: '8px !important',
-            '& .MuiOutlinedInput-input': { ...outlinedInputSx(size)['& .MuiOutlinedInput-input'], flex: 1, minWidth: 80 },
+            '& .MuiOutlinedInput-input': { ...outlinedInputSx(size)['& .MuiOutlinedInput-input'], flex: 1, minWidth: multiple ? 80 : 0 },
           }}
         />
       )}

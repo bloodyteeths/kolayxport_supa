@@ -146,15 +146,12 @@ const rawDateSql = (key: string) => {
 /** Unix seconds, at most 11 integer digits (year ≤ 5138) so to_timestamp cannot overflow. */
 const EPOCH_RE = String.raw`^[0-9]{1,11}(\.[0-9]+)?$`;
 
-/** Effective ship-by as a timestamptz (NULL when no source has one). */
-export const EFFECTIVE_SHIP_BY_SQL = `COALESCE(
-    (SELECT MIN(si."shipBy") FROM "OrderItem" si WHERE si."orderId" = o.id),
-    o."shipByAt",
-    ${rawDateSql('due_date')},
-    ${rawDateSql('ship_by_date')},
-    (SELECT to_timestamp(MIN(CASE WHEN (tx->>'expected_ship_date') ~ '${EPOCH_RE}' THEN NULLIF((tx->>'expected_ship_date')::double precision, 0) END))
-       FROM jsonb_array_elements(CASE WHEN jsonb_typeof(o."rawData"->'transactions') = 'array' THEN o."rawData"->'transactions' ELSE '[]'::jsonb END) AS tx)
-  )`;
+/**
+ * Effective ship-by as a timestamptz (NULL when no source has one). Reads the stored Order.shipByAt only:
+ * writers set it (earliest line ship-by, else the marketplace ship-by) and it was backfilled from the old
+ * per-row OrderItem/rawData derivation, which made To ship/counts take ~6 s. Indexed (userId, status, shipByAt).
+ */
+export const EFFECTIVE_SHIP_BY_SQL = `o."shipByAt"`;
 
 /**
  * An order still "open" this long after it was placed was shipped or cancelled
@@ -252,6 +249,8 @@ export function orderHasLabel(row: OrderViewRow): boolean {
 
 /** Pure twin of EFFECTIVE_SHIP_BY_SQL. */
 export function effectiveShipBy(row: OrderViewRow): Date | null {
+  const stored = validDate(row.shipByAt);
+  if (stored) return stored;
   const itemDates = (row.items ?? []).map((i) => validDate(i.shipBy)).filter((d): d is Date => d !== null);
   if (itemDates.length > 0) return new Date(Math.min(...itemDates.map((d) => d.getTime())));
   const at = validDate(row.shipByAt);

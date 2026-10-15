@@ -115,7 +115,7 @@ export function isBuiltInView(id: string | undefined | null): id is OrderViewKey
 /** The built-in view the server filters on: the view itself, or a user view's base (default To ship). */
 export function baseViewOf(state: Pick<OrdersUrlState, 'view' | 'base'>): OrderViewKey {
   if (isBuiltInView(state.view)) return state.view;
-  return state.base ?? 'to_ship';
+  return state.base ?? 'all';
 }
 
 const VIEW_LABEL_KEY: Record<OrderViewKey, string> = {

@@ -42,6 +42,18 @@ feels lost, waits, or has to think, it's broken. Turkish is the primary language
 - Large empty gaps between sections; section headers + chips duplicated (chip bar and section title).
 - Footer "Up to date with Etsy" is good; when there are changes the primary must be obvious.
 
+### Mobile walkthrough (500px, TR, real data)
+- Orders: every card carries a full-width outlined "Etiket oluştur" button → each card ≈ half a screen, 2 orders
+  visible. Make the card tap-to-open with a compact trailing icon/text action; 4–5 orders per screen. Lone "Seç" link
+  and lone "25 sonuç" line waste two rows — merge into one compact row. Default chip is Gönderilecek (should be Tümü).
+- Listings grid mobile: same pattern — full-width "Düzenle" per card, lone "Seç", big gaps. Whole card opens editor.
+- Create label mobile: full recipient form expanded, phone country-code select tall/broken, Country empty for masked
+  Trendyol order (*** values) — show "Trendyol hides the address until shipment; label uses Trendyol cargo code".
+- Editor mobile: big empty gaps between sections; description inner-scroll box; photo action buttons wrap in 2 rows.
+- Home mobile: titled "Raporlar"; USD; each KPI card repeats a "0:19 itibarıyla · Siparişler · 4 mağaza" footer
+  (noise — state freshness once in the header); comparison text "18 Ağu – 16 Eyl 2026 dönemine göre" wraps badly.
+- Messages: avatar initials clipped under the marketplace badge ("KD" cut).
+
 ## Principles for the fix wave
 - Density: tighten vertical rhythm (section gap ≤ 24px desktop / 16px mobile, panel padding 16px, no empty filler).
 - Turkish-first copy; TRY default; Intl formatting tr-TR.

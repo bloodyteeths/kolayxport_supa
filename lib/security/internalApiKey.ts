@@ -66,3 +66,24 @@ export function applyExtensionCors(
   );
   res.setHeader('Access-Control-Allow-Credentials', 'true');
 }
+
+/**
+ * 401 for an unauthenticated extension call — except an extension that sent no
+ * Bearer token at all, which predates token auth (v9.4 and older used a public
+ * shop name). Those get 426 + a message so the user knows to update instead of
+ * silently losing addresses/tracking.
+ */
+export function rejectUnauthenticated(
+  req: NextApiRequest,
+  res: { status: (code: number) => { json: (body: unknown) => unknown } },
+): unknown {
+  const fromExtension = String(req.headers.origin || '').startsWith('chrome-extension://');
+  if (fromExtension && !req.headers.authorization) {
+    return res.status(426).json({
+      error: 'EXTENSION_UPDATE_REQUIRED',
+      message: 'KolayXport uzantısı güncel değil. Lütfen uzantıyı güncelleyin ve kolayxport.com sayfasını bir kez açın. / Your KolayXport extension is outdated — please update it and open kolayxport.com once.',
+      minVersion: '9.5.0',
+    });
+  }
+  return res.status(401).json({ error: 'Unauthorized' });
+}

@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { getAuthUser } from '@/lib/auth';
-import { applyExtensionCors } from '@/lib/security/internalApiKey';
+import { applyExtensionCors, rejectUnauthenticated } from '@/lib/security/internalApiKey';
 
 const CANCELLED_STATUS_VARIANTS = ['CANCELLED', 'CANCELED', 'cancelled', 'canceled', 'Cancelled', 'Canceled', 'REFUNDED', 'refunded', 'Refunded'];
 
@@ -21,7 +21,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // No fallback by (public) Etsy shop name.
   const user = await getAuthUser(req, res);
 
-  if (!user) return res.status(401).json({ error: 'Unauthorized' });
+  if (!user) return rejectUnauthenticated(req, res);
 
   try {
     console.log('[tracking-pending] Authenticated user', { userId: user.id });

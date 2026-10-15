@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { getAuthUser } from '@/lib/auth';
 import { withUsageLimiter } from '@/lib/middleware/withUsageLimiter';
-import { applyExtensionCors } from '@/lib/security/internalApiKey';
+import { applyExtensionCors, rejectUnauthenticated } from '@/lib/security/internalApiKey';
 
 // Etsy's API no longer returns buyer shipping addresses, so the Chrome extension
 // scrapes them off Shop Manager. Map the scraped shape → the Order.shippingAddress
@@ -64,7 +64,7 @@ async function handler(
       origin: req.headers.origin,
       userAgent: req.headers['user-agent']
     });
-    return res.status(401).json({ error: 'Unauthorized' });
+    return rejectUnauthenticated(req, res);
   }
   const userId = user.id;
 

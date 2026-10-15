@@ -36,11 +36,12 @@ jobs:
           host: ${{ secrets.KOLAYXPORT_VPS_IP }}
           username: deploy
           key: ${{ secrets.KOLAYXPORT_SSH_KEY }}
-          # Next.js webpack build now runs ~28–30 minutes on this VPS (CPU contention
-          # from other tenants on the shared box), so 30m was cutting it off mid-build
-          # and failing every deploy. 50m gives real headroom; the atomic swap means a
-          # genuine hang still can't take down the live service.
-          command_timeout: 50m
+          # The webpack build competes with other tenants on this 8 GB box and swaps
+          # heavily; since the design-system milestones it runs past 50 minutes and was
+          # killed mid-build (fa4755b, 57048f3). 110m gives headroom until the build
+          # moves to CI; the atomic .next swap means a hang still can't take down the
+          # live service.
+          command_timeout: 110m
           # Push events default to full deploy; workflow_dispatch can pick `restart`.
           script: |
             set -euo pipefail

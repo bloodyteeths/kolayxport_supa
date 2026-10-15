@@ -1,6 +1,7 @@
 export { Page, PAGE_MAX_WIDTH, type PageProps } from './Page';
 export { PageHeader, splitHeaderActions, MAX_SECONDARY, type PageHeaderProps } from './PageHeader';
 export { Section, type SectionProps } from './Section';
+export { SectionNav, scrollToSection, getScrollParent, SECTION_NAV_HEIGHT, SECTION_NAV_CHIP_H, type SectionNavProps, type SectionNavItem, type SectionNavState, type ScrollToSectionOptions } from './SectionNav';
 export { SyncMeta, type SyncMetaProps, type SyncMetaState, type SyncMetaCopy } from './SyncMeta';
 export { StickyActionBar, ACTION_BAR_VAR, type StickyActionBarProps } from './StickyActionBar';
 export { ActionButton, type ActionButtonProps, type ActionButtonVariant } from './ActionButton';

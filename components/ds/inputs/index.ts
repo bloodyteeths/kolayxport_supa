@@ -25,5 +25,5 @@ export { CountrySelect, type CountrySelectProps } from './CountrySelect';
 export { CurrencySelect, type CurrencySelectProps } from './CurrencySelect';
 export { PhoneInput, PhoneField, toE164, fromE164, type PhoneInputProps } from './PhoneInput';
 export { RateList, type RateListProps, type Rate, type CarrierKey } from './RateList';
-export { ImageGrid, type ImageGridProps, type GridImage } from './ImageGrid';
+export { ImageGrid, STRIP_TILE, type ImageGridProps, type GridImage, type StripVideo, type ImageGridVariant } from './ImageGrid';
 export { parseLocaleNumber } from './_number';

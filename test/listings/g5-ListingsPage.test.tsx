@@ -267,6 +267,25 @@ describe('ListingsPage (Etsy, desktop)', () => {
     await waitFor(() => expect(adapter.send).toHaveBeenCalledWith(['d1']));
   });
 
+  it('editor-etsy on: "Open editor" goes to the editor route and writes kx:editorNav for ‹ › and Back (M6)', async () => {
+    window.localStorage.setItem('kx-ui-override', 'editor-etsy');
+    window.sessionStorage.removeItem('kx:editorNav');
+    try {
+      router.query = { open: '1' };
+      await renderPage();
+      const panel = await screen.findByTestId('listings-quickview');
+      fireEvent.click(await within(panel).findByRole('button', { name: 'Open editor' }));
+      await waitFor(() => expect(router.push).toHaveBeenCalledWith(expect.stringMatching(/^\/app\/etsy-listings\/1(\?|$)/)));
+      const nav = JSON.parse(window.sessionStorage.getItem('kx:editorNav') ?? 'null');
+      expect(nav?.marketplace).toBe('etsy');
+      expect(nav?.ids).toContain('1');
+      expect(String(nav?.query ?? '')).not.toContain('open=');
+    } finally {
+      window.localStorage.removeItem('kx-ui-override');
+      window.sessionStorage.removeItem('kx:editorNav');
+    }
+  });
+
   it('a conflict opens the quick view without a send action', async () => {
     router.query = { open: '4' };
     await renderPage();

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Box, Typography, Button, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, TextField } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
@@ -7,7 +7,15 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { draftErrorI18n } from '@/lib/etsy/seoRules';
-import { stageEtsyDraft, stageEtsyDraftFile } from '@/lib/etsy/draftClient';
+import { fetchEtsyDrafts, stageEtsyDraft, stageEtsyDraftFile } from '@/lib/etsy/draftClient';
+// Embedded mode (listing editor M6, Group C): the video is the photo strip's trailing tile + the photo panel.
+import type { StripVideo } from '@/components/ds/inputs/ImageGrid';
+import { useConfirm } from '@/components/ds/overlay/ConfirmDialog';
+import { useToast } from '@/components/ds/feedback/toast';
+import { PhotoPanel } from '@/components/domain/listing-editor/sections/PhotoPanel';
+import {
+  EMPTY_STAGED_OPS, VIDEO_MAX_BYTES, VIDEO_TYPES, collectStagedOps, type StagedMediaOps,
+} from '@/components/domain/listing-editor/sections/photosModel';
 
 interface VideoInfo {
   video_id: number;
@@ -21,9 +29,39 @@ interface VideoUploaderProps {
   shopId: string;
   videos: VideoInfo[];
   onVideoChanged: () => void;
+  /**
+   * Listing editor (M6) mode: renders no box of its own. The video shows as the photo strip's trailing tile
+   * (`onTileChange` → ImageManager `video`), opens in the photo panel, and exposes `stage()` / `isDirty()` /
+   * `pick()` / `open()` through the ref. Staging calls are the same (`stageEtsyDraftFile` kind video, media delete).
+   */
+  embedded?: boolean;
+  /** Embedded: the tile to show (null = no video; the strip then shows "Add video"). */
+  onTileChange?: (tile: StripVideo | null) => void;
+  /** Embedded: drops one staged EtsyDraftMedia row (see ImageManager). Optional until the route exists. */
+  removeStagedMedia?: (draftMediaId: string) => Promise<void>;
+  /** Embedded: changes when the DB draft changed elsewhere → staged video ops are re-read. */
+  draftVersion?: string | number | null;
+  readOnly?: boolean;
+  /** Embedded: a staging request started or settled → the editor recounts / schedules. */
+  onLocalChange?: () => void;
 }
 
-export default function VideoUploader({ listingId, shopId, videos, onVideoChanged }: VideoUploaderProps) {
+/** Ref handle of the embedded VideoUploader (registered by PhotosSection as `photos:video`). */
+export interface VideoUploaderHandle {
+  /** Waits for a video upload/delete in flight; throws when that request fails. */
+  stage(): Promise<void>;
+  isDirty(): boolean;
+  /** File picker: adds a video, or replaces the current one (its delete is staged first). */
+  pick(): void;
+  /** Opens the video panel (player, Replace, Remove). */
+  open(): void;
+  /** Undo a staged removal (only with `removeStagedMedia`). */
+  undoRemove(): void;
+}
+
+const VideoUploader = forwardRef<VideoUploaderHandle, VideoUploaderProps>(function VideoUploader({
+  listingId, shopId, videos, onVideoChanged, embedded = false, onTileChange, removeStagedMedia, draftVersion, readOnly = false, onLocalChange,
+}, ref) {
   const t = useTranslations('etsy.video');
   const tEtsyRoot = useTranslations('etsy');
   /** Server validation errors carry an i18n key (etsy.validation.*, etsy.draftSync.*); never show raw text. */
@@ -131,6 +169,180 @@ export default function VideoUploader({ listingId, shopId, videos, onVideoChange
       setDeleting(false);
     }
   };
+
+
+  // --- Embedded (listing editor) -------------------------------------------------------------------------------
+  const tLe = useTranslations('listingEditor');
+  const dsToast = useToast();
+  const dsConfirm = useConfirm();
+  const [stagedOps, setStagedOps] = useState<StagedMediaOps>(EMPTY_STAGED_OPS);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const inflightRef = useRef<Set<Promise<unknown>>>(new Set());
+  const embeddedFileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!embedded) return undefined;
+    let cancelled = false;
+    fetchEtsyDrafts(shopId, listingId)
+      .then((drafts) => { if (!cancelled) setStagedOps(collectStagedOps(drafts)); })
+      .catch(() => { /* keep the last known staged state; the editor's own draft check reports failures */ });
+    return () => { cancelled = true; };
+  }, [embedded, shopId, listingId, draftVersion, reloadKey]);
+
+  const remote = videos[0] || null;
+  const stagedUpload = stagedOps.videoUploads.length ? stagedOps.videoUploads[stagedOps.videoUploads.length - 1] : null;
+  const remoteDeleteRow = remote ? stagedOps.videoDeletes.get(Number(remote.video_id)) ?? null : null;
+  const tile: StripVideo | null = useMemo(() => {
+    if (stagedUpload) {
+      return { src: stagedUpload.sourceUrl || `/api/etsy-drafts/media-preview?id=${encodeURIComponent(stagedUpload.id)}`, staged: 'add' };
+    }
+    if (remote) return { src: remote.video_url, poster: remote.thumbnail_url, staged: remoteDeleteRow ? 'delete' : undefined };
+    return null;
+  }, [stagedUpload, remote, remoteDeleteRow]);
+  const tileKey = JSON.stringify(tile);
+  const onTileChangeRef = useRef(onTileChange);
+  onTileChangeRef.current = onTileChange;
+  useEffect(() => {
+    if (embedded) onTileChangeRef.current?.(tile);
+    // tileKey stands for `tile`.
+  }, [embedded, tileKey]);
+
+  const onLocalChangeRef = useRef(onLocalChange);
+  onLocalChangeRef.current = onLocalChange;
+  const track = useCallback(<T,>(work: () => Promise<T>): Promise<T> => {
+    const p = work();
+    inflightRef.current.add(p);
+    onLocalChangeRef.current?.();
+    const done = () => { inflightRef.current.delete(p); onLocalChangeRef.current?.(); };
+    p.then(done, done);
+    return p;
+  }, []);
+
+  const embeddedError = (err: unknown, fallback: string) => {
+    console.error('[VideoUploader] embedded staging failed', err);
+    dsToast.error(draftErr(err, fallback));
+  };
+
+  const stageVideoFile = async (file: File) => {
+    if (readOnly) return;
+    if (!(VIDEO_TYPES as readonly string[]).includes(file.type)) {
+      dsToast.error(tLe('video.unsupported'), { persist: false });
+      return;
+    }
+    if (file.size > VIDEO_MAX_BYTES) {
+      dsToast.error(tLe('video.tooLarge'), { persist: false });
+      return;
+    }
+    if (stagedUpload && !removeStagedMedia) {
+      // A second staged upload would make Send try two videos; Etsy allows one.
+      dsToast.info(tLe('video.pendingRemoveViaDiscard'));
+      return;
+    }
+    try {
+      await track(async () => {
+        // Upload first: if it is rejected (type, size, 413, network) nothing else changes, so a failed Replace can
+        // never leave a staged delete of the live video behind. Etsy allows one video; the server sends video
+        // deletes before uploads whatever order the rows were staged in.
+        await stageEtsyDraftFile({ shopId, listingId, file, kind: 'video', operation: 'upload' });
+        if (stagedUpload && removeStagedMedia) await removeStagedMedia(stagedUpload.id);
+        if (remote && !remoteDeleteRow) {
+          const draft = await stageEtsyDraft({ shopId, listingId, media: [{ kind: 'video', operation: 'delete', etsyMediaId: remote.video_id }] });
+          if (draft) setStagedOps(collectStagedOps([draft]));
+        }
+      });
+    } catch (err) {
+      embeddedError(err, t('uploadErrorDetail', { size: Math.round(file.size / 1024 / 1024), type: file.type || '?' }));
+    } finally {
+      setReloadKey((k) => k + 1);
+      onVideoChanged();
+    }
+  };
+
+  const removeVideoEmbedded = async () => {
+    if (readOnly) return;
+    if (stagedUpload) {
+      if (!removeStagedMedia) { dsToast.info(tLe('video.pendingRemoveViaDiscard')); return; }
+      try {
+        await track(() => removeStagedMedia(stagedUpload.id));
+        setPanelOpen(false);
+      } catch (err) { embeddedError(err, t('deleteError')); }
+      setReloadKey((k) => k + 1);
+      onVideoChanged();
+      return;
+    }
+    if (!remote || remoteDeleteRow) return;
+    if (!removeStagedMedia) {
+      const ok = await dsConfirm({
+        title: tLe('video.confirmRemoveTitle'),
+        body: tLe('photos.confirmRemoveBody', { marketplace: 'Etsy' }),
+        confirmLabel: tLe('photos.remove'),
+        tone: 'danger',
+      });
+      if (!ok) return;
+    }
+    try {
+      const draft = await track(() => stageEtsyDraft({ shopId, listingId, media: [{ kind: 'video', operation: 'delete', etsyMediaId: remote.video_id }] }));
+      if (draft) setStagedOps(collectStagedOps([draft]));
+      onVideoChanged();
+    } catch (err) { embeddedError(err, t('deleteError')); }
+  };
+
+  const undoRemoveEmbedded = async () => {
+    if (!remoteDeleteRow || !removeStagedMedia) return;
+    try {
+      await track(() => removeStagedMedia(remoteDeleteRow));
+    } catch (err) { embeddedError(err, t('deleteError')); }
+    setReloadKey((k) => k + 1);
+    onVideoChanged();
+  };
+
+  useImperativeHandle(ref, () => ({
+    async stage() {
+      // Rejects when a video upload/delete still in flight fails (it was already shown as a toast).
+      await Promise.all(Array.from(inflightRef.current));
+    },
+    isDirty() { return inflightRef.current.size > 0; },
+    pick() { if (!readOnly) embeddedFileRef.current?.click(); },
+    open() { if (tile) setPanelOpen(true); else embeddedFileRef.current?.click(); },
+    undoRemove() { void undoRemoveEmbedded(); },
+  }));
+
+  if (embedded) {
+    return (
+      <>
+        <input
+          ref={embeddedFileRef}
+          type="file"
+          accept={VIDEO_TYPES.join(',')}
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = '';
+            if (file) void stageVideoFile(file);
+          }}
+        />
+        <PhotoPanel
+          open={panelOpen && Boolean(tile)}
+          onClose={() => setPanelOpen(false)}
+          marketplaceName="Etsy"
+          media={tile ? {
+            kind: 'video',
+            src: tile.src,
+            poster: tile.poster,
+            pending: tile.staged === 'add',
+            removing: tile.staged === 'delete',
+            processing: !stagedUpload && remote?.state === 'processing',
+          } : null}
+          onReplace={(file) => stageVideoFile(file)}
+          onRemove={stagedUpload && !removeStagedMedia ? undefined : () => { void removeVideoEmbedded(); }}
+          onUndoRemove={remoteDeleteRow && removeStagedMedia ? () => { void undoRemoveEmbedded(); } : undefined}
+          readOnly={readOnly}
+          data-testid="video-panel"
+        />
+      </>
+    );
+  }
 
   return (
     <Box>
@@ -265,4 +477,6 @@ export default function VideoUploader({ listingId, shopId, videos, onVideoChange
       </Dialog>
     </Box>
   );
-}
+});
+
+export default VideoUploader;

@@ -4,6 +4,7 @@ import { getAuthUserOrApiKey } from '@/lib/auth';
 import { upsertDraftPatch, toSerializable } from '@/lib/ebay/draftService';
 import { logger } from '@/lib/logger';
 import { withLegacyLastSyncError } from '@/lib/drafts/syncErrors';
+import { ebayDraftErrorResponse, isEbayDraftError } from '@/lib/ebay/draftErrors';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const user = await getAuthUserOrApiKey(req, res);
@@ -37,6 +38,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         queuedActions,
         media,
         replaceFields,
+        preserveConflict,
       } = req.body || {};
 
       if (!sku) return res.status(400).json({ error: 'sku is required' });
@@ -51,6 +53,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         queuedActions,
         media,
         replaceFields: Boolean(replaceFields),
+        preserveConflict: preserveConflict === true,
       });
 
       return res.status(200).json({ draft: toSerializable(draft ? withLegacyLastSyncError(draft as any) : draft) });
@@ -58,7 +61,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err: any) {
-    logger.error('eBay draft request failed', err, { userId: user.id });
-    return res.status(500).json({ error: err.message || 'Draft request failed' });
+    if (!isEbayDraftError(err)) logger.error('eBay draft request failed', err, { userId: user.id });
+    const { status, body } = ebayDraftErrorResponse(err, 'Draft request failed');
+    return res.status(status).json(body);
   }
 }

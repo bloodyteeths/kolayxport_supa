@@ -4,10 +4,10 @@
 import withAuth from '@/components/withAuth';
 import ListingsPage from '@/components/domain/listings/ListingsPage';
 import EtsyListingsLegacy from '@/components/legacy/listings/EtsyListingsLegacy';
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useUiFlag } from '@/lib/ds/uiFlags';
-import { needsLegacyListingsPage } from '@/lib/listings/legacyHandoff';
+import { editorHandoffHref, needsLegacyListingsPage } from '@/lib/listings/legacyHandoff';
 
 function EtsyListingsV2() {
   return <ListingsPage marketplace="etsy" />;
@@ -17,12 +17,24 @@ const EtsyListingsV2WithAuth = withAuth(EtsyListingsV2);
 
 export default function EtsyListingsRoute() {
   const v2 = useUiFlag('listings-etsy');
+  const editorOn = useUiFlag('editor-etsy');
   const router = useRouter();
-  // Research/cross-list hand-offs (`?prefill=session`, `?crosslist=`) open the legacy creator until the M6 editor
-  // ships (lib/listings/legacyHandoff.ts). Wait for the query on the flag-on path so the grid never mounts first.
+  // `useUiFlag` applies the `?ui=` override in an effect; hold hand-offs until it has run so the legacy page never
+  // consumes a prefill that belongs to the editor.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const editorTarget = router.isReady && editorOn ? editorHandoffHref('etsy', router.query) : null;
+  useEffect(() => {
+    if (mounted && editorTarget) void router.replace(editorTarget);
+  }, [mounted, editorTarget, router]);
+  // Research/cross-list hand-offs (`?prefill=session`, `?crosslist=`) go to the M6 editor's create route while its
+  // flag is on, else open the legacy creator (lib/listings/legacyHandoff.ts). Wait for the query on the flag-on path
+  // so the grid never mounts first.
   // Latched: the legacy page drops the param once it has opened the creator, which must not swap the page under it.
   const handoff = useRef(false);
-  if (router.isReady && needsLegacyListingsPage(router.query)) handoff.current = true;
+  const pendingHandoff = router.isReady && needsLegacyListingsPage(router.query);
+  if (pendingHandoff && (!mounted || editorTarget)) return null;
+  if (pendingHandoff) handoff.current = true;
   if (v2 && !router.isReady) return null;
   const legacy = !v2 || handoff.current;
   // The legacy default export is already wrapped in withAuth (+ its own layout / RequireConnection).

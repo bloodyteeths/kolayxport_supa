@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
 import {
   Box,
   IconButton,
@@ -20,6 +20,10 @@ import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import ImageIcon from '@mui/icons-material/Image';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+// Embedded mode (listing editor M6, Group C): DS strip + photo panel. The picture list stays a controlled field.
+import { ImageGrid, moveItem } from '@/components/ds/inputs/ImageGrid';
+import { PhotoPanel } from '@/components/domain/listing-editor/sections/PhotoPanel';
+import { IMAGE_TYPES, summarizeEbayPhotos, type PhotosSummary } from '@/components/domain/listing-editor/sections/photosModel';
 
 interface ImageManagerProps {
   images: string[];
@@ -27,12 +31,48 @@ interface ImageManagerProps {
   maxImages?: number;
   /** Optional product title for auto-prompting */
   productTitle?: string;
+  /**
+   * Listing editor (M6) mode: DS photo strip (`ImageGrid variant="strip"`) + photo SidePanel instead of the
+   * dropzone grid and dialogs. The URL list stays controlled (`onImagesChanged` → the editor's `images` field,
+   * staged by the eBay adapter); the ref's `stage()` waits for picture uploads in flight.
+   */
+  embedded?: boolean;
+  /** Embedded: the URLs on eBay (staged badges, summary). Default: the images at mount. */
+  baseline?: string[];
+  /** Embedded: what is on the strip (score, preview, "Not sent yet"). */
+  onSummary?: (summary: PhotosSummary) => void;
+  readOnly?: boolean;
+  /** Embedded: text of the inline dropzone when there are no photos. */
+  emptyMessage?: React.ReactNode;
+}
+
+/** Ref handle of the embedded eBay ImageManager (registered by PhotosSection as `photos:images`). */
+export interface EbayImageManagerHandle {
+  /** Waits for picture uploads in flight (the URL list itself is a field the adapter stages). */
+  stage(): Promise<void>;
+  /** A picture upload in flight (its URL is not in the field yet). */
+  isDirty(): boolean;
+  openUpload(): void;
+  openGenerate(): void;
+  openPhoto(index?: number): void;
+}
+
+/** Stable strip ids for a URL list (the same URL twice gets `#2`). */
+function urlTileIds(urls: string[]): string[] {
+  const seen = new Map<string, number>();
+  return urls.map((u) => {
+    const n = (seen.get(u) ?? 0) + 1;
+    seen.set(u, n);
+    return n > 1 ? `${u}#${n}` : u;
+  });
 }
 
 const VALID_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 const MAX_SIZE = 12 * 1024 * 1024; // 12MB
 
-export default function ImageManager({ images, onImagesChanged, maxImages = 24, productTitle }: ImageManagerProps) {
+const ImageManager = forwardRef<EbayImageManagerHandle, ImageManagerProps>(function ImageManager({
+  images, onImagesChanged, maxImages = 24, productTitle, embedded = false, baseline, onSummary, readOnly = false, emptyMessage,
+}, ref) {
   const t = useTranslations('ebay.imageManager');
   const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -54,6 +94,9 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
 
   const sortedImages = images || [];
   const remaining = maxImages - sortedImages.length;
+  /** The latest URL list: an embedded upload resolving later appends to it, keeping removals/moves made meanwhile. */
+  const imagesRef = useRef(sortedImages);
+  imagesRef.current = sortedImages;
 
   // Upload a single file and return the public URL
   const uploadFile = useCallback(async (file: File): Promise<string | null> => {
@@ -110,13 +153,13 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
     }
 
     if (newUrls.length > 0) {
-      onImagesChanged([...sortedImages, ...newUrls]);
+      onImagesChanged([...(embedded ? imagesRef.current : sortedImages), ...newUrls]);
       toast.success(t('imagesUploaded', { count: newUrls.length }));
     }
 
     setUploading(false);
     setUploadProgress(0);
-  }, [remaining, maxImages, sortedImages, onImagesChanged, uploadFile]);
+  }, [remaining, maxImages, sortedImages, onImagesChanged, uploadFile, embedded]);
 
   // File input change (click to browse)
   const handleFileInput = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -282,7 +325,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
 
       const url = await uploadFile(file);
       if (url) {
-        onImagesChanged([...sortedImages, url]);
+        onImagesChanged([...(embedded ? imagesRef.current : sortedImages), url]);
         toast.success(t('aiImageAdded'));
         setAiPreview(null);
         setAiOpen(false);
@@ -293,6 +336,327 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
       setAiUploading(false);
     }
   };
+
+  // AI image generation (reference input + dialog), shared by the legacy grid and the embedded strip; unchanged.
+  const aiDialog = (
+    <>
+      <input
+        ref={refImageInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/gif,image/webp"
+        style={{ display: 'none' }}
+        onChange={handleRefImageSelect}
+      />
+      {/* AI Image Generation Dialog — high z-index for nesting inside other dialogs */}
+      <Dialog
+        open={aiOpen}
+        onClose={() => !aiGenerating && !aiUploading && setAiOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        sx={{ zIndex: 1500 }}
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <AutoFixHighIcon color="primary" />
+            {t('aiGeneratorTitle')}
+          </Box>
+          <IconButton size="small" onClick={() => setAiOpen(false)} disabled={aiGenerating || aiUploading}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+            {/* Prompt */}
+            <TextField
+              label={t('promptLabel')}
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              multiline
+              rows={3}
+              fullWidth
+              size="small"
+              placeholder={t('promptPlaceholder')}
+              disabled={aiGenerating}
+            />
+
+            {/* Reference image */}
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                {t('referenceImageOptional')}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<ImageIcon />}
+                  onClick={() => refImageInputRef.current?.click()}
+                  disabled={aiGenerating}
+                >
+                  {t('uploadFromFile')}
+                </Button>
+                {/* Show current reference */}
+                {(aiRefImage || aiRefUrl) && (
+                  <>
+                    <img
+                      src={aiRefImage ? `data:${aiRefImage.mimeType};base64,${aiRefImage.base64}` : aiRefUrl!}
+                      alt={t('referenceAlt')}
+                      style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 4, border: '2px solid #1976d2' }}
+                    />
+                    <Button
+                      size="small"
+                      color="error"
+                      onClick={() => { setAiRefImage(null); setAiRefUrl(null); }}
+                      disabled={aiGenerating}
+                      sx={{ minWidth: 0, px: 1 }}
+                    >
+                      <CloseIcon sx={{ fontSize: 16 }} />
+                    </Button>
+                  </>
+                )}
+              </Box>
+              {/* Pick from existing listing images */}
+              {sortedImages.length > 0 && (
+                <Box sx={{ mt: 1 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                    {t('orPickExisting')}
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                    {sortedImages.map((imgUrl, idx) => (
+                      <Box
+                        key={idx}
+                        onClick={() => {
+                          if (aiGenerating) return;
+                          setAiRefImage(null);
+                          setAiRefUrl(imgUrl);
+                        }}
+                        sx={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: 1,
+                          overflow: 'hidden',
+                          cursor: aiGenerating ? 'default' : 'pointer',
+                          border: aiRefUrl === imgUrl ? '2px solid #1976d2' : '1px solid #ddd',
+                          opacity: aiGenerating ? 0.5 : 1,
+                          transition: 'border 0.15s',
+                          '&:hover': aiGenerating ? {} : { borderColor: '#1976d2' },
+                        }}
+                      >
+                        <img
+                          src={imgUrl}
+                          alt={t('refAlt', { index: idx + 1 })}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              )}
+            </Box>
+
+            {/* Generate button */}
+            <Button
+              variant="contained"
+              onClick={handleAIGenerate}
+              disabled={aiGenerating || !aiPrompt.trim()}
+              startIcon={aiGenerating ? <CircularProgress size={18} color="inherit" /> : <AutoFixHighIcon />}
+              fullWidth
+            >
+              {aiGenerating ? t('generating') : t('generateImage')}
+            </Button>
+
+            {/* Preview */}
+            {aiPreview && (
+              <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
+                <img
+                  src={`data:${aiPreview.mimeType};base64,${aiPreview.base64}`}
+                  alt={t('aiGeneratedAlt')}
+                  style={{ width: '100%', display: 'block' }}
+                />
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, p: 1.5, bgcolor: '#f9fafb' }}>
+                  <Button
+                    variant="contained"
+                    color="success"
+                    onClick={embedded ? () => { void trackUpload(handleAcceptAIImage()); } : handleAcceptAIImage}
+                    disabled={aiUploading}
+                    startIcon={aiUploading ? <CircularProgress size={16} color="inherit" /> : <AddPhotoAlternateIcon />}
+                    fullWidth
+                  >
+                    {aiUploading ? t('adding') : t('addToListing')}
+                  </Button>
+
+                  {/* Follow-up prompt for regeneration */}
+                  <TextField
+                    value={aiFollowUp}
+                    onChange={(e) => setAiFollowUp(e.target.value)}
+                    size="small"
+                    fullWidth
+                    placeholder={t('followUpPlaceholder')}
+                    disabled={aiGenerating}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (aiFollowUp.trim()) {
+                          setAiPrompt(aiFollowUp.trim());
+                          setAiFollowUp('');
+                        }
+                        handleAIGenerate();
+                      }
+                    }}
+                  />
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button
+                      variant="outlined"
+                      onClick={() => {
+                        if (aiFollowUp.trim()) {
+                          setAiPrompt(aiFollowUp.trim());
+                          setAiFollowUp('');
+                        }
+                        handleAIGenerate();
+                      }}
+                      disabled={aiGenerating}
+                      startIcon={aiGenerating ? <CircularProgress size={14} /> : undefined}
+                      fullWidth
+                    >
+                      {aiFollowUp.trim() ? t('regenerateWithChanges') : t('regenerateSamePrompt')}
+                    </Button>
+                  </Box>
+                </Box>
+              </Box>
+            )}
+          </Box>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+
+  // --- Embedded (listing editor) -------------------------------------------------------------------------------
+  const tLe = useTranslations('listingEditor');
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const baselineRef = useRef<string[]>(baseline ?? images ?? []);
+  if (baseline) baselineRef.current = baseline;
+  const inflightRef = useRef<Set<Promise<unknown>>>(new Set());
+  const embeddedFileRef = useRef<HTMLInputElement>(null);
+
+  const trackUpload = (work: Promise<unknown>) => {
+    inflightRef.current.add(work);
+    const done = () => { inflightRef.current.delete(work); };
+    work.then(done, done);
+    return work;
+  };
+
+  const tileIds = useMemo(() => urlTileIds(sortedImages), [sortedImages]);
+  const baseSet = useMemo(() => new Set(baselineRef.current), [baseline, embedded]);
+  const summary = useMemo(() => summarizeEbayPhotos(sortedImages, baselineRef.current), [sortedImages, baseline]);
+  const summaryKey = JSON.stringify(summary);
+  const onSummaryRef = useRef(onSummary);
+  onSummaryRef.current = onSummary;
+  useEffect(() => {
+    if (embedded) onSummaryRef.current?.(summary);
+    // summaryKey stands for `summary`.
+  }, [embedded, summaryKey]);
+
+  const replaceAt = async (index: number, file: File) => {
+    if (readOnly) return;
+    const work = (async () => {
+      const url = await uploadFile(file);
+      if (!url) return;
+      const next = [...imagesRef.current];
+      if (index < 0 || index >= next.length) return;
+      next[index] = url;
+      onImagesChanged(next);
+    })();
+    try {
+      await trackUpload(work);
+    } catch (err: any) {
+      toast.error(err?.message || t('imageUploadFailed'));
+    }
+  };
+
+  useImperativeHandle(ref, () => ({
+    async stage() {
+      await Promise.all(Array.from(inflightRef.current).map((p) => p.catch(() => undefined)));
+    },
+    isDirty() { return uploading || aiUploading || inflightRef.current.size > 0; },
+    openUpload() { if (!readOnly) embeddedFileRef.current?.click(); },
+    openGenerate() { if (!readOnly) handleOpenAI(); },
+    openPhoto(index?: number) { if (imagesRef.current.length) setOpenIndex(index ?? 0); },
+  }));
+
+  if (embedded) {
+    const openUrl = openIndex != null ? sortedImages[openIndex] : undefined;
+    const step = (delta: number) => {
+      if (openIndex == null || sortedImages.length < 2) return;
+      setOpenIndex((openIndex + delta + sortedImages.length) % sortedImages.length);
+    };
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }} data-testid="ebay-photo-strip">
+        <ImageGrid
+          variant="strip"
+          images={sortedImages.map((src, i) => ({ id: tileIds[i], src, staged: baseSet.has(src) ? undefined : 'add' }))}
+          max={maxImages}
+          onReorder={(ids) => {
+            const byId = new Map(tileIds.map((id, i) => [id, sortedImages[i]]));
+            const next = ids.map((id) => byId.get(id)).filter((u): u is string => typeof u === 'string');
+            if (next.length === sortedImages.length) onImagesChanged(next);
+          }}
+          onUpload={(files) => { void trackUpload(uploadFiles(files)); }}
+          onDelete={(id) => {
+            const i = tileIds.indexOf(id);
+            if (i >= 0) onImagesChanged(sortedImages.filter((_, j) => j !== i));
+          }}
+          onOpen={(id) => { const i = tileIds.indexOf(id); if (i >= 0) setOpenIndex(i); }}
+          flagMissingAlt={false}
+          accept={IMAGE_TYPES.join(',')}
+          disabled={readOnly || uploading}
+          emptyMessage={emptyMessage ?? tLe('photos.noPhotos', { marketplace: 'eBay' })}
+        />
+        {uploading ? (
+          <Box role="status" sx={{ fontSize: 12, lineHeight: '16px', color: 'text.secondary' }}>{t('uploadingProgress', { progress: uploadProgress })}</Box>
+        ) : null}
+        <input
+          ref={embeddedFileRef}
+          type="file"
+          accept={IMAGE_TYPES.join(',')}
+          multiple
+          hidden
+          onChange={(e) => {
+            const files = Array.from(e.target.files || []);
+            e.target.value = '';
+            void trackUpload(uploadFiles(files));
+          }}
+        />
+        <PhotoPanel
+          open={openUrl !== undefined}
+          onClose={() => setOpenIndex(null)}
+          marketplaceName="eBay"
+          media={openUrl !== undefined && openIndex != null ? {
+            kind: 'photo',
+            id: tileIds[openIndex],
+            src: openUrl,
+            fullSrc: openUrl,
+            alt: '',
+            position: openIndex + 1,
+            total: sortedImages.length,
+            pending: false,
+            removing: false,
+          } : null}
+          onPrev={sortedImages.length > 1 ? () => step(-1) : undefined}
+          onNext={sortedImages.length > 1 ? () => step(1) : undefined}
+          onMakePrimary={openIndex != null && openIndex > 0 ? () => {
+            onImagesChanged(moveItem(sortedImages, openIndex, 0));
+            setOpenIndex(0);
+          } : undefined}
+          onReplace={openIndex != null ? (file) => replaceAt(openIndex, file) : undefined}
+          onRemove={openIndex != null ? () => {
+            onImagesChanged(sortedImages.filter((_, j) => j !== openIndex));
+            setOpenIndex(null);
+          } : undefined}
+          readOnly={readOnly}
+        />
+        {aiDialog}
+      </Box>
+    );
+  }
 
   return (
     <Box>
@@ -456,13 +820,6 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
         style={{ display: 'none' }}
         onChange={handleFileInput}
       />
-      <input
-        ref={refImageInputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/gif,image/webp"
-        style={{ display: 'none' }}
-        onChange={handleRefImageSelect}
-      />
 
       {/* Delete confirmation dialog */}
       <Dialog open={deleteConfirmIndex !== null} onClose={() => setDeleteConfirmIndex(null)} maxWidth="xs" sx={{ zIndex: 1500 }}>
@@ -487,185 +844,9 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
         </DialogActions>
       </Dialog>
 
-      {/* AI Image Generation Dialog — high z-index for nesting inside other dialogs */}
-      <Dialog
-        open={aiOpen}
-        onClose={() => !aiGenerating && !aiUploading && setAiOpen(false)}
-        maxWidth="sm"
-        fullWidth
-        sx={{ zIndex: 1500 }}
-      >
-        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <AutoFixHighIcon color="primary" />
-            {t('aiGeneratorTitle')}
-          </Box>
-          <IconButton size="small" onClick={() => setAiOpen(false)} disabled={aiGenerating || aiUploading}>
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-            {/* Prompt */}
-            <TextField
-              label={t('promptLabel')}
-              value={aiPrompt}
-              onChange={(e) => setAiPrompt(e.target.value)}
-              multiline
-              rows={3}
-              fullWidth
-              size="small"
-              placeholder={t('promptPlaceholder')}
-              disabled={aiGenerating}
-            />
-
-            {/* Reference image */}
-            <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-                {t('referenceImageOptional')}
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<ImageIcon />}
-                  onClick={() => refImageInputRef.current?.click()}
-                  disabled={aiGenerating}
-                >
-                  {t('uploadFromFile')}
-                </Button>
-                {/* Show current reference */}
-                {(aiRefImage || aiRefUrl) && (
-                  <>
-                    <img
-                      src={aiRefImage ? `data:${aiRefImage.mimeType};base64,${aiRefImage.base64}` : aiRefUrl!}
-                      alt={t('referenceAlt')}
-                      style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 4, border: '2px solid #1976d2' }}
-                    />
-                    <Button
-                      size="small"
-                      color="error"
-                      onClick={() => { setAiRefImage(null); setAiRefUrl(null); }}
-                      disabled={aiGenerating}
-                      sx={{ minWidth: 0, px: 1 }}
-                    >
-                      <CloseIcon sx={{ fontSize: 16 }} />
-                    </Button>
-                  </>
-                )}
-              </Box>
-              {/* Pick from existing listing images */}
-              {sortedImages.length > 0 && (
-                <Box sx={{ mt: 1 }}>
-                  <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-                    {t('orPickExisting')}
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                    {sortedImages.map((imgUrl, idx) => (
-                      <Box
-                        key={idx}
-                        onClick={() => {
-                          if (aiGenerating) return;
-                          setAiRefImage(null);
-                          setAiRefUrl(imgUrl);
-                        }}
-                        sx={{
-                          width: 44,
-                          height: 44,
-                          borderRadius: 1,
-                          overflow: 'hidden',
-                          cursor: aiGenerating ? 'default' : 'pointer',
-                          border: aiRefUrl === imgUrl ? '2px solid #1976d2' : '1px solid #ddd',
-                          opacity: aiGenerating ? 0.5 : 1,
-                          transition: 'border 0.15s',
-                          '&:hover': aiGenerating ? {} : { borderColor: '#1976d2' },
-                        }}
-                      >
-                        <img
-                          src={imgUrl}
-                          alt={t('refAlt', { index: idx + 1 })}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                      </Box>
-                    ))}
-                  </Box>
-                </Box>
-              )}
-            </Box>
-
-            {/* Generate button */}
-            <Button
-              variant="contained"
-              onClick={handleAIGenerate}
-              disabled={aiGenerating || !aiPrompt.trim()}
-              startIcon={aiGenerating ? <CircularProgress size={18} color="inherit" /> : <AutoFixHighIcon />}
-              fullWidth
-            >
-              {aiGenerating ? t('generating') : t('generateImage')}
-            </Button>
-
-            {/* Preview */}
-            {aiPreview && (
-              <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
-                <img
-                  src={`data:${aiPreview.mimeType};base64,${aiPreview.base64}`}
-                  alt={t('aiGeneratedAlt')}
-                  style={{ width: '100%', display: 'block' }}
-                />
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, p: 1.5, bgcolor: '#f9fafb' }}>
-                  <Button
-                    variant="contained"
-                    color="success"
-                    onClick={handleAcceptAIImage}
-                    disabled={aiUploading}
-                    startIcon={aiUploading ? <CircularProgress size={16} color="inherit" /> : <AddPhotoAlternateIcon />}
-                    fullWidth
-                  >
-                    {aiUploading ? t('adding') : t('addToListing')}
-                  </Button>
-
-                  {/* Follow-up prompt for regeneration */}
-                  <TextField
-                    value={aiFollowUp}
-                    onChange={(e) => setAiFollowUp(e.target.value)}
-                    size="small"
-                    fullWidth
-                    placeholder={t('followUpPlaceholder')}
-                    disabled={aiGenerating}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        if (aiFollowUp.trim()) {
-                          setAiPrompt(aiFollowUp.trim());
-                          setAiFollowUp('');
-                        }
-                        handleAIGenerate();
-                      }
-                    }}
-                  />
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Button
-                      variant="outlined"
-                      onClick={() => {
-                        if (aiFollowUp.trim()) {
-                          setAiPrompt(aiFollowUp.trim());
-                          setAiFollowUp('');
-                        }
-                        handleAIGenerate();
-                      }}
-                      disabled={aiGenerating}
-                      startIcon={aiGenerating ? <CircularProgress size={14} /> : undefined}
-                      fullWidth
-                    >
-                      {aiFollowUp.trim() ? t('regenerateWithChanges') : t('regenerateSamePrompt')}
-                    </Button>
-                  </Box>
-                </Box>
-              </Box>
-            )}
-          </Box>
-        </DialogContent>
-      </Dialog>
+      {aiDialog}
     </Box>
   );
-}
+});
+
+export default ImageManager;

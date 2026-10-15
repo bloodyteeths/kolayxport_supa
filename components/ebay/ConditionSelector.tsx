@@ -9,18 +9,30 @@ import {
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import { useTranslations } from 'next-intl';
+import { FormField, Select as DsSelect, TextArea } from '@/components/ds/inputs';
 
 interface ConditionOption {
   conditionId: string;
   conditionDescription?: string;
 }
 
-interface ConditionSelectorProps {
+export interface ConditionSelectorProps {
   condition: string;
   conditionDescription: string;
   categoryConditions?: ConditionOption[];
   onChange: (condition: string, description: string) => void;
+  /** listing-editor: DS FormField + Select + TextArea (labels above, counter, dirty marker), no MUI. */
+  embedded?: boolean;
+  /** Embedded: draws the FormField dirty marker + "Changed · Revert" on each field. */
+  dirty?: { condition?: boolean; description?: boolean };
+  onRevert?: { condition?: () => void; description?: () => void };
+  /** Embedded: inline errors (already translated), e.g. from the send-time validation. */
+  error?: { condition?: string | null; description?: string | null };
+  disabled?: boolean;
 }
+
+/** eBay caps the condition description at 1000 characters. */
+export const CONDITION_DESCRIPTION_MAX = 1000;
 
 /**
  * eBay's Inventory API ConditionEnum. The used grades are prefixed USED_ — the
@@ -43,8 +55,14 @@ export default function ConditionSelector({
   conditionDescription,
   categoryConditions,
   onChange,
+  embedded,
+  dirty,
+  onRevert,
+  error,
+  disabled,
 }: ConditionSelectorProps) {
   const t = useTranslations('ebay.listing');
+  const tLe = useTranslations('listingEditor.condition');
 
   function getConditionLabel(value: string): string {
     const key = CONDITION_KEYS[value];
@@ -89,6 +107,54 @@ export default function ConditionSelector({
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange(condition, e.target.value);
   };
+
+  if (embedded) {
+    // A stored value eBay no longer lists for this category stays selectable, so the field never shows blank.
+    const options = conditions.some((c) => c.value === condition) || !condition
+      ? conditions
+      : [{ value: condition, label: getConditionLabel(condition) }, ...conditions];
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '16px' }} data-testid="condition-selector-embedded">
+        <FormField
+          label={tLe('label')}
+          width="medium"
+          required
+          dirty={dirty?.condition}
+          onRevert={onRevert?.condition}
+          error={error?.condition ?? null}
+        >
+          <DsSelect<string>
+            value={condition || null}
+            onChange={(next) => onChange(next, next === 'NEW' ? '' : conditionDescription)}
+            options={options}
+            placeholder={tLe('placeholder')}
+            disabled={disabled}
+          />
+        </FormField>
+        {condition && condition !== 'NEW' && (
+          <FormField
+            label={tLe('description')}
+            optional
+            helper={tLe('descriptionHelp')}
+            counter={{ value: conditionDescription.length, max: CONDITION_DESCRIPTION_MAX }}
+            dirty={dirty?.description}
+            onRevert={onRevert?.description}
+            error={error?.description ?? null}
+          >
+            <TextArea
+              value={conditionDescription}
+              onChange={(v) => onChange(condition, v)}
+              minRows={2}
+              maxRows={8}
+              maxLength={CONDITION_DESCRIPTION_MAX}
+              placeholder={tLe('descriptionPlaceholder')}
+              disabled={disabled}
+            />
+          </FormField>
+        )}
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>

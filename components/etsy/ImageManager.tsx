@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   Box,
@@ -26,6 +26,19 @@ import EditIcon from '@mui/icons-material/Edit';
 import { toast } from 'react-hot-toast';
 import { fetchEtsyDrafts, stageEtsyDraft, stageEtsyDraftFile } from '@/lib/etsy/draftClient';
 import { aiErrorCode, AiRequestError, draftErrorI18n, ETSY_MAX_IMAGES } from '@/lib/etsy/seoRules';
+// Embedded mode (listing editor M6, Group C): DS strip + photo panel; staging calls below are the same ones.
+import { ImageGrid, type StripVideo } from '@/components/ds/inputs/ImageGrid';
+import { FormField as DsFormField } from '@/components/ds/inputs/FormField';
+import { TextArea as DsTextArea } from '@/components/ds/inputs/TextArea';
+import { Modal as DsModal } from '@/components/ds/overlay/Modal';
+import { useConfirm } from '@/components/ds/overlay/ConfirmDialog';
+import { useToast } from '@/components/ds/feedback/toast';
+import { moveItem } from '@/components/ds/inputs/ImageGrid';
+import { PhotoPanel, AltTextBatchPanel, defaultWriteAltText, type WriteAltText, type AltBatchItem } from '@/components/domain/listing-editor/sections/PhotoPanel';
+import {
+  EMPTY_STAGED_OPS, IMAGE_TYPES, applyTileOrder, buildPhotoTiles, cleanAltText, collectStagedOps, parseImageLinks,
+  reorderOpsFor, splitImageFiles, tileIdFor, summarizeEtsyPhotos, type PhotoTile, type PhotosSummary, type StagedMediaOps,
+} from '@/components/domain/listing-editor/sections/photosModel';
 
 interface ImageInfo {
   listing_image_id: number;
@@ -45,6 +58,53 @@ interface ImageManagerProps {
   shopId: string;
   images: ImageInfo[];
   onImagesChanged: () => void;
+  /**
+   * Listing editor (M6) mode: renders the DS photo strip (`ImageGrid variant="strip"`) and the photo SidePanel
+   * instead of the legacy grid and dialogs, and exposes `stage()` / `isDirty()` through the ref. Uploads, deletes
+   * and alt text still stage immediately with the same `stageEtsyDraft` / `stageEtsyDraftFile` calls; the photo
+   * order is staged by `stage()` (or 800ms after the last move, as before).
+   */
+  embedded?: boolean;
+  /** Embedded: listing title/description for AI alt text. */
+  listingTitle?: string;
+  listingDescription?: string;
+  /** Embedded: AI alt writer (useListingAI); default `/api/ai/etsy generate_alt_text`; `null` hides AI. */
+  writeAltText?: WriteAltText | null;
+  /** Embedded: the strip's trailing video tile (from VideoUploader `onTileChange`). */
+  video?: StripVideo | null;
+  onOpenVideo?: () => void;
+  onAddVideo?: () => void;
+  onUndoDeleteVideo?: () => void;
+  /** Embedded: what is on the strip and what is staged (score, preview, "Not sent yet"). */
+  onSummary?: (summary: PhotosSummary) => void;
+  /**
+   * Embedded: drops one staged EtsyDraftMedia row (undo a staged delete, remove a staged upload). Not available
+   * yet (no route); without it, staged deletes are confirmed first and staged uploads leave with Discard changes.
+   */
+  removeStagedMedia?: (draftMediaId: string) => Promise<void>;
+  /** Embedded: changes when the DB draft changed elsewhere (send, discard, refresh) → staged media are re-read. */
+  draftVersion?: string | number | null;
+  /** Embedded: draft is being sent; the strip is read-only. */
+  readOnly?: boolean;
+  /** Embedded: text of the inline dropzone when there are no photos (create vs edit wording). */
+  emptyMessage?: React.ReactNode;
+  /** Embedded: the unsaved state changed (a photo moved, a staging request started or settled) → recount / schedule. */
+  onLocalChange?: () => void;
+}
+
+/** Ref handle of the embedded ImageManager (registered by PhotosSection as the `photos:images` DraftSection). */
+export interface ImageManagerHandle {
+  /** Writes the unsaved photo order into the DB draft and waits for uploads/deletes in flight. Throws on failure. */
+  stage(): Promise<void>;
+  /** A photo move not staged yet, or a staging request in flight. */
+  isDirty(): boolean;
+  openUpload(): void;
+  openGenerate(): void;
+  openPasteLinks(): void;
+  /** Opens the photo panel (first photo when no id). */
+  openPhoto(tileId?: string): void;
+  /** Opens "Write alt text for N" (AI proposals for every photo without alt text). */
+  writeMissingAlt(): void;
 }
 
 function fileToBase64(file: File): Promise<string> {
@@ -80,7 +140,11 @@ function base64ToFile(base64: string, mimeType: string, filename: string): File 
   return new File([bytes], filename, { type: mimeType });
 }
 
-export default function ImageManager({ listingId, shopId, images, onImagesChanged }: ImageManagerProps) {
+const ImageManager = forwardRef<ImageManagerHandle, ImageManagerProps>(function ImageManager({
+  listingId, shopId, images, onImagesChanged,
+  embedded = false, listingTitle, listingDescription, writeAltText, video, onOpenVideo, onAddVideo, onUndoDeleteVideo,
+  onSummary, removeStagedMedia, draftVersion, readOnly = false, emptyMessage, onLocalChange,
+}, ref) {
   const t = useTranslations('etsy.imageManager');
   const tAiErr = useTranslations('etsy.aiErrors');
   const tEtsyRoot = useTranslations('etsy');
@@ -127,6 +191,37 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
   const [aiWhiteBg, setAiWhiteBg] = useState(false);
   const aiRefInputRef = useRef<HTMLInputElement>(null);
 
+  // Embedded-mode state (unused by the legacy grid).
+  const tLe = useTranslations('listingEditor');
+  const dsToast = useToast();
+  const dsConfirm = useConfirm();
+  const [stagedOps, setStagedOps] = useState<StagedMediaOps>(EMPTY_STAGED_OPS);
+  const [openTileId, setOpenTileId] = useState<string | null>(null);
+  const [altBatchOpen, setAltBatchOpen] = useState(false);
+  const [linksOpen, setLinksOpen] = useState(false);
+  const [linksText, setLinksText] = useState('');
+  const [linksSaving, setLinksSaving] = useState(false);
+  const [busyCount, setBusyCount] = useState(0);
+  const embeddedFileRef = useRef<HTMLInputElement>(null);
+  /** Local photo moves vs the last move written to the draft (isDirty / stage). */
+  const reorderSeqRef = useRef(0);
+  const reorderStagedSeqRef = useRef(0);
+  const inflightRef = useRef<Set<Promise<unknown>>>(new Set());
+  /** Set when the DB draft changed elsewhere (sent / discarded): local-only staged uploads are stale. */
+  const dropLocalPendingRef = useRef(false);
+  const draftVersionRef = useRef(draftVersion);
+  if (embedded && draftVersionRef.current !== draftVersion) {
+    draftVersionRef.current = draftVersion;
+    dropLocalPendingRef.current = true;
+  }
+  useEffect(() => {
+    // The draft was sent / discarded / refreshed: a photo order that is already in the draft no longer pins the
+    // local order, so the next read shows the draft's (or Etsy's) order.
+    if (!embedded || reorderSeqRef.current !== reorderStagedSeqRef.current) return;
+    hasPendingOrderRef.current = false;
+    setHasPendingOrder(false);
+  }, [embedded, draftVersion]);
+
   // Alt text editing state
   const [editAltImage, setEditAltImage] = useState<ImageInfo | null>(null);
   const [editAltText, setEditAltText] = useState('');
@@ -156,6 +251,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
     const loadDraftMedia = async () => {
       try {
         const drafts = await fetchEtsyDrafts(shopId, listingId);
+        if (!cancelled) setStagedOps(collectStagedOps(drafts));
         if (cancelled || hasPendingOrderRef.current) return;
         const currentImages = imagesRef.current;
         const baseImages = sortImagesByRank(currentImages);
@@ -199,7 +295,9 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
           // lag or because the DB write committed after this fetch started).
           // Without this merge, the freshly-added image visibly disappears.
           const dbPendingIds = new Set(pendingUploads.map((p) => p.pending_media_id).filter(Boolean));
-          const localOnlyPending = localImagesRef.current.filter((img) =>
+          const dropLocal = dropLocalPendingRef.current;
+          dropLocalPendingRef.current = false;
+          const localOnlyPending = dropLocal ? [] : localImagesRef.current.filter((img) =>
             img.is_pending_upload && img.pending_media_id && !dbPendingIds.has(img.pending_media_id),
           );
           setLocalImages(sortImagesByRank([...reorderedBase, ...pendingUploads, ...localOnlyPending]));
@@ -216,7 +314,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
     };
     loadDraftMedia();
     return () => { cancelled = true; };
-  }, [shopId, listingId, sourceImageKey, draftMediaReloadKey]);
+  }, [shopId, listingId, sourceImageKey, draftMediaReloadKey, draftVersion]);
 
   const sortedImages = localImages;
 
@@ -441,10 +539,12 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
     if (!hasPendingOrder) return;
     if (reorderDebounceRef.current) clearTimeout(reorderDebounceRef.current);
     reorderDebounceRef.current = setTimeout(() => {
+      // Embedded: same op list, but the outcome is tracked so the editor's save state is honest.
+      if (embedded) { flushReorderRef.current().catch(() => undefined); return; }
       stageReorderToDraft([...localImagesRef.current]);
     }, 800);
     return () => { if (reorderDebounceRef.current) clearTimeout(reorderDebounceRef.current); };
-  }, [hasPendingOrder, localImages, stageReorderToDraft]);
+  }, [hasPendingOrder, localImages, stageReorderToDraft, embedded]);
 
   const handleDropImage = useCallback((e: React.DragEvent<HTMLDivElement>, targetImageId: number) => {
     e.preventDefault();
@@ -553,6 +653,11 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
 
   const handleAiAcceptAndUpload = async () => {
     if (!aiResult) return;
+    // The listing editor stages through its own tracked path (capacity, capped rank, DS toast, Send vocabulary).
+    if (embedded) {
+      await acceptAiEmbedded();
+      return;
+    }
 
     if (sortedImages.length >= ETSY_MAX_IMAGES) {
       toast.error(t('maxImagesError', { max: ETSY_MAX_IMAGES }));
@@ -631,7 +736,691 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
     }
   };
 
+
+  // --- Embedded (listing editor) -------------------------------------------------------------------------------
+
+  const tiles: PhotoTile[] = useMemo(
+    () => buildPhotoTiles(localImages, stagedOps, originalRankByImageId),
+    [localImages, stagedOps, originalRankByImageId],
+  );
+  const tilesRef = useRef(tiles);
+  tilesRef.current = tiles;
+  const liveCount = tiles.filter((tile) => tile.staged !== 'delete').length;
+
+  /** Runs one staging request and keeps it visible to isDirty()/stage() until it settles. */
+  const onLocalChangeRef = useRef(onLocalChange);
+  onLocalChangeRef.current = onLocalChange;
+  const track = useCallback(<T,>(work: () => Promise<T>): Promise<T> => {
+    const p = work();
+    inflightRef.current.add(p);
+    setBusyCount((n) => n + 1);
+    onLocalChangeRef.current?.();
+    const done = () => {
+      inflightRef.current.delete(p);
+      setBusyCount((n) => Math.max(0, n - 1));
+      onLocalChangeRef.current?.();
+    };
+    p.then(done, done);
+    return p;
+  }, []);
+
+  const applyDraft = useCallback((draft: { status?: string; media?: any[] } | null | undefined) => {
+    if (draft) setStagedOps(collectStagedOps([draft]));
+  }, []);
+
+  const stagedOpsRef = useRef(stagedOps);
+  stagedOpsRef.current = stagedOps;
+
+  const flushReorder = useCallback(async () => {
+    const seq = reorderSeqRef.current;
+    if (seq === reorderStagedSeqRef.current) return;
+    const ops = reorderOpsFor(localImagesRef.current, originalRankByImageId, stagedOpsRef.current.imageReorders);
+    if (ops.length) {
+      const draft = await track(() => stageEtsyDraft({ shopId, listingId, media: ops }));
+      applyDraft(draft);
+      onImagesChanged();
+    }
+    // A newer move while this one was in flight keeps the section dirty.
+    if (reorderSeqRef.current === seq) reorderStagedSeqRef.current = seq;
+    onLocalChangeRef.current?.();
+  }, [shopId, listingId, originalRankByImageId, track, applyDraft, onImagesChanged]);
+  const flushReorderRef = useRef(flushReorder);
+  flushReorderRef.current = flushReorder;
+
+  const embeddedError = (err: unknown) => {
+    console.error('[ImageManager] embedded staging failed', err);
+    dsToast.error(draftErr(err, tLe('photos.stageFailed')));
+  };
+
+  /**
+   * Free photo slots before Send. A staged removal still holds its slot: the server sends uploads before image
+   * deletes, so Etsy would reject a 21st upload while the removed photo is still there (the legacy grid's rule).
+   */
+  const roomLeft = () => ETSY_MAX_IMAGES - tilesRef.current.length;
+  const capacityMessage = (count: number) => (
+    tilesRef.current.some((tile) => tile.staged === 'delete')
+      ? tLe('photos.fullUntilSent', { max: ETSY_MAX_IMAGES, marketplace: 'Etsy' })
+      : tLe('photos.overLimit', { count, max: ETSY_MAX_IMAGES, marketplace: 'Etsy' })
+  );
+
+  const stageFilesEmbedded = async (files: File[]) => {
+    if (readOnly || files.length === 0) return;
+    const { accepted, badType, overLimit } = splitImageFiles(files, roomLeft());
+    if (badType) dsToast.error(tLe('photos.badType', { count: badType }), { persist: false });
+    if (overLimit) dsToast.error(capacityMessage(overLimit), { persist: false });
+    if (!accepted.length) return;
+    const current = localImagesRef.current;
+    const startRank = current.length > 0 ? Math.max(...current.map((i) => i.rank)) + 1 : 1;
+    const done: File[] = [];
+    const stagedMedia: any[] = [];
+    try {
+      await track(async () => {
+        for (let i = 0; i < accepted.length; i++) {
+          const staged = await stageEtsyDraftFile({
+            shopId, listingId, file: accepted[i], kind: 'image', operation: 'upload', rank: Math.min(startRank + i, ETSY_MAX_IMAGES),
+          });
+          done.push(accepted[i]);
+          stagedMedia.push(staged.media);
+        }
+      });
+    } catch (err) {
+      embeddedError(err);
+    } finally {
+      if (done.length) {
+        appendPendingUploads(done, startRank, undefined, stagedMedia);
+        setDraftMediaReloadKey((key) => key + 1);
+        onImagesChanged();
+      }
+    }
+  };
+
+  const findTile = (id: string) => tilesRef.current.find((tile) => tile.id === id) || null;
+
+  const removeTileEmbedded = async (id: string) => {
+    const tile = findTile(id);
+    if (!tile || readOnly) return;
+    if (tile.pending) {
+      if (!removeStagedMedia || !tile.mediaId) {
+        dsToast.info(tLe('photos.pendingRemoveViaDiscard'));
+        return;
+      }
+      try {
+        await track(() => removeStagedMedia(tile.mediaId as string));
+        setLocalImages((cur) => sortImagesByRank(cur.filter((img) => img.pending_media_id !== tile.mediaId)));
+        setDraftMediaReloadKey((key) => key + 1);
+        onImagesChanged();
+      } catch (err) { embeddedError(err); }
+      return;
+    }
+    if (tile.imageId == null) return;
+    if (!removeStagedMedia) {
+      const position = tilesRef.current.findIndex((x) => x.id === id) + 1;
+      const ok = await dsConfirm({
+        title: tLe('photos.confirmRemoveTitle', { position }),
+        body: tLe('photos.confirmRemoveBody', { marketplace: 'Etsy' }),
+        confirmLabel: tLe('photos.remove'),
+        tone: 'danger',
+      });
+      if (!ok) return;
+    }
+    try {
+      const draft = await track(() => stageEtsyDraft({
+        shopId, listingId, media: [{ kind: 'image', operation: 'delete', etsyMediaId: tile.imageId }],
+      }));
+      applyDraft(draft);
+      onImagesChanged();
+    } catch (err) { embeddedError(err); }
+  };
+
+  const undoRemoveEmbedded = async (id: string) => {
+    const tile = findTile(id);
+    if (!tile || tile.imageId == null || !removeStagedMedia) return;
+    const rowId = stagedOpsRef.current.imageDeletes.get(tile.imageId);
+    if (!rowId) return;
+    try {
+      await track(() => removeStagedMedia(rowId));
+      setStagedOps((ops) => {
+        const imageDeletes = new Map(ops.imageDeletes);
+        imageDeletes.delete(tile.imageId as number);
+        return { ...ops, imageDeletes };
+      });
+      setDraftMediaReloadKey((key) => key + 1);
+      onImagesChanged();
+    } catch (err) { embeddedError(err); }
+  };
+
+  const reorderEmbedded = (nextIds: string[]) => {
+    if (readOnly) return;
+    const next = applyTileOrder(tilesRef.current, nextIds);
+    if (!next) {
+      dsToast.info(tLe('photos.pendingReorder', { marketplace: 'Etsy' }));
+      return;
+    }
+    const byTile = new Map(localImagesRef.current.map((img) => [tileIdFor(img), img]));
+    const reordered = next.map((tile) => byTile.get(tile.id)).filter((img): img is ImageInfo => Boolean(img));
+    if (reordered.length !== localImagesRef.current.length) return;
+    setLocalImages(reordered.map((img, index) => ({ ...img, rank: index + 1 })));
+    reorderSeqRef.current += 1;
+    hasPendingOrderRef.current = true;
+    setHasPendingOrder(true);
+    onLocalChangeRef.current?.();
+  };
+
+  const makePrimaryEmbedded = (id: string) => {
+    const ids = tilesRef.current.map((tile) => tile.id);
+    const from = ids.indexOf(id);
+    if (from > 0) reorderEmbedded(moveItem(ids, from, 0));
+  };
+
+  const saveAltEmbedded = async (id: string, alt: string) => {
+    const tile = findTile(id);
+    if (!tile || tile.imageId == null || tile.pending) return;
+    try {
+      const draft = await track(() => stageEtsyDraft({
+        shopId, listingId, media: [{ kind: 'image', operation: 'update_alt', etsyMediaId: tile.imageId, altText: cleanAltText(alt) }],
+      }));
+      applyDraft(draft);
+      onImagesChanged();
+    } catch (err) {
+      embeddedError(err);
+      throw err;
+    }
+  };
+
+  const replaceEmbedded = async (id: string, file: File) => {
+    const tile = findTile(id);
+    if (!tile || tile.imageId == null || tile.pending || readOnly) return;
+    if (!(IMAGE_TYPES as readonly string[]).includes(file.type)) {
+      dsToast.error(tLe('photos.badType', { count: 1 }), { persist: false });
+      return;
+    }
+    if (roomLeft() <= 0) {
+      // The new photo uploads before the old one is removed, so it needs a free slot on Etsy.
+      dsToast.info(capacityMessage(1));
+      return;
+    }
+    const position = Math.min(tilesRef.current.findIndex((x) => x.id === id) + 1, ETSY_MAX_IMAGES);
+    try {
+      // Upload first, then remove the old photo: the server sends uploads before deletes, and never deletes the
+      // last photo of a listing, so a failed upload cannot leave the listing without this photo.
+      const staged = await track(() => stageEtsyDraftFile({
+        shopId, listingId, file, kind: 'image', operation: 'upload', rank: position, altText: tile.alt || undefined,
+      }));
+      appendPendingUploads([file], position, tile.alt || undefined, [staged.media]);
+      const draft = await track(() => stageEtsyDraft({
+        shopId, listingId, media: [{ kind: 'image', operation: 'delete', etsyMediaId: tile.imageId }],
+      }));
+      applyDraft(draft);
+      setDraftMediaReloadKey((key) => key + 1);
+      onImagesChanged();
+      setOpenTileId(null);
+    } catch (err) { embeddedError(err); }
+  };
+
+  const acceptAiEmbedded = async () => {
+    if (!aiResult || readOnly) return;
+    if (roomLeft() <= 0) {
+      dsToast.error(capacityMessage(1), { persist: false });
+      return;
+    }
+    const current = localImagesRef.current;
+    const rank = Math.min(current.length > 0 ? Math.max(...current.map((i) => i.rank)) + 1 : 1, ETSY_MAX_IMAGES);
+    const aiFile = base64ToFile(aiResult.base64, aiResult.mimeType, `ai-image-${Date.now()}.${aiResult.mimeType === 'image/jpeg' ? 'jpg' : 'png'}`);
+    setAiUploading(true);
+    try {
+      const staged = await track(() => stageEtsyDraftFile({
+        shopId, listingId, file: aiFile, kind: 'image', operation: 'ai_upload', rank,
+      }));
+      if (!staged?.media?.id) throw new Error('missing_media_id');
+      appendPendingUploads([aiFile], rank, undefined, [staged.media]);
+      dsToast.success(tLe('photos.aiPhotoAdded', { marketplace: 'Etsy' }));
+      setAiDialogOpen(false);
+      setDraftMediaReloadKey((key) => key + 1);
+      onImagesChanged();
+    } catch (err) {
+      embeddedError(err);
+    } finally {
+      setAiUploading(false);
+    }
+  };
+
+  const stageLinksEmbedded = async () => {
+    const room = roomLeft();
+    if (room <= 0) {
+      dsToast.error(capacityMessage(1), { persist: false });
+      return;
+    }
+    const { urls, rejected } = parseImageLinks(linksText, room);
+    if (!urls.length) {
+      dsToast.error(tLe('photos.linksRejected', { count: Math.max(1, rejected) }), { persist: false });
+      return;
+    }
+    const current = localImagesRef.current;
+    const startRank = current.length > 0 ? Math.max(...current.map((i) => i.rank)) + 1 : 1;
+    setLinksSaving(true);
+    try {
+      const draft = await track(() => stageEtsyDraft({
+        shopId,
+        listingId,
+        media: urls.map((sourceUrl, i) => ({ kind: 'image', operation: 'upload', sourceUrl, rank: Math.min(startRank + i, ETSY_MAX_IMAGES) })),
+      }));
+      applyDraft(draft);
+      if (rejected) dsToast.info(tLe('photos.linksRejected', { count: rejected }));
+      setLinksOpen(false);
+      setLinksText('');
+      setDraftMediaReloadKey((key) => key + 1);
+      onImagesChanged();
+    } catch (err) {
+      embeddedError(err);
+    } finally {
+      setLinksSaving(false);
+    }
+  };
+
+  const altWriter: WriteAltText | null = writeAltText === null ? null : (writeAltText ?? defaultWriteAltText);
+  const altBatchItems: AltBatchItem[] = tiles
+    .map((tile, index) => ({ tile, index }))
+    .filter(({ tile }) => !tile.pending && tile.staged !== 'delete' && !tile.alt.trim())
+    .map(({ tile, index }) => ({ id: tile.id, src: tile.src, position: index + 1 }));
+
+  const useBatchAlts = async (accepted: Array<{ id: string; alt: string }>) => {
+    const previous = accepted.map((a) => ({ id: a.id, alt: findTile(a.id)?.alt ?? '' }));
+    for (const a of accepted) await saveAltEmbedded(a.id, a.alt);
+    // Re-staging the old alt text would leave update_alt rows behind (the draft stays "Not sent yet" and Send
+    // still writes to Etsy), so Undo waits for the route that drops staged rows, as removal does.
+    if (!removeStagedMedia) {
+      dsToast.success(tLe('ai.replaced', { field: tLe('photos.altLabel') }));
+      return;
+    }
+    const removeRow = removeStagedMedia;
+    dsToast.success(tLe('ai.replaced', { field: tLe('photos.altLabel') }), {
+      undo: () => {
+        void (async () => {
+          for (const p of previous) {
+            const tile = findTile(p.id);
+            if (!tile || tile.imageId == null) continue;
+            const etsyAlt = (String(localImagesRef.current.find((img) => !img.is_pending_upload && img.listing_image_id === tile.imageId)?.alt_text ?? ''));
+            const rowId = stagedOpsRef.current.imageAltRows.get(tile.imageId);
+            try {
+              if (rowId && cleanAltText(p.alt) === cleanAltText(etsyAlt)) {
+                // Back to Etsy's text: drop the staged row so nothing is left to send.
+                await track(() => removeRow(rowId));
+                setStagedOps((ops) => {
+                  const imageAlts = new Map(ops.imageAlts);
+                  const imageAltRows = new Map(ops.imageAltRows);
+                  imageAlts.delete(tile.imageId as number);
+                  imageAltRows.delete(tile.imageId as number);
+                  return { ...ops, imageAlts, imageAltRows };
+                });
+                setDraftMediaReloadKey((key) => key + 1);
+                onImagesChanged();
+              } else {
+                await saveAltEmbedded(p.id, p.alt);
+              }
+            } catch (err) {
+              // saveAltEmbedded already showed its toast.
+              if (rowId && cleanAltText(p.alt) === cleanAltText(etsyAlt)) embeddedError(err);
+            }
+          }
+        })();
+      },
+    });
+  };
+
+  const summary = useMemo(
+    () => summarizeEtsyPhotos(tiles, { has: Boolean(video) && video?.staged !== 'delete', staged: Boolean(video?.staged) }),
+    [tiles, video],
+  );
+  const summaryKey = JSON.stringify(summary);
+  const onSummaryRef = useRef(onSummary);
+  onSummaryRef.current = onSummary;
+  useEffect(() => {
+    if (embedded) onSummaryRef.current?.(summary);
+    // summaryKey stands for `summary` (a new object whenever tiles re-memoise).
+  }, [embedded, summaryKey]);
+
+  useImperativeHandle(ref, () => ({
+    async stage() {
+      if (reorderDebounceRef.current) clearTimeout(reorderDebounceRef.current);
+      await flushReorderRef.current();
+      await Promise.all(Array.from(inflightRef.current));
+    },
+    isDirty() {
+      return reorderSeqRef.current !== reorderStagedSeqRef.current || inflightRef.current.size > 0;
+    },
+    openUpload() { embeddedFileRef.current?.click(); },
+    openGenerate() { openAiDialog(); },
+    openPasteLinks() { setLinksOpen(true); },
+    openPhoto(tileId?: string) {
+      const id = tileId ?? tilesRef.current[0]?.id;
+      if (id) setOpenTileId(id);
+    },
+    writeMissingAlt() { if (altWriter) setAltBatchOpen(true); },
+  }));
+
   // --- Render ---
+
+  // AI image generation dialog (shared by the legacy grid and the embedded strip; unchanged).
+  const aiDialog = (
+      <Dialog
+        open={aiDialogOpen}
+        onClose={() => !aiGenerating && !aiUploading && setAiDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <AutoFixHighIcon sx={{ color: '#a855f7' }} />
+          {t('aiDialogTitle')}
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            {t('aiDialogDescription')}
+          </Typography>
+
+          <TextField
+            label={t('promptLabel')}
+            placeholder={t('promptPlaceholder')}
+            fullWidth
+            multiline
+            minRows={3}
+            value={aiPrompt}
+            onChange={(e) => setAiPrompt(e.target.value)}
+            disabled={aiGenerating}
+            sx={{ mb: 2 }}
+            helperText={t('promptHelperText')}
+          />
+
+          {/* Reference image (optional) */}
+          <input
+            ref={aiRefInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            style={{ display: 'none' }}
+            onChange={handleAiRefSelect}
+          />
+
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+              {t('referenceImage')}
+            </Typography>
+
+            {/* Selected reference preview */}
+            {aiRefPreview ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <img
+                  src={aiRefPreview}
+                  alt={t('referenceImage')}
+                  style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '2px solid #a855f7' }}
+                />
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    {aiRefFile ? t('uploadedImage') : t('listingImage')}
+                  </Typography>
+                  <Button
+                    size="small"
+                    color="error"
+                    onClick={() => {
+                      setAiRefFile(null);
+                      setAiRefPreview(null);
+                      setAiRefUrl(null);
+                      if (aiRefInputRef.current) aiRefInputRef.current.value = '';
+                    }}
+                  >
+                    {t('remove')}
+                  </Button>
+                </Box>
+              </Box>
+            ) : (
+              <>
+                {/* Existing listing images as selectable references */}
+                {sortedImages.length > 0 && (
+                  <Box sx={{ mb: 1 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                      {t('selectFromExisting')}
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                      {sortedImages.map((img) => (
+                        <Box
+                          key={img.listing_image_id}
+                          onClick={() => {
+                            if (aiGenerating) return;
+                            const fullUrl = img.url_fullxfull || img.url_570xN;
+                            setAiRefUrl(fullUrl);
+                            setAiRefPreview(img.url_570xN);
+                            setAiRefFile(null);
+                          }}
+                          sx={{
+                            width: 56,
+                            height: 56,
+                            borderRadius: 1,
+                            overflow: 'hidden',
+                            border: '2px solid #e5e7eb',
+                            cursor: aiGenerating ? 'not-allowed' : 'pointer',
+                            '&:hover': { borderColor: '#a855f7', transform: 'scale(1.05)' },
+                            transition: 'all 0.15s',
+                          }}
+                        >
+                          <img
+                            src={img.url_170x135 || img.url_75x75}
+                            alt={img.alt_text || t('imageRankAlt', { rank: img.rank })}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        </Box>
+                      ))}
+                    </Box>
+                  </Box>
+                )}
+
+                {/* Upload new reference image */}
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => aiRefInputRef.current?.click()}
+                  disabled={aiGenerating}
+                  startIcon={<AddPhotoAlternateIcon />}
+                >
+                  {t('uploadFromComputer')}
+                </Button>
+              </>
+            )}
+          </Box>
+
+          <Divider sx={{ my: 2 }} />
+
+          <FormControlLabel
+            control={<Checkbox size="small" checked={aiWhiteBg} onChange={(e) => setAiWhiteBg(e.target.checked)} disabled={aiGenerating} />}
+            label={<Typography variant="caption">{t('aiWhiteBg')}</Typography>}
+            sx={{ mb: 1 }}
+          />
+
+          {/* Generate button */}
+          <Button
+            variant="contained"
+            fullWidth
+            onClick={() => handleAiGenerate()}
+            disabled={aiGenerating || !aiPrompt.trim()}
+            startIcon={aiGenerating ? <CircularProgress size={18} color="inherit" /> : <AutoFixHighIcon />}
+            sx={{
+              bgcolor: '#a855f7',
+              '&:hover': { bgcolor: '#9333ea' },
+            }}
+          >
+            {aiGenerating ? t('generating') : t('generateImage')}
+          </Button>
+
+          {/* Result preview */}
+          {aiResult && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle2" gutterBottom sx={{ textAlign: 'center' }}>{t('generatedImage')}</Typography>
+              <Box sx={{ textAlign: 'center' }}>
+                <img
+                  src={`data:${aiResult.mimeType};base64,${aiResult.base64}`}
+                  alt={t('aiImageAlt')}
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: 300,
+                    borderRadius: 8,
+                    border: '2px solid #a855f7',
+                  }}
+                />
+              </Box>
+
+              {/* Follow-up prompt for regeneration */}
+              <TextField
+                size="small"
+                fullWidth
+                placeholder={t('followUpPlaceholder')}
+                value={aiFollowUp}
+                onChange={(e) => setAiFollowUp(e.target.value)}
+                disabled={aiGenerating}
+                sx={{ mt: 1.5 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !aiGenerating) {
+                    e.preventDefault();
+                    handleAiFollowUp();
+                  }
+                }}
+              />
+
+              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', mt: 1, flexWrap: 'wrap' }}>
+                <Button
+                  variant="outlined"
+                  onClick={handleAiFollowUp}
+                  disabled={aiGenerating}
+                  size="small"
+                  startIcon={aiGenerating ? <CircularProgress size={14} /> : null}
+                >
+                  {aiFollowUp.trim() ? t('regenerateWithChanges') : t('regenerateSamePrompt')}
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={handleAiAcceptAndUpload}
+                  disabled={aiUploading}
+                  startIcon={aiUploading ? <CircularProgress size={16} color="inherit" /> : null}
+                  color="success"
+                  size="small"
+                >
+                  {aiUploading ? t('uploading') : t('acceptAndUpload')}
+                </Button>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAiDialogOpen(false)} disabled={aiGenerating || aiUploading}>
+            {t('close')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+  );
+
+  if (embedded) {
+    const openIndex = openTileId ? tiles.findIndex((tile) => tile.id === openTileId) : -1;
+    const openTile = openIndex >= 0 ? tiles[openIndex] : null;
+    const step = (delta: number) => {
+      if (openIndex < 0 || tiles.length < 2) return;
+      setOpenTileId(tiles[(openIndex + delta + tiles.length) % tiles.length].id);
+    };
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }} data-testid="etsy-photo-strip">
+        <ImageGrid
+          variant="strip"
+          images={tiles.map((tile) => ({ id: tile.id, src: tile.src, alt: tile.alt, staged: tile.staged }))}
+          max={ETSY_MAX_IMAGES}
+          onReorder={reorderEmbedded}
+          onUpload={(files) => { void stageFilesEmbedded(files); }}
+          onDelete={(id) => { void removeTileEmbedded(id); }}
+          onUndoDelete={removeStagedMedia ? (id) => { void undoRemoveEmbedded(id); } : undefined}
+          onOpen={setOpenTileId}
+          flagMissingAlt
+          accept={IMAGE_TYPES.join(',')}
+          disabled={readOnly}
+          video={video ?? null}
+          onOpenVideo={onOpenVideo}
+          onAddVideo={onAddVideo}
+          onUndoDeleteVideo={onUndoDeleteVideo}
+          emptyMessage={emptyMessage ?? tLe('photos.noPhotos', { marketplace: 'Etsy' })}
+        />
+        {busyCount > 0 ? (
+          <Box role="status" sx={{ fontSize: 12, lineHeight: '16px', color: 'text.secondary' }}>{tLe('photos.saving')}</Box>
+        ) : null}
+        <input
+          ref={embeddedFileRef}
+          type="file"
+          accept={IMAGE_TYPES.join(',')}
+          multiple
+          hidden
+          onChange={(e) => {
+            const files = Array.from(e.target.files || []);
+            e.target.value = '';
+            void stageFilesEmbedded(files);
+          }}
+        />
+        <PhotoPanel
+          open={Boolean(openTile)}
+          onClose={() => setOpenTileId(null)}
+          marketplaceName="Etsy"
+          media={openTile ? {
+            kind: 'photo',
+            id: openTile.id,
+            src: openTile.src,
+            fullSrc: openTile.fullSrc,
+            alt: openTile.alt,
+            position: openIndex + 1,
+            total: tiles.length,
+            pending: openTile.pending,
+            removing: openTile.staged === 'delete',
+          } : null}
+          onPrev={tiles.length > 1 ? () => step(-1) : undefined}
+          onNext={tiles.length > 1 ? () => step(1) : undefined}
+          alt={openTile ? {
+            editable: !openTile.pending,
+            onSave: (alt) => saveAltEmbedded(openTile.id, alt),
+            write: altWriter && !openTile.pending
+              ? () => altWriter({ imageUrl: openTile.fullSrc || openTile.src, title: listingTitle || '', description: listingDescription })
+              : undefined,
+          } : undefined}
+          onMakePrimary={openTile ? () => makePrimaryEmbedded(openTile.id) : undefined}
+          onReplace={openTile && !openTile.pending ? (file) => replaceEmbedded(openTile.id, file) : undefined}
+          onRemove={openTile && (!openTile.pending || removeStagedMedia) ? () => { void removeTileEmbedded(openTile.id); } : undefined}
+          onUndoRemove={openTile && removeStagedMedia ? () => { void undoRemoveEmbedded(openTile.id); } : undefined}
+          readOnly={readOnly}
+        />
+        {altWriter ? (
+          <AltTextBatchPanel
+            open={altBatchOpen}
+            onClose={() => setAltBatchOpen(false)}
+            marketplaceName="Etsy"
+            items={altBatchItems}
+            write={(item) => {
+              const tile = findTile(item.id);
+              return altWriter({ imageUrl: tile?.fullSrc || item.src, title: listingTitle || '', description: listingDescription });
+            }}
+            onUse={useBatchAlts}
+          />
+        ) : null}
+        <DsModal
+          open={linksOpen}
+          onClose={() => { if (!linksSaving) setLinksOpen(false); }}
+          title={tLe('photos.pasteLinks')}
+          size="md"
+          primary={{
+            id: 'add-links',
+            label: tLe('photos.linksAdd'),
+            onClick: () => { void stageLinksEmbedded(); },
+            loading: linksSaving,
+            disabled: !linksText.trim(),
+            disabledReason: tLe('photos.linksEmpty'),
+          }}
+        >
+          <DsFormField label={tLe('photos.linksLabel')} helper={tLe('photos.linksHelper', { marketplace: 'Etsy' })}>
+            <DsTextArea value={linksText} onChange={setLinksText} minRows={4} maxRows={10} />
+          </DsFormField>
+        </DsModal>
+        {aiDialog}
+      </Box>
+    );
+  }
 
   return (
     <Box>
@@ -1023,217 +1812,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
         </DialogActions>
       </Dialog>
 
-      {/* AI Image Generation Dialog */}
-      <Dialog
-        open={aiDialogOpen}
-        onClose={() => !aiGenerating && !aiUploading && setAiDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <AutoFixHighIcon sx={{ color: '#a855f7' }} />
-          {t('aiDialogTitle')}
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {t('aiDialogDescription')}
-          </Typography>
-
-          <TextField
-            label={t('promptLabel')}
-            placeholder={t('promptPlaceholder')}
-            fullWidth
-            multiline
-            minRows={3}
-            value={aiPrompt}
-            onChange={(e) => setAiPrompt(e.target.value)}
-            disabled={aiGenerating}
-            sx={{ mb: 2 }}
-            helperText={t('promptHelperText')}
-          />
-
-          {/* Reference image (optional) */}
-          <input
-            ref={aiRefInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/gif,image/webp"
-            style={{ display: 'none' }}
-            onChange={handleAiRefSelect}
-          />
-
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-              {t('referenceImage')}
-            </Typography>
-
-            {/* Selected reference preview */}
-            {aiRefPreview ? (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                <img
-                  src={aiRefPreview}
-                  alt={t('referenceImage')}
-                  style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '2px solid #a855f7' }}
-                />
-                <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                    {aiRefFile ? t('uploadedImage') : t('listingImage')}
-                  </Typography>
-                  <Button
-                    size="small"
-                    color="error"
-                    onClick={() => {
-                      setAiRefFile(null);
-                      setAiRefPreview(null);
-                      setAiRefUrl(null);
-                      if (aiRefInputRef.current) aiRefInputRef.current.value = '';
-                    }}
-                  >
-                    {t('remove')}
-                  </Button>
-                </Box>
-              </Box>
-            ) : (
-              <>
-                {/* Existing listing images as selectable references */}
-                {sortedImages.length > 0 && (
-                  <Box sx={{ mb: 1 }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                      {t('selectFromExisting')}
-                    </Typography>
-                    <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                      {sortedImages.map((img) => (
-                        <Box
-                          key={img.listing_image_id}
-                          onClick={() => {
-                            if (aiGenerating) return;
-                            const fullUrl = img.url_fullxfull || img.url_570xN;
-                            setAiRefUrl(fullUrl);
-                            setAiRefPreview(img.url_570xN);
-                            setAiRefFile(null);
-                          }}
-                          sx={{
-                            width: 56,
-                            height: 56,
-                            borderRadius: 1,
-                            overflow: 'hidden',
-                            border: '2px solid #e5e7eb',
-                            cursor: aiGenerating ? 'not-allowed' : 'pointer',
-                            '&:hover': { borderColor: '#a855f7', transform: 'scale(1.05)' },
-                            transition: 'all 0.15s',
-                          }}
-                        >
-                          <img
-                            src={img.url_170x135 || img.url_75x75}
-                            alt={img.alt_text || t('imageRankAlt', { rank: img.rank })}
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          />
-                        </Box>
-                      ))}
-                    </Box>
-                  </Box>
-                )}
-
-                {/* Upload new reference image */}
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={() => aiRefInputRef.current?.click()}
-                  disabled={aiGenerating}
-                  startIcon={<AddPhotoAlternateIcon />}
-                >
-                  {t('uploadFromComputer')}
-                </Button>
-              </>
-            )}
-          </Box>
-
-          <Divider sx={{ my: 2 }} />
-
-          <FormControlLabel
-            control={<Checkbox size="small" checked={aiWhiteBg} onChange={(e) => setAiWhiteBg(e.target.checked)} disabled={aiGenerating} />}
-            label={<Typography variant="caption">{t('aiWhiteBg')}</Typography>}
-            sx={{ mb: 1 }}
-          />
-
-          {/* Generate button */}
-          <Button
-            variant="contained"
-            fullWidth
-            onClick={() => handleAiGenerate()}
-            disabled={aiGenerating || !aiPrompt.trim()}
-            startIcon={aiGenerating ? <CircularProgress size={18} color="inherit" /> : <AutoFixHighIcon />}
-            sx={{
-              bgcolor: '#a855f7',
-              '&:hover': { bgcolor: '#9333ea' },
-            }}
-          >
-            {aiGenerating ? t('generating') : t('generateImage')}
-          </Button>
-
-          {/* Result preview */}
-          {aiResult && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="subtitle2" gutterBottom sx={{ textAlign: 'center' }}>{t('generatedImage')}</Typography>
-              <Box sx={{ textAlign: 'center' }}>
-                <img
-                  src={`data:${aiResult.mimeType};base64,${aiResult.base64}`}
-                  alt={t('aiImageAlt')}
-                  style={{
-                    maxWidth: '100%',
-                    maxHeight: 300,
-                    borderRadius: 8,
-                    border: '2px solid #a855f7',
-                  }}
-                />
-              </Box>
-
-              {/* Follow-up prompt for regeneration */}
-              <TextField
-                size="small"
-                fullWidth
-                placeholder={t('followUpPlaceholder')}
-                value={aiFollowUp}
-                onChange={(e) => setAiFollowUp(e.target.value)}
-                disabled={aiGenerating}
-                sx={{ mt: 1.5 }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !aiGenerating) {
-                    e.preventDefault();
-                    handleAiFollowUp();
-                  }
-                }}
-              />
-
-              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', mt: 1, flexWrap: 'wrap' }}>
-                <Button
-                  variant="outlined"
-                  onClick={handleAiFollowUp}
-                  disabled={aiGenerating}
-                  size="small"
-                  startIcon={aiGenerating ? <CircularProgress size={14} /> : null}
-                >
-                  {aiFollowUp.trim() ? t('regenerateWithChanges') : t('regenerateSamePrompt')}
-                </Button>
-                <Button
-                  variant="contained"
-                  onClick={handleAiAcceptAndUpload}
-                  disabled={aiUploading}
-                  startIcon={aiUploading ? <CircularProgress size={16} color="inherit" /> : null}
-                  color="success"
-                  size="small"
-                >
-                  {aiUploading ? t('uploading') : t('acceptAndUpload')}
-                </Button>
-              </Box>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setAiDialogOpen(false)} disabled={aiGenerating || aiUploading}>
-            {t('close')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {aiDialog}
 
       {/* Delete confirmation dialog */}
       <Dialog open={!!deleteConfirm} onClose={() => !deleting && setDeleteConfirm(null)} maxWidth="xs">
@@ -1404,4 +1983,6 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
       </Dialog>
     </Box>
   );
-}
+});
+
+export default ImageManager;

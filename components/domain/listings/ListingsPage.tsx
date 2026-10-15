@@ -24,6 +24,7 @@ import { ErrorState } from '@/components/ds/state/ErrorState';
 import { useConfirm } from '@/components/ds/overlay/ConfirmDialog';
 import { useUrlState } from '@/lib/ds/useUrlState';
 import { useUiFlag } from '@/lib/ds/uiFlags';
+import { listQueryForEditor, writeEditorNav } from '@/lib/listingEditor/editorNav';
 import { useCommands, type Command } from '@/lib/ds/useCommand';
 import { icons } from '@/lib/ds/icons';
 import { useAuth } from '@/lib/auth-context';
@@ -417,10 +418,20 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
   const openEditor = React.useCallback(
     (r: ListingRow) => {
       const href = editorHref(r.id);
-      if (href) void router.push(href);
-      else openQuick(r);
+      if (!href) {
+        openQuick(r);
+        return;
+      }
+      // ‹ › / j k and Back in the editor read the list's current page and URL state (listing-editor §1).
+      writeEditorNav({
+        marketplace,
+        shopId: marketplace === 'etsy' ? storeId : null,
+        ids: rows.map((x) => x.id),
+        query: listQueryForEditor(),
+      });
+      void router.push(href);
     },
-    [editorHref, router, openQuick],
+    [editorHref, router, openQuick, marketplace, storeId, rows],
   );
   const newHref = editorOn ? config.newListingHref(storeId) : null;
   const bulkHref = bulkOn && config.bulkEditHref ? config.bulkEditHref(storeId) : null;

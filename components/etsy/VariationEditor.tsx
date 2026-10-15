@@ -1,17 +1,11 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, forwardRef, useImperativeHandle } from 'react';
 import {
   TextField, Switch, Button, CircularProgress, Paper, Typography, Box,
   IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
   Chip, Tooltip, InputAdornment, Checkbox, FormControlLabel,
   Select, MenuItem, Tabs, Tab, Alert, Divider,
 } from '@mui/material';
-import {
-  Delete as DeleteIcon,
-  Add as AddIcon,
-  ContentCopy as DuplicateIcon,
-  KeyboardArrowUp as UpIcon,
-  KeyboardArrowDown as DownIcon,
-} from '@mui/icons-material';
+import { icons, ICON_STROKE } from '@/lib/ds/icons';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { draftErrorI18n } from '@/lib/etsy/seoRules';
@@ -19,6 +13,24 @@ import { stageEtsyDraft, fetchEtsyDrafts } from '@/lib/etsy/draftClient';
 import { useStockManaged } from '@/components/stock/useStockManaged';
 import StockManagedQtyChip from '@/components/stock/StockManagedQtyChip';
 import { etsyVariantKeys, pairsFromEtsyProduct } from '@/lib/etsy/variantKey';
+import { validateEtsyInventory, type FieldError } from '@/lib/etsy/validation';
+import { decodeEntities } from '@/lib/text/decodeEntities';
+import {
+  Tabs as DsTabs,
+  Button as DsButton,
+  FormField,
+  TextArea,
+  Select as DsSelect,
+  MoneyField,
+  NumberField,
+} from '@/components/ds/inputs';
+import { Banner } from '@/components/ds/feedback/Banner';
+import { useToast } from '@/components/ds/feedback/toast';
+import { Modal } from '@/components/ds/overlay/Modal';
+import { SidePanel } from '@/components/ds/overlay/SidePanel';
+import { useConfirm as useDsConfirm } from '@/components/ds/overlay/ConfirmDialog';
+import { ErrorState } from '@/components/ds/state/ErrorState';
+import { PanelSkeleton } from '@/components/ds/state/Skeletons';
 
 // --- Types ---
 
@@ -56,13 +68,17 @@ interface Product {
   kx_loaded_quantity?: number;
 }
 
-/** Match products by variant tuple (property_id + values), not product_id (Etsy regenerates ids). */
+/**
+ * Match products by variant tuple (property_id + values), not product_id (Etsy regenerates ids). Values are
+ * entity-decoded: the embedded editor decodes on load, while live Etsy inventory and older drafts may still
+ * carry "one&#39;s"; both must land on the same key (decodeEntities is idempotent).
+ */
 function variantTupleKey(p: any): string {
   return JSON.stringify(
     (p?.property_values || [])
       .map((pv: any) => [
         Number(pv.property_id) === 508 ? 513 : Number(pv.property_id),
-        (pv.values || []).map((v: any) => String(v).trim().toLowerCase()),
+        (pv.values || []).map((v: any) => decodeEntities(String(v)).trim().toLowerCase()),
       ])
       .sort((a: any, b: any) => a[0] - b[0]),
   );
@@ -132,11 +148,103 @@ interface ListingImage {
   url_fullxfull: string;
 }
 
-interface VariationEditorProps {
+/** What the listing editor's collapsed row and the read-only price field need (listing-editor §2.1, §6.5). */
+export interface EtsyVariationSummary {
+  /** Number of variation axes (Color, Size, …). 0 = no variations. */
+  variations: number;
+  /** Number of combinations (products carrying at least one property value). */
+  combinations: number;
+  /** Combinations that are on sale (offering enabled). */
+  enabled: number;
+  /** Lowest / highest enabled price in major units; null without variations. */
+  priceMin: number | null;
+  priceMax: number | null;
+  currency: string;
+  /** Sum of enabled quantities. */
+  totalQuantity: number;
+}
+
+/** Pure: summary of an Etsy inventory `products` array (live or staged `inventoryPatch.products`). */
+export function summarizeEtsyInventory(rawProducts: unknown, fallbackCurrency = 'USD'): EtsyVariationSummary {
+  const products = (Array.isArray(rawProducts) ? rawProducts : []).filter((p: any) => p && !p.is_deleted);
+  const withValues = products.filter((p: any) => Array.isArray(p.property_values) && p.property_values.length > 0);
+  const axes = new Set<number>();
+  let currency = '';
+  let min: number | null = null;
+  let max: number | null = null;
+  let enabled = 0;
+  let qty = 0;
+  for (const p of withValues as any[]) {
+    for (const pv of p.property_values) {
+      const id = Number(pv?.property_id);
+      if (Number.isFinite(id) && id > 0) axes.add(id === 508 ? 513 : id);
+    }
+    const o = (Array.isArray(p.offerings) ? p.offerings : []).find((x: any) => x && !x.is_deleted);
+    if (!o) continue;
+    if (!currency && o.price?.currency_code) currency = String(o.price.currency_code);
+    if (o.is_enabled === false) continue;
+    enabled += 1;
+    qty += Number(o.quantity) || 0;
+    const amount = typeof o.price === 'object' && o.price
+      ? Number(o.price.amount) / (Number(o.price.divisor) || 100)
+      : Number(o.price);
+    if (Number.isFinite(amount)) {
+      min = min == null ? amount : Math.min(min, amount);
+      max = max == null ? amount : Math.max(max, amount);
+    }
+  }
+  return {
+    variations: axes.size,
+    combinations: withValues.length,
+    enabled,
+    priceMin: min,
+    priceMax: max,
+    currency: currency || fallbackCurrency,
+    totalQuantity: qty,
+  };
+}
+
+/** Registration object handed to the listing editor's autosave engine (listing-editor §5.1 `DraftSection`). */
+export interface VariationDraftSection {
+  id: 'variations';
+  isDirty(): boolean;
+  stage(): Promise<void>;
+  /** Send-time checks (`etsy`-namespace keys, same shape as `lib/etsy/validation` FieldError). */
+  validate(): FieldError[];
+}
+
+/** Imperative handle (`ref`) of the embedded editor. */
+export interface VariationEditorHandle {
+  isDirty(): boolean;
+  /** Stages inventory + variation photos into the EtsyListingDraft (never sends to Etsy). No-op when clean. */
+  stage(): Promise<void>;
+  /** Drops unstaged edits (back to the last loaded/staged state). */
+  revert(): void;
+  validate(): FieldError[];
+  summary(): EtsyVariationSummary | null;
+}
+
+export interface VariationEditorProps {
   listingId: string;
   shopId: string;
   taxonomyId?: number;
-  onSaved: () => void;
+  /** Legacy (drawer / bulk editor): called after the own Save button staged. */
+  onSaved?: () => void;
+  /**
+   * listing-editor §5.1: no own save buttons, DS chrome, staging only through `stage()` (ref / `register`),
+   * no success toasts, failures thrown from `stage()` for the engine to show.
+   */
+  embedded?: boolean;
+  /** Embedded: registers with the autosave engine; returns the unregister function. */
+  register?: (section: VariationDraftSection) => () => void;
+  /** Embedded: called after every edit with the current dirty flag (the host schedules its debounced save). */
+  onChange?: (dirty: boolean) => void;
+  /** Embedded: called whenever the products change (collapsed row, read-only price field). */
+  onSummaryChange?: (summary: EtsyVariationSummary) => void;
+  /** Embedded, new listing (negative local id): nothing to load from Etsy yet. */
+  createMode?: boolean;
+  /** Currency for new rows when the listing has no offerings yet (create mode). */
+  currencyCode?: string;
 }
 
 // --- Etsy known property types ---
@@ -359,7 +467,7 @@ const sectionHeaderSx = {
 };
 
 // --- Inline editable text ---
-function EditableText({ value, onChange, fontWeight = 600 }: { value: string; onChange: (v: string) => void; fontWeight?: number }) {
+function EditableText({ value, onChange, fontWeight = 600, editLabel = 'Click to edit' }: { value: string; onChange: (v: string) => void; fontWeight?: number; editLabel?: string }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -385,7 +493,7 @@ function EditableText({ value, onChange, fontWeight = 600 }: { value: string; on
   }
 
   return (
-    <Tooltip title="Click to edit" arrow placement="top">
+    <Tooltip title={editLabel} arrow placement="top">
       <Typography
         variant="body2"
         fontWeight={fontWeight}
@@ -406,7 +514,7 @@ function EditableText({ value, onChange, fontWeight = 600 }: { value: string; on
 // --- Error Boundary ---
 
 class VariationErrorBoundary extends React.Component<
-  { children: React.ReactNode; listingId: string },
+  { children: React.ReactNode; listingId: string; labels?: { title: string; retry: string } },
   { error: Error | null }
 > {
   state: { error: Error | null } = { error: null };
@@ -419,14 +527,17 @@ class VariationErrorBoundary extends React.Component<
       return (
         <Box sx={{ p: 2, border: '1px solid #f44336', borderRadius: 2, bgcolor: '#fff5f5' }}>
           <Typography variant="body2" color="error" fontWeight={700}>
-            Variation editor error
+            {this.props.labels?.title ?? 'Variation editor error'}
           </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
-            {this.state.error.message}
-          </Typography>
+          {/* Embedded (DS) mode never shows raw error text (DS §3.14); the legacy drawer keeps it. */}
+          {!this.props.labels && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
+              {this.state.error.message}
+            </Typography>
+          )}
           <Button size="small" sx={{ mt: 1, textTransform: 'none' }}
             onClick={() => this.setState({ error: null })}>
-            Retry
+            {this.props.labels?.retry ?? 'Retry'}
           </Button>
         </Box>
       );
@@ -521,19 +632,342 @@ function sanitizeProducts(raw: any[]): Product[] {
   }));
 }
 
+/**
+ * Embedded (DS P5, CRITIQUE V2): Etsy returns some variation text entity-encoded ("one&#39;s"). It is decoded
+ * once on load, so the editor shows, compares and stages plain text and never sends an entity back. Value ids,
+ * prices and quantities are untouched (stock-sync identity is value-id based; variantTupleKey decodes too).
+ */
+export function decodeInventoryProducts(products: Product[]): Product[] {
+  return products.map((p) => ({
+    ...p,
+    property_values: p.property_values.map((pv) => ({
+      ...pv,
+      property_name: decodeEntities(pv.property_name ?? ''),
+      values: pv.values.map((v) => decodeEntities(v)),
+    })),
+  }));
+}
+
+/** Pure: rename one option value in every combination that carries it (a value belongs to the whole option). */
+export function renamePropertyValue(products: Product[], idx: number, pvIdx: number, newValue: string): Product[] {
+  const target = products[idx]?.property_values?.[pvIdx];
+  if (!target) return products;
+  const oldValue = target.values?.[0];
+  return products.map((p, i) => {
+    let changed = false;
+    const pvs = p.property_values.map((pv, j) => {
+      const hit = i === idx ? j === pvIdx : pv.property_id === target.property_id && pv.values?.[0] === oldValue;
+      if (!hit) return pv;
+      changed = true;
+      return { ...pv, values: [newValue] };
+    });
+    return changed ? { ...p, property_values: pvs } : p;
+  });
+}
+
+// --- Embedded staging helpers (pure) ---
+
+type Baseline = { products: Product[]; priceOn: number[]; images: VariationImage[] };
+
+function propertyIdsOf(products: Product[]): number[] {
+  return normalizePropertyIds(products.flatMap(p => p.property_values.map(pv => pv.property_id)));
+}
+
+/** The `inventory` patch the legacy Save built (price/quantity/sku_on_property), without its side effects. */
+export function buildEtsyInventoryPayload(products: Product[], priceOnPropertyIds: number[]) {
+  const all = propertyIdsOf(products);
+  const price_on_property = normalizePropertyIds(priceOnPropertyIds).filter(id => all.includes(id));
+  const quantity_on_property = derivePropertyDrivers(products, product => product.offerings?.[0]?.quantity).filter(id => all.includes(id));
+  const sku_on_property = derivePropertyDrivers(products, product => product.sku).filter(id => all.includes(id));
+  const pricesVary = new Set(products.map(product => product.offerings?.[0]?.price?.amount).filter(value => value !== null && value !== undefined)).size > 1;
+  return { products, price_on_property, quantity_on_property, sku_on_property, pricesVary };
+}
+
+function priceOnKey(ids: number[], products: Product[]): string {
+  const all = propertyIdsOf(products);
+  return JSON.stringify(normalizePropertyIds(ids).filter(id => all.includes(id)).sort((a, b) => a - b));
+}
+
+/** Which parts differ from the baseline (what is already staged / live). */
+export function variationDirtyParts(
+  baseline: Baseline,
+  current: { products: Product[]; priceOn: number[]; images: VariationImage[] },
+): { inventory: boolean; images: boolean } {
+  const inventory = JSON.stringify(current.products) !== JSON.stringify(baseline.products)
+    || priceOnKey(current.priceOn, current.products) !== priceOnKey(baseline.priceOn, baseline.products);
+  const images = JSON.stringify(current.images) !== JSON.stringify(baseline.images);
+  return { inventory, images };
+}
+
+/**
+ * Send-time checks for the embedded editor. Mirrors the server: missing combinations are auto-filled before the
+ * PUT (`fillMissingCartesianCombinations`), so the check runs on the filled set and only reports what Etsy would
+ * still reject.
+ */
+export function validateVariationProducts(products: Product[], priceOnPropertyIds: number[]): FieldError[] {
+  if (products.length === 0) return [];
+  const filled = fillMissingCombinations(products, computeCartesianStatus(products));
+  const payload = buildEtsyInventoryPayload(filled, priceOnPropertyIds);
+  return validateEtsyInventory({ products: filled, price_on_property: payload.price_on_property });
+}
+
+// --- Embedded dialogs (CRITIQUE U7: ≤ 4 fields → nested Modal, longer flows → SidePanel md) ---
+
+type Translator = (key: string, values?: Record<string, any>) => string;
+
+interface EmbeddedVariationDialogsProps {
+  t: Translator;
+  tLe: Translator;
+  currencyCode: string;
+  batch: {
+    open: boolean;
+    onClose: () => void;
+    onSubmit: () => void;
+    propertyOptions: Array<{ value: number; label: string }>;
+    propertyId: number;
+    onPropertyId: (id: number) => void;
+    scales: Array<{ value: number; label: string }>;
+    scaleId: number | null;
+    onScaleId: (id: number | null) => void;
+    values: string;
+    onValues: (v: string) => void;
+    valuesCount: number;
+    secondLabel: string | null;
+    secondValues: string;
+    onSecondValues: (v: string) => void;
+    thirdLabel: string | null;
+    thirdValues: string;
+    onThirdValues: (v: string) => void;
+    thirdPredefined: string[];
+    price: string;
+    onPrice: (v: string) => void;
+    quantity: string;
+    onQuantity: (v: string) => void;
+    createCount: number;
+  };
+  second: {
+    open: boolean;
+    onClose: () => void;
+    onSubmit: () => void;
+    label: string;
+    values: string;
+    onValues: (v: string) => void;
+    createCount: number;
+  };
+  third: {
+    open: boolean;
+    onClose: () => void;
+    onSubmit: () => void;
+    label: string;
+    values: string;
+    onValues: (v: string) => void;
+    predefined: string[];
+    createCount: number;
+  };
+}
+
+function appendCommaValue(current: string, value: string): string {
+  const parts = current.split(',').map(v => v.trim()).filter(Boolean);
+  if (parts.includes(value)) return current;
+  return parts.length ? `${current}, ${value}` : value;
+}
+
+function PredefinedValueChips({ values, current, onPick, label }: { values: string[]; current: string; onPick: (v: string) => void; label: string }) {
+  if (values.length === 0) return null;
+  return (
+    <Box>
+      <Typography variant="caption" component="p" sx={{ m: 0, mb: 0.5 }}>{label}</Typography>
+      <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', maxHeight: 160, overflowY: 'auto' }}>
+        {values.map(v => (
+          <DsButton key={v} variant="secondary" size="sm" onClick={() => onPick(appendCommaValue(current, v))}>{v}</DsButton>
+        ))}
+      </Box>
+    </Box>
+  );
+}
+
+function EmbeddedVariationDialogs({ t, tLe, currencyCode, batch, second, third }: EmbeddedVariationDialogsProps) {
+  const batchBlocked = !batch.values.trim() || batch.price === '';
+  return (
+    <>
+      <SidePanel
+        open={batch.open}
+        onClose={batch.onClose}
+        size="md"
+        title={t('batchAdd')}
+        primary={{
+          id: 'variations-batch-add',
+          label: tLe('addCount', { count: batch.createCount || 0 }),
+          onClick: batch.onSubmit,
+          disabled: batchBlocked,
+          disabledReason: batchBlocked ? tLe('addNeedsValuesAndPrice') : undefined,
+        }}
+        secondary={{ id: 'variations-batch-cancel', label: tLe('cancel'), onClick: batch.onClose }}
+        data-testid="variation-batch-panel"
+      >
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, p: '20px' }}>
+          <Typography variant="caption" component="p" sx={{ m: 0 }}>{t('bulkAddHint')}</Typography>
+          <FormField label={t('propertyType')}>
+            <DsSelect<number> value={batch.propertyId} onChange={batch.onPropertyId} options={batch.propertyOptions} />
+          </FormField>
+          {batch.scales.length > 0 && (
+            <FormField label={t('scale')} optional>
+              <DsSelect<number>
+                value={batch.scaleId}
+                onChange={(v) => batch.onScaleId(v || null)}
+                options={[{ value: 0, label: t('allScales') }, ...batch.scales]}
+              />
+            </FormField>
+          )}
+          <FormField
+            label={t('valuesLabel')}
+            helper={batch.values ? t('variationsWillBeAdded', { count: batch.valuesCount }) : t('eachValueCreatesVariation')}
+          >
+            <TextArea value={batch.values} onChange={batch.onValues} minRows={2} maxRows={6} placeholder={t('valuesPlaceholder')} autoFocus />
+          </FormField>
+          {batch.secondLabel && (
+            <FormField
+              label={`${batch.secondLabel} · ${t('valuesLabel')}`}
+              helper={batch.secondValues && batch.values ? t('cartesianHint', { count: batch.createCount }) : t('secondValuesHint')}
+            >
+              <TextArea value={batch.secondValues} onChange={batch.onSecondValues} minRows={2} maxRows={6} placeholder={t('valuesPlaceholder')} />
+            </FormField>
+          )}
+          {batch.thirdLabel && (
+            <>
+              <FormField
+                label={`${batch.thirdLabel} · ${t('valuesLabel')}`}
+                helper={batch.thirdValues && batch.values ? t('cartesianHint', { count: batch.createCount }) : t('thirdValuesHint')}
+              >
+                <TextArea value={batch.thirdValues} onChange={batch.onThirdValues} minRows={2} maxRows={6} placeholder={t('valuesPlaceholder')} />
+              </FormField>
+              <PredefinedValueChips values={batch.thirdPredefined} current={batch.thirdValues} onPick={batch.onThirdValues} label={t('predefinedValues')} />
+            </>
+          )}
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+            <FormField label={t('tabPrice')} helper={t('appliedToAll')}>
+              <MoneyField
+                currency={currencyCode}
+                value={batch.price === '' ? null : Number(batch.price)}
+                onChange={(v) => batch.onPrice(v == null ? '' : String(v))}
+              />
+            </FormField>
+            <FormField label={t('tabStock')}>
+              <NumberField
+                value={batch.quantity === '' ? null : Number(batch.quantity)}
+                onChange={(v) => batch.onQuantity(v == null ? '' : String(v))}
+                min={0}
+              />
+            </FormField>
+          </Box>
+        </Box>
+      </SidePanel>
+
+      <Modal
+        open={second.open}
+        onClose={second.onClose}
+        nested
+        title={t('secondVariation')}
+        description={t('secondVariationSetupHint')}
+        primary={{
+          id: 'variations-second-apply',
+          label: tLe('addCount', { count: second.createCount }),
+          onClick: second.onSubmit,
+          disabled: !second.values.trim(),
+          disabledReason: !second.values.trim() ? t('secondValuesHint') : undefined,
+        }}
+        secondary={{ id: 'variations-second-cancel', label: tLe('cancel'), onClick: second.onClose }}
+        data-testid="variation-second-modal"
+      >
+        <FormField
+          label={`${second.label} · ${t('valuesLabel')}`}
+          helper={second.values ? t('cartesianHint', { count: second.createCount }) : t('secondValuesHint')}
+        >
+          <TextArea value={second.values} onChange={second.onValues} minRows={2} maxRows={6} placeholder={t('valuesPlaceholder')} autoFocus />
+        </FormField>
+      </Modal>
+
+      <Modal
+        open={third.open}
+        onClose={third.onClose}
+        nested
+        title={t('thirdVariation')}
+        description={t('thirdVariationSetupHint')}
+        primary={{
+          id: 'variations-third-apply',
+          label: tLe('addCount', { count: third.createCount }),
+          onClick: third.onSubmit,
+          disabled: !third.values.trim(),
+          disabledReason: !third.values.trim() ? t('thirdValuesHint') : undefined,
+        }}
+        secondary={{ id: 'variations-third-cancel', label: tLe('cancel'), onClick: third.onClose }}
+        data-testid="variation-third-modal"
+      >
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <FormField
+            label={`${third.label} · ${t('valuesLabel')}`}
+            helper={third.values ? t('cartesianHint', { count: third.createCount }) : t('thirdValuesHint')}
+          >
+            <TextArea value={third.values} onChange={third.onValues} minRows={2} maxRows={6} placeholder={t('valuesPlaceholder')} autoFocus />
+          </FormField>
+          <PredefinedValueChips values={third.predefined} current={third.values} onPick={third.onValues} label={t('predefinedValues')} />
+        </Box>
+      </Modal>
+    </>
+  );
+}
+
 // --- Component ---
 
-export default function VariationEditor(props: VariationEditorProps) {
+function EmbeddedBoundary({ listingId, children }: { listingId: string; children: React.ReactNode }) {
+  const tLe = useTranslations('listingEditor.variations');
   return (
-    <VariationErrorBoundary listingId={props.listingId}>
-      <VariationEditorInner {...props} />
+    <VariationErrorBoundary listingId={listingId} labels={{ title: tLe('crashTitle'), retry: tLe('crashRetry') }}>
+      {children}
     </VariationErrorBoundary>
   );
 }
 
-function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: VariationEditorProps) {
+const VariationEditor = forwardRef<VariationEditorHandle, VariationEditorProps>(function VariationEditor(props, ref) {
+  if (props.embedded) {
+    return (
+      <EmbeddedBoundary listingId={props.listingId}>
+        <VariationEditorInner {...props} handleRef={ref} />
+      </EmbeddedBoundary>
+    );
+  }
+  return (
+    <VariationErrorBoundary listingId={props.listingId}>
+      <VariationEditorInner {...props} handleRef={ref} />
+    </VariationErrorBoundary>
+  );
+});
+
+export default VariationEditor;
+
+type InnerProps = VariationEditorProps & { handleRef?: React.ForwardedRef<VariationEditorHandle> };
+
+const OPEN_DRAFT_STATUSES = ['draft', 'failed', 'conflict'];
+
+function cloneJson<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function VariationEditorInner({
+  listingId, shopId, taxonomyId, onSaved, embedded = false, register, onChange, onSummaryChange, createMode = false,
+  currencyCode: currencyFallback, handleRef,
+}: InnerProps) {
   const t = useTranslations('etsy.variation');
   const tEtsy = useTranslations('etsy');
+  const tLe = useTranslations('listingEditor.variations');
+  const tTerms = useTranslations('ds.termNames');
+  const dsToast = useToast();
+  const dsConfirm = useDsConfirm();
+  /** Embedded mode shows only failures (DS §3.14: results visible on the page get no toast). */
+  const notify = {
+    success: (msg: string) => { if (!embedded) toast.success(msg); },
+    error: (msg: string) => { if (embedded) dsToast.error(msg, { persist: false }); else toast.error(msg); },
+  };
   /** Translated message for a save failure — never the raw server text. */
   const variationErrorMessage = (err: unknown): string => {
     const i18n = draftErrorI18n(err);
@@ -546,6 +980,15 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
   const [products, setProducts] = useState<Product[]>([]);
   const [originalProducts, setOriginalProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  // Embedded: a failed load (inventory or the draft check) blocks editing instead of risking an overwrite of a
+  // staged draft we never saw (listing-editor §6.1 "Drafts fetch fails").
+  const [loadError, setLoadError] = useState(false);
+  const loadedRef = useRef(false);
+  // Embedded: what is already in the DB draft (or on Etsy when nothing is staged). Updated synchronously on
+  // load and after each stage so a second stage() before the re-render is a no-op.
+  const baselineRef = useRef<Baseline>({ products: [], priceOn: [], images: [] });
+  const [baselineVersion, setBaselineVersion] = useState(0);
+  const stagingRef = useRef<Promise<void> | null>(null);
   // Live inventory + pending draft as loaded, for the kx_loaded_quantity stamp at save time.
   const liveInventoryRef = useRef<any>(null);
   const pendingDraftRef = useRef<any>(null);
@@ -628,6 +1071,8 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
   // Photos
   const [listingImages, setListingImages] = useState<ListingImage[]>([]);
   const [variationImages, setVariationImages] = useState<VariationImage[]>([]);
+  // Embedded: last loaded/staged variation photo map (dirty check; staged by `stage()`).
+  const [originalVariationImages, setOriginalVariationImages] = useState<VariationImage[]>([]);
   const [savingPhotos, setSavingPhotos] = useState(false);
 
   // Detect currency
@@ -635,8 +1080,8 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
     for (const p of products) {
       if (p.offerings?.[0]?.price?.currency_code) return p.offerings[0].price.currency_code;
     }
-    return 'USD';
-  }, [products]);
+    return currencyFallback || 'USD';
+  }, [products, currencyFallback]);
   const sym = getCurrencySymbol(currencyCode);
 
   const defaultDivisor = useMemo(() => {
@@ -765,7 +1210,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
       const pv = p.property_values?.[0];
       if (pv?.scale_id) { setSelectedScaleId(pv.scale_id); return; }
     }
-  }, [products.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [products.length]);
 
   // Detect individual pricing/quantity/sku on load
   useEffect(() => {
@@ -777,7 +1222,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
     setIndividualQuantity(!quantities.every(q => q === quantities[0]));
     setIndividualSku(!skus.every(s => s === skus[0]) && skus.length > 0);
     if (skus.length > 0 && skus.every(s => s === skus[0])) setUniformSku(skus[0]);
-  }, [products.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [products.length]);
 
   // --- Grouped by first property ---
   const grouped = useMemo(() => {
@@ -799,22 +1244,46 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
 
   const fetchInventory = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
-      const [inventoryRes, draftsRes] = await Promise.all([
-        fetch(`/api/clawd/etsy?action=get_listing_inventory&listing_id=${listingId}&shop_id=${shopId}`),
-        fetchEtsyDrafts(shopId, listingId).catch(() => []),
+      const [inventoryRes, draftsRes, variationImagesData] = await Promise.all([
+        createMode
+          ? Promise.resolve(null)
+          : fetch(`/api/clawd/etsy?action=get_listing_inventory&listing_id=${listingId}&shop_id=${shopId}`),
+        // Embedded: a failed draft check is a load error (never edit over an unseen draft); legacy keeps going.
+        embedded ? fetchEtsyDrafts(shopId, listingId) : fetchEtsyDrafts(shopId, listingId).catch(() => []),
+        embedded && !createMode
+          ? fetch(`/api/clawd/etsy?action=get_variation_images&listing_id=${listingId}&shop_id=${shopId}`)
+            .then(r => (r.ok ? r.json() : null))
+            .catch(() => null)
+          : Promise.resolve(null),
       ]);
-      if (!inventoryRes.ok) throw new Error(t('inventoryFetchFailed'));
-      const data = await inventoryRes.json();
+      if (inventoryRes && !inventoryRes.ok) throw new Error(t('inventoryFetchFailed'));
+      const data = inventoryRes ? await inventoryRes.json() : { products: [] };
 
       const pendingDraft = Array.isArray(draftsRes)
-        ? draftsRes.find((d: any) => ['draft', 'failed', 'conflict'].includes(d.status) && d.inventoryPatch && Array.isArray(d.inventoryPatch.products) && d.inventoryPatch.products.length > 0)
+        ? draftsRes.find((d: any) => OPEN_DRAFT_STATUSES.includes(d.status) && d.inventoryPatch && Array.isArray(d.inventoryPatch.products) && d.inventoryPatch.products.length > 0)
         : null;
+      let images: VariationImage[] = [];
+      if (embedded) {
+        // Server-draft overlay (I0 8b) for variation photos too: staged map first, live map otherwise.
+        const imagesDraft = Array.isArray(draftsRes)
+          ? draftsRes.find((d: any) => OPEN_DRAFT_STATUSES.includes(d.status) && Array.isArray(d.variationImagesPatch?.variation_images))
+          : null;
+        const rawImages: VariationImage[] = imagesDraft
+          ? imagesDraft.variationImagesPatch.variation_images
+          : (Array.isArray(variationImagesData?.results) ? variationImagesData.results : []);
+        // Matched to the (decoded) product values by text, so decoded the same way.
+        images = rawImages.map((vi) => (typeof vi?.value === 'string' ? { ...vi, value: decodeEntities(vi.value) } : vi));
+        setVariationImages(images);
+        setOriginalVariationImages(cloneJson(images));
+      }
 
       liveInventoryRef.current = data;
       pendingDraftRef.current = pendingDraft || null;
       const source = pendingDraft ? pendingDraft.inventoryPatch : data;
-      const fetched = sanitizeProducts(source.products || []);
+      const sanitized = sanitizeProducts(source.products || []);
+      const fetched = embedded ? decodeInventoryProducts(sanitized) : sanitized;
       const apiPriceOnProperty = normalizePropertyIds(source.price_on_property);
       const initialPriceOnProperty = apiPriceOnProperty.length ? apiPriceOnProperty : derivePropertyDrivers(fetched, product => product.offerings?.[0]?.price?.amount);
       setProducts(fetched);
@@ -822,12 +1291,16 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
       setPriceOnPropertyIds(initialPriceOnProperty);
       setOriginalPriceOnPropertyIds(initialPriceOnProperty);
       setPriceOnPropertyTouched(apiPriceOnProperty.length > 0);
+      baselineRef.current = { products: cloneJson(fetched), priceOn: [...initialPriceOnProperty], images: cloneJson(images) };
+      setBaselineVersion(v => v + 1);
+      loadedRef.current = true;
     } catch (err: any) {
-      toast.error(err.message);
+      if (embedded) setLoadError(true);
+      else toast.error(err.message);
     } finally {
       setLoading(false);
     }
-  }, [listingId, shopId, t]);
+  }, [listingId, shopId, t, embedded, createMode]);
 
   useEffect(() => { fetchInventory(); }, [fetchInventory]);
 
@@ -856,25 +1329,33 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
 
   // Fetch listing images for photos tab
   useEffect(() => {
+    if (createMode) return;
     fetch(`/api/clawd/etsy?action=get_listing_images&listing_id=${listingId}&shop_id=${shopId}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data?.images) setListingImages(data.images); })
       .catch(() => {});
-  }, [listingId, shopId]);
+  }, [listingId, shopId, createMode]);
 
-  // Fetch variation images
+  // Fetch variation images (embedded mode loads them with the draft overlay in fetchInventory)
   useEffect(() => {
+    if (embedded) return;
     fetch(`/api/clawd/etsy?action=get_variation_images&listing_id=${listingId}&shop_id=${shopId}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data?.results) setVariationImages(data.results); })
       .catch(() => {});
-  }, [listingId, shopId]);
+  }, [listingId, shopId, embedded]);
 
   // --- Helpers ---
 
-  const getLabel = (p: Product) =>
-    p.property_values?.map(pv => pv.values.join(', ')).join(' / ') || '-';
+  // Embedded values are already decoded on load (decodeInventoryProducts); `show` keeps display safe for values
+  // added later from taxonomy lists (idempotent).
+  const show = (v: string) => (embedded ? decodeEntities(v) : v);
 
+  const getLabel = (p: Product) =>
+    p.property_values?.map(pv => pv.values.map(show).join(', ')).join(' / ') || '-';
+
+  // Editable input value (not display formatting): always two decimals so "12.50" round-trips in the field.
+  // eslint-disable-next-line no-restricted-syntax
   const getPrice = (o: Offering) => (o.price.amount / o.price.divisor).toFixed(2);
 
   // --- Mutations ---
@@ -904,6 +1385,12 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
   };
 
   const updatePropertyValue = (idx: number, pvIdx: number, newValue: string) => {
+    // Embedded: a value is renamed in every combination that carries it (one row alone would split the option and
+    // fail the all-combinations check). Legacy keeps its per-row edit.
+    if (embedded) {
+      setProducts(prev => renamePropertyValue(prev, idx, pvIdx, newValue));
+      return;
+    }
     setProducts(prev => {
       const arr = [...prev];
       const p = { ...arr[idx] };
@@ -917,7 +1404,19 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
   const removeProduct = (idx: number) => {
     setProducts(prev => prev.filter((_, i) => i !== idx));
     setDeleteIndex(null);
-    toast.success(t('variationDeleted'));
+    notify.success(t('variationDeleted'));
+  };
+
+  // Embedded (CRITIQUE U7): the delete confirm is the DS confirm, nested over the page / sheet.
+  const confirmEmbeddedDelete = async (idx: number) => {
+    const target = products[idx];
+    const ok = await dsConfirm({
+      title: target ? t('deleteConfirmNamed', { name: getLabel(target) }) : t('deleteConfirm'),
+      body: t('deleteNote'),
+      confirmLabel: t('deleteVariation'),
+      tone: 'danger',
+    });
+    if (ok) removeProduct(idx);
   };
 
   const duplicateProduct = (idx: number) => {
@@ -959,7 +1458,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
       o.price = { ...o.price, amount: Math.round(newPrice * o.price.divisor) };
       return { ...p, offerings: [o, ...p.offerings.slice(1)] };
     }));
-    toast.success(t('pricesUpdated'));
+    notify.success(t('pricesUpdated'));
   };
 
   const applyBulkQuantity = () => {
@@ -976,7 +1475,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
       o.quantity = newQty;
       return { ...p, offerings: [o, ...p.offerings.slice(1)] };
     }));
-    toast.success(t('stockUpdated'));
+    notify.success(t('stockUpdated'));
   };
 
   // --- Per-axis group helpers ------------------------------------------------
@@ -1140,7 +1639,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
     if (!thirdPropertyId) return;
     const values = parseCommaValues(thirdSetupValues);
     if (values.length === 0) {
-      toast.error(t('thirdValuesHint'));
+      notify.error(t('thirdValuesHint'));
       return;
     }
 
@@ -1197,14 +1696,14 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
     setProducts(nextProducts);
     setThirdSetupOpen(false);
     setThirdSetupValues('');
-    toast.success(t('variationsAdded', { count: nextProducts.length }));
+    notify.success(t('variationsAdded', { count: nextProducts.length }));
   };
 
   const applySecondVariationMatrix = () => {
     if (!secondPropertyId) return;
     const values = parseCommaValues(secondSetupValues);
     if (values.length === 0) {
-      toast.error(t('secondValuesHint'));
+      notify.error(t('secondValuesHint'));
       return;
     }
 
@@ -1239,7 +1738,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
     setProducts(nextProducts);
     setSecondSetupOpen(false);
     setSecondSetupValues('');
-    toast.success(t('variationsAdded', { count: nextProducts.length }));
+    notify.success(t('variationsAdded', { count: nextProducts.length }));
   };
 
   // Inline add single variation
@@ -1292,11 +1791,11 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
   // Batch add variations (from dialog)
   const addVariations = () => {
     const values = addValues.split(',').map(v => v.trim()).filter(v => v.length > 0);
-    if (!values.length) { toast.error(t('enterAtLeastOneValue')); return; }
+    if (!values.length) { notify.error(t('enterAtLeastOneValue')); return; }
     const priceNum = parseFloat(addPrice);
     const qtyNum = parseInt(addQuantity, 10);
-    if (isNaN(priceNum) || priceNum < 0) { toast.error(t('enterValidPrice')); return; }
-    if (isNaN(qtyNum) || qtyNum < 0) { toast.error(t('enterValidStock')); return; }
+    if (isNaN(priceNum) || priceNum < 0) { notify.error(t('enterValidPrice')); return; }
+    if (isNaN(qtyNum) || qtyNum < 0) { notify.error(t('enterValidStock')); return; }
 
     const propName = getPropertyName(addPropertyId);
 
@@ -1378,7 +1877,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
     setAddThirdValues('');
     setAddPrice('');
     setAddQuantity('1');
-    toast.success(t('variationsAdded', { count: newProducts.length }));
+    notify.success(t('variationsAdded', { count: newProducts.length }));
   };
 
   // --- Save inventory ---
@@ -1388,7 +1887,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
   const handleFillMissing = () => {
     const filled = fillMissingCombinations(products, cartesianStatus);
     setProducts(filled);
-    toast.success(t('cartesianFilled', { count: cartesianStatus.missing.length }));
+    notify.success(t('cartesianFilled', { count: cartesianStatus.missing.length }));
   };
 
   const handleSave = async () => {
@@ -1422,7 +1921,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
       toast.success(t('variationsStaged'));
       setOriginalProducts(JSON.parse(JSON.stringify(productsToSave)));
       setOriginalPriceOnPropertyIds(price_on_property);
-      onSaved();
+      onSaved?.();
     } catch (err: any) {
       toast.error(variationErrorMessage(err));
     } finally {
@@ -1443,6 +1942,115 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
       setSavingPhotos(false);
     }
   };
+
+  // --- Embedded: autosave engine contract (listing-editor §5.1) -------------------
+  const dirtyParts = useMemo(
+    () => (embedded && loadedRef.current
+      ? variationDirtyParts(baselineRef.current, { products, priceOn: priceOnPropertyIds, images: variationImages })
+      : { inventory: false, images: false }),
+    // baselineVersion re-evaluates after load/stage (the baseline lives in a ref).
+    [embedded, products, priceOnPropertyIds, variationImages, baselineVersion, loading],
+  );
+  const embeddedDirty = dirtyParts.inventory || dirtyParts.images;
+
+  const liveRef = useRef({ products, priceOnPropertyIds, variationImages, originalProducts, loadError, shopId, listingId });
+  liveRef.current = { products, priceOnPropertyIds, variationImages, originalProducts, loadError, shopId, listingId };
+
+  const handle = useMemo<VariationEditorHandle>(() => {
+    const currentParts = () => {
+      const c = liveRef.current;
+      if (!loadedRef.current || c.loadError) return { inventory: false, images: false };
+      return variationDirtyParts(baselineRef.current, { products: c.products, priceOn: c.priceOnPropertyIds, images: c.variationImages });
+    };
+    const stageOnce = async () => {
+      const parts = currentParts();
+      if (!parts.inventory && !parts.images) return;
+      const c = liveRef.current;
+      const snapProducts = cloneJson(c.products);
+      const snapImages = cloneJson(c.variationImages);
+      const payload = buildEtsyInventoryPayload(snapProducts, c.priceOnPropertyIds);
+      const stamped = parts.inventory
+        ? stampLoadedQuantities(snapProducts, {
+          liveInventory: liveInventoryRef.current,
+          pendingDraft: pendingDraftRef.current,
+          originalProducts: c.originalProducts,
+        })
+        : null;
+      // Unchanged server contract: same `inventory` / `variationImages` payloads as the legacy Save buttons.
+      await stageEtsyDraft({
+        shopId: c.shopId,
+        listingId: c.listingId,
+        ...(parts.inventory ? {
+          inventory: {
+            products: stamped,
+            price_on_property: payload.price_on_property,
+            quantity_on_property: payload.quantity_on_property,
+            sku_on_property: payload.sku_on_property,
+          },
+        } : {}),
+        ...(parts.images ? { variationImages: { variation_images: snapImages } } : {}),
+      });
+      const next = { ...baselineRef.current };
+      if (parts.inventory) {
+        pendingDraftRef.current = { inventoryPatch: { products: stamped } };
+        next.products = snapProducts;
+        next.priceOn = payload.price_on_property;
+        setOriginalProducts(cloneJson(snapProducts));
+        setOriginalPriceOnPropertyIds(payload.price_on_property);
+      }
+      if (parts.images) {
+        next.images = snapImages;
+        setOriginalVariationImages(cloneJson(snapImages));
+      }
+      baselineRef.current = next;
+      setBaselineVersion(v => v + 1);
+    };
+    return {
+      isDirty: () => {
+        const p = currentParts();
+        return p.inventory || p.images;
+      },
+      stage: async () => {
+        // One request in flight; a call during a request waits for it, then stages what is still dirty.
+        while (stagingRef.current) {
+          try { await stagingRef.current; } catch { /* the earlier caller handles its own failure */ }
+        }
+        const run = stageOnce();
+        stagingRef.current = run;
+        try { await run; } finally { stagingRef.current = null; }
+      },
+      revert: () => {
+        const b = baselineRef.current;
+        setProducts(cloneJson(b.products));
+        setPriceOnPropertyIds([...b.priceOn]);
+        setPriceOnPropertyTouched(true);
+        setVariationImages(cloneJson(b.images));
+      },
+      validate: () => {
+        const c = liveRef.current;
+        if (!loadedRef.current || c.loadError) return [];
+        return validateVariationProducts(c.products, c.priceOnPropertyIds);
+      },
+      summary: () => (loadedRef.current ? summarizeEtsyInventory(liveRef.current.products, currencyFallback) : null),
+    };
+  }, [currencyFallback]);
+
+  useImperativeHandle(handleRef, () => handle, [handle]);
+
+  useEffect(() => {
+    if (!embedded || !register) return undefined;
+    return register({ id: 'variations', isDirty: handle.isDirty, stage: handle.stage, validate: handle.validate });
+  }, [embedded, register, handle]);
+
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const onSummaryRef = useRef(onSummaryChange);
+  onSummaryRef.current = onSummaryChange;
+  useEffect(() => {
+    if (!embedded || loading || !loadedRef.current) return;
+    onChangeRef.current?.(embeddedDirty);
+    onSummaryRef.current?.(summarizeEtsyInventory(products, currencyFallback));
+  }, [embedded, loading, embeddedDirty, products, currencyFallback]);
 
   // All hooks MUST be above any early return (React Rules of Hooks)
   const totalStock = products.reduce((sum, p) => sum + (p.offerings[0]?.quantity || 0), 0);
@@ -1470,6 +2078,20 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
 
   // --- Render ---
 
+  if (embedded && loading) {
+    return <PanelSkeleton sections={2} data-testid="variation-editor-loading" />;
+  }
+  if (embedded && loadError) {
+    return (
+      <ErrorState
+        variant="inline"
+        title={tLe('loadFailed')}
+        onRetry={() => { void fetchInventory(); }}
+        data-testid="variation-editor-error"
+      />
+    );
+  }
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" py={4}>
@@ -1481,9 +2103,26 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
     );
   }
 
+  const embeddedTabs: Array<{ value: string; index: number; label: string }> = [
+    { value: 'variations', index: 0, label: t('tabVariations') },
+    { value: 'price', index: 1, label: t('tabPrice') },
+    { value: 'quantity', index: 2, label: t('tabStock') },
+    { value: 'sku', index: 3, label: tTerms('sku') },
+    { value: 'visibility', index: 4, label: t('tabVisibility') },
+    { value: 'photos', index: 5, label: t('tabPhotos') },
+    // No "Processing" tab when embedded: it never staged anything; processing lives in the Shipping section.
+  ];
+
   return (
-    <Box>
-      {/* Tabs — 7 tabs */}
+    <Box data-testid={embedded ? 'variation-editor-embedded' : undefined}>
+      {embedded ? (
+        <DsTabs<string>
+          value={embeddedTabs.find(tab => tab.index === activeTab)?.value ?? 'variations'}
+          onChange={(v) => setActiveTab(embeddedTabs.find(tab => tab.value === v)?.index ?? 0)}
+          tabs={embeddedTabs.map(({ value, label }) => ({ value, label }))}
+          aria-label={tLe('tabsLabel')}
+        />
+      ) : (
       <Tabs
         value={activeTab}
         onChange={(_, v) => setActiveTab(v)}
@@ -1509,9 +2148,19 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
         <Tab label={t('tabPhotos')} />
         <Tab label={t('tabProcessing')} />
       </Tabs>
+      )}
 
-      {/* Summary chips */}
-      {products.length > 0 && (
+      {/* Summary line (embedded: one caption line, no chips) */}
+      {embedded && products.length > 0 && (
+        <Typography variant="caption" component="p" sx={{ py: 1, m: 0 }} data-testid="variation-editor-summary">
+          {tLe('editorSummary', {
+            combos: products.length,
+            stock: totalStock,
+            axes: existingProperties.map(p => p.name).join(', '),
+          })}
+        </Typography>
+      )}
+      {!embedded && products.length > 0 && (
         <Box sx={{ display: 'flex', gap: 1, py: 1, px: 0.5, flexWrap: 'wrap' }}>
           <Chip label={`${products.length} ${t('tabVariations').toLowerCase()}`} size="small" variant="outlined" />
           <Chip label={`${t('totalStock')}: ${totalStock}`} size="small" variant="outlined" />
@@ -1522,8 +2171,8 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
         </Box>
       )}
 
-      {/* Unsaved warning */}
-      {hasChanges && (
+      {/* Unsaved warning (embedded: the section dirty marker + nav dot say this) */}
+      {!embedded && hasChanges && (
         <Alert severity="warning" sx={{ py: 0.3, my: 0.5, borderRadius: '8px', fontSize: '0.8rem' }}>
           {t('unsavedChanges')}
         </Alert>
@@ -1531,7 +2180,17 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
 
       {/* Cartesian-incomplete warning. Etsy rejects partial matrices with
           "All combinations of property values must be supplied". */}
-      {!cartesianStatus.complete && cartesianStatus.missing.length > 0 && (
+      {embedded && !cartesianStatus.complete && cartesianStatus.missing.length > 0 && (
+        <Box sx={{ my: 1 }}>
+          <Banner
+            tone="warning"
+            title={t('cartesianIncomplete', { actual: cartesianStatus.actual, expected: cartesianStatus.expected })}
+            action={{ id: 'fill-missing', label: t('fillMissing', { count: cartesianStatus.missing.length }), onClick: handleFillMissing }}
+            data-testid="variation-cartesian-banner"
+          />
+        </Box>
+      )}
+      {!embedded && !cartesianStatus.complete && cartesianStatus.missing.length > 0 && (
         <Alert
           severity="error"
           sx={{ py: 0.5, my: 0.5, borderRadius: '8px', fontSize: '0.8rem' }}
@@ -1649,7 +2308,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
             <Button
               size="small"
               variant="outlined"
-              startIcon={<AddIcon />}
+              startIcon={<icons.add size={16} strokeWidth={ICON_STROKE} />}
               onClick={() => {
                 setAddPropertyId(primaryPropertyId || existingProperties[0]?.id || 200);
                 setAddDialogOpen(true);
@@ -1694,10 +2353,10 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
                         {/* Reorder arrows */}
                         <Box sx={{ display: 'flex', flexDirection: 'column', mr: 0.5 }}>
                           <IconButton size="small" disabled={globalIdx === 0} onClick={() => moveProduct(globalIdx, 'up')} sx={{ p: 0.15 }}>
-                            <UpIcon sx={{ fontSize: 16 }} />
+                            <icons.sortAsc size={16} strokeWidth={ICON_STROKE} />
                           </IconButton>
                           <IconButton size="small" disabled={globalIdx === products.length - 1} onClick={() => moveProduct(globalIdx, 'down')} sx={{ p: 0.15 }}>
-                            <DownIcon sx={{ fontSize: 16 }} />
+                            <icons.sortDesc size={16} strokeWidth={ICON_STROKE} />
                           </IconButton>
                         </Box>
 
@@ -1724,14 +2383,15 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
                                   {pv.property_name || (pvIdx === 0 ? t('tabVariations') : t('secondVariation'))}
                                 </Typography>
                                 <EditableText
-                                  value={pv.values?.[0] || ''}
+                                  editLabel={embedded ? tLe('clickToEdit') : undefined}
+                                  value={show(pv.values?.[0] || '')}
                                   onChange={(v) => updatePropertyValue(globalIdx, pvIdx, v)}
                                 />
                               </Box>
                             ))}
                           </Box>
                           {product.sku && (
-                            <Typography variant="caption" color="text.secondary">SKU: {product.sku}</Typography>
+                            <Typography variant="caption" color="text.secondary">{tTerms('sku')}: {product.sku}</Typography>
                           )}
                         </Box>
 
@@ -1756,16 +2416,16 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
 
                         {/* Enabled indicator */}
                         {!o.is_enabled && (
-                          <Chip label="OFF" size="small" color="default" sx={{ fontSize: '0.65rem', height: 18, opacity: 0.6 }} />
+                          <Chip label={embedded ? tLe('off') : 'OFF'} size="small" color="default" sx={{ fontSize: '0.65rem', height: 18, opacity: 0.6 }} />
                         )}
 
                         {/* Actions */}
                         <Box sx={{ display: 'flex', gap: 0 }}>
                           <Tooltip title={t('copy')}>
-                            <IconButton size="small" onClick={() => duplicateProduct(globalIdx)}><DuplicateIcon sx={{ fontSize: 16 }} /></IconButton>
+                            <IconButton size="small" onClick={() => duplicateProduct(globalIdx)}><icons.copy size={16} strokeWidth={ICON_STROKE} /></IconButton>
                           </Tooltip>
                           <Tooltip title={t('deleteTooltip')}>
-                            <IconButton size="small" color="error" onClick={() => setDeleteIndex(globalIdx)}><DeleteIcon sx={{ fontSize: 16 }} /></IconButton>
+                            <IconButton size="small" color="error" onClick={() => (embedded ? void confirmEmbeddedDelete(globalIdx) : setDeleteIndex(globalIdx))}><icons.delete size={16} strokeWidth={ICON_STROKE} /></IconButton>
                           </Tooltip>
                         </Box>
                       </Box>
@@ -1846,11 +2506,13 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
                 const indices = productsMatchingAxisValue(priceGroupBy, value);
                 const s = summarizeGroup(indices, (p) => p.offerings[0]?.price?.amount ?? 0);
                 const divisor = products[indices[0]]?.offerings[0]?.price?.divisor || defaultDivisor;
+                // Input default value (not display formatting), same two-decimal form as getPrice.
+                // eslint-disable-next-line no-restricted-syntax
                 const displayPrice = s.count > 0 ? ((s.representative as number) / divisor).toFixed(2) : '';
                 return (
                   <Box key={value} sx={rowSx}>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="body2" fontWeight={600}>{value}</Typography>
+                      <Typography variant="body2" fontWeight={600}>{show(value)}</Typography>
                       <Typography variant="caption" color={s.allSame ? 'text.secondary' : 'warning.main'} sx={{ display: 'block' }}>
                         {t('combosCount', { count: s.count })}
                         {!s.allSame && ` · ${t('mixedPricesHint')}`}
@@ -1956,7 +2618,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
                 return (
                   <Box key={value} sx={rowSx}>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="body2" fontWeight={600}>{value}</Typography>
+                      <Typography variant="body2" fontWeight={600}>{show(value)}</Typography>
                       <Typography variant="caption" color={s.allSame ? 'text.secondary' : 'warning.main'} sx={{ display: 'block' }}>
                         {t('combosCount', { count: s.count })}
                         {!s.allSame && ` · ${t('mixedQuantitiesHint')}`}
@@ -2064,7 +2726,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
                 return (
                   <Box key={value} sx={rowSx}>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="body2" fontWeight={600}>{value}</Typography>
+                      <Typography variant="body2" fontWeight={600}>{show(value)}</Typography>
                       <Typography variant="caption" color={s.allSame ? 'text.secondary' : 'warning.main'} sx={{ display: 'block' }}>
                         {t('combosCount', { count: s.count })}
                         {!s.allSame && ` · ${t('mixedSkusHint')}`}
@@ -2200,7 +2862,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
 
                   return (
                     <Box key={value} sx={{ ...rowSx, py: 1.5, gap: 2 }}>
-                      <Typography variant="body2" fontWeight={600} sx={{ minWidth: 120 }}>{value}</Typography>
+                      <Typography variant="body2" fontWeight={600} sx={{ minWidth: 120 }}>{show(value)}</Typography>
                       <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap', flex: 1 }}>
                         {listingImages.map(img => {
                           const isSelected = assignedImg?.listing_image_id === img.listing_image_id;
@@ -2245,8 +2907,8 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
                 })}
               </Paper>
 
-              {/* Save photos button */}
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1.5 }}>
+              {/* Save photos button (embedded: staged with the rest by the autosave engine) */}
+              {!embedded && <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1.5 }}>
                 <Button
                   variant="contained"
                   size="small"
@@ -2257,7 +2919,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
                 >
                   {savingPhotos ? t('saving') : t('saveToEtsy')}
                 </Button>
-              </Box>
+              </Box>}
             </>
           )}
         </Box>
@@ -2266,7 +2928,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
       {/* ============================================================ */}
       {/* TAB 6: Processing Time                                        */}
       {/* ============================================================ */}
-      {activeTab === 6 && (
+      {!embedded && activeTab === 6 && (
         <Box sx={{ pt: 1 }}>
           <Alert severity="info" sx={{ py: 0.3, mb: 1.5, borderRadius: '8px', fontSize: '0.8rem' }}>
             {t('processingTime')} — {t('appliedToAll')}
@@ -2299,8 +2961,8 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
         </Box>
       )}
 
-      {/* Save / Cancel */}
-      <Box display="flex" justifyContent="flex-end" mt={2} gap={1} alignItems="center"
+      {/* Save / Cancel (embedded: no own save button; the page footer sends, autosave stages) */}
+      {!embedded && <Box display="flex" justifyContent="flex-end" mt={2} gap={1} alignItems="center"
         sx={{ py: 1.5, borderTop: '1px solid #eee' }}>
         {hasChanges && (
           <>
@@ -2326,9 +2988,72 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
         >
           {saving ? t('saving') : t('saveToEtsy')}
         </Button>
-      </Box>
+      </Box>}
+
+      {embedded && (
+        <EmbeddedVariationDialogs
+          t={t}
+          tLe={tLe}
+          currencyCode={currencyCode}
+          batch={{
+            open: addDialogOpen,
+            onClose: () => setAddDialogOpen(false),
+            onSubmit: addVariations,
+            propertyOptions: [
+              ...existingProperties.map(prop => {
+                const ep = ETSY_PROPERTIES.find(p => p.id === prop.id);
+                return { value: prop.id, label: `${ep ? t(ep.tKey) : prop.name} (${t('existing')})` };
+              }),
+              ...ETSY_PROPERTIES.filter(p => !existingProperties.some(ep => ep.id === p.id)).slice(0, 8)
+                .map(prop => ({ value: prop.id, label: t(prop.tKey) })),
+            ],
+            propertyId: addPropertyId,
+            onPropertyId: setAddPropertyId,
+            scales: scalesForProperty.length > 0 && addPropertyId === primaryPropertyId
+              ? scalesForProperty.map(sc => ({ value: sc.scale_id, label: sc.display_name }))
+              : [],
+            scaleId: selectedScaleId,
+            onScaleId: setSelectedScaleId,
+            values: addValues,
+            onValues: setAddValues,
+            valuesCount: addValuesCount,
+            secondLabel: secondPropertyId ? getPropertyName(secondPropertyId, t('secondVariation')) : null,
+            secondValues: addSecondValues,
+            onSecondValues: setAddSecondValues,
+            thirdLabel: thirdPropertyId ? getPropertyName(thirdPropertyId, t('thirdVariation')) : null,
+            thirdValues: addThirdValues,
+            onThirdValues: setAddThirdValues,
+            thirdPredefined: thirdPropertyPossibleValues.map(pv => pv.name),
+            price: addPrice,
+            onPrice: setAddPrice,
+            quantity: addQuantity,
+            onQuantity: setAddQuantity,
+            createCount: addDialogCreateCount,
+          }}
+          second={{
+            open: secondSetupOpen,
+            onClose: () => setSecondSetupOpen(false),
+            onSubmit: applySecondVariationMatrix,
+            label: getPropertyName(secondPropertyId || 0, t('secondVariation')),
+            values: secondSetupValues,
+            onValues: setSecondSetupValues,
+            createCount: uniqueFirstPropValues.length * parseCommaValues(secondSetupValues).length,
+          }}
+          third={{
+            open: thirdSetupOpen,
+            onClose: () => setThirdSetupOpen(false),
+            onSubmit: applyThirdVariationMatrix,
+            label: getPropertyName(thirdPropertyId || 0, t('thirdVariation')),
+            values: thirdSetupValues,
+            onValues: setThirdSetupValues,
+            predefined: thirdPropertyPossibleValues.map(pv => pv.name),
+            createCount: Math.max(1, new Set(products.map(p => `${p.property_values[0]?.values?.[0] || ''}|${p.property_values[1]?.values?.[0] || ''}`)).size) * parseCommaValues(thirdSetupValues).length,
+          }}
+        />
+      )}
 
       {/* --- Batch Add Variations Dialog --- */}
+      {!embedded && <>
       <Dialog open={addDialogOpen} onClose={() => setAddDialogOpen(false)} maxWidth="sm" fullWidth sx={{ zIndex: 1600 }}>
         <DialogTitle sx={{ fontWeight: 700 }}>{t('batchAdd')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: '16px !important' }}>
@@ -2583,6 +3308,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
           </Button>
         </DialogActions>
       </Dialog>
+      </>}
     </Box>
   );
 }

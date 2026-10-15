@@ -12,6 +12,7 @@ import { OverflowMenu } from './OverflowMenu';
 import { ConfirmDialog } from './ConfirmDialog';
 import { useSheetDrag } from './BottomSheet';
 import { CloseIcon, NextIcon, PrevIcon } from './icons.internal';
+import { SectionNav, type SectionNavItem } from '../page/SectionNav';
 
 export type SidePanelSize = keyof typeof panelWidth;
 export type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
@@ -44,8 +45,11 @@ export interface SidePanelProps {
   dirty?: boolean;
   /** ⌘/Ctrl+S handler (save draft). */
   onSave?: () => void;
-  /** Sticky anchor chips; rendered only with more than 5 sections (DS §3.5). */
-  sectionNav?: { id: string; label: string }[];
+  /**
+   * Anchor chips (the shared `ds/page/SectionNav`, non-sticky, scroll-spied on the panel body); rendered only
+   * with more than 5 sections (DS §3.5). `state` adds the not-sent / needs-a-fix dot.
+   */
+  sectionNav?: SectionNavItem[];
   /** Extra content rendered between header and body (e.g. a Banner). Not scrolled. */
   headerSlot?: React.ReactNode;
   children?: React.ReactNode;
@@ -122,11 +126,6 @@ export function SidePanel({
     }
   };
 
-  const scrollTo = (id: string) => {
-    const el = Array.from(bodyRef.current?.querySelectorAll<HTMLElement>('[id]') ?? []).find((x) => x.id === id);
-    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
   return (
     <>
       <Drawer
@@ -197,21 +196,8 @@ export function SidePanel({
           {meta && <Box sx={{ mt: '2px', fontSize: 12, lineHeight: '16px', color: n[500], whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{meta}</Box>}
         </Box>
         {sectionNav && sectionNav.length > 5 && (
-          <Box component="nav" aria-label={t('sections')} sx={{ flexShrink: 0, display: 'flex', gap: '6px', px: '20px', py: '8px', overflowX: 'auto', borderBottom: `1px solid ${n[100]}`, bgcolor: n[25] }}>
-            {sectionNav.map((s) => (
-              <Box
-                key={s.id}
-                component="button"
-                type="button"
-                onClick={() => scrollTo(s.id)}
-                sx={{
-                  flexShrink: 0, height: 28, px: '10px', border: `1px solid ${n[200]}`, borderRadius: `${radius.full}px`, bgcolor: n[0],
-                  fontFamily: 'inherit', fontSize: 12, fontWeight: 500, color: n[700], cursor: 'pointer', '&:hover': { bgcolor: n[50] },
-                }}
-              >
-                {s.label}
-              </Box>
-            ))}
+          <Box sx={{ px: '20px', bgcolor: n[25], borderBottom: `1px solid ${n[100]}`, '& > nav': { bgcolor: 'transparent', borderBottom: 0 } }}>
+            <SectionNav sections={sectionNav} sticky={false} scrollRoot={bodyRef} aria-label={t('sections')} data-testid="panel-section-nav" />
           </Box>
         )}
         {headerSlot && <Box sx={{ flexShrink: 0 }}>{headerSlot}</Box>}

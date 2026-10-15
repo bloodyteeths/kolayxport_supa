@@ -4,6 +4,7 @@ import fs from 'fs';
 import { getAuthUserOrApiKey } from '@/lib/auth';
 import { upsertDraftPatch, createDraftMediaFile, toSerializable } from '@/lib/ebay/draftService';
 import { logger } from '@/lib/logger';
+import { ebayDraftErrorResponse, isEbayDraftError } from '@/lib/ebay/draftErrors';
 
 export const config = {
   api: {
@@ -66,7 +67,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({ success: true, draftId: draft.id, media: toSerializable(media) });
   } catch (err: any) {
-    logger.error('eBay media staging failed', err, { userId: user.id });
-    return res.status(500).json({ error: err.message || 'Media staging failed' });
+    if (!isEbayDraftError(err)) logger.error('eBay media staging failed', err, { userId: user.id });
+    const { status, body } = ebayDraftErrorResponse(err, 'Media staging failed');
+    return res.status(status).json(body);
   }
 }

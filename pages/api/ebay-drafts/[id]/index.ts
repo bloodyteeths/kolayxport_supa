@@ -1,7 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { getAuthUserOrApiKey } from '@/lib/auth';
-import { discardDraft, toSerializable } from '@/lib/ebay/draftService';
+import { discardDraft, removeQueuedActions, toSerializable } from '@/lib/ebay/draftService';
+import { ebayDraftErrorResponse, isEbayDraftError } from '@/lib/ebay/draftErrors';
 import { logger } from '@/lib/logger';
 import { ScheduleError, scheduleErrorResponse, setDraftScheduledSendAt } from '@/lib/drafts/scheduledSend';
 import { withLegacyLastSyncError } from '@/lib/drafts/syncErrors';
@@ -21,8 +22,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           syncAttempts: { orderBy: { startedAt: 'desc' }, take: 10 },
         },
       });
-      if (!draft) return res.status(404).json({ error: 'Draft not found' });
-      return res.status(200).json({ draft: toSerializable(draft ? withLegacyLastSyncError(draft as any) : draft) });
+      if (!draft) return res.status(404).json({ error: 'Draft not found', code: 'DRAFT_NOT_FOUND', key: 'draftSync.draftNotFound' });
+      return res.status(200).json({ draft: toSerializable(withLegacyLastSyncError(draft as any)) });
+    }
+
+    // PATCH { removeQueuedActions: string[] } (listing-editor §6.3 banners, parity with
+    // Etsy): un-queue `delete` / `publish` / `withdraw` / `copy`. Never syncs.
+    if (req.method === 'PATCH' && req.body && Array.isArray(req.body.removeQueuedActions)) {
+      const types = (req.body.removeQueuedActions as unknown[]).filter((t): t is string => typeof t === 'string');
+      const draft = await removeQueuedActions(id, user.id, types);
+      return res.status(200).json({ draft: toSerializable(draft) });
     }
 
     // PATCH { scheduledSendAt: string|null } (additive, listings-grid §9.4):
@@ -51,7 +60,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err: any) {
-    logger.error('eBay draft [id] request failed', err, { userId: user.id, draftId: id });
-    return res.status(500).json({ error: err.message || 'Draft request failed' });
+    if (!isEbayDraftError(err)) logger.error('eBay draft [id] request failed', err, { userId: user.id, draftId: id });
+    const { status, body } = ebayDraftErrorResponse(err, 'Draft request failed');
+    return res.status(status).json(body);
   }
 }

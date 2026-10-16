@@ -67,7 +67,9 @@ export function buttonSizeSx(size: ControlSize) {
   return {
     minHeight: control[size],
     ...(size === 'xl' ? { padding: '0 20px', fontSize: 14 } : null),
-    [COARSE]: { minHeight: Math.max(control[size], control.lg) },
+    // Touch: sm stays compact (36px) with an invisible 44px hit area — growing every small button to 44px made phone
+    // cards and panels loose. md and up still grow to 44px (primary actions, footers).
+    [COARSE]: size === 'sm' ? { minHeight: 36, ...hitSlopAfter } : { minHeight: Math.max(control[size], control.lg) },
   };
 }
 

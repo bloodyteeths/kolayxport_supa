@@ -86,7 +86,7 @@ export function SavedViews({ views, activeId, onSelect, onSave, onDelete, varian
                 border: `1px solid ${on ? neutral[900] : neutral[200]}`,
                 bgcolor: on ? neutral[0] : neutral[100],
                 color: on ? neutral[900] : neutral[600],
-                '@media (pointer: coarse)': { height: control.lg },
+                '@media (pointer: coarse)': { height: 36 }, // view chips: 36px on touch (44px chips doubled the toolbar height)
               }}
             >
               {v.label}
@@ -174,7 +174,7 @@ export function SavedViews({ views, activeId, onSelect, onSave, onDelete, varian
           flexShrink: 0,
           '&:hover': { bgcolor: neutral[50] },
           '&.Mui-focusVisible': { boxShadow: focusRing },
-          '@media (pointer: coarse)': { height: control.lg },
+          '@media (pointer: coarse)': { height: 36 }, // view chips: 36px on touch (44px chips doubled the toolbar height)
         }}
       >
         <Box component="span" sx={{ color: neutral[500] }}>

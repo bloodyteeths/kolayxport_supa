@@ -175,7 +175,7 @@ function OrderTitle({ row, t, isNew, newLabel }: { row: OrderRow; t: OrdersT; is
   return (
     <Typography
       component="span"
-      sx={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: neutral[900], display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+      sx={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: neutral[900], display: '-webkit-box', WebkitLineClamp: { xs: 2, md: 1 }, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
       title={title}
     >
       {title}
@@ -324,8 +324,12 @@ export function orderColumns(t: OrdersT, ctx: OrderColumnsContext): Column<Order
       width: 148,
       mobile: 'status',
       render: (r) => <StatusCell row={r} t={t} ctx={ctx} />,
+      // Phone cards: a plain "To ship" pill next to a "Create label" button says the same thing twice and pushes the
+      // button onto its own row; keep pills that add information (overdue, problem, shipped…).
       mobileRender: (r) =>
-        r.status.domain === 'label' ? <StatusPill domain="label" status="label_failed" raw={r.status.raw || null} /> : <StatusPill domain="order" status={r.status.key} raw={r.status.raw || null} />,
+        r.status.domain === 'label' ? <StatusPill domain="label" status="label_failed" raw={r.status.raw || null} />
+          : r.status.key === 'to_ship' && isLabelable(r) ? null
+          : <StatusPill domain="order" status={r.status.key} raw={r.status.raw || null} />,
     },
     {
       key: 'shipBy',

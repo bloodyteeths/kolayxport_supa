@@ -273,9 +273,13 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
   useLimitDialogOptOut();
 
   // ── URL state + data ─────────────────────────────────────────────────────────────────────────────────
+  const { user } = useAuth() as { user?: { id?: string } | null };
+  const userId = user?.id ?? null;
+
   const [url, setUrl] = useUrlState(LISTINGS_URL_SCHEMA);
   const query = React.useMemo(() => toListingsQuery(url, config), [url, config]);
-  const list = useListings(query);
+  // Rows from this viewer's last visit paint at once (dimmed, "Updating…") while the fresh list loads.
+  const list = useListings(query, { cacheScope: userId });
   const data = list.data;
   const rows = list.rows;
   const counts = data?.counts;
@@ -283,9 +287,6 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
   const storeName = data?.store.name ?? '';
   const storeCurrency = data?.store.currency ?? rows[0]?.price?.currency ?? 'USD';
   const activeView = activeViewOf(url, config);
-
-  const { user } = useAuth() as { user?: { id?: string } | null };
-  const userId = user?.id ?? null;
 
   const { data: settings } = useSWR<SettingsSlice>(SETTINGS_KEY, settingsFetcher, { revalidateOnFocus: false, dedupingInterval: 300_000 });
   const sub = settings?.subscription ?? null;
@@ -1159,7 +1160,8 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
           now={now}
           data-testid="listings-sync-meta"
         />
-        {FRESHNESS_CHIP[marketplace] && storeId ? <CacheFreshnessChip shopId={storeId} /> : null}
+        {/* Phones: one freshness line ("Refreshed … ago"), not two. */}
+        {FRESHNESS_CHIP[marketplace] && storeId && !mobile ? <CacheFreshnessChip shopId={storeId} /> : null}
       </Box>
     );
 
@@ -1294,6 +1296,7 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
         onClearAll={clearFilters}
         resultCount={knownTotal}
         updating={list.refetching}
+        filtered={filtered}
         views={views}
         activeView={activeView}
         onSelectView={selectView}
@@ -1339,7 +1342,8 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
         }}
         onRowOpen={openFromRow}
         onRowEdit={openEditor}
-        inlineAction={inlineAction}
+        // Cards: the whole card opens the editor, so no full-width "Edit" button per card (⋯ stays).
+        inlineAction={mobile ? () => null : inlineAction}
         rowActions={rowActions}
         onCellCommit={onCellCommit}
         dirtyCells={dirtyCells}
@@ -1357,6 +1361,9 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
         unscored={counts?.unscored}
         activeRowId={openId}
         ariaLabel={title}
+        mobileCountLabel={
+          list.refetching ? t('listings.toolbar.updating') : knownTotal !== undefined ? t('listings.toolbar.results', { count: knownTotal }) : undefined
+        }
       />
 
       {mobile && !selecting ? <SendChangesBar action={send.action} unsent={unsent} t={t} /> : null}

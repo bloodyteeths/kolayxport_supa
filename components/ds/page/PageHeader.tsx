@@ -154,9 +154,9 @@ export function PageHeader({
     ];
     const shellOwnsTitle = Boolean(page?.shellManaged);
     return (
-      <Box component="header" className={className} data-testid={testId} data-layout="mobile" sx={{ mb: '12px' }}>
+      <Box component="header" className={className} data-testid={testId} data-layout="mobile" sx={{ mb: '8px' }}>
         {shellOwnsTitle ? null : (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', minHeight: 44 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', minHeight: 40 }}>
             <Typography variant="titleMd" component="h1" noWrap sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center' }}>
               <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {title}
@@ -188,7 +188,7 @@ export function PageHeader({
           {backLabel ?? t('back')}
         </Link>
       ) : null}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', height: 56 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', minHeight: 48 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
           <Typography variant="titleLg" component="h1" noWrap sx={{ minWidth: 0 }}>
             {title}

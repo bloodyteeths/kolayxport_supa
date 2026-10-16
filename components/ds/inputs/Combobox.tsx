@@ -43,6 +43,8 @@ interface ComboboxBase extends DsBaseProps {
   minQueryLength?: number;
   /** Prefix match on the label instead of substring (long fixed lists). */
   matchFrom?: 'any' | 'start';
+  /** Hide the ✕ clear button (pickers that always hold a value: phone country, currency). Default false. */
+  disableClearable?: boolean;
   'aria-label'?: string;
 }
 
@@ -61,8 +63,8 @@ export type ComboboxProps = ComboboxSingleProps | ComboboxMultipleProps;
 export function Combobox(props: ComboboxProps) {
   const {
     options: staticOptions, loadOptions, creatable, renderOption, placeholder, size = 'md', id, invalid, disabled,
-    noOptionsText, debounceMs = 250, minQueryLength = 0, matchFrom = 'any', className, 'data-testid': testId,
-    'aria-label': ariaLabel,
+    noOptionsText, debounceMs = 250, minQueryLength = 0, matchFrom = 'any', disableClearable = false, className,
+    'data-testid': testId, 'aria-label': ariaLabel,
   } = props;
   const t = useTranslations('ds.inputs.combobox');
   const field = useFieldContext();
@@ -109,7 +111,7 @@ export function Combobox(props: ComboboxProps) {
   );
 
   return (
-    <Autocomplete<ComboboxOption, boolean, false, false>
+    <Autocomplete<ComboboxOption, boolean, boolean, false>
       multiple={multiple}
       value={props.value as never}
       onChange={(_, v) => {
@@ -143,6 +145,7 @@ export function Combobox(props: ComboboxProps) {
       loadingText={t('loading')}
       noOptionsText={loadFailed ? t('loadFailed') : noOptionsText ?? t('noResults')}
       disabled={disabled}
+      disableClearable={disableClearable}
       popupIcon={<IconDisclose size={16} strokeWidth={ICON_STROKE} aria-hidden />}
       clearIcon={<IconClose size={14} strokeWidth={ICON_STROKE} aria-hidden />}
       clearText={t('clear')}
@@ -192,17 +195,22 @@ export function Combobox(props: ComboboxProps) {
           }}
           sx={{
             ...outlinedInputSx(size),
-            // Only multi-select wraps (chips). A single value must stay on one line: wrapping + minWidth 80
-            // pushed the chevron onto a second row in narrow pickers (phone country code).
+            // Single: one line, always (the chevron must never wrap under the value: "+90", "₺ TRY").
+            // Multi: tags wrap; the indicators stay on the first line.
             flexWrap: multiple ? 'wrap' : 'nowrap',
             gap: '2px',
             pr: '8px !important',
-            '& .MuiOutlinedInput-input': { ...outlinedInputSx(size)['& .MuiOutlinedInput-input'], flex: 1, minWidth: multiple ? 80 : 0 },
+            '& .MuiOutlinedInput-input': {
+              ...outlinedInputSx(size)['& .MuiOutlinedInput-input'],
+              flex: 1,
+              minWidth: multiple ? 80 : 0,
+              textOverflow: 'ellipsis',
+            },
           }}
         />
       )}
       sx={{
-        '& .MuiAutocomplete-endAdornment': { position: 'static', transform: 'none' },
+        '& .MuiAutocomplete-endAdornment': { position: 'static', transform: 'none', flexShrink: 0, alignSelf: 'center' },
         '& .MuiAutocomplete-groupLabel': { fontSize: typeScale.caption[0], fontWeight: 500, color: neutral[500] },
       }}
     />

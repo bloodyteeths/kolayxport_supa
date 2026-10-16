@@ -228,6 +228,15 @@ function extraText(row: ListingRow, key: ListingColumnKey): string | number | nu
   return v;
 }
 
+/**
+ * Native hover text with the full title for the 2-line clamped title cell. Omitted when the cell already has the
+ * "On Etsy: …" draft tooltip (two tooltips would stack).
+ */
+export function fullTitleHint(row: ListingRow, ctx: Pick<ListingCellContext, 'overlays'>): string | undefined {
+  if (row.sync?.draft.title !== undefined && row.sync.draft.title !== row.title) return undefined;
+  return displayTitle(row, ctx.overlays) || undefined;
+}
+
 // ─── Builder ────────────────────────────────────────────────────────────────
 
 /**
@@ -241,6 +250,8 @@ export function listingColumns(t: ListingsT, ctx: ListingCellContext): Column<Li
   const cols: Column<ListingRow>[] = [];
 
   const hideable = (key: ListingColumnKey) => ({ hideable: true, defaultHidden: hidden.has(key) });
+  const hasChanges = ctx.config.columns.includes('changes');
+  const healthOnCard = ctx.config.columns.includes('health') && ctx.config.columns.includes('listing');
 
   for (const key of ctx.config.columns) {
     switch (key) {
@@ -259,7 +270,7 @@ export function listingColumns(t: ListingsT, ctx: ListingCellContext): Column<Li
           mobile: 'title',
           render: (r) => (
             <Box sx={{ minWidth: 0 }}>
-              <Box component="span" sx={{ ...clamp2, fontWeight: 500 }} data-testid="listing-title">
+              <Box component="span" sx={{ ...clamp2, fontWeight: 500 }} data-testid="listing-title" title={fullTitleHint(r, ctx)}>
                 {displayTitle(r, ctx.overlays)}
               </Box>
               <MetaLine row={r} />
@@ -267,23 +278,33 @@ export function listingColumns(t: ListingsT, ctx: ListingCellContext): Column<Li
             </Box>
           ),
           mobileRender: (r) => (
-            <Box component="span" sx={clamp2}>
+            <Box component="span" sx={clamp2} title={fullTitleHint(r, ctx)}>
               {displayTitle(r, ctx.overlays)}
             </Box>
           ),
           cellTooltip: (r) => (r.sync?.draft.title !== undefined && r.sync.draft.title !== r.title ? onMp(r.title) : null),
         });
-        // Card-only second line: "ID 1490012234 · BB-PINK" (+ "Will be deleted on send").
+        // Card-only second line: "ID 1490012234 · BB-PINK · ▪▪▪▪ 75" (+ "Will be deleted on send"). The health
+        // meter rides on this line so a card is three short lines (title, meta, price + status), not four.
         cols.push({
           key: 'listingMeta',
           header: t('listings.col.listing'),
           desktop: false,
           mobile: 'subtitle',
           render: (r) => (
-            <>
-              <MetaLine row={r} />
+            <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexWrap: 'wrap' }}>
+              {r.metaLine.length ? (
+                <Box component="span" sx={{ minWidth: 0, flex: '0 1 auto', overflow: 'hidden' }}>
+                  <MetaLine row={r} />
+                </Box>
+              ) : null}
+              {healthOnCard ? (
+                <Box component="span" sx={{ display: 'inline-flex', flexShrink: 0 }} data-testid="listing-card-health">
+                  <HealthCell row={r} />
+                </Box>
+              ) : null}
               <WillDelete row={r} t={t} kind={ctx.removalKind ?? 'delete'} />
-            </>
+            </Box>
           ),
         });
         break;
@@ -345,9 +366,19 @@ export function listingColumns(t: ListingsT, ctx: ListingCellContext): Column<Li
           key,
           header: t('listings.col.status'),
           type: 'status',
-          width: 112,
+          // Listing pill with the change pill under it (one column instead of two, so the grid fits 1024–1440px
+          // without scrolling sideways and both pills stay readable).
+          width: hasChanges ? 140 : 112,
           mobile: 'status',
           value: (r) => ({ domain: 'listing', status: r.status, raw: r.statusNote ?? r.statusRaw }),
+          render: hasChanges
+            ? (r) => (
+                <Box component="span" sx={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
+                  <StatusPill domain="listing" status={r.status} raw={r.statusNote ?? r.statusRaw} />
+                  <SyncCell row={r} t={t} ctx={ctx} />
+                </Box>
+              )
+            : undefined,
           mobileRender: (r) => (
             <Box component="span" sx={{ display: 'inline-flex', gap: '6px', flexWrap: 'wrap' }}>
               <StatusPill domain="listing" status={r.status} raw={r.statusNote ?? r.statusRaw} />
@@ -357,7 +388,9 @@ export function listingColumns(t: ListingsT, ctx: ListingCellContext): Column<Li
         });
         break;
       case 'changes':
-        cols.push({ key, header: t('listings.col.changes'), width: 120, mobile: 'hidden', render: (r) => <SyncCell row={r} t={t} ctx={ctx} /> });
+        // Shown inside the status cell (desktop) and next to the status pill (cards); kept as a key so configs and
+        // saved column state stay valid.
+        cols.push({ key, header: t('listings.col.changes'), width: 120, desktop: false, mobile: 'hidden', render: (r) => <SyncCell row={r} t={t} ctx={ctx} /> });
         break;
       case 'health':
         cols.push({
@@ -367,7 +400,8 @@ export function listingColumns(t: ListingsT, ctx: ListingCellContext): Column<Li
           width: 96,
           align: 'right',
           sortable: true,
-          mobile: 'meta',
+          // Cards show it on the meta line (listingMeta) when the listing column is there.
+          mobile: healthOnCard ? 'hidden' : 'meta',
           value: (r) => r.health.score,
           render: (r) => <HealthCell row={r} />,
         });

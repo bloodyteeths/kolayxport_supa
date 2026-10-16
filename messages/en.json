@@ -13550,7 +13550,8 @@
       "reconnect": "{marketplace} needs to be reconnected to refresh or send changes",
       "reconnectCta": "Reconnect {marketplace}",
       "couldntCheck": "Couldn't check {marketplace}",
-      "retry": "Retry"
+      "retry": "Retry",
+      "failedFix": "{count, plural, one {# listing wasn't} other {# listings weren't}} sent {to}. Fix them and send again."
     },
     "meta": {
       "refreshed": "Refreshed from {from} {ago}",

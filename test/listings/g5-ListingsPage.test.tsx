@@ -188,7 +188,7 @@ describe('ListingsPage (Etsy, desktop)', () => {
     const header = screen.getByTestId('listings-header');
     expect(within(header).getByText('Etsy listings')).toBeTruthy();
     expect(within(header).getByRole('button', { name: /Send 3 changes to Etsy/ })).toBeTruthy();
-    expect(screen.getByTestId('listings-failure-banner').textContent).toContain('1 changed on Etsy since your draft.');
+    expect(screen.getByTestId('listings-failure-banner').textContent).toContain('Fix them and send again.');
     expect(screen.getByTestId('listings-sync-meta')).toBeTruthy();
     expect(screen.getByTestId('freshness-chip')).toBeTruthy();
     // No "Sync" wording anywhere (listings-grid §15).

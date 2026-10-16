@@ -13550,7 +13550,8 @@
       "reconnect": "Yenilemek ve değişiklik göndermek için {marketplace} yeniden bağlanmalı",
       "reconnectCta": "{marketplace} hesabını yeniden bağla",
       "couldntCheck": "{marketplace} bağlantısı kontrol edilemedi",
-      "retry": "Yeniden dene"
+      "retry": "Yeniden dene",
+      "failedFix": "{count} ilan {to} gönderilemedi. Düzeltip tekrar gönderin."
     },
     "meta": {
       "refreshed": "{from} {ago} yenilendi",

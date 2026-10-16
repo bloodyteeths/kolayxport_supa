@@ -1,6 +1,6 @@
 import React from 'react';
 import Box from '@mui/material/Box';
-import { neutral as n } from '@/lib/ds/tokens';
+import { layout, neutral as n } from '@/lib/ds/tokens';
 import { ActionButton, type ActionSpec } from './actions';
 
 export interface SidePanelSectionProps {
@@ -15,7 +15,7 @@ export interface SidePanelSectionProps {
   'data-testid'?: string;
 }
 
-/** DS §3.5 panel body section: title 14/600, optional right action, 20px padding, 1px neutral-100 rule. */
+/** DS §3.5 panel body section: title 14/600, optional right action, 16px padding (density pass), 1px neutral-100 rule. */
 export function SidePanelSection({ id, title, description, action, children, className, ...rest }: SidePanelSectionProps) {
   const headingId = `${id}-title`;
   return (
@@ -25,9 +25,9 @@ export function SidePanelSection({ id, title, description, action, children, cla
       aria-labelledby={headingId}
       className={className}
       data-testid={rest['data-testid'] ?? `panel-section-${id}`}
-      sx={{ p: '20px', scrollMarginTop: '56px', '& + &': { borderTop: `1px solid ${n[100]}` } }}
+      sx={{ p: `${layout.panelPad}px`, scrollMarginTop: '56px', '& + &': { borderTop: `1px solid ${n[100]}` } }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', minHeight: 24, mb: children ? '12px' : 0 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', minHeight: 24, mb: children ? '8px' : 0 }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Box id={headingId} component="h3" sx={{ m: 0, fontSize: 14, lineHeight: '20px', fontWeight: 600, color: n[900] }}>
             {title}

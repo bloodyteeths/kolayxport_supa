@@ -19,11 +19,13 @@ export interface CurrencySelectProps extends DsBaseProps {
   id?: string;
   invalid?: boolean;
   disabled?: boolean;
+  /** Hide the ✕ (the field always holds a currency). Default false. */
+  disableClearable?: boolean;
   'aria-label'?: string;
 }
 
 export function CurrencySelect({
-  value, onChange, defaultCurrency, currencies, placeholder, size = 'md', id, invalid, disabled, className,
+  value, onChange, defaultCurrency, currencies, placeholder, size = 'md', id, invalid, disabled, disableClearable, className,
   'data-testid': testId, 'aria-label': ariaLabel,
 }: CurrencySelectProps) {
   const locale = useIntlLocale();
@@ -48,6 +50,7 @@ export function CurrencySelect({
       id={id}
       invalid={invalid}
       disabled={disabled}
+      disableClearable={disableClearable}
       className={className}
       data-testid={testId}
       aria-label={ariaLabel}

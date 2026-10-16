@@ -23,7 +23,7 @@ export interface SplitButtonProps extends DsBaseProps {
   menuLabel?: string;
 }
 
-const MUI_SIZE = { sm: 'small', md: 'medium', lg: 'large', xl: 'large' } as const;
+const MUI_SIZE = { xs: 'small', sm: 'small', md: 'medium', lg: 'large', xl: 'large' } as const;
 
 export function SplitButton({ primary, options, variant = 'primary', size = 'md', menuLabel, className, 'data-testid': testId }: SplitButtonProps) {
   const t = useTranslations('ds.inputs');

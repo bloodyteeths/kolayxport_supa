@@ -5,7 +5,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Box from '@mui/material/Box';
 import NextLink from 'next/link';
 import { control, neutral, tone, accent, radius } from '@/lib/ds/tokens';
-import { COARSE } from './_shared';
+import { COARSE, hitSlopAfter } from './_shared';
 import { ICON_STROKE, type LucideIcon } from './_icons';
 import type { DsBaseProps } from './types';
 
@@ -13,7 +13,8 @@ export interface IconButtonProps extends DsBaseProps {
   icon: LucideIcon;
   /** Required: aria-label and tooltip text. */
   label: string;
-  size?: 'sm' | 'md' | 'lg';
+  /** xs 28 (dense rows: stays 28 on touch with a 44 hit slop) · sm 32 (default) · md 40 · lg 44. */
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   variant?: 'ghost' | 'secondary';
   tone?: 'default' | 'danger';
   /** Shown in the tooltip, e.g. "⌘K" or "j". */
@@ -35,7 +36,7 @@ export interface IconButtonProps extends DsBaseProps {
   type?: 'button' | 'submit';
 }
 
-const ICON_PX = { sm: 16, md: 18, lg: 20 } as const;
+const ICON_PX = { xs: 14, sm: 16, md: 18, lg: 20 } as const;
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
   {
@@ -76,7 +77,9 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
         ...(pressed ? { backgroundColor: accent[50], color: accent[700] } : null),
         '&:hover': { backgroundColor: btnTone === 'danger' ? tone.danger.bg : neutral[50], color: btnTone === 'danger' ? tone.danger.fg : neutral[800] },
         '&.Mui-disabled': { color: neutral[400] },
-        [COARSE]: { width: Math.max(px, control.lg), height: Math.max(px, control.lg) },
+        [COARSE]: size === 'xs'
+          ? hitSlopAfter
+          : { width: Math.max(px, control.lg), height: Math.max(px, control.lg) },
       }}
     >
       <Icon size={ICON_PX[size]} strokeWidth={ICON_STROKE} aria-hidden />

@@ -13506,7 +13506,8 @@
       "copyToShop": "Başka mağazaya kopyala…",
       "copyToEtsy": "Etsy'ye kopyala",
       "unarchive": "Arşivden çıkar",
-      "unarchiveNeedsAlone": "Arşivden çıkarmadan önce bu ürünün diğer değişikliklerini gönderin ya da atın"
+      "unarchiveNeedsAlone": "Arşivden çıkarmadan önce bu ürünün diğer değişikliklerini gönderin ya da atın",
+      "viewOnShort": "{marketplace} sayfası ↗"
     },
     "bulk": {
       "skippedRemovals": "{kind, select, archive {{count} ilan atlandı: gönderildiğinde arşivlenecekler} other {{count} ilan atlandı: gönderildiğinde silinecekler}}",
@@ -14148,7 +14149,10 @@
       "connectTitle": "İlanlarınızı düzenlemek için Etsy'yi bağlayın",
       "connectBody": "Mağazanız bağlandığında ilanlarınız, fotoğraflarınız ve taslaklarınız burada görünür.",
       "crosslistFailed": "Kopyalanacak Etsy ilanı yüklenemedi",
-      "crosslistEbayFailed": "Kopyalanacak eBay ilanı yüklenemedi"
+      "crosslistEbayFailed": "Kopyalanacak eBay ilanı yüklenemedi",
+      "ebayLegacyTitle": "Bu ilan doğrudan eBay'de oluşturulmuş",
+      "ebayLegacyBody": "eBay, kendi sitesinde oluşturulan ilanların uygulamalardan düzenlenmesine henüz izin vermiyor. İlanı eBay'de düzenleyin; siparişleri ve stoğu burada görünmeye devam eder.",
+      "ebayLegacyAction": "eBay'de düzenle"
     },
     "createdOnSend": "Bu ilanı gönderdiğinizde Etsy'de oluşturulur",
     "stageFailed": "Kaydedilemedi. Tekrar deneyin",

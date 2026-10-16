@@ -13506,7 +13506,8 @@
       "copyToShop": "Copy to another shop…",
       "copyToEtsy": "Copy to Etsy",
       "unarchive": "Unarchive",
-      "unarchiveNeedsAlone": "Send or discard the other changes on this product before unarchiving it"
+      "unarchiveNeedsAlone": "Send or discard the other changes on this product before unarchiving it",
+      "viewOnShort": "View on {marketplace} ↗"
     },
     "bulk": {
       "skippedRemovals": "{kind, select, archive {{count, plural, one {# listing} other {# listings}} skipped: they will be archived on send} other {{count, plural, one {# listing} other {# listings}} skipped: they will be deleted on send}}",
@@ -14148,7 +14149,10 @@
       "connectTitle": "Connect Etsy to edit your listings",
       "connectBody": "Your listings, photos and drafts appear here once your shop is connected.",
       "crosslistFailed": "Couldn't load the Etsy listing to copy",
-      "crosslistEbayFailed": "Couldn't load the eBay listing to copy"
+      "crosslistEbayFailed": "Couldn't load the eBay listing to copy",
+      "ebayLegacyTitle": "This listing was created directly on eBay",
+      "ebayLegacyBody": "eBay doesn't let apps edit listings made on eBay's own site yet. Edit it on eBay; its orders and stock still show here.",
+      "ebayLegacyAction": "Edit on eBay"
     },
     "createdOnSend": "It's created on Etsy when you send this listing",
     "stageFailed": "Couldn't save this. Try again",

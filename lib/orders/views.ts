@@ -101,12 +101,14 @@ export const OPEN_STATUS_SQL = `${NORMALIZED_STATUS_SQL} NOT IN (${sqlList(CLOSE
  * direct sync rows[0]['fulfillment-channel'] AFN|AMAZON; Veeqo channel.name ~ FBA,
  * channel.with_fba, channel.type_code 'amazon_fba'. Never NULL.
  */
-export const FBA_SQL = `COALESCE(LOWER(o."marketplace") = 'amazon' AND (
+export const FBA_SQL = `(CASE WHEN LOWER(o."marketplace") = 'amazon' THEN COALESCE(
     UPPER(COALESCE(o."rawData"->'rows'->0->>'fulfillment-channel', '')) IN ('AFN', 'AMAZON')
     OR COALESCE(o."rawData"->'channel'->>'name', '') ILIKE '%fba%'
     OR COALESCE(o."rawData"->'channel'->>'with_fba', '') = 'true'
     OR COALESCE(o."rawData"->'channel'->>'type_code', '') = 'amazon_fba'
-  ), false)`;
+  , false) ELSE false END)`;
+// CASE (not AND): Postgres may evaluate both sides of an AND, so every non-Amazon order had its large rawData
+// de-TOASTed for the FBA test — ~2 s of the 5.4 s view-counts query. CASE only reads rawData for Amazon rows.
 
 /**
  * A label exists (orders.md §4.2 rule 6): Order tracking number / label URL /
@@ -481,7 +483,9 @@ export const SHIPPED_VIEW_SQL = `(${LISTED_ORDER_SQL} AND (${rawIn('shipped')} O
 export const PROBLEMS_SQL = `(${LISTED_ORDER_SQL} AND ${OPEN_STATUS_SQL} AND NOT ${FBA_SQL} AND (
     ${LABEL_FAILED_SQL}
     OR ${TRACKING_PUSH_FAILED_SQL}
-    OR (${TO_SHIP_SQL} AND ${ADDRESS_INCOMPLETE_SQL})
+    /* CASE, not AND: Postgres may evaluate both sides, and the address test de-TOASTs rawData (about 2.6 s
+       over every order). Only orders still to ship get the address test. */
+    OR (CASE WHEN ${TO_SHIP_SQL} THEN ${ADDRESS_INCOMPLETE_SQL} ELSE false END)
   ))`;
 
 /** WHERE fragment (over alias `o`, no params) for a built-in view. `all` = what the API lists anyway. */
@@ -561,6 +565,17 @@ export const VIEW_COUNTS_SQL = `SELECT
     COUNT(*) FILTER (WHERE ${PROBLEMS_SQL}) AS "problems"
   FROM "Order" o
   WHERE o."userId" = $1 AND ${LISTED_ORDER_SQL}`;
+
+/**
+ * The same four counts as separate queries (`$1` = userId), run in parallel by the API. One FILTER query made
+ * Postgres re-read (de-TOAST) rawData for every FILTER expression: ~5 s for 6.8k orders; separately ≤ 0.7 s.
+ */
+export const VIEW_COUNT_QUERIES: Record<'to_ship' | 'overdue' | 'label_created' | 'problems', string> = {
+  to_ship: `SELECT COUNT(*) AS "n" FROM "Order" o WHERE o."userId" = $1 AND ${LISTED_ORDER_SQL} AND ${TO_SHIP_SQL}`,
+  overdue: `SELECT COUNT(*) AS "n" FROM "Order" o WHERE o."userId" = $1 AND ${LISTED_ORDER_SQL} AND ${TO_SHIP_SQL} AND ${OVERDUE_SQL}`,
+  label_created: `SELECT COUNT(*) AS "n" FROM "Order" o WHERE o."userId" = $1 AND ${LISTED_ORDER_SQL} AND ${LABEL_CREATED_SQL}`,
+  problems: `SELECT COUNT(*) AS "n" FROM "Order" o WHERE o."userId" = $1 AND ${LISTED_ORDER_SQL} AND ${PROBLEMS_SQL}`,
+};
 
 /**
  * Cheap change marker for the view-counts cache (`$1` = userId): one row `{ fp: text }`. It changes

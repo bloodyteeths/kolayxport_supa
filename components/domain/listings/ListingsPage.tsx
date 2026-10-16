@@ -371,6 +371,7 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
       removalKind,
       optionLabels,
       stockManagedIds,
+      externalUrl: config.externalUrl,
     }),
     [config, mpName, staged.overlays, staged.sendingIds, formatMoney, errorText, storeCurrency, removalKind, optionLabels, stockManagedIds],
   );

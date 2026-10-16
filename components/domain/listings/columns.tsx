@@ -25,6 +25,8 @@ export type ListingCellContext = {
   config: Pick<ListingsConfig, 'marketplace' | 'inlineEdit' | 'validation' | 'columns' | 'hiddenByDefault'>;
   /** Proper noun ("Etsy"). */
   marketplaceName: string;
+  /** Public listing page on the marketplace (the visible "View on Etsy ↗" link next to the ID). */
+  externalUrl?: (r: ListingRow) => string | null | undefined;
   /** Local optimistic overlays per listing id (useStagedChanges). */
   overlays: ReadonlyMap<string, ListingDraftOverlay>;
   /** Listing ids being sent from this tab. */
@@ -244,6 +246,26 @@ export function fullTitleHint(row: ListingRow, ctx: Pick<ListingCellContext, 'ov
  * Card roles (§6.5): media = thumb · title = listing · subtitle = meta line (card-only) · trailing = price +
  * stock · status = listing pill + sync pill · meta = health.
  */
+/** Visible "View on Etsy ↗" link (users looked for the old "View" link; it was only inside ⋯). */
+function ViewOnLink({ row, t, ctx }: { row: ListingRow; t: ListingsT; ctx: ListingCellContext }) {
+  const href = ctx.externalUrl?.(row);
+  if (!href) return null;
+  return (
+    <Box
+      component="a"
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      data-row-stop="true"
+      onClick={(e: React.MouseEvent) => e.stopPropagation()}
+      sx={{ fontSize: 12, lineHeight: '16px', color: 'primary.main', textDecoration: 'none', whiteSpace: 'nowrap', '&:hover': { textDecoration: 'underline' } }}
+      data-testid="listing-view-on"
+    >
+      {t('listings.action.viewOnShort', { marketplace: ctx.marketplaceName })}
+    </Box>
+  );
+}
+
 export function listingColumns(t: ListingsT, ctx: ListingCellContext): Column<ListingRow>[] {
   const onMp = (value: string) => t('listings.cell.onMarketplace', { marketplace: ctx.marketplaceName, value });
   const hidden = new Set(ctx.config.hiddenByDefault);
@@ -273,7 +295,10 @@ export function listingColumns(t: ListingsT, ctx: ListingCellContext): Column<Li
               <Box component="span" sx={{ ...clamp2, fontWeight: 500 }} data-testid="listing-title" title={fullTitleHint(r, ctx)}>
                 {displayTitle(r, ctx.overlays)}
               </Box>
-              <MetaLine row={r} />
+              <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                <MetaLine row={r} />
+                <ViewOnLink row={r} t={t} ctx={ctx} />
+              </Box>
               <WillDelete row={r} t={t} kind={ctx.removalKind ?? 'delete'} />
             </Box>
           ),
@@ -298,6 +323,7 @@ export function listingColumns(t: ListingsT, ctx: ListingCellContext): Column<Li
                   <MetaLine row={r} />
                 </Box>
               ) : null}
+              <ViewOnLink row={r} t={t} ctx={ctx} />
               {healthOnCard ? (
                 <Box component="span" sx={{ display: 'inline-flex', flexShrink: 0 }} data-testid="listing-card-health">
                   <HealthCell row={r} />

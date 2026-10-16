@@ -384,9 +384,11 @@ export function OrdersPage({ now }: OrdersPageProps = {}) {
     },
   };
   // With a selection the header primary demotes (the bulk bar owns the primary).
-  const headerPrimary = primaryKind === 'createLabels' ? createLabelsAction : primaryKind === 'addManualOrder' ? manualAction : undefined;
+  // Phones: "Add manual order" is rare — it lives in ⋯, never as a sticky full-width bar over the list.
+  const manualInOverflow = primaryKind === 'createLabels' || primaryKind === 'none' || (mobile && primaryKind === 'addManualOrder');
+  const headerPrimary = primaryKind === 'createLabels' ? createLabelsAction : primaryKind === 'addManualOrder' && !mobile ? manualAction : undefined;
   const headerOverflow: ActionSpec[] = [
-    ...(primaryKind === 'createLabels' || primaryKind === 'none' ? [manualAction] : []),
+    ...(manualInOverflow ? [manualAction] : []),
     pickListAction,
     { id: 'refreshOrders', label: t('actions.refresh'), icon: icons.pull, onClick: () => void pull(), disabled: list.pulling },
   ];

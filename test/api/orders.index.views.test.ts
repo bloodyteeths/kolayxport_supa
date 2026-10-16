@@ -18,7 +18,7 @@ vi.mock('@/lib/auth', () => ({ getAuthUser: async () => ({ id: 'u1' }) }));
 
 import handler, { clearViewCountsCache, partitionStatusValues, MAX_ORDERS_PAGE_SIZE } from '../../pages/api/orders/index';
 import manualHandler, { DUPLICATE_ORDER_NUMBER } from '../../pages/api/orders/manual';
-import { VIEW_COUNTS_SQL, VIEW_COUNTS_FINGERPRINT_SQL, TO_SHIP_SQL, PROBLEMS_SQL, EFFECTIVE_SHIP_BY_SQL } from '../../lib/orders/views';
+import { VIEW_COUNT_QUERIES, VIEW_COUNTS_FINGERPRINT_SQL, TO_SHIP_SQL, PROBLEMS_SQL, EFFECTIVE_SHIP_BY_SQL } from '../../lib/orders/views';
 
 function res() {
   const r: any = { statusCode: 0, body: undefined, setHeader: vi.fn() };
@@ -47,7 +47,11 @@ beforeEach(() => {
   queryRaw.mockImplementation(async (sql: string) => {
     const s = String(sql);
     if (s === VIEW_COUNTS_FINGERPRINT_SQL) return [{ fp: fingerprint }];
-    if (s === VIEW_COUNTS_SQL) return [{ to_ship: BigInt(12), overdue: '3', label_created: 4, problems: 1 }];
+    // Four parallel count queries (one per view).
+    if (s === VIEW_COUNT_QUERIES.to_ship) return [{ n: BigInt(12) }];
+    if (s === VIEW_COUNT_QUERIES.overdue) return [{ n: '3' }];
+    if (s === VIEW_COUNT_QUERIES.label_created) return [{ n: 4 }];
+    if (s === VIEW_COUNT_QUERIES.problems) return [{ n: 1 }];
     if (s.includes('COUNT(*) as total')) return [{ total: '1' }];
     if (s.includes('LIMIT $')) return [ORDER_ROW];
     if (s.includes('FROM "OrderItem" oi')) return [{ id: 'i1', orderId: 'o1', productName: 'P', labelJobStatus: 'failed', labelJobCreatedAt: new Date('2026-10-14T10:00:00Z'), labelJobError: 'Bad postal' }];
@@ -77,7 +81,7 @@ describe('/api/orders A1–A4', () => {
     expect(r.body.counts).toEqual({ to_ship: 12, overdue: 3, label_created: 4, problems: 1 });
     expect(r.body.lastPulledAt).toBe('2026-10-15T10:00:00.000Z');
     expect(r.body.etsyShopNames).toEqual(['BelleCoutureGifts']);
-    const countCalls = () => queryRaw.mock.calls.filter((c) => c[0] === VIEW_COUNTS_SQL);
+    const countCalls = () => queryRaw.mock.calls.filter((c) => c[0] === VIEW_COUNT_QUERIES.to_ship);
     expect(countCalls()).toHaveLength(1);
     expect(countCalls()[0].slice(1)).toEqual(['u1']);
     await run({ view: 'overdue', include: 'counts' });
@@ -85,7 +89,7 @@ describe('/api/orders A1–A4', () => {
   });
 
   it('a pull / label / live event changes the fingerprint and the next call recounts', async () => {
-    const countCalls = () => queryRaw.mock.calls.filter((c) => c[0] === VIEW_COUNTS_SQL);
+    const countCalls = () => queryRaw.mock.calls.filter((c) => c[0] === VIEW_COUNT_QUERIES.to_ship);
     await run({ view: 'to_ship', include: 'counts' });
     fingerprint = 'fp2';
     await run({ view: 'to_ship', include: 'counts' });
@@ -95,7 +99,7 @@ describe('/api/orders A1–A4', () => {
 
   it('no fingerprint (query failed) means no caching', async () => {
     fingerprint = null;
-    const countCalls = () => queryRaw.mock.calls.filter((c) => c[0] === VIEW_COUNTS_SQL);
+    const countCalls = () => queryRaw.mock.calls.filter((c) => c[0] === VIEW_COUNT_QUERIES.to_ship);
     await run({ view: 'to_ship', include: 'counts' });
     await run({ view: 'to_ship', include: 'counts' });
     expect(countCalls()).toHaveLength(2);
@@ -120,7 +124,7 @@ describe('/api/orders A1–A4', () => {
   it('a failing counts/lastPulled lookup never 500s', async () => {
     findUser.mockRejectedValue(new Error('db'));
     queryRaw.mockImplementation(async (sql: string) => {
-      if (sql === VIEW_COUNTS_SQL) throw new Error('timeout');
+      if (sql === VIEW_COUNT_QUERIES.to_ship) throw new Error('timeout');
       if (String(sql).includes('COUNT(*) as total')) return [{ total: '0' }];
       return [];
     });

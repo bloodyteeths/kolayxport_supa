@@ -1214,12 +1214,20 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
     body = slow ? <SlowState onRetry={() => router.reload()} /> : <EditorSkeleton />;
   } else if (engine.loadState === 'error') {
     const status = engine.loadError?.status ?? null;
-    const title = status === 404 ? t('state.notFound', mp) : t('state.loadFailed', mp);
-    const cause = status === 401 ? t('state.reconnect', mp) : undefined;
+    // eBay listings made on eBay's own site ("legacy-<itemId>") are refused with 409: say why and link to eBay's
+    // revise page instead of a generic "couldn't load" (every legacy eBay listing hit this).
+    const ebayLegacyId = marketplace === 'ebay' && status === 409 && props.listingId?.startsWith('legacy-') ? props.listingId.slice(7) : null;
+    const title = ebayLegacyId ? t('state.ebayLegacyTitle') : status === 404 ? t('state.notFound', mp) : t('state.loadFailed', mp);
+    const cause = ebayLegacyId ? t('state.ebayLegacyBody') : status === 401 ? t('state.reconnect', mp) : undefined;
     body = (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'flex-start' }}>
-        <ErrorState variant="page" title={title} cause={cause} onRetry={() => router.reload()} />
+        <ErrorState variant="page" title={title} cause={cause} onRetry={ebayLegacyId ? undefined : () => router.reload()} />
         <Box sx={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {ebayLegacyId ? (
+            <Button variant="primary" onClick={() => window.open(`https://www.ebay.com/sl/list?mode=ReviseItem&itemId=${encodeURIComponent(ebayLegacyId)}`, '_blank', 'noopener')}>
+              {t('state.ebayLegacyAction')}
+            </Button>
+          ) : null}
           {status === 401 ? (
             <Button variant="secondary" href="/ayarlar?tab=connections">
               {t('state.reconnectAction', mp)}

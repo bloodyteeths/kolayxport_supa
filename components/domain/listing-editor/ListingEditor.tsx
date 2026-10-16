@@ -429,7 +429,10 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
   // banner's "Remove delete"; the footer still sends it (with the type-to-confirm dialog).
   const formLocked = readOnly || queuedDelete;
   const count = changeCount(changes);
-  const hasWork = count > 0 || Boolean(draft);
+  // An open draft with no changes (e.g. after Undo) is not work: no Send/Discard, no "Not sent" pill. A failed,
+  // conflicted or sending draft still needs attention even when its change list is empty.
+  const draftNeedsAction = Boolean(draft) && ['failed', 'conflict', 'syncing'].includes(String((draft as { status?: unknown }).status ?? ''));
+  const hasWork = count > 0 || (mode === 'create' ? Boolean(draft) : draftNeedsAction);
 
   // ── navigation helpers ────────────────────────────────────────────────────────────────────────────────
   const scrollTo = React.useCallback((section: string, field?: string) => {
@@ -1063,7 +1066,8 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
   const rawSyncPill = draft ? syncStatus({ status: draftStatus, syncedAt: draft.syncedAt, updatedAt: draft.updatedAt }) : saveState === 'dirty' && mode === 'edit' && count > 0 ? 'pending' : null;
   // "N changes not sent" (a link to the list) says what the plain "Not sent yet" pill said, with the number.
   const showChanges = mode === 'edit' && count > 0;
-  const syncPill = showChanges && rawSyncPill === 'pending' ? null : rawSyncPill;
+  // An empty open draft has nothing to send: no "Not sent yet" pill.
+  const syncPill = (showChanges || (mode === 'edit' && count === 0)) && rawSyncPill === 'pending' ? null : rawSyncPill;
   const changesIndicator = showChanges ? (
     <ButtonBase
       onClick={(e) => setStatusAnchor(e.currentTarget)}

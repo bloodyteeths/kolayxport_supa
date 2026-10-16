@@ -338,11 +338,11 @@ export function DataTable<T>(props: DataTableProps<T>) {
             </Button>
           </Box>
         )}
-        <Box component="ul" aria-label={ariaLabel} sx={{ listStyle: 'none', m: 0, p: 0, display: 'flex', flexDirection: 'column', gap: px(space[2]) }}>
+        <Box component="ul" aria-label={ariaLabel} sx={{ listStyle: 'none', m: 0, p: 0, display: 'flex', flexDirection: 'column', ...surface, overflow: 'hidden', '& > li + li': { borderTop: `1px solid ${n[200]}` } }}>
           {state === 'loading'
             ? (showSkeleton
               ? Array.from({ length: 5 }, (_, i) => (
-                <Box component="li" key={i} sx={{ ...surface, p: px(space[3]), display: 'flex', gap: px(space[3]) }}>
+                <Box component="li" key={i} sx={{ px: px(space[3]), py: px(10), display: 'flex', gap: px(10) }}>
                   <Skeleton variant="rounded" width={64} height={64} />
                   <Box sx={{ flex: 1 }}><Skeleton width="80%" /><Skeleton width="50%" /><Skeleton width="30%" /></Box>
                 </Box>
@@ -364,11 +364,12 @@ export function DataTable<T>(props: DataTableProps<T>) {
                   tabIndex={onRowOpen ? 0 : undefined}
                   onClick={(e) => onRowClick(e, r)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget && onRowOpen) onRowOpen(r); }}
+                  // Mobile cards: one joined list (dividers, no floating boxes) and tight padding — founder: "full of whitespace".
                   sx={{
-                    ...surface,
-                    p: px(space[3]),
+                    px: px(space[3]),
+                    py: px(10),
                     display: 'flex',
-                    gap: px(space[3]),
+                    gap: px(10),
                     position: 'relative',
                     cursor: onRowOpen || selectMode ? 'pointer' : 'default',
                     ...(selected ? { bgcolor: accent[50], boxShadow: `inset 2px 0 0 ${accent[600]}` } : {}),
@@ -416,12 +417,18 @@ export function DataTable<T>(props: DataTableProps<T>) {
                         ))}
                       </Typography>
                     )}
-                    {(trailingCol || statusCol) && (
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: px(space[2]) }}>
+                    {(trailingCol || statusCol || ((actionCol || ia) && !selectMode)) && (
+                      // Price · status on the left, the main action on the right: one row, not three.
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: px(space[2]), flexWrap: 'wrap' }}>
                         <Typography variant="label" component="div" sx={{ color: n[900], fontVariantNumeric: 'tabular-nums' }}>
                           {trailingCol ? cell(trailingCol, r) : null}
                         </Typography>
                         {statusCol && <Box>{cell(statusCol, r)}</Box>}
+                        {(actionCol || ia) && !selectMode && (
+                          <Box data-row-stop="true" sx={{ ml: 'auto' }}>
+                            {actionCol ? cell(actionCol, r) : ia ? <InlineAction action={ia} size="md" /> : null}
+                          </Box>
+                        )}
                       </Box>
                     )}
                     {metas.length > 0 && (
@@ -433,11 +440,6 @@ export function DataTable<T>(props: DataTableProps<T>) {
                           </Box>
                         ))}
                       </Typography>
-                    )}
-                    {(actionCol || ia) && !selectMode && (
-                      <Box data-row-stop="true" sx={{ pt: px(space[1]) }}>
-                        {actionCol ? cell(actionCol, r) : ia ? <InlineAction action={ia} size="lg" /> : null}
-                      </Box>
                     )}
                   </Box>
                 </Box>

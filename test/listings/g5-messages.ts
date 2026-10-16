@@ -146,7 +146,7 @@ export const G5_EN = {
     cell: {
       priceFrom: 'from {price}',
       onMarketplace: 'On {marketplace}: {value}',
-      variationsReadOnly: 'Edit prices per variation in the editor',
+      variationsReadOnly: 'Has variations: change price and stock per variation in the editor',
       notTracked: 'Not tracked',
       notScored: 'Not scored yet · refresh to score',
       willDelete: 'Will be deleted on send',
@@ -434,7 +434,7 @@ export const G5_TR = {
     cell: {
       priceFrom: 'en az {price}',
       onMarketplace: '{marketplace} üzerinde: {value}',
-      variationsReadOnly: 'Fiyatları düzenleyicide varyasyon bazında değiştirin',
+      variationsReadOnly: 'Varyasyonlu ilan: fiyat ve adedi düzenleyicide varyasyon bazında değiştirin',
       notTracked: 'Takip edilmiyor',
       notScored: 'Henüz puanlanmadı · puanlamak için yenileyin',
       willDelete: 'Gönderildiğinde silinecek',

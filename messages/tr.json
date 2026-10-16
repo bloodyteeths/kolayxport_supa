@@ -13373,7 +13373,7 @@
       "removalQueued": "{kind, select, archive {Gönderildiğinde arşivlenecek. Düzenlemek için bu değişikliği atın} other {Gönderildiğinde silinecek. Düzenlemek için bu değişikliği atın}}",
       "priceFrom": "en az {price}",
       "onMarketplace": "{marketplace} üzerinde: {value}",
-      "variationsReadOnly": "Fiyatları düzenleyicide varyasyon bazında değiştirin",
+      "variationsReadOnly": "Varyasyonlu ilan: fiyat ve adedi düzenleyicide varyasyon bazında değiştirin",
       "notTracked": "Sınırsız",
       "notScored": "Henüz puanlanmadı · puanlamak için yenileyin",
       "willDelete": "Gönderildiğinde silinecek",

@@ -13373,7 +13373,7 @@
       "removalQueued": "{kind, select, archive {Will be archived on send. Discard that change to edit} other {Will be deleted on send. Discard that change to edit}}",
       "priceFrom": "from {price}",
       "onMarketplace": "On {marketplace}: {value}",
-      "variationsReadOnly": "Edit prices per variation in the editor",
+      "variationsReadOnly": "Has variations: change price and stock per variation in the editor",
       "notTracked": "Unlimited",
       "notScored": "Not scored yet · refresh to score",
       "willDelete": "Will be deleted on send",

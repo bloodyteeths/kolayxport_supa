@@ -309,7 +309,8 @@ function expandAddressSections() {
 }
 
 // Core extractor using REAL Etsy DOM structure with fallback selectors
-async function extract() {
+async function extract(opts) {
+  const force = !!(opts && opts.force);
   log.info('Starting order extraction');
 
   // First, try to expand any collapsed address sections
@@ -420,7 +421,7 @@ async function extract() {
       }
       
       // Skip if synced within last 24 hours
-      if (syncedMap[orderId] && (syncNow - syncedMap[orderId] < 24 * 60 * 60 * 1000)) {
+      if (!force && syncedMap[orderId] && (syncNow - syncedMap[orderId] < 24 * 60 * 60 * 1000)) {
         return; // Recently synced, skip
       }
       
@@ -645,6 +646,7 @@ async function extract() {
   if (batch.length > 0) {
     await pushBatch(batch);
   }
+  return batch.length;
 }
 
 // Message listener for popup communication
@@ -678,8 +680,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       
     case 'fullImport':
       log.info('Full import triggered');
-      performFullImport().then(() => {
-        sendResponse({ status: 'importing' });
+      // Manual import from the popup re-sends every order on the page (ignores
+      // the 24h "already sent" cache) and reports how many it sent.
+      performFullImport({ force: true }).then((sent) => {
+        sendResponse({ status: 'completed', sent: sent || 0 });
+      }).catch((error) => {
+        sendResponse({ status: 'error', error: error && error.message });
       });
       break;
       
@@ -720,7 +726,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // Bulk import function
-async function performFullImport() {
+async function performFullImport(opts) {
   log.info('Starting full import - scrolling to load all orders');
   
   // Scroll to load more orders
@@ -734,9 +740,10 @@ async function performFullImport() {
   await new Promise(r => setTimeout(r, 2000));
   
   // Extract all loaded orders
-  await extract();
+  const sent = await extract(opts);
   
   log.success('Full import completed');
+  return sent;
 }
 
 // Initialize

@@ -53,12 +53,14 @@
     </div>
 
     <div class="card" id="addressCard" style="display:none;">
-      <h3 class="card-title" data-i18n="addressTitle">Missing addresses</h3>
+      <h3 class="card-title" data-i18n="addressTitle">Etsy addresses</h3>
       <div class="setting-row">
         <span id="addressPendingLabel">—</span>
         <span id="addressPendingCount" class="status-badge">0</span>
       </div>
-      <button id="openNextAddress" class="btn btn-secondary full-width" style="margin-top:6px;" data-i18n="openNextOrder">Open next order</button>
+      <button id="importAllAddresses" class="btn btn-primary full-width" style="margin-top:6px;" data-i18n="importAllAddresses">Import all addresses</button>
+      <div id="importAllResult" class="text-muted" style="margin-top:4px;font-size:12px;"></div>
+      <button id="openNextAddress" class="btn btn-secondary full-width" style="margin-top:6px;display:none;" data-i18n="openNextOrder">Open next order</button>
     </div>
 
     <a href="https://kolayxport.com/app" target="_blank" class="btn btn-primary full-width" style="margin-top:8px;" data-i18n="openApp">

@@ -19,8 +19,13 @@ const _t = {
     openApp: 'KolayXport\'u Aç', help: 'Yardım',
     trackingTitle: 'Kargo Takip', pendingTracking: 'Bekleyen takip no',
     goToEtsyOrders: 'Etsy Siparişlerine Git',
-    addressTitle: 'Eksik adresler', openNextOrder: 'Sıradaki siparişi aç',
+    addressTitle: 'Etsy adresleri', openNextOrder: 'Sıradaki siparişi aç (listede görünmeyenler)',
     addressPending: (n) => `${n} siparişte adres eksik`,
+    addressesComplete: 'Tüm adresler tamam',
+    importAllAddresses: 'Tüm adresleri içe aktar',
+    importing: 'İçe aktarılıyor…',
+    importSent: (n) => `${n} siparişin adresi gönderildi`,
+    openingOrders: 'Etsy sipariş listesi açılıyor — adresler otomatik gönderilecek',
   },
   en: {
     status: 'Status', checking: 'Checking...', connected: 'Connected',
@@ -31,8 +36,13 @@ const _t = {
     openApp: 'Open KolayXport', help: 'Help',
     trackingTitle: 'Tracking Push', pendingTracking: 'Pending tracking',
     goToEtsyOrders: 'Go to Etsy Orders',
-    addressTitle: 'Missing addresses', openNextOrder: 'Open next order',
+    addressTitle: 'Etsy addresses', openNextOrder: 'Open next order (not on the list)',
     addressPending: (n) => `${n} ${n === 1 ? 'order is' : 'orders are'} missing an address`,
+    addressesComplete: 'All addresses complete',
+    importAllAddresses: 'Import all addresses',
+    importing: 'Importing…',
+    importSent: (n) => `Sent addresses for ${n} ${n === 1 ? 'order' : 'orders'}`,
+    openingOrders: 'Opening your Etsy orders — addresses are sent automatically',
   },
 };
 
@@ -137,11 +147,19 @@ async function checkPendingTracking() {
 let _nextAddressUrl = null;
 
 function renderAddressPending(state) {
+  $('addressCard').style.display = '';
   if (!state || !state.count) {
-    $('addressCard').style.display = 'none';
+    $('addressPendingLabel').textContent = t('addressesComplete');
+    $('addressPendingCount').textContent = '✓';
+    $('addressPendingCount').style.background = '#4caf50';
+    $('addressPendingCount').style.color = '#fff';
+    $('addressPendingCount').style.padding = '2px 8px';
+    $('addressPendingCount').style.borderRadius = '10px';
+    $('openNextAddress').style.display = 'none';
+    _nextAddressUrl = null;
     return;
   }
-  $('addressCard').style.display = '';
+  $('openNextAddress').style.display = '';
   $('addressPendingLabel').textContent = t('addressPending', state.count);
   $('addressPendingCount').textContent = String(state.count);
   $('addressPendingCount').style.background = '#f44336';
@@ -174,6 +192,35 @@ async function checkPendingAddresses() {
 function setupListeners() {
   $('openNextAddress').addEventListener('click', () => {
     if (_nextAddressUrl) chrome.tabs.create({ url: _nextAddressUrl });
+  });
+
+  // Bulk: run the full import on the open Etsy orders list; anywhere else,
+  // open the list (the content script imports it automatically on load).
+  $('importAllAddresses').addEventListener('click', async () => {
+    const btn = $('importAllAddresses');
+    const out = $('importAllResult');
+    const ORDERS_URL = 'https://www.etsy.com/your/orders/sold';
+    btn.disabled = true;
+    out.textContent = t('importing');
+    const tabs = await new Promise((r) => chrome.tabs.query({ active: true, currentWindow: true }, r));
+    const tab = tabs && tabs[0];
+    const onOrders = tab && /^https:\/\/www\.etsy\.com\/(your\/orders|your\/account\/your-shop\/orders|shop-manager\/.*orders)/.test(tab.url || '');
+    if (!onOrders) {
+      chrome.tabs.create({ url: ORDERS_URL });
+      out.textContent = t('openingOrders');
+      btn.disabled = false;
+      return;
+    }
+    chrome.tabs.sendMessage(tab.id, { action: 'fullImport' }, (resp) => {
+      btn.disabled = false;
+      if (chrome.runtime.lastError || !resp) {
+        chrome.tabs.update(tab.id, { url: ORDERS_URL });
+        out.textContent = t('openingOrders');
+        return;
+      }
+      out.textContent = resp.status === 'completed' ? t('importSent', resp.sent || 0) : (resp.error || '');
+      setTimeout(checkPendingAddresses, 1500);
+    });
   });
 
   $('toggleOverlays').addEventListener('change', (e) => {

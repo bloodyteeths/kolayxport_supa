@@ -21,3 +21,16 @@ describe('stale open orders are not "to ship"', () => {
     expect(TO_SHIP_SQL).toContain(`INTERVAL '${STALE_OPEN_ORDER_DAYS} days'`);
   });
 });
+
+import { marketplaceShipByDay } from '../../lib/orders/toOrderRows';
+describe('eBay ship-by day', () => {
+  it('keeps eBay\'s Pacific calendar day (Ship by Oct 14 = 06:59:59Z on Oct 15)', () => {
+    const d = marketplaceShipByDay(new Date('2026-10-15T06:59:59Z'), 'eBay')!;
+    expect(d.getDate()).toBe(14);
+    expect(d.getTime()).toBeLessThanOrEqual(new Date('2026-10-15T06:59:59Z').getTime());
+  });
+  it('other marketplaces unchanged', () => {
+    const x = new Date('2026-10-15T06:59:59Z');
+    expect(marketplaceShipByDay(x, 'Trendyol')).toBe(x);
+  });
+});

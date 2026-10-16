@@ -586,7 +586,7 @@ export function toOrderRow(order: ApiOrder, ctx: ToOrderRowsContext = {}): Order
   const hasLabel = orderHasLabel(facts);
   const labelFailed = isLabelFailedOrder(facts);
   const failure = labelFailed ? latestFailure(order) : null;
-  const shipByDate = effectiveShipBy(facts);
+  const shipByDate = marketplaceShipByDay(effectiveShipBy(facts), order.marketplace);
   const isFBA = order.isFBA === true;
 
   const status = orderRowStatus({
@@ -730,4 +730,17 @@ export async function fetchOrderEnrichment(
       : undefined,
   ]);
   return out;
+}
+
+/**
+ * eBay states ship-by as a calendar day in US Pacific time ("Ship by Oct 14" = 23:59:59 PT, stored as
+ * 2026-10-15T06:59:59Z). Shown in Turkey that instant read "15 Oct 09:59", which is not what eBay shows the seller.
+ * Keep eBay's calendar day and end it at 23:59 local time (never later than eBay's own deadline).
+ */
+export function marketplaceShipByDay(d: Date | null, marketplace: string | null | undefined): Date | null {
+  if (!d || String(marketplace ?? '').toLowerCase() !== 'ebay') return d;
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+  const local = new Date(get('year'), get('month') - 1, get('day'), 23, 59, 0, 0);
+  return local.getTime() < d.getTime() ? local : d;
 }

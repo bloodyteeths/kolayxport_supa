@@ -148,6 +148,8 @@ function OrderMetaLine({ row, t, withStore }: { row: OrderRow; t: OrdersT; withS
     );
   }
   if (row.shipTo.country) parts.push(<span key="c">{row.shipTo.country}</span>);
+  // When the order came in (founder: "orders are not showing when the order came"): on every row and card.
+  if (row.orderedAt) parts.push(<DateText key="d" value={row.orderedAt} mode="datetime" />);
   return (
     <Box component="span" className="mono" sx={{ ...captionSx, display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '4px' }}>
       {parts.map((p, i) => (
@@ -197,7 +199,8 @@ function StatusCell({ row, t, ctx }: { row: OrderRow; t: OrdersT; ctx: OrderColu
     </Typography>
   ) : null;
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', minWidth: 0 }}>
+    // Capped width: badges ("Shipped outside KolayXport") wrap instead of widening the table past the page.
+    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', minWidth: 0, maxWidth: 168, '& *': { whiteSpace: 'normal' } }}>
       {s.domain === 'label' ? <StatusPill domain="label" status="label_failed" raw={s.raw || null} /> : <StatusPill domain="order" status={s.key} raw={s.raw || null} />}
       {caption?.hint ? (
         <Tooltip title={caption.hint}>
@@ -300,9 +303,9 @@ export function orderColumns(t: OrdersT, ctx: OrderColumnsContext): Column<Order
       hideable: true,
       mobile: 'hidden',
       render: (r) => (
-        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: '6px', minWidth: 0, maxWidth: 136 }} title={storeText(r, t)}>
           {r.isManual ? null : <LogoTile brand={r.store.marketplace === 'other' ? r.marketplace : r.store.marketplace} size={16} />}
-          <Typography component="span" noWrap sx={{ fontSize: 13, color: neutral[800] }}>
+          <Typography component="span" noWrap sx={{ fontSize: 13, color: neutral[800], minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {storeText(r, t)}
           </Typography>
         </Box>

@@ -266,7 +266,8 @@ export function InlineAction({ action, size = 'sm' }: { action: ActionSpec; size
             disabled={disabled}
             onClick={(e) => { e.stopPropagation(); action.onClick?.(); }}
             {...linkProps}
-            sx={{ minHeight: px(size === 'lg' ? control.lg : control.sm), whiteSpace: 'nowrap' }}
+            title={size === 'md' ? label : undefined}
+            sx={{ minHeight: px(size === 'lg' ? control.lg : control.sm), whiteSpace: 'nowrap', ...(size === 'md' ? { maxWidth: 156, overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', lineHeight: px(control.sm - 2) } : {}) }}
           >
             {label}
           </Button>

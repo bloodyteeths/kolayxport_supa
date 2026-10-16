@@ -12688,7 +12688,7 @@
       "messageBuyer": "Alıcıya mesaj gönder",
       "fixAddress": "Adresi düzelt",
       "deleteLabel": "Etiketi sil…",
-      "deleteOrder": "Siparişi sil…",
+      "deleteOrder": "KolayXport'tan kaldır…",
       "copyAddress": "Kopyala"
     },
     "toolbar": {
@@ -12845,7 +12845,7 @@
       "deleteOrder": {
         "title": "{number} numaralı sipariş silinsin mi?",
         "body": "Sipariş yalnızca KolayXport'tan silinir. {marketplace} tarafında hiçbir şey değişmez.",
-        "confirm": "Siparişi sil",
+        "confirm": "KolayXport'tan kaldır",
         "bodyManual": "Sipariş KolayXport'tan silinir.",
         "failed": "Sipariş silinemedi",
         "done": "{number} numaralı sipariş silindi"

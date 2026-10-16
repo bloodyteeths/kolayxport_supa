@@ -12688,7 +12688,7 @@
       "messageBuyer": "Message buyer",
       "fixAddress": "Fix address",
       "deleteLabel": "Delete label…",
-      "deleteOrder": "Delete order…",
+      "deleteOrder": "Remove from KolayXport…",
       "copyAddress": "Copy"
     },
     "toolbar": {
@@ -12845,7 +12845,7 @@
       "deleteOrder": {
         "title": "Delete order {number}?",
         "body": "It's removed from KolayXport only. Nothing changes on {marketplace}.",
-        "confirm": "Delete order",
+        "confirm": "Remove from KolayXport",
         "bodyManual": "It's removed from KolayXport.",
         "failed": "Couldn't delete the order",
         "done": "Order {number} deleted"

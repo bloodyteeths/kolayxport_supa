@@ -11384,9 +11384,9 @@
       "favoritesAll": "{count} (all time)",
       "favoritesCard": "{count} favorites (all time)",
       "age": {
-        "days": "{count} d",
-        "months": "{count} mo",
-        "years": "{count} y"
+        "days": "{count, plural, one {# day old} other {# days old}}",
+        "months": "{count, plural, one {# month old} other {# months old}}",
+        "years": "{count, plural, one {# year old} other {# years old}}"
       },
       "openOn": "Open on {marketplace}",
       "startFrom": "Use as a starting point",

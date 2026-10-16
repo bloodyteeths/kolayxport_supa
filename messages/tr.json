@@ -11384,9 +11384,9 @@
       "favoritesAll": "{count} (tüm zamanlar)",
       "favoritesCard": "{count} favori (tüm zamanlar)",
       "age": {
-        "days": "{count} g",
-        "months": "{count} ay",
-        "years": "{count} y"
+        "days": "{count} günlük",
+        "months": "{count} aylık",
+        "years": "{count} yıllık"
       },
       "openOn": "{marketplace}'de aç",
       "startFrom": "Başlangıç noktası olarak kullan",

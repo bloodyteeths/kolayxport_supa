@@ -184,7 +184,7 @@ export function SidePanel({
               {title}
             </Box>
             {status && <Box sx={{ flexShrink: 0, display: 'inline-flex' }}>{status}</Box>}
-            {(onPrev || onNext) && (
+            {(onPrev || onNext) && !isPhone && ( /* phones: no ‹ › (the title needs the room; close and pick the next card) */
               <Box sx={{ display: 'inline-flex', flexShrink: 0 }}>
                 <IconAction icon={PrevIcon} label={t('prev')} shortcut="K" disabled={!onPrev} onClick={() => onPrev && guard(onPrev)} data-testid="panel-prev" />
                 <IconAction icon={NextIcon} label={t('next')} shortcut="J" disabled={!onNext} onClick={() => onNext && guard(onNext)} data-testid="panel-next" />

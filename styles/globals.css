@@ -172,14 +172,10 @@ body {
   }
 }
 
-/* Touch-friendly button sizes */
+/* Touch sizes: no blanket rule. A global `button { min-height/min-width: 44px }` used to inflate every copy, icon and
+   chip button on phones (the "huge white spaces"); DS components give small controls an invisible 44px hit area
+   (hitSlopAfter) and size primary controls themselves. */
 @media (hover: none) and (pointer: coarse) {
-  button,
-  .btn,
-  [role="button"] {
-    min-height: 44px;
-    min-width: 44px;
-  }
 
   /* Legacy page / public navs only: the app shell's own <nav>s (sidebar, tab bar, breadcrumbs, More
      sheet) and legacy page navs inside it size their rows themselves (shell-nav §4.3). */

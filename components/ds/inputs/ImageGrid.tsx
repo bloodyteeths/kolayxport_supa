@@ -242,14 +242,16 @@ export function ImageGrid({
                     // The button is the hit area (24, 44 on coarse pointers, inside the clipped tile); the inner chip is the visual.
                     position: 'absolute', bottom: 4, right: 4, width: 24, height: 24, borderRadius: `${radius.sm}px`,
                     color: neutral[700], opacity: 0, '&:focus-visible': { opacity: 1 }, '&:focus-visible > span': { boxShadow: focusRing },
-                    [COARSE]: { opacity: 1, width: 44, height: 44, bottom: 0, right: 0 },
+                    // Touch: a small corner ✕ (22px chip, 36px hit area in the top-right corner); a 32px chip in the
+                    // middle-bottom covered half of each thumbnail on phones.
+                    [COARSE]: { opacity: 1, width: 36, height: 36, top: 0, right: 0, bottom: 'auto', display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', p: '4px' },
                   }}
                 >
                   <Box
                     component="span"
                     sx={{
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24,
-                      borderRadius: `${radius.sm}px`, backgroundColor: neutral[0], [COARSE]: { width: 32, height: 32 },
+                      borderRadius: `${radius.sm}px`, backgroundColor: neutral[0], [COARSE]: { width: 22, height: 22, borderRadius: '50%', boxShadow: '0 1px 2px rgba(0,0,0,.25)' },
                     }}
                   >
                     <IconClose size={14} strokeWidth={ICON_STROKE} aria-hidden />

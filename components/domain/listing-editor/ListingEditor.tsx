@@ -1092,7 +1092,8 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
   const subtitleParts: string[] = [];
   if (mode === 'edit' && view.meta.id) {
     subtitleParts.push(
-      view.meta.updatedAt
+      // Phones: the ID alone (the "refreshed" line right below already says how fresh it is).
+      view.meta.updatedAt && !isMobile
         ? t('page.idMeta', { ...mp, id: view.meta.id, date: format.dateTime(view.meta.updatedAt, { day: 'numeric', month: 'short' }) })
         : t('page.idOnly', { id: view.meta.id }),
     );

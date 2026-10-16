@@ -314,7 +314,7 @@ export function SectionNav({
                   transition: `background-color ${motion.fast}ms ${motion.ease}, color ${motion.fast}ms ${motion.ease}`,
                   '&:hover': { bgcolor: active ? accent[50] : neutral[50] },
                   '&:focus-visible': { outline: 'none', boxShadow: focusRing },
-                  [COARSE]: { height: 44, px: '14px' },
+                  [COARSE]: { height: 36, px: '12px' }, // touch: 36px chips (44px made the section bar a third of the header)
                 }}
               >
                 <span>{s.label}</span>

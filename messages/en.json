@@ -15442,7 +15442,21 @@
         "title": "Get your {name} payments",
         "body": "We read fees, refunds and payouts from {name}. Nothing is changed on {name}."
       },
-      "empty": "No payments in this period"
+      "empty": "No payments in this period",
+      "quickCosts": {
+        "title": "Enter product costs",
+        "subtitle": "Unit cost per product, in {currency}",
+        "missing": "Missing ({count})",
+        "all": "All products",
+        "sold": "{count, plural, one {# sold} other {# sold}}",
+        "placeholder": "Cost",
+        "costFor": "Cost for {name}",
+        "save": "{count, plural, =0 {Save costs} one {Save # cost} other {Save # costs}}",
+        "detailed": "Detailed form",
+        "saved": "{count, plural, one {# cost saved} other {# costs saved}}",
+        "failed": "Couldn't save the costs. Try again.",
+        "allDone": "Every product you sold has a cost. Net profit is complete."
+      }
     },
     "error": {
       "rangeTooLong": "Choose a range of up to 2 years",

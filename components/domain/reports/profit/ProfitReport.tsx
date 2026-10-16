@@ -42,6 +42,7 @@ import { ProfitStatement, useStatementLabel } from './ProfitStatement';
 import { ProfitTrendChart } from './ProfitTrendChart';
 import { ProductPnLTable } from './ProductPnLTable';
 import { ProductCostsPanel, type CostsPanelProduct } from './ProductCostsPanel';
+import { QuickCostsPanel } from './QuickCostsPanel';
 
 export const CONNECT_HREF = '/ayarlar?tab=connections';
 
@@ -122,7 +123,10 @@ export function ProfitReport({ now }: ProfitReportProps = {}) {
     if (added > 0) toast.info(t('toast.newTransactions', { count: added, name, mp }));
   };
 
-  const openPanel = (row?: FinanceProductRow | null) =>
+  // Adding costs opens the quick list (one box per product); the detailed form is for shipping/notes/paste.
+  const [quick, setQuick] = useState<{ open: boolean; focus: string | null }>({ open: false, focus: null });
+  const openPanel = (row?: FinanceProductRow | null) => setQuick({ open: true, focus: row?.key ?? null });
+  const openDetailed = (row?: FinanceProductRow | null) =>
     setPanel({ open: true, product: row ? { productName: row.productName, barcode: row.barcode, sku: row.sku } : null });
 
   const exportCsv = () => {
@@ -158,7 +162,7 @@ export function ProfitReport({ now }: ProfitReportProps = {}) {
   const transactionsHref = `/app/reports/transactions?${new URLSearchParams({ mp, from: scope.from, to: scope.to })}`;
   const overflow: ActionSpec[] | undefined = view === 'ready' || view === 'empty'
     ? [
-        { id: 'manage-costs', label: t('actions.manageCosts'), onClick: () => openPanel() },
+        { id: 'manage-costs', label: t('actions.manageCosts'), onClick: () => openDetailed() },
         { id: 'open-transactions', label: t('actions.openTransactions'), href: transactionsHref },
       ]
     : undefined;
@@ -317,6 +321,7 @@ export function ProfitReport({ now }: ProfitReportProps = {}) {
             loading={busy}
             onSaved={() => { void report.mutate(); }}
             onAddCost={openPanel}
+            onOpenDetailed={openDetailed}
             onRetry={report.retry}
           />
         </Box>
@@ -344,6 +349,18 @@ export function ProfitReport({ now }: ProfitReportProps = {}) {
       data-testid="reports-profit"
     >
       {body}
+      {data && !gated ? (
+        <QuickCostsPanel
+          open={quick.open}
+          onClose={() => setQuick({ open: false, focus: null })}
+          mp={mp}
+          currency={data.summary.currency}
+          rows={data.productBreakdown}
+          focusKey={quick.focus}
+          onSaved={() => { void report.mutate(); }}
+          onOpenDetailed={() => { setQuick({ open: false, focus: null }); openDetailed(); }}
+        />
+      ) : null}
       {data && !gated ? (
         <ProductCostsPanel
           open={panel.open}

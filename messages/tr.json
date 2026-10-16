@@ -15442,7 +15442,21 @@
         "title": "{name} ödemelerinizi alın",
         "body": "Kesintileri, iadeleri ve ödemeleri {name} hesabınızdan okuruz. {name} tarafında hiçbir şey değişmez."
       },
-      "empty": "Bu dönemde ödeme kaydı yok"
+      "empty": "Bu dönemde ödeme kaydı yok",
+      "quickCosts": {
+        "title": "Ürün maliyetlerini girin",
+        "subtitle": "Ürün başına birim maliyet, {currency} olarak",
+        "missing": "Eksik ({count})",
+        "all": "Tüm ürünler",
+        "sold": "{count} satıldı",
+        "placeholder": "Maliyet",
+        "costFor": "{name} maliyeti",
+        "save": "{count, plural, =0 {Maliyetleri kaydet} other {# maliyeti kaydet}}",
+        "detailed": "Ayrıntılı form",
+        "saved": "{count} maliyet kaydedildi",
+        "failed": "Maliyetler kaydedilemedi. Tekrar deneyin.",
+        "allDone": "Sattığınız her ürünün maliyeti var. Net kâr eksiksiz."
+      }
     },
     "error": {
       "rangeTooLong": "En fazla 2 yıllık bir aralık seçin",

@@ -37,6 +37,8 @@ export interface ProductPnLTableProps {
   onSaved(): void;
   /** Open the cost panel at this product ("Add cost", Enter on a row). */
   onAddCost(row: FinanceProductRow): void;
+  /** The detailed cost form (no code to match on, or the shipping must be re-entered in another currency). */
+  onOpenDetailed?(row: FinanceProductRow): void;
   onRetry?(): void;
 }
 
@@ -49,7 +51,7 @@ export function filterProducts(rows: FinanceProductRow[], q: string): FinancePro
   return rows.filter((r) => [r.productName, r.barcode, r.sku].some((v) => v && v.toLocaleLowerCase().includes(s)));
 }
 
-export function ProductPnLTable({ data, mp, mpName, state, loading, onSaved, onAddCost, onRetry }: ProductPnLTableProps) {
+export function ProductPnLTable({ data, mp, mpName, state, loading, onSaved, onAddCost, onOpenDetailed, onRetry }: ProductPnLTableProps) {
   const t = useTranslations('reports');
   const fmt = useFormatters();
   const toast = useToast();
@@ -85,7 +87,7 @@ export function ProductPnLTable({ data, mp, mpName, state, loading, onSaved, onA
         : t('profit.products.costSaveFailed');
       setFailed((f) => new Map(f).set(rowId, msg));
       toast.error(msg);
-      if (err instanceof CostCurrencyConflictError) onAddCost(row);
+      if (err instanceof CostCurrencyConflictError) (onOpenDetailed ?? onAddCost)(row);
     }
   };
 
@@ -212,7 +214,7 @@ export function ProductPnLTable({ data, mp, mpName, state, loading, onSaved, onA
           state={tableState}
           empty={empty}
           error={<ErrorState variant="inline" title={t('error.profit', { name: mpName })} onRetry={onRetry} />}
-          onRowOpen={(r) => onAddCost(r)}
+          onRowOpen={(r) => (!(r.barcode || r.sku) && onOpenDetailed ? onOpenDetailed(r) : onAddCost(r))}
           onCellCommit={(rowId, _key, value) => { void commit(rowId, value); }}
           columnStateKey="reports.profit.products"
           ariaLabel={t('profit.products.title')}

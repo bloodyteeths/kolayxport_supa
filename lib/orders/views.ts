@@ -249,8 +249,6 @@ export function orderHasLabel(row: OrderViewRow): boolean {
 
 /** Pure twin of EFFECTIVE_SHIP_BY_SQL. */
 export function effectiveShipBy(row: OrderViewRow): Date | null {
-  const stored = validDate(row.shipByAt);
-  if (stored) return stored;
   const itemDates = (row.items ?? []).map((i) => validDate(i.shipBy)).filter((d): d is Date => d !== null);
   if (itemDates.length > 0) return new Date(Math.min(...itemDates.map((d) => d.getTime())));
   const at = validDate(row.shipByAt);

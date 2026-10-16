@@ -143,17 +143,8 @@ describe('lib/orders/views — SQL fragments', () => {
     expect(TO_SHIP_COUNTS_SQL).not.toContain('cargoTrackingNumber');
   });
 
-  it('casts of rawData values are guarded (a malformed value cannot throw)', () => {
-    const casts = EFFECTIVE_SHIP_BY_SQL.match(/::timestamptz|::double precision/g) ?? [];
-    const guards = EFFECTIVE_SHIP_BY_SQL.match(/CASE WHEN \(/g) ?? [];
-    expect(casts.length).toBe(3);
-    expect(guards.length).toBe(3);
-  });
-
-  it('date guard rejects 29 Feb outside leap years before casting (nested CASE, not AND)', () => {
-    expect(EFFECTIVE_SHIP_BY_SQL).toContain(`THEN (CASE WHEN substr((o."rawData"->>'due_date'), 6, 5) = '02-29' AND NOT`);
-    expect(EFFECTIVE_SHIP_BY_SQL).toContain('% 400 = 0');
-    expect(EFFECTIVE_SHIP_BY_SQL).toContain('^[0-9]{1,11}');
+  it('ship-by SQL reads the stored, indexed Order.shipByAt only (no per-row OrderItem/rawData parsing: ~6 s → fast)', () => {
+    expect(EFFECTIVE_SHIP_BY_SQL.trim()).toBe('o."shipByAt"');
   });
 
   it('the counts query is user-scoped with one bind parameter', () => {

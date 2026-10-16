@@ -553,7 +553,14 @@ export function mergeBreadcrumbs(nav: NavCrumb[], page?: PageBreadcrumb[] | null
   if (!page || page.length === 0) return nav;
   const head = nav.map((c) => ({ ...c, current: false }));
   const tail = page.map((c, i) => ({ ...c, current: i === page.length - 1 }));
-  return [...head, ...tail];
+  // Drop a repeated label where the nav trail and the page trail meet ("Research › Research › Keywords").
+  const merged: NavCrumb[] = [];
+  for (const c of [...head, ...tail]) {
+    const prev = merged[merged.length - 1];
+    if (prev && prev.label === c.label) merged[merged.length - 1] = { ...prev, ...c, href: c.href ?? prev.href };
+    else merged.push(c);
+  }
+  return merged;
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────────────────────────────────

@@ -13374,7 +13374,7 @@
       "priceFrom": "from {price}",
       "onMarketplace": "On {marketplace}: {value}",
       "variationsReadOnly": "Edit prices per variation in the editor",
-      "notTracked": "Not tracked",
+      "notTracked": "Unlimited",
       "notScored": "Not scored yet · refresh to score",
       "willDelete": "Will be deleted on send",
       "inStock": "{count} in stock",

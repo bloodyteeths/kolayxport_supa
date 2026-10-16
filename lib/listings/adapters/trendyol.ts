@@ -175,6 +175,7 @@ export const trendyolAdapter: ListingsAdapter = {
     blacklisted: true,
     archived: true,
     rejectReasons: true,
+    attributes: true,
     trendyolCreatedDate: true,
     trendyolLastUpdate: true,
   },
@@ -188,7 +189,12 @@ export const trendyolAdapter: ListingsAdapter = {
     return {
       id: String(r.barcode),
       title: decodeEntities(String(r.title ?? '')),
-      metaLine: [String(r.barcode), ...(r.stockCode && r.stockCode !== r.barcode ? [String(r.stockCode)] : [])],
+      // Size · colour first: a product family shares one title, so the variant is what tells rows apart.
+      metaLine: [
+        ...(trendyolVariantLabel(r.attributes) ? [trendyolVariantLabel(r.attributes) as string] : []),
+        String(r.barcode),
+        ...(r.stockCode && r.stockCode !== r.barcode ? [String(r.stockCode)] : []),
+      ],
       thumbUrl: r.thumbnailUrl || null,
       price: sale === null ? null : { amount: roundMoney(sale), currency: r.currencyType || 'TRY' },
       qty: toNumber(r.quantity),
@@ -228,3 +234,18 @@ export const trendyolAdapter: ListingsAdapter = {
     destructiveActions: CATALOG_DESTRUCTIVE_ACTIONS,
   },
 };
+
+/**
+ * "3-4 Yaş · Kırmızı" from Trendyol category attributes: Beden (size) and the variant colour (the Renk entry with
+ * an attributeValueId; a free-text Renk is the description colour). Null when neither is set.
+ */
+export function trendyolVariantLabel(attributes: unknown): string | null {
+  if (!Array.isArray(attributes)) return null;
+  const pick = (name: string, preferId: boolean) => {
+    const all = attributes.filter((a: any) => a && a.attributeName === name && typeof a.attributeValue === 'string' && a.attributeValue.trim());
+    const hit = (preferId ? all.find((a: any) => a.attributeValueId != null) : undefined) ?? all[0];
+    return hit ? String((hit as any).attributeValue).trim() : null;
+  };
+  const parts = [pick('Beden', false), pick('Renk', true)].filter(Boolean) as string[];
+  return parts.length ? parts.join(' · ') : null;
+}

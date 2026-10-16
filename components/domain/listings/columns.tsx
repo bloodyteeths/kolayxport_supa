@@ -540,7 +540,9 @@ export function listingColumns(t: ListingsT, ctx: ListingCellContext): Column<Li
           render: (r) => {
             const v = extraText(r, key);
             if (v === null) return '—';
-            const label = ctx.optionLabels?.[key]?.get(String(v)) ?? String(v);
+            const named = ctx.optionLabels?.[key]?.get(String(v));
+            // Never show a raw id (Wix collection UUIDs appeared when the names failed to load): "—" until named.
+            const label = named ?? (/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(String(v)) ? '—' : String(v));
             return (
               <Box component="span" sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {label}

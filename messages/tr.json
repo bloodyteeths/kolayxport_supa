@@ -13374,7 +13374,7 @@
       "priceFrom": "en az {price}",
       "onMarketplace": "{marketplace} üzerinde: {value}",
       "variationsReadOnly": "Fiyatları düzenleyicide varyasyon bazında değiştirin",
-      "notTracked": "Takip edilmiyor",
+      "notTracked": "Sınırsız",
       "notScored": "Henüz puanlanmadı · puanlamak için yenileyin",
       "willDelete": "Gönderildiğinde silinecek",
       "inStock": "Stokta {count}",

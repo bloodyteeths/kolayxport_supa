@@ -147,7 +147,7 @@ function OrderMetaLine({ row, t, withStore, hideNumber }: { row: OrderRow; t: Or
       ),
     );
   }
-  if (row.shipTo.country) parts.push(<span key="c">{row.shipTo.country}</span>);
+  if (row.shipTo.country && !hideNumber) parts.push(<span key="c">{row.shipTo.country}</span>); // cards (hideNumber) skip it: one line
   // When the order came in (founder: "orders are not showing when the order came"): on every row and card.
   if (row.orderedAt) parts.push(<DateText key="d" value={row.orderedAt} mode="datetime" />);
   return (

@@ -6,6 +6,7 @@ import { isShopifyEnabled } from '@/lib/config';
 import { startSync, updateSyncProgress, completeSync, cleanupStaleSyncs } from '@/lib/sync-status';
 import { ShopifyClient, getValidAccessToken } from '@/lib/integrations/shopifyClient';
 import { toOrder } from '@/lib/mappers/shopify';
+import { isConnectionBlocked, recordAuthFailure, recordAuthSuccess } from '@/lib/integrations/authFailures';
 
 type SyncMetrics = {
   processedOrders: number;
@@ -27,14 +28,26 @@ export async function syncShopifyRecentOrdersForUser(userId: string): Promise<Sy
   }
 
   // Get all active Shopify shops for user
-  const shops = await prisma.shopifyShop.findMany({
+  const activeShops = await prisma.shopifyShop.findMany({
     where: { userId, isActive: true },
   });
 
-  if (shops.length === 0) {
+  if (activeShops.length === 0) {
     logger.info(`[SHOPIFY SYNC] Skipping user ${userId}: no active shops`);
     return null;
   }
+
+  // Shops whose auth was rejected AUTH_FAILURE_THRESHOLD times in a row are parked until the
+  // user reconnects (lib/integrations/authFailures.ts); Settings shows them as "Reconnect".
+  const shops: typeof activeShops = [];
+  for (const shop of activeShops) {
+    if (await isConnectionBlocked(userId, 'shopify', shop.shopDomain)) {
+      logger.info(`[SHOPIFY SYNC] Skipping shop ${shop.shopDomain}: reconnect required`, { userId, shop: shop.shopDomain });
+    } else {
+      shops.push(shop);
+    }
+  }
+  if (shops.length === 0) return null;
 
   const syncType = 'shopify';
   let syncId: string | undefined;
@@ -64,6 +77,8 @@ export async function syncShopifyRecentOrdersForUser(userId: string): Promise<Sy
           status: 'any',
           created_at_min: sinceDate,
         });
+        // Token refresh + an authenticated read both succeeded: reset the auth-failure counter.
+        await recordAuthSuccess(userId, 'shopify', shop.shopDomain);
 
         logger.info(`[SHOPIFY SYNC] Fetched ${rawOrders.length} orders from ${shop.shopDomain}`, { userId, shop: shop.shopDomain, orderCount: rawOrders.length });
 
@@ -154,6 +169,8 @@ export async function syncShopifyRecentOrdersForUser(userId: string): Promise<Sy
       } catch (shopErr: any) {
         logger.error(`[SHOPIFY SYNC] Failed for shop ${shop.shopDomain}`, shopErr);
         errors.push({ orderId: `shop:${shop.shopDomain}`, error: shopErr.message });
+        // Counts only 401/403/invalid_grant/token-refresh rejections; network/5xx are ignored.
+        await recordAuthFailure(userId, 'shopify', shop.shopDomain, shopErr);
       }
     }
 

@@ -5,10 +5,10 @@
  */
 import React, { useCallback, useState } from 'react';
 import { useRouter } from 'next/router';
-import { Button, Tab, Tabs } from '@mui/material';
-import { CheckCheck } from 'lucide-react';
+import { Tab, Tabs } from '@mui/material';
 import { useLocale, useTranslations } from 'next-intl';
-import PageHeader from '@/components/ui/PageHeader';
+import { PageHeader, type ActionSpec } from '@/components/ds/page';
+import { icons } from '@/lib/ds/icons';
 import { isNotificationGroup, type NotificationGroup } from '@/lib/notificationCenter/registry';
 import NotificationFeed, { type FeedView } from './NotificationFeed';
 import NotificationPreferencesPanel from './NotificationPreferencesPanel';
@@ -45,29 +45,34 @@ export default function NotificationCenterPage() {
     [router, tab, group],
   );
 
+  const markAllAction: ActionSpec | undefined =
+    tab !== 'preferences' && tab !== 'activity' && markAll
+      ? {
+          id: 'notifications-mark-all-read',
+          label: t('page.markAllRead'),
+          icon: icons.check,
+          loading: marking,
+          disabled: marking,
+          onClick: async () => {
+            setMarking(true);
+            try {
+              await markAll();
+            } finally {
+              setMarking(false);
+            }
+          },
+        }
+      : undefined;
+
+  // DS PageHeader: inside the shell-managed <Page> (pages/app/bildirimler.tsx) the mobile title row
+  // belongs to the shell TopBar, so the title is not rendered twice on mobile.
   return (
-    <div className="max-w-3xl mx-auto w-full">
-      <PageHeader title={t('page.title')} subtitle={t('page.subtitle')}>
-        {tab !== 'preferences' && tab !== 'activity' && markAll && (
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<CheckCheck size={14} />}
-            disabled={marking}
-            onClick={async () => {
-              setMarking(true);
-              try {
-                await markAll();
-              } finally {
-                setMarking(false);
-              }
-            }}
-            sx={{ minHeight: 44, textTransform: 'none', borderRadius: 2 }}
-          >
-            {t('page.markAllRead')}
-          </Button>
-        )}
-      </PageHeader>
+    <div className="w-full">
+      <PageHeader
+        title={t('page.title')}
+        subtitle={t('page.subtitle')}
+        secondaryActions={markAllAction ? [markAllAction] : undefined}
+      />
 
       <Tabs
         value={tab}

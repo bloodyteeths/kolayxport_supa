@@ -14,6 +14,7 @@ export const REQUIRED_NOTIFICATION_PARAMS: Record<string, string[]> = {
   draftSyncFailed: ['title'],
   draftConflict: ['title'],
   reauthRequired: ['provider'],
+  reauthRejected: ['provider', 'account'],
   orderSyncFailed: ['provider'],
   usageNearLimit: ['kind', 'used', 'limit'],
   usageLimitReached: ['kind'],

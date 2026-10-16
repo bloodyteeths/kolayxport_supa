@@ -64,6 +64,7 @@ model User {
   wixSites                WixSite[]                @relation("UserWixSites")
   wixProducts             WixProduct[]
   shopifyShops            ShopifyShop[]            @relation("UserShopifyShops")
+  connectionAuthStates    ConnectionAuthState[]
   shopifyProducts         ShopifyProduct[]
   amazonTrackedProducts   AmazonTrackedProduct[]
   amazonPriceSnapshots    AmazonPriceSnapshot[]
@@ -2260,4 +2261,28 @@ model InboxThread {
 
   @@unique([userId, platform, externalId])
   @@index([userId, needsReply, lastMessageAt])
+}
+
+/// Consecutive auth failures per marketplace connection (lib/integrations/authFailures.ts).
+/// accountId = the connection's user-facing id (Shopify shop domain, Trendyol supplier id,
+/// Amazon seller id). After AUTH_FAILURE_THRESHOLD consecutive 401/403/invalid_grant/token
+/// refresh failures `needsReconnect` is set: sync skips the connection and Settings shows
+/// Reconnect until a successful auth or a reconnect / credential re-save deletes the row.
+model ConnectionAuthState {
+  id                  String    @id @default(cuid())
+  userId              String
+  provider            String
+  accountId           String
+  consecutiveFailures Int       @default(0)
+  lastFailureAt       DateTime?
+  lastError           String?
+  needsReconnect      Boolean   @default(false)
+  needsReconnectAt    DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider, accountId])
+  @@index([userId, needsReconnect])
 }

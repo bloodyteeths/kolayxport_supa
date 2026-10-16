@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { exchangeAuthCode, regionForMarketplaceId } from '@/lib/integrations/amazonClient';
 import { logger } from '@/lib/logger';
 import { encryptIfNeeded } from '@/lib/crypto/credentials';
+import { clearConnectionAuthState } from '@/lib/integrations/authFailures';
 
 export const config = { runtime: 'nodejs' };
 
@@ -124,6 +125,8 @@ export default async function handler(
         amazonRegion: region,
       },
     });
+    // Fresh grant: forget earlier auth failures and resolve a pending "reconnect".
+    await clearConnectionAuthState(userId, 'amazon');
 
     logger.info('Amazon OAuth completed successfully', {
       userId,

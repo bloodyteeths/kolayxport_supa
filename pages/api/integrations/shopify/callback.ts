@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import prisma from '../../../../lib/prisma';
 import { logger } from '../../../../lib/logger';
 import { encryptIfNeeded } from '@/lib/crypto/credentials';
+import { clearConnectionAuthState } from '@/lib/integrations/authFailures';
 import crypto from 'crypto';
 
 const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
@@ -225,6 +226,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         isActive: true,
       },
     });
+    // Fresh grant: forget earlier auth failures and resolve a pending "reconnect" for this shop.
+    await clearConnectionAuthState(userId, 'shopify', shop);
 
     // Also update Credential for backward compat
     await prisma.credential.upsert({

@@ -6,6 +6,7 @@ import { encryptCredentials, decryptCredentials, maskCredentials, stripMaskedSec
 import { getPlanLimits } from '@/lib/billing/planLimits';
 import { parsePreferencesPatch } from '@/lib/settings/accountTimezone';
 import { invalidateNotificationConfig } from '@/lib/notificationCenter/preferences';
+import { clearConnectionAuthState } from '@/lib/integrations/authFailures';
 
 export default async function handler(
   req: NextApiRequest,
@@ -162,6 +163,15 @@ export default async function handler(
         });
 
         try {
+          // Trendyol credentials re-saved (new key/secret, or a different supplier id): the user
+          // "reconnected", so a parked Trendyol connection is cleared below (lib/integrations/authFailures.ts).
+          const filled = (v: unknown) => typeof v === 'string' && v.trim().length > 0;
+          let trendyolResaved = filled(integrationSettings.trendyolApiKey) || filled(integrationSettings.trendyolApiSecret);
+          if (!trendyolResaved && filled(integrationSettings.trendyolSupplierId)) {
+            const prev = await prisma.credential.findUnique({ where: { userId: authUser.id }, select: { trendyolSupplierId: true } });
+            trendyolResaved = String(prev?.trendyolSupplierId ?? '').trim() !== String(integrationSettings.trendyolSupplierId).trim();
+          }
+
           // Encrypt sensitive credential fields before storing
           const encrypted = encryptCredentials(integrationSettings);
 
@@ -217,6 +227,7 @@ export default async function handler(
             } as any),
           });
           console.log('Integration settings saved successfully');
+          if (trendyolResaved) await clearConnectionAuthState(authUser.id, 'trendyol');
         } catch (error) {
           console.error('Error saving integration settings:', error);
           throw error;

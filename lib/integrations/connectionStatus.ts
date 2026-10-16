@@ -16,6 +16,7 @@
 import prisma from '@/lib/prisma';
 import { getOpenReauthFlags, resolveNotification, type OpenReauthFlag } from '@/lib/notifications';
 import { isShopReauthBlocked } from '@/lib/etsy/etsyToken';
+import { getReconnectFlags } from '@/lib/integrations/authFailures';
 
 export const CONNECTION_PROVIDERS = [
   'etsy',
@@ -219,12 +220,37 @@ function applyRuntimeReauthFlags(
   }
 }
 
+/**
+ * Mark accounts parked by repeated auth failures (ConnectionAuthState.needsReconnect, see
+ * lib/integrations/authFailures.ts). Like EtsyShop.needsReauth this is the source of truth and does
+ * not depend on the reauthRequired notification row. `flags` maps provider -> flagged accountIds;
+ * accountId '' (no user-facing id known) flags every account of that provider. Pure (mutates
+ * `connections` in place).
+ */
+export function applyReconnectFlags(connections: ConnectionsMap, flags: Map<string, Set<string>>): void {
+  for (const [provider, ids] of Array.from(flags.entries())) {
+    if (!(CONNECTION_PROVIDERS as readonly string[]).includes(provider)) continue;
+    const current = connections[provider as ConnectionProvider];
+    if (!current?.connected || current.accounts.length === 0) continue;
+    const all = ids.has('');
+    let changed = false;
+    const accounts = current.accounts.map((a) => {
+      if (a.needsReauth || !(all || (a.externalId !== null && ids.has(a.externalId)))) return a;
+      changed = true;
+      return { ...a, needsReauth: true, reason: 'reauth_required' as const };
+    });
+    if (changed) connections[provider as ConnectionProvider] = entry(accounts);
+  }
+}
+
 export async function getConnectionStatus(userId: string): Promise<ConnectionStatusResponse> {
   const now = Date.now();
 
   // Runtime re-auth signals (one indexed query, never throws). Runs in
   // parallel with the main snapshot query.
   const reauthFlagsPromise = getOpenReauthFlags(userId);
+  // Connections parked after repeated 401/403/invalid_grant (never throws).
+  const reconnectFlagsPromise = getReconnectFlags(userId);
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -460,6 +486,7 @@ export async function getConnectionStatus(userId: string): Promise<ConnectionSta
     etsyIssued.set(c.etsyShopId, c.etsyTokenExpiresAt.getTime() - ETSY_ACCESS_TOKEN_LIFETIME_MS);
   }
 
+  applyReconnectFlags(connections, await reconnectFlagsPromise);
   applyRuntimeReauthFlags(userId, connections, await reauthFlagsPromise, { etsy: etsyIssued });
 
   const lastExt = user?.trackingSubmissions?.[0]?.etsySubmittedAt ?? null;

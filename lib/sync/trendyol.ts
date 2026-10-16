@@ -6,6 +6,7 @@ import { isTrendyolEnabled } from "@/lib/config";
 import { startSync, updateSyncProgress, completeSync, cleanupStaleSyncs } from "@/lib/sync-status";
 import { fetchTrendyolOrders, fetchCreatedOrders } from "@/lib/integrations/trendyolClient";
 import { toOrder, mapTrendyolOrdersWithImages } from "@/lib/mappers/trendyol";
+import { isAuthFailure, isConnectionBlocked, recordAuthFailure, recordAuthSuccess } from "@/lib/integrations/authFailures";
 
 type SyncMetrics = {
   processedOrders: number;
@@ -41,6 +42,14 @@ export async function syncTrendyolRecentOrdersForUser(userId: string): Promise<S
     return null;
   }
 
+  // Credentials Trendyol rejected AUTH_FAILURE_THRESHOLD times in a row are parked until the user
+  // re-saves them (lib/integrations/authFailures.ts); Settings shows Trendyol as "Reconnect".
+  const supplierId = String(settings.trendyolSupplierId);
+  if (await isConnectionBlocked(userId, 'trendyol', supplierId)) {
+    logger.info(`[TRENDYOL SYNC] Skipping user ${userId}: reconnect required (credentials rejected)`);
+    return null;
+  }
+
   const syncType = "trendyol";
   let syncId: string | undefined;
   let processed = 0;
@@ -69,6 +78,7 @@ export async function syncTrendyolRecentOrdersForUser(userId: string): Promise<S
         endDateMs: null,
         pageSize: 200,
       });
+      await recordAuthSuccess(userId, 'trendyol', supplierId);
       orders = allOrders.filter((order: any) => {
         if (!order.orderDate) return false;
         const ts = typeof order.orderDate === "string" ? new Date(order.orderDate).getTime() : order.orderDate;
@@ -76,6 +86,11 @@ export async function syncTrendyolRecentOrdersForUser(userId: string): Promise<S
       });
     } catch (err: any) {
       logger.warn(`[TRENDYOL SYNC] Main fetch failed for user ${userId}: ${err?.message}`);
+      if (isAuthFailure(err)) {
+        // Same credentials would be rejected by the fallback too: count it and stop here.
+        await recordAuthFailure(userId, 'trendyol', supplierId, err);
+        throw Object.assign(new Error(`Trendyol rejected the credentials: ${String(err?.message || err).slice(0, 200)}`), { authFailure: true });
+      }
       try {
         const created = await fetchCreatedOrders({
           supplierId: settings.trendyolSupplierId,
@@ -85,6 +100,7 @@ export async function syncTrendyolRecentOrdersForUser(userId: string): Promise<S
           endDateMs: null,
           pageSize: 100,
         });
+        await recordAuthSuccess(userId, 'trendyol', supplierId);
         orders = created.filter((order: any) => {
           if (!order.orderDate) return false;
           const ts = typeof order.orderDate === "string" ? new Date(order.orderDate).getTime() : order.orderDate;
@@ -92,6 +108,7 @@ export async function syncTrendyolRecentOrdersForUser(userId: string): Promise<S
         });
       } catch (fallbackErr: any) {
         logger.error(`[TRENDYOL SYNC] Fallback fetch failed for user ${userId}: ${fallbackErr?.message}`);
+        await recordAuthFailure(userId, 'trendyol', supplierId, fallbackErr);
         orders = [];
       }
     }

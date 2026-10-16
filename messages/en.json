@@ -9964,6 +9964,7 @@
       "draftSyncFailed": "Sync to Etsy failed for \"{title}\"",
       "draftConflict": "\"{title}\" was changed on Etsy: review it before syncing",
       "reauthRequired": "Your {provider} connection expired. Reconnect it in Settings",
+      "reauthRejected": "{provider} keeps rejecting the connection for {account}. Sync is paused until you reconnect it in Settings",
       "orderSyncFailed": "Order sync from {provider} failed",
       "usageNearLimit": "You have used {used} of {limit} {kind, select, orderSync {order syncs} label {labels} other {credits}} this period",
       "usageLimitReached": "You have reached your {kind, select, orderSync {order sync} label {label} other {usage}} limit. Upgrade your plan to continue",
@@ -10518,7 +10519,7 @@
     "loadFailed": "Couldn't load SEO experiments."
   },
   "stockSync": {
-    "pageTitle": "Stock Sync",
+    "pageTitle": "Stock sync",
     "pageSubtitle": "When an item sells on one channel, it goes down everywhere else, so you never oversell.",
     "status": {
       "disabled": "Off",

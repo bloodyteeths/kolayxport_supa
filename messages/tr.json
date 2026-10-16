@@ -9964,6 +9964,7 @@
       "draftSyncFailed": "\"{title}\" için Etsy'ye senkronizasyon başarısız oldu",
       "draftConflict": "\"{title}\" Etsy'de değiştirildi, senkronize etmeden önce kontrol edin",
       "reauthRequired": "{provider} bağlantınızın süresi doldu. Ayarlar'dan yeniden bağlanın",
+      "reauthRejected": "{provider}, {account} bağlantısını reddetmeye devam ediyor. Ayarlar'dan yeniden bağlayana kadar senkronizasyon duraklatıldı",
       "orderSyncFailed": "{provider} sipariş senkronizasyonu başarısız oldu",
       "usageNearLimit": "Bu dönemde {limit} {kind, select, orderSync {sipariş senkronizasyonu} label {etiket} other {kullanım}} hakkınızın {used} tanesini kullandınız",
       "usageLimitReached": "{kind, select, orderSync {Sipariş senkronizasyonu} label {Etiket} other {Kullanım}} limitinize ulaştınız. Devam etmek için planınızı yükseltin",
@@ -10518,7 +10519,7 @@
     "loadFailed": "SEO deneyleri yüklenemedi."
   },
   "stockSync": {
-    "pageTitle": "Stok Senkronu",
+    "pageTitle": "Stok senkronu",
     "pageSubtitle": "Bir kanalda satılan ürün diğer kanallarda otomatik düşsün, fazla satış olmasın.",
     "status": {
       "disabled": "Kapalı",

@@ -1155,9 +1155,15 @@ export async function syncAllOrders(userId: string, options: {
 
     // Amazon SP-API order sync (uses Reports API for bulk, Orders API for incremental)
     if (wants('amazon')) {
+      let amazonAccount = '';
       try {
         const cred = await prisma.credential.findUnique({ where: { userId } }) as any;
-        if (cred?.amazonAccessToken && cred?.amazonRefreshToken) {
+        // Parked after repeated LWA invalid_grant (lib/integrations/authFailures.ts) until the user reconnects.
+        const { isConnectionBlocked: amazonBlocked } = await import('./integrations/authFailures');
+        amazonAccount = String(cred?.amazonSellerId || '');
+        if (cred?.amazonAccessToken && cred?.amazonRefreshToken && (await amazonBlocked(userId, 'amazon', amazonAccount))) {
+          logger.info('[AmazonSync] Skipping: reconnect required', { userId });
+        } else if (cred?.amazonAccessToken && cred?.amazonRefreshToken) {
           const { getValidToken, fetchCatalogItems } = await import('./integrations/amazonClient');
           const { fetchOrderReport } = await import('./integrations/amazonReports');
           const { toNormalizedOrderFromGroup, groupReportRows } = await import('./mappers/amazon');
@@ -1170,6 +1176,8 @@ export async function syncAllOrders(userId: string, options: {
           });
 
           if (token) {
+            const { recordAuthSuccess } = await import('./integrations/authFailures');
+            await recordAuthSuccess(userId, 'amazon', amazonAccount);
             const region = (cred.amazonRegion || 'eu') as 'na' | 'eu' | 'fe';
             const marketplaceIds: string[] = Array.isArray(cred.amazonMarketplaceIds) && cred.amazonMarketplaceIds.length > 0
               ? cred.amazonMarketplaceIds
@@ -1269,6 +1277,11 @@ export async function syncAllOrders(userId: string, options: {
       } catch (err: any) {
         logger.error('[AmazonSync] Failed to initialize', err, { userId });
         notifyOrderSyncFailed(userId, 'amazon');
+        // LWA invalid_grant counts toward the reconnect flag; config / network errors do not.
+        try {
+          const { recordAuthFailure } = await import('./integrations/authFailures');
+          await recordAuthFailure(userId, 'amazon', amazonAccount, err);
+        } catch { /* best effort */ }
       }
     }
 

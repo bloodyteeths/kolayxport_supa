@@ -2,9 +2,8 @@ import React, { useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { Box, Chip, CircularProgress, InputAdornment, Stack, TextField, Typography, useMediaQuery, useTheme } from '@mui/material';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
-import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded';
 import { useTranslations } from 'next-intl';
-import AppLayout from '@/components/AppLayout';
+import { Page, PageHeader } from '@/components/ds/page';
 import withAuth from '@/components/withAuth';
 import ErrorState from '@/components/ui/ErrorState';
 import { useLiveRevalidate } from '@/components/live/useLiveEvent';
@@ -55,21 +54,10 @@ function StockSyncPage() {
   }, [items.data, q]);
 
   return (
-    <AppLayout title={t('pageTitle')}>
-      <Box sx={{ p: { xs: 0.5, sm: 1, md: 1.5 }, maxWidth: 1200, mx: 'auto' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-          <Box sx={{ p: 1.25, borderRadius: '14px', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', display: 'flex' }}>
-            <Inventory2RoundedIcon sx={{ color: '#fff' }} />
-          </Box>
-          <Box sx={{ minWidth: 0 }}>
-            <Typography variant="h5" fontWeight={700} sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
-              {t('pageTitle')}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {t('pageSubtitle')}
-            </Typography>
-          </Box>
-        </Box>
+    <Page title={t('pageTitle')} width="detail" data-testid="stock-sync-page">
+      <Box>
+        {/* DS PageHeader: the shell TopBar owns the mobile title row, so no duplicate title on mobile. */}
+        <PageHeader title={t('pageTitle')} subtitle={t('pageSubtitle')} />
 
         {settings.error && <ErrorState error={settings.error} onRetry={() => settings.mutate()} />}
         {!settings.data && !settings.error && (
@@ -132,7 +120,7 @@ function StockSyncPage() {
       <GoLiveDialog open={goLiveOpen} onClose={() => setGoLiveOpen(false)} onDone={refresh} />
       <StockTimeline stockItemId={timelineFor?.id ?? null} open={!!timelineFor} onClose={() => setTimelineFor(null)} onChanged={refresh} />
       <StockAdjustDialog item={adjustFor} open={!!adjustFor} onClose={() => setAdjustFor(null)} onSaved={refresh} />
-    </AppLayout>
+    </Page>
   );
 }
 

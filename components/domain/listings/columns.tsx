@@ -326,7 +326,7 @@ export function listingColumns(t: ListingsT, ctx: ListingCellContext): Column<Li
                 </Box>
               ) : null}
               <ViewOnLink row={r} t={t} ctx={ctx} />
-              {healthOnCard ? (
+              {healthOnCard && r.health.score != null ? ( /* no lone "—" when unscored */
                 <Box component="span" sx={{ display: 'inline-flex', flexShrink: 0 }} data-testid="listing-card-health">
                   <HealthCell row={r} />
                 </Box>

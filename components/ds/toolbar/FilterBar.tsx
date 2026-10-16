@@ -123,12 +123,20 @@ export function FilterBar({
         ...extraChips,
       ];
 
-  const countText =
+  const countNode =
     typeof resultCount === 'number' ? (
       <Typography variant="caption" component="span" className="tnum" sx={{ whiteSpace: 'nowrap', color: neutral[600] }} data-testid="toolbar-result-count" aria-live="polite">
         {resultLabel ?? t('results', { count: resultCount })}
       </Typography>
     ) : null;
+  // Phones: a DataTable card list portals its "Select" toggle into this slot, so count and Select share one line
+  // instead of taking two lone rows.
+  const countText = countNode && isMobile ? (
+    <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: '12px' }}>
+      {countNode}
+      <span data-kx-select-slot="" />
+    </Box>
+  ) : countNode;
   const countInChipsRow = isNarrow || isMobile;
 
   const FiltersIcon = dsIcons.filters;

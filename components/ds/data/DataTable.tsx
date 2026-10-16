@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState, type HTMLAttributes, type Keyboar
 import {
   Box, Button, Checkbox, Skeleton, Table, TableBody, TableCell, TableHead, TableRow, Typography, useMediaQuery,
 } from '@mui/material';
+import { createPortal } from 'react-dom';
 import { useTheme } from '@mui/material/styles';
 import { useTranslations } from 'next-intl';
 import {
@@ -256,6 +257,13 @@ export function DataTable<T>(props: DataTableProps<T>) {
   // Card select mode ("Select" button, no long-press).
   const [selectMode, setSelectMode] = useState(false);
   useEffect(() => { if (anySelected) setSelectMode(true); }, [anySelected]);
+  // Phones: the page's FilterBar exposes a slot next to the result count; the Select toggle goes there (one line
+  // instead of a lone "Select" row under a lone count row).
+  const [selectSlot, setSelectSlot] = useState<Element | null>(null);
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    setSelectSlot(document.querySelector('[data-kx-select-slot]'));
+  });
 
   const onRowClick = (e: React.MouseEvent<HTMLElement>, row: T) => {
     if (grid) return;
@@ -324,22 +332,27 @@ export function DataTable<T>(props: DataTableProps<T>) {
 
     return (
       <Box className={className} data-testid={testId} data-layout="cards" data-state={state} aria-busy={state === 'loading' || undefined}>
-        {selection && state === 'ready' && (
-          // Compact: the Select toggle used to be a 44px row of its own above the list.
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: px(space[2]), mt: px(-space[1]), pb: px(space[1]) }}>
-            {selectMode && (
-              <Typography variant="caption" sx={{ color: n[600], mr: 'auto' }}>{t('selectedCount', { count: selectedSet.size })}</Typography>
-            )}
+        {selection && state === 'ready' && (() => {
+          const toggle = (
             <Button
               variant="text"
               onClick={() => { if (selectMode) { selection.onChange([]); setSelectMode(false); } else setSelectMode(true); }}
               size="small"
-              sx={{ minHeight: px(control.sm), py: 0 }}
+              sx={{ minHeight: px(control.sm), py: 0, minWidth: 0 }}
             >
               {selectMode ? t('done') : t('select')}
             </Button>
-          </Box>
-        )}
+          );
+          if (selectSlot && !selectMode) return createPortal(toggle, selectSlot);
+          return (
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: px(space[2]), mt: px(-space[1]), pb: px(space[1]) }}>
+              {selectMode && (
+                <Typography variant="caption" sx={{ color: n[600], mr: 'auto' }}>{t('selectedCount', { count: selectedSet.size })}</Typography>
+              )}
+              {toggle}
+            </Box>
+          );
+        })()}
         <Box component="ul" aria-label={ariaLabel} sx={{ listStyle: 'none', m: 0, p: 0, display: 'flex', flexDirection: 'column', ...surface, overflow: 'hidden', '& > li + li': { borderTop: `1px solid ${n[200]}` } }}>
           {state === 'loading'
             ? (showSkeleton

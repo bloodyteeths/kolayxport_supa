@@ -1425,7 +1425,15 @@
       "etgbOn": "Açık · {email} adresine gönderilir",
       "etgbOff": "Kapalı",
       "edit": "Düzenle",
-      "loadFailed": "Gönderici profiliniz yüklenemedi"
+      "loadFailed": "Gönderici profiliniz yüklenemedi",
+      "tin": {
+        "FEDERAL_TAX_ID": "Federal vergi no",
+        "STATE_TAX_ID": "Eyalet vergi no",
+        "BUSINESS_NATIONAL": "İşletme vergi no",
+        "PERSONAL_NATIONAL": "TC kimlik no",
+        "BUSINESS_UNION": "AB işletme no",
+        "PERSONAL_UNION": "AB kişisel no"
+      }
     },
     "saveFailed": "Kaydedilemedi. Değişiklikleriniz duruyor.",
     "credentials": {

@@ -50,8 +50,8 @@ function ItemLine({ item, currency }: { item: OrderItemRow; currency: string | n
         </Typography>
         {(item.variant || item.sku) && (
           <Typography variant="caption" component="div" sx={{ color: n[600], display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' }}>
-            {item.variant && <span>{item.variant}</span>}
-            {item.variant && item.sku && <span aria-hidden>·</span>}
+            {/* Variant and SKU are separate lines: a "·" between them dangled at the end of the line when the SKU wrapped. */}
+            {item.variant && <Box component="span" sx={{ flexBasis: '100%' }}>{item.variant}</Box>}
             {item.sku && (
               <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                 <span>{td('termNames.sku')}</span>

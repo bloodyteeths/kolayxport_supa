@@ -1507,7 +1507,15 @@
       "etgbOn": "On · sent to {email}",
       "etgbOff": "Off",
       "edit": "Edit",
-      "loadFailed": "Couldn't load your sender profile"
+      "loadFailed": "Couldn't load your sender profile",
+      "tin": {
+        "FEDERAL_TAX_ID": "Federal tax ID",
+        "STATE_TAX_ID": "State tax ID",
+        "BUSINESS_NATIONAL": "Business tax number",
+        "PERSONAL_NATIONAL": "Personal ID number",
+        "BUSINESS_UNION": "EU business ID",
+        "PERSONAL_UNION": "EU personal ID"
+      }
     },
     "saveFailed": "Couldn't save. Your changes are still here.",
     "credentials": {

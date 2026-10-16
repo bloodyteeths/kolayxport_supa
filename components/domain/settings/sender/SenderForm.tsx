@@ -74,7 +74,8 @@ export function SenderForm(props: SenderFormProps) {
   };
 
   const currencies = useMemo(() => senderCurrencies(config.currencyListFirst), [config.currencyListFirst]);
-  const tinOptions: SelectOption<string>[] = useMemo(() => TIN_TYPES.map((c) => ({ value: c, label: tinTypeLabel(c) })), []);
+  // Acronyms (VAT, EORI…) stay as-is; word codes (BUSINESS_NATIONAL…) get readable names ('BUSINESS N…' on phones).
+  const tinOptions: SelectOption<string>[] = useMemo(() => TIN_TYPES.map((c) => ({ value: c, label: t.has(`tin.${c}`) ? t(`tin.${c}`) : tinTypeLabel(c) })), [t]);
   const partyLabel = useCallback(
     (group: 'paymentParty' | 'shippingChargesParty', opt: FedExOption) => {
       const key = `${group}.${opt.value}`;

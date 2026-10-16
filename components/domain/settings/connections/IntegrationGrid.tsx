@@ -20,13 +20,13 @@ export function IntegrationGrid({ groups }: { groups: IntegrationGridGroup[] }) 
     <div data-testid="integration-grid">
       {groups.filter((g) => g.tiles.length > 0).map((g, i) => (
         <section key={g.id} aria-labelledby={`integration-group-${g.id}`} data-testid={`integration-group-${g.id}`}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: px(space[2]), margin: `${px(i === 0 ? space[4] : space[6])} 0 ${px(space[2])}`, minHeight: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: px(space[2]), margin: `${px(i === 0 ? space[2] : space[4])} 0 ${px(space[2])}`, minHeight: 16 }}>
             <h3 id={`integration-group-${g.id}`} style={{ margin: 0, flex: 1, fontSize: cs, lineHeight: px(cl), fontWeight: 500, color: n[500] }}>
               {g.heading}
             </h3>
             {g.trailing}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))', gap: px(space[4]) }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))', gap: px(space[2]) }}>
             {g.tiles}
           </div>
         </section>

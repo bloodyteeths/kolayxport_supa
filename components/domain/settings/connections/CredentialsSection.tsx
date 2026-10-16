@@ -85,7 +85,7 @@ export function CredentialsSection({ credentials: injected }: CredentialsSection
   };
 
   const [cs, cl] = typeScale.caption;
-  const header = { id: 'settings-credentials', title: t('credentials.title'), description: t('credentials.description') };
+  const header = { id: 'settings-credentials', title: isPhone ? undefined : t('credentials.title'), description: t('credentials.description') };
 
   if (error && !connections && !isLoading) {
     return (
@@ -134,14 +134,14 @@ export function CredentialsSection({ credentials: injected }: CredentialsSection
                     id={`credentials-row-${spec.id}`}
                     data-testid={`credentials-row-${spec.id}`}
                     divider={i > 0}
-                    stacked={isPhone}
+                    stacked={false} // phones too: one row with a small Edit on the right (stacked full-width buttons doubled each row)
                     leading={<LogoTile brand={spec.logo} size={32} label={spec.name} />}
                     title={spec.name}
                     status={<StatusPill domain="connection" status={statusOf(spec)} size="sm" />}
                     caption={hint || undefined}
                     captionMono
                     trailing={
-                      <Button variant="secondary" size="sm" fullWidth={isPhone} onClick={() => setOpenId(spec.id)} data-testid={`credentials-row-${spec.id}-action`}>
+                      <Button variant="secondary" size="sm" onClick={() => setOpenId(spec.id)} data-testid={`credentials-row-${spec.id}-action`}>
                         {label}
                       </Button>
                     }

@@ -296,7 +296,8 @@ export function ConnectionsSection(props: ConnectionsSectionProps) {
   ]);
 
   /* ── render ─────────────────────────────────────────────────────────────────────────────────── */
-  const header = { id: 'settings-connections', title: tc('title'), description: tc('description') };
+  // Phones: the top bar already says "Connections"; repeating it as the first heading cost a row.
+  const header = { id: 'settings-connections', title: isPhone ? undefined : tc('title'), description: tc('description') };
 
   if (connError && !connections) {
     return (

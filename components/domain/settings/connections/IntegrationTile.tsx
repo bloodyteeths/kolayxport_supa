@@ -40,7 +40,7 @@ const titleSm = typeScale.titleSm;
  * layout is set here: tile height, the column body (Section's single content box), and the focus ring.
  */
 const tileSectionSx = (highlighted: boolean | undefined) => ({
-  mb: 0, flex: 1, minWidth: 0, minHeight: 120, display: 'flex', flexDirection: 'column' as const,
+  mb: 0, flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' as const,
   boxShadow: highlighted ? focusRing : 'none', transition: 'box-shadow 120ms ease',
   '& > div': { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' as const, gap: px(space[2]) },
 });
@@ -123,24 +123,24 @@ export function IntegrationTile({ spec, model, action, actionVariant = 'secondar
       style={{ display: 'flex', minWidth: 0, outline: 'none' }}
     >
       <Section variant="card" sx={tileSectionSx(highlighted)} data-testid={`tile-${spec.id}-card`}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: px(space[3]), minWidth: 0 }}>
+        {/* Two rows (density pass, founder: settings cards were ~180px on phones): logo · name · status · ⋯,
+            then the detail line with the action on its right. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: px(space[2]), minWidth: 0 }}>
           <LogoTile brand={spec.logo} size={32} label={spec.name} />
           <span style={{ flex: 1, minWidth: 0, fontSize: titleSm[0], lineHeight: px(titleSm[1]), fontWeight: titleSm[2], color: n[900], overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {spec.name}
           </span>
+          {loading ? <Bone w={72} h={20} r={radius.full} /> : <StatusPill domain="connection" status={model.status === 'loading' ? null : model.status} />}
           {!loading && (
             <OverflowMenu items={overflow} label={tc('menu.more', { provider: spec.name })} data-testid={`tile-${spec.id}-more`} itemTestIdPrefix={`tile-${spec.id}-menu-`} />
           )}
         </div>
-        <div style={{ minHeight: 20, display: 'flex', alignItems: 'center' }}>
-          {loading ? <Bone w={96} h={20} r={radius.full} /> : <StatusPill domain="connection" status={model.status === 'loading' ? null : model.status} />}
-        </div>
-        <div style={{ minHeight: 16, display: 'flex', alignItems: 'center', minWidth: 0 }}>
-          {loading ? <Bone w="70%" h={12} /> : (
-            <MetaLine spec={spec} meta={model.meta} wixElapsedSec={wixElapsedSec} onRefreshAll={onRefreshAll} refreshing={refreshing} />
-          )}
-        </div>
-        <div style={{ marginTop: 'auto', display: 'flex' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: px(space[2]), minWidth: 0, minHeight: 20 }}>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center' }}>
+            {loading ? <Bone w="70%" h={12} /> : (
+              <MetaLine spec={spec} meta={model.meta} wixElapsedSec={wixElapsedSec} onRefreshAll={onRefreshAll} refreshing={refreshing} />
+            )}
+          </div>
           {!loading && action && <ActionButton action={action} variant={actionVariant} size="sm" data-testid={`tile-${spec.id}-action`} />}
         </div>
       </Section>

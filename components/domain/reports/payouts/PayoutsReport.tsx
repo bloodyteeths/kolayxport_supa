@@ -398,7 +398,7 @@ export function PayoutsReport({ now }: PayoutsReportProps = {}) {
       ) : (
         <Box
           aria-busy={report.isValidating || undefined}
-          sx={{ display: 'flex', flexDirection: 'column', gap: px(space[6]), opacity: report.isValidating ? 0.6 : 1, transition: 'opacity 120ms linear' }}
+          sx={{ display: 'flex', flexDirection: 'column', gap: { xs: px(space[4]), md: px(space[6]) }, '& > section': { mb: 0 }, opacity: report.isValidating ? 0.6 : 1, transition: 'opacity 120ms linear' }}
           data-testid="payouts-body"
         >
           {report.state === 'stale' ? <ErrorState variant="stale" onRetry={report.retry} data-testid="payouts-stale" /> : null}

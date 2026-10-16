@@ -446,7 +446,7 @@ export function SalesReport({ now }: SalesReportProps = {}) {
         <Box
           aria-busy={updating || undefined}
           data-updating={updating || undefined}
-          sx={{ display: 'flex', flexDirection: 'column', gap: { xs: px(space[6]), md: px(space[8]) }, opacity: updating ? 0.6 : 1, transition: 'opacity 120ms linear' }}
+          sx={{ display: 'flex', flexDirection: 'column', gap: { xs: px(space[4]), md: px(space[6]) }, '& > section': { mb: 0 }, opacity: updating ? 0.6 : 1, transition: 'opacity 120ms linear' }}
         >
           {stale}
           <SalesKpis report={data} loading={false} currency={currency} approx={approx} fxNote={fxNote} periodLabel={comparison.short} periodDetail={comparison.detail} />

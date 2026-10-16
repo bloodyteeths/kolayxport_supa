@@ -289,7 +289,7 @@ export function ProfitReport({ now }: ProfitReportProps = {}) {
     case 'ready':
     default:
       body = data ? (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: px(space[6]) }} data-testid="profit-body">
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: px(space[4]), md: px(space[6]) }, '& > section': { mb: 0 } }} data-testid="profit-body">
           {report.state === 'stale' ? (
             <ErrorState
               variant="stale"

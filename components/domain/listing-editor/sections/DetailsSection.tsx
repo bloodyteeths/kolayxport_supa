@@ -76,7 +76,8 @@ function PropertyField({ prop, value, onChange, disabled }: {
               value={value?.scale_id ? String(value.scale_id) : ''}
               disabled={disabled}
               onChange={(v) => onChange({ ...(value ?? { property_id: prop.property_id, values: [] }), property_id: prop.property_id, scale_id: v ? Number(v) : null })}
-              options={[{ value: '', label: '—' }, ...prop.scales.map((s) => ({ value: String(s.scale_id), label: s.display_name }))]}
+              placeholder={t('field.choose')}
+              options={prop.scales.map((s) => ({ value: String(s.scale_id), label: s.display_name }))}
             />
           </FormField>
         </Box>

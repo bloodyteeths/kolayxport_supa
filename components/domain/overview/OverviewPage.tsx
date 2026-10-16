@@ -272,7 +272,7 @@ export function OverviewPage({ now: nowProp }: OverviewPageProps = {}) {
         mobilePrimary={primaryKind === 'goToOrders' ? 'sticky' : 'none'}
       />
 
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: px(space[6]), md: px(space[8]) } }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: px(space[4]), md: px(space[6]) }, '& > section': { mb: 0 } }}>
         {setupVisible && facts ? (
           <SetupChecklist
             facts={facts}

@@ -354,7 +354,8 @@ export function ReportsPage({
           data-testid="reports-mobile-meta"
           sx={{ display: 'flex', alignItems: 'center', gap: px(space[2]), mb: px(space[3]), mt: px(-space[2]) }}
         >
-          <Box sx={{ flex: 1, minWidth: 0, fontSize: 12, lineHeight: '16px' }}>{meta}</Box>
+          {/* Phones: freshness + rate source clamp to 2 lines next to the currency switch (it was 3–4 lines). */}
+          <Box sx={{ flex: 1, minWidth: 0, fontSize: 12, lineHeight: '16px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{meta}</Box>
           <Box sx={{ flexShrink: 0 }}>{headerControl}</Box>
         </Box>
       ) : null}

@@ -182,6 +182,9 @@ export function buildChartOptions(input: ChartBuildInput, fmt: DsFormat) {
       xaxis: {
         categories: cats,
         tickAmount: Math.min(maxTicks, Math.max(1, cats.length - 1)),
+        // ApexCharts ignores tickAmount on category axes unless ticks sit "on" the points: without it every day got
+        // a label and they overlapped on phones ("17 Ey20 Ey23…").
+        tickPlacement: 'on' as const,
         labels: { style: axisLabelStyle, rotate: 0, hideOverlappingLabels: true },
         axisBorder: { show: false },
         axisTicks: { show: false },

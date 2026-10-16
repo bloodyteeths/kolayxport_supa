@@ -65,7 +65,7 @@ export function SegmentedControl<T extends string>({
         borderRadius: `${radius.sm}px`,
         backgroundColor: neutral[100],
         height: h,
-        [COARSE]: { height: control.lg },
+        [COARSE]: { height: 36 }, // touch: 36px (44px switches dominated small headers); segments are wide enough to hit
       }}
     >
       {options.map((o, i) => {

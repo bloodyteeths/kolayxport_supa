@@ -94,7 +94,7 @@ export function Chart({
   const built = useMemo(
     () => buildChartOptions(
       {
-        type, series, categories, format, currency, maxSlots, directLabel,
+        type, series, categories, format, currency, maxSlots, directLabel: narrow ? 'none' : directLabel,
         maxTicks: maxTicks ?? (narrow ? 4 : 8), comparisonName: t('previousPeriod'), markers,
         plotWidth: width !== null ? Math.max(1, width - Y_AXIS_PX) : undefined,
       },

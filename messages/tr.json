@@ -15484,7 +15484,8 @@
         "search": "Ürün veya SKU ara",
         "product": "Ürün",
         "units": "Adet",
-        "revenue": "Ciro"
+        "revenue": "Ciro",
+        "unitsMeta": "{count} adet"
       },
       "status": {
         "title": "Duruma göre siparişler"

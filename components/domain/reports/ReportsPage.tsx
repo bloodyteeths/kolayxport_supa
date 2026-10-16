@@ -224,7 +224,8 @@ export function useReportMarketplace(): ReportMarketplace {
     [conn],
   );
   const { mp, supported } = resolveFinanceMarketplace(url.mp, connected);
-  const options: FilterOption[] = FINANCE_MARKETPLACES.map((m) => ({
+  // Only this seller's connected stores (plus the one in the URL), never every marketplace we support.
+  const options: FilterOption[] = FINANCE_MARKETPLACES.filter((m) => connected[m] !== false || m === mp).map((m) => ({
     value: m,
     label: connected[m] === false ? t('toolbar.notConnected', { name: FINANCE_MARKETPLACE_NAME[m] }) : FINANCE_MARKETPLACE_NAME[m],
     leading: <LogoTile brand={m} size={16} />,

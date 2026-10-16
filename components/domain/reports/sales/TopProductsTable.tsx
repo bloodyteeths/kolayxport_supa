@@ -59,7 +59,8 @@ export function TopProductsTable({ rows, currency, approx, fxNote, q, onQueryCha
         </Box>
       ),
     },
-    { key: 'units', header: t('sales.products.units'), type: 'number', mobile: 'meta' },
+    // Cards: "11 adet", not a bare "11".
+    { key: 'units', header: t('sales.products.units'), type: 'number', mobile: 'meta', mobileRender: (r) => t('sales.products.unitsMeta', { count: r.units }) },
     {
       key: 'revenue',
       header: t('sales.products.revenue'),

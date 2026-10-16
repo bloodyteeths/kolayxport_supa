@@ -91,6 +91,8 @@ export function buildChartOptions(input: ChartBuildInput, fmt: DsFormat) {
   );
   const colors = seriesColors(ordered, input.maxSlots);
   const cats = categories.map((c) => formatCategory(c, fmt));
+  const labelStep = Math.max(1, Math.ceil(cats.length / Math.max(1, maxTicks)));
+  const shownLabels = new Set(cats.filter((_, i) => i % labelStep === 0 || i === cats.length - 1).map(String));
   const fmtAxis = (v: number) => formatValue(v, format, fmt, currency, true);
   const fmtFull = (v: number) => formatValue(v, format, fmt, currency, false);
   const axisLabelStyle = { colors: n[500], fontSize: '12px', fontFamily: font.sans };
@@ -185,7 +187,11 @@ export function buildChartOptions(input: ChartBuildInput, fmt: DsFormat) {
         // ApexCharts ignores tickAmount on category axes unless ticks sit "on" the points: without it every day got
         // a label and they overlapped on phones ("17 Ey20 Ey23…").
         tickPlacement: 'on' as const,
-        labels: { style: axisLabelStyle, rotate: 0, hideOverlappingLabels: true },
+        // Only every `step`-th category gets a label (ApexCharts still drew all 30 dates on phones, overlapping).
+        labels: {
+          style: axisLabelStyle, rotate: 0, hideOverlappingLabels: true,
+          formatter: (value: string) => (shownLabels.has(String(value)) ? value : ''),
+        },
         axisBorder: { show: false },
         axisTicks: { show: false },
         crosshairs: { show: true },

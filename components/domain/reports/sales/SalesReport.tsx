@@ -315,13 +315,15 @@ export function SalesReport({ now }: SalesReportProps = {}) {
         }}
       />
       {storeCount > 0 ? (
-        <Typography variant="caption" component="span" sx={{ color: neutral[500] }} data-testid="sales-store-count">
+        // Phones: one header line (time + refresh). Store count and the exchange-rate source stay on wider screens;
+        // the "≈" on converted amounts still marks conversion.
+        <Typography variant="caption" component="span" sx={{ color: neutral[500], display: { xs: 'none', sm: 'inline' } }} data-testid="sales-store-count">
           {t('meta.storeCount', { count: storeCount })}
         </Typography>
       ) : null}
       {fxMeta ? (
         <Tooltip title={fxNote ?? fxMeta}>
-          <Typography variant="caption" component="span" sx={{ color: neutral[500] }} tabIndex={0} data-testid="sales-fx-meta">
+          <Typography variant="caption" component="span" sx={{ color: neutral[500], display: { xs: 'none', sm: 'inline' } }} tabIndex={0} data-testid="sales-fx-meta">
             {fxMeta}
           </Typography>
         </Tooltip>

@@ -54,7 +54,7 @@ export const C_EN = {
         aov: 'Avg order',
         manual: 'Manual orders',
       },
-      products: { title: 'Top products', search: 'Search product or SKU', product: 'Product', units: 'Units', revenue: 'Revenue' },
+      products: { title: 'Top products', search: 'Search product or SKU', product: 'Product', units: 'Units', revenue: 'Revenue', unitsMeta: '{count, plural, one {# unit} other {# units}}' },
       status: { title: 'Orders by status' },
     },
     fx: {
@@ -138,7 +138,7 @@ export const C_TR = {
         aov: 'Ort. sipariş',
         manual: 'Manuel siparişler',
       },
-      products: { title: 'En çok satan ürünler', search: 'Ürün veya SKU ara', product: 'Ürün', units: 'Adet', revenue: 'Ciro' },
+      products: { title: 'En çok satan ürünler', search: 'Ürün veya SKU ara', product: 'Ürün', units: 'Adet', revenue: 'Ciro', unitsMeta: '{count} adet' },
       status: { title: 'Duruma göre siparişler' },
     },
     fx: {

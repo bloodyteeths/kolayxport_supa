@@ -15484,7 +15484,8 @@
         "search": "Search product or SKU",
         "product": "Product",
         "units": "Units",
-        "revenue": "Revenue"
+        "revenue": "Revenue",
+        "unitsMeta": "{count, plural, one {# unit} other {# units}}"
       },
       "status": {
         "title": "Orders by status"

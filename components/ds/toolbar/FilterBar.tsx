@@ -92,7 +92,8 @@ export function FilterBar({
   const [sheetAnchor, setSheetAnchor] = React.useState<HTMLElement | null>(null);
   const [sheetOpen, setSheetOpen] = React.useState(false);
 
-  const cap = isMobile ? 0 : isNarrow ? Math.max(maxVisible - 1, 1) : maxVisible;
+  // Phones: a page with a single filter (e.g. the report store picker) shows it as a dropdown, not behind "Filters".
+  const cap = isMobile ? (filters.length === 1 ? 1 : 0) : isNarrow ? Math.max(maxVisible - 1, 1) : maxVisible;
   const visible = pickVisibleFilters(filters.filter(isToolbarEligible), cap);
   const visibleKeys = new Set(visible.map((f) => f.key));
   const hidden = filters.filter((f) => !visibleKeys.has(f.key));
@@ -203,6 +204,24 @@ export function FilterBar({
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {leading}
           {search ? <SearchField size="md" {...search} shortcut={null} fullWidth /> : null}
+          {visible.map((f) =>
+            f.render ? (
+              <React.Fragment key={f.key}>{f.render({ value: values[f.key], onChange: (v) => set(f.key, v), placement: 'toolbar' })}</React.Fragment>
+            ) : (
+              <FilterButton
+                key={f.key}
+                data-testid={`filter-${f.key}`}
+                label={f.label}
+                value={values[f.key] as string | string[] | undefined}
+                options={f.options ?? []}
+                multiple={f.type === 'multiselect'}
+                searchable={f.searchable}
+                allLabel={f.allLabel}
+                size="md"
+                onChange={(v) => set(f.key, f.type === 'multiselect' ? (v as string[]) ?? [] : v)}
+              />
+            ),
+          )}
           {filtersButton}
         </Box>
         {mobileSecondRow ? (

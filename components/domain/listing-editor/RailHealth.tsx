@@ -218,7 +218,7 @@ function FixRow({ check, onFix, busy }: { check: Check; onFix: (c: Check) => voi
       </Box>
       <Box sx={{ minWidth: 0 }}>
         <Typography variant="dense" component="span" sx={{ color: check.status === 'na' ? n[500] : n[800] }}>
-          <Box component="span" sx={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
+          <Box component="span" sx={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
             {ts(`status.${check.status}`)}
           </Box>
           {label}

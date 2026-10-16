@@ -17,7 +17,7 @@ export interface ShipByProps {
 }
 
 // Unknown deadline: the dash is decorative, screen readers get the words.
-const SR_ONLY = { position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' } as const;
+const SR_ONLY = { position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' } as const;
 
 export function ShipBy({ date, shippedAt, now, className, 'data-testid': testId }: ShipByProps) {
   const f = useFormatters();

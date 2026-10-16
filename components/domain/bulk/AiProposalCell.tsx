@@ -17,7 +17,7 @@ import { icons, ICON_STROKE } from '@/lib/ds/icons';
 import { accent } from '@/lib/ds/tokens';
 
 const SR_ONLY = {
-  position: 'absolute', width: 1, height: 1, p: 0, m: '-1px', overflow: 'hidden',
+  position: 'absolute', width: '1px', height: '1px', p: 0, m: '-1px', overflow: 'hidden',
   clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0,
 } as const;
 

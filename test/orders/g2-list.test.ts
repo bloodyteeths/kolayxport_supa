@@ -59,8 +59,9 @@ describe('legacy query migration on mount (orders §1.2)', () => {
 });
 
 describe('views and the server query (orders §1.3)', () => {
-  it('defaults to To ship, undated, ship-by ascending', () => {
-    const q = toOrdersQuery(state(), NOW);
+  it('defaults to All orders, newest first (founder 2026-10-16); To ship stays undated, ship-by ascending', () => {
+    expect(toOrdersQuery(state(), NOW)).toMatchObject({ view: 'all', sort: 'orderedAt', dir: 'desc', page: 1, size: 50 });
+    const q = toOrdersQuery(state({ view: 'to_ship' }), NOW);
     expect(q).toMatchObject({ view: 'to_ship', sort: 'shipBy', dir: 'asc', page: 1, size: 50 });
     expect(q.from).toBeUndefined();
     expect(q.preset).toBeUndefined();

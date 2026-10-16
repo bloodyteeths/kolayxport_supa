@@ -188,7 +188,9 @@ function OrderTitle({ row, t, isNew, newLabel }: { row: OrderRow; t: OrdersT; is
 function StatusCell({ row, t, ctx }: { row: OrderRow; t: OrdersT; ctx: OrderColumnsContext }) {
   const s = row.status;
   const caption = statusCaption(row, t);
-  const flags = ctx.lifecycle?.[row.id];
+  const rawFlags = ctx.lifecycle?.[row.id];
+  // The status pill already says "Overdue"; don't repeat it as a second "late" badge in the same cell.
+  const flags = rawFlags && s.key === 'overdue' && rawFlags.late ? { ...rawFlags, late: false } : rawFlags;
   const captionNode = caption ? (
     <Typography component="span" sx={{ ...captionSx, display: 'block', color: caption.tone === 'danger' ? tone.danger.fg : caption.tone === 'success' ? tone.success.fg : neutral[600] }}>
       {caption.text}
@@ -274,8 +276,6 @@ export function orderColumns(t: OrdersT, ctx: OrderColumnsContext): Column<Order
       key: 'order',
       header: t('columns.order'),
       minWidth: 280,
-      // The order column takes the spare width; the others hug their content (no wide empty gaps on big screens).
-      width: '100%',
       mobile: 'title',
       render: (r) => (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>

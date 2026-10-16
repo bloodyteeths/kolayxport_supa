@@ -113,7 +113,7 @@ export function CopyText({ value, display, mono, truncate, className, 'data-test
         component="span"
         role="status"
         aria-live="polite"
-        sx={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}
+        sx={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}
       >
         {state === 'copied' ? t('copied') : state === 'failed' ? t('failed') : ''}
       </Box>

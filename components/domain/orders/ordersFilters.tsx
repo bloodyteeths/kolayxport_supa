@@ -71,7 +71,7 @@ export const SORT_OPTIONS = [
 
 export const ORDERS_URL_SCHEMA = {
   /** A built-in view key or a user saved-view id (`u_…`). */
-  view: urlField.string('to_ship', { maxLength: 64 }),
+  view: urlField.string('all', { maxLength: 64 }),
   /** Built-in base of a user saved view (only meaningful while `view` is a user view). */
   base: urlField.optionalEnum(ORDER_VIEWS),
   q: urlField.string(undefined, { maxLength: 200 }),
@@ -191,7 +191,7 @@ export function applyViewPatch(id: string, userViews: readonly SavedView[]): Par
   };
   if (isBuiltInView(id)) return { ...cleared, view: id };
   const saved = userViews.find((v) => v.id === id);
-  if (!saved) return { ...cleared, view: 'to_ship' };
+  if (!saved) return { ...cleared, view: 'all' };
   const q = saved.query ?? {};
   const str = (k: string) => (typeof q[k] === 'string' ? (q[k] as string) : undefined);
   const list = (k: string) => (Array.isArray(q[k]) ? (q[k] as string[]) : typeof q[k] === 'string' ? [q[k] as string] : []);

@@ -88,7 +88,7 @@ export function ProfitStatement({ data, loading }: ProfitStatementProps) {
           />
         ) : (
           <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse' }} aria-label={t('profit.statement.title')}>
-            <Box component="thead" sx={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
+            <Box component="thead" sx={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
               <tr>
                 <th scope="col">{t('profit.statement.title')}</th>
                 <th scope="col">{t('profit.products.revenue')}</th>

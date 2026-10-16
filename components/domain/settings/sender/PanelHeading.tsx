@@ -8,7 +8,7 @@ import { useIsMobile } from '@/components/ds/page';
 import { neutral, px, space, type as typeScale } from '@/lib/ds/tokens';
 
 const srOnly = {
-  position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0,
+  position: 'absolute', width: '1px', height: '1px', padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0,
 } as const;
 
 export interface PanelHeadingProps {

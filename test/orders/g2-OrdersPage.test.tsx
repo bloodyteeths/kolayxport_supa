@@ -257,7 +257,7 @@ describe('empty state per view (orders §7.1)', () => {
   ];
   it.each(cases)('%s', async (view, text) => {
     list.state = 'empty';
-    router.query = view === 'to_ship' ? {} : { view };
+    router.query = { view };
     renderPage();
     await act(async () => {});
     expect(screen.getByText(text)).toBeTruthy();

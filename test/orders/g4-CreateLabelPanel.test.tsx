@@ -96,7 +96,10 @@ describe('CreateLabelPanel', () => {
       // UPS is the only connected carrier: FedEx row says why it is disabled, DHL is TR-only.
       const list = screen.getByTestId('rate-list');
       expect(within(list).getAllByText(locale === 'en' ? 'Connect FedEx in Settings' : "FedEx hesabını Ayarlar'dan bağlayın").length).toBeGreaterThan(0);
-      expect(within(list).getByText(locale === 'en' ? 'Turkey domestic only' : 'Yalnızca Türkiye içi')).toBeTruthy();
+      // International order: DHL eCommerce (TR-only) is folded under "Other carriers", not in the main list.
+      expect(within(list).queryByText(locale === 'en' ? 'Turkey domestic only' : 'Yalnızca Türkiye içi')).toBeNull();
+      fireEvent.click(screen.getByTestId('carrier-other-toggle'));
+      expect(within(screen.getByTestId('rate-list-other')).getByText(locale === 'en' ? 'Turkey domestic only' : 'Yalnızca Türkiye içi')).toBeTruthy();
     });
   }
 

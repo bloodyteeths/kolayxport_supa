@@ -129,7 +129,9 @@ export function PackageSection({
             <Box
               sx={{
                 display: 'grid',
-                gridTemplateColumns: { xs: '1fr 1fr', sm: packaging ? '112px repeat(3, 84px) minmax(140px, 1fr)' : '112px repeat(3, 84px)' },
+                // Fit the panel, not the viewport: the side panel is ~560px even on large screens, so a fixed
+                // 5-column row overflowed sideways. Fields wrap to the next row when they no longer fit.
+                gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(auto-fill, minmax(104px, 1fr))' },
                 gap: '12px',
                 alignItems: 'start',
               }}

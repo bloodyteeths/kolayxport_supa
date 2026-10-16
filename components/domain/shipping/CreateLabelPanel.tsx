@@ -617,7 +617,12 @@ export function CreateLabelPanel({ order, open, onClose, onBack, defaultCarrier,
           weightError={msg(errors['pkg.weightKg'])}
           onBlurWeight={() => blur('pkg.weightKg')}
         />
-        <CarrierServiceSection rows={rows} value={rateId(draft.carrier, draft.service)} onChange={onPickRate} />
+        <CarrierServiceSection
+          rows={rows}
+          value={rateId(draft.carrier, draft.service)}
+          onChange={onPickRate}
+          primary={primaryCarriersFor(routeOf(senderCountry, draft.shipTo.country))}
+        />
         {showCustoms ? (
           <CustomsSection
             customs={draft.customs}

@@ -15691,5 +15691,52 @@
       "empty": "Bu dönemde ödeme yok",
       "connect": "Ödemelerinizi görmek için {name} hesabınızı bağlayın"
     }
+  },
+  "help": {
+    "guide": {
+      "title": "Nasıl kullanılır",
+      "subtitle": "KolayXport'u kurmak ve her gün kullanmak için 8 adım",
+      "connect": {
+        "title": "Mağazalarınızı bağlayın",
+        "body": "Ayarlar → Bağlantılar'dan Etsy, eBay, Amazon ve Shopify'ı \"Bağla\" ile; Trendyol ve Wix'i API anahtarıyla bağlayın. Kargo firmalarınızı (DHL eCommerce, FedEx, UPS) \"Kargo ve API anahtarları\" bölümüne ekleyin.",
+        "action": "Bağlantılara git"
+      },
+      "sender": {
+        "title": "Gönderici profilinizi doldurun",
+        "body": "Etikette ve gümrük formunda yazan adresiniz, telefonunuz ve vergi numaranız. Bir kez doldurmanız yeterli.",
+        "action": "Gönderici profilini aç"
+      },
+      "orders": {
+        "title": "Siparişleri hazırlayın ve etiket basın",
+        "body": "Tüm pazaryerlerinin siparişleri Siparişler'de toplanır. Bir siparişe dokunun, \"Etiket oluştur\" deyin; birden çok sipariş seçip toplu etiket de basabilirsiniz. Takip numarası pazaryerine otomatik gönderilir.",
+        "action": "Siparişlere git"
+      },
+      "extension": {
+        "title": "Etsy adresleri için eklentiyi kurun",
+        "body": "Etsy alıcı adresini API ile vermez. KolayXport Chrome eklentisini kurun ve Etsy'de Siparişler sayfasını açın: adresler toplu aktarılır. Eklentideki \"Tüm adresleri içe aktar\" ile istediğiniz zaman tekrar alabilirsiniz.",
+        "action": "Bağlantılarda eklentiyi gör"
+      },
+      "listings": {
+        "title": "İlanlarınızı düzenleyin",
+        "body": "Yaptığınız değişiklikler önce taslak olarak kaydedilir; siz \"Etsy'ye gönder\" diyene kadar pazaryerinde hiçbir şey değişmez. Toplu düzenleme ve fotoğraf stüdyosu ile çok ilanı birden güncelleyin.",
+        "action": "İlanlara git"
+      },
+      "messages": {
+        "title": "Mesajları tek yerden yanıtlayın",
+        "body": "Trendyol soruları ve Wix mesajları Mesajlar'da toplanır. Sık yazdığınız cevapları \"Hazır yanıtlar\" ile kaydedin.",
+        "action": "Mesajlara git"
+      },
+      "reports": {
+        "title": "Satış ve kârınızı takip edin",
+        "body": "Ana sayfa cironuzu, sipariş sayınızı ve mağaza dağılımını gösterir. Kâr sekmesinde ürün maliyetlerini girerseniz net kârınızı görürsünüz.",
+        "action": "Ana sayfaya git"
+      },
+      "research": {
+        "title": "Pazarı araştırın",
+        "body": "Ürün bulucu, anahtar kelime gezgini, ilan doktoru ve mağaza takibi ile ne satacağınıza, fiyatınıza ve etiketlerinize karar verin.",
+        "action": "Pazar araştırmasına git"
+      },
+      "contact": "Takıldığınız bir yer olursa destek@kolayxport.com adresine yazın."
+    }
   }
 }

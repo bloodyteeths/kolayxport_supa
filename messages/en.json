@@ -15691,5 +15691,52 @@
       "empty": "No payouts in this period",
       "connect": "Connect {name} to see your payouts"
     }
+  },
+  "help": {
+    "guide": {
+      "title": "How to use",
+      "subtitle": "8 steps to set up KolayXport and use it every day",
+      "connect": {
+        "title": "Connect your stores",
+        "body": "In Settings → Connections, connect Etsy, eBay, Amazon and Shopify with \"Connect\", and Trendyol and Wix with an API key. Add your carriers (DHL eCommerce, FedEx, UPS) under \"Carriers and API keys\".",
+        "action": "Go to Connections"
+      },
+      "sender": {
+        "title": "Fill in your sender profile",
+        "body": "The address, phone and tax number printed on labels and customs forms. You only do this once.",
+        "action": "Open sender profile"
+      },
+      "orders": {
+        "title": "Prepare orders and print labels",
+        "body": "Orders from every marketplace land in Orders. Tap an order and choose \"Create label\", or select several for bulk labels. Tracking numbers go back to the marketplace automatically.",
+        "action": "Go to Orders"
+      },
+      "extension": {
+        "title": "Install the extension for Etsy addresses",
+        "body": "Etsy does not share buyer addresses through its API. Install the KolayXport Chrome extension and open your Orders page on Etsy: addresses import in one go. Use \"Import all addresses\" in the extension any time.",
+        "action": "See the extension in Connections"
+      },
+      "listings": {
+        "title": "Edit your listings",
+        "body": "Your changes are saved as drafts first; nothing changes on the marketplace until you press \"Send to Etsy\". Use bulk edit and the photo studio to update many listings at once.",
+        "action": "Go to Listings"
+      },
+      "messages": {
+        "title": "Answer messages in one place",
+        "body": "Trendyol questions and Wix messages are collected in Messages. Save the answers you send often as saved replies.",
+        "action": "Go to Messages"
+      },
+      "reports": {
+        "title": "Track sales and profit",
+        "body": "Home shows your revenue, order count and store split. Add product costs on the Profit tab to see your net profit.",
+        "action": "Go to Home"
+      },
+      "research": {
+        "title": "Research the market",
+        "body": "Use the product finder, keyword explorer, listing doctor and shop tracker to decide what to sell, how to price it and which tags to use.",
+        "action": "Go to Market research"
+      },
+      "contact": "Stuck somewhere? Write to destek@kolayxport.com."
+    }
   }
 }

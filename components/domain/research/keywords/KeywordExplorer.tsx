@@ -770,7 +770,7 @@ function KeywordExplorerPanel({ listing, open, onClose, onApply, navigate }: Pan
 
   return (
     <>
-      <SidePanel
+      <SidePanel padded
         open={open}
         onClose={onClose}
         size="lg"

@@ -336,6 +336,7 @@ export function FindReplacePanel({ open, onClose, ctx, fields: fieldsProp }: Fin
 
   return (
     <SidePanel
+      padded
       open={open}
       onClose={close}
       size="md"

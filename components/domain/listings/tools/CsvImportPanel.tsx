@@ -304,6 +304,7 @@ export function CsvImportPanel({ open, onClose, ctx, allowDescription = false }:
 
   return (
     <SidePanel
+      padded
       open={open}
       onClose={close}
       size="lg"

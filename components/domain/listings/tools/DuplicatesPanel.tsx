@@ -135,7 +135,7 @@ export function DuplicatesPanel({ open, onClose, ctx }: ListingsToolPanelProps) 
   const groups = data?.groups ?? [];
 
   return (
-    <SidePanel open={open} onClose={onClose} size="lg" title={t('tools.duplicates')} data-testid="listings-tool-duplicates">
+    <SidePanel padded open={open} onClose={onClose} size="lg" title={t('tools.duplicates')} data-testid="listings-tool-duplicates">
       {loadError && !data ? (
         <ErrorState
           variant="inline"

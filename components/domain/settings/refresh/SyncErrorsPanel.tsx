@@ -32,7 +32,7 @@ export function SyncErrorsPanel({ run, onClose }: SyncErrorsPanelProps) {
   };
 
   return (
-    <SidePanel
+    <SidePanel padded
       open={open}
       onClose={onClose}
       size="md"

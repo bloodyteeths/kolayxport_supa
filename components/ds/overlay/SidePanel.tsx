@@ -32,6 +32,8 @@ export interface SidePanelProps {
   status?: React.ReactNode;
   /** Caption line under the title: "#3891 · Etsy · Ordered 14 Oct". */
   meta?: React.ReactNode;
+  /** Pad the body (16px) for panels whose content is not made of SidePanelSections (tools, forms). */
+  padded?: boolean;
   onPrev?: () => void;
   onNext?: () => void;
   primary?: ActionSpec;
@@ -74,7 +76,7 @@ function isTypingTarget(el: EventTarget | null): boolean {
  * body scrolls. Keys: Esc close, j/k prev/next (outside inputs), ⌘/Ctrl+Enter primary, ⌘/Ctrl+S onSave.
  */
 export function SidePanel({
-  open, onClose, size = 'md', title, leading, status, meta, onPrev, onNext, primary, secondary, overflow,
+  open, onClose, size = 'md', title, leading, status, meta, padded, onPrev, onNext, primary, secondary, overflow,
   saveState = 'idle', saveNote, dirty, onSave, sectionNav, headerSlot, children, className, ...rest
 }: SidePanelProps) {
   const t = useTranslations('ds.overlay');
@@ -201,7 +203,7 @@ export function SidePanel({
           </Box>
         )}
         {headerSlot && <Box sx={{ flexShrink: 0 }}>{headerSlot}</Box>}
-        <Box ref={bodyRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>
+        <Box ref={bodyRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', ...(padded ? { p: '16px', display: 'flex', flexDirection: 'column', gap: '16px' } : null) }}>
           {children}
         </Box>
         {hasFooter && (

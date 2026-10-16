@@ -154,7 +154,7 @@ export function ScheduledSendsPanel({ open, onClose, ctx }: ListingsToolPanelPro
   const now = new Date();
 
   return (
-    <SidePanel open={open} onClose={onClose} size="md" title={t('tools.scheduled')} data-testid="listings-tool-scheduled">
+    <SidePanel padded open={open} onClose={onClose} size="md" title={t('tools.scheduled')} data-testid="listings-tool-scheduled">
       {loadError && !data ? (
         <ErrorState
           variant="inline"

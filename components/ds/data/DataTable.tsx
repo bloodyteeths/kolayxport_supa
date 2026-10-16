@@ -409,16 +409,20 @@ export function DataTable<T>(props: DataTableProps<T>) {
                         </Box>
                       )}
                     </Box>
-                    {subtitleCols.length > 0 && (
-                      <Typography variant="caption" component="div" sx={{ color: n[600], display: 'flex', alignItems: 'center', gap: px(space[1]), flexWrap: 'wrap' }}>
-                        {subtitleCols.map((c, i) => (
-                          <Box component="span" key={c.key} sx={{ display: 'inline-flex', alignItems: 'center', gap: px(space[1]) }}>
-                            {i > 0 && <Box component="span" aria-hidden>{'·'}</Box>}
-                            {cell(c, r)}
-                          </Box>
-                        ))}
-                      </Typography>
-                    )}
+                    {(() => {
+                      // Empty values ("—") are dropped like meta values: no "SKU 123 · —" on cards.
+                      const subs = subtitleCols.map((c) => ({ key: c.key, node: cell(c, r) })).filter((m) => m.node !== null && m.node !== '—');
+                      return subs.length > 0 ? (
+                        <Typography variant="caption" component="div" sx={{ color: n[600], display: 'flex', alignItems: 'center', gap: px(space[1]), flexWrap: 'wrap' }}>
+                          {subs.map((m, i) => (
+                            <Box component="span" key={m.key} sx={{ display: 'inline-flex', alignItems: 'center', gap: px(space[1]) }}>
+                              {i > 0 && <Box component="span" aria-hidden>{'·'}</Box>}
+                              {m.node}
+                            </Box>
+                          ))}
+                        </Typography>
+                      ) : null;
+                    })()}
                     {(trailingCol || statusCol || ((actionCol || ia) && !selectMode)) && (
                       // Price · status on the left, the main action on the right: one row, not three.
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: px(space[2]), flexWrap: 'wrap' }}>

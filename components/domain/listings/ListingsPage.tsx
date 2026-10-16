@@ -257,6 +257,9 @@ export type ListingsPageProps = {
   stagingAdapter?: UseStagedChanges['adapter'];
 };
 
+/** A listings cache older than this refreshes by itself when the page opens. */
+const AUTO_PULL_AFTER_MS = 12 * 60 * 60 * 1000;
+
 export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageProps) {
   const config = listingsConfig(marketplace);
   const t = useTranslations() as unknown as ListingsT;
@@ -1033,6 +1036,18 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
     const res = await pull.run();
     if (res.ok && typeof res.synced === 'number' && res.synced !== before) toast.success(t('listings.meta.refreshToast', { count: res.synced }));
   }, [pull, counts?.all, toast, t]);
+
+  // Stale cache → refresh once on open (founder saw eBay "7 days ago" and Trendyol "19 Jun": stock and prices on
+  // screen were wrong until someone pressed Refresh). Pull only reads the marketplace; it never sends edits.
+  const autoPulled = React.useRef(false);
+  const lastPulledAt = data?.store.lastPulledAt ?? null;
+  React.useEffect(() => {
+    if (autoPulled.current || notConnected || !data || pull.state !== 'idle') return;
+    const ageMs = lastPulledAt ? Date.now() - new Date(lastPulledAt).getTime() : Infinity;
+    if (!(ageMs > AUTO_PULL_AFTER_MS)) return;
+    autoPulled.current = true;
+    void pull.run();
+  }, [data, lastPulledAt, notConnected, pull]);
 
   const newAction: ActionSpec | null = newHref
     ? { id: 'newListing', label: t('listings.action.new'), icon: icons.add, shortcut: 'n', onClick: () => void router.push(newHref) }

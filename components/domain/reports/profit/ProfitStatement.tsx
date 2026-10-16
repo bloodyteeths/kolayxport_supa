@@ -96,14 +96,22 @@ export function ProfitStatement({ data, loading }: ProfitStatementProps) {
               </tr>
             </Box>
             <tbody>
-              {lines.map((l) => {
+              {/* Zero deduction lines are noise ("Discounts $0.00"); gross and net always show. */}
+              {lines.filter((l) => l.key === 'gross' || l.key === 'net' || l.amount !== 0).map((l) => {
                 const isNet = l.key === 'net';
+                const isDeduction = !isNet && l.key !== 'gross';
                 return (
                   <Box
                     component="tr"
                     key={l.key}
                     data-line={l.key}
-                    sx={{ borderTop: isNet ? `1px solid ${n[200]}` : undefined, '& td': { py: px(isNet ? space[3] : space[1.5]) } }}
+                    sx={{
+                      borderTop: isNet ? `1px solid ${n[200]}` : undefined,
+                      bgcolor: isNet ? n[50] : undefined,
+                      '& td': { py: px(isNet ? space[3] : space[1.5]) },
+                      '& td:first-of-type': { pl: px(isDeduction ? space[4] : space[2]) },
+                      '& td:last-of-type': { pr: px(space[2]) },
+                    }}
                   >
                     <Box component="td" sx={{ color: n[700] }}>
                       <Typography variant={isNet ? 'titleSm' : 'dense'} component="span" sx={{ color: isNet ? n[900] : n[700] }}>

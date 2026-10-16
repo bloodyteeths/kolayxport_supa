@@ -274,6 +274,8 @@ export function orderColumns(t: OrdersT, ctx: OrderColumnsContext): Column<Order
       key: 'order',
       header: t('columns.order'),
       minWidth: 280,
+      // The order column takes the spare width; the others hug their content (no wide empty gaps on big screens).
+      width: '100%',
       mobile: 'title',
       render: (r) => (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>

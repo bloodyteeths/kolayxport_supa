@@ -15616,7 +15616,29 @@
         "other": "Diğer"
       },
       "empty": "Bu dönemde işlem yok",
-      "connect": "İşlemlerinizi görmek için {name} hesabınızı bağlayın"
+      "connect": "İşlemlerinizi görmek için {name} hesabınızı bağlayın",
+      "code": {
+        "payment_processing_fee": "Ödeme işlem ücreti",
+        "sales_tax": "Satış vergisi",
+        "transaction": "İşlem ücreti",
+        "transaction_quantity": "İşlem ücreti (adet)",
+        "renew": "İlan yenileme",
+        "renew_sold": "Satış sonrası yenileme",
+        "renew_sold_auto": "Satış sonrası otomatik yenileme",
+        "renew_expired": "Süresi dolan ilan yenileme",
+        "listing": "İlan ücreti",
+        "shipping_transaction": "Kargo işlem ücreti",
+        "shipping_labels": "Kargo etiketi",
+        "offsite_ads_fee": "Site dışı reklam ücreti",
+        "prolist": "Etsy reklamları",
+        "vat_tax": "KDV",
+        "vat_seller_services": "Satıcı ücretleri KDV",
+        "refund": "İade",
+        "payment": "Ödeme",
+        "disbursement": "Hesaba aktarım",
+        "subscription_fee": "Abonelik ücreti",
+        "regulatory_operating_fee": "Yasal işletim ücreti"
+      }
     },
     "toast": {
       "newTransactions": "{mp, select, etsy {Etsy’den} ebay {eBay’den} amazon {Amazon’dan} trendyol {Trendyol’dan} other {{name} kaynağından}} {count} yeni işlem"

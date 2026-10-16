@@ -39,6 +39,21 @@ import {
 
 // ── pure helpers (unit-tested) ──────────────────────────────────────────────────────────────────────────
 
+/**
+ * Fee/tax lines carry the marketplace's raw ledger code where a product would be ("payment_processing_fee").
+ * Show a readable name: a known code from reports.tx.code, else the code humanized ("Some new fee").
+ */
+export function productText(
+  name: string | null | undefined,
+  t: { (key: string): string; has(key: string): boolean },
+): string | null {
+  if (!name) return null;
+  if (!/^[a-z0-9]+(_[a-z0-9]+)*$/.test(name)) return name;
+  if (t.has(`tx.code.${name}`)) return t(`tx.code.${name}`);
+  const words = name.replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 /** Type filter options: categories with counts; the current URL value is kept as an option even at count 0. */
 export function buildTypeOptions(
   summary: Array<{ type: string; count: number; category: string | null }> | undefined,
@@ -329,8 +344,8 @@ function txColumns(t: ReturnType<typeof useTranslations>, name: string): Column<
     {
       key: 'product',
       header: t('tx.product'),
-      render: (r) => r.productName ?? '—',
-      mobileRender: (r) => r.productName ?? catLabel(r),
+      render: (r) => productText(r.productName, t) ?? '—',
+      mobileRender: (r) => productText(r.productName, t) ?? catLabel(r),
       minWidth: 200,
       mobile: 'title',
     },

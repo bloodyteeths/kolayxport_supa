@@ -15616,7 +15616,29 @@
         "other": "Other"
       },
       "empty": "No transactions in this period",
-      "connect": "Connect {name} to see your transactions"
+      "connect": "Connect {name} to see your transactions",
+      "code": {
+        "payment_processing_fee": "Payment processing fee",
+        "sales_tax": "Sales tax",
+        "transaction": "Transaction fee",
+        "transaction_quantity": "Transaction fee (quantity)",
+        "renew": "Listing renewal",
+        "renew_sold": "Renewal after sale",
+        "renew_sold_auto": "Auto-renewal after sale",
+        "renew_expired": "Renewal of expired listing",
+        "listing": "Listing fee",
+        "shipping_transaction": "Shipping transaction fee",
+        "shipping_labels": "Shipping label",
+        "offsite_ads_fee": "Offsite Ads fee",
+        "prolist": "Etsy Ads",
+        "vat_tax": "VAT",
+        "vat_seller_services": "VAT on seller fees",
+        "refund": "Refund",
+        "payment": "Payment",
+        "disbursement": "Payout",
+        "subscription_fee": "Subscription fee",
+        "regulatory_operating_fee": "Regulatory operating fee"
+      }
     },
     "toast": {
       "newTransactions": "{count} new transactions from {name}"

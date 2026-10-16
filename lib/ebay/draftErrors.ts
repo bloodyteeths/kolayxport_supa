@@ -5,6 +5,8 @@
 // instead of a raw English server string. `error` stays in the body as the
 // English fallback for logs and older clients.
 
+import { EBAY_LEGACY_LISTING_CODE, EBAY_LEGACY_LISTING_KEY } from './legacy';
+
 export class EbayDraftError extends Error {
   code: string;
   status: number;
@@ -26,6 +28,17 @@ export class EbayDraftError extends Error {
     this.params = opts.params;
     this.extra = opts.extra;
   }
+}
+
+/**
+ * The listing was created on eBay (Trading API, SKU `legacy-<itemId>`): the Inventory API cannot edit it, so nothing
+ * is staged. `key` is the full next-intl key (root namespace); the editor adapter accepts both forms.
+ */
+export function ebayLegacyListingError(sku: string): EbayDraftError {
+  return new EbayDraftError(EBAY_LEGACY_LISTING_CODE, `Listing ${sku} was created on eBay; edit it on eBay`, {
+    status: 409,
+    key: EBAY_LEGACY_LISTING_KEY,
+  });
 }
 
 export function isEbayDraftError(err: unknown): err is EbayDraftError {

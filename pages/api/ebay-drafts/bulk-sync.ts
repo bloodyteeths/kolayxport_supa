@@ -32,8 +32,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     success: results.filter((r) => r.status === 'success').length,
     failed: results.filter((r) => r.status === 'failed').length,
     conflicts: results.filter((r) => r.status === 'conflict').length,
-    // Drafts with nothing left to send were cancelled without calling eBay: neither sent nor failed.
+    // Drafts with nothing left to send were cancelled without calling eBay, and legacy listings' drafts are left
+    // untouched: neither sent nor failed.
     skipped: results.filter((r) => r.status === 'skipped').length,
     emptyDrafts: results.filter((r) => r.status === 'skipped' && r.reason === 'empty').map((r) => r.draftId),
+    // Listings created on eBay (`legacy-<itemId>`): not sent, not failed; their drafts stay open for Discard.
+    legacyDrafts: results.filter((r) => r.status === 'skipped' && r.reason === 'legacy').map((r) => r.draftId),
   });
 }

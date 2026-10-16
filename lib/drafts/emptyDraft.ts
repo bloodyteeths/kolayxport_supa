@@ -6,6 +6,8 @@
  * such drafts, the send paths to skip them, and the counters to exclude them.
  */
 
+import { isLegacyEbaySku } from '@/lib/ebay/legacy';
+
 /** Open statuses an empty draft is auto-cancelled from (never `syncing`: a send owns that row). */
 export const EMPTY_CANCELLABLE_STATUSES = ['draft', 'failed', 'conflict'];
 
@@ -86,6 +88,22 @@ export function isOpenEmptyDraft(model: DraftModelKind, draft: Record<string, an
   return EMPTY_CANCELLABLE_STATUSES.includes(String(draft.status)) && isDraftRowEmpty(model, draft);
 }
 
+/**
+ * An eBay draft for a listing created on eBay (`legacy-<itemId>`, lib/ebay/legacy): it can never be sent from
+ * KolayXport (send paths skip it), so it is not a "change not sent". The row stays for the editor's Discard.
+ */
+export function isUnsendableLegacyDraft(model: DraftModelKind, draft: Record<string, any>): boolean {
+  return model === 'EbayListingDraft' && isLegacyEbaySku(draft?.sku);
+}
+
+/**
+ * Excluded from every "N changes not sent" count, the send bar and the row badges: open empty drafts and
+ * unsendable legacy eBay drafts. Needs the columns of `emptyCheckSelect` (eBay: includes `sku`).
+ */
+export function isUncountedDraft(model: DraftModelKind, draft: Record<string, any>): boolean {
+  return isOpenEmptyDraft(model, draft) || isUnsendableLegacyDraft(model, draft);
+}
+
 /** Columns (Prisma `select`) the emptiness check reads, per model. */
 export function emptyCheckSelect(model: DraftModelKind, opts: { scheduledSendAt?: boolean } = {}): Record<string, any> {
   const sched = opts.scheduledSendAt ? { scheduledSendAt: true } : {};
@@ -96,7 +114,7 @@ export function emptyCheckSelect(model: DraftModelKind, opts: { scheduledSendAt?
     };
   }
   if (model === 'EbayListingDraft') {
-    return { inventoryPatch: true, offerPatch: true, variationPatch: true, queuedActions: true, _count: { select: { media: true } }, ...sched };
+    return { sku: true, inventoryPatch: true, offerPatch: true, variationPatch: true, queuedActions: true, _count: { select: { media: true } }, ...sched };
   }
   return { fieldPatch: true, queuedActions: true, ...sched };
 }

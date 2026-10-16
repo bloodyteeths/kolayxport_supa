@@ -56,6 +56,24 @@ return each draft with:
 | `ebay.draftSync.failed` | anything else | none |
 | `ebay.draftSync.interrupted` | reserved (eBay recovers stale `syncing` inline and re-runs the send) | none |
 
+### Legacy eBay listings (`EBAY_LEGACY_LISTING`)
+
+Listings created on eBay itself (Trading API / Seller Hub) are cached in `EbayListing` with `isLegacy = true` and the
+synthetic SKU `legacy-<itemId>`. The Inventory API cannot edit them. Helper: `isLegacyEbaySku()` /
+`isLegacyEbayListing()` in `lib/ebay/legacy.ts`. This code is **never stored** in `lastSyncError`:
+
+- **Staging refused**: `POST /api/ebay-drafts`, `POST /api/ebay-drafts/media`, `POST /api/ebay-drafts/batch-stage` (per
+  item) and `PATCH /api/ebay-drafts/[id]` with a non-null `scheduledSendAt` answer
+  `409 { error, code: 'EBAY_LEGACY_LISTING', key: 'ebay.draftSync.legacyListing' }` (full key, root namespace;
+  batch-stage returns it in the item result). Nothing is read from eBay or written.
+- **Sends skip**: `syncDraft` (single sync, `bulk-sync`, scheduled send) returns
+  `{ status: 'skipped', reason: 'legacy', code, key }` without calling eBay and without touching the row (no
+  attempt, no status change), so the seller can still see and discard it in the editor. `bulk-sync` adds
+  `legacyDrafts: string[]`; the scheduled-send tally counts them as `legacy` (no failure, no warning notification).
+- **Counts**: excluded from every "changes not sent" count via `isUncountedDraft()` (`lib/drafts/emptyDraft.ts`):
+  listings grid send bar and row badges, `GET /api/ebay-drafts` without `?sku=` (with `?sku=` they are still returned
+  for the editor), `/api/nav/counts`, and the overview draft bucket (also never linked as first conflict/failed).
+
 ## Catalog (`CatalogDraft`: Trendyol, Wix, Shopify)
 
 Unchanged. It already stores `listings.draftError.*` / `listings.validate.*` keys (see `ERROR_META` in

@@ -171,6 +171,7 @@ export function toSendResult(data: unknown, requested: string[]): SendResult {
       else if (status === 'conflict') out.conflicts.push(id);
       else if (status === 'syncing' || status === 'pending') continue; // Trendyol async batch: still in flight
       else if (status === 'skipped' && r.reason === 'empty') continue; // nothing left to send: cancelled server-side, not a failure
+      else if (status === 'skipped' && r.reason === 'legacy') continue; // eBay listing created on eBay: not sendable from here, not a failure
       else {
         const key = typeof r.errorKey === 'string' ? r.errorKey : typeof r.key === 'string' ? r.key : '';
         const params = r.errorParams ?? r.params;

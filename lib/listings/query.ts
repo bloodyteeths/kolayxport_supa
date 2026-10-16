@@ -30,7 +30,7 @@ import type {
 } from './types';
 import { splitSortKey } from './types';
 import { draftSendError, type SendError } from './sendError';
-import { emptyCheckSelect, isOpenEmptyDraft } from '@/lib/drafts/emptyDraft';
+import { emptyCheckSelect, isUncountedDraft } from '@/lib/drafts/emptyDraft';
 
 // ─── Prisma plumbing ────────────────────────────────────────────────────────
 
@@ -237,9 +237,12 @@ export function pickEffectiveDrafts<T extends { extId: string; status: string; u
   return out;
 }
 
-/** Open drafts whose every change was undone hold nothing to send: never a pending change (lib/drafts/emptyDraft). */
+/**
+ * Open drafts whose every change was undone hold nothing to send, and eBay drafts of listings created on eBay
+ * (`legacy-<itemId>`) can never be sent: neither is a pending change (lib/drafts/emptyDraft).
+ */
 function dropOpenEmpty<T extends DbRow>(spec: DraftSourceSpec, rows: T[]): T[] {
-  return rows.filter((r) => !isOpenEmptyDraft(spec.model, r));
+  return rows.filter((r) => !isUncountedDraft(spec.model, r));
 }
 
 function draftDelegate(db: ListingsDb, spec: DraftSourceSpec): ModelDelegate | null {

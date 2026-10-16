@@ -31,6 +31,7 @@ import { isKnownType } from '@/lib/notificationCenter/registry';
 import { syncDraft as syncEtsyDraft } from '@/lib/etsy/draftService';
 import { syncDraft as syncEbayDraft } from '@/lib/ebay/draftService';
 import type { ScheduledJob } from '@/lib/scheduler/types';
+import { isLegacyEbaySku } from '@/lib/ebay/legacy';
 import {
   CatalogDraftError,
   catalogDraftsAvailable,
@@ -177,8 +178,12 @@ export async function setDraftScheduledSendAt(
 // Runner
 // ---------------------------------------------------------------------------
 
-/** `empty`: drafts with nothing left to send, cancelled without calling the marketplace (not a problem). */
-export type ScheduledTally = { sent: number; failed: number; conflicts: number; skipped: number; pending: number; empty: number };
+/**
+ * `empty`: drafts with nothing left to send, cancelled without calling the marketplace (not a problem).
+ * `legacy`: eBay drafts of listings created on eBay (`legacy-<itemId>`), never sendable from KolayXport: not sent,
+ * not failed, no warning; the draft row is left open (only its schedule is cleared by the claim).
+ */
+export type ScheduledTally = { sent: number; failed: number; conflicts: number; skipped: number; pending: number; empty: number; legacy: number };
 export type ScheduledRunSummary = {
   /** false when the schema is not deployed yet (nothing ran). */
   supported: Record<ScheduleKind, boolean>;
@@ -213,7 +218,7 @@ const LISTINGS_LINK: Record<ScheduledMarketplace, string> = {
   shopify: '/app/shopify-urunler',
 };
 
-const zero = (): ScheduledTally => ({ sent: 0, failed: 0, conflicts: 0, skipped: 0, pending: 0, empty: 0 });
+const zero = (): ScheduledTally => ({ sent: 0, failed: 0, conflicts: 0, skipped: 0, pending: 0, empty: 0, legacy: 0 });
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function tally(summary: ScheduledRunSummary, userId: string, mp: ScheduledMarketplace, key: keyof ScheduledTally, by = 1) {
@@ -264,8 +269,16 @@ export async function runScheduledSends(opts: RunScheduledSendsOptions = {}): Pr
       if (!(await claim(kind, row.id, now))) continue;
       // Re-read after the claim: `rows` can be minutes old by now, and the
       // sync service runs whatever is queued at the time it reads the draft.
-      const fresh = await delegate(kind).findFirst({ where: { id: row.id }, select: { status: true, queuedActions: true } });
+      const fresh = await delegate(kind).findFirst({
+        where: { id: row.id },
+        select: { status: true, queuedActions: true, ...(kind === 'ebay' ? { sku: true } : {}) },
+      });
       if (!fresh || !DUE_STATUSES.includes(fresh.status)) continue;
+      if (kind === 'ebay' && isLegacyEbaySku(fresh.sku)) {
+        // Created on eBay: the Inventory API can't edit it. Not sent, not a failure, eBay never called.
+        tally(summary, row.userId, kind, 'legacy');
+        continue;
+      }
       if (hasPendingDeleteAction(fresh.queuedActions)) {
         tally(summary, row.userId, kind, 'skipped');
         continue;
@@ -274,7 +287,8 @@ export async function runScheduledSends(opts: RunScheduledSendsOptions = {}): Pr
         const result: any = kind === 'etsy'
           ? await (deps.syncEtsy || syncEtsyDraft)(row.id, row.userId, { force: false })
           : await (deps.syncEbay || syncEbayDraft)(row.id, row.userId);
-        tally(summary, row.userId, kind, result?.status === 'conflict' ? 'conflicts' : result?.status === 'skipped' ? 'empty' : 'sent');
+        tally(summary, row.userId, kind, result?.status === 'conflict' ? 'conflicts'
+          : result?.status === 'skipped' ? (result?.reason === 'legacy' ? 'legacy' : 'empty') : 'sent');
       } catch (err) {
         tally(summary, row.userId, kind, 'failed');
         logger.warn('scheduledSend.draft_failed', { kind, draftId: row.id, userId: row.userId, error: String((err as any)?.message || err) });

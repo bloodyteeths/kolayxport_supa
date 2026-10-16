@@ -4,7 +4,7 @@ import { getAuthUserOrApiKey } from '@/lib/auth';
 import { upsertDraftPatch, toSerializable } from '@/lib/ebay/draftService';
 import { logger } from '@/lib/logger';
 import { withLegacyLastSyncError } from '@/lib/drafts/syncErrors';
-import { isOpenEmptyDraft } from '@/lib/drafts/emptyDraft';
+import { isOpenEmptyDraft, isUnsendableLegacyDraft } from '@/lib/drafts/emptyDraft';
 import { ebayDraftErrorResponse, isEbayDraftError } from '@/lib/ebay/draftErrors';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -27,7 +27,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
 
       // An open draft whose every change was undone holds nothing to send: it is not a pending change.
-      const drafts = rows.filter((d) => !isOpenEmptyDraft('EbayListingDraft', d as any));
+      // A legacy listing's draft (`legacy-<itemId>`, created on eBay) can never be sent: left out of the list the
+      // send bar counts and sends, but still returned for `?sku=` so the editor can show and discard it.
+      const drafts = rows.filter((d) => !isOpenEmptyDraft('EbayListingDraft', d as any) && (sku || !isUnsendableLegacyDraft('EbayListingDraft', d)));
       return res.status(200).json({ drafts: toSerializable(drafts.map(withLegacyLastSyncError)), count: drafts.length });
     }
 

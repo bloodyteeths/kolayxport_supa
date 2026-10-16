@@ -17,7 +17,8 @@
  */
 import { randomUUID } from 'crypto';
 import prisma from '@/lib/prisma';
-import { EMPTY_CANCELLABLE_STATUSES, emptyCheckSelect, isOpenEmptyDraft, type DraftModelKind } from '@/lib/drafts/emptyDraft';
+import { EMPTY_CANCELLABLE_STATUSES, emptyCheckSelect, isUncountedDraft, type DraftModelKind } from '@/lib/drafts/emptyDraft';
+import { LEGACY_EBAY_SKU_PREFIX } from '@/lib/ebay/legacy';
 import { logger } from '@/lib/logger';
 import { getExchangeRates, convertToBase, normalizeCurrency, type RatesSnapshot } from '@/lib/fx';
 import { canonicalStore } from '@/lib/marketplaces/canonical';
@@ -579,8 +580,8 @@ function bucketFromGroups(groups: Array<{ status: string; _count: unknown }>): D
 const ACTIVE_DRAFT_STATUSES = ['draft', 'failed', 'conflict', 'syncing'];
 
 /**
- * Open drafts whose every change was undone hold nothing to send (lib/drafts/emptyDraft): they are taken out of
- * the "changes not sent" bucket.
+ * Open drafts whose every change was undone hold nothing to send, and eBay drafts of listings created on eBay
+ * (`legacy-<itemId>`) can never be sent (lib/drafts/emptyDraft): they are taken out of the "changes not sent" bucket.
  */
 async function withoutEmptyDrafts(model: DraftModelKind, delegate: any, userId: string, bucket: DraftBucket): Promise<DraftBucket> {
   const rows: any[] = await delegate.findMany({
@@ -589,7 +590,7 @@ async function withoutEmptyDrafts(model: DraftModelKind, delegate: any, userId: 
   });
   const out = { ...bucket };
   for (const r of rows ?? []) {
-    if (!isOpenEmptyDraft(model, r)) continue;
+    if (!isUncountedDraft(model, r)) continue;
     const k = r.status as 'draft' | 'failed' | 'conflict';
     out[k] = Math.max(0, out[k] - 1);
   }
@@ -656,13 +657,15 @@ export async function getEtsyDraftBucket(ctx: SummaryContext): Promise<DraftBuck
 
 export async function getEbayDraftBucket(ctx: SummaryContext): Promise<DraftBucket> {
   const where = { userId: ctx.userId };
+  // First conflict / failed links never point at a legacy listing's draft (it is not counted either).
+  const sendable = { NOT: { sku: { startsWith: LEGACY_EBAY_SKU_PREFIX } } };
   const staleBefore = new Date(ctx.now.getTime() - EBAY_STALE_SYNCING_MS);
   const [groups, stale, conflict, failed] = await Promise.all([
     prisma.ebayListingDraft.groupBy({ by: ['status'], where: { ...where, status: { in: ACTIVE_DRAFT_STATUSES } }, _count: { _all: true } }),
     prisma.ebayListingDraft.count({ where: { ...where, status: 'syncing', updatedAt: { lt: staleBefore } } }),
-    prisma.ebayListingDraft.findFirst({ where: { ...where, status: 'conflict' }, orderBy: { updatedAt: 'desc' }, select: EBAY_REF_SELECT }),
+    prisma.ebayListingDraft.findFirst({ where: { ...where, ...sendable, status: 'conflict' }, orderBy: { updatedAt: 'desc' }, select: EBAY_REF_SELECT }),
     prisma.ebayListingDraft.findFirst({
-      where: { ...where, OR: [{ status: 'failed' }, { status: 'syncing', updatedAt: { lt: staleBefore } }] },
+      where: { ...where, ...sendable, OR: [{ status: 'failed' }, { status: 'syncing', updatedAt: { lt: staleBefore } }] },
       orderBy: { updatedAt: 'desc' },
       select: EBAY_REF_SELECT,
     }),

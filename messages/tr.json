@@ -6560,7 +6560,8 @@
       "createIncompleteShort": "Bazı zorunlu alanlar boş",
       "createdNotPublished": "İlan eBay'de oluşturuldu ama yayınlanmadı. Yayınlamak için tekrar göndermeyi deneyin.",
       "deleteOnNew": "Yeni bir ilan eBay'de silinemez. Bunun yerine taslağı atın.",
-      "legacyNotEditable": "Bu ilan eBay Inventory API dışında oluşturulmuş, bu yüzden burada düzenlenemez. Bunun yerine yeni bir ilana kopyalayın."
+      "legacyNotEditable": "Bu ilan eBay Inventory API dışında oluşturulmuş, bu yüzden burada düzenlenemez. Bunun yerine yeni bir ilana kopyalayın.",
+      "legacyListing": "Bu ilan eBay'de oluşturulmuş; düzenlemek için eBay'i kullanın."
     },
     "validation": {
       "variantSkuDuplicate": "Her varyasyonun SKU kodu farklı olmalı",

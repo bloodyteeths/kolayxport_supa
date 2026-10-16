@@ -2,7 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { getAuthUserOrApiKey } from '@/lib/auth';
 import { cancelDraftIfEmpty, discardDraft, removeQueuedActions, toSerializable } from '@/lib/ebay/draftService';
-import { ebayDraftErrorResponse, isEbayDraftError } from '@/lib/ebay/draftErrors';
+import { ebayDraftErrorResponse, ebayLegacyListingError, isEbayDraftError } from '@/lib/ebay/draftErrors';
+import { isLegacyEbaySku } from '@/lib/ebay/legacy';
 import { logger } from '@/lib/logger';
 import { ScheduleError, scheduleErrorResponse, setDraftScheduledSendAt } from '@/lib/drafts/scheduledSend';
 import { withLegacyLastSyncError } from '@/lib/drafts/syncErrors';
@@ -39,6 +40,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (req.method === 'PATCH') {
       if (!req.body || !Object.prototype.hasOwnProperty.call(req.body, 'scheduledSendAt')) {
         return res.status(400).json({ error: 'scheduledSendAt is required' });
+      }
+      const scheduling = req.body.scheduledSendAt !== null && req.body.scheduledSendAt !== '';
+      if (scheduling) {
+        // A legacy listing's draft (created on eBay) can never be sent: scheduling it is staging a send. Unscheduling stays allowed.
+        const target = await prisma.ebayListingDraft.findFirst({ where: { id, userId: user.id }, select: { sku: true } });
+        if (target && isLegacyEbaySku(target.sku)) throw ebayLegacyListingError(target.sku);
       }
       try {
         await setDraftScheduledSendAt('ebay', id, user.id, req.body.scheduledSendAt);

@@ -15,15 +15,18 @@ import { getAuthUser } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { TO_SHIP_COUNTS_SQL } from '@/lib/orders/views';
 import type { NavCountsResponse } from '@/lib/nav/useNavCounts';
-import { emptyCheckSelect, isOpenEmptyDraft, type DraftModelKind } from '@/lib/drafts/emptyDraft';
+import { emptyCheckSelect, isUncountedDraft, type DraftModelKind } from '@/lib/drafts/emptyDraft';
 
 /** Draft statuses that mean "staged here, not on the marketplace yet". */
 export const UNSENT_DRAFT_STATUSES = ['draft', 'failed', 'conflict'] as const;
 
-/** Unsent drafts that hold something to send (an open draft whose every change was undone is not counted). */
+/**
+ * Unsent drafts that hold something to send (an open draft whose every change was undone is not counted, nor an
+ * eBay draft of a listing created on eBay, which can never be sent from here).
+ */
 async function countNonEmpty(model: DraftModelKind, delegate: any, userId: string, status: unknown): Promise<number> {
   const rows: any[] = await delegate.findMany({ where: { userId, status }, select: { status: true, ...emptyCheckSelect(model, { scheduledSendAt: true }) } });
-  return rows.filter((r) => !isOpenEmptyDraft(model, r)).length;
+  return rows.filter((r) => !isUncountedDraft(model, r)).length;
 }
 
 function toCount(v: unknown): number {

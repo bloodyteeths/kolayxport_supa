@@ -289,6 +289,27 @@ describe('drafts', () => {
     expect(countArgs.where.updatedAt.lt.toISOString()).toBe('2026-10-15T11:50:00.000Z');
   });
 
+  it('eBay drafts of legacy listings (`legacy-<itemId>`) are not counted and never linked as first conflict/failed', async () => {
+    p.ebayListingDraft.groupBy.mockResolvedValue([
+      { status: 'draft', _count: { _all: 3 } },
+      { status: 'failed', _count: { _all: 1 } },
+    ]);
+    const staged = { inventoryPatch: { product: { title: 'x' } }, offerPatch: {}, variationPatch: null, queuedActions: [], _count: { media: 0 }, scheduledSendAt: null };
+    p.ebayListingDraft.findMany.mockResolvedValue([
+      { ...staged, status: 'draft', sku: 'SKU-1' },
+      { ...staged, status: 'draft', sku: 'legacy-198020866463' },
+      { ...staged, status: 'draft', sku: 'legacy-197105625421' },
+      { ...staged, status: 'failed', sku: 'legacy-197008549496' },
+    ]);
+    const ctx = createSummaryContext({ userId: 'u1', tz: 'UTC', currency: 'TRY', now: NOW });
+    const b = await getEbayDraftBucket(ctx);
+    expect(b).toMatchObject({ draft: 1, failed: 0 });
+    for (const [args] of p.ebayListingDraft.findFirst.mock.calls as any[]) {
+      expect(args.where.NOT).toEqual({ sku: { startsWith: 'legacy-' } });
+    }
+    expect(p.ebayListingDraft.findMany.mock.calls[0][0].select).toMatchObject({ sku: true });
+  });
+
   it('Etsy recovers stale syncing drafts first; fieldPatch.title wins over the cache', async () => {
     p.etsyListingDraft.findFirst.mockImplementation(async ({ where }: any) =>
       where.status === 'conflict'

@@ -6,7 +6,8 @@ import { classifyEbayDraftSyncError, EBAY_DRAFT_ERROR } from '@/lib/drafts/syncE
 import { getUserAccessToken } from '@/lib/integrations/ebayClient';
 import { callEbayRateLimited } from '@/lib/integrations/ebayRateLimiter';
 import { sanitizeInventoryItemPayload } from '@/lib/ebay/payloadRules';
-import { EbayDraftError, classifyEbayError } from '@/lib/ebay/draftErrors';
+import { EbayDraftError, classifyEbayError, ebayLegacyListingError } from '@/lib/ebay/draftErrors';
+import { EBAY_LEGACY_LISTING_CODE, EBAY_LEGACY_LISTING_KEY, isLegacyEbaySku } from '@/lib/ebay/legacy';
 import { EMPTY_CANCELLABLE_STATUSES, isEbayDraftEmpty, isEmptyPatchValue, type EmptyDraftOptions } from '@/lib/drafts/emptyDraft';
 import {
   DEFAULT_MARKETPLACE,
@@ -93,6 +94,8 @@ export async function getOrCreateDraft(params: {
   isNew?: boolean;
 }) {
   const { userId, sku, offerId } = params;
+  // Listings created on eBay (`legacy-<itemId>`) cannot be edited through the Inventory API: never stage for them.
+  if (isLegacyEbaySku(sku)) throw ebayLegacyListingError(sku);
   const marketplaceId = params.marketplaceId || DEFAULT_MARKETPLACE;
 
   const existing = await prisma.ebayListingDraft.findFirst({
@@ -191,6 +194,8 @@ export async function upsertDraftPatch(params: {
    */
   preserveConflict?: boolean;
 }) {
+  // Refused before anything is read or written (also when an older draft for this SKU is still open).
+  if (isLegacyEbaySku(params.sku)) throw ebayLegacyListingError(params.sku);
   const incomingCreate = findCreateAction(params.queuedActions);
   const draft = await getOrCreateDraft({
     userId: params.userId,
@@ -367,6 +372,11 @@ export async function syncDraft(draftId: string, userId: string) {
     include: { media: { orderBy: { createdAt: 'asc' } }, syncAttempts: { orderBy: { startedAt: 'desc' }, take: 1 } },
   });
   if (!draft) throw draftNotFound();
+  // A listing created on eBay (`legacy-<itemId>`) can't be edited through the Inventory API: never call eBay, never
+  // touch the row (the seller can still see and discard it in the editor). Reported as skipped, not failed.
+  if (isLegacyEbaySku(draft.sku)) {
+    return { status: 'skipped' as const, reason: 'legacy' as const, draftId: draft.id, code: EBAY_LEGACY_LISTING_CODE, key: EBAY_LEGACY_LISTING_KEY };
+  }
   // An open draft with nothing staged (every change undone) is never sent: cancel it instead of calling eBay.
   if (OPEN_STATUSES.includes(draft.status) && (await cancelDraftIfEmpty(draft.id, userId, { ignoreSchedule: true }))) {
     return { status: 'skipped' as const, reason: 'empty' as const, draftId: draft.id };
@@ -1078,12 +1088,12 @@ export async function resolveDraft(draftId: string, userId: string, keep: string
 // ---------------------------------------------------------------------------
 
 export async function bulkSyncDrafts(draftIds: string[], userId: string) {
-  const results: Array<{ draftId: string; success: boolean; skipped?: 'empty'; error?: string }> = [];
+  const results: Array<{ draftId: string; success: boolean; skipped?: 'empty' | 'legacy'; error?: string }> = [];
 
   for (const draftId of draftIds) {
     try {
       const r: any = await syncDraft(draftId, userId);
-      results.push(r?.status === 'skipped' ? { draftId, success: true, skipped: 'empty' } : { draftId, success: true });
+      results.push(r?.status === 'skipped' ? { draftId, success: true, skipped: r.reason === 'legacy' ? 'legacy' : 'empty' } : { draftId, success: true });
     } catch (err: any) {
       results.push({ draftId, success: false, error: err.message || 'Sync failed' });
     }

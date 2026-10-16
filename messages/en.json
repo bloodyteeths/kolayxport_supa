@@ -6560,7 +6560,8 @@
       "createIncompleteShort": "Some required fields are empty",
       "createdNotPublished": "The listing was created on eBay but not published. Try sending again to publish it.",
       "deleteOnNew": "A new listing can't be deleted on eBay. Discard the draft instead.",
-      "legacyNotEditable": "This listing was made outside the eBay Inventory API, so it can't be edited here. Copy it to a new listing instead."
+      "legacyNotEditable": "This listing was made outside the eBay Inventory API, so it can't be edited here. Copy it to a new listing instead.",
+      "legacyListing": "This listing was created on eBay — edit it on eBay."
     },
     "validation": {
       "variantSkuDuplicate": "Each variation needs a different SKU",

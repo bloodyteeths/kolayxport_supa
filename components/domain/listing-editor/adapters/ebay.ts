@@ -900,7 +900,7 @@ export function ebayErrorInfo(err: unknown): AdapterErrorInfo {
       status: err.status,
       network: false,
       conflict: err.isConflict,
-      key: err.key ? `ebay.${err.key}` : null,
+      key: err.key ? (err.key.startsWith('ebay.') ? err.key : `ebay.${err.key}`) : null, // EBAY_LEGACY_LISTING sends a full key
       params: err.params,
       issues,
     };

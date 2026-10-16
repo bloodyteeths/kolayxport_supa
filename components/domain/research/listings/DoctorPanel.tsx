@@ -214,7 +214,7 @@ export function DoctorPanel({
   }, [listing, proposals, staging, stage, toast, t, go, mkt, shopId, onStaged]);
 
   if (!row || !listing) {
-    return <SidePanel open={false} onClose={onClose} title="" size="lg" />;
+    return <SidePanel padded open={false} onClose={onClose} title="" size="lg" />;
   }
 
   const count = proposals.length;

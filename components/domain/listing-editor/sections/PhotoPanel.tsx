@@ -170,6 +170,7 @@ export function PhotoPanel({
 
   return (
     <SidePanel
+      padded
       open={open && Boolean(media)}
       onClose={onClose}
       size="lg"

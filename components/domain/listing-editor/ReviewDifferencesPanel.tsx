@@ -463,7 +463,7 @@ export function ReviewDifferencesPanel({
   } as const;
 
   return (
-    <SidePanel
+    <SidePanel padded
       open={open}
       onClose={onClose}
       size="lg"

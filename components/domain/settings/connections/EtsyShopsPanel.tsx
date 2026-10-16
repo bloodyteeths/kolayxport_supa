@@ -39,7 +39,7 @@ export function EtsyShopsPanel({ open, onClose, accounts, loading, storesFull, s
   const [cs, cl] = typeScale.caption;
 
   return (
-    <SidePanel
+    <SidePanel padded
       open={open}
       onClose={onClose}
       size="sm"

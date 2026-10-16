@@ -187,7 +187,7 @@ export function ProviderCredentialsPanel({
   ) : undefined;
 
   return (
-    <SidePanel
+    <SidePanel padded
       open={open}
       onClose={onClose}
       size="sm"

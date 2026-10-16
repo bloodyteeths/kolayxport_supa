@@ -72,7 +72,7 @@ export function CreateShippingProfilePanel({ open, onClose, onSubmit, defaultOri
   const dirty = Boolean(form.title.trim());
 
   return (
-    <SidePanel
+    <SidePanel padded
       open={open}
       onClose={onClose}
       size="md"

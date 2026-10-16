@@ -30,7 +30,7 @@ export function ShopifyPanel({ open, onClose, accounts, status }: ShopifyPanelPr
   const sub = domain.trim();
 
   return (
-    <SidePanel
+    <SidePanel padded
       open={open}
       onClose={onClose}
       size="sm"

@@ -50,7 +50,7 @@ export function AmazonPanel({ open, onClose, details, connected, status, fallbac
   };
 
   return (
-    <SidePanel
+    <SidePanel padded
       open={open}
       onClose={onClose}
       size="sm"

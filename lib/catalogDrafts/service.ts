@@ -22,6 +22,7 @@
 import { randomBytes } from 'crypto';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { isCatalogDraftEmpty, type EmptyDraftOptions } from '@/lib/drafts/emptyDraft';
 import { channelEnabled, getStockSettings, isStockSyncActive } from '@/lib/stock/settings';
 import {
   ALLOWED_FIELDS,
@@ -157,7 +158,8 @@ export type SendResult = {
   /** conflict: patched fields that changed remotely ([] when only the timestamp is known). */
   changedFields?: string[];
   /** skipped: why nothing was attempted. */
-  reason?: 'queued_delete' | 'not_sendable' | 'not_found';
+  /** `empty`: nothing left to send (every staged change undone); the draft was cancelled, nothing was called. */
+  reason?: 'queued_delete' | 'not_sendable' | 'not_found' | 'empty';
   /**
    * The product's marketplace id after a create (success, or failed after the product was created).
    * The draft row's `externalId` already holds it; the editor replaces `/new` with it.
@@ -736,6 +738,10 @@ export async function stageCatalogDraft(input: StageInput): Promise<CatalogDraft
       },
     });
   });
+  // A stage that removed fields / actions or unscheduled may leave nothing to send: close the draft.
+  if ((remove.length > 0 || removeTypes.length > 0 || scheduledSendAt === null) && (await cancelDraftIfEmpty(String(row.id), input.userId))) {
+    return getCatalogDraft(String(row.id), input.userId);
+  }
   return toRecord(row);
 }
 
@@ -765,13 +771,42 @@ export async function listCatalogDrafts(params: {
     orderBy: { updatedAt: 'desc' },
     take: 5000,
   });
-  return rows.map(toRecord);
+  // An open draft whose every change was undone holds nothing to send: it is not a pending change.
+  return rows.map(toRecord).filter((r: CatalogDraftRecord) => !((SENDABLE_STATUSES as string[]).includes(r.status) && isDraftEmpty(r)));
 }
 
 export async function getCatalogDraft(id: string, userId: string): Promise<CatalogDraftRecord> {
   const row = await db().findFirst({ where: { id, userId } });
   if (!row) throw new CatalogDraftError('DRAFT_NOT_FOUND', 'Draft not found');
   return toRecord(row);
+}
+
+/**
+ * True when the draft holds nothing to send: no non-empty field patch, no queued action and no scheduledSendAt
+ * (lib/drafts/emptyDraft).
+ */
+export function isDraftEmpty(draft: Pick<CatalogDraftRecord, 'fieldPatch' | 'queuedActions' | 'scheduledSendAt'>, opts: EmptyDraftOptions = {}): boolean {
+  return isCatalogDraftEmpty(draft as Record<string, any>, opts);
+}
+
+/**
+ * Cancel an open draft (draft / failed / conflict) that holds nothing any more (every staged change undone).
+ * Keeps the row (status `cancelled`), never calls the marketplace. Atomic on the checked row version
+ * (status + updatedAt), so it cannot race a send claim or a new stage. True when cancelled.
+ */
+export async function cancelDraftIfEmpty(id: string, userId: string, opts: EmptyDraftOptions = {}): Promise<boolean> {
+  const d = db();
+  const row = await d.findFirst({ where: { id, userId } });
+  if (!row) return false;
+  const draft = toRecord(row);
+  if (!(SENDABLE_STATUSES as string[]).includes(draft.status) || !isDraftEmpty(draft, opts)) return false;
+  const res = await d.updateMany({
+    where: { id, userId, status: draft.status, updatedAt: row.updatedAt },
+    data: { status: 'cancelled', scheduledSendAt: null },
+  });
+  if (res.count === 0) return false;
+  logger.info('catalogDrafts.cancelled_empty', { userId, draftId: id, marketplace: draft.marketplace });
+  return true;
 }
 
 /** Discard = status `cancelled` (the row stays for history). Refused while sending. */
@@ -824,6 +859,8 @@ export async function patchCatalogDraft(
     },
   });
   if (res.count === 0) throw new CatalogDraftError('DRAFT_NOT_EDITABLE', 'Draft changed while updating');
+  // Un-queuing the last action / unscheduling may leave nothing to send: close the draft.
+  await cancelDraftIfEmpty(id, userId);
   return getCatalogDraft(id, userId);
 }
 
@@ -899,6 +936,8 @@ export async function resolveCatalogDraft(
   });
   if (res.count === 0) throw new CatalogDraftError('DRAFT_NOT_EDITABLE', 'Draft changed while rebasing');
   logger.info('catalogDrafts.resolve', { userId, draftId: id, marketplace: current.marketplace, from: current.status, dropped });
+  // Keeping the marketplace's value for every staged field leaves nothing to send: close the draft.
+  if (dropped.length) await cancelDraftIfEmpty(id, userId);
   return getCatalogDraft(id, userId);
 }
 
@@ -1176,6 +1215,18 @@ export async function sendCatalogDrafts(userId: string, draftIds: string[], opts
     if (hasQueuedDelete(draft.queuedActions) && !confirmed.has(id)) {
       pushResult(summary, { draftId: id, status: 'skipped', reason: 'queued_delete' });
       continue;
+    }
+    // Nothing staged any more (every change undone): cancel instead of calling the marketplace. Conditional on
+    // the version read above, so a stage landing in between is sent normally.
+    if ((SENDABLE_STATUSES as string[]).includes(draft.status) && isDraftEmpty(draft, { ignoreSchedule: true })) {
+      const cancel = await d.updateMany({
+        where: { id, userId, status: draft.status, updatedAt: draft.updatedAt },
+        data: { status: 'cancelled', scheduledSendAt: null },
+      });
+      if (cancel.count === 1) {
+        pushResult(summary, { draftId: id, status: 'skipped', reason: 'empty' });
+        continue;
+      }
     }
     const staleCutoff = new Date(now().getTime() - STALE_SYNCING_MS);
     const claim = await d.updateMany({

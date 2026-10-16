@@ -7,6 +7,7 @@ import { queueHealthRefresh } from '@/lib/listings/healthQueue';
 import { classifyEtsyDraftSyncError, ETSY_DRAFT_ERROR } from '@/lib/drafts/syncErrors';
 import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
 import { EtsyDraftError, draftSendingError, isEtsyDraftError, type DraftIssue } from './draftErrors';
+import { EMPTY_CANCELLABLE_STATUSES, isEmptyPatchValue, isEtsyDraftEmpty, type EmptyDraftOptions } from '@/lib/drafts/emptyDraft';
 import {
   ETSY_DRAFT_UPLOAD_ROOT,
   assertAllowedSourceUrl,
@@ -606,6 +607,42 @@ function hasDraftContent(draftLike: JsonMap, mediaCount: number, queuedActions: 
   );
 }
 
+/**
+ * True when the draft holds nothing to send: no non-empty field / taxonomy / inventory / variation-image /
+ * personalization patch, no staged media, no queued action and no scheduledSendAt (lib/drafts/emptyDraft).
+ */
+export function isDraftEmpty(draft: JsonMap, mediaCount?: number | null, opts: EmptyDraftOptions = {}): boolean {
+  return isEtsyDraftEmpty(draft, mediaCount, opts);
+}
+
+/**
+ * Cancel an open draft (draft / failed / conflict) that holds nothing any more, e.g. after "Undo" un-staged its
+ * only photo delete. Keeps the row (status `cancelled`) and never calls Etsy. Atomic: the conditional update only
+ * matches the row version that was checked (status + updatedAt), so it cannot race a send claim or a new stage;
+ * media staged in between (createDraftMediaFile does not touch the draft row) re-opens it.
+ * Returns true when the draft was cancelled.
+ */
+export async function cancelDraftIfEmpty(draftId: string, userId: string, opts: EmptyDraftOptions = {}): Promise<boolean> {
+  const draft = await prisma.etsyListingDraft.findFirst({
+    where: { id: draftId, userId },
+    include: { _count: { select: { media: true } } },
+  });
+  if (!draft || !EMPTY_CANCELLABLE_STATUSES.includes(draft.status)) return false;
+  if (!isDraftEmpty(draft as any, undefined, opts)) return false;
+  const res = await prisma.etsyListingDraft.updateMany({
+    where: { id: draft.id, userId, status: draft.status, updatedAt: draft.updatedAt },
+    data: { status: 'cancelled', ...(opts.ignoreSchedule ? { scheduledSendAt: null } : {}) },
+  });
+  if (res.count === 0) return false;
+  const media = await prisma.etsyDraftMedia.count({ where: { draftId: draft.id } });
+  if (media > 0) {
+    await prisma.etsyListingDraft.updateMany({ where: { id: draft.id, status: 'cancelled' }, data: { status: draft.status } });
+    return false;
+  }
+  logger.info('Etsy draft cancelled: nothing left to send', { draftId: draft.id });
+  return true;
+}
+
 function issuesFromErrors(errors: FieldError[]): DraftIssue[] {
   return errors.map((e) => ({
     field: e.field,
@@ -736,12 +773,7 @@ export async function upsertDraftPatch(params: {
       return true;
     });
 
-    if (!mediaToCreate.length) {
-      return prisma.etsyListingDraft.findUnique({
-        where: { id: updated.id },
-        include: { media: true, syncAttempts: { orderBy: { startedAt: 'desc' }, take: 5 } },
-      });
-    }
+    if (!mediaToCreate.length) return finishUpsert(updated.id, params);
 
     await prisma.etsyDraftMedia.createMany({
       data: mediaToCreate.map((m) => ({
@@ -761,8 +793,29 @@ export async function upsertDraftPatch(params: {
     });
   }
 
+  return finishUpsert(updated.id, params);
+}
+
+/**
+ * The stage request removed or cleared staged content: replaced the field patch, un-queued actions, or cleared a
+ * taxonomy / inventory / variation-image / personalization patch (null or {}). A plain stage (e.g. the
+ * `fields: {}` the media upload route sends to get a draft id) never auto-cancels.
+ */
+function stageRemovesContent(params: { replaceFields?: boolean; removeQueuedActions?: string[]; taxonomy?: any; inventory?: any; variationImages?: any; personalization?: any }) {
+  return Boolean(
+    params.replaceFields ||
+    (params.removeQueuedActions && params.removeQueuedActions.length > 0) ||
+    (params.taxonomy !== undefined && isEmptyPatchValue(params.taxonomy)) ||
+    (params.inventory !== undefined && isEmptyPatchValue(params.inventory)) ||
+    (params.variationImages !== undefined && isEmptyPatchValue(params.variationImages)) ||
+    (params.personalization !== undefined && isEmptyPatchValue(params.personalization)),
+  );
+}
+
+async function finishUpsert(draftId: string, params: { userId: string } & Parameters<typeof stageRemovesContent>[0]) {
+  if (stageRemovesContent(params)) await cancelDraftIfEmpty(draftId, params.userId);
   return prisma.etsyListingDraft.findUnique({
-    where: { id: updated.id },
+    where: { id: draftId },
     include: { media: true, syncAttempts: { orderBy: { startedAt: 'desc' }, take: 5 } },
   });
 }
@@ -776,9 +829,14 @@ export async function removeQueuedActions(draftId: string, userId: string, types
   }
   const remove = new Set(types.map(String));
   const next = (((draft.queuedActions as any[]) || [])).filter((a: any) => !remove.has(String(a?.type)));
-  return prisma.etsyListingDraft.update({
+  const updated = await prisma.etsyListingDraft.update({
     where: { id: draft.id },
     data: { queuedActions: next },
+    include: { media: true, syncAttempts: { orderBy: { startedAt: 'desc' }, take: 5 } },
+  });
+  if (!(await cancelDraftIfEmpty(draft.id, userId))) return updated;
+  return prisma.etsyListingDraft.findUnique({
+    where: { id: draft.id },
     include: { media: true, syncAttempts: { orderBy: { startedAt: 'desc' }, take: 5 } },
   });
 }
@@ -810,7 +868,9 @@ export async function removeDraftMedia(draftId: string, userId: string, mediaId:
     for (const r of rows) if (r.localPath) await unlinkDraftUploadFile(r.localPath);
   }
   const found = new Set(rows.map((r) => r.id));
-  return { removedIds: rows.map((r) => r.id), missingIds: ids.filter((id) => !found.has(id)) };
+  // "Undo" of the only staged change leaves nothing to send: close the draft.
+  const cancelled = rows.length ? await cancelDraftIfEmpty(draft.id, userId) : false;
+  return { removedIds: rows.map((r) => r.id), missingIds: ids.filter((id) => !found.has(id)), cancelled };
 }
 
 export function draftUploadDir(userId: string, draftId: string) {
@@ -1702,7 +1762,9 @@ export type SyncDraftOptions = {
 };
 
 export type SyncDraftResult = {
-  status: 'success' | 'conflict';
+  /** `skipped` (+ reason `empty`): the draft held nothing to send; it was cancelled and Etsy was not called. */
+  status: 'success' | 'conflict' | 'skipped';
+  reason?: 'empty';
   draftId: string;
   count?: number;
   deleted?: boolean;
@@ -1782,6 +1844,10 @@ async function syncDraftInner(draftId: string, userId: string, options: SyncDraf
   // (process died mid-sync) is claimable too.
   const before = await prisma.etsyListingDraft.findFirst({ where: { id: draftId, userId }, select: { status: true } });
   if (!before) throw new EtsyDraftError('DRAFT_NOT_FOUND', 'Draft not found', { status: 404, key: 'draftSync.draftNotFound' });
+  // An open draft with nothing staged (every change undone) is never sent: cancel it instead of calling Etsy.
+  if (SYNCABLE_STATUSES.includes(before.status) && (await cancelDraftIfEmpty(draftId, userId, { ignoreSchedule: true }))) {
+    return { status: 'skipped', reason: 'empty', draftId };
+  }
   const staleCutoff = new Date(Date.now() - STALE_SYNCING_MS);
   const claim = await prisma.etsyListingDraft.updateMany({
     where: {

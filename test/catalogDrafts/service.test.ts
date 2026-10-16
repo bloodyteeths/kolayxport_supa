@@ -281,7 +281,7 @@ describe('sendCatalogDrafts', () => {
   });
 
   it('a delete queued between the read and the claim still needs its confirmation', async () => {
-    h.catalogDraft.rows.push(draftRow({ fieldPatch: {} }));
+    h.catalogDraft.rows.push(draftRow({ fieldPatch: { price: 31 } }));
     const realUpdateMany = h.catalogDraft.updateMany;
     let first = true;
     h.catalogDraft.updateMany = async (args: any) => {

@@ -4,6 +4,7 @@ import { getAuthUserOrApiKey } from '@/lib/auth';
 import { upsertDraftPatch, toSerializable } from '@/lib/ebay/draftService';
 import { logger } from '@/lib/logger';
 import { withLegacyLastSyncError } from '@/lib/drafts/syncErrors';
+import { isOpenEmptyDraft } from '@/lib/drafts/emptyDraft';
 import { ebayDraftErrorResponse, isEbayDraftError } from '@/lib/ebay/draftErrors';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -16,7 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const where: any = { userId: user.id, status: { in: ['draft', 'failed', 'conflict'] } };
       if (sku) where.sku = sku;
 
-      const drafts = await prisma.ebayListingDraft.findMany({
+      const rows = await prisma.ebayListingDraft.findMany({
         where,
         include: {
           media: true,
@@ -25,6 +26,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         orderBy: { updatedAt: 'desc' },
       });
 
+      // An open draft whose every change was undone holds nothing to send: it is not a pending change.
+      const drafts = rows.filter((d) => !isOpenEmptyDraft('EbayListingDraft', d as any));
       return res.status(200).json({ drafts: toSerializable(drafts.map(withLegacyLastSyncError)), count: drafts.length });
     }
 

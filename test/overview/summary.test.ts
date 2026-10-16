@@ -8,8 +8,8 @@ const p = {
   shopifyShop: { count: vi.fn() },
   etsyShop: { findMany: vi.fn() },
   etsyListing: { findUnique: vi.fn(), count: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
-  etsyListingDraft: { groupBy: vi.fn(), findFirst: vi.fn() },
-  ebayListingDraft: { groupBy: vi.fn(), findFirst: vi.fn(), count: vi.fn() },
+  etsyListingDraft: { groupBy: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
+  ebayListingDraft: { groupBy: vi.fn(), findFirst: vi.fn(), count: vi.fn(), findMany: vi.fn() },
   order: { findFirst: vi.fn() },
   shipperProfile: { findUnique: vi.fn() },
   shipment: { findFirst: vi.fn() },
@@ -92,6 +92,8 @@ function happyDefaults() {
   p.ebayListingDraft.groupBy.mockResolvedValue([]);
   p.ebayListingDraft.findFirst.mockResolvedValue(null);
   p.ebayListingDraft.count.mockResolvedValue(0);
+  p.etsyListingDraft.findMany.mockResolvedValue([]);
+  p.ebayListingDraft.findMany.mockResolvedValue([]);
   p.order.findFirst.mockImplementation(async ({ where }: any) => (where.labelStatus ? null : { id: 'o1' }));
   p.shipperProfile.findUnique.mockResolvedValue({ shipperStreet1: 'Street 1', shipperCity: 'İstanbul' });
   p.shipment.findFirst.mockResolvedValue(null);

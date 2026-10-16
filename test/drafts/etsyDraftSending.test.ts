@@ -122,10 +122,12 @@ describe('removeDraftMedia', () => {
   });
 
   it('deletes only this draft’s rows and unlinks their staged files', async () => {
-    h.ownedDraft = { id: 'd1', status: 'draft' };
+    // The draft still holds a field edit, so removing its media does not empty (cancel) it.
+    h.ownedDraft = { id: 'd1', status: 'draft', fieldPatch: { title: 'Kept' } } as any;
     h.mediaRows = [{ id: 'm1', localPath: '/uploads/u1/d1/a.jpg' }, { id: 'm2', localPath: null }];
     const r = await removeDraftMedia('d1', 'u1', ['m1', 'm2', 'other']);
-    expect(r).toEqual({ removedIds: ['m1', 'm2'], missingIds: ['other'] });
+    expect(r).toEqual({ removedIds: ['m1', 'm2'], missingIds: ['other'], cancelled: false });
+    expect(h.draftUpdateMany).not.toHaveBeenCalled();
     expect(h.mediaFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { draftId: 'd1', id: { in: ['m1', 'm2', 'other'] } } }));
     expect(h.mediaDeleteMany).toHaveBeenCalledWith({ where: { draftId: 'd1', id: { in: ['m1', 'm2'] } } });
     expect(h.unlink).toHaveBeenCalledTimes(1);

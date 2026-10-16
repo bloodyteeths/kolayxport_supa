@@ -105,8 +105,8 @@ function etsyDb() {
     ],
     etsyListingDraft: [
       draft('d1', 1, 'draft', { fieldPatch: { price: 12.5, quantity: 4 } }),
-      draft('d2', 2, 'failed', { lastSyncError: 'Etsy API 401 Unauthorized: invalid token' }),
-      draft('d3', 3, 'conflict', { lastSyncError: 'changed on Etsy' }),
+      draft('d2', 2, 'failed', { fieldPatch: { title: 'New' }, lastSyncError: 'Etsy API 401 Unauthorized: invalid token' }),
+      draft('d3', 3, 'conflict', { fieldPatch: { title: 'New' }, lastSyncError: 'changed on Etsy' }),
       draft('d4', 4, 'draft', { queuedActions: [{ type: 'delete' }] }),
       draft('d5', 5, 'synced', { syncedAt: new Date(NOW.getTime() - 2 * HOUR), updatedAt: new Date(NOW.getTime() - 2 * HOUR) }),
       draft('d6', 6, 'synced', { syncedAt: new Date(NOW.getTime() - 72 * HOUR) }),

@@ -176,7 +176,7 @@ describe('grid row loader includes the latest failed attempt (Etsy / eBay only)'
   it('asks Prisma for syncAttempts and maps errorParams', async () => {
     const findMany = vi.fn(async () => [
       {
-        id: 'd1', etsyListingId: BigInt(1001), status: 'failed', fieldPatch: {}, queuedActions: [], updatedAt: NOW, syncedAt: null,
+        id: 'd1', etsyListingId: BigInt(1001), status: 'failed', fieldPatch: { quantity: 2 }, queuedActions: [], updatedAt: NOW, syncedAt: null,
         lastSyncError: 'etsy.draftSync.processingNotMapped',
         syncAttempts: [{ status: 'failed', result: { errorKey: 'etsy.draftSync.processingNotMapped', errorParams: { min: 1, max: 3 } } }],
       },
@@ -194,7 +194,7 @@ describe('grid row loader includes the latest failed attempt (Etsy / eBay only)'
     const fake = makeDb({
       etsyListingDraft: [
         {
-          id: 'd1', etsyShopId: 'shop1', userId: 'u1', etsyListingId: BigInt(1001), status: 'failed', fieldPatch: {}, queuedActions: [],
+          id: 'd1', etsyShopId: 'shop1', userId: 'u1', etsyListingId: BigInt(1001), status: 'failed', fieldPatch: { quantity: 2 }, queuedActions: [],
           updatedAt: NOW, syncedAt: null, lastSyncError: 'etsy.draftSync.processingNotMapped',
           // Stored oldest first on purpose; the loader must sort newest first and keep only failed / conflict ones.
           syncAttempts: [

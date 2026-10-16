@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { getAuthUserOrApiKey } from '@/lib/auth';
-import { discardDraft, removeQueuedActions, toSerializable } from '@/lib/ebay/draftService';
+import { cancelDraftIfEmpty, discardDraft, removeQueuedActions, toSerializable } from '@/lib/ebay/draftService';
 import { ebayDraftErrorResponse, isEbayDraftError } from '@/lib/ebay/draftErrors';
 import { logger } from '@/lib/logger';
 import { ScheduleError, scheduleErrorResponse, setDraftScheduledSendAt } from '@/lib/drafts/scheduledSend';
@@ -42,6 +42,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
       try {
         await setDraftScheduledSendAt('ebay', id, user.id, req.body.scheduledSendAt);
+        // Unscheduling a draft whose other changes are all gone leaves nothing to send: close it.
+        if (req.body.scheduledSendAt === null || req.body.scheduledSendAt === '') await cancelDraftIfEmpty(id, user.id);
       } catch (err) {
         if (err instanceof ScheduleError) {
           const { status, body } = scheduleErrorResponse(err);

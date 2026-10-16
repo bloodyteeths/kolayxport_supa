@@ -7,8 +7,8 @@ const authUser = vi.fn();
 vi.mock('@/lib/prisma', () => ({
   default: {
     $queryRawUnsafe: (...a: any[]) => queryRaw(...a),
-    etsyListingDraft: { count: (...a: any[]) => etsyCount(...a) },
-    ebayListingDraft: { count: (...a: any[]) => ebayCount(...a) },
+    etsyListingDraft: { findMany: (...a: any[]) => etsyCount(...a) },
+    ebayListingDraft: { findMany: (...a: any[]) => ebayCount(...a) },
   },
 }));
 vi.mock('@/lib/auth', () => ({ getAuthUser: (...a: any[]) => authUser(...a) }));
@@ -170,8 +170,11 @@ describe('GET /api/nav/counts', () => {
     authUser.mockReset();
     authUser.mockResolvedValue({ id: 'u1' });
     queryRaw.mockResolvedValue([{ toShip: BigInt(12), overdue: '1' }]);
-    etsyCount.mockResolvedValue(3);
-    ebayCount.mockResolvedValue(0);
+    const staged = { status: 'draft', fieldPatch: { title: 'x' }, queuedActions: [], _count: { media: 0 } };
+    // The 4th Etsy draft had every change undone (empty): not an unsent change.
+    const empty = { status: 'draft', fieldPatch: {}, taxonomyPatch: null, inventoryPatch: null, variationImagesPatch: null, personalizationPatch: null, queuedActions: [], _count: { media: 0 }, scheduledSendAt: null };
+    etsyCount.mockResolvedValue([staged, staged, staged, empty]);
+    ebayCount.mockResolvedValue([]);
   });
 
   it('returns the documented shape', async () => {
@@ -187,8 +190,8 @@ describe('GET /api/nav/counts', () => {
     await run();
     expect(queryRaw).toHaveBeenCalledWith(TO_SHIP_COUNTS_SQL, 'u1');
     const where = { userId: 'u1', status: { in: [...UNSENT_DRAFT_STATUSES] } };
-    expect(etsyCount).toHaveBeenCalledWith({ where });
-    expect(ebayCount).toHaveBeenCalledWith({ where });
+    expect(etsyCount).toHaveBeenCalledWith(expect.objectContaining({ where }));
+    expect(ebayCount).toHaveBeenCalledWith(expect.objectContaining({ where }));
     expect(UNSENT_DRAFT_STATUSES).toEqual(['draft', 'failed', 'conflict']);
   });
 

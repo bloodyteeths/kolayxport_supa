@@ -17,6 +17,7 @@
  */
 import { randomUUID } from 'crypto';
 import prisma from '@/lib/prisma';
+import { EMPTY_CANCELLABLE_STATUSES, emptyCheckSelect, isOpenEmptyDraft, type DraftModelKind } from '@/lib/drafts/emptyDraft';
 import { logger } from '@/lib/logger';
 import { getExchangeRates, convertToBase, normalizeCurrency, type RatesSnapshot } from '@/lib/fx';
 import { canonicalStore } from '@/lib/marketplaces/canonical';
@@ -577,6 +578,24 @@ function bucketFromGroups(groups: Array<{ status: string; _count: unknown }>): D
 
 const ACTIVE_DRAFT_STATUSES = ['draft', 'failed', 'conflict', 'syncing'];
 
+/**
+ * Open drafts whose every change was undone hold nothing to send (lib/drafts/emptyDraft): they are taken out of
+ * the "changes not sent" bucket.
+ */
+async function withoutEmptyDrafts(model: DraftModelKind, delegate: any, userId: string, bucket: DraftBucket): Promise<DraftBucket> {
+  const rows: any[] = await delegate.findMany({
+    where: { userId, status: { in: EMPTY_CANCELLABLE_STATUSES } },
+    select: { status: true, ...emptyCheckSelect(model, { scheduledSendAt: true }) },
+  });
+  const out = { ...bucket };
+  for (const r of rows ?? []) {
+    if (!isOpenEmptyDraft(model, r)) continue;
+    const k = r.status as 'draft' | 'failed' | 'conflict';
+    out[k] = Math.max(0, out[k] - 1);
+  }
+  return out;
+}
+
 async function etsyDraftRef(
   row: { id: string; etsyShopId: string; etsyListingId: bigint | number | string; fieldPatch: unknown; lastSyncError: string | null } | null,
 ): Promise<DraftRef | null> {
@@ -630,7 +649,7 @@ export async function getEtsyDraftBucket(ctx: SummaryContext): Promise<DraftBuck
     prisma.etsyListingDraft.findFirst({ where: { ...where, status: 'conflict' }, orderBy: { updatedAt: 'desc' }, select: ETSY_REF_SELECT }),
     prisma.etsyListingDraft.findFirst({ where: { ...where, status: 'failed' }, orderBy: { updatedAt: 'desc' }, select: ETSY_REF_SELECT }),
   ]);
-  const bucket = bucketFromGroups(groups as unknown as Array<{ status: string; _count: unknown }>);
+  const bucket = await withoutEmptyDrafts('EtsyListingDraft', prisma.etsyListingDraft, ctx.userId, bucketFromGroups(groups as unknown as Array<{ status: string; _count: unknown }>));
   const [firstConflict, firstFailed] = await Promise.all([etsyDraftRef(conflict as never), etsyDraftRef(failed as never)]);
   return { ...bucket, firstConflict, firstFailed };
 }
@@ -648,7 +667,7 @@ export async function getEbayDraftBucket(ctx: SummaryContext): Promise<DraftBuck
       select: EBAY_REF_SELECT,
     }),
   ]);
-  const bucket = bucketFromGroups(groups as unknown as Array<{ status: string; _count: unknown }>);
+  const bucket = await withoutEmptyDrafts('EbayListingDraft', prisma.ebayListingDraft, ctx.userId, bucketFromGroups(groups as unknown as Array<{ status: string; _count: unknown }>));
   // Read-only: stale syncing rows are reported as failed, not written (eBay has no list-level recovery).
   const moved = Math.min(toCount(stale), bucket.syncing);
   return {

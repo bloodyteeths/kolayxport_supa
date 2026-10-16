@@ -7,6 +7,7 @@ import { getUserAccessToken } from '@/lib/integrations/ebayClient';
 import { callEbayRateLimited } from '@/lib/integrations/ebayRateLimiter';
 import { sanitizeInventoryItemPayload } from '@/lib/ebay/payloadRules';
 import { EbayDraftError, classifyEbayError } from '@/lib/ebay/draftErrors';
+import { EMPTY_CANCELLABLE_STATUSES, isEbayDraftEmpty, isEmptyPatchValue, type EmptyDraftOptions } from '@/lib/drafts/emptyDraft';
 import {
   DEFAULT_MARKETPLACE,
   applyInventoryPatch,
@@ -311,10 +312,49 @@ export async function upsertDraftPatch(params: {
     }
   }
 
+  // Replacing / clearing staged values (editor revert) can leave nothing to send: close the draft. A plain stage
+  // never auto-cancels.
+  const removesContent = Boolean(params.replaceFields)
+    || (params.variationFields !== undefined && isEmptyPatchValue(params.variationFields));
+  if (removesContent && !params.media?.length) await cancelDraftIfEmpty(updated.id, params.userId);
   return prisma.ebayListingDraft.findUnique({
     where: { id: updated.id },
     include: { media: true, syncAttempts: { orderBy: { startedAt: 'desc' }, take: 5 } },
   });
+}
+
+/**
+ * True when the draft holds nothing to send: no non-empty inventory / offer / variation patch, no staged media, no
+ * queued action and no scheduledSendAt (lib/drafts/emptyDraft).
+ */
+export function isDraftEmpty(draft: JsonMap, mediaCount?: number | null, opts: EmptyDraftOptions = {}): boolean {
+  return isEbayDraftEmpty(draft, mediaCount, opts);
+}
+
+/**
+ * Cancel an open draft (draft / failed / conflict) that holds nothing any more (every staged change undone).
+ * Keeps the row (status `cancelled`), never calls eBay. Atomic on the checked row version (status + updatedAt) so
+ * it cannot race a send claim or a new stage; media staged in between re-opens it. True when cancelled.
+ */
+export async function cancelDraftIfEmpty(draftId: string, userId: string, opts: EmptyDraftOptions = {}): Promise<boolean> {
+  const draft = await prisma.ebayListingDraft.findFirst({
+    where: { id: draftId, userId },
+    include: { _count: { select: { media: true } } },
+  });
+  if (!draft || !EMPTY_CANCELLABLE_STATUSES.includes(draft.status)) return false;
+  if (!isDraftEmpty(draft as any, undefined, opts)) return false;
+  const res = await prisma.ebayListingDraft.updateMany({
+    where: { id: draft.id, userId, status: draft.status, updatedAt: draft.updatedAt },
+    data: { status: 'cancelled', ...(opts.ignoreSchedule ? { scheduledSendAt: null } : {}) },
+  });
+  if (res.count === 0) return false;
+  const media = await prisma.ebayDraftMedia.count({ where: { draftId: draft.id } });
+  if (media > 0) {
+    await prisma.ebayListingDraft.updateMany({ where: { id: draft.id, status: 'cancelled' }, data: { status: draft.status } });
+    return false;
+  }
+  logger.info('eBay draft cancelled: nothing left to send', { draftId: draft.id });
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -327,6 +367,10 @@ export async function syncDraft(draftId: string, userId: string) {
     include: { media: { orderBy: { createdAt: 'asc' } }, syncAttempts: { orderBy: { startedAt: 'desc' }, take: 1 } },
   });
   if (!draft) throw draftNotFound();
+  // An open draft with nothing staged (every change undone) is never sent: cancel it instead of calling eBay.
+  if (OPEN_STATUSES.includes(draft.status) && (await cancelDraftIfEmpty(draft.id, userId, { ignoreSchedule: true }))) {
+    return { status: 'skipped' as const, reason: 'empty' as const, draftId: draft.id };
+  }
   if (!OPEN_STATUSES.includes(draft.status)) {
     // See etsy/draftService: recover drafts orphaned in 'syncing' by a process
     // restart mid-sync instead of leaving them stuck forever.
@@ -913,11 +957,13 @@ export async function removeQueuedActions(draftId: string, userId: string, types
       params: { status: draft.status },
     });
   }
-  return prisma.ebayListingDraft.update({
+  const updated = await prisma.ebayListingDraft.update({
     where: { id: draft.id },
     data: { queuedActions: removeActions(draft.queuedActions, types) },
     include: DRAFT_INCLUDE,
   });
+  if (!(await cancelDraftIfEmpty(draft.id, userId))) return updated;
+  return prisma.ebayListingDraft.findUnique({ where: { id: draft.id }, include: DRAFT_INCLUDE });
 }
 
 // ---------------------------------------------------------------------------
@@ -1009,7 +1055,7 @@ export async function resolveDraft(draftId: string, userId: string, keep: string
     inventoryPatch: draft.inventoryPatch as JsonMap,
     offerPatch: draft.offerPatch as JsonMap,
   });
-  return prisma.ebayListingDraft.update({
+  const resolved = await prisma.ebayListingDraft.update({
     where: { id: draft.id },
     data: {
       status: 'draft',
@@ -1022,6 +1068,9 @@ export async function resolveDraft(draftId: string, userId: string, keep: string
     },
     include: DRAFT_INCLUDE,
   });
+  // Keeping eBay's value for every staged field leaves nothing to send: close the draft.
+  if (!(await cancelDraftIfEmpty(draft.id, userId))) return resolved;
+  return prisma.ebayListingDraft.findUnique({ where: { id: draft.id }, include: DRAFT_INCLUDE });
 }
 
 // ---------------------------------------------------------------------------
@@ -1029,12 +1078,12 @@ export async function resolveDraft(draftId: string, userId: string, keep: string
 // ---------------------------------------------------------------------------
 
 export async function bulkSyncDrafts(draftIds: string[], userId: string) {
-  const results: Array<{ draftId: string; success: boolean; error?: string }> = [];
+  const results: Array<{ draftId: string; success: boolean; skipped?: 'empty'; error?: string }> = [];
 
   for (const draftId of draftIds) {
     try {
-      await syncDraft(draftId, userId);
-      results.push({ draftId, success: true });
+      const r: any = await syncDraft(draftId, userId);
+      results.push(r?.status === 'skipped' ? { draftId, success: true, skipped: 'empty' } : { draftId, success: true });
     } catch (err: any) {
       results.push({ draftId, success: false, error: err.message || 'Sync failed' });
     }

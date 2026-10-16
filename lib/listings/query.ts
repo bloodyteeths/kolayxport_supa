@@ -30,6 +30,7 @@ import type {
 } from './types';
 import { splitSortKey } from './types';
 import { draftSendError, type SendError } from './sendError';
+import { emptyCheckSelect, isOpenEmptyDraft } from '@/lib/drafts/emptyDraft';
 
 // ─── Prisma plumbing ────────────────────────────────────────────────────────
 
@@ -236,6 +237,11 @@ export function pickEffectiveDrafts<T extends { extId: string; status: string; u
   return out;
 }
 
+/** Open drafts whose every change was undone hold nothing to send: never a pending change (lib/drafts/emptyDraft). */
+function dropOpenEmpty<T extends DbRow>(spec: DraftSourceSpec, rows: T[]): T[] {
+  return rows.filter((r) => !isOpenEmptyDraft(spec.model, r));
+}
+
 function draftDelegate(db: ListingsDb, spec: DraftSourceSpec): ModelDelegate | null {
   const d = db[spec.delegateKey];
   return d && typeof d.findMany === 'function' ? (d as ModelDelegate) : null;
@@ -245,10 +251,13 @@ function draftDelegate(db: ListingsDb, spec: DraftSourceSpec): ModelDelegate | n
 export async function loadStoreDrafts(db: ListingsDb, spec: DraftSourceSpec, ctx: StoreContext, caps: SchemaCaps, now: Date): Promise<Map<string, DraftLite>> {
   const delegate = caps.drafts ? draftDelegate(db, spec) : null;
   if (!delegate) return new Map();
-  const rows = await delegate.findMany({
+  const rows = dropOpenEmpty(spec, await delegate.findMany({
     where: { AND: [spec.where(ctx), draftWindowWhere(now)] },
-    select: { id: true, status: true, [spec.idField]: true, queuedActions: true, syncedAt: true, updatedAt: true },
-  });
+    select: {
+      id: true, status: true, [spec.idField]: true, queuedActions: true, syncedAt: true, updatedAt: true,
+      ...emptyCheckSelect(spec.model, { scheduledSendAt: caps.scheduledSendAt }),
+    },
+  }));
   const lite: DraftLite[] = rows.map((r) => ({
     id: String(r.id),
     extId: String(r[spec.idField]),
@@ -306,15 +315,23 @@ export async function loadRowSync(
   const delegate = caps.drafts ? draftDelegate(db, spec) : null;
   const dbIds = ids.map((id) => spec.toDbId(id)).filter((v) => v !== undefined);
   if (!delegate || dbIds.length === 0) return out;
-  const rows = await delegate.findMany({
+  const rows = dropOpenEmpty(spec, await delegate.findMany({
     where: { AND: [spec.where(ctx), { [spec.idField]: { in: dbIds } }, draftWindowWhere(now)] },
     // ICU params for the stored error key live on the failed / conflict attempt whose `result.errorKey` matches it
     // (Etsy / eBay only). A few attempts, since the newest failed one may be an unrelated concurrent-send / stale
     // recovery attempt with no `errorKey`.
-    ...(spec.attemptsRelation
-      ? { include: { [spec.attemptsRelation]: { where: { status: { in: ['failed', 'conflict'] } }, orderBy: { startedAt: 'desc' }, take: ATTEMPTS_FOR_PARAMS, select: { status: true, result: true } } } }
+    // `_count.media` (Etsy / eBay) feeds the empty-draft check: a draft holding only staged photos is not empty.
+    ...(spec.attemptsRelation || spec.model !== 'CatalogDraft'
+      ? {
+        include: {
+          ...(spec.attemptsRelation
+            ? { [spec.attemptsRelation]: { where: { status: { in: ['failed', 'conflict'] } }, orderBy: { startedAt: 'desc' }, take: ATTEMPTS_FOR_PARAMS, select: { status: true, result: true } } }
+            : {}),
+          ...(spec.model !== 'CatalogDraft' ? { _count: { select: { media: true } } } : {}),
+        },
+      }
       : {}),
-  });
+  }));
   const effective = pickEffectiveDrafts(
     rows.map((r) => ({ row: r, extId: String(r[spec.idField]), status: String(r.status), updatedAt: asDate(r.updatedAt), syncedAt: asDate(r.syncedAt) })),
   );

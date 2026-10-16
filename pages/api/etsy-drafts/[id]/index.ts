@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { getAuthUser } from '@/lib/auth';
-import { discardDraft, removeDraftMedia, removeQueuedActions, toSerializable } from '@/lib/etsy/draftService';
+import { cancelDraftIfEmpty, discardDraft, removeDraftMedia, removeQueuedActions, toSerializable } from '@/lib/etsy/draftService';
 import { draftErrorResponse } from '@/lib/etsy/draftErrors';
 import { ScheduleError, scheduleErrorResponse, setDraftScheduledSendAt } from '@/lib/drafts/scheduledSend';
 import { withLegacyLastSyncError } from '@/lib/drafts/syncErrors';
@@ -55,6 +55,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           if (hasRemoveMedia) await removeDraftMedia(id, user.id, mediaIds);
           if (Array.isArray(types)) await removeQueuedActions(id, user.id, types);
           await setDraftScheduledSendAt('etsy', id, user.id, req.body.scheduledSendAt);
+          // Unscheduling a draft whose other changes are all gone leaves nothing to send: close it.
+          if (req.body.scheduledSendAt === null || req.body.scheduledSendAt === '') await cancelDraftIfEmpty(id, user.id);
         } catch (err) {
           if (err instanceof ScheduleError) {
             const { status, body } = scheduleErrorResponse(err);

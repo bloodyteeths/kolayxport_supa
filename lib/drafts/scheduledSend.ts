@@ -177,7 +177,8 @@ export async function setDraftScheduledSendAt(
 // Runner
 // ---------------------------------------------------------------------------
 
-export type ScheduledTally = { sent: number; failed: number; conflicts: number; skipped: number; pending: number };
+/** `empty`: drafts with nothing left to send, cancelled without calling the marketplace (not a problem). */
+export type ScheduledTally = { sent: number; failed: number; conflicts: number; skipped: number; pending: number; empty: number };
 export type ScheduledRunSummary = {
   /** false when the schema is not deployed yet (nothing ran). */
   supported: Record<ScheduleKind, boolean>;
@@ -212,7 +213,7 @@ const LISTINGS_LINK: Record<ScheduledMarketplace, string> = {
   shopify: '/app/shopify-urunler',
 };
 
-const zero = (): ScheduledTally => ({ sent: 0, failed: 0, conflicts: 0, skipped: 0, pending: 0 });
+const zero = (): ScheduledTally => ({ sent: 0, failed: 0, conflicts: 0, skipped: 0, pending: 0, empty: 0 });
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function tally(summary: ScheduledRunSummary, userId: string, mp: ScheduledMarketplace, key: keyof ScheduledTally, by = 1) {
@@ -273,7 +274,7 @@ export async function runScheduledSends(opts: RunScheduledSendsOptions = {}): Pr
         const result: any = kind === 'etsy'
           ? await (deps.syncEtsy || syncEtsyDraft)(row.id, row.userId, { force: false })
           : await (deps.syncEbay || syncEbayDraft)(row.id, row.userId);
-        tally(summary, row.userId, kind, result?.status === 'conflict' ? 'conflicts' : 'sent');
+        tally(summary, row.userId, kind, result?.status === 'conflict' ? 'conflicts' : result?.status === 'skipped' ? 'empty' : 'sent');
       } catch (err) {
         tally(summary, row.userId, kind, 'failed');
         logger.warn('scheduledSend.draft_failed', { kind, draftId: row.id, userId: row.userId, error: String((err as any)?.message || err) });
@@ -306,7 +307,8 @@ export async function runScheduledSends(opts: RunScheduledSendsOptions = {}): Pr
         for (const r of res.results) {
           const mp = mpById.get(r.draftId);
           if (!mp) continue;
-          const key: keyof ScheduledTally = r.status === 'success' ? 'sent' : r.status === 'conflict' ? 'conflicts' : r.status === 'pending' ? 'pending' : r.status === 'skipped' ? 'skipped' : 'failed';
+          const key: keyof ScheduledTally = r.status === 'success' ? 'sent' : r.status === 'conflict' ? 'conflicts' : r.status === 'pending' ? 'pending'
+            : r.status === 'skipped' ? (r.reason === 'empty' ? 'empty' : 'skipped') : 'failed';
           tally(summary, userId, mp, key);
         }
       } catch (err) {

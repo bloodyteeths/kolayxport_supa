@@ -4,6 +4,7 @@ import { getAuthUser } from '@/lib/auth';
 import { toSerializable, upsertDraftPatch, recoverStaleSyncingDrafts } from '@/lib/etsy/draftService';
 import { draftErrorResponse } from '@/lib/etsy/draftErrors';
 import { withLegacyLastSyncError } from '@/lib/drafts/syncErrors';
+import { isOpenEmptyDraft } from '@/lib/drafts/emptyDraft';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const user = await getAuthUser(req, res);
@@ -19,7 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // (retryable) before listing them.
       await recoverStaleSyncingDrafts(user.id, shopId);
 
-      const drafts = await prisma.etsyListingDraft.findMany({
+      const rows = await prisma.etsyListingDraft.findMany({
         where: {
           userId: user.id,
           etsyShopId: shopId,
@@ -29,6 +30,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         include: { media: true, syncAttempts: { orderBy: { startedAt: 'desc' }, take: 5 } },
         orderBy: { updatedAt: 'desc' },
       });
+      // An open draft whose every change was undone holds nothing to send: it is not a pending change.
+      const drafts = rows.filter((d) => !isOpenEmptyDraft('EtsyListingDraft', d as any));
       return res.status(200).json({ drafts: toSerializable(drafts.map(withLegacyLastSyncError)), count: drafts.length });
     }
 

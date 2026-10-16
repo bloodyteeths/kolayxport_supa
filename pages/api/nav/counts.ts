@@ -5,7 +5,8 @@
  *   { orders: { toShip, overdue }, drafts: { etsy, ebay }, generatedAt }
  *
  * Session cookie only (no extension Bearer / API key). Private, never cached.
- * Cost: 1 raw COUNT query (both order counts via FILTER) + 2 Prisma counts.
+ * Cost: 1 raw COUNT query (both order counts via FILTER) + 2 light draft reads (open drafts whose every change
+ * was undone hold nothing to send and are not counted, lib/drafts/emptyDraft).
  * "To ship" / "Overdue" come from lib/orders/views.ts, the one definition the
  * Orders page and Overview also use (CRITIQUE C4).
  */
@@ -14,9 +15,16 @@ import { getAuthUser } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { TO_SHIP_COUNTS_SQL } from '@/lib/orders/views';
 import type { NavCountsResponse } from '@/lib/nav/useNavCounts';
+import { emptyCheckSelect, isOpenEmptyDraft, type DraftModelKind } from '@/lib/drafts/emptyDraft';
 
 /** Draft statuses that mean "staged here, not on the marketplace yet". */
 export const UNSENT_DRAFT_STATUSES = ['draft', 'failed', 'conflict'] as const;
+
+/** Unsent drafts that hold something to send (an open draft whose every change was undone is not counted). */
+async function countNonEmpty(model: DraftModelKind, delegate: any, userId: string, status: unknown): Promise<number> {
+  const rows: any[] = await delegate.findMany({ where: { userId, status }, select: { status: true, ...emptyCheckSelect(model, { scheduledSendAt: true }) } });
+  return rows.filter((r) => !isOpenEmptyDraft(model, r)).length;
+}
 
 function toCount(v: unknown): number {
   const n = typeof v === 'bigint' ? Number(v) : Number(v ?? 0);
@@ -37,8 +45,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const status = { in: [...UNSENT_DRAFT_STATUSES] };
     const [orderRows, etsy, ebay] = await Promise.all([
       prisma.$queryRawUnsafe<Array<{ toShip: unknown; overdue: unknown }>>(TO_SHIP_COUNTS_SQL, user.id),
-      prisma.etsyListingDraft.count({ where: { userId: user.id, status } }),
-      prisma.ebayListingDraft.count({ where: { userId: user.id, status } }),
+      countNonEmpty('EtsyListingDraft', prisma.etsyListingDraft, user.id, status),
+      countNonEmpty('EbayListingDraft', prisma.ebayListingDraft, user.id, status),
     ]);
     const row = orderRows?.[0];
     const body: NavCountsResponse = {

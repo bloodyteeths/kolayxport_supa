@@ -15,6 +15,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 type DraftResult = {
   draftId: string;
   status: string;
+  reason?: string;
   count?: number;
   error?: string;
   code?: string;
@@ -58,12 +59,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const success = results.filter((r) => r.status === 'success').length;
   const failed = results.filter((r) => r.status === 'failed');
   const conflicts = results.filter((r) => r.status === 'conflict');
+  // Drafts with nothing left to send were cancelled without calling Etsy: neither sent nor failed.
+  const empty = results.filter((r) => r.status === 'skipped' && r.reason === 'empty');
 
   return res.status(200).json({
     results,
     success,
     failed: failed.length,
     conflicts: conflicts.length,
+    skipped: empty.length,
+    emptyDrafts: empty.map((r) => r.draftId),
     // Surface partial failures so the UI can tell the user *which* drafts to
     // retry instead of showing a single generic error.
     failedDrafts: failed.map((r) => ({ draftId: r.draftId, error: r.error || 'Sync failed' })),

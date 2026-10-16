@@ -172,6 +172,22 @@ describe('runScheduledSends', () => {
     }));
   });
 
+  it('an empty draft (every change undone) is reported as empty, not failed or skipped, and does not notify', async () => {
+    h.knownTypes.add('scheduledSendResult');
+    h.etsyListingDraft.rows.push(etsyRow());
+    h.catalogDraft.rows.push({ id: 'c1', userId: 'u1', marketplace: 'shopify', status: 'draft', queuedActions: [], scheduledSendAt: DUE });
+    const syncEtsy = vi.fn(async () => ({ status: 'skipped', reason: 'empty', draftId: 'e1' }));
+    const sendCatalog = vi.fn(async () => ({
+      results: [{ draftId: 'c1', status: 'skipped' as const, reason: 'empty' as const }],
+      sent: [], failed: [], conflicts: [], pending: [], skipped: [{ id: 'c1', reason: 'empty' as const }],
+    }));
+    const s = await runScheduledSends({ now: NOW, interDraftDelayMs: 0, deps: { supported: (k) => k !== 'ebay', syncEtsy: syncEtsy as any, sendCatalog: sendCatalog as any, resolveBatches: vi.fn(async () => ({ synced: 0, failed: 0, pending: 0 })) } });
+    expect(s.byUser.u1.etsy).toMatchObject({ empty: 1, sent: 0, failed: 0, skipped: 0 });
+    expect(s.byUser.u1.shopify).toMatchObject({ empty: 1, sent: 0, failed: 0, skipped: 0 });
+    expect(s.totals.failed).toBe(0);
+    expect(h.notify).not.toHaveBeenCalled();
+  });
+
   it('sends catalog drafts through sendCatalogDrafts with no delete confirmation', async () => {
     h.catalogDraft.rows.push(
       { id: 'c1', userId: 'u2', marketplace: 'shopify', status: 'draft', queuedActions: [], scheduledSendAt: DUE },

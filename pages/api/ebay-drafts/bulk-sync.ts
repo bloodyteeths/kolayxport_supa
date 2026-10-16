@@ -12,7 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const draftIds = Array.isArray(req.body?.draftIds) ? req.body.draftIds : [];
   if (draftIds.length === 0) return res.status(400).json({ error: 'draftIds is required' });
 
-  const results: Array<{ draftId: string; status: string; count?: number; error?: string; code?: string; key?: string; params?: Record<string, string | number> }> = [];
+  const results: Array<{ draftId: string; status: string; reason?: string; count?: number; error?: string; code?: string; key?: string; params?: Record<string, string | number> }> = [];
   for (const draftId of draftIds) {
     try {
       results.push(await syncDraft(String(draftId), user.id));
@@ -32,5 +32,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     success: results.filter((r) => r.status === 'success').length,
     failed: results.filter((r) => r.status === 'failed').length,
     conflicts: results.filter((r) => r.status === 'conflict').length,
+    // Drafts with nothing left to send were cancelled without calling eBay: neither sent nor failed.
+    skipped: results.filter((r) => r.status === 'skipped').length,
+    emptyDrafts: results.filter((r) => r.status === 'skipped' && r.reason === 'empty').map((r) => r.draftId),
   });
 }

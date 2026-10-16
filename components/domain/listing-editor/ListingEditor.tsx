@@ -1232,6 +1232,12 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
               {t('state.ebayLegacyAction')}
             </Button>
           ) : null}
+          {/* Staged changes on a listing that cannot be sent from here: let the seller drop them. */}
+          {ebayLegacyId && draft ? (
+            <Button variant="secondary" onClick={() => void doDiscard()}>
+              {t('action.discard')}
+            </Button>
+          ) : null}
           {status === 401 ? (
             <Button variant="secondary" href="/ayarlar?tab=connections">
               {t('state.reconnectAction', mp)}

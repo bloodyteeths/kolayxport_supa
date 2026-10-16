@@ -12,6 +12,8 @@ export interface ShipByProps {
   /** When set, renders the neutral "Shipped Oct 14" instead of the deadline. */
   shippedAt?: DateInput;
   now?: Date;
+  /** Drop the "Ship by:" prefix (the cell sits under a "Ship by" column header). */
+  bare?: boolean;
   className?: string;
   'data-testid'?: string;
 }
@@ -19,7 +21,7 @@ export interface ShipByProps {
 // Unknown deadline: the dash is decorative, screen readers get the words.
 const SR_ONLY = { position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' } as const;
 
-export function ShipBy({ date, shippedAt, now, className, 'data-testid': testId }: ShipByProps) {
+export function ShipBy({ date, shippedAt, now, bare, className, 'data-testid': testId }: ShipByProps) {
   const f = useFormatters();
   const t = useTranslations('ds.shipBy');
   const p = f.shipByParts(date, shippedAt, now);
@@ -47,7 +49,8 @@ export function ShipBy({ date, shippedAt, now, className, 'data-testid': testId 
           </Box>
         </>
       ) : (
-        t(p.key, p.values)
+        // `bare`: under a "Ship by" column header the "Ship by:" prefix is noise (and widened the table).
+        t(bare && (p.key === 'today' || p.key === 'tomorrow' || p.key === 'date') ? `${p.key}Bare` : p.key, p.values)
       )}
     </Box>
   );

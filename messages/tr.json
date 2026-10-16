@@ -11823,7 +11823,10 @@
       "overdueHours": "{count} saat gecikti",
       "overdueDays": "{count} gün gecikti",
       "shipped": "Kargoya verildi: {date}",
-      "unknown": "Son gönderim tarihi yok"
+      "unknown": "Son gönderim tarihi yok",
+      "todayBare": "Bugün {time}",
+      "tomorrowBare": "Yarın {time}",
+      "dateBare": "{date}"
     },
     "copy": {
       "action": "Kopyala",

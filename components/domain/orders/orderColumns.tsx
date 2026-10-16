@@ -216,10 +216,10 @@ function StatusCell({ row, t, ctx }: { row: OrderRow; t: OrdersT; ctx: OrderColu
   );
 }
 
-function ShipByCell({ row, t }: { row: OrderRow; t: OrdersT }) {
+function ShipByCell({ row, t, bare }: { row: OrderRow; t: OrdersT; bare?: boolean }) {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-      <ShipBy date={row.shipBy} shippedAt={row.shippedAt} />
+      <ShipBy date={row.shipBy} shippedAt={row.shippedAt} bare={bare} />
       {row.shippingUpgrade ? (
         <Box component="span" sx={{ ...captionSx, display: 'inline-flex', alignItems: 'center', gap: '4px', color: neutral[700] }}>
           <RushIcon size={12} strokeWidth={ICON_STROKE} aria-hidden />
@@ -338,7 +338,9 @@ export function orderColumns(t: OrdersT, ctx: OrderColumnsContext): Column<Order
       sortable: true,
       hideable: true,
       mobile: 'meta',
-      render: (r) => <ShipByCell row={r} t={t} />,
+      // Desktop: under the "Ship by" header the cell drops its "Ship by:" prefix; cards keep it (no header there).
+      render: (r) => <ShipByCell row={r} t={t} bare />,
+      mobileRender: (r) => <ShipByCell row={r} t={t} />,
     },
     {
       key: 'orderedAt',

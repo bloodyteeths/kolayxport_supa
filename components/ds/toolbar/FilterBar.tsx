@@ -215,7 +215,8 @@ export function FilterBar({
 
   return (
     <Box className={className} data-testid={rest['data-testid'] ?? 'filter-bar'} data-layout="desktop">
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', minHeight: 40, minWidth: 0 }}>
+      {/* Wraps instead of overflowing: in Turkish the labels are longer and the count was cut off ("427 sc"). */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', rowGap: '8px', flexWrap: 'wrap', minHeight: 40, minWidth: 0 }}>
         {leading}
         {search ? <SearchField {...search} /> : null}
         {visible.map((f) =>

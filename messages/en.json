@@ -11823,7 +11823,10 @@
       "overdueHours": "Overdue {count, plural, one {# hour} other {# hours}}",
       "overdueDays": "Overdue {count, plural, one {# day} other {# days}}",
       "shipped": "Shipped {date}",
-      "unknown": "No ship-by date"
+      "unknown": "No ship-by date",
+      "todayBare": "Today {time}",
+      "tomorrowBare": "Tomorrow {time}",
+      "dateBare": "{date}"
     },
     "copy": {
       "action": "Copy",

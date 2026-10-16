@@ -377,7 +377,7 @@ export async function getEtsyShops(shopIds: string[], opts: { maxLive?: number }
   return out;
 }
 
-/** Raw `/listings/batch?includes=Images,Shipping,Videos` result → detail. Pure. */
+/** Raw `/listings/batch?includes=Images,Videos` result → detail. Pure. */
 export function mapListingDetail(l: any, country = 'US'): EtsyListingDetail {
   const images = Array.isArray(l?.images) ? l.images : null;
   const videos = Array.isArray(l?.videos) ? l.videos : null;
@@ -400,13 +400,13 @@ export function mapListingDetail(l: any, country = 'US'): EtsyListingDetail {
   };
 }
 
-/** Photos, video and shipping for ≤ 100 listings in ONE Etsy call (shared cache 24 h). */
+/** Photos and video for ≤ 100 listings in ONE Etsy call (shared cache 24 h). `Shipping` is not a valid include on listings/batch: Etsy answered 400 and every research thumbnail was blank. */
 export async function getEtsyListingDetails(listingIds: string[], country = 'US'): Promise<Served<Record<string, EtsyListingDetail>>> {
   const ids = Array.from(new Set(listingIds.filter((s) => /^\d{1,20}$/.test(String(s))))).slice(0, 100);
   if (ids.length === 0) return { data: {}, fetchedAt: new Date().toISOString(), cached: false, stale: false, budgetLimited: false };
   const key = `public:etsy:details:${sha1([...ids].sort().join(',') + '|' + country.toUpperCase())}`;
   return cachedLive(key, DETAILS_TTL_MS, async () => {
-    const data = await etsyPublicGet(`/listings/batch?listing_ids=${ids.join(',')}&includes=Images,Shipping,Videos`);
+    const data = await etsyPublicGet(`/listings/batch?listing_ids=${ids.join(',')}&includes=Images,Videos`);
     const out: Record<string, EtsyListingDetail> = {};
     for (const l of Array.isArray(data?.results) ? data.results : []) {
       const d = mapListingDetail(l, country);

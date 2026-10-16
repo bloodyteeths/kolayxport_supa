@@ -1378,12 +1378,15 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
           mobilePrimary="none"
         />
         </Box>
-        {isMobile && engine.loadState === 'ready' ? (
+        {/* Phones: pills + score row only when there is something to show (a new listing showed a lone "—"). */}
+        {isMobile && engine.loadState === 'ready' && (pills || health.score != null) ? (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', mb: '4px' }}>
             {pills}
-            <Box sx={{ ml: 'auto' }}>
-              <ScoreMeter score={health.score} afterScore={health.afterScore} variant="cell" checksUsed={health.result.checksUsed} checksTotal={health.result.checksTotal} onClick={() => setPanel('health')} />
-            </Box>
+            {health.score != null ? (
+              <Box sx={{ ml: 'auto' }}>
+                <ScoreMeter score={health.score} afterScore={health.afterScore} variant="cell" checksUsed={health.result.checksUsed} checksTotal={health.result.checksTotal} onClick={() => setPanel('health')} />
+              </Box>
+            ) : null}
           </Box>
         ) : null}
         {body}

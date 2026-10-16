@@ -77,7 +77,9 @@ export function ProfitStatement({ data, loading }: ProfitStatementProps) {
       <Box aria-busy={loading || undefined} sx={{ opacity: loading ? 0.6 : 1 }}>
         {mobile ? (
           <KeyValueList
-            items={lines.map((l) => ({
+            valueAlign="end"
+            labelWidth="60%"
+            items={lines.filter((l) => l.key === 'gross' || l.key === 'net' || l.amount !== 0).map((l) => ({
               label: label(l.key, data),
               value: (
                 <Box component="span" sx={{ color: l.key === 'net' ? netColor : n[800], fontWeight: l.key === 'net' ? 600 : 400 }}>

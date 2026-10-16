@@ -136,7 +136,8 @@ export function ProductPnLTable({ data, mp, mpName, state, loading, onSaved, onA
       mobile: 'subtitle',
       render: (r) => [
         `${t('profit.products.sold')} ${fmt.num(r.quantity)}`,
-        r.margin === null ? null : `${t('profit.products.margin')} ${fmt.percent(r.margin)}`,
+        // No cost entered → the margin is meaningless (it read "Margin 100%"); the row's "Add cost" says what's missing.
+        r.margin === null || unitCostOf(r) == null ? null : `${t('profit.products.margin')} ${fmt.percent(r.margin)}`,
       ].filter(Boolean).join(' · '),
     },
     { key: 'quantity', header: t('profit.products.sold'), type: 'number', mobile: 'hidden', sortable: false },

@@ -68,6 +68,8 @@ export function Section({
             display: 'flex',
             alignItems: 'flex-start',
             gap: '12px',
+            // Phones: a header slot (search, switch) drops under the title instead of squeezing it to 2 lines.
+            flexWrap: { xs: 'wrap', sm: 'nowrap' },
             px: card ? '16px' : 0,
             pt: card ? '12px' : 0,
             pb: card ? (flush ? '12px' : 0) : '8px',
@@ -86,7 +88,7 @@ export function Section({
               </Typography>
             ) : null}
           </Box>
-          {headerSlot}
+          {headerSlot ? <Box sx={{ flex: { xs: '1 1 100%', sm: '0 0 auto' }, minWidth: 0, '& > *': { maxWidth: '100%' } }}>{headerSlot}</Box> : null}
           {action ? <ActionButton action={action} variant="ghost" size="sm" /> : null}
         </Box>
       ) : null}

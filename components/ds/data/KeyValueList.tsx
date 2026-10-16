@@ -13,9 +13,11 @@ export type KeyValueListProps = DsBaseProps & {
   columns?: 1 | 2;
   /** Width of the label column (default 40 %). */
   labelWidth?: number | string;
+  /** Value alignment; 'end' for money columns (statements). Default 'start'. */
+  valueAlign?: 'start' | 'end';
 };
 
-export function KeyValueList({ items, columns = 1, labelWidth = '40%', className, 'data-testid': testId }: KeyValueListProps) {
+export function KeyValueList({ items, columns = 1, labelWidth = '40%', valueAlign = 'start', className, 'data-testid': testId }: KeyValueListProps) {
   return (
     <Box
       component="dl"
@@ -42,7 +44,7 @@ export function KeyValueList({ items, columns = 1, labelWidth = '40%', className
           }}
         >
           <Typography component="dt" variant="dense" sx={{ color: n[500], m: 0 }}>{it.label}</Typography>
-          <Typography component="dd" variant="dense" sx={{ color: n[800], m: 0, minWidth: 0, overflowWrap: 'anywhere', fontVariantNumeric: 'tabular-nums' }}>
+          <Typography component="dd" variant="dense" sx={{ color: n[800], m: 0, minWidth: 0, overflowWrap: 'anywhere', fontVariantNumeric: 'tabular-nums', textAlign: valueAlign === 'end' ? 'right' : undefined }}>
             {it.copy ? <CopyText value={it.copy} display={typeof it.value === 'string' ? it.value : undefined} mono={it.mono} /> : it.value}
           </Typography>
         </Box>

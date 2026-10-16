@@ -1198,6 +1198,29 @@ export async function syncAllOrders(userId: string, options: {
                   );
                   logger.info(`[AmazonSync] Parsed ${orders.length} orders from ${groups.size} groups`, { userId });
 
+                  // The report has no ship-by column: fill it from the Orders API for
+                  // orders that don't have one stored yet (throttled endpoint).
+                  try {
+                    const needIds = orders.filter((o: any) => !o.shipByDate).map((o: any) => String(o.orderNumber));
+                    if (needIds.length > 0) {
+                      const have = await prisma.order.findMany({
+                        where: { userId, source: 'amazon', orderNumber: { in: needIds }, shipByAt: { not: null } },
+                        select: { orderNumber: true, shipByAt: true },
+                      });
+                      const stored = new Map(have.map((h) => [h.orderNumber, h.shipByAt]));
+                      const { fetchAmazonShipByDates } = await import('./integrations/amazonShipBy');
+                      const fetched = await fetchAmazonShipByDates(token, region, marketplaceIds, needIds.filter((id) => !stored.has(id)));
+                      for (const o of orders as any[]) {
+                        if (o.shipByDate) continue;
+                        const prev = stored.get(String(o.orderNumber));
+                        const f = fetched.get(String(o.orderNumber));
+                        o.shipByDate = (f?.latest || f?.earliest) ?? (prev ? prev.toISOString() : undefined);
+                      }
+                    }
+                  } catch (e: any) {
+                    logger.warn('[AmazonSync] Ship-by enrichment skipped', { userId, error: String(e?.message || e).slice(0, 200) });
+                  }
+
                   // Enrich with product images / weights via the Catalog API.
                   // Cache aggressively in AmazonProductCache to stay well under rate limits.
                   const STALE_AFTER_DAYS = 7;

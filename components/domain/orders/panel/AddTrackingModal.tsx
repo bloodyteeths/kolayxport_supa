@@ -41,6 +41,9 @@ export interface AddTrackingModalProps {
 }
 
 /** Prefill: the latest label first (same source for number and carrier), else the latest submission. */
+/** DHL eCommerce (MNG Kargo) in TRACKING_CARRIERS. */
+const DOMESTIC_TR_CARRIER_ID = 10;
+
 export function trackingPrefill(row: OrderRow | null): { trackingNumber: string; carrierId: number } {
   if (!row) return { trackingNumber: '', carrierId: OTHER_CARRIER_ID };
   if (row.label?.trackingNumber) {
@@ -49,7 +52,8 @@ export function trackingPrefill(row: OrderRow | null): { trackingNumber: string;
   if (row.trackingSubmission?.trackingNumber) {
     return { trackingNumber: row.trackingSubmission.trackingNumber, carrierId: carrierToTrackingId(row.trackingSubmission.carrierName) };
   }
-  return { trackingNumber: '', carrierId: OTHER_CARRIER_ID };
+  // Domestic Turkish orders mostly ship with DHL eCommerce (MNG): start there instead of "Other".
+  return { trackingNumber: '', carrierId: (row.shipTo.country || '').toUpperCase() === 'TR' ? DOMESTIC_TR_CARRIER_ID : OTHER_CARRIER_ID };
 }
 
 export function AddTrackingModal({ open, row, onClose, onSubmit, onDone }: AddTrackingModalProps) {

@@ -200,12 +200,14 @@ function SyncCell({ row, t, ctx }: { row: ListingRow; t: ListingsT; ctx: Listing
   const err = key === 'sync_failed' ? ctx.errorText(row) : null;
   const pill = <StatusPill domain="sync" status={key} />;
   if (!err) return pill;
+  // The reason is shown, not only in a tooltip: sellers could not tell what to fix without opening each listing.
   return (
-    <Tooltip title={err}>
-      <Box component="span" sx={{ display: 'inline-flex' }} data-testid="listing-sync-error">
-        {pill}
+    <Box component="span" sx={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', maxWidth: 220 }} data-testid="listing-sync-error">
+      {pill}
+      <Box component="span" title={err} sx={{ fontSize: 12, lineHeight: '16px', color: 'error.main', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+        {err}
       </Box>
-    </Tooltip>
+    </Box>
   );
 }
 

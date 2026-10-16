@@ -267,7 +267,7 @@ describe('listings row open (founder follow-up)', { timeout: 30_000 }, () => {
     const labels = await waitFor(() => {
       const els = screen.getAllByTestId('listing-sync-error');
       expect(els.length).toBe(3);
-      return els.map((e) => e.getAttribute('aria-label') ?? '');
+      return els.map((e) => e.textContent ?? ''); // the reason is visible text now (was a tooltip)
     });
     const text = labels.join('\n');
     expect(text).toContain((en as any).etsy.draftSync.processingNotMapped.replace('{min}', '1').replace('{max}', '3'));

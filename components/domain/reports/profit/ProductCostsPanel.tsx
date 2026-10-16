@@ -260,7 +260,8 @@ export function ProductCostsPanel({ open, onClose, mp, mpName, currency, initial
       headerSlot={panelError ? <Banner tone="danger" title={t('costs.failed')} /> : undefined}
       data-testid="product-costs-panel"
     >
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: px(space[4]) }}>
+      {/* The form above the saved list had no side padding (fields touched the panel edge); sections pad themselves. */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: px(space[4]), pt: '16px', '& > :not([id^="saved-costs"]):not([data-testid^="panel-section"])': { mx: '16px' } }}>
         <SegmentedControl<CostsPanelMode>
           value={mode}
           onChange={(m) => { setMode(m); setFieldError(null); setCodeError(null); setShipError(null); }}

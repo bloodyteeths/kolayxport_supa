@@ -1,9 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { Box, Button, Chip, CircularProgress, MenuItem, Paper, TextField, Typography } from '@mui/material';
-import { Activity } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import AppLayout from '@/components/AppLayout';
+import { Page, PageHeader } from '@/components/ds/page';
 import withAuth from '@/components/withAuth';
 import ConnectEmptyState from '@/components/ui/ConnectEmptyState';
 import ErrorState from '@/components/ui/ErrorState';
@@ -189,31 +188,10 @@ function EtsyActivityPage() {
   const freshnessShop = useMemo(() => shopId || (shops && shops.length ? shops[0].shopId : ''), [shopId, shops]);
 
   return (
-    <AppLayout title={t('pageTitle')}>
-      <Box sx={{ p: { xs: 0.5, sm: 1, md: 1.5 }, maxWidth: 960, mx: 'auto' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-          <Box
-            sx={{
-              p: 1.25,
-              borderRadius: '14px',
-              background: 'linear-gradient(135deg, #F97316 0%, #EA580C 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <Activity size={22} color="#fff" />
-          </Box>
-          <Box sx={{ minWidth: 0 }}>
-            <Typography variant="h5" sx={{ fontWeight: 800, letterSpacing: '-0.02em', fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
-              {t('pageTitle')}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {t('pageSubtitle')}
-            </Typography>
-          </Box>
-        </Box>
+    <Page title={t('pageTitle')} width="form" data-testid="etsy-activity-page">
+      <Box>
+        {/* DS PageHeader: the shell TopBar owns the mobile title row, so no duplicate title on mobile. */}
+        <PageHeader title={t('pageTitle')} subtitle={t('pageSubtitle')} />
 
         {etsyConnected === false ? (
           <Paper sx={{ borderRadius: '12px' }}>
@@ -270,7 +248,7 @@ function EtsyActivityPage() {
           </>
         )}
       </Box>
-    </AppLayout>
+    </Page>
   );
 }
 

@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { createWixClient, wixProductMediaIds, type WixApiClient } from '@/lib/integrations/wixClient';
+import { ensureWixCatalogVersion, wixCatalogOptionsForSite } from '@/lib/integrations/wixSiteCatalog';
 import {
   WIX_COLLECTIONS_MAX,
   applyWixCollectionChange,
@@ -51,7 +52,9 @@ async function getAuthAndClient(req: NextApiRequest, res: NextApiResponse) {
     }
   };
 
-  const client = createWixClient(credential, onTokenRefresh);
+  // Catalog V1 or V3 (stored on WixSite; asked once, else a V1 501 switches to V3).
+  const client = createWixClient(credential, onTokenRefresh, wixCatalogOptionsForSite(wixSite));
+  await ensureWixCatalogVersion(client);
   return { userId: user.id, siteId, client, wixSiteDbId: wixSite?.id || siteId };
 }
 
@@ -110,12 +113,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // ── SYNC (full) ─────────────────────────────────────
     if (action === 'sync' && req.method === 'POST') {
-      let offset = 0;
-      const limit = 100;
       let synced = 0;
 
-      while (true) {
-        const { products, totalResults } = await client.queryProducts({ limit, offset });
+      // V1: offset pages; V3: cursor pages with variants + inventory (mapped to the V1 shape).
+      await client.forEachProductPage(async (products) => {
         for (const p of products) {
           try {
             await upsertWixProduct(userId, wixSiteDbId, p);
@@ -124,9 +125,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             logger.warn(`[WIX PRODUCTS] Sync upsert failed for ${p.id}`);
           }
         }
-        offset += limit;
-        if (offset >= totalResults || products.length === 0) break;
-      }
+      });
 
       // Listing health (listings-grid §9.3); store key = WixProduct.wixSiteId
       // (WixSite.id). Never fails the pull.

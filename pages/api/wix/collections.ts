@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { createWixClient } from '@/lib/integrations/wixClient';
+import { ensureWixCatalogVersion, wixCatalogOptionsForSite } from '@/lib/integrations/wixSiteCatalog';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
@@ -20,7 +21,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const client = createWixClient(credential);
+    // Catalog V1 collections, or V3 categories in the same shape.
+    const client = createWixClient(credential, undefined, wixCatalogOptionsForSite(wixSite));
+    await ensureWixCatalogVersion(client);
     const { collections, totalResults } = await client.queryCollections({ limit: 100 });
     return res.status(200).json({ collections, totalResults });
   } catch (err: any) {

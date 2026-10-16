@@ -1,17 +1,21 @@
 /**
  * Wix stock adapter (W2, T8). Server-only.
  *
- * Founder decision: Wix stock WRITES ship only once the Stores Catalog V1
- * absolute inventory endpoint is verified for the connected site. Until the
+ * Founder decision: Wix stock WRITES ship only once the absolute inventory
+ * write is verified for the connected site (Catalog V1: Stores V2 inventory
+ * PATCH; Catalog V3: Inventory Items V3 bulk update — the client picks the
+ * right one per site, see lib/integrations/wixCatalogV3.ts). Until the
  * operator sets STOCK_WIX_WRITE_VERIFIED=1 (after a manual test on a test
  * product), supportsWrite=false with reason 'catalog_v3_or_unverified':
  * links can be created and quantities are read/observed, nothing is written.
  *
  * Identity: accountRef = WixSite.id, externalId = Wix productId,
- * variantRef = variantId (V1 default variant id is all zeros).
+ * variantRef = variantId (V1 default variant id is all zeros; V3 single
+ * variant products have a real variant id).
  */
 import prisma from '@/lib/prisma';
 import { createWixClient, type WixApiClient } from '@/lib/integrations/wixClient';
+import { wixCatalogOptionsForSite } from '@/lib/integrations/wixSiteCatalog';
 import { decideSendQty } from '../math';
 import type { RemoteCandidate } from '../matching';
 import { ACCOUNT_CHANGED_PATCH, errMsg, failAll, isRetryableHttp, type PushResult, type RemoteQty, type StockAdapter } from './types';
@@ -33,6 +37,7 @@ async function clientFor(userId: string, accountRef: string): Promise<WixApiClie
         /* token persistence is best effort */
       }
     },
+    wixCatalogOptionsForSite(site),
   );
 }
 

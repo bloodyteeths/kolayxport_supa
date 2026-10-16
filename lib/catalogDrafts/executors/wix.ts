@@ -29,6 +29,7 @@
  */
 import prisma from '@/lib/prisma';
 import { createWixClient, type WixApiClient } from '@/lib/integrations/wixClient';
+import { ensureWixCatalogVersion, wixCatalogOptionsForSite } from '@/lib/integrations/wixSiteCatalog';
 import {
   CatalogExecutorError,
   ERR,
@@ -383,7 +384,9 @@ export const wixExecutor: CatalogExecutor = {
           /* token persistence is best effort */
         }
       },
+      wixCatalogOptionsForSite(site),
     );
+    await ensureWixCatalogVersion(client);
     return createWixSession(client as WixApiClient & WixWriteMethods, userId, site.id);
   },
 };

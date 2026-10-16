@@ -1,0 +1,2089 @@
+{
+ "_note": "Captured read-only from a real Wix Catalog V3 site (2026-10-16) and scrubbed: ids, media ids, names, URLs and descriptions replaced. Shapes and price/inventory values kept.",
+ "version": {
+  "catalogVersion": "V3_CATALOG"
+ },
+ "query": {
+  "products": [
+   {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "revision": "1",
+    "createdDate": "2026-05-18T11:59:38.610Z",
+    "updatedDate": "2026-10-14T18:49:34.709Z",
+    "name": "Sample name",
+    "slug": "Sample slug",
+    "url": {
+     "relativePath": "/product-page/sample",
+     "url": "https://shop.example.com/product-page/sample"
+    },
+    "plainDescription": "<p>Sample description</p>",
+    "visible": true,
+    "visibleInPos": true,
+    "media": {
+     "main": {
+      "id": "abc123_media1~mv2.jpg",
+      "image": {
+       "id": "abc123_media1~mv2.jpg",
+       "url": "https://static.example.com/media/abc123_media1~mv2.jpg",
+       "height": 898,
+       "width": 794,
+       "filename": "Sample filename"
+      },
+      "mediaType": "IMAGE",
+      "thumbnail": {
+       "url": "https://static.example.com/media/abc123_media1~mv2.jpg/v1/fit/w_50,h_50,q_90/file.jpg",
+       "height": 50,
+       "width": 50
+      },
+      "uploadId": "abc123_media1~mv2.jpg"
+     },
+     "itemsInfo": {
+      "items": [
+       {
+        "id": "abc123_media1~mv2.jpg",
+        "image": {
+         "id": "abc123_media1~mv2.jpg",
+         "url": "https://static.example.com/media/abc123_media1~mv2.jpg",
+         "height": 898,
+         "width": 794,
+         "filename": "Sample filename"
+        },
+        "mediaType": "IMAGE",
+        "thumbnail": {
+         "url": "https://static.example.com/media/abc123_media1~mv2.jpg/v1/fit/w_50,h_50,q_90/file.jpg",
+         "height": 50,
+         "width": 50
+        },
+        "uploadId": "abc123_media1~mv2.jpg"
+       },
+       {
+        "id": "abc123_media2~mv2.jpg",
+        "image": {
+         "id": "abc123_media2~mv2.jpg",
+         "url": "https://static.example.com/media/abc123_media2~mv2.jpg",
+         "height": 1534,
+         "width": 1200,
+         "filename": "Sample filename"
+        },
+        "mediaType": "IMAGE",
+        "thumbnail": {
+         "url": "https://static.example.com/media/abc123_media2~mv2.jpg/v1/fit/w_50,h_50,q_90/file.png",
+         "height": 50,
+         "width": 50
+        },
+        "uploadId": "abc123_media2~mv2.jpg"
+       },
+       {
+        "id": "abc123_media3~mv2.jpg",
+        "image": {
+         "id": "abc123_media3~mv2.jpg",
+         "url": "https://static.example.com/media/abc123_media3~mv2.jpg",
+         "height": 1800,
+         "width": 1200,
+         "filename": "Sample filename"
+        },
+        "mediaType": "IMAGE",
+        "thumbnail": {
+         "url": "https://static.example.com/media/abc123_media3~mv2.jpg/v1/fit/w_50,h_50,q_90/file.png",
+         "height": 50,
+         "width": 50
+        },
+        "uploadId": "abc123_media3~mv2.jpg"
+       },
+       {
+        "id": "abc123_media4~mv2.jpg",
+        "image": {
+         "id": "abc123_media4~mv2.jpg",
+         "url": "https://static.example.com/media/abc123_media4~mv2.jpg",
+         "height": 1746,
+         "width": 1588,
+         "filename": "Sample filename"
+        },
+        "mediaType": "IMAGE",
+        "thumbnail": {
+         "url": "https://static.example.com/media/abc123_media4~mv2.jpg/v1/fit/w_50,h_50,q_90/file.jpg",
+         "height": 50,
+         "width": 50
+        },
+        "uploadId": "abc123_media4~mv2.jpg"
+       },
+       {
+        "id": "abc123_media5~mv2.jpg",
+        "image": {
+         "id": "abc123_media5~mv2.jpg",
+         "url": "https://static.example.com/media/abc123_media5~mv2.jpg",
+         "height": 1800,
+         "width": 1200,
+         "filename": "Sample filename"
+        },
+        "mediaType": "IMAGE",
+        "thumbnail": {
+         "url": "https://static.example.com/media/abc123_media5~mv2.jpg/v1/fit/w_50,h_50,q_90/file.png",
+         "height": 50,
+         "width": 50
+        },
+        "uploadId": "abc123_media5~mv2.jpg"
+       },
+       {
+        "id": "abc123_media6~mv2.jpg",
+        "image": {
+         "id": "abc123_media6~mv2.jpg",
+         "url": "https://static.example.com/media/abc123_media6~mv2.jpg",
+         "height": 898,
+         "width": 794,
+         "filename": "Sample filename"
+        },
+        "mediaType": "IMAGE",
+        "thumbnail": {
+         "url": "https://static.example.com/media/abc123_media6~mv2.jpg/v1/fit/w_50,h_50,q_90/file.png",
+         "height": 50,
+         "width": 50
+        },
+        "uploadId": "abc123_media6~mv2.jpg"
+       }
+      ]
+     }
+    },
+    "options": [],
+    "modifiers": [
+     {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "name": "Beden",
+      "modifierRenderType": "TEXT_CHOICES",
+      "toBeRemovedMandatory": false,
+      "choicesSettings": {
+       "choices": [
+        {
+         "choiceId": "00000000-0000-4000-8000-000000000003",
+         "linkedMedia": [],
+         "choiceType": "CHOICE_TEXT",
+         "key": "1 Yaş",
+         "name": "1 Yaş"
+        },
+        {
+         "choiceId": "00000000-0000-4000-8000-000000000004",
+         "linkedMedia": [],
+         "choiceType": "CHOICE_TEXT",
+         "key": "2 Yaş",
+         "name": "2 Yaş"
+        },
+        {
+         "choiceId": "00000000-0000-4000-8000-000000000005",
+         "linkedMedia": [],
+         "choiceType": "CHOICE_TEXT",
+         "key": "3 Yaş",
+         "name": "3 Yaş"
+        },
+        {
+         "choiceId": "00000000-0000-4000-8000-000000000006",
+         "linkedMedia": [],
+         "choiceType": "CHOICE_TEXT",
+         "key": "4 Yaş",
+         "name": "4 Yaş"
+        },
+        {
+         "choiceId": "00000000-0000-4000-8000-000000000007",
+         "linkedMedia": [],
+         "choiceType": "CHOICE_TEXT",
+         "key": "5 Yaş",
+         "name": "5 Yaş"
+        },
+        {
+         "choiceId": "00000000-0000-4000-8000-000000000008",
+         "linkedMedia": [],
+         "choiceType": "CHOICE_TEXT",
+         "key": "6 Yaş",
+         "name": "6 Yaş"
+        }
+       ]
+      },
+      "key": "Beden",
+      "mandatory": false
+     },
+     {
+      "id": "00000000-0000-4000-8000-000000000009",
+      "name": "Sample name",
+      "modifierRenderType": "FREE_TEXT",
+      "toBeRemovedMandatory": true,
+      "freeTextSettings": {
+       "minCharCount": 0,
+       "maxCharCount": 15,
+       "title": "Sample title",
+       "key": "Lütfen ürünün arka yüzüne yazılacak ismi/metni belirtiniz."
+      },
+      "key": "Lütfen ürünün arka yüzüne yazılacak ismi/metni bel",
+      "mandatory": true
+     },
+     {
+      "id": "00000000-0000-4000-8000-000000000010",
+      "name": "Sample name",
+      "modifierRenderType": "FREE_TEXT",
+      "toBeRemovedMandatory": true,
+      "freeTextSettings": {
+       "minCharCount": 0,
+       "maxCharCount": 15,
+       "title": "Sample title",
+       "key": "Lütfen ürünün ön yüzüne yazılacak ismi/metni belirtiniz."
+      },
+      "key": "Lütfen ürünün ön yüzüne yazılacak ismi/metni belir",
+      "mandatory": true
+     }
+    ],
+    "brand": {
+     "id": "00000000-0000-4000-8000-000000000011",
+     "name": "Sample name"
+    },
+    "infoSections": [],
+    "directCategoriesInfo": {
+     "categories": [
+      {
+       "id": "00000000-0000-4000-8000-000000000012",
+       "index": 0
+      },
+      {
+       "id": "00000000-0000-4000-8000-000000000013"
+      }
+     ]
+    },
+    "mainCategoryId": "00000000-0000-4000-8000-000000000013",
+    "inventory": {
+     "availabilityStatus": "IN_STOCK",
+     "preorderStatus": "DISABLED",
+     "preorderAvailability": "NO_VARIANTS"
+    },
+    "productType": "PHYSICAL",
+    "physicalProperties": {
+     "shippingWeightRange": {
+      "minValue": 0,
+      "maxValue": 0
+     },
+     "weightMeasurementUnitInfo": {
+      "weightMeasurementUnit": "KG"
+     }
+    },
+    "handle": "Sample handle",
+    "currency": "TRY",
+    "actualPriceRange": {
+     "minValue": {
+      "amount": "2999.00",
+      "formattedAmount": "₺2.999,00"
+     },
+     "maxValue": {
+      "amount": "2999.00",
+      "formattedAmount": "₺2.999,00"
+     }
+    },
+    "additionalRibbons": [],
+    "flattenOptions": [],
+    "flattenModifiers": [],
+    "variantSummary": {
+     "variantCount": 1
+    },
+    "entityEventSequence": "8"
+   },
+   {
+    "id": "00000000-0000-4000-8000-000000000014",
+    "revision": "1",
+    "createdDate": "2025-08-12T10:59:51.102Z",
+    "updatedDate": "2026-10-14T18:49:34.707Z",
+    "name": "Sample name",
+    "slug": "Sample slug",
+    "url": {
+     "relativePath": "/product-page/sample",
+     "url": "https://shop.example.com/product-page/sample"
+    },
+    "plainDescription": "<p>Sample description</p>",
+    "visible": true,
+    "visibleInPos": true,
+    "media": {
+     "main": {
+      "id": "abc123_media7~mv2.jpg",
+      "image": {
+       "id": "abc123_media7~mv2.jpg",
+       "url": "https://static.example.com/media/abc123_media7~mv2.jpg",
+       "height": 4000,
+       "width": 4662,
+       "filename": "Sample filename"
+      },
+      "mediaType": "IMAGE",
+      "thumbnail": {
+       "url": "https://static.example.com/media/abc123_media7~mv2.jpg/v1/fit/w_50,h_50,q_90/file.jpg",
+       "height": 50,
+       "width": 50
+      },
+      "uploadId": "abc123_media7~mv2.jpg"
+     },
+     "itemsInfo": {
+      "items": [
+       {
+        "id": "abc123_media7~mv2.jpg",
+        "image": {
+         "id": "abc123_media7~mv2.jpg",
+         "url": "https://static.example.com/media/abc123_media7~mv2.jpg",
+         "height": 4000,
+         "width": 4662,
+         "filename": "Sample filename"
+        },
+        "mediaType": "IMAGE",
+        "thumbnail": {
+         "url": "https://static.example.com/media/abc123_media7~mv2.jpg/v1/fit/w_50,h_50,q_90/file.jpg",
+         "height": 50,
+         "width": 50
+        },
+        "uploadId": "abc123_media7~mv2.jpg"
+       },
+       {
+        "id": "abc123_media8~mv2.jpg",
+        "image": {
+         "id": "abc123_media8~mv2.jpg",
+         "url": "https://static.example.com/media/abc123_media8~mv2.jpg",
+         "height": 4000,
+         "width": 3216,
+         "filename": "Sample filename"
+        },
+        "mediaType": "IMAGE",
+        "thumbnail": {
+         "url": "https://static.example.com/media/abc123_media8~mv2.jpg/v1/fit/w_50,h_50,q_90/file.jpg",
+         "height": 50,
+         "width": 50
+        },
+        "uploadId": "abc123_media8~mv2.jpg"
+       },
+       {
+        "id": "abc123_media9~mv2.jpg",
+        "image": {
+         "id": "abc123_media9~mv2.jpg",
+         "url": "https://static.example.com/media/abc123_media9~mv2.jpg",
+         "height": 4000,
+         "width": 3093,
+         "filename": "Sample filename"
+        },
+        "mediaType": "IMAGE",
+        "thumbnail": {
+         "url": "https://static.example.com/media/abc123_media9~mv2.jpg/v1/fit/w_50,h_50,q_90/file.jpg",
+         "height": 50,
+         "width": 50
+        },
+        "uploadId": "abc123_media9~mv2.jpg"
+       },
+       {
+        "id": "abc123_media10~mv2.jpg",
+        "image": {
+         "id": "abc123_media10~mv2.jpg",
+         "url": "https://static.example.com/media/abc123_media10~mv2.jpg",
+         "height": 4000,
+         "width": 2809,
+         "filename": "Sample filename"
+        },
+        "mediaType": "IMAGE",
+        "thumbnail": {
+         "url": "https://static.example.com/media/abc123_media10~mv2.jpg/v1/fit/w_50,h_50,q_90/file.jpg",
+         "height": 50,
+         "width": 50
+        },
+        "uploadId": "abc123_media10~mv2.jpg"
+       },
+       {
+        "id": "abc123_media11~mv2.jpg",
+        "image": {
+         "id": "abc123_media11~mv2.jpg",
+         "url": "https://static.example.com/media/abc123_media11~mv2.jpg",
+         "height": 4000,
+         "width": 2667,
+         "filename": "Sample filename"
+        },
+        "mediaType": "IMAGE",
+        "thumbnail": {
+         "url": "https://static.example.com/media/abc123_media11~mv2.jpg/v1/fit/w_50,h_50,q_90/file.jpg",
+         "height": 50,
+         "width": 50
+        },
+        "uploadId": "abc123_media11~mv2.jpg"
+       },
+       {
+        "id": "abc123_media12~mv2.jpg",
+        "image": {
+         "id": "abc123_media12~mv2.jpg",
+         "url": "https://static.example.com/media/abc123_media12~mv2.jpg",
+         "height": 4000,
+         "width": 2950,
+         "filename": "Sample filename"
+        },
+        "mediaType": "IMAGE",
+        "thumbnail": {
+         "url": "https://static.example.com/media/abc123_media12~mv2.jpg/v1/fit/w_50,h_50,q_90/file.jpg",
+         "height": 50,
+         "width": 50
+        },
+        "uploadId": "abc123_media12~mv2.jpg"
+       },
+       {
+        "id": "abc123_media13~mv2.jpg",
+        "image": {
+         "id": "abc123_media13~mv2.jpg",
+         "url": "https://static.example.com/media/abc123_media13~mv2.jpg",
+         "height": 4000,
+         "width": 3011,
+         "filename": "Sample filename"
+        },
+        "mediaType": "IMAGE",
+        "thumbnail": {
+         "url": "https://static.example.com/media/abc123_media13~mv2.jpg/v1/fit/w_50,h_50,q_90/file.jpg",
+         "height": 50,
+         "width": 50
+        },
+        "uploadId": "abc123_media13~mv2.jpg"
+       }
+      ]
+     }
+    },
+    "options": [
+     {
+      "id": "00000000-0000-4000-8000-000000000015",
+      "name": "Beden",
+      "optionRenderType": "TEXT_CHOICES",
+      "choicesSettings": {
+       "choices": [
+        {
+         "choiceId": "00000000-0000-4000-8000-000000000016",
+         "linkedMedia": [],
+         "choiceType": "CHOICE_TEXT",
+         "key": "0-3 ay",
+         "name": "0-3 ay",
+         "inStock": true,
+         "visible": true
+        },
+        {
+         "choiceId": "00000000-0000-4000-8000-000000000017",
+         "linkedMedia": [],
+         "choiceType": "CHOICE_TEXT",
+         "key": "3-6 ay",
+         "name": "3-6 ay",
+         "inStock": true,
+         "visible": true
+        },
+        {
+         "choiceId": "00000000-0000-4000-8000-000000000018",
+         "linkedMedia": [],
+         "choiceType": "CHOICE_TEXT",
+         "key": "1 Yaş",
+         "name": "1 Yaş",
+         "inStock": true,
+         "visible": true
+        },
+        {
+         "choiceId": "00000000-0000-4000-8000-000000000019",
+         "linkedMedia": [],
+         "choiceType": "CHOICE_TEXT",
+         "key": "2 Yaş",
+         "name": "2 Yaş",
+         "inStock": true,
+         "visible": true
+        },
+        {
+         "choiceId": "00000000-0000-4000-8000-000000000020",
+         "linkedMedia": [],
+         "choiceType": "CHOICE_TEXT",
+         "key": "3 Yaş",
+         "name": "3 Yaş",
+         "inStock": true,
+         "visible": true
+        },
+        {
+         "choiceId": "00000000-0000-4000-8000-000000000021",
+         "linkedMedia": [],
+         "choiceType": "CHOICE_TEXT",
+         "key": "4 Yaş",
+         "name": "4 Yaş",
+         "inStock": true,
+         "visible": true
+        },
+        {
+         "choiceId": "00000000-0000-4000-8000-000000000022",
+         "linkedMedia": [],
+         "choiceType": "CHOICE_TEXT",
+         "key": "5 Yaş",
+         "name": "5 Yaş",
+         "inStock": true,
+         "visible": true
+        },
+        {
+         "choiceId": "00000000-0000-4000-8000-000000000023",
+         "linkedMedia": [],
+         "choiceType": "CHOICE_TEXT",
+         "key": "6 Yaş",
+         "name": "6 Yaş",
+         "inStock": true,
+         "visible": true
+        },
+        {
+         "choiceId": "00000000-0000-4000-8000-000000000024",
+         "linkedMedia": [],
+         "choiceType": "CHOICE_TEXT",
+         "key": "7 Yaş",
+         "name": "7 Yaş",
+         "inStock": true,
+         "visible": true
+        },
+        {
+         "choiceId": "00000000-0000-4000-8000-000000000025",
+         "linkedMedia": [],
+         "choiceType": "CHOICE_TEXT",
+         "key": "8 Yaş",
+         "name": "8 Yaş",
+         "inStock": true,
+         "visible": true
+        },
+        {
+         "choiceId": "00000000-0000-4000-8000-000000000026",
+         "linkedMedia": [],
+         "choiceType": "CHOICE_TEXT",
+         "key": "9 Yaş",
+         "name": "9 Yaş",
+         "inStock": true,
+         "visible": true
+        },
+        {
+         "choiceId": "00000000-0000-4000-8000-000000000027",
+         "linkedMedia": [],
+         "choiceType": "CHOICE_TEXT",
+         "key": "10 yaş",
+         "name": "10 yaş",
+         "inStock": true,
+         "visible": true
+        }
+       ]
+      },
+      "key": "Beden"
+     },
+     {
+      "id": "00000000-0000-4000-8000-000000000028",
+      "name": "renk",
+      "optionRenderType": "SWATCH_CHOICES",
+      "choicesSettings": {
+       "choices": [
+        {
+         "choiceId": "00000000-0000-4000-8000-000000000029",
+         "linkedMedia": [],
+         "choiceType": "ONE_COLOR",
+         "key": "Mavi",
+         "name": "Mavi",
+         "inStock": true,
+         "visible": true,
+         "colorCode": "#0086ff"
+        }
+       ]
+      },
+      "key": "renk"
+     }
+    ],
+    "modifiers": [
+     {
+      "id": "00000000-0000-4000-8000-000000000030",
+      "name": "Sample name",
+      "modifierRenderType": "FREE_TEXT",
+      "toBeRemovedMandatory": false,
+      "freeTextSettings": {
+       "minCharCount": 0,
+       "maxCharCount": 500,
+       "title": "Sample title",
+       "key": "Eklemek istediğiniz not"
+      },
+      "key": "Eklemek istediğiniz not",
+      "mandatory": false
+     }
+    ],
+    "brand": {
+     "id": "00000000-0000-4000-8000-000000000031",
+     "name": "Sample name"
+    },
+    "infoSections": [],
+    "directCategoriesInfo": {
+     "categories": [
+      {
+       "id": "00000000-0000-4000-8000-000000000032",
+       "index": 2
+      },
+      {
+       "id": "00000000-0000-4000-8000-000000000013"
+      }
+     ]
+    },
+    "mainCategoryId": "00000000-0000-4000-8000-000000000013",
+    "inventory": {
+     "availabilityStatus": "IN_STOCK",
+     "preorderStatus": "DISABLED",
+     "preorderAvailability": "NO_VARIANTS"
+    },
+    "productType": "PHYSICAL",
+    "physicalProperties": {
+     "weightMeasurementUnitInfo": {
+      "weightMeasurementUnit": "KG"
+     }
+    },
+    "handle": "Sample handle",
+    "currency": "TRY",
+    "actualPriceRange": {
+     "minValue": {
+      "amount": "3400.00",
+      "formattedAmount": "₺3.400,00"
+     },
+     "maxValue": {
+      "amount": "5200.00",
+      "formattedAmount": "₺5.200,00"
+     }
+    },
+    "compareAtPriceRange": {
+     "minValue": {
+      "amount": "3500.00",
+      "formattedAmount": "₺3.500,00"
+     },
+     "maxValue": {
+      "amount": "5300.00",
+      "formattedAmount": "₺5.300,00"
+     }
+    },
+    "additionalRibbons": [],
+    "flattenOptions": [],
+    "flattenModifiers": [],
+    "variantSummary": {
+     "variantCount": 12
+    },
+    "entityEventSequence": "14"
+   }
+  ],
+  "pagingMetadata": {
+   "count": 2,
+   "cursors": {},
+   "hasNext": false
+  }
+ },
+ "variants": {
+  "variants": [
+   {
+    "id": "00000000-0000-4000-8000-000000000033",
+    "visible": true,
+    "optionChoices": [],
+    "price": {
+     "actualPrice": {
+      "amount": "2999.00",
+      "formattedAmount": "₺2.999,00"
+     }
+    },
+    "media": {
+     "id": "abc123_media1~mv2.jpg",
+     "image": {
+      "id": "abc123_media1~mv2.jpg",
+      "url": "https://static.example.com/media/abc123_media1~mv2.jpg",
+      "height": 898,
+      "width": 794,
+      "filename": "Sample filename"
+     },
+     "mediaType": "IMAGE",
+     "thumbnail": {
+      "url": "https://static.example.com/media/abc123_media1~mv2.jpg/v1/fit/w_50,h_50,q_90/file.jpg",
+      "height": 50,
+      "width": 50
+     },
+     "uploadId": "abc123_media1~mv2.jpg"
+    },
+    "physicalProperties": {
+     "weight": 0
+    },
+    "inventoryStatus": {
+     "inStock": true,
+     "preorderEnabled": false
+    },
+    "productData": {
+     "productId": "00000000-0000-4000-8000-000000000001",
+     "name": "Sample name",
+     "productType": "PHYSICAL",
+     "slug": "Sample slug",
+     "visible": true,
+     "visibleInPos": true,
+     "mainCategoryId": "00000000-0000-4000-8000-000000000013",
+     "directCategoryIds": [
+      "00000000-0000-4000-8000-000000000012",
+      "00000000-0000-4000-8000-000000000013"
+     ],
+     "currency": "TRY",
+     "physicalProperties": {
+      "weightMeasurementUnitInfo": {
+       "weightMeasurementUnit": "KG"
+      }
+     },
+     "revision": "1",
+     "handle": "Sample handle",
+     "brand": {
+      "id": "00000000-0000-4000-8000-000000000011",
+      "name": "Sample name"
+     },
+     "updatedDate": "2026-09-15T16:58:35.039Z"
+    },
+    "internalMetadata": {
+     "rowState": "READY"
+    },
+    "locations": {},
+    "variantId": "00000000-0000-4000-8000-000000000033"
+   },
+   {
+    "id": "00000000-0000-4000-8000-000000000034",
+    "visible": true,
+    "optionChoices": [
+     {
+      "optionChoiceIds": {
+       "optionId": "00000000-0000-4000-8000-000000000015",
+       "choiceId": "00000000-0000-4000-8000-000000000018"
+      },
+      "optionChoiceNames": {
+       "optionName": "Beden",
+       "choiceName": "1 Yaş",
+       "renderType": "TEXT_CHOICES"
+      }
+     },
+     {
+      "optionChoiceIds": {
+       "optionId": "00000000-0000-4000-8000-000000000028",
+       "choiceId": "00000000-0000-4000-8000-000000000029"
+      },
+      "optionChoiceNames": {
+       "optionName": "renk",
+       "choiceName": "Mavi",
+       "renderType": "SWATCH_CHOICES"
+      }
+     }
+    ],
+    "price": {
+     "actualPrice": {
+      "amount": "3400.00",
+      "formattedAmount": "₺3.400,00"
+     },
+     "compareAtPrice": {
+      "amount": "3500.00",
+      "formattedAmount": "₺3.500,00"
+     }
+    },
+    "media": {
+     "id": "abc123_media7~mv2.jpg",
+     "image": {
+      "id": "abc123_media7~mv2.jpg",
+      "url": "https://static.example.com/media/abc123_media7~mv2.jpg",
+      "height": 4000,
+      "width": 4662,
+      "filename": "Sample filename"
+     },
+     "mediaType": "IMAGE",
+     "thumbnail": {
+      "url": "https://static.example.com/media/abc123_media7~mv2.jpg/v1/fit/w_50,h_50,q_90/file.jpg",
+      "height": 50,
+      "width": 50
+     },
+     "uploadId": "abc123_media7~mv2.jpg"
+    },
+    "physicalProperties": {},
+    "inventoryStatus": {
+     "inStock": true,
+     "preorderEnabled": false
+    },
+    "productData": {
+     "productId": "00000000-0000-4000-8000-000000000014",
+     "name": "Sample name",
+     "productType": "PHYSICAL",
+     "slug": "Sample slug",
+     "visible": true,
+     "visibleInPos": true,
+     "mainCategoryId": "00000000-0000-4000-8000-000000000013",
+     "directCategoryIds": [
+      "00000000-0000-4000-8000-000000000032",
+      "00000000-0000-4000-8000-000000000013"
+     ],
+     "currency": "TRY",
+     "physicalProperties": {
+      "weightMeasurementUnitInfo": {
+       "weightMeasurementUnit": "KG"
+      }
+     },
+     "revision": "1",
+     "handle": "Sample handle",
+     "brand": {
+      "id": "00000000-0000-4000-8000-000000000031",
+      "name": "Sample name"
+     },
+     "updatedDate": "2026-09-15T16:58:34.132Z"
+    },
+    "internalMetadata": {
+     "rowState": "READY"
+    },
+    "locations": {},
+    "variantId": "00000000-0000-4000-8000-000000000034"
+   },
+   {
+    "id": "00000000-0000-4000-8000-000000000035",
+    "visible": true,
+    "optionChoices": [
+     {
+      "optionChoiceIds": {
+       "optionId": "00000000-0000-4000-8000-000000000015",
+       "choiceId": "00000000-0000-4000-8000-000000000027"
+      },
+      "optionChoiceNames": {
+       "optionName": "Beden",
+       "choiceName": "10 yaş",
+       "renderType": "TEXT_CHOICES"
+      }
+     },
+     {
+      "optionChoiceIds": {
+       "optionId": "00000000-0000-4000-8000-000000000028",
+       "choiceId": "00000000-0000-4000-8000-000000000029"
+      },
+      "optionChoiceNames": {
+       "optionName": "renk",
+       "choiceName": "Mavi",
+       "renderType": "SWATCH_CHOICES"
+      }
+     }
+    ],
+    "price": {
+     "actualPrice": {
+      "amount": "5200.00",
+      "formattedAmount": "₺5.200,00"
+     },
+     "compareAtPrice": {
+      "amount": "5300.00",
+      "formattedAmount": "₺5.300,00"
+     }
+    },
+    "media": {
+     "id": "abc123_media7~mv2.jpg",
+     "image": {
+      "id": "abc123_media7~mv2.jpg",
+      "url": "https://static.example.com/media/abc123_media7~mv2.jpg",
+      "height": 4000,
+      "width": 4662,
+      "filename": "Sample filename"
+     },
+     "mediaType": "IMAGE",
+     "thumbnail": {
+      "url": "https://static.example.com/media/abc123_media7~mv2.jpg/v1/fit/w_50,h_50,q_90/file.jpg",
+      "height": 50,
+      "width": 50
+     },
+     "uploadId": "abc123_media7~mv2.jpg"
+    },
+    "physicalProperties": {},
+    "inventoryStatus": {
+     "inStock": true,
+     "preorderEnabled": false
+    },
+    "productData": {
+     "productId": "00000000-0000-4000-8000-000000000014",
+     "name": "Sample name",
+     "productType": "PHYSICAL",
+     "slug": "Sample slug",
+     "visible": true,
+     "visibleInPos": true,
+     "mainCategoryId": "00000000-0000-4000-8000-000000000013",
+     "directCategoryIds": [
+      "00000000-0000-4000-8000-000000000032",
+      "00000000-0000-4000-8000-000000000013"
+     ],
+     "currency": "TRY",
+     "physicalProperties": {
+      "weightMeasurementUnitInfo": {
+       "weightMeasurementUnit": "KG"
+      }
+     },
+     "revision": "1",
+     "handle": "Sample handle",
+     "brand": {
+      "id": "00000000-0000-4000-8000-000000000031",
+      "name": "Sample name"
+     },
+     "updatedDate": "2026-09-15T16:58:34.132Z"
+    },
+    "internalMetadata": {
+     "rowState": "READY"
+    },
+    "locations": {},
+    "variantId": "00000000-0000-4000-8000-000000000035"
+   },
+   {
+    "id": "00000000-0000-4000-8000-000000000036",
+    "visible": true,
+    "optionChoices": [
+     {
+      "optionChoiceIds": {
+       "optionId": "00000000-0000-4000-8000-000000000015",
+       "choiceId": "00000000-0000-4000-8000-000000000019"
+      },
+      "optionChoiceNames": {
+       "optionName": "Beden",
+       "choiceName": "2 Yaş",
+       "renderType": "TEXT_CHOICES"
+      }
+     },
+     {
+      "optionChoiceIds": {
+       "optionId": "00000000-0000-4000-8000-000000000028",
+       "choiceId": "00000000-0000-4000-8000-000000000029"
+      },
+      "optionChoiceNames": {
+       "optionName": "renk",
+       "choiceName": "Mavi",
+       "renderType": "SWATCH_CHOICES"
+      }
+     }
+    ],
+    "price": {
+     "actualPrice": {
+      "amount": "3400.00",
+      "formattedAmount": "₺3.400,00"
+     },
+     "compareAtPrice": {
+      "amount": "3500.00",
+      "formattedAmount": "₺3.500,00"
+     }
+    },
+    "media": {
+     "id": "abc123_media7~mv2.jpg",
+     "image": {
+      "id": "abc123_media7~mv2.jpg",
+      "url": "https://static.example.com/media/abc123_media7~mv2.jpg",
+      "height": 4000,
+      "width": 4662,
+      "filename": "Sample filename"
+     },
+     "mediaType": "IMAGE",
+     "thumbnail": {
+      "url": "https://static.example.com/media/abc123_media7~mv2.jpg/v1/fit/w_50,h_50,q_90/file.jpg",
+      "height": 50,
+      "width": 50
+     },
+     "uploadId": "abc123_media7~mv2.jpg"
+    },
+    "physicalProperties": {},
+    "inventoryStatus": {
+     "inStock": true,
+     "preorderEnabled": false
+    },
+    "productData": {
+     "productId": "00000000-0000-4000-8000-000000000014",
+     "name": "Sample name",
+     "productType": "PHYSICAL",
+     "slug": "Sample slug",
+     "visible": true,
+     "visibleInPos": true,
+     "mainCategoryId": "00000000-0000-4000-8000-000000000013",
+     "directCategoryIds": [
+      "00000000-0000-4000-8000-000000000032",
+      "00000000-0000-4000-8000-000000000013"
+     ],
+     "currency": "TRY",
+     "physicalProperties": {
+      "weightMeasurementUnitInfo": {
+       "weightMeasurementUnit": "KG"
+      }
+     },
+     "revision": "1",
+     "handle": "Sample handle",
+     "brand": {
+      "id": "00000000-0000-4000-8000-000000000031",
+      "name": "Sample name"
+     },
+     "updatedDate": "2026-09-15T16:58:34.132Z"
+    },
+    "internalMetadata": {
+     "rowState": "READY"
+    },
+    "locations": {},
+    "variantId": "00000000-0000-4000-8000-000000000036"
+   },
+   {
+    "id": "00000000-0000-4000-8000-000000000037",
+    "visible": true,
+    "optionChoices": [
+     {
+      "optionChoiceIds": {
+       "optionId": "00000000-0000-4000-8000-000000000015",
+       "choiceId": "00000000-0000-4000-8000-000000000026"
+      },
+      "optionChoiceNames": {
+       "optionName": "Beden",
+       "choiceName": "9 Yaş",
+       "renderType": "TEXT_CHOICES"
+      }
+     },
+     {
+      "optionChoiceIds": {
+       "optionId": "00000000-0000-4000-8000-000000000028",
+       "choiceId": "00000000-0000-4000-8000-000000000029"
+      },
+      "optionChoiceNames": {
+       "optionName": "renk",
+       "choiceName": "Mavi",
+       "renderType": "SWATCH_CHOICES"
+      }
+     }
+    ],
+    "price": {
+     "actualPrice": {
+      "amount": "5200.00",
+      "formattedAmount": "₺5.200,00"
+     },
+     "compareAtPrice": {
+      "amount": "5300.00",
+      "formattedAmount": "₺5.300,00"
+     }
+    },
+    "media": {
+     "id": "abc123_media7~mv2.jpg",
+     "image": {
+      "id": "abc123_media7~mv2.jpg",
+      "url": "https://static.example.com/media/abc123_media7~mv2.jpg",
+      "height": 4000,
+      "width": 4662,
+      "filename": "Sample filename"
+     },
+     "mediaType": "IMAGE",
+     "thumbnail": {
+      "url": "https://static.example.com/media/abc123_media7~mv2.jpg/v1/fit/w_50,h_50,q_90/file.jpg",
+      "height": 50,
+      "width": 50
+     },
+     "uploadId": "abc123_media7~mv2.jpg"
+    },
+    "physicalProperties": {},
+    "inventoryStatus": {
+     "inStock": true,
+     "preorderEnabled": false
+    },
+    "productData": {
+     "productId": "00000000-0000-4000-8000-000000000014",
+     "name": "Sample name",
+     "productType": "PHYSICAL",
+     "slug": "Sample slug",
+     "visible": true,
+     "visibleInPos": true,
+     "mainCategoryId": "00000000-0000-4000-8000-000000000013",
+     "directCategoryIds": [
+      "00000000-0000-4000-8000-000000000032",
+      "00000000-0000-4000-8000-000000000013"
+     ],
+     "currency": "TRY",
+     "physicalProperties": {
+      "weightMeasurementUnitInfo": {
+       "weightMeasurementUnit": "KG"
+      }
+     },
+     "revision": "1",
+     "handle": "Sample handle",
+     "brand": {
+      "id": "00000000-0000-4000-8000-000000000031",
+      "name": "Sample name"
+     },
+     "updatedDate": "2026-09-15T16:58:34.132Z"
+    },
+    "internalMetadata": {
+     "rowState": "READY"
+    },
+    "locations": {},
+    "variantId": "00000000-0000-4000-8000-000000000037"
+   },
+   {
+    "id": "00000000-0000-4000-8000-000000000038",
+    "visible": true,
+    "optionChoices": [
+     {
+      "optionChoiceIds": {
+       "optionId": "00000000-0000-4000-8000-000000000015",
+       "choiceId": "00000000-0000-4000-8000-000000000022"
+      },
+      "optionChoiceNames": {
+       "optionName": "Beden",
+       "choiceName": "5 Yaş",
+       "renderType": "TEXT_CHOICES"
+      }
+     },
+     {
+      "optionChoiceIds": {
+       "optionId": "00000000-0000-4000-8000-000000000028",
+       "choiceId": "00000000-0000-4000-8000-000000000029"
+      },
+      "optionChoiceNames": {
+       "optionName": "renk",
+       "choiceName": "Mavi",
+       "renderType": "SWATCH_CHOICES"
+      }
+     }
+    ],
+    "price": {
+     "actualPrice": {
+      "amount": "4300.00",
+      "formattedAmount": "₺4.300,00"
+     },
+     "compareAtPrice": {
+      "amount": "4400.00",
+      "formattedAmount": "₺4.400,00"
+     }
+    },
+    "media": {
+     "id": "abc123_media7~mv2.jpg",
+     "image": {
+      "id": "abc123_media7~mv2.jpg",
+      "url": "https://static.example.com/media/abc123_media7~mv2.jpg",
+      "height": 4000,
+      "width": 4662,
+      "filename": "Sample filename"
+     },
+     "mediaType": "IMAGE",
+     "thumbnail": {
+      "url": "https://static.example.com/media/abc123_media7~mv2.jpg/v1/fit/w_50,h_50,q_90/file.jpg",
+      "height": 50,
+      "width": 50
+     },
+     "uploadId": "abc123_media7~mv2.jpg"
+    },
+    "physicalProperties": {},
+    "inventoryStatus": {
+     "inStock": true,
+     "preorderEnabled": false
+    },
+    "productData": {
+     "productId": "00000000-0000-4000-8000-000000000014",
+     "name": "Sample name",
+     "productType": "PHYSICAL",
+     "slug": "Sample slug",
+     "visible": true,
+     "visibleInPos": true,
+     "mainCategoryId": "00000000-0000-4000-8000-000000000013",
+     "directCategoryIds": [
+      "00000000-0000-4000-8000-000000000032",
+      "00000000-0000-4000-8000-000000000013"
+     ],
+     "currency": "TRY",
+     "physicalProperties": {
+      "weightMeasurementUnitInfo": {
+       "weightMeasurementUnit": "KG"
+      }
+     },
+     "revision": "1",
+     "handle": "Sample handle",
+     "brand": {
+      "id": "00000000-0000-4000-8000-000000000031",
+      "name": "Sample name"
+     },
+     "updatedDate": "2026-09-15T16:58:34.132Z"
+    },
+    "internalMetadata": {
+     "rowState": "READY"
+    },
+    "locations": {},
+    "variantId": "00000000-0000-4000-8000-000000000038"
+   },
+   {
+    "id": "00000000-0000-4000-8000-000000000039",
+    "visible": true,
+    "optionChoices": [
+     {
+      "optionChoiceIds": {
+       "optionId": "00000000-0000-4000-8000-000000000015",
+       "choiceId": "00000000-0000-4000-8000-000000000020"
+      },
+      "optionChoiceNames": {
+       "optionName": "Beden",
+       "choiceName": "3 Yaş",
+       "renderType": "TEXT_CHOICES"
+      }
+     },
+     {
+      "optionChoiceIds": {
+       "optionId": "00000000-0000-4000-8000-000000000028",
+       "choiceId": "00000000-0000-4000-8000-000000000029"
+      },
+      "optionChoiceNames": {
+       "optionName": "renk",
+       "choiceName": "Mavi",
+       "renderType": "SWATCH_CHOICES"
+      }
+     }
+    ],
+    "price": {
+     "actualPrice": {
+      "amount": "4300.00",
+      "formattedAmount": "₺4.300,00"
+     },
+     "compareAtPrice": {
+      "amount": "4400.00",
+      "formattedAmount": "₺4.400,00"
+     }
+    },
+    "media": {
+     "id": "abc123_media7~mv2.jpg",
+     "image": {
+      "id": "abc123_media7~mv2.jpg",
+      "url": "https://static.example.com/media/abc123_media7~mv2.jpg",
+      "height": 4000,
+      "width": 4662,
+      "filename": "Sample filename"
+     },
+     "mediaType": "IMAGE",
+     "thumbnail": {
+      "url": "https://static.example.com/media/abc123_media7~mv2.jpg/v1/fit/w_50,h_50,q_90/file.jpg",
+      "height": 50,
+      "width": 50
+     },
+     "uploadId": "abc123_media7~mv2.jpg"
+    },
+    "physicalProperties": {},
+    "inventoryStatus": {
+     "inStock": true,
+     "preorderEnabled": false
+    },
+    "productData": {
+     "productId": "00000000-0000-4000-8000-000000000014",
+     "name": "Sample name",
+     "productType": "PHYSICAL",
+     "slug": "Sample slug",
+     "visible": true,
+     "visibleInPos": true,
+     "mainCategoryId": "00000000-0000-4000-8000-000000000013",
+     "directCategoryIds": [
+      "00000000-0000-4000-8000-000000000032",
+      "00000000-0000-4000-8000-000000000013"
+     ],
+     "currency": "TRY",
+     "physicalProperties": {
+      "weightMeasurementUnitInfo": {
+       "weightMeasurementUnit": "KG"
+      }
+     },
+     "revision": "1",
+     "handle": "Sample handle",
+     "brand": {
+      "id": "00000000-0000-4000-8000-000000000031",
+      "name": "Sample name"
+     },
+     "updatedDate": "2026-09-15T16:58:34.132Z"
+    },
+    "internalMetadata": {
+     "rowState": "READY"
+    },
+    "locations": {},
+    "variantId": "00000000-0000-4000-8000-000000000039"
+   },
+   {
+    "id": "00000000-0000-4000-8000-000000000040",
+    "visible": true,
+    "optionChoices": [
+     {
+      "optionChoiceIds": {
+       "optionId": "00000000-0000-4000-8000-000000000015",
+       "choiceId": "00000000-0000-4000-8000-000000000017"
+      },
+      "optionChoiceNames": {
+       "optionName": "Beden",
+       "choiceName": "3-6 ay",
+       "renderType": "TEXT_CHOICES"
+      }
+     },
+     {
+      "optionChoiceIds": {
+       "optionId": "00000000-0000-4000-8000-000000000028",
+       "choiceId": "00000000-0000-4000-8000-000000000029"
+      },
+      "optionChoiceNames": {
+       "optionName": "renk",
+       "choiceName": "Mavi",
+       "renderType": "SWATCH_CHOICES"
+      }
+     }
+    ],
+    "price": {
+     "actualPrice": {
+      "amount": "3400.00",
+      "formattedAmount": "₺3.400,00"
+     },
+     "compareAtPrice": {
+      "amount": "3500.00",
+      "formattedAmount": "₺3.500,00"
+     }
+    },
+    "media": {
+     "id": "abc123_media7~mv2.jpg",
+     "image": {
+      "id": "abc123_media7~mv2.jpg",
+      "url": "https://static.example.com/media/abc123_media7~mv2.jpg",
+      "height": 4000,
+      "width": 4662,
+      "filename": "Sample filename"
+     },
+     "mediaType": "IMAGE",
+     "thumbnail": {
+      "url": "https://static.example.com/media/abc123_media7~mv2.jpg/v1/fit/w_50,h_50,q_90/file.jpg",
+      "height": 50,
+      "width": 50
+     },
+     "uploadId": "abc123_media7~mv2.jpg"
+    },
+    "physicalProperties": {},
+    "inventoryStatus": {
+     "inStock": true,
+     "preorderEnabled": false
+    },
+    "productData": {
+     "productId": "00000000-0000-4000-8000-000000000014",
+     "name": "Sample name",
+     "productType": "PHYSICAL",
+     "slug": "Sample slug",
+     "visible": true,
+     "visibleInPos": true,
+     "mainCategoryId": "00000000-0000-4000-8000-000000000013",
+     "directCategoryIds": [
+      "00000000-0000-4000-8000-000000000032",
+      "00000000-0000-4000-8000-000000000013"
+     ],
+     "currency": "TRY",
+     "physicalProperties": {
+      "weightMeasurementUnitInfo": {
+       "weightMeasurementUnit": "KG"
+      }
+     },
+     "revision": "1",
+     "handle": "Sample handle",
+     "brand": {
+      "id": "00000000-0000-4000-8000-000000000031",
+      "name": "Sample name"
+     },
+     "updatedDate": "2026-09-15T16:58:34.132Z"
+    },
+    "internalMetadata": {
+     "rowState": "READY"
+    },
+    "locations": {},
+    "variantId": "00000000-0000-4000-8000-000000000040"
+   },
+   {
+    "id": "00000000-0000-4000-8000-000000000041",
+    "visible": true,
+    "optionChoices": [
+     {
+      "optionChoiceIds": {
+       "optionId": "00000000-0000-4000-8000-000000000015",
+       "choiceId": "00000000-0000-4000-8000-000000000016"
+      },
+      "optionChoiceNames": {
+       "optionName": "Beden",
+       "choiceName": "0-3 ay",
+       "renderType": "TEXT_CHOICES"
+      }
+     },
+     {
+      "optionChoiceIds": {
+       "optionId": "00000000-0000-4000-8000-000000000028",
+       "choiceId": "00000000-0000-4000-8000-000000000029"
+      },
+      "optionChoiceNames": {
+       "optionName": "renk",
+       "choiceName": "Mavi",
+       "renderType": "SWATCH_CHOICES"
+      }
+     }
+    ],
+    "price": {
+     "actualPrice": {
+      "amount": "3400.00",
+      "formattedAmount": "₺3.400,00"
+     },
+     "compareAtPrice": {
+      "amount": "3500.00",
+      "formattedAmount": "₺3.500,00"
+     }
+    },
+    "media": {
+     "id": "abc123_media7~mv2.jpg",
+     "image": {
+      "id": "abc123_media7~mv2.jpg",
+      "url": "https://static.example.com/media/abc123_media7~mv2.jpg",
+      "height": 4000,
+      "width": 4662,
+      "filename": "Sample filename"
+     },
+     "mediaType": "IMAGE",
+     "thumbnail": {
+      "url": "https://static.example.com/media/abc123_media7~mv2.jpg/v1/fit/w_50,h_50,q_90/file.jpg",
+      "height": 50,
+      "width": 50
+     },
+     "uploadId": "abc123_media7~mv2.jpg"
+    },
+    "physicalProperties": {},
+    "inventoryStatus": {
+     "inStock": true,
+     "preorderEnabled": false
+    },
+    "productData": {
+     "productId": "00000000-0000-4000-8000-000000000014",
+     "name": "Sample name",
+     "productType": "PHYSICAL",
+     "slug": "Sample slug",
+     "visible": true,
+     "visibleInPos": true,
+     "mainCategoryId": "00000000-0000-4000-8000-000000000013",
+     "directCategoryIds": [
+      "00000000-0000-4000-8000-000000000032",
+      "00000000-0000-4000-8000-000000000013"
+     ],
+     "currency": "TRY",
+     "physicalProperties": {
+      "weightMeasurementUnitInfo": {
+       "weightMeasurementUnit": "KG"
+      }
+     },
+     "revision": "1",
+     "handle": "Sample handle",
+     "brand": {
+      "id": "00000000-0000-4000-8000-000000000031",
+      "name": "Sample name"
+     },
+     "updatedDate": "2026-09-15T16:58:34.132Z"
+    },
+    "internalMetadata": {
+     "rowState": "READY"
+    },
+    "locations": {},
+    "variantId": "00000000-0000-4000-8000-000000000041"
+   },
+   {
+    "id": "00000000-0000-4000-8000-000000000042",
+    "visible": true,
+    "optionChoices": [
+     {
+      "optionChoiceIds": {
+       "optionId": "00000000-0000-4000-8000-000000000015",
+       "choiceId": "00000000-0000-4000-8000-000000000025"
+      },
+      "optionChoiceNames": {
+       "optionName": "Beden",
+       "choiceName": "8 Yaş",
+       "renderType": "TEXT_CHOICES"
+      }
+     },
+     {
+      "optionChoiceIds": {
+       "optionId": "00000000-0000-4000-8000-000000000028",
+       "choiceId": "00000000-0000-4000-8000-000000000029"
+      },
+      "optionChoiceNames": {
+       "optionName": "renk",
+       "choiceName": "Mavi",
+       "renderType": "SWATCH_CHOICES"
+      }
+     }
+    ],
+    "price": {
+     "actualPrice": {
+      "amount": "5200.00",
+      "formattedAmount": "₺5.200,00"
+     },
+     "compareAtPrice": {
+      "amount": "5300.00",
+      "formattedAmount": "₺5.300,00"
+     }
+    },
+    "media": {
+     "id": "abc123_media7~mv2.jpg",
+     "image": {
+      "id": "abc123_media7~mv2.jpg",
+      "url": "https://static.example.com/media/abc123_media7~mv2.jpg",
+      "height": 4000,
+      "width": 4662,
+      "filename": "Sample filename"
+     },
+     "mediaType": "IMAGE",
+     "thumbnail": {
+      "url": "https://static.example.com/media/abc123_media7~mv2.jpg/v1/fit/w_50,h_50,q_90/file.jpg",
+      "height": 50,
+      "width": 50
+     },
+     "uploadId": "abc123_media7~mv2.jpg"
+    },
+    "physicalProperties": {},
+    "inventoryStatus": {
+     "inStock": true,
+     "preorderEnabled": false
+    },
+    "productData": {
+     "productId": "00000000-0000-4000-8000-000000000014",
+     "name": "Sample name",
+     "productType": "PHYSICAL",
+     "slug": "Sample slug",
+     "visible": true,
+     "visibleInPos": true,
+     "mainCategoryId": "00000000-0000-4000-8000-000000000013",
+     "directCategoryIds": [
+      "00000000-0000-4000-8000-000000000032",
+      "00000000-0000-4000-8000-000000000013"
+     ],
+     "currency": "TRY",
+     "physicalProperties": {
+      "weightMeasurementUnitInfo": {
+       "weightMeasurementUnit": "KG"
+      }
+     },
+     "revision": "1",
+     "handle": "Sample handle",
+     "brand": {
+      "id": "00000000-0000-4000-8000-000000000031",
+      "name": "Sample name"
+     },
+     "updatedDate": "2026-09-15T16:58:34.132Z"
+    },
+    "internalMetadata": {
+     "rowState": "READY"
+    },
+    "locations": {},
+    "variantId": "00000000-0000-4000-8000-000000000042"
+   },
+   {
+    "id": "00000000-0000-4000-8000-000000000043",
+    "visible": true,
+    "optionChoices": [
+     {
+      "optionChoiceIds": {
+       "optionId": "00000000-0000-4000-8000-000000000015",
+       "choiceId": "00000000-0000-4000-8000-000000000023"
+      },
+      "optionChoiceNames": {
+       "optionName": "Beden",
+       "choiceName": "6 Yaş",
+       "renderType": "TEXT_CHOICES"
+      }
+     },
+     {
+      "optionChoiceIds": {
+       "optionId": "00000000-0000-4000-8000-000000000028",
+       "choiceId": "00000000-0000-4000-8000-000000000029"
+      },
+      "optionChoiceNames": {
+       "optionName": "renk",
+       "choiceName": "Mavi",
+       "renderType": "SWATCH_CHOICES"
+      }
+     }
+    ],
+    "price": {
+     "actualPrice": {
+      "amount": "4300.00",
+      "formattedAmount": "₺4.300,00"
+     },
+     "compareAtPrice": {
+      "amount": "4400.00",
+      "formattedAmount": "₺4.400,00"
+     }
+    },
+    "media": {
+     "id": "abc123_media7~mv2.jpg",
+     "image": {
+      "id": "abc123_media7~mv2.jpg",
+      "url": "https://static.example.com/media/abc123_media7~mv2.jpg",
+      "height": 4000,
+      "width": 4662,
+      "filename": "Sample filename"
+     },
+     "mediaType": "IMAGE",
+     "thumbnail": {
+      "url": "https://static.example.com/media/abc123_media7~mv2.jpg/v1/fit/w_50,h_50,q_90/file.jpg",
+      "height": 50,
+      "width": 50
+     },
+     "uploadId": "abc123_media7~mv2.jpg"
+    },
+    "physicalProperties": {},
+    "inventoryStatus": {
+     "inStock": true,
+     "preorderEnabled": false
+    },
+    "productData": {
+     "productId": "00000000-0000-4000-8000-000000000014",
+     "name": "Sample name",
+     "productType": "PHYSICAL",
+     "slug": "Sample slug",
+     "visible": true,
+     "visibleInPos": true,
+     "mainCategoryId": "00000000-0000-4000-8000-000000000013",
+     "directCategoryIds": [
+      "00000000-0000-4000-8000-000000000032",
+      "00000000-0000-4000-8000-000000000013"
+     ],
+     "currency": "TRY",
+     "physicalProperties": {
+      "weightMeasurementUnitInfo": {
+       "weightMeasurementUnit": "KG"
+      }
+     },
+     "revision": "1",
+     "handle": "Sample handle",
+     "brand": {
+      "id": "00000000-0000-4000-8000-000000000031",
+      "name": "Sample name"
+     },
+     "updatedDate": "2026-09-15T16:58:34.132Z"
+    },
+    "internalMetadata": {
+     "rowState": "READY"
+    },
+    "locations": {},
+    "variantId": "00000000-0000-4000-8000-000000000043"
+   },
+   {
+    "id": "00000000-0000-4000-8000-000000000044",
+    "visible": true,
+    "optionChoices": [
+     {
+      "optionChoiceIds": {
+       "optionId": "00000000-0000-4000-8000-000000000015",
+       "choiceId": "00000000-0000-4000-8000-000000000024"
+      },
+      "optionChoiceNames": {
+       "optionName": "Beden",
+       "choiceName": "7 Yaş",
+       "renderType": "TEXT_CHOICES"
+      }
+     },
+     {
+      "optionChoiceIds": {
+       "optionId": "00000000-0000-4000-8000-000000000028",
+       "choiceId": "00000000-0000-4000-8000-000000000029"
+      },
+      "optionChoiceNames": {
+       "optionName": "renk",
+       "choiceName": "Mavi",
+       "renderType": "SWATCH_CHOICES"
+      }
+     }
+    ],
+    "price": {
+     "actualPrice": {
+      "amount": "5200.00",
+      "formattedAmount": "₺5.200,00"
+     },
+     "compareAtPrice": {
+      "amount": "5300.00",
+      "formattedAmount": "₺5.300,00"
+     }
+    },
+    "media": {
+     "id": "abc123_media7~mv2.jpg",
+     "image": {
+      "id": "abc123_media7~mv2.jpg",
+      "url": "https://static.example.com/media/abc123_media7~mv2.jpg",
+      "height": 4000,
+      "width": 4662,
+      "filename": "Sample filename"
+     },
+     "mediaType": "IMAGE",
+     "thumbnail": {
+      "url": "https://static.example.com/media/abc123_media7~mv2.jpg/v1/fit/w_50,h_50,q_90/file.jpg",
+      "height": 50,
+      "width": 50
+     },
+     "uploadId": "abc123_media7~mv2.jpg"
+    },
+    "physicalProperties": {},
+    "inventoryStatus": {
+     "inStock": true,
+     "preorderEnabled": false
+    },
+    "productData": {
+     "productId": "00000000-0000-4000-8000-000000000014",
+     "name": "Sample name",
+     "productType": "PHYSICAL",
+     "slug": "Sample slug",
+     "visible": true,
+     "visibleInPos": true,
+     "mainCategoryId": "00000000-0000-4000-8000-000000000013",
+     "directCategoryIds": [
+      "00000000-0000-4000-8000-000000000032",
+      "00000000-0000-4000-8000-000000000013"
+     ],
+     "currency": "TRY",
+     "physicalProperties": {
+      "weightMeasurementUnitInfo": {
+       "weightMeasurementUnit": "KG"
+      }
+     },
+     "revision": "1",
+     "handle": "Sample handle",
+     "brand": {
+      "id": "00000000-0000-4000-8000-000000000031",
+      "name": "Sample name"
+     },
+     "updatedDate": "2026-09-15T16:58:34.132Z"
+    },
+    "internalMetadata": {
+     "rowState": "READY"
+    },
+    "locations": {},
+    "variantId": "00000000-0000-4000-8000-000000000044"
+   },
+   {
+    "id": "00000000-0000-4000-8000-000000000045",
+    "visible": true,
+    "optionChoices": [
+     {
+      "optionChoiceIds": {
+       "optionId": "00000000-0000-4000-8000-000000000015",
+       "choiceId": "00000000-0000-4000-8000-000000000021"
+      },
+      "optionChoiceNames": {
+       "optionName": "Beden",
+       "choiceName": "4 Yaş",
+       "renderType": "TEXT_CHOICES"
+      }
+     },
+     {
+      "optionChoiceIds": {
+       "optionId": "00000000-0000-4000-8000-000000000028",
+       "choiceId": "00000000-0000-4000-8000-000000000029"
+      },
+      "optionChoiceNames": {
+       "optionName": "renk",
+       "choiceName": "Mavi",
+       "renderType": "SWATCH_CHOICES"
+      }
+     }
+    ],
+    "price": {
+     "actualPrice": {
+      "amount": "4300.00",
+      "formattedAmount": "₺4.300,00"
+     },
+     "compareAtPrice": {
+      "amount": "4400.00",
+      "formattedAmount": "₺4.400,00"
+     }
+    },
+    "media": {
+     "id": "abc123_media7~mv2.jpg",
+     "image": {
+      "id": "abc123_media7~mv2.jpg",
+      "url": "https://static.example.com/media/abc123_media7~mv2.jpg",
+      "height": 4000,
+      "width": 4662,
+      "filename": "Sample filename"
+     },
+     "mediaType": "IMAGE",
+     "thumbnail": {
+      "url": "https://static.example.com/media/abc123_media7~mv2.jpg/v1/fit/w_50,h_50,q_90/file.jpg",
+      "height": 50,
+      "width": 50
+     },
+     "uploadId": "abc123_media7~mv2.jpg"
+    },
+    "physicalProperties": {},
+    "inventoryStatus": {
+     "inStock": true,
+     "preorderEnabled": false
+    },
+    "productData": {
+     "productId": "00000000-0000-4000-8000-000000000014",
+     "name": "Sample name",
+     "productType": "PHYSICAL",
+     "slug": "Sample slug",
+     "visible": true,
+     "visibleInPos": true,
+     "mainCategoryId": "00000000-0000-4000-8000-000000000013",
+     "directCategoryIds": [
+      "00000000-0000-4000-8000-000000000032",
+      "00000000-0000-4000-8000-000000000013"
+     ],
+     "currency": "TRY",
+     "physicalProperties": {
+      "weightMeasurementUnitInfo": {
+       "weightMeasurementUnit": "KG"
+      }
+     },
+     "revision": "1",
+     "handle": "Sample handle",
+     "brand": {
+      "id": "00000000-0000-4000-8000-000000000031",
+      "name": "Sample name"
+     },
+     "updatedDate": "2026-09-15T16:58:34.132Z"
+    },
+    "internalMetadata": {
+     "rowState": "READY"
+    },
+    "locations": {},
+    "variantId": "00000000-0000-4000-8000-000000000045"
+   }
+  ],
+  "pagingMetadata": {
+   "count": 0,
+   "cursors": {},
+   "hasNext": false
+  }
+ },
+ "inventory": {
+  "inventoryItems": [
+   {
+    "id": "00000000-0000-4000-8000-000000000046",
+    "revision": "1",
+    "createdDate": "2025-08-22T06:34:43.721Z",
+    "updatedDate": "2026-09-15T16:58:34.720Z",
+    "variantId": "00000000-0000-4000-8000-000000000034",
+    "locationId": "00000000-0000-4000-8000-000000000047",
+    "productId": "00000000-0000-4000-8000-000000000014",
+    "quantity": 5,
+    "trackQuantity": true,
+    "inTransitQuantity": 0,
+    "availabilityStatus": "IN_STOCK",
+    "preorderInfo": {
+     "enabled": false
+    },
+    "product": {
+     "name": "Sample name",
+     "directCategoryIds": [
+      "00000000-0000-4000-8000-000000000032",
+      "00000000-0000-4000-8000-000000000013"
+     ],
+     "variantName": "Sample variantName",
+     "variantVisible": true,
+     "brand": {
+      "id": "00000000-0000-4000-8000-000000000031",
+      "name": "Sample name"
+     }
+    }
+   },
+   {
+    "id": "00000000-0000-4000-8000-000000000048",
+    "revision": "1",
+    "createdDate": "2026-05-18T11:59:38.610Z",
+    "updatedDate": "2026-09-15T16:58:35.811Z",
+    "variantId": "00000000-0000-4000-8000-000000000033",
+    "locationId": "00000000-0000-4000-8000-000000000047",
+    "productId": "00000000-0000-4000-8000-000000000001",
+    "inStock": true,
+    "trackQuantity": false,
+    "inTransitQuantity": 0,
+    "availabilityStatus": "IN_STOCK",
+    "preorderInfo": {
+     "enabled": false
+    },
+    "product": {
+     "name": "Sample name",
+     "directCategoryIds": [
+      "00000000-0000-4000-8000-000000000012",
+      "00000000-0000-4000-8000-000000000013"
+     ],
+     "variantName": "Sample variantName",
+     "variantVisible": true,
+     "brand": {
+      "id": "00000000-0000-4000-8000-000000000011",
+      "name": "Sample name"
+     }
+    }
+   },
+   {
+    "id": "00000000-0000-4000-8000-000000000049",
+    "revision": "1",
+    "createdDate": "2025-08-22T06:34:43.721Z",
+    "updatedDate": "2026-09-15T16:58:34.719Z",
+    "variantId": "00000000-0000-4000-8000-000000000045",
+    "locationId": "00000000-0000-4000-8000-000000000047",
+    "productId": "00000000-0000-4000-8000-000000000014",
+    "quantity": 5,
+    "trackQuantity": true,
+    "inTransitQuantity": 0,
+    "availabilityStatus": "IN_STOCK",
+    "preorderInfo": {
+     "enabled": false
+    },
+    "product": {
+     "name": "Sample name",
+     "directCategoryIds": [
+      "00000000-0000-4000-8000-000000000032",
+      "00000000-0000-4000-8000-000000000013"
+     ],
+     "variantName": "Sample variantName",
+     "variantVisible": true,
+     "brand": {
+      "id": "00000000-0000-4000-8000-000000000031",
+      "name": "Sample name"
+     }
+    }
+   },
+   {
+    "id": "00000000-0000-4000-8000-000000000050",
+    "revision": "1",
+    "createdDate": "2025-08-22T06:34:43.721Z",
+    "updatedDate": "2026-09-15T16:58:34.718Z",
+    "variantId": "00000000-0000-4000-8000-000000000036",
+    "locationId": "00000000-0000-4000-8000-000000000047",
+    "productId": "00000000-0000-4000-8000-000000000014",
+    "quantity": 5,
+    "trackQuantity": true,
+    "inTransitQuantity": 0,
+    "availabilityStatus": "IN_STOCK",
+    "preorderInfo": {
+     "enabled": false
+    },
+    "product": {
+     "name": "Sample name",
+     "directCategoryIds": [
+      "00000000-0000-4000-8000-000000000032",
+      "00000000-0000-4000-8000-000000000013"
+     ],
+     "variantName": "Sample variantName",
+     "variantVisible": true,
+     "brand": {
+      "id": "00000000-0000-4000-8000-000000000031",
+      "name": "Sample name"
+     }
+    }
+   },
+   {
+    "id": "00000000-0000-4000-8000-000000000051",
+    "revision": "1",
+    "createdDate": "2025-08-22T06:34:43.721Z",
+    "updatedDate": "2026-09-15T16:58:34.719Z",
+    "variantId": "00000000-0000-4000-8000-000000000037",
+    "locationId": "00000000-0000-4000-8000-000000000047",
+    "productId": "00000000-0000-4000-8000-000000000014",
+    "quantity": 5,
+    "trackQuantity": true,
+    "inTransitQuantity": 0,
+    "availabilityStatus": "IN_STOCK",
+    "preorderInfo": {
+     "enabled": false
+    },
+    "product": {
+     "name": "Sample name",
+     "directCategoryIds": [
+      "00000000-0000-4000-8000-000000000032",
+      "00000000-0000-4000-8000-000000000013"
+     ],
+     "variantName": "Sample variantName",
+     "variantVisible": true,
+     "brand": {
+      "id": "00000000-0000-4000-8000-000000000031",
+      "name": "Sample name"
+     }
+    }
+   },
+   {
+    "id": "00000000-0000-4000-8000-000000000052",
+    "revision": "1",
+    "createdDate": "2025-08-22T06:34:43.721Z",
+    "updatedDate": "2026-09-15T16:58:34.719Z",
+    "variantId": "00000000-0000-4000-8000-000000000043",
+    "locationId": "00000000-0000-4000-8000-000000000047",
+    "productId": "00000000-0000-4000-8000-000000000014",
+    "quantity": 5,
+    "trackQuantity": true,
+    "inTransitQuantity": 0,
+    "availabilityStatus": "IN_STOCK",
+    "preorderInfo": {
+     "enabled": false
+    },
+    "product": {
+     "name": "Sample name",
+     "directCategoryIds": [
+      "00000000-0000-4000-8000-000000000032",
+      "00000000-0000-4000-8000-000000000013"
+     ],
+     "variantName": "Sample variantName",
+     "variantVisible": true,
+     "brand": {
+      "id": "00000000-0000-4000-8000-000000000031",
+      "name": "Sample name"
+     }
+    }
+   },
+   {
+    "id": "00000000-0000-4000-8000-000000000053",
+    "revision": "1",
+    "createdDate": "2025-08-22T06:34:43.721Z",
+    "updatedDate": "2026-09-15T16:58:34.719Z",
+    "variantId": "00000000-0000-4000-8000-000000000044",
+    "locationId": "00000000-0000-4000-8000-000000000047",
+    "productId": "00000000-0000-4000-8000-000000000014",
+    "quantity": 5,
+    "trackQuantity": true,
+    "inTransitQuantity": 0,
+    "availabilityStatus": "IN_STOCK",
+    "preorderInfo": {
+     "enabled": false
+    },
+    "product": {
+     "name": "Sample name",
+     "directCategoryIds": [
+      "00000000-0000-4000-8000-000000000032",
+      "00000000-0000-4000-8000-000000000013"
+     ],
+     "variantName": "Sample variantName",
+     "variantVisible": true,
+     "brand": {
+      "id": "00000000-0000-4000-8000-000000000031",
+      "name": "Sample name"
+     }
+    }
+   }
+  ]
+ },
+ "categories": {
+  "categories": [
+   {
+    "id": "00000000-0000-4000-8000-000000000013",
+    "revision": "3",
+    "createdDate": "2026-09-15T16:58:26.617Z",
+    "updatedDate": "2026-09-15T16:58:59.730Z",
+    "name": "Sample name",
+    "image": {
+     "id": "abc123_media14~mv2.jpg",
+     "url": "https://static.example.com/media/abc123_media14~mv2.jpg",
+     "height": 6000,
+     "width": 4000,
+     "filename": "Sample filename"
+    },
+    "itemCounter": 251,
+    "visible": true,
+    "parentCategory": {
+     "index": 1
+    },
+    "slug": "Sample slug",
+    "handle": "Sample handle",
+    "treeReference": {
+     "appNamespace": "@wix/stores"
+    },
+    "managingAppId": "215238eb-22a5-4c36-9e7b-e7c08025e04e"
+   },
+   {
+    "id": "00000000-0000-4000-8000-000000000054",
+    "revision": "1",
+    "createdDate": "2026-04-06T13:08:14.515Z",
+    "updatedDate": "2026-09-15T16:58:35.638Z",
+    "name": "Sample name",
+    "itemCounter": 3,
+    "visible": true,
+    "parentCategory": {
+     "index": 17
+    },
+    "slug": "Sample slug",
+    "handle": "Sample handle",
+    "treeReference": {
+     "appNamespace": "@wix/stores"
+    }
+   }
+  ]
+ },
+ "v1Unsupported": {
+  "message": "Sample message",
+  "details": {
+   "applicationError": {
+    "code": "UNIMPLEMENTED"
+   }
+  }
+ }
+}

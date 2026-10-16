@@ -10051,7 +10051,8 @@
     "noSku": "No SKU",
     "neededFor": "Orders",
     "popupBlocked": "Your browser blocked the new tab. Allow pop-ups for this site and try again.",
-    "truncated": "Only the first {max} selected orders were opened."
+    "truncated": "Only the first {max} selected orders were opened.",
+    "personalization": "Personalization"
   },
   "etsyOps": {
     "common": {

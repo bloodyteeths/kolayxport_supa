@@ -63,7 +63,8 @@ function ItemLine({ item, currency }: { item: OrderItemRow; currency: string | n
         {item.personalization && (
           <Box sx={{ mt: '4px', display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px' }}>
             <Typography variant="caption" component="span" sx={{ color: n[500] }}>{t('personalization')}:</Typography>
-            <CopyText value={item.personalization} data-testid="item-personalization" />
+            {/* The full personalization: it is what gets produced (it was cut to one line). */}
+            <CopyText value={item.personalization} wrap data-testid="item-personalization" />
           </Box>
         )}
       </Box>

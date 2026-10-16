@@ -2,6 +2,7 @@ import React from 'react';
 import { useTranslations } from 'next-intl';
 import { useLocale } from '@/lib/i18n/useLocale';
 import { defaultAddressStyle, formatAddressForCopy, normalizeAddress } from '@/lib/format/address';
+import { splitVariant } from '@/lib/orders/toOrderRows';
 import { PrintThumb } from './PrintShell';
 import type { PrintDataResponse, PrintOrder, PrintSender } from './types';
 
@@ -89,11 +90,24 @@ function PackingSlip({ order, sender }: { order: PrintOrder; sender: PrintSender
             <PrintThumb src={item.image} alt={item.title} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 600, wordBreak: 'break-word' }}>{item.title || '—'}</div>
-              {item.variation && (
-                <div style={{ fontSize: '0.85rem', wordBreak: 'break-word' }}>
-                  <span className="kxp-muted">{t('variation')}:</span> {item.variation}
-                </div>
-              )}
+              {(() => {
+                // Personalization on its own line (it is what gets made), not buried in the variation text.
+                const { variant, personalization } = splitVariant(item.variation);
+                return (
+                  <>
+                    {variant && (
+                      <div style={{ fontSize: '0.85rem', wordBreak: 'break-word' }}>
+                        <span className="kxp-muted">{t('variation')}:</span> {variant}
+                      </div>
+                    )}
+                    {personalization && (
+                      <div style={{ fontSize: '0.9rem', fontWeight: 600, wordBreak: 'break-word', whiteSpace: 'pre-wrap', marginTop: 2 }}>
+                        <span className="kxp-muted" style={{ fontWeight: 400 }}>{t('personalization')}:</span> {personalization}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
               {item.sku && (
                 <div style={{ fontSize: '0.8rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', wordBreak: 'break-all' }}>
                   <span className="kxp-muted">{t('sku')}:</span> {item.sku}

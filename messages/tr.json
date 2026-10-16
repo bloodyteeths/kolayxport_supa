@@ -10051,7 +10051,8 @@
     "noSku": "SKU yok",
     "neededFor": "Siparişler",
     "popupBlocked": "Tarayıcınız yeni sekmeyi engelledi. Bu site için açılır pencerelere izin verip tekrar deneyin.",
-    "truncated": "Seçilen siparişlerden yalnızca ilk {max} tanesi açıldı."
+    "truncated": "Seçilen siparişlerden yalnızca ilk {max} tanesi açıldı.",
+    "personalization": "Kişiselleştirme"
   },
   "etsyOps": {
     "common": {

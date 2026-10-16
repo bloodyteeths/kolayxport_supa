@@ -19,6 +19,8 @@ export interface CopyTextProps {
   mono?: boolean;
   /** Max visible characters; longer text ends with "…" and the full value is in the tooltip. */
   truncate?: number;
+  /** Show the whole value on as many lines as it needs (personalization, notes) instead of one ellipsised line. */
+  wrap?: boolean;
   className?: string;
   'data-testid'?: string;
 }
@@ -30,7 +32,7 @@ export function truncateText(text: string, max?: number): string {
   return `${text.slice(0, max - 1)}…`;
 }
 
-export function CopyText({ value, display, mono, truncate, className, 'data-testid': testId }: CopyTextProps) {
+export function CopyText({ value, display, mono, truncate, wrap, className, 'data-testid': testId }: CopyTextProps) {
   const t = useTranslations('ds.copy');
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -78,9 +80,9 @@ export function CopyText({ value, display, mono, truncate, className, 'data-test
         component="span"
         title={visible !== shown ? shown : undefined}
         sx={{
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
+          ...(wrap
+            ? { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }
+            : { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }),
           ...(mono ? { fontFamily: font.mono, fontVariantNumeric: 'tabular-nums' } : {}),
         }}
       >

@@ -15456,7 +15456,8 @@
         "revenueConverted": "Ciro ({symbol})",
         "share": "Pay",
         "aov": "Ort. sipariş",
-        "manual": "Manuel siparişler"
+        "manual": "Manuel siparişler",
+        "mobileMeta": "{orders} sipariş · {units} adet · {share}"
       },
       "products": {
         "title": "En çok satan ürünler",

@@ -149,13 +149,21 @@ export function StoreTable({ rows, currency, fxNote, excludedCurrencies = [], fr
 
   const columns: Column<SalesStoreRow>[] = [
     { key: 'store', header: t('sales.stores.store'), mobile: 'title', render: storeCell, minWidth: 200 },
-    { key: 'orders', header: t('sales.stores.orders'), type: 'number', mobile: 'meta' },
-    { key: 'units', header: t('sales.stores.units'), type: 'number', mobile: 'meta' },
+    {
+      key: 'orders',
+      header: t('sales.stores.orders'),
+      type: 'number',
+      mobile: 'meta',
+      // Mobile: one labelled line ("93 orders · 104 units · 56.3%"), not bare "93 · 104 ·".
+      mobileRender: (r) => t('sales.stores.mobileMeta', { orders: r.orders, units: r.units, share: r.share == null ? '—' : fmt.percent(r.share) }),
+    },
+    { key: 'units', header: t('sales.stores.units'), type: 'number', mobile: 'hidden' },
     {
       key: 'revenueOriginal',
       header: t('sales.stores.revenueOriginal'),
       align: 'right',
-      mobile: 'subtitle',
+      // Mobile shows the converted amount only (the original repeated the same number for TRY stores).
+      mobile: 'hidden',
       render: (r) => <span className="tnum">{originalRevenueText(r, fmt)}</span>,
     },
     {
@@ -180,7 +188,7 @@ export function StoreTable({ rows, currency, fxNote, excludedCurrencies = [], fr
       },
       mobile: 'trailing',
     },
-    { key: 'share', header: t('sales.stores.share'), type: 'share', mobile: 'meta', width: 140 },
+    { key: 'share', header: t('sales.stores.share'), type: 'share', mobile: 'hidden', width: 140 },
     {
       key: 'aov',
       header: t('sales.stores.aov'),

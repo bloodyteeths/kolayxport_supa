@@ -15456,7 +15456,8 @@
         "revenueConverted": "Revenue ({symbol})",
         "share": "Share",
         "aov": "Avg order",
-        "manual": "Manual orders"
+        "manual": "Manual orders",
+        "mobileMeta": "{orders, plural, one {# order} other {# orders}} · {units, plural, one {# unit} other {# units}} · {share}"
       },
       "products": {
         "title": "Top products",

@@ -67,7 +67,7 @@ export function CopyText({ value, display, mono, truncate, wrap, className, 'dat
       data-testid={testId}
       sx={{
         display: 'inline-flex',
-        alignItems: 'center',
+        alignItems: wrap ? 'flex-start' : 'center', // multi-line values: the copy icon sits by the first line
         gap: '4px',
         maxWidth: '100%',
         verticalAlign: 'middle',

@@ -100,7 +100,8 @@ export function KpiTile({
           {delta.period}
         </Typography>
       )}
-      <Typography variant="caption" component="span" suppressHydrationWarning sx={{ color: n[500], mt: 'auto', pt: px(space[1]) }}>
+      <Typography variant="caption" component="span" suppressHydrationWarning sx={{ color: n[500], mt: 'auto', pt: px(space[1]), display: { xs: 'none', md: 'block' } }}>
+        {/* Phones: the page header states freshness once; repeating it on every tile doubled their height. */}
         {t('asOf', { time: when, source })}
       </Typography>
     </Box>

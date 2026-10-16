@@ -147,9 +147,9 @@ export function useSendChanges({ marketplace, unsent, staged, t, disabledReason,
 export function SendChangesBar({ action, unsent, t, hidden }: { action: ActionSpec | null; unsent: number; t: ListingsT; hidden?: boolean }) {
   if (!action || hidden) return null;
   return (
+    // No separate status line: the button already says "Send 9 changes to Etsy" (the line cost a row on phones).
     <StickyActionBar
       variant="mobile"
-      status={t('listings.pending.bar', { count: unsent })}
       primary={action}
       data-testid="listings-send-bar"
     />

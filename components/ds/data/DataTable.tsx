@@ -354,7 +354,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
               const id = getRowId(r);
               const selected = selectedSet.has(id);
               const selectable = !isRowSelectable || isRowSelectable(r);
-              const metas = metaCols.map((c) => ({ key: c.key, node: cell(c, r) })).filter((m) => m.node !== null && m.node !== '—');
+              const metas = metaCols.map((c) => ({ key: c.key, node: cell(c, r) })).filter((m) => m.node !== null && m.node !== undefined && m.node !== '' && m.node !== '—');
               const ia = inlineAction?.(r);
               const overflow = rowActions?.(r) ?? [];
               return (
@@ -411,7 +411,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
                     </Box>
                     {(() => {
                       // Empty values ("—") are dropped like meta values: no "SKU 123 · —" on cards.
-                      const subs = subtitleCols.map((c) => ({ key: c.key, node: cell(c, r) })).filter((m) => m.node !== null && m.node !== '—');
+                      const subs = subtitleCols.map((c) => ({ key: c.key, node: cell(c, r) })).filter((m) => m.node !== null && m.node !== undefined && m.node !== '' && m.node !== '—');
                       return subs.length > 0 ? (
                         <Typography variant="caption" component="div" sx={{ color: n[600], display: 'flex', alignItems: 'center', gap: px(space[1]), flexWrap: 'wrap' }}>
                           {subs.map((m, i) => (

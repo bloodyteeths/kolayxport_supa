@@ -336,7 +336,7 @@ describe('ListingsPage queued deletes and mobile', () => {
   it('mobile: cards plus the sticky "Send N changes" bar', async () => {
     setViewport('mobile');
     await renderPage();
-    expect(screen.getByTestId('listings-send-bar').textContent).toContain('3 changes not sent yet');
+    expect(screen.getByTestId('listings-send-bar').textContent).not.toContain('not sent yet'); // the button carries the count (no extra status row on phones)
     expect(screen.getByTestId('listings-table').getAttribute('data-layout')).toBe('cards');
   });
 });

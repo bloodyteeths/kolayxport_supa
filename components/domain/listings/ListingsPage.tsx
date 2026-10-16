@@ -1269,7 +1269,8 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
 
       {failureBanner}
 
-      {staged.adapter.listNewListings ? (
+      {/* Phones: the "Not sent" chip already lists unsent new listings; a second banner pushed the list off screen. */}
+      {staged.adapter.listNewListings && !mobile ? (
         <NewDraftsBanner
           marketplaceName={mpName}
           load={staged.adapter.listNewListings}

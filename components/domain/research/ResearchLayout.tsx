@@ -245,7 +245,9 @@ export function ResearchLayout({
       <Box
         sx={{
           position: 'sticky',
-          top: 'var(--kx-topbar-current, 0px)',
+          // The shell's scroll container (main) already starts below the top bar: sticking at the top bar height
+          // again left a 48px blank band and made the tabs cover the "Search | From Trendyol" switch on mobile.
+          top: 0,
           zIndex: 3,
           bgcolor: 'background.default',
           mb: '16px',

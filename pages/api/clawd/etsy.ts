@@ -902,7 +902,9 @@ export default async function handler(
     // --- Public Etsy API actions (no OAuth needed, just x-api-key) ---
     const publicAction = req.query.action as string;
     if (publicAction && [
-      'search_market', 'get_public_shop', 'get_public_shop_listings', 'batch_shops', 'taxonomy',
+      // 'taxonomy' is NOT public: handlePublicAction has no branch for it (it answered "Invalid public action" and
+      // every editor showed "Category #486"). The shop-scoped handler below serves it.
+      'search_market', 'get_public_shop', 'get_public_shop_listings', 'batch_shops',
       'analyze_niche', 'estimate_sales_velocity', 'analyze_competition',
       'get_shop_reviews', 'analyze_listing_url', 'get_discovery_data',
     ].includes(publicAction)) {

@@ -25,7 +25,8 @@ export function SidePanelSection({ id, title, description, action, children, cla
       aria-labelledby={headingId}
       className={className}
       data-testid={rest['data-testid'] ?? `panel-section-${id}`}
-      sx={{ p: `${layout.panelPad}px`, scrollMarginTop: '56px', '& + &': { borderTop: `1px solid ${n[100]}` } }}
+      // Phones: 12px between sections (16px stacked up into the founder's "huge white spaces"); 16px from sm up.
+      sx={{ px: `${layout.panelPad}px`, py: { xs: '12px', sm: `${layout.panelPad}px` }, scrollMarginTop: '56px', '& + &': { borderTop: `1px solid ${n[100]}` } }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', minHeight: 24, mb: children ? '8px' : 0 }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>

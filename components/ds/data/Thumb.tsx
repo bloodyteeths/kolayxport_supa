@@ -7,7 +7,7 @@ import { neutral as n, px, radius, elevation, zIndex } from '@/lib/ds/tokens';
 import { PlaceholderIcon } from './dataIcons';
 import type { DsBaseProps } from './types';
 
-export type ThumbSize = 16 | 32 | 40 | 48 | 64 | 96 | 120;
+export type ThumbSize = 16 | 32 | 40 | 48 | 64 | 80 | 96 | 120;
 
 export type ThumbProps = DsBaseProps & {
   src?: string | null;

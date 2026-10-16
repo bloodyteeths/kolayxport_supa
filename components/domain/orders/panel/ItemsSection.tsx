@@ -39,7 +39,7 @@ function ItemLine({ item, currency }: { item: OrderItemRow; currency: string | n
     <Box component="li" sx={{ display: 'grid', gridTemplateColumns: '48px 1fr auto', columnGap: '12px', alignItems: 'start', py: '8px' }} data-testid="order-item">
       <Thumb src={item.image} alt={item.title} size={48} preview />
       <Box sx={{ minWidth: 0 }}>
-        <Typography variant="dense" component="p" sx={{ m: 0, fontWeight: 500, color: n[900], overflowWrap: 'anywhere' }}>
+        <Typography variant="dense" component="p" title={item.title} sx={{ m: 0, fontWeight: 500, color: n[900], overflowWrap: 'anywhere', display: '-webkit-box', WebkitLineClamp: { xs: 2, sm: 3 }, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {item.listingUrl ? (
             <Link href={item.listingUrl} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ color: 'inherit' }}>
               {item.title}

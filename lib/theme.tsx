@@ -125,7 +125,7 @@ const theme = createTheme({
           '&:hover': { boxShadow: 'none' },
           '&.Mui-focusVisible, &:focus-visible': { boxShadow: focusRing },
           '&.Mui-disabled': { backgroundImage: 'none' },
-          '@media (pointer: coarse)': { minHeight: control.lg },
+          '@media (pointer: coarse)': { minHeight: 36 }, // DS Button sizes md+ to 44 itself; small buttons (split, copy) stay compact on phones
         },
         startIcon: { marginRight: 0, marginLeft: 0 },
         endIcon: { marginLeft: 0, marginRight: 0 },

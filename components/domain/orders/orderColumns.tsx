@@ -124,10 +124,10 @@ function NewChip({ label }: { label: string }) {
   );
 }
 
-function OrderMetaLine({ row, t, withStore }: { row: OrderRow; t: OrdersT; withStore?: boolean }) {
+function OrderMetaLine({ row, t, withStore, hideNumber }: { row: OrderRow; t: OrdersT; withStore?: boolean; hideNumber?: boolean }) {
   const buyer = buyerText(row, t);
   const orderNo = `#${row.orderNumber}`;
-  const parts: React.ReactNode[] = [<span key="n">{orderNo}</span>];
+  const parts: React.ReactNode[] = hideNumber ? [] : [<span key="n">{orderNo}</span>];
   if (withStore) {
     parts.push(
       <Box key="s" component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -177,7 +177,7 @@ function OrderTitle({ row, t, isNew, newLabel }: { row: OrderRow; t: OrdersT; is
   return (
     <Typography
       component="span"
-      sx={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: neutral[900], display: '-webkit-box', WebkitLineClamp: { xs: 2, md: 1 }, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+      sx={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: neutral[900], display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
       title={title}
     >
       {title}
@@ -273,7 +273,8 @@ export function orderColumns(t: OrdersT, ctx: OrderColumnsContext): Column<Order
         const more = r.items.length > 1 ? `+${r.items.length - 1}` : undefined;
         return <Thumb src={r.items[0]?.image ?? null} alt={r.items[0]?.title ?? ''} size={48} preview badge={more} />;
       },
-      mobileRender: (r) => <Thumb src={r.items[0]?.image ?? null} alt={r.items[0]?.title ?? ''} size={64} />,
+      // Phones: a bigger photo (sellers recognise the product by its picture), one-line title, no order number.
+      mobileRender: (r) => <Thumb src={r.items[0]?.image ?? null} alt={r.items[0]?.title ?? ''} size={80} badge={r.items.length > 1 ? `+${r.items.length - 1}` : undefined} />,
     },
     {
       key: 'order',
@@ -293,7 +294,7 @@ export function orderColumns(t: OrdersT, ctx: OrderColumnsContext): Column<Order
       header: t('columns.order'),
       desktop: false,
       mobile: 'subtitle',
-      render: (r) => <OrderMetaLine row={r} t={t} withStore />,
+      render: (r) => <OrderMetaLine row={r} t={t} withStore hideNumber />,
     },
     {
       key: 'store',

@@ -258,6 +258,8 @@ describe('BulkCreateLabelsPanel', () => {
   it('DHL eCommerce is disabled unless every order ships within Turkey (tr)', async () => {
     connState.connections = { fedex: { connected: true }, ups: { connected: true }, mng: { connected: true } };
     wrap(<BulkCreateLabelsPanel orders={[row()]} open onClose={vi.fn()} onFixOrder={vi.fn()} onDone={vi.fn()} />, 'tr');
+    // International batch: DHL eCommerce sits under "Other carriers" with the reason.
+    fireEvent.click(await screen.findByTestId('carrier-other-toggle'));
     expect(await screen.findByText('DHL eCommerce yalnızca tüm siparişler Türkiye içine gönderiliyorsa kullanılabilir')).toBeTruthy();
   });
 });

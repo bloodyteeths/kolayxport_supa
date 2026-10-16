@@ -47,6 +47,7 @@ import { usePackagePresets } from '@/lib/shipping/usePackagePresets';
 import { senderPhoneE164 } from '@/components/domain/orders/panel/ShipToForm';
 import { FromSection } from './FromSection';
 import { PackageSection } from './PackageSection';
+import { primaryCarriersFor } from './labelUx';
 import { CarrierServiceSection } from './CarrierServiceSection';
 
 export interface BulkCreateLabelsPanelProps {
@@ -287,7 +288,7 @@ export function BulkCreateLabelsPanel({ orders, open, onClose, onFixOrder, onDon
   // ─── columns ───
   const columns: Column<BulkRow>[] = [
     {
-      key: 'state', header: t('bulk.status'), width: 220, mobile: 'status',
+      key: 'state', header: t('bulk.status'), width: 140, mobile: 'status',
       render: (r) => <RowStatus state={r.state} mp={marketplaceSelectKey(r.draft.marketplace)} fieldLabel={(f) => tf(f)} />,
     },
     {
@@ -296,9 +297,9 @@ export function BulkCreateLabelsPanel({ orders, open, onClose, onFixOrder, onDon
         const num = `#${r.order.orderNumber}`;
         const who = [r.draft.shipTo.name, r.draft.shipTo.country].filter(Boolean).join(' · ');
         return (
-          <Box sx={{ minWidth: 0, display: 'flex', gap: '6px', alignItems: 'baseline' }}>
-            <Box component="span" sx={{ fontFamily: 'var(--kx-font-mono, monospace)', fontSize: 13, color: n[800] }}>{num}</Box>
-            <Box component="span" sx={{ fontSize: 13, color: n[600] }}>{who}</Box>
+          <Box sx={{ minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+            <Box component="span" sx={{ fontFamily: 'var(--kx-font-mono, monospace)', fontSize: 13, color: n[800], whiteSpace: 'nowrap' }}>{num}</Box>
+            <Box component="span" sx={{ fontSize: 12, color: n[600], overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{who}</Box>
           </Box>
         );
       },
@@ -413,6 +414,8 @@ export function BulkCreateLabelsPanel({ orders, open, onClose, onFixOrder, onDon
               value={rate}
               onChange={(id) => phase !== 'running' && setRate(id)}
               overrideReason={allTr ? undefined : { dhl: t('bulk.dhlMixed') }}
+              // Same as the single panel: all-domestic batches show DHL eCommerce first, the rest folded.
+              primary={primaryCarriersFor(allTr ? 'domestic' : 'international')}
             />
             <PackageSection
               pkg={rows[0]?.draft.pkg ?? { weightKg: 0, packaging: '' }}

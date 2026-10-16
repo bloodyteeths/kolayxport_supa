@@ -1204,7 +1204,7 @@
     "amazonDesc": "Amazon Satıcı hesabınızı bağlayarak seçtiğiniz pazaryerlerindeki siparişleri senkronize edin ve kargo takip bilgisini Amazon'a iletin.",
     "amazonMarketplaces": "Pazaryerleri",
     "amazonMarketplacesHelp": "Satış yaptığınız tüm Amazon pazaryerlerini seçin. Daha sonra değiştirebilirsiniz.",
-    "amazonSelectMarketplacesHelp": "Bağlanmadan önce Amazon pazaryerlerinizi seçin.",
+    "amazonSelectMarketplacesHelp": "KolayXport'un sipariş çektiği Amazon pazaryerlerini seçin.",
     "amazonSelectMarketplaceFirst": "Önce en az bir pazaryeri seçin.",
     "connectAmazon": "Amazon'u Bağla",
     "checkingAmazonStatus": "Amazon bağlantı durumu kontrol ediliyor...",

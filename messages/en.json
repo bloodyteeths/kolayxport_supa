@@ -1286,7 +1286,7 @@
     "amazonDesc": "Connect your Amazon Seller account to sync orders across selected marketplaces and submit tracking back to Amazon.",
     "amazonMarketplaces": "Marketplaces",
     "amazonMarketplacesHelp": "Pick every Amazon marketplace you sell on. You can change this later.",
-    "amazonSelectMarketplacesHelp": "Choose your Amazon marketplaces before connecting.",
+    "amazonSelectMarketplacesHelp": "Choose the Amazon marketplaces KolayXport pulls orders from.",
     "amazonSelectMarketplaceFirst": "Pick at least one marketplace first.",
     "connectAmazon": "Connect Amazon",
     "checkingAmazonStatus": "Checking Amazon connection status...",

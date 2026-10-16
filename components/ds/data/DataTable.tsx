@@ -325,14 +325,16 @@ export function DataTable<T>(props: DataTableProps<T>) {
     return (
       <Box className={className} data-testid={testId} data-layout="cards" data-state={state} aria-busy={state === 'loading' || undefined}>
         {selection && state === 'ready' && (
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: px(space[2]), pb: px(space[2]) }}>
+          // Compact: the Select toggle used to be a 44px row of its own above the list.
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: px(space[2]), mt: px(-space[1]), pb: px(space[1]) }}>
             {selectMode && (
               <Typography variant="caption" sx={{ color: n[600], mr: 'auto' }}>{t('selectedCount', { count: selectedSet.size })}</Typography>
             )}
             <Button
               variant="text"
               onClick={() => { if (selectMode) { selection.onChange([]); setSelectMode(false); } else setSelectMode(true); }}
-              sx={{ minHeight: px(control.lg) }}
+              size="small"
+              sx={{ minHeight: px(control.sm), py: 0 }}
             >
               {selectMode ? t('done') : t('select')}
             </Button>

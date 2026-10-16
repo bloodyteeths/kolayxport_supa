@@ -93,7 +93,7 @@ describe('views and the server query (orders §1.3)', () => {
   });
   it('built-in views carry counts only where the view shows one, overdue in danger tone', () => {
     const views = builtInViews((k) => k, { to_ship: 12, overdue: 1, label_created: 3, problems: 2 });
-    expect(views.map((v) => v.id)).toEqual(['to_ship', 'overdue', 'label_created', 'shipped', 'problems', 'all']);
+    expect(views.map((v) => v.id)).toEqual(['all', 'to_ship', 'overdue', 'label_created', 'shipped', 'problems']);
     expect(views.find((v) => v.id === 'to_ship')?.count).toBe(12);
     expect(views.find((v) => v.id === 'shipped')?.count).toBeUndefined();
     expect(views.find((v) => v.id === 'overdue')?.countTone).toBe('danger');

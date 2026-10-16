@@ -22,7 +22,7 @@ import { ORDER_VIEWS as API_ORDER_VIEWS } from '@/lib/orders/views';
 
 // ── vocabularies ────────────────────────────────────────────────────────────────────────────────────────
 
-export const ORDER_VIEWS = ['to_ship', 'overdue', 'label_created', 'shipped', 'problems', 'all'] as const satisfies readonly ApiViewKey[];
+export const ORDER_VIEWS = ['all', 'to_ship', 'overdue', 'label_created', 'shipped', 'problems'] as const satisfies readonly ApiViewKey[];
 export type OrderViewKey = (typeof ORDER_VIEWS)[number];
 
 export const SEARCH_IN = ['all', 'customer', 'order', 'tracking', 'product', 'sku', 'city', 'phone', 'note'] as const satisfies readonly OrderSearchIn[];

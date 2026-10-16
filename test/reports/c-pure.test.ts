@@ -26,7 +26,8 @@ import { bucketLabel, alignPrevious } from '@/components/domain/reports/sales/Sa
 import { currencySymbol, originalRevenueText, reportOrdersHref, rowConverted, storeDisplayName, storeOrdersHref, storeOrdersValues } from '@/components/domain/reports/sales/StoreTable';
 import { summarizeStatuses } from '@/components/domain/reports/sales/StatusSummary';
 import { matchesProduct } from '@/components/domain/reports/sales/TopProductsTable';
-import { baseSalesCurrency, convertedCurrencies, defaultSalesCurrency, excludedCurrencies, isRangeRejected, salesCsvBlocks, storeChoices } from '@/components/domain/reports/sales/SalesReport';
+import { convertedCurrencies, excludedCurrencies, isRangeRejected, salesCsvBlocks, storeChoices } from '@/components/domain/reports/sales/SalesReport';
+import { resolveDisplayCurrency } from '@/components/domain/reports/useDisplayCurrency';
 
 const IST = 'Europe/Istanbul';
 
@@ -269,14 +270,11 @@ describe('Sales helpers', () => {
     expect(alignPrevious(withGap.series.slice(0, 2), withGap.previousSeries, 'orders')).toEqual([withGap.previousSeries[0]?.orders, null]);
   });
   it('base currency and CSV blocks', () => {
-    expect(baseSalesCurrency('tr')).toBe('TRY');
-    expect(baseSalesCurrency('en')).toBe('USD');
-    // The account base wins over the UI locale (a TR seller on the EN UI sees TRY); locale only as the fallback.
-    expect(defaultSalesCurrency({ state: 'ready', hasSender: true, baseCurrency: 'TRY' }, 'en')).toBe('TRY');
-    expect(defaultSalesCurrency({ state: 'ready', hasSender: true, baseCurrency: 'GBP' }, 'en')).toBe('TRY');
-    expect(defaultSalesCurrency({ state: 'ready', hasSender: false, baseCurrency: 'USD' }, 'tr')).toBe('TRY');
-    expect(defaultSalesCurrency({ state: 'error', hasSender: false, baseCurrency: 'USD' }, 'en')).toBe('TRY');
-    expect(defaultSalesCurrency({ state: 'ready', hasSender: true, baseCurrency: 'USD' }, 'tr')).toBe('TRY');
+    // Home display currency: shared-link ?cur → this browser's last choice → TRY (never the sender profile / locale).
+    expect(resolveDisplayCurrency(null, null)).toBe('TRY');
+    expect(resolveDisplayCurrency(null, 'usd')).toBe('USD');
+    expect(resolveDisplayCurrency('EUR', 'USD')).toBe('EUR');
+    expect(resolveDisplayCurrency('GBP', 'junk')).toBe('TRY');
     expect(isRangeRejected({ status: 400 })).toBe(true);
     expect(isRangeRejected({ status: 500 })).toBe(false);
     const blocks = salesCsvBlocks(r, { currency: 'TRY', t: (k) => k, manualLabel: 'Manual orders' });

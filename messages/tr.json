@@ -15486,7 +15486,8 @@
       "amountsIn": "Tutarlar {symbol} cinsinden",
       "refreshFrom": "{mp, select, etsy {Etsy’den} ebay {eBay’den} amazon {Amazon’dan} trendyol {Trendyol’dan} other {{name} kaynağından}} yenile",
       "refreshingFrom": "{mp, select, etsy {Etsy’den} ebay {eBay’den} amazon {Amazon’dan} trendyol {Trendyol’dan} other {{name} kaynağından}} yenileniyor…",
-      "ledgerSourceNotRefreshed": "{name} ödeme kayıtları (henüz yenilenmedi)"
+      "ledgerSourceNotRefreshed": "{name} ödeme kayıtları (henüz yenilenmedi)",
+      "storeCount": "{count, plural, one {# mağaza} other {# mağaza}}"
     },
     "actions": {
       "exportCsv": "CSV indir",
@@ -15519,7 +15520,8 @@
     "delta": {
       "vsRange": "{range} dönemine göre",
       "noBaseline": "Önceki dönemde veri yok",
-      "points": "{value} puan"
+      "points": "{value} puan",
+      "vsPreviousDays": "önceki {days} güne göre"
     },
     "chart": {
       "thisPeriod": "Bu dönem",

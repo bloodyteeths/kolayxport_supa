@@ -45,7 +45,7 @@ describe('M9-C i18n', () => {
       for (const [locale, text] of [['en', e], ['tr', t]] as const) {
         const errors: string[] = [];
         const tt = createTranslator({ locale, messages: { x: { y: text } } as never, onError: (err) => errors.push(err.message) });
-        tt('x.y' as never, { count: 2, time: '10:42', source: 'exchangerate-api.com', date: '15 Oct', range: '1–31 Aug', symbol: '₺', name: 'Etsy', currencies: 'USD', q: 'box' } as never);
+        tt('x.y' as never, { count: 2, time: '10:42', source: 'exchangerate-api.com', date: '15 Oct', range: '1–31 Aug', symbol: '₺', name: 'Etsy', currencies: 'USD', q: 'box', days: 30 } as never);
         expect(errors, `${locale} ${key}`).toEqual([]);
       }
     }

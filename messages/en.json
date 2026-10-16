@@ -15486,7 +15486,8 @@
       "amountsIn": "Amounts in {symbol}",
       "refreshFrom": "Refresh from {name}",
       "refreshingFrom": "Refreshing from {name}…",
-      "ledgerSourceNotRefreshed": "{name} payments ledger (not refreshed yet)"
+      "ledgerSourceNotRefreshed": "{name} payments ledger (not refreshed yet)",
+      "storeCount": "{count, plural, one {# store} other {# stores}}"
     },
     "actions": {
       "exportCsv": "Export CSV",
@@ -15519,7 +15520,8 @@
     "delta": {
       "vsRange": "vs {range}",
       "noBaseline": "No data in the previous period",
-      "points": "{value} pts"
+      "points": "{value} pts",
+      "vsPreviousDays": "vs previous {days} days"
     },
     "chart": {
       "thisPeriod": "This period",

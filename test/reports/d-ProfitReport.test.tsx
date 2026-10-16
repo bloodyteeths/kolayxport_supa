@@ -196,9 +196,10 @@ describe('Profit tab, ready (EN)', () => {
   it('the delta label names the window the server compared against (Sep 1–30 → Aug 2–31, not Aug 1–31)', async () => {
     renderProfit();
     await settle();
-    const kpis = screen.getByTestId('profit-kpis').textContent ?? '';
-    expect(kpis).toMatch(/vs Aug 2\s*[–-]\s*31/);
-    expect(kpis).not.toMatch(/vs Aug 1\s*[–-]/);
+    // The tile says "vs previous 30 days"; the exact server window is the tooltip (aria-label) of that line.
+    const kpis = screen.getByTestId('profit-kpis').innerHTML;
+    expect(kpis).toMatch(/Aug 2\s*[–-]\s*31/);
+    expect(kpis).not.toMatch(/Aug 1\s*[–-]/);
   });
 
   it('a range starting on the 1st (Oct 1–15) is labelled with the server window Sep 16–30', async () => {
@@ -206,9 +207,9 @@ describe('Profit tab, ready (EN)', () => {
     (dashboard.body as Obj).previous = { from: '2026-09-16', to: '2026-09-30' };
     renderProfit();
     await settle();
-    const kpis = screen.getByTestId('profit-kpis').textContent ?? '';
-    expect(kpis).toMatch(/vs Sep 16\s*[–-]\s*30/);
-    expect(kpis).not.toMatch(/vs Sep 1\s*[–-]\s*15/);
+    const kpis = screen.getByTestId('profit-kpis').innerHTML;
+    expect(kpis).toMatch(/Sep 16\s*[–-]\s*30/);
+    expect(kpis).not.toMatch(/Sep 1\s*[–-]\s*15/);
   });
 
   it('switching marketplace never shows (or edits) the previous marketplace\'s numbers while the new one loads', async () => {

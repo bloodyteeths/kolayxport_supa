@@ -6,6 +6,7 @@ export const C_EN = {
     page: { title: 'Reports' },
     tabs: { sales: 'Sales', profit: 'Profit', payouts: 'Payouts', transactions: 'Transactions' },
     meta: {
+      storeCount: '{count, plural, one {# store} other {# stores}}',
       ordersAsOf: 'Orders as of {time}',
       updating: 'Updating…',
       refresh: 'Refresh',
@@ -23,7 +24,7 @@ export const C_EN = {
     },
     toolbar: { store: 'Store', all: 'All', showIn: 'Show in', notConnected: '{name} · not connected' },
     granularity: { label: 'Chart interval', hour: 'Hourly', day: 'Daily', week: 'Weekly', month: 'Monthly' },
-    delta: { vsRange: 'vs {range}', noBaseline: 'No data in the previous period' },
+    delta: { vsRange: 'vs {range}', vsPreviousDays: 'vs previous {days} days', noBaseline: 'No data in the previous period' },
     chart: { thisPeriod: 'This period', previousPeriod: 'Previous period ({range})', previousDay: 'Previous day' },
     sales: {
       kpi: {
@@ -88,6 +89,7 @@ export const C_TR = {
     page: { title: 'Raporlar' },
     tabs: { sales: 'Satışlar', profit: 'Kâr', payouts: 'Ödemeler', transactions: 'İşlemler' },
     meta: {
+      storeCount: '{count, plural, one {# mağaza} other {# mağaza}}',
       ordersAsOf: 'Siparişler {time} itibarıyla',
       updating: 'Güncelleniyor…',
       refresh: 'Yenile',
@@ -105,7 +107,7 @@ export const C_TR = {
     },
     toolbar: { store: 'Mağaza', all: 'Tümü', showIn: 'Para birimi', notConnected: '{name} · bağlı değil' },
     granularity: { label: 'Grafik aralığı', hour: 'Saatlik', day: 'Günlük', week: 'Haftalık', month: 'Aylık' },
-    delta: { vsRange: '{range} dönemine göre', noBaseline: 'Önceki dönemde veri yok' },
+    delta: { vsRange: '{range} dönemine göre', vsPreviousDays: 'önceki {days} güne göre', noBaseline: 'Önceki dönemde veri yok' },
     chart: { thisPeriod: 'Bu dönem', previousPeriod: 'Önceki dönem ({range})', previousDay: 'Önceki gün' },
     sales: {
       kpi: {

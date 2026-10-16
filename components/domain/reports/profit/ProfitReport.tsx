@@ -14,7 +14,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import Box from '@mui/material/Box';
 import { useTranslations } from 'next-intl';
-import { ReportsPage } from '@/components/domain/reports/ReportsPage';
+import { ReportsPage, useComparisonLabel } from '@/components/domain/reports/ReportsPage';
 import { SyncMeta } from '@/components/ds/page/SyncMeta';
 import { Banner } from '@/components/ds/feedback/Banner';
 import { useToast } from '@/components/ds/feedback/toast';
@@ -99,12 +99,11 @@ export function ProfitReport({ now }: ProfitReportProps = {}) {
   const [panel, setPanel] = useState<{ open: boolean; product: CostsPanelProduct | null }>({ open: false, product: null });
   const statementLabel = useStatementLabel();
 
-  const asOf = useMemo(() => (data?.lastSyncedAt ? new Date(data.lastSyncedAt) : now ?? new Date()), [data?.lastSyncedAt, now]);
   const ledger = t('meta.ledgerSource', { name });
   // The server's comparison window (same day count ending the day before `from`), not the client's calendar rule:
   // the label must name the days the deltas were computed from. Client window only when the API does not say.
   const prev = data?.previousWindow ?? scope.previous;
-  const period = t('delta.vsRange', { range: fmt.dateRange(dayKeyToDate(prev.from), dayKeyToDate(prev.to)) });
+  const comparison = useComparisonLabel(prev);
   const busy = report.isValidating && Boolean(data);
 
   // "N new transactions" = ledger rows after − before, from a fresh read of the same key (`totalUpserted` counts
@@ -299,7 +298,7 @@ export function ProfitReport({ now }: ProfitReportProps = {}) {
               onRetry={report.retry}
             />
           ) : null}
-          <ProfitKpis data={data} source={ledger} asOf={asOf} period={period} loading={busy} />
+          <ProfitKpis data={data} period={comparison.short} periodDetail={comparison.detail} loading={busy} />
           <Box sx={{ display: 'grid', gap: px(space[4]), gridTemplateColumns: { xs: 'minmax(0,1fr)', lg: 'minmax(0,1fr) minmax(0,1fr)' } }}>
             <ProfitStatement data={data} loading={busy} />
             <ProfitTrendChart

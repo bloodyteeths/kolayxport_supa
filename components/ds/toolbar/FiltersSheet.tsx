@@ -115,6 +115,7 @@ function FilterControl({ def, value, onChange }: { def: FilterDef; value: Filter
       if (options.length > SEARCHABLE_THRESHOLD || def.searchable) {
         return (
           <FilterButton
+            inSheet
             label={def.label}
             value={value as string | string[] | undefined}
             options={options}

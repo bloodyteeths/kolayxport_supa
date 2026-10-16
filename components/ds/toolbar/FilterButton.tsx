@@ -31,6 +31,8 @@ export type FilterButtonProps = DsBaseProps & {
   /** Hide the "All" row (a value is always required, e.g. research marketplace). */
   required?: boolean;
   size?: 'sm' | 'md';
+  /** Inside the Filters sheet: full width, no "Label:" prefix (the sheet already shows the label above it). */
+  inSheet?: boolean;
   disabled?: boolean;
 };
 
@@ -48,6 +50,7 @@ export function FilterButton({
   size = 'sm',
   disabled,
   className,
+  inSheet,
   ...rest
 }: FilterButtonProps) {
   const t = useTranslations('ds.toolbar');
@@ -100,7 +103,8 @@ export function FilterButton({
           height: size === 'md' ? control.md : control.sm,
           px: '10px',
           gap: '4px',
-          maxWidth: 240,
+          maxWidth: inSheet ? 'none' : 240,
+          ...(inSheet ? { width: '100%', justifyContent: 'space-between' } : null),
           border: `1px solid ${active ? accent[200] : neutral[300]}`,
           bgcolor: active ? accent[50] : neutral[0],
           borderRadius: `${radius.sm}px`,
@@ -113,9 +117,11 @@ export function FilterButton({
           '@media (pointer: coarse)': { height: control.lg },
         }}
       >
-        <Box component="span" sx={{ color: neutral[500] }}>
-          {t('filterLabel', { label })}
-        </Box>
+        {inSheet ? null : (
+          <Box component="span" sx={{ color: neutral[500] }}>
+            {t('filterLabel', { label })}
+          </Box>
+        )}
         <Box component="span" sx={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis' }} data-testid="filter-button-value">
           {valueText}
         </Box>

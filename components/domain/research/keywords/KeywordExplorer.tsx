@@ -377,8 +377,11 @@ function ExplorerForMkt({ market, navigate }: { market: ReturnType<typeof useRes
   const clearFilters = () => setUrl({ 'f.notInTitle': false, 'f.maxLen': undefined, 'f.competition': undefined, 'f.demand': undefined });
 
   const views = viewsFor(mkt).map((v) => ({ id: v, label: t(`kw.view.${v}`) }));
+  const [showPicker, setShowPicker] = React.useState(false);
   const countryOptions = KW_COUNTRIES.map((c) => ({ value: c, label: c }));
 
+  // Phones: the "or pick a listing" picker hides behind a small link until wanted (it cost two rows above results).
+  const pickerOpen = !mobile || showPicker || Boolean(currentListing);
   const searchRow = (
     <Box sx={{ mb: '8px' }}>
       <Box
@@ -403,7 +406,7 @@ function ExplorerForMkt({ market, navigate }: { market: ReturnType<typeof useRes
             data-testid="kw-search"
           />
         </Box>
-        {mkt === 'etsy' ? (
+        {mkt === 'etsy' && pickerOpen ? (
           <>
             <Typography variant="caption" component="span" sx={{ color: neutral[600] }}>{t('kw.or')}</Typography>
             <Box sx={{ flex: mobile ? '1 1 100%' : '0 1 300px', minWidth: 0 }}>
@@ -426,6 +429,11 @@ function ExplorerForMkt({ market, navigate }: { market: ReturnType<typeof useRes
         <Button variant="secondary" size={mobile ? 'md' : 'sm'} type="submit" data-testid="kw-search-submit">
           {t('search.cta')}
         </Button>
+        {mkt === 'etsy' && !pickerOpen ? (
+          <Button variant="ghost" size="sm" onClick={() => setShowPicker(true)} data-testid="kw-pick-listing">
+            {t('kw.pickListing')}
+          </Button>
+        ) : null}
       </Box>
       {showTranslate ? (
         <Box sx={{ mt: '8px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>

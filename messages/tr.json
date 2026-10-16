@@ -11538,7 +11538,8 @@
       "panelTitle": "Anahtar kelime fikirleri · {title}",
       "panelAria": "Anahtar kelime fikirleri",
       "openFull": "Anahtar kelime gezginini tam aç",
-      "showMore": "Daha fazla göster"
+      "showMore": "Daha fazla göster",
+      "pickListing": "İlanımdan seç"
     },
     "watch": {
       "ebayQueryUnsupported": "Kayıtlı eBay aramaları henüz izlenemiyor. Bunun yerine bir Etsy aramasını veya eBay satıcısını izleyin.",

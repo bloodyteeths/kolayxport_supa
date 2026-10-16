@@ -11538,7 +11538,8 @@
       "panelTitle": "Keyword ideas · {title}",
       "panelAria": "Keyword ideas",
       "openFull": "Open full Keyword explorer",
-      "showMore": "Show more"
+      "showMore": "Show more",
+      "pickListing": "From my listing"
     },
     "watch": {
       "ebayQueryUnsupported": "Saved eBay searches can't be tracked yet. Track an Etsy search or an eBay seller instead.",

@@ -12,3 +12,9 @@ export function useIsNarrow(): boolean {
   const theme = useTheme();
   return useMediaQuery(theme.breakpoints.down('lg'));
 }
+
+/** True below 600px (phones). Tools that need a grid (bulk edit, photo studio) still work on tablets. */
+export function useIsPhone(): boolean {
+  const theme = useTheme();
+  return useMediaQuery(theme.breakpoints.down('sm'));
+}

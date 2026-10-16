@@ -19,7 +19,7 @@ import Box from '@mui/material/Box';
 import { useTranslations } from 'next-intl';
 import { Page } from '@/components/ds/page/Page';
 import { PageHeader } from '@/components/ds/page/PageHeader';
-import { useIsMobile } from '@/components/ds/page/useViewport';
+import { useIsPhone } from '@/components/ds/page/useViewport';
 import type { ActionSpec } from '@/components/ds/types/actions';
 import { Tabs } from '@/components/ds/inputs/Tabs';
 import { Select } from '@/components/ds/inputs/Select';
@@ -80,7 +80,7 @@ const OPEN_ACCESS = new Set(['allowed', 'trial', 'unknown']);
 
 export function PhotoStudioPage({ shopId, ids, tab, onTabChange, backHref }: PhotoStudioPageProps) {
   const t = useTranslations('photoStudio');
-  const mobile = useIsMobile();
+  const mobile = useIsPhone(); // tablets get the full tool; only phones see the 'bigger screen' state
   const { access, entitlement } = useFeatureAccess('bulkPhotoStudio');
   const open = OPEN_ACCESS.has(access);
   // 402s on this page (AI credits, the feature gate) are shown inline, never as the global dialog (C6).

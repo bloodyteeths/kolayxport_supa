@@ -12,7 +12,7 @@ import useSWR from 'swr';
 import { useRouter } from 'next/router';
 import { useFormatter, useTranslations } from 'next-intl';
 import { Page, PageHeader, type ActionSpec } from '@/components/ds/page';
-import { useIsMobile } from '@/components/ds/page/useViewport';
+import { useIsPhone } from '@/components/ds/page/useViewport';
 import { BulkGrid, usePasteSummary, type CellOrigin, type CellPatch as GridCellPatch, type PasteOutcome } from '@/components/ds/data/BulkGrid';
 import { useToast } from '@/components/ds/feedback/toast';
 import { useConfirm } from '@/components/ds/overlay/ConfirmDialog';
@@ -340,7 +340,7 @@ export function BulkEditPage({ marketplace, transport: injectedTransport, stagin
   const format = useFormatter();
   const toast = useToast();
   const confirm = useConfirm();
-  const mobile = useIsMobile();
+  const mobile = useIsPhone(); // tablets get the full tool; only phones see the 'bigger screen' state
   const mpName = MARKETPLACE_NAME[marketplace];
   const to = t('listings.mp.to', { marketplace });
 

@@ -122,8 +122,9 @@ export function ProductPnLTable({ data, mp, mpName, state, loading, onSaved, onA
       mobile: 'title',
       minWidth: 220,
       render: (r) => (
-        <Box sx={{ minWidth: 0 }}>
-          <Box sx={{ color: n[900], overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.productName}</Box>
+        // Capped width + 2-line clamp: a nowrap title made this column 1600px wide and pushed every number off screen.
+        <Box sx={{ minWidth: 0, maxWidth: 420 }}>
+          <Box title={r.productName} sx={{ color: n[900], display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.productName}</Box>
           {subtitle(r) ? <Box sx={{ color: n[500], fontSize: 12, lineHeight: '16px' }}>{subtitle(r)}</Box> : null}
         </Box>
       ),

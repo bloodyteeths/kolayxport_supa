@@ -47,8 +47,8 @@ export function TopProductsTable({ rows, currency, approx, fxNote, q, onQueryCha
       mobile: 'title',
       minWidth: 200,
       render: (r) => (
-        <Box sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-          <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: neutral[900] }} title={r.name}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', minWidth: 0, maxWidth: 420 }}>
+          <Box component="span" sx={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', color: neutral[900] }} title={r.name}>
             {r.name || '—'}
           </Box>
           {r.sku ? (

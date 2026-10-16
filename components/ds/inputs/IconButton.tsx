@@ -77,7 +77,9 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
         ...(pressed ? { backgroundColor: accent[50], color: accent[700] } : null),
         '&:hover': { backgroundColor: btnTone === 'danger' ? tone.danger.bg : neutral[50], color: btnTone === 'danger' ? tone.danger.fg : neutral[800] },
         '&.Mui-disabled': { color: neutral[400] },
-        [COARSE]: size === 'xs'
+        // Touch: xs/sm keep their visual size with an invisible 44px hit area (growing them to 44px made every row
+        // with a ⋯ / copy / arrow button taller on phones — the founder's "huge white spaces"). md/lg grow as before.
+        [COARSE]: size === 'xs' || size === 'sm'
           ? hitSlopAfter
           : { width: Math.max(px, control.lg), height: Math.max(px, control.lg) },
       }}

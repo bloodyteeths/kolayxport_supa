@@ -103,7 +103,9 @@ export function CopyText({ value, display, mono, truncate, className, 'data-test
             transition: `opacity ${motion.fast}ms ${motion.ease}, background-color ${motion.fast}ms ${motion.ease}`,
             '&:hover': { bgcolor: neutral[100], color: neutral[700] },
             '&.Mui-focusVisible': { boxShadow: focusRing },
-            '@media (pointer: coarse)': { width: 44, height: 44 },
+            // Touch: keep the 24px icon in the layout and give it an invisible 44px hit area, so every copyable
+            // line (order number, SKU, name) doesn't grow to 44px tall on phones.
+            '@media (pointer: coarse)': { position: 'relative', '&::after': { content: '""', position: 'absolute', inset: '-10px' } },
           }}
         >
           <Icon size={iconSize.control} strokeWidth={ICON_STROKE} aria-hidden />

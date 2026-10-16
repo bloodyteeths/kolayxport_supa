@@ -34,7 +34,8 @@ export function SidePanelSection({ id, title, description, action, children, cla
           </Box>
           {description && <Box sx={{ mt: '2px', fontSize: 12, lineHeight: '16px', color: n[500] }}>{description}</Box>}
         </Box>
-        {action && <ActionButton action={action} variant="ghost" size="sm" />}
+        {/* Touch: the 44px button overlaps the row's padding instead of making every section header 44px tall. */}
+        {action && <Box sx={{ '@media (pointer: coarse)': { my: '-10px' } }}><ActionButton action={action} variant="ghost" size="sm" /></Box>}
       </Box>
       {children}
     </Box>

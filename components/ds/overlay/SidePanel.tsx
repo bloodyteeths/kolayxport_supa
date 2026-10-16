@@ -193,7 +193,7 @@ export function SidePanel({
             {!hasFooter && overflow && overflow.length > 0 && <OverflowMenu items={overflow} />}
             <IconAction icon={CloseIcon} label={t('close')} shortcut="Esc" onClick={requestClose} data-testid="panel-close" />
           </Box>
-          {meta && <Box sx={{ mt: '2px', fontSize: 12, lineHeight: '16px', color: n[500], whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{meta}</Box>}
+          {meta && <Box sx={{ mt: '2px', fontSize: 12, lineHeight: '16px', color: n[500], ...(isPhone ? { display: 'flex', flexWrap: 'wrap', '& > *': { flexWrap: 'wrap' } } : { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }) }}>{meta}</Box>}
         </Box>
         {sectionNav && sectionNav.length > 5 && (
           <Box sx={{ px: '16px', bgcolor: n[25], borderBottom: `1px solid ${n[100]}`, '& > nav': { bgcolor: 'transparent', borderBottom: 0 } }}>
@@ -220,15 +220,18 @@ export function SidePanel({
               sx={{
                 flex: 1, minWidth: 0, fontSize: 12, lineHeight: '16px', display: 'flex', alignItems: 'center', gap: '6px',
                 color: saveState === 'error' ? tone.danger.fg : saveState === 'dirty' ? tone.attention.fg : n[500],
+                // Phone: an empty save line used to take a whole row with ⋯ above the buttons. Hide it when empty;
+                // when it has text it sits on its own line above ⋯ + buttons.
+                ...(isPhone && (saveText || saveState === 'saving' ? { flexBasis: '100%', order: -1 } : { display: 'none' })),
               }}
             >
               {saveState === 'saving' && <CircularProgress size={12} sx={{ color: n[400] }} />}
               {saveText}
             </Box>
             {(secondary || primary) && (
-              <Box sx={{ display: 'flex', gap: '8px', ...(isPhone && { width: '100%', '& > *': { flex: 1 } }) }}>
-                {secondary && <ActionButton action={secondary} variant="secondary" size={isPhone ? 'xl' : 'md'} fullWidth={isPhone} />}
-                {primary && <ActionButton action={primary} variant="primary" size={isPhone ? 'xl' : 'md'} fullWidth={isPhone} />}
+              <Box sx={{ display: 'flex', gap: '8px', ...(isPhone && { flex: 1, minWidth: 0, '& > *': { flex: 1, minWidth: 0 } }) }}>
+                {secondary && <ActionButton action={secondary} variant="secondary" size={isPhone ? 'lg' : 'md'} fullWidth={isPhone} />}
+                {primary && <ActionButton action={primary} variant="primary" size={isPhone ? 'lg' : 'md'} fullWidth={isPhone} />}
               </Box>
             )}
           </Box>

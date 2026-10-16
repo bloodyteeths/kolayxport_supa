@@ -12999,7 +12999,8 @@
         "positive": "0'dan büyük bir sayı girin",
         "required": "Zorunlu",
         "fixFields": "Devam etmek için {count} alanı düzeltin"
-      }
+      },
+      "district": "İlçe"
     },
     "status": {
       "rawTooltip": "{marketplace}: {raw}"

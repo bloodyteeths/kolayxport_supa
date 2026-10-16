@@ -344,7 +344,9 @@ export function shipToFromRaw(raw: RawOrderLike | null | undefined): ShipTo {
     city: clean(r.recipientCity) || clean(sa.city) || clean(ty.city) || clean(wixAddr.city),
     state: clean(r.recipientState) || clean(sa.state) || clean(wixAddr.subdivision),
     postal: clean(r.recipientPostal) || clean(sa.postal) || clean(sa.postalCode) || clean(ty.postalCode) || clean(wixAddr.postalCode),
-    district: clean(ty.district) || clean(sa.district),
+    // Manual TR orders keep the district in the state field (Turkey has no states).
+    district: clean(ty.district) || clean(sa.district)
+      || (toIso2(clean(r.recipientCountry) || clean(sa.country) || clean(ty.countryCode) || clean(wixAddr.country)) === 'TR' ? clean(r.recipientState) : ''),
     neighbourhood: clean(ty.neighborhood) || clean(ty.neighbourhood) || clean(sa.neighbourhood),
   };
 }

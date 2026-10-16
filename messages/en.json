@@ -12999,7 +12999,8 @@
         "positive": "Enter a number above 0",
         "required": "Required",
         "fixFields": "Fix {count, plural, one {# field} other {# fields}} to continue"
-      }
+      },
+      "district": "District"
     },
     "status": {
       "rawTooltip": "{marketplace}: {raw}"

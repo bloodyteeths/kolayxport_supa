@@ -324,7 +324,8 @@ export function ManualOrderPanel({ open, onClose, onCreated }: ManualOrderPanelP
                     />
                   </Field>
                 ) : (
-                  <Field label={t('stateProvince')} optional width="medium">
+                  // Turkey has no states: the same field holds the district (İlçe), which DHL eCommerce needs.
+                  <Field label={form.country === 'TR' ? t('district') : t('stateProvince')} optional width="medium">
                     <TextField value={form.state} onChange={(v) => set('state', v)} autoComplete="off" />
                   </Field>
                 )}

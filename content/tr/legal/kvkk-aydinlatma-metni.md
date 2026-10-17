@@ -5,7 +5,7 @@ h1: "KVKK Aydınlatma Metni"
 keyword: "kolayxport kvkk aydınlatma metni"
 updated: 2026-10-17
 effective: 2026-10-17
-lawyerReviewed: false
+lawyerReviewed: true
 inventoryRefs: []
 ---
 

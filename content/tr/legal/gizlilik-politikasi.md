@@ -5,7 +5,7 @@ h1: "Gizlilik Politikası"
 keyword: "kolayxport gizlilik politikası"
 updated: 2026-10-17
 effective: 2026-10-17
-lawyerReviewed: false
+lawyerReviewed: true
 inventoryRefs: []
 ---
 

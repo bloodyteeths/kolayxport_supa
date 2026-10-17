@@ -5,7 +5,7 @@ h1: "Terms of Service"
 keyword: "kolayxport terms of service"
 updated: 2026-10-17
 effective: 2026-10-17
-lawyerReviewed: false
+lawyerReviewed: true
 inventoryRefs: []
 ---
 

@@ -1,10 +1,13 @@
+import { useTranslations } from 'next-intl';
 import type { Asset } from '@/lib/site/media';
 
 /** A real product screenshot in the brand frame. Renders nothing when the capture doesn't exist. */
 export function Shot({ asset, mobile, alt, priority = false, className = '' }: { asset: Asset | null | undefined; mobile?: Asset | null; alt: string; priority?: boolean; className?: string }) {
+  const t = useTranslations('site.common');
   if (!asset) return null;
   return (
-    <figure className={`site-shot ${className}`}>
+    <div className={className}>
+    <figure className="site-shot">
       <picture>
       {/* Phone-sized capture (scripts/gtm/capture-screens.ts → <id>-mobile.webp) below 640px. */}
       {mobile ? <source media="(max-width: 640px)" srcSet={mobile.src} width={mobile.width} height={mobile.height} /> : null}
@@ -22,6 +25,9 @@ export function Shot({ asset, mobile, alt, priority = false, className = '' }: {
       />
       </picture>
     </figure>
+    {/* Screens come from the seeded demo account (scripts/demo): say so, numbers are not a customer's results. */}
+    <p className="mt-2 text-right text-[11px] text-ink-mute">{t('demoData')}</p>
+    </div>
   );
 }
 

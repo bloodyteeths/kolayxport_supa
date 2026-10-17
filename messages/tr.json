@@ -15982,7 +15982,8 @@
       "related": "İlgili sayfalar",
       "breadcrumbHome": "Ana sayfa",
       "notFound": "Bu sayfa bulunamadı.",
-      "statusLabel": "Durum"
+      "statusLabel": "Durum",
+      "demoData": "Demo hesaptan ekran görüntüsü; veriler örnektir."
     },
     "home": {
       "seoTitle": "KolayXport — Yurt dışına satışın tek paneli",

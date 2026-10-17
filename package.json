@@ -24,7 +24,8 @@
     "gtm:check-claims": "tsx scripts/gtm/check-claims.ts",
     "gtm:og": "node scripts/brand/export-assets.mjs og",
     "gtm:brand": "node scripts/brand/export-assets.mjs",
-    "gtm:preview": "node scripts/gtm/preview-pages.mjs"
+    "gtm:preview": "node scripts/gtm/preview-pages.mjs",
+    "tutorials": "node scripts/tutorials/run.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

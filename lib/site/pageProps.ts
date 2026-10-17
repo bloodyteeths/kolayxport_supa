@@ -20,6 +20,12 @@ export function docPaths(locale: SiteLocale, type: ContentType, param = 'slug') 
 export async function docProps(locale: SiteLocale, type: ContentType, slug: string) {
   const doc = getContent(locale, type, slug);
   if (!doc) return { notFound: true as const };
+  // Local tutorial videos are not in git (YouTube hosts them): only reference a file that exists.
+  if (type === 'guides' && doc.meta.video?.file) {
+    const fs = require('fs');
+    const p = require('path');
+    if (!fs.existsSync(p.join(process.cwd(), 'public/media/tutorials', `${doc.meta.video.file}.mp4`))) doc.meta.video = { ...doc.meta.video, file: null };
+  }
   const [heroPhoto, heroShot, heroShotMobile] = await Promise.all([photo(doc.meta.image), screen(doc.meta.screenshot, locale), screen(doc.meta.screenshot ? `${doc.meta.screenshot}-mobile` : null, locale)]);
   const related = type === 'cases' || type === 'integrations' ? contentCards(locale, type).filter((d) => d.slug !== slug).slice(0, 3) : [];
   const ogPath = `/og/${locale}/${type}/${slug}.png`;

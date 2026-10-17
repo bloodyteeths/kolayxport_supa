@@ -1166,12 +1166,14 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
   );
 
   const subtitleParts: string[] = [];
+  // A listing created on eBay has the synthetic id `legacy-<itemId>`: show the eBay item number the seller knows.
+  const shownId = view.meta.id && marketplace === 'ebay' ? view.meta.id.replace(/^legacy-/, '') : view.meta.id;
   if (mode === 'edit' && view.meta.id) {
     subtitleParts.push(
       // Phones: the ID alone (the "refreshed" line right below already says how fresh it is).
       view.meta.updatedAt && !isMobile
-        ? t('page.idMeta', { ...mp, id: view.meta.id, date: format.dateTime(view.meta.updatedAt, { day: 'numeric', month: 'short' }) })
-        : t('page.idOnly', { id: view.meta.id }),
+        ? t('page.idMeta', { ...mp, id: shownId, date: format.dateTime(view.meta.updatedAt, { day: 'numeric', month: 'short' }) })
+        : t('page.idOnly', { id: shownId }),
     );
     if (!isMobile && (view.meta.views > 0 || view.meta.favorites > 0)) subtitleParts.push(t('page.stats', { views: view.meta.views, favorites: view.meta.favorites }));
   } else if (mode === 'create') {

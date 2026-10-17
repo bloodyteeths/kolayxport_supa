@@ -85,11 +85,12 @@ export function Banner({ tone, title, children, action, dismissKey, onDismiss, c
       <Box component="span" sx={{ display: 'inline-flex', color: c.fg, flexShrink: 0 }}>
         <Icon size={16} strokeWidth={1.75} aria-hidden />
       </Box>
-      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'baseline' }}>
+      {/* The text keeps at least ~240px: on a phone the action wraps under it instead of squeezing it into a column. */}
+      <Box sx={{ flex: '1 1 240px', minWidth: 0, display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'baseline' }}>
         <Box component="span" sx={{ fontWeight: 500, color: c.fg }}>{title}</Box>
         {children && <Box component="span" sx={{ color: n[700] }}>{children}</Box>}
       </Box>
-      {action && <ActionButton action={action} variant="ghost" size="sm" />}
+      {action && <Box sx={{ ml: 'auto', flexShrink: 0 }}><ActionButton action={action} variant="ghost" size="sm" /></Box>}
       {dismissKey && (
         <IconAction
           icon={CloseIcon}

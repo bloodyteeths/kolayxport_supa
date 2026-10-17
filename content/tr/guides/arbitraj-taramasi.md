@@ -11,7 +11,7 @@ inventoryRefs:
   - research-product-finder
 draft: false
 order: 6
-duration: PT1M23S
+duration: PT1M20S
 video:
   file: arbitraj-taramasi
   youtubeId: ''

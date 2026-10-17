@@ -14,7 +14,7 @@ inventoryRefs:
   - help-getting-started
 draft: false
 order: 12
-duration: PT1M7S
+duration: PT1M8S
 video:
   file: chrome-eklentisi
   youtubeId: ''

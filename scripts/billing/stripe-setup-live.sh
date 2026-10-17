@@ -12,7 +12,12 @@ STARTER=${STARTER:-prod_Shl7a7l3vXvMpJ}   # "Başlangıç" (existing live produc
 GROWTH=${GROWTH:-prod_ShlAKBtwxfUDRf}     # "Büyüme" (existing live product)
 MODE=${STRIPE_MODE---live}              # STRIPE_MODE= (empty) runs against test mode for a dry run
 
-json() { python3 -c "import sys,json,re; t=re.sub(r'\x1b\[[0-9;]*m','',sys.stdin.read()); i=t.find('{'); d=json.loads(t[i:]); $1"; }
+# Parse the CLI's JSON; on a Stripe error print its message and stop.
+json() { python3 -c "import sys,json,re
+t=re.sub(r'\x1b\[[0-9;]*m','',sys.stdin.read()); i=t.find('{')
+d=json.loads(t[i:]) if i>=0 else {'error': {'message': t.strip()[:400]}}
+if 'error' in d: sys.exit('Stripe error: ' + str(d['error'].get('message', d['error'])))
+$1"; }
 
 # Pro product: reuse the one tagged app=kolayxport, plan=pro if it exists.
 PRO=$(stripe products list $MODE --limit 100 | json "print(next((p['id'] for p in d['data'] if p.get('metadata',{}).get('app')=='kolayxport' and p.get('metadata',{}).get('plan')=='pro'), ''))")

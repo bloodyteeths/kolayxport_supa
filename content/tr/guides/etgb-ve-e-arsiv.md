@@ -13,7 +13,7 @@ inventoryRefs:
   - parasut-einvoice
 draft: false
 order: 8
-duration: PT1M16S
+duration: PT1M17S
 video:
   file: etgb-ve-e-arsiv
   youtubeId: ''

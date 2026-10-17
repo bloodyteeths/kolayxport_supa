@@ -14,7 +14,8 @@ order: 6
 duration: PT1M20S
 video:
   file: arbitraj-taramasi
-  youtubeId: ''
+  youtubeId: vMZIW3NYkJA
+  uploadDate: '2026-10-17'
 steps:
   - name: Ürün bulucuyu açın
     text: Pazar araştırması sayfasında Ürün bulucu sekmesine geçin.

@@ -16,7 +16,8 @@ order: 8
 duration: PT1M17S
 video:
   file: etgb-ve-e-arsiv
-  youtubeId: ''
+  youtubeId: U1ns-AKE9pw
+  uploadDate: '2026-10-17'
 steps:
   - name: Gönderici profilinizi kontrol edin
     text: >-

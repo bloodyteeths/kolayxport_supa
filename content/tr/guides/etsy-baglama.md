@@ -16,7 +16,8 @@ order: 1
 duration: PT1M14S
 video:
   file: etsy-baglama
-  youtubeId: ''
+  youtubeId: taV9Gb0sl_c
+  uploadDate: '2026-10-17'
 steps:
   - name: Ayarlar › Bağlantılar'ı açın
     text: 'Sol menüden Ayarlar''a, sonra Bağlantılar''a tıklayın. Mağazalarınız ve kargo firmalarınız burada listelenir.'

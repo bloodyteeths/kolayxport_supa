@@ -56,8 +56,12 @@ async function planInfo(userId: string): Promise<Info> {
   const a = await accountEntitlement(userId);
   if (!a) return { plan: 'trial', allowance: 0, channel: null, neutral: true };
   const allowance = a.ent.state === 'expired' ? 0 : monthlyAllowance(a.ent.plan);
-  // Shopify App Store rule: a Shopify-billed account pays through Shopify billing, never Stripe.
-  const channel: CreditBalance['channel'] = a.shopify ? (process.env.SHOPIFY_API_KEY ? 'shopify' : null) : 'stripe';
+  // Shopify App Store rule: a Shopify-billed account pays through Shopify billing, never Stripe. While the app is
+  // on Shopify App Pricing (managed pricing) Shopify refuses every Billing API charge ("Cannot use the Billing API
+  // … when on Shopify App Pricing"), so Shopify accounts can't buy packs; they keep their monthly plan credits.
+  // Set SHOPIFY_CREDIT_PURCHASES=1 only after switching the app to manual pricing.
+  const shopifyBuys = process.env.SHOPIFY_API_KEY && process.env.SHOPIFY_CREDIT_PURCHASES === '1';
+  const channel: CreditBalance['channel'] = a.shopify ? (shopifyBuys ? 'shopify' : null) : 'stripe';
   return { plan: a.ent.plan, allowance, channel, neutral: a.neutral };
 }
 

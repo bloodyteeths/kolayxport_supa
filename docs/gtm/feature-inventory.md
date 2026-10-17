@@ -80,7 +80,7 @@ Reading the production server was out of scope. Anything that depends on those f
 
 | ID | Name (TR) | Name (EN) | Marketplaces/carriers | Maturity | Plan tier | Where users find it | Proof | Notes/limits |
 |---|---|---|---|---|---|---|---|---|
-| `etgb-excel-email` | ETGB Excel hazırlama ve e-posta | ETGB spreadsheet + email to broker | international orders | partial (single-tenant) | all (not metered) | Orders › bulk › "Send ETGB"; after-label checkbox when `etgbEnabled` | `lib/services/etgbExcelService.ts` (L228–247), `lib/services/etgbMailerService.ts`, `pages/api/etgb/process.ts`, `components/domain/orders/OrdersBulkActions.tsx` | Builds an XLSX and emails it over SMTP to the recipient set in Settings. It is **not** a customs filing. The exporter name (`TAMSAR TEKSTİL`), its tax number, the default HS code `6204439506` and the "Textile Product" fallback are **hardcoded**, so it is wrong for any other company. Max 100 orders. |
+| `etgb-excel-email` | ETGB Excel hazırlama ve e-posta | ETGB spreadsheet + email to broker | international orders | production (file only) | all (not metered) | Orders › bulk › "Send ETGB"; after-label checkbox when `etgbEnabled` | `lib/services/etgbExcelService.ts` (L228–247), `lib/services/etgbMailerService.ts`, `pages/api/etgb/process.ts`, `components/domain/orders/OrdersBulkActions.tsx` | Builds an XLSX and emails it over SMTP to the recipient set in Settings. It is **not** a customs filing. The exporter name (`TAMSAR TEKSTİL`), its tax number, the default HS code `6204439506` and the "Textile Product" fallback are **hardcoded**, so it is wrong for any other company. Max 100 orders. |
 | `parasut-einvoice` | Paraşüt e-Fatura / e-Arşiv | Paraşüt e-invoice / e-archive | Paraşüt | partial | all | Settings › Connections › Paraşüt (credentials only) | `lib/integrations/parasutClient.ts`, `lib/services/invoiceService.ts`, `lib/services/etgbService.ts` (L96–105) | Real client: creates contacts, sales invoices and e-Fatura/e-Arşiv, then fetches PDFs. Its **only** trigger is the ETGB flow. There is no "create invoice" button and no invoice list. Errors are swallowed and the ETGB email is sent anyway. |
 
 ### Listing management per marketplace
@@ -179,7 +179,7 @@ All five editable marketplaces share one editor and one grid, and all edits are 
 
 | ID | Name (TR) | Name (EN) | Marketplaces/carriers | Maturity | Plan tier | Where users find it | Proof | Notes/limits |
 |---|---|---|---|---|---|---|---|---|
-| `billing-checkout` | Stripe ile abonelik | Stripe subscription checkout | n/a | partial | n/a | `/fiyatlandirma`, `/ayarlar?tab=billing` | `pages/api/stripe/create-checkout-session.ts`, `components/domain/pricing/useCheckout.ts`, `lib/stripePrices.ts` | Only Starter and Growth can be bought. Pro is rejected (H-1). Currency and founding-offer fields from the UI are ignored by the server. |
+| `billing-checkout` | Stripe ile abonelik | Stripe subscription checkout | n/a | production | n/a | `/fiyatlandirma`, `/ayarlar?tab=billing` | `pages/api/stripe/create-checkout-session.ts`, `components/domain/pricing/useCheckout.ts`, `lib/stripePrices.ts` | Only Starter and Growth can be bought. Pro is rejected (H-1). Currency and founding-offer fields from the UI are ignored by the server. |
 | `billing-portal-invoices` | Fatura geçmişi ve abonelik yönetimi | Billing portal & invoice history | n/a | production | paid | `/ayarlar?tab=billing`, `/faturalar` | `pages/api/stripe/create-portal-session.ts`, `pages/api/stripe/billing-history.ts`, `components/domain/billing/BillingPanel.tsx` | Hidden for Shopify-free accounts. |
 | `usage-meters` | Kullanım sayaçları | Usage meters & limit alerts | n/a | production | all | Sidebar footer; Billing › Usage | `lib/middleware/withUsageLimiter.ts`, `lib/billing/planLimits.ts`, `components/domain/billing/UsageCard.tsx` | Meters order syncs and labels only. Near-limit and limit-reached notifications. |
 | `shopify-free` | Shopify mağazaları için ücretsiz | Free for Shopify App Store installs | Shopify | production | shopify_free | Shopify App Store install | `pages/api/integrations/shopify/callback.ts`, `lib/billing/requireFeature.ts` | Unlimited meters. Pro features OFF. Pricing and upsell hidden (App Store rule 1.2.1). |
@@ -314,3 +314,18 @@ Production features that make a strong case for Turkish cross-border sellers:
 | H-19 | **Bulk "add tags" disabled** in the listing doctor | Shows "Etiket önerileri Anahtar kelime gezgini ile gelecek". | `components/domain/research/listings/ListingDoctor.tsx` (L330) |
 | H-20 | **Legacy `/app/senkron`** | Redirect stub to Orders. Old marketing links to "üretim listesi" are dead. | `pages/app/senkron.js` |
 | H-21 | **Billing "detailed usage" placeholder** | `billing.usage.soon` is shown in fallback mode. | `components/domain/billing/UsageCard.tsx` (L137) |
+
+
+## 7. Changes on branch `gtm/overhaul` (2026-10-17)
+
+These rows changed after the audit above. The fixes are committed and tested locally; they go live with the merge to `main`.
+
+| Item | Before | Now | Commit |
+|---|---|---|---|
+| H-1 Pro purchasable | Checkout accepted only starter/growth; `pro` was `invalidPlan` in the limiter | Pro checkout (`PRICE_PRO_*`), limiter knows `pro` | d446f0a |
+| H-2 Enforced vs decided limits | 50/10, 200/100, 2000/500 | Trial 150/30, Starter 500/250, Growth 2000/1000, Pro 6000/3000 (order meter still counts sync calls) | d446f0a |
+| H-3 Trial length | 30 days | 14 days + 3 grace everywhere; Stripe carries over the remaining trial | af08f85 |
+| H-5 Financials gate | UI only | `requireFeature('financials')` on `/api/finance/*` | d77f996 |
+| `etgb-excel-email` / N-3 | Exporter hardcoded to one company | Exporter name, VKN, default GTIP and origin from each seller's Gönderici profile; refuses when missing. Still an Excel file emailed to the broker, **not** a customs filing | 6cdd6fa |
+| Founding-member offer | Pricing UI only, no backend | `/api/billing/founding-spots` + coupon applied at checkout (`STRIPE_FOUNDING_COUPON_ID`) | d446f0a |
+| Signup intent | `/login?mode=signup` ignored | Opens the signup form | 20ef38b |

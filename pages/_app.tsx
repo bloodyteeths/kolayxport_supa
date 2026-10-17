@@ -19,6 +19,10 @@ import useLocaleStore from '@/lib/stores/useLocaleStore';
 import trMessages from '@/messages/tr.json';
 import enMessages from '@/messages/en.json';
 import CookieConsent from '@/components/CookieConsent';
+import { captureAttribution, track } from '@/lib/tracking/events';
+
+// First path segment of Turkish marketing routes (SiteLayout sets <html lang> itself there).
+const SITE_TR_ROUTES = new Set(['', 'cozumler', 'entegrasyonlar', 'karsilastirma', 'nasil-kullanirim', 'blog', 'kurumsal', 'iletisim', 'ozellikler', 'kvkk-aydinlatma-metni', 'cerez-politikasi', 'gizlilik-politikasi', 'kullanim-sartlari', 'mesafeli-satis-sozlesmesi', 'on-bilgilendirme-formu']);
 import { ConfirmProvider } from '@/components/ds/overlay/ConfirmDialog';
 import LimitReachedDialog from '@/components/billing/LimitReachedDialog';
 import { installLimitInterceptor } from '@/lib/http/limitInterceptor';
@@ -139,11 +143,22 @@ function MyApp({ Component, pageProps }: AppProps) {
   const locale = useLocaleStore((s) => s.locale);
   const hydrate = useLocaleStore((s) => s.hydrate);
 
+  // Marketing pages (components/site/SiteLayout) lock their own language: / is Turkish, /en is English.
+  const isSiteRoute = router.pathname === '/en' || router.pathname.startsWith('/en/') || SITE_TR_ROUTES.has(router.pathname.split('/')[1] ?? '');
+
   useEffect(() => {
-    // _document hard-codes lang="tr"; the UI locale is client-side, so keep <html lang> in sync
+    // _document renders lang per route; the app UI locale is client-side, so keep <html lang> in sync
     // (CSS case mapping and hyphenation follow it — fixes "FAİLED" in the EN UI).
-    if (typeof document !== 'undefined') document.documentElement.lang = locale;
-  }, [locale]);
+    if (typeof document !== 'undefined' && !isSiteRoute) document.documentElement.lang = locale;
+  }, [locale, isSiteRoute]);
+
+  // First-touch UTM / click-id capture and SPA page views for GTM (lib/tracking/events.ts).
+  useEffect(() => {
+    captureAttribution(window.location.search);
+    const onRoute = (url: string) => track('page_view', { page_path: url });
+    router.events.on('routeChangeComplete', onRoute);
+    return () => router.events.off('routeChangeComplete', onRoute);
+  }, [router.events]);
 
   // Hydrate locale from localStorage after mount to avoid SSR mismatch
   useEffect(() => {

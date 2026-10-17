@@ -9807,7 +9807,7 @@
         "continue": "Continue",
         "notNow": "Not now"
       },
-      "mostPopular": "Most popular",
+      "mostPopular": "Recommended",
       "perMonth": "/ month",
       "perYear": "/ year",
       "listPrice": "Regular price {price}",
@@ -15900,6 +15900,396 @@
         "action": "Go to Market research"
       },
       "contact": "Stuck somewhere? Write to destek@kolayxport.com."
+    }
+  },
+  "site": {
+    "nav": {
+      "solutions": "Solutions",
+      "integrations": "Integrations",
+      "pricing": "Pricing",
+      "help": "How-to guides",
+      "blog": "Blog",
+      "login": "Sign in",
+      "cta": "Start free",
+      "menu": "Menu",
+      "close": "Close",
+      "lang": "Türkçe",
+      "langShort": "TR",
+      "skip": "Skip to content",
+      "allSolutions": "All solutions",
+      "home": "Home"
+    },
+    "cases": {
+      "etsy-satici": {
+        "label": "Etsy sellers",
+        "desc": "Listing SEO, bulk editing, orders and shipping"
+      },
+      "ebay-satici": {
+        "label": "eBay sellers",
+        "desc": "Copy Etsy listings to eBay, bulk editing"
+      },
+      "trendyoldan-dunyaya": {
+        "label": "From Trendyol to the world",
+        "desc": "Sell your Trendyol products abroad"
+      },
+      "ai-ilan-optimizasyonu": {
+        "label": "AI listings",
+        "desc": "English titles, tags, descriptions and images"
+      },
+      "urun-arastirma-arbitraj": {
+        "label": "Product research",
+        "desc": "Keywords, competitor shops and price gaps"
+      },
+      "mikro-ihracat-kargo-etgb": {
+        "label": "Shipping & ETGB",
+        "desc": "FedEx, UPS, DHL eCommerce labels and ETGB file"
+      }
+    },
+    "common": {
+      "trialLine": "14 days free · No credit card · Cancel anytime",
+      "ctaTrial": "Start your 14-day free trial",
+      "ctaPricing": "See pricing",
+      "ctaContact": "Contact us",
+      "readMore": "Read more",
+      "updated": "Updated",
+      "lastVerified": "Last verified",
+      "faqTitle": "Frequently asked questions",
+      "stepsTitle": "How it works",
+      "featuresTitle": "What KolayXport does",
+      "painsTitle": "Sound familiar?",
+      "painsSource": "Source",
+      "toc": "On this page",
+      "minutes": "{count} min",
+      "setup": "Setup",
+      "status": {
+        "yes": "Yes",
+        "partial": "Partly",
+        "no": "No"
+      },
+      "maturity": {
+        "production": "Live",
+        "beta": "Beta",
+        "partial": "Partial"
+      },
+      "kinds": {
+        "marketplace": "Marketplace",
+        "carrier": "Carrier",
+        "accounting": "Accounting",
+        "tool": "Tool"
+      },
+      "screenAlt": "KolayXport screen: {name}",
+      "illustration": "Illustrative photo",
+      "related": "Related pages",
+      "breadcrumbHome": "Home",
+      "notFound": "This page could not be found.",
+      "statusLabel": "Status"
+    },
+    "home": {
+      "seoTitle": "KolayXport — One dashboard for selling abroad",
+      "seoDescription": "For sellers in Türkiye on Etsy, eBay and Amazon: AI-written English listings, product research, FedEx/UPS labels, ETGB and profit reports in one place. 14 days free.",
+      "hero": {
+        "eyebrow": "Etsy · eBay · Amazon · Trendyol",
+        "title": "One dashboard for selling abroad",
+        "lead": "Optimise your listings in English with AI, choose what to sell with data, and take every order from label to ETGB file in the same place.",
+        "ctaSecondary": "See how it works",
+        "stamp": "Ready to ship"
+      },
+      "pains": {
+        "title": "What sellers selling abroad keep running into",
+        "lead": "These aren't our words; sellers wrote them on forums and complaint sites."
+      },
+      "steps": {
+        "title": "Start in three steps",
+        "items": [
+          {
+            "title": "Connect your shop",
+            "text": "Connect Etsy, eBay, Amazon, Trendyol, Shopify or Wix in a few minutes. Your listings and orders come into the dashboard."
+          },
+          {
+            "title": "Strengthen your listings",
+            "text": "AI suggests English titles, tags and descriptions; research shows what competitors sell with. Nothing reaches the marketplace until you approve it."
+          },
+          {
+            "title": "Ship the order",
+            "text": "Print FedEx, UPS or DHL eCommerce labels, send the ETGB file to your customs broker, and see your profit per marketplace."
+          }
+        ]
+      },
+      "pillars": {
+        "title": "Listings, research, operations",
+        "lead": "Instead of paying for separate tools, everything works in one dashboard on the same data.",
+        "listings": {
+          "eyebrow": "Listings",
+          "title": "English listings that get found",
+          "text": "Edit Etsy and eBay listings one by one or in bulk. Changes stay as drafts until you press \"Send\".",
+          "bullets": [
+            "AI-written English titles, 13 tags and descriptions",
+            "Bulk editing, scheduled sends and version history",
+            "Copy an Etsy listing to eBay in one click",
+            "AI product images and alt text"
+          ]
+        },
+        "research": {
+          "eyebrow": "Research",
+          "title": "Choose what to sell with data, not guesses",
+          "text": "Keyword, product and shop research on Etsy, eBay, Amazon and Trendyol, plus an SEO score and fix list for your listing.",
+          "bullets": [
+            "Keyword and product research",
+            "Listing doctor: SEO score and one-click fixes",
+            "Price gaps between Trendyol and eBay (Pro)",
+            "Chrome extension on Etsy, eBay and Amazon pages"
+          ]
+        },
+        "ops": {
+          "eyebrow": "Operations",
+          "title": "From order to label, from ETGB to profit",
+          "text": "Orders from every marketplace in one list. Print the label, push tracking to the marketplace, see what you really earn.",
+          "bullets": [
+            "FedEx and UPS labels with your own carrier account; DHL eCommerce in Türkiye",
+            "Electronic commercial invoice and bulk labels",
+            "ETGB Excel file and e-Arşiv invoices via Paraşüt",
+            "Net profit after fees, shipping and ads (Pro)"
+          ]
+        }
+      },
+      "trendyol": {
+        "eyebrow": "For Trendyol sellers",
+        "title": "You sell on Trendyol. The same products can sell abroad.",
+        "text": "Manage Trendyol products in the dashboard, keep stock in sync with Etsy, eBay and Shopify, and find products with a price gap abroad.",
+        "cta": "From Trendyol to the world"
+      },
+      "integrations": {
+        "title": "Where it works",
+        "lead": "Connected through official APIs, with the permissions you grant.",
+        "notYet": "Not yet: Hepsiburada, N11, Çiçeksepeti; Yurtiçi, Aras, Sürat labels. They're on our roadmap.",
+        "all": "All integrations"
+      },
+      "trust": {
+        "title": "Care for your data",
+        "items": [
+          {
+            "title": "Nothing changes without you",
+            "text": "Listing edits wait as drafts. If someone changed the listing on the marketplace, we warn you before sending."
+          },
+          {
+            "title": "Hosted in the EU",
+            "text": "The app and database run on servers in the European Union; your marketplace keys are stored encrypted."
+          },
+          {
+            "title": "Official APIs",
+            "text": "We connect to Etsy, eBay, Amazon, Trendyol, Shopify and Wix through their official APIs; we never ask for your password."
+          },
+          {
+            "title": "A real company",
+            "text": "Modsons Yazılım E-Ticaret İthalat İhracat Ltd. Şti., Adana, Türkiye. Invoices, contracts and data protection handled in Türkiye."
+          }
+        ]
+      },
+      "pricing": {
+        "title": "Monthly billing, no hidden fees",
+        "lead": "Every plan starts with a 14-day free trial. No credit card.",
+        "perMonth": "/mo",
+        "cta": "Compare plans",
+        "plans": {
+          "starter": "2 shops, bulk editing, basic research",
+          "growth": "5 shops, full AI, shipping and research",
+          "pro": "10 shops, arbitrage, profit reports, priority support"
+        },
+        "founding": "Founding members: {percent}% off for life for the first 20 subscribers. Spots left: {remaining}"
+      },
+      "faq": {
+        "items": [
+          {
+            "q": "Who is KolayXport for?",
+            "a": "Sellers in Türkiye who sell, or want to sell, abroad on Etsy, eBay or Amazon. You can connect Trendyol, Shopify and Wix shops to the same dashboard."
+          },
+          {
+            "q": "How does the free trial work?",
+            "a": "Your 14-day trial starts when you sign up; no credit card. If you don't pick a plan, the account stays open for 3 more days and is then paused. We never charge automatically."
+          },
+          {
+            "q": "Will AI change my listings on its own?",
+            "a": "No. Suggestions arrive as drafts; nothing goes to Etsy, eBay or any marketplace until you edit and press \"Send\"."
+          },
+          {
+            "q": "Do I need a carrier contract for labels?",
+            "a": "FedEx and UPS labels are created with your own FedEx or UPS account, so your negotiated rates apply. In Türkiye you can also print DHL eCommerce (MNG) labels."
+          },
+          {
+            "q": "Do you file the ETGB for me?",
+            "a": "No. KolayXport builds the Excel file your customs broker needs for the ETGB from your orders and emails it to them. Your broker files the declaration."
+          },
+          {
+            "q": "Do you support Hepsiburada or Yurtiçi Kargo?",
+            "a": "Not yet. Hepsiburada, N11, Çiçeksepeti and Yurtiçi/Aras/Sürat labels are on our roadmap; this page will say so when they ship."
+          },
+          {
+            "q": "Which currency am I billed in?",
+            "a": "Plans show in TRY on the Turkish interface and in USD on the English one; you can choose the currency at checkout. Invoices are issued by Modsons Yazılım E-Ticaret İthalat İhracat Ltd. Şti."
+          },
+          {
+            "q": "Can I cancel anytime?",
+            "a": "Yes. Cancel from Settings › Billing; you keep access until the end of the period you paid for."
+          }
+        ]
+      },
+      "final": {
+        "title": "Strengthen your first listing today",
+        "text": "Connect your shop, rewrite one listing with AI and see the difference yourself."
+      }
+    },
+    "footer": {
+      "tagline": "One dashboard for selling abroad.",
+      "solutions": "Solutions",
+      "product": "Product",
+      "company": "Company",
+      "legal": "Legal",
+      "features": "Features",
+      "integrations": "Integrations",
+      "pricing": "Pricing",
+      "help": "How-to guides",
+      "blog": "Blog",
+      "compare": "Comparisons",
+      "about": "About",
+      "contact": "Contact",
+      "kvkk": "KVKK Privacy Notice",
+      "cookies": "Cookie Policy",
+      "privacy": "Privacy Policy",
+      "terms": "Terms of Service",
+      "distance": "Distance Sales Agreement",
+      "preinfo": "Pre-information Form",
+      "cookiePrefs": "Cookie preferences",
+      "taxNo": "Tax no",
+      "taxOffice": "Tax office",
+      "registry": "Trade registry",
+      "mersis": "MERSİS",
+      "kep": "KEP",
+      "etsyNotice": "The term 'Etsy' is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed or certified by Etsy, Inc.",
+      "marks": "Other marketplace and carrier names are trademarks of their owners and are used only to identify the connected service.",
+      "rights": "© {year} KolayXport"
+    },
+    "pricingTeaser": {},
+    "casesIndex": {
+      "title": "Solutions",
+      "seoTitle": "Solutions — KolayXport",
+      "seoDescription": "AI listings, product research, shipping labels and ETGB for Etsy, eBay and Trendyol sellers in Türkiye.",
+      "lead": "Start from your sales channel and your biggest headache."
+    },
+    "integrationsIndex": {
+      "title": "Integrations",
+      "seoTitle": "Integrations: Etsy, eBay, Amazon, Trendyol, FedEx, UPS — KolayXport",
+      "seoDescription": "The marketplaces, carriers and accounting software KolayXport connects to, and exactly what works in each.",
+      "lead": "For each integration we spell out what works and what doesn't yet.",
+      "capabilities": "What works",
+      "connect": "How to connect"
+    },
+    "compare": {
+      "title": "Comparisons",
+      "seoTitle": "KolayXport comparisons",
+      "seoDescription": "Compare KolayXport with Turkish integrators and global Etsy tools. Sourced facts only.",
+      "lead": "Sourced facts only. We also list where the competitor is ahead.",
+      "feature": "Feature",
+      "us": "KolayXport",
+      "note": "Note",
+      "sources": "Sources",
+      "disclaimer": "Competitor details were checked on the competitor's own pages on {date}. If you spot a mistake, email destek@kolayxport.com and we'll fix it."
+    },
+    "blog": {
+      "title": "Blog",
+      "seoTitle": "Blog: Etsy, eBay and export guides — KolayXport",
+      "seoDescription": "Sourced guides on Etsy SEO, micro-export, ETGB, shipping and profit for sellers in Türkiye.",
+      "lead": "Sourced, practical guides on selling abroad.",
+      "by": "By",
+      "readTime": "{count} min read"
+    },
+    "help": {
+      "title": "How-to guides",
+      "seoTitle": "How-to guides and videos — KolayXport",
+      "seoDescription": "Short guides and videos for every step in KolayXport, from connecting a shop to listing optimisation, labels and ETGB.",
+      "lead": "A short guide and a narrated video for every task.",
+      "video": "Video",
+      "steps": "Steps",
+      "duration": "Time",
+      "empty": "Guides are on their way."
+    },
+    "legal": {
+      "draft": "This text is a draft pending legal review.",
+      "effective": "Effective date"
+    },
+    "about": {
+      "seoTitle": "About — KolayXport",
+      "seoDescription": "About Modsons Yazılım E-Ticaret İthalat İhracat Ltd. Şti., the company behind KolayXport: story, principles and company details.",
+      "eyebrow": "About",
+      "title": "We started for our own shop",
+      "lead": "KolayXport grew out of the daily work in our own shops that sell abroad: English listings, shipping labels, ETGB, profit maths. Today we offer the same tools to other sellers.",
+      "principlesTitle": "Our principles",
+      "principles": [
+        {
+          "title": "We do what we say",
+          "text": "Every feature on this site works in the product. What doesn't exist yet, we label \"not yet\"."
+        },
+        {
+          "title": "You stay in control",
+          "text": "No change reaches a marketplace without your approval."
+        },
+        {
+          "title": "We speak seller",
+          "text": "Desi, ETGB, tags, barem: the words you actually use."
+        }
+      ],
+      "companyTitle": "Company details",
+      "legalName": "Legal name",
+      "address": "Address",
+      "contactCta": "Get in touch"
+    },
+    "contact": {
+      "seoTitle": "Contact — KolayXport",
+      "seoDescription": "Reach the KolayXport team by email, WhatsApp or the form. Enterprise plans and partnerships.",
+      "eyebrow": "Contact",
+      "title": "How can we help?",
+      "lead": "On weekdays we usually reply the same day.",
+      "email": "Email",
+      "whatsapp": "Message us on WhatsApp",
+      "whatsappText": "Hi, I'd like to know more about KolayXport.",
+      "formTitle": "Send a message",
+      "name": "Your name",
+      "emailField": "Your email",
+      "subject": "Subject",
+      "message": "Message",
+      "send": "Send",
+      "sending": "Sending…",
+      "sent": "Your message arrived. We'll get back to you soon.",
+      "error": "The message couldn't be sent. Please email destek@kolayxport.com.",
+      "required": "This field is required.",
+      "invalidEmail": "Enter a valid email address.",
+      "tooShort": "Your message should be at least 10 characters.",
+      "consent": "We process what you send only to answer your request. Details: KVKK Privacy Notice.",
+      "presets": {
+        "enterprise": "Enterprise plan request",
+        "partner": "Partnership"
+      }
+    },
+    "features": {
+      "seoTitle": "Features — KolayXport",
+      "seoDescription": "Every KolayXport feature: AI listings, bulk editing, research, arbitrage, orders, shipping labels, ETGB, stock sync, profit reports.",
+      "eyebrow": "Features",
+      "title": "Everything, with its status",
+      "lead": "This list is generated straight from our product inventory. Where a feature says \"Beta\" or \"Partial\", you see its limits next to it."
+    },
+    "cookies": {
+      "title": "Cookie preferences",
+      "text": "We use necessary cookies to run the site. With your permission we also use cookies to measure visits (analytics) and our ads (marketing).",
+      "acceptAll": "Accept all",
+      "rejectAll": "Necessary only",
+      "customize": "Manage preferences",
+      "save": "Save choices",
+      "necessary": "Necessary",
+      "necessaryDesc": "Session, security and your preferences. Always on.",
+      "analytics": "Analytics",
+      "analyticsDesc": "Google Analytics shows us which pages are useful.",
+      "marketing": "Marketing",
+      "marketingDesc": "Measures the results of our Meta, Google, X, TikTok and LinkedIn ads.",
+      "policy": "Cookie Policy"
     }
   }
 }

@@ -1,4 +1,34 @@
+const MARKETING_REDIRECTS = [
+  ['/kariyer', '/kurumsal'],
+  ['/support', '/iletisim'],
+  ['/docs', '/nasil-kullanirim'],
+  ['/docs/terms', '/en/kullanim-sartlari'],
+  ['/docs/terms-tr', '/kullanim-sartlari'],
+  ['/docs/:path*', '/nasil-kullanirim'],
+  ['/privacy', '/en/gizlilik-politikasi'],
+  ['/privacy-tr', '/gizlilik-politikasi'],
+  ['/terms', '/en/kullanim-sartlari'],
+  ['/terms-tr', '/kullanim-sartlari'],
+  // Old blog posts (unsourced, invented authors) were removed; send readers to the closest real page.
+  ['/blog/trendyol-entegrasyonu-adim-adim', '/entegrasyonlar/trendyol'],
+  ['/blog/fedex-ups-kargo-karsilastirmasi', '/cozumler/mikro-ihracat-kargo-etgb'],
+  ['/blog/kargo-maliyet-optimizasyonu', '/cozumler/mikro-ihracat-kargo-etgb'],
+  ['/blog/api-entegrasyon-hatalari-cozumleri', '/blog'],
+  ['/blog/black-friday-hazirlik-rehberi', '/blog'],
+  ['/blog/e-ticaret-otomasyon-rehberi-2025', '/blog'],
+  ['/blog/envanter-yonetimi-en-iyi-uygulamalar', '/blog'],
+  ['/blog/hepsiburada-amazon-siparis-optimizasyonu', '/blog'],
+];
+
+// Marketing/analytics tags loaded through Google Tag Manager (only after cookie consent).
+const TAG_HOSTS = {
+  script: 'https://www.googletagmanager.com https://www.google-analytics.com https://connect.facebook.net https://static.ads-twitter.com https://analytics.tiktok.com https://snap.licdn.com https://googleads.g.doubleclick.net https://www.googleadservices.com',
+  connect: 'https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://www.facebook.com https://connect.facebook.net https://analytics.twitter.com https://static.ads-twitter.com https://analytics.tiktok.com https://px.ads.linkedin.com https://googleads.g.doubleclick.net',
+  frame: 'https://www.googletagmanager.com https://td.doubleclick.net',
+};
+
 const withPWA = require('@ducanh2912/next-pwa').default({
+
   dest: 'public',
   // Also allow disabling in production via DISABLE_PWA=1 — the next-pwa
   // precache generation hangs indefinitely on this codebase during builds
@@ -120,6 +150,8 @@ const nextConfig = {
         destination: '/app/analytics',
         permanent: false,
       },
+      // GTM overhaul (2026-10): retired marketing URLs → their replacements (301).
+      ...MARKETING_REDIRECTS.map(([source, destination]) => ({ source, destination, permanent: true })),
     ];
   },
 
@@ -157,7 +189,17 @@ const nextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.stripe.com https://*.etsy.com https://*.ebay.com https://*.trendyol.com; frame-src https://js.stripe.com https://hooks.stripe.com;",
+            // Tag hosts are allowed here but only fire after consent (Consent Mode v2, docs/gtm/tracking/README.md).
+            value: [
+              "default-src 'self'",
+              `script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com ${TAG_HOSTS.script}`,
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              "img-src 'self' data: blob: https:",
+              "font-src 'self' https://fonts.gstatic.com",
+              `connect-src 'self' https://api.stripe.com https://*.etsy.com https://*.ebay.com https://*.trendyol.com ${TAG_HOSTS.connect}`,
+              `frame-src https://js.stripe.com https://hooks.stripe.com https://www.youtube-nocookie.com ${TAG_HOSTS.frame}`,
+              "media-src 'self' blob:",
+            ].join('; ') + ';',
           },
           {
             key: 'Permissions-Policy',

@@ -704,7 +704,11 @@ const listingBasicCache = new Map<string, { at: number; item: any }>();
 
 /** The listing page's estimate per listing id, reused by search cards for 24h so both show the same figure. */
 const PAGE_ESTIMATE_TTL_MS = 24 * 60 * 60 * 1000;
-const pageEstimateCache = new Map<string, { at: number; sales: { kind: SalesKind; confidence: Confidence | null; monthlySales: number | null; monthlySalesUpperBound: number | null; inputs: Record<string, any> } }>();
+// Kept on globalThis: Next.js bundles each API route separately, so a plain module-level Map would give
+// /api/ext/listing-stats and /api/ext/research two different caches inside the same server process.
+type PageEstimate = { at: number; sales: { kind: SalesKind; confidence: Confidence | null; monthlySales: number | null; monthlySalesUpperBound: number | null; inputs: Record<string, any> } };
+const pageEstimateCache: Map<string, PageEstimate> =
+  ((globalThis as any).__kxPageEstimates ??= new Map<string, PageEstimate>());
 
 function rememberPageEstimate(listingId: string, sales: any) {
   pageEstimateCache.set(String(listingId), {

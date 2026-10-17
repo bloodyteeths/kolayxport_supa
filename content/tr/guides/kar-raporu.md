@@ -12,7 +12,7 @@ inventoryRefs:
   - reports-sales
 draft: false
 order: 10
-duration: PT1M16S
+duration: PT1M17S
 video:
   file: kar-raporu
   youtubeId: ''

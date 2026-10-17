@@ -11,7 +11,7 @@ inventoryRefs:
   - ai-message-draft
 draft: false
 order: 11
-duration: PT1M14S
+duration: PT1M11S
 video:
   file: mesaj-kutusu-ai-yanit
   youtubeId: ''

@@ -12,7 +12,7 @@ inventoryRefs:
   - staged-drafts-send
 draft: false
 order: 3
-duration: PT1M18S
+duration: PT1M16S
 video:
   file: toplu-duzenleme
   youtubeId: ''

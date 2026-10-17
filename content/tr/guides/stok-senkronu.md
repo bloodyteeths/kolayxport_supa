@@ -11,7 +11,7 @@ inventoryRefs:
   - stock-sku-matching
 draft: false
 order: 9
-duration: PT1M27S
+duration: PT1M24S
 video:
   file: stok-senkronu
   youtubeId: ''
@@ -21,8 +21,8 @@ steps:
     image: media/guides/stok-senkronu/01.webp
   - name: Kurulum sihirbazıyla eşleştirin
     text: >-
-      İlk kurulumda sihirbaz ilanlarınızı SKU'ya göre eşleştirir. SKU'su birebir aynı olanlar otomatik bağlanır; benzer
-      olanlar size öneri olarak gelir.
+      İlk kurulumda sihirbaz ilanlarınızı stok koduna göre eşleştirir. Stok kodu birebir aynı olanlar otomatik bağlanır;
+      benzer olanlar size öneri olarak gelir.
     image: media/guides/stok-senkronu/02.webp
   - name: Önce deneme modunda bakın
     text: Canlıya almadan önce deneme modunda hangi stokların değişeceğini görürsünüz. Emin olunca canlıya geçersiniz.

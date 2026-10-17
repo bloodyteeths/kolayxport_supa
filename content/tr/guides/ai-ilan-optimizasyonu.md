@@ -37,8 +37,8 @@ steps:
     image: media/guides/ai-ilan-optimizasyonu/04.webp
   - name: Zayıf etiketi değiştirin
     text: >-
-      Etsy'de en fazla on üç etiket olur. Kota doluysa turuncu işaretli zayıf bir etiketi kaldırın, sonra öneriye
-      tıklayıp ekleyin.
+      Bir Etsy ilanında en fazla on üç etiket olur. Kota doluysa turuncu işaretli zayıf bir etiketi kaldırın, sonra
+      öneriye tıklayıp ekleyin.
     image: media/guides/ai-ilan-optimizasyonu/05.webp
   - name: Değişiklikleri Etsy'ye gönderin
     text: >-

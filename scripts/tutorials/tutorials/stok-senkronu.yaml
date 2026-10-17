@@ -15,7 +15,7 @@ steps:
       - hover: { text: "Durum ve ayarlar" }
     zoom: { text: "Bağlı ilan", scale: 1.4 }
   - title: "Kurulum sihirbazıyla eşleştirin"
-    say: "İlk kurulumda sihirbaz ilanlarınızı SKU'ya göre eşleştirir. SKU'su birebir aynı olanlar otomatik bağlanır; benzer olanlar size öneri olarak gelir."
+    say: "İlk kurulumda sihirbaz ilanlarınızı stok koduna göre eşleştirir. Stok kodu birebir aynı olanlar otomatik bağlanır; benzer olanlar size öneri olarak gelir."
     do:
       - hover: { role: button, name: "Kurulum sihirbazı" }
     zoom: { role: button, name: "Kurulum sihirbazı", scale: 1.6 }

@@ -39,7 +39,7 @@ steps:
       - waitFor: { role: button, name: "fruit dish etiketini ekle" }
     zoom: { role: button, name: "fruit dish etiketini ekle", scale: 1.4 }
   - title: "Zayıf etiketi değiştirin"
-    say: "Etsy'de en fazla on üç etiket olur. Kota doluysa turuncu işaretli zayıf bir etiketi kaldırın, sonra öneriye tıklayıp ekleyin."
+    say: "Bir Etsy ilanında en fazla on üç etiket olur. Kota doluysa turuncu işaretli zayıf bir etiketi kaldırın, sonra öneriye tıklayıp ekleyin."
     do:
       - click: { role: button, name: "gift for mom etiketini kaldır" }
       - wait: 500

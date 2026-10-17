@@ -14,7 +14,7 @@ inventoryRefs:
   - customs-commercial-invoice
 draft: false
 order: 7
-duration: PT1M30S
+duration: PT1M29S
 video:
   file: siparisler-ve-etiket
   youtubeId: ''

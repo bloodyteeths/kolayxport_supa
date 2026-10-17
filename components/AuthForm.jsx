@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { useTranslations } from 'next-intl';
@@ -41,6 +41,12 @@ export default function AuthForm() {
   const [resentStatus, setResentStatus] = useState('');
   const router = useRouter();
   const callbackUrl = safeCallbackUrl(router.query.callbackUrl);
+
+  // Marketing and pricing CTAs link to /login?mode=signup; open the signup form for them.
+  const queryMode = Array.isArray(router.query.mode) ? router.query.mode[0] : router.query.mode;
+  useEffect(() => {
+    if (router.isReady && queryMode === 'signup') setIsSignUp(true);
+  }, [router.isReady, queryMode]);
 
   // NextAuth redirects OAuth failures to the sign-in page (/login?error=<code>).
   const queryError = Array.isArray(router.query.error) ? router.query.error[0] : router.query.error;

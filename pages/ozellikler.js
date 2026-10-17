@@ -111,7 +111,7 @@ export default function OzelliklerPage() {
           <p className="text-blue-100 text-lg mb-8 max-w-2xl mx-auto">
             {t('cta.subtitle')}
           </p>
-          <Link href="/login" className="bg-white text-blue-600 font-semibold px-8 py-3 rounded-lg shadow-md hover:bg-blue-50 transition-colors text-lg">
+          <Link href="/login?mode=signup" className="bg-white text-blue-600 font-semibold px-8 py-3 rounded-lg shadow-md hover:bg-blue-50 transition-colors text-lg">
             {t('cta.button')}
           </Link>
         </div>

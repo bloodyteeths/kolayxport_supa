@@ -108,7 +108,7 @@ export default function HomeContent({ locale = 'tr' }) {
             {t('hero.subtitle')}
           </p>
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-x-6">
-            <Link href="/login" className="btn-primary">
+            <Link href="/login?mode=signup" className="btn-primary">
               {t('hero.ctaPrimary')}
             </Link>
             <Link href="/ozellikler" className="btn-secondary">{t('hero.ctaSecondary')} <span aria-hidden="true">→</span></Link>
@@ -268,7 +268,7 @@ export default function HomeContent({ locale = 'tr' }) {
                 ))}
               </ul>
               <div className="mt-8">
-                <Link href="/login" className="inline-block px-8 py-3 text-sm font-semibold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
+                <Link href="/login?mode=signup" className="inline-block px-8 py-3 text-sm font-semibold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
                   {t('arbitrage.cta')}
                 </Link>
               </div>
@@ -391,7 +391,7 @@ export default function HomeContent({ locale = 'tr' }) {
                 ))}
               </ul>
               <div className="mt-8">
-                <Link href="/login" className="inline-block px-8 py-3 text-sm font-semibold text-white bg-gradient-to-r from-indigo-500 to-blue-600 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
+                <Link href="/login?mode=signup" className="inline-block px-8 py-3 text-sm font-semibold text-white bg-gradient-to-r from-indigo-500 to-blue-600 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
                   {t('extension.cta')}
                 </Link>
               </div>
@@ -482,7 +482,7 @@ export default function HomeContent({ locale = 'tr' }) {
             {t('cta.subtitle')} <Link href="/fiyatlandirma" className="text-blue-100 hover:text-white underline">{t('cta.pricingLinkText')}</Link>
           </p>
           <div className="mt-8">
-            <Link href="/login" className="inline-block px-12 py-4 text-xl font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
+            <Link href="/login?mode=signup" className="inline-block px-12 py-4 text-xl font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
               {t('cta.button')}
             </Link>
             <p className="mt-6 text-sm text-blue-200">

@@ -21,6 +21,7 @@ import { fieldAnchorId, sectionAnchorId } from '@/lib/listingEditor/sections';
 import type { DraftRow, ListingSectionProps } from '@/lib/listingEditor/types';
 import EtsyImageManager, { type ImageManagerHandle } from '@/components/etsy/ImageManager';
 import VideoUploader, { type VideoUploaderHandle } from '@/components/etsy/VideoUploader';
+import { AiVideoPanel } from '../AiVideoPanel';
 import EbayImageManager, { type EbayImageManagerHandle } from '@/components/ebay/ImageManager';
 import { useListingEditor, useRegisterDraftSection } from '../useListingDraft';
 import type { WriteAltText } from './PhotoPanel';
@@ -130,6 +131,7 @@ function EtsyPhotos({ id = 'photos', writeAltText, removeStagedMedia, handleRef 
   const isLocal = !listingId || Number(listingId) < 0;
   const imagesRef = React.useRef<ImageManagerHandle | null>(null);
   const videoRef = React.useRef<VideoUploaderHandle | null>(null);
+  const [aiVideoOpen, setAiVideoOpen] = React.useState(false);
   const [summary, setSummary] = React.useState<PhotosSummary | null>(null);
   const [videoTile, setVideoTile] = React.useState<StripVideo | null>(null);
   const [videoLoad, setVideoLoad] = React.useState<VideoLoad>({ status: 'idle', videos: [] });
@@ -295,6 +297,13 @@ function EtsyPhotos({ id = 'photos', writeAltText, removeStagedMedia, handleRef 
         {mode === 'create' && count === 0 ? (
           <Box sx={{ fontSize: 12, color: neutral[500] }}>{t('photos.hint', { max: PHOTO_MAX.etsy })}</Box>
         ) : null}
+        <AiVideoPanel
+          open={aiVideoOpen}
+          onClose={() => setAiVideoOpen(false)}
+          images={remoteImages.map((i) => ({ id: String(i.id), src: i.src, fullSrc: i.fullSrc }))}
+          onUse={async (file) => { await videoRef.current?.stageFile(file); }}
+          defaultPrompt={t('aiVideo.defaultPrompt')}
+        />
         {videoLoad.status === 'error' ? (
           <ErrorState
             variant="inline"
@@ -311,6 +320,7 @@ function EtsyPhotos({ id = 'photos', writeAltText, removeStagedMedia, handleRef 
             primary={[
               ...(!full ? [{ id: 'choose', anchor: 'photos', label: t('photos.choose'), icon: icons.upload, onClick: () => imagesRef.current?.openUpload() }] : []),
               ...(!full ? [{ id: 'generate', label: t('ai.generatePhoto'), icon: icons.ai, onClick: () => imagesRef.current?.openGenerate() }] : []),
+              ...(remoteImages.length ? [{ id: 'aiVideo', label: t('aiVideo.open'), icon: icons.video, onClick: () => setAiVideoOpen(true) }] : []),
               // Desktop keeps the alt-text fix in the row; on a phone it joins ⋯ (the heading still says how many miss it).
               ...(altEnabled && missingAlt > 0 && !isMobile
                 ? [{ id: 'alt', label: t('ai.writeAlt', { count: missingAlt }), icon: icons.ai, onClick: () => imagesRef.current?.writeMissingAlt() }]

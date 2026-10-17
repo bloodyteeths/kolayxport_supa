@@ -57,6 +57,8 @@ export interface VideoUploaderHandle {
   open(): void;
   /** Undo a staged removal (only with `removeStagedMedia`). */
   undoRemove(): void;
+  /** Stages a video file (AI video panel): adds it, or replaces the current one like a picked file. */
+  stageFile(file: File): Promise<void>;
 }
 
 const VideoUploader = forwardRef<VideoUploaderHandle, VideoUploaderProps>(function VideoUploader({
@@ -306,6 +308,7 @@ const VideoUploader = forwardRef<VideoUploaderHandle, VideoUploaderProps>(functi
     pick() { if (!readOnly) embeddedFileRef.current?.click(); },
     open() { if (tile) setPanelOpen(true); else embeddedFileRef.current?.click(); },
     undoRemove() { void undoRemoveEmbedded(); },
+    async stageFile(file: File) { if (!readOnly) await stageVideoFile(file); },
   }));
 
   if (embedded) {

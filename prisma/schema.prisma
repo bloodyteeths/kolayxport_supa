@@ -81,6 +81,7 @@ model User {
   notificationPreferences NotificationPreference[]
   aiPreferences           AiPreference[]
   aiUsage                 AiUsage[]
+  aiVideoJobs             AiVideoJob[]
   notificationSettings    NotificationSettings?
   stockSettings           StockSettings?
   stockItems              StockItem[]
@@ -2352,4 +2353,30 @@ model AiUsage {
 
   @@index([userId, createdAt])
   @@index([feature, createdAt])
+}
+
+/// One AI product video (Veo). Long-running: started, then polled until done; the mp4 is stored on the VPS
+/// (uploads/ai-videos/<userId>/<id>.mp4). A follow-up ("slower camera") is a new job with parentId. provider =
+/// 'gemini' (API key) or 'vertex' (Google Cloud project, needed for photos with child models — allowlisted).
+model AiVideoJob {
+  id          String   @id @default(cuid())
+  userId      String
+  parentId    String?
+  provider    String   @default("gemini")
+  model       String
+  status      String   @default("running") // running | done | failed
+  prompt      String
+  instruction String?
+  sourceUrl   String?
+  aspectRatio String   @default("9:16")
+  durationSec Int      @default(8)
+  operation   String?
+  filePath    String?
+  errorKey    String?
+  errorDetail String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }

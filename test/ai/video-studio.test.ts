@@ -72,7 +72,8 @@ describe('product lock keyframes', () => {
     expect(normalizePhotoAnalysis({ photos, start: 2, end: 3 }, 4)).toMatchObject({ start: 1, end: 2 });
     // the model picked the close-up and no end: the rules fall back to the front and the back photo
     expect(normalizePhotoAnalysis([{ photos, start: 4, end: null }], 4)).toMatchObject({ start: 1, end: 2 });
-    expect(normalizePhotoAnalysis(null, 2)).toMatchObject({ start: null, end: null });
+    // no analysis: the first photo starts, no end
+    expect(normalizePhotoAnalysis(null, 2)).toMatchObject({ start: 0, end: null });
   });
   it('quality check answers are clamped and cleaned', () => {
     expect(normalizeQa({ productMatch: 14, realism: '7', diffs: [{ text: 'hem flowers missing', fix: 'keep the hem flowers' }, { text: '' }], issues: 'x' }))

@@ -104,6 +104,9 @@ After uploading to YouTube, paste the video id into `content/tr/guides/<slug>.md
 
 ## 7. Things the founder still has to do
 
+The step-by-step version is in [`LAUNCH-CHECKLIST.md`](LAUNCH-CHECKLIST.md).
+
+
 - **Company identity.**
   - Confirm the company details in `company.md` against the ticaret sicil.
   - Add the MERSİS number, vergi dairesi and KEP to `lib/site/company.ts`.

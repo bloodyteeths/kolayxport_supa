@@ -329,3 +329,7 @@ These rows changed after the audit above. The fixes are committed and tested loc
 | `etgb-excel-email` / N-3 | Exporter hardcoded to one company | Exporter name, VKN, default GTIP and origin from each seller's Gönderici profile; refuses when missing. Still an Excel file emailed to the broker, **not** a customs filing | 6cdd6fa |
 | Founding-member offer | Pricing UI only, no backend | `/api/billing/founding-spots` + coupon applied at checkout (`STRIPE_FOUNDING_COUPON_ID`) | d446f0a |
 | Signup intent | `/login?mode=signup` ignored | Opens the signup form | 20ef38b |
+| H-2 / G3 Order meter | +1 per sync call | Counts **new orders** imported by manual and extension syncs (scheduled syncs not metered yet) | fc1040c |
+| G10 Promotion codes | No code field at checkout | Stripe promotion-code field whenever the founding coupon doesn't apply | fc1040c |
+| Pricing copy | FAQ claimed scheduled imports pause at 110% and AI pauses | Describes only what is enforced (manual imports + labels pause at the limit) | 17fc956 |
+| Public pricing page | MUI app page (Lighthouse perf 74) | Server-rendered site page `/fiyatlandirma` + `/en/fiyatlandirma`; signed-in → `/plan` (checkout) | 17fc956 |

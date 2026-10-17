@@ -6586,7 +6586,9 @@
       "imageInvalid": "eBay fotoğraflardan birini kabul etmedi (boyut veya bağlantı). Fotoğrafları kontrol edin.",
       "titleInvalid": "eBay başlığı kabul etmedi (en fazla 80 karakter). Başlığı düzeltin.",
       "priceInvalid": "eBay fiyatı kabul etmedi. Fiyatı kontrol edin.",
-      "quantityInvalid": "eBay stok adedini kabul etmedi. Stoğu kontrol edin."
+      "quantityInvalid": "eBay stok adedini kabul etmedi. Stoğu kontrol edin.",
+      "legacyUnsupportedFields": "Bu ilan eBay'de oluşturulmuş; KolayXport'tan yalnızca başlık, açıklama, fiyat ve stok değiştirilebilir. Diğer değişiklikleri eBay'de yapın.",
+      "legacyVariationsPriceStock": "Bu ilanın varyasyonları var; fiyat ve stok her varyasyon için eBay'de ayarlanır. Başlık ve açıklama değişiklikleri gönderilebilir."
     },
     "validation": {
       "variantSkuDuplicate": "Her varyasyonun SKU kodu farklı olmalı",
@@ -14079,7 +14081,9 @@
       "fixFields": "{mp, select, etsy {Etsy'ye} ebay {eBay'e} trendyol {Trendyol'a} wix {Wix'e} shopify {Shopify'a} amazon {Amazon'a} other {Pazaryerine}} göndermeden önce {count} alanı düzeltin",
       "goToFirst": "İlkine git",
       "warnings": "{count} uyarıyla gönderildi",
-      "draftCheckFailed": "Gönderilmemiş değişiklikler kontrol edilemedi"
+      "draftCheckFailed": "Gönderilmemiş değişiklikler kontrol edilemedi",
+      "ebayLegacy": "Bu ilan eBay'de oluşturulmuş: buradan başlık, açıklama, fiyat ve stok değiştirilebilir. Fotoğraf, özellikler ve kargo için eBay'de düzenleyin.",
+      "ebayLegacyVariations": "Varyasyonlu ilan: fiyat ve stok varyasyon başına eBay'de ayarlanır; başlık ve açıklama buradan gönderilebilir."
     },
     "page": {
       "editTitle": "İlanı düzenle",

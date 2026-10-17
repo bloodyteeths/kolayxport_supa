@@ -46,7 +46,9 @@ function useEbayFields() {
   const errorFor = useFieldError({ issues: ed.issues });
   const dirty = (key: EbayFieldKey) => ed.mode === 'edit' && ed.isFieldDirty(key);
   const set = <K extends EbayFieldKey>(key: K, value: EbayEditorFields[K]) => ed.setField(key, value);
-  return { ed, f: ed.view.fields, ro: ed.readOnly, errorFor, dirty, set };
+  // Listing created on eBay: subtitle and currency are not editable through the Trading API path.
+  const legacy = Boolean((ed.view.meta.raw as { isLegacy?: boolean } | undefined)?.isLegacy);
+  return { ed, f: ed.view.fields, ro: ed.readOnly, legacy, errorFor, dirty, set };
 }
 
 /**
@@ -121,7 +123,7 @@ export interface EbayTitleSectionProps extends Partial<ListingSectionProps> {
 export function EbayTitleSection({ id = 'title', aiTitle: aiTitleProp, aiDescription: aiDescriptionProp }: EbayTitleSectionProps) {
   const t = useTranslations('listingEditor');
   const toast = useToast();
-  const { f, ro, errorFor, dirty, set, ed } = useEbayFields();
+  const { f, ro, legacy, errorFor, dirty, set, ed } = useEbayFields();
   const ownAi = useEbayAI();
   const aiTitle = aiTitleProp ?? ownAi.fieldState<string>('title');
   const aiDescription = aiDescriptionProp ?? ownAi.fieldState<string>('description');
@@ -194,7 +196,7 @@ export function EbayTitleSection({ id = 'title', aiTitle: aiTitleProp, aiDescrip
           onRevert={() => ed.revert(['subtitle'])}
           optional
         >
-          <TextField id={fieldAnchorId('subtitle')} value={f.subtitle} onChange={(v) => set('subtitle', v.replace(/[\r\n]+/g, ' '))} readOnly={ro} />
+          <TextField id={fieldAnchorId('subtitle')} value={f.subtitle} onChange={(v) => set('subtitle', v.replace(/[\r\n]+/g, ' '))} readOnly={ro || legacy} />
         </FormField>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -238,7 +240,7 @@ export interface EbayPriceSectionProps extends Partial<ListingSectionProps> {
 
 export function EbayPriceSection({ id = 'price', priceRange }: EbayPriceSectionProps) {
   const t = useTranslations('listingEditor');
-  const { f, ro, errorFor, dirty, set, ed } = useEbayFields();
+  const { f, ro, legacy, errorFor, dirty, set, ed } = useEbayFields();
   const fmt = useFormatters();
   const price = parseFloat(f.price);
   const range = priceRange ?? ed.view.facts.variations?.priceRange ?? null;
@@ -278,7 +280,7 @@ export function EbayPriceSection({ id = 'price', priceRange }: EbayPriceSectionP
                 value={f.currency || 'USD'}
                 onChange={(c) => c && set('currency', c)}
                 currencies={[...EBAY_CURRENCIES]}
-                disabled={ro}
+                disabled={ro || legacy}
               />
             </FormField>
             <FormField label={t('field.quantity')} htmlFor={fieldAnchorId('quantity')} required error={errorFor('quantity')} dirty={dirty('quantity')} onRevert={() => ed.revert(['quantity'])}>

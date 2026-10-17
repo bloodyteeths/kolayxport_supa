@@ -154,6 +154,11 @@ export function classifyEtsyDraftSyncError(err: unknown): StoredDraftError {
 
 /** eBay draft sync failure → stored key. */
 export function classifyEbayDraftSyncError(err: unknown): StoredDraftError {
+  const e = err as any;
+  // Typed errors (EbayDraftError, legacy Trading refusals) already name the exact cause.
+  if (e && e.name === 'EbayDraftError' && typeof e.key === 'string' && e.key) {
+    return { key: e.key.startsWith('ebay.') ? e.key : `ebay.${e.key}`, ...(e.params ? { params: e.params } : {}) };
+  }
   const generic = classifyGeneric(err, {
     reauthRequired: EBAY_DRAFT_ERROR.reauthRequired, rateLimited: EBAY_DRAFT_ERROR.rateLimited, notFound: EBAY_DRAFT_ERROR.notFound,
     rejected: EBAY_DRAFT_ERROR.rejected, unavailable: EBAY_DRAFT_ERROR.unavailable, failed: EBAY_DRAFT_ERROR.failed,

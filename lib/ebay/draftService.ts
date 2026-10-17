@@ -6,8 +6,9 @@ import { classifyEbayDraftSyncError, EBAY_DRAFT_ERROR } from '@/lib/drafts/syncE
 import { getUserAccessToken } from '@/lib/integrations/ebayClient';
 import { callEbayRateLimited } from '@/lib/integrations/ebayRateLimiter';
 import { sanitizeInventoryItemPayload } from '@/lib/ebay/payloadRules';
-import { EbayDraftError, classifyEbayError, ebayLegacyListingError } from '@/lib/ebay/draftErrors';
-import { EBAY_LEGACY_LISTING_CODE, EBAY_LEGACY_LISTING_KEY, isLegacyEbaySku } from '@/lib/ebay/legacy';
+import { EbayDraftError, classifyEbayError } from '@/lib/ebay/draftErrors';
+import { isLegacyEbaySku, legacyEbayItemId } from '@/lib/ebay/legacy';
+import { getLegacyItem, legacyChanges, legacySnapshots, reviseLegacyItem } from '@/lib/ebay/legacyTrading';
 import { EMPTY_CANCELLABLE_STATUSES, isEbayDraftEmpty, isEmptyPatchValue, type EmptyDraftOptions } from '@/lib/drafts/emptyDraft';
 import {
   DEFAULT_MARKETPLACE,
@@ -94,8 +95,6 @@ export async function getOrCreateDraft(params: {
   isNew?: boolean;
 }) {
   const { userId, sku, offerId } = params;
-  // Listings created on eBay (`legacy-<itemId>`) cannot be edited through the Inventory API: never stage for them.
-  if (isLegacyEbaySku(sku)) throw ebayLegacyListingError(sku);
   const marketplaceId = params.marketplaceId || DEFAULT_MARKETPLACE;
 
   const existing = await prisma.ebayListingDraft.findFirst({
@@ -127,6 +126,20 @@ export async function getOrCreateDraft(params: {
   }
 
   const token = await getUserAccessToken(userId);
+
+  // Listings created on eBay (`legacy-<itemId>`): the base comes from the Trading API (GetItem), in the same shapes.
+  const legacyId = legacyEbayItemId(sku);
+  if (legacyId) {
+    const snap = legacySnapshots(await getLegacyItem(token, legacyId));
+    return prisma.ebayListingDraft.create({
+      data: {
+        userId, sku, offerId: null, listingId: legacyId, status: 'draft',
+        baseSnapshotInventory: snap.inventory, baseSnapshotOffer: snap.offer, baseUpdatedAt: new Date(),
+        inventoryPatch: {}, offerPatch: {}, queuedActions: [],
+      },
+      include: { media: true, syncAttempts: { orderBy: { startedAt: 'desc' }, take: 5 } },
+    });
+  }
 
   let baseSnapshotInventory: any = {};
   try {
@@ -172,6 +185,37 @@ export async function getOrCreateDraft(params: {
   });
 }
 
+/**
+ * A listing created on eBay: only title, description, price and quantity are staged (the Trading API fields
+ * syncLegacyDraft sends); the editor shows the rest read-only. Photos, variations and listing actions are refused
+ * with a reason instead of being staged and failing later. Exported for tests.
+ */
+export function legacyStageParams<T extends { inventoryFields?: JsonMap; offerFields?: JsonMap; variationFields?: JsonMap | null; queuedActions?: any[]; media?: Array<JsonMap> }>(params: T): T {
+  if ((params.media && params.media.length) || (params.variationFields && !isEmptyPatch(params.variationFields)) || (params.queuedActions && params.queuedActions.length)) {
+    throw new EbayDraftError('LEGACY_UNSUPPORTED_FIELDS', 'Only title, description, price and quantity can be changed for this listing', {
+      status: 409,
+      key: 'draftSync.legacyUnsupportedFields',
+      params: { fields: params.media?.length ? 'photos' : params.queuedActions?.length ? 'actions' : 'variations' },
+    });
+  }
+  const inv = params.inventoryFields || {};
+  const ofr = params.offerFields || {};
+  const inventoryFields: JsonMap = {};
+  if (inv.product && (inv.product.title !== undefined || inv.product.description !== undefined)) {
+    inventoryFields.product = {
+      ...(inv.product.title !== undefined ? { title: inv.product.title } : {}),
+      ...(inv.product.description !== undefined ? { description: inv.product.description } : {}),
+    };
+  }
+  if (inv.availability?.shipToLocationAvailability?.quantity !== undefined) {
+    inventoryFields.availability = { shipToLocationAvailability: { quantity: inv.availability.shipToLocationAvailability.quantity } };
+  }
+  const offerFields: JsonMap = {};
+  if (ofr.pricingSummary?.price) offerFields.pricingSummary = { price: ofr.pricingSummary.price };
+  if (ofr.listingDescription !== undefined) offerFields.listingDescription = ofr.listingDescription;
+  return { ...params, inventoryFields, offerFields, variationFields: undefined };
+}
+
 // ---------------------------------------------------------------------------
 // upsertDraftPatch
 // ---------------------------------------------------------------------------
@@ -194,8 +238,7 @@ export async function upsertDraftPatch(params: {
    */
   preserveConflict?: boolean;
 }) {
-  // Refused before anything is read or written (also when an older draft for this SKU is still open).
-  if (isLegacyEbaySku(params.sku)) throw ebayLegacyListingError(params.sku);
+  if (isLegacyEbaySku(params.sku)) params = legacyStageParams(params);
   const incomingCreate = findCreateAction(params.queuedActions);
   const draft = await getOrCreateDraft({
     userId: params.userId,
@@ -372,11 +415,6 @@ export async function syncDraft(draftId: string, userId: string) {
     include: { media: { orderBy: { createdAt: 'asc' } }, syncAttempts: { orderBy: { startedAt: 'desc' }, take: 1 } },
   });
   if (!draft) throw draftNotFound();
-  // A listing created on eBay (`legacy-<itemId>`) can't be edited through the Inventory API: never call eBay, never
-  // touch the row (the seller can still see and discard it in the editor). Reported as skipped, not failed.
-  if (isLegacyEbaySku(draft.sku)) {
-    return { status: 'skipped' as const, reason: 'legacy' as const, draftId: draft.id, code: EBAY_LEGACY_LISTING_CODE, key: EBAY_LEGACY_LISTING_KEY };
-  }
   // An open draft with nothing staged (every change undone) is never sent: cancel it instead of calling eBay.
   if (OPEN_STATUSES.includes(draft.status) && (await cancelDraftIfEmpty(draft.id, userId, { ignoreSchedule: true }))) {
     return { status: 'skipped' as const, reason: 'empty' as const, draftId: draft.id };
@@ -441,6 +479,11 @@ export async function syncDraft(draftId: string, userId: string) {
     const token = await getUserAccessToken(userId);
     const marketplaceId = DEFAULT_MARKETPLACE;
     const results: any[] = [];
+
+    // --- Listing created on eBay: Trading API (title, description, price, quantity) ---
+    if (isLegacyEbaySku(draft.sku)) {
+      return await syncLegacyDraft({ draft, attemptId: attempt.id, token, userId });
+    }
 
     // --- F1: new listing (queued `create`) ---
     if (createAction) {
@@ -679,13 +722,61 @@ export async function syncDraft(draftId: string, userId: string) {
       // Stable i18n key (docs/integration/draft-sync-error-codes.md); English text stays on the attempt.
       data: { status: 'failed', lastSyncError: classifyEbayDraftSyncError(err).key },
     });
+    const classified = classifyEbayDraftSyncError(err);
     await prisma.ebayDraftSyncAttempt.update({
       where: { id: attempt.id },
-      data: { status: 'failed', finishedAt: new Date(), error: err.message || 'Sync failed', result: { errorKey: classifyEbayDraftSyncError(err).key } },
+      data: { status: 'failed', finishedAt: new Date(), error: err.message || 'Sync failed', result: { errorKey: classified.key, ...(classified.params ? { errorParams: classified.params } : {}) } },
     });
     // F2: typed error (code/key) with the same English message as before.
     throw classifyEbayError(err);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Legacy (listing created on eBay): Trading API send
+// ---------------------------------------------------------------------------
+
+/** Same field comparison the conflict check needs: base vs live for each field the draft changes. Pure. */
+export function legacyConflicts(base: { inventory: JsonMap; offer: JsonMap }, live: { inventory: JsonMap; offer: JsonMap }, changes: ReturnType<typeof legacyChanges>): string[] {
+  const out: string[] = [];
+  const norm = (v: unknown) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : JSON.stringify(v ?? null));
+  if (changes.title !== undefined && norm(base.inventory?.product?.title) !== norm(live.inventory?.product?.title)) out.push('title');
+  if (changes.description !== undefined && norm(base.inventory?.product?.description) !== norm(live.inventory?.product?.description)) out.push('description');
+  if (changes.price !== undefined && norm(base.offer?.pricingSummary?.price?.value) !== norm(live.offer?.pricingSummary?.price?.value)) out.push('price');
+  if (changes.quantity !== undefined && norm(base.inventory?.availability?.shipToLocationAvailability?.quantity) !== norm(live.inventory?.availability?.shipToLocationAvailability?.quantity)) out.push('quantity');
+  return out;
+}
+
+async function syncLegacyDraft(input: { draft: any; attemptId: string; token: string; userId: string }) {
+  const { draft, attemptId, token, userId } = input;
+  const itemId = legacyEbayItemId(draft.sku) as string;
+  const changes = legacyChanges(draft.inventoryPatch as JsonMap, draft.offerPatch as JsonMap);
+  const item = await getLegacyItem(token, itemId);
+  const live = legacySnapshots(item);
+  const changed = legacyConflicts({ inventory: draft.baseSnapshotInventory as JsonMap, offer: draft.baseSnapshotOffer as JsonMap }, live, changes);
+  if (changed.length) {
+    // eBay changed a field this draft also changes: never overwrite silently (Review differences decides).
+    await prisma.ebayListingDraft.update({ where: { id: draft.id }, data: { status: 'conflict', lastSyncError: EBAY_DRAFT_ERROR.conflict } });
+    await prisma.ebayDraftSyncAttempt.update({
+      where: { id: attemptId },
+      data: { status: 'conflict', finishedAt: new Date(), error: `Changed on eBay: ${changed.join(', ')}`, result: { errorKey: EBAY_DRAFT_ERROR.conflict, changedFields: changed } },
+    });
+    return { status: 'conflict' as const, draftId: draft.id, code: 'REMOTE_CHANGED', key: 'draftSync.conflict', changedFields: changed };
+  }
+  const sent = await reviseLegacyItem(token, item, changes);
+  await prisma.ebayListingDraft.update({ where: { id: draft.id }, data: { status: 'synced', syncedAt: new Date(), lastSyncError: null } });
+  await prisma.ebayDraftSyncAttempt.update({ where: { id: attemptId }, data: { status: 'success', finishedAt: new Date(), result: { actions: [{ step: 'legacyRevise', itemId, fields: sent }] } } });
+  // The list reads the EbayListing cache: show the sent values right away.
+  const data: Record<string, unknown> = {};
+  if (changes.title !== undefined) data.title = changes.title;
+  if (changes.description !== undefined) data.description = changes.description;
+  if (changes.price !== undefined) data.priceValue = changes.price.value;
+  if (changes.quantity !== undefined) data.quantity = changes.quantity;
+  if (Object.keys(data).length) {
+    await prisma.ebayListing.updateMany({ where: { userId, sku: draft.sku }, data }).catch((err: any) => logger.warn('eBay legacy cache update failed', { sku: draft.sku, error: err?.message }));
+  }
+  cleanupDraftMedia(draft.media);
+  return { status: 'success' as const, draftId: draft.id, results: [{ step: 'legacyRevise', fields: sent }] };
 }
 
 // ---------------------------------------------------------------------------
@@ -981,6 +1072,11 @@ export async function removeQueuedActions(draftId: string, userId: string, types
 // ---------------------------------------------------------------------------
 
 async function fetchLive(token: string, draft: { sku: string; offerId: string | null }, marketplaceId: string) {
+  const legacyId = legacyEbayItemId(draft.sku);
+  if (legacyId) {
+    const snap = legacySnapshots(await getLegacyItem(token, legacyId));
+    return { liveInventory: snap.inventory, liveOffer: snap.offer };
+  }
   let liveInventory: JsonMap = {};
   try {
     liveInventory = await fetchInventoryItem(token, draft.sku, marketplaceId);

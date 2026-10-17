@@ -150,6 +150,9 @@ const MP_NAME: Record<EditorMarketplace, string> = { etsy: 'Etsy', ebay: 'eBay',
 /** The CatalogDraft marketplaces (marketplace-editors §1): no preview, no profiles, one create primary. */
 const isCatalogMarketplace = (m: EditorMarketplace): m is 'trendyol' | 'wix' | 'shopify' => m === 'trendyol' || m === 'wix' || m === 'shopify';
 
+/** Sections a listing created on eBay can change from KolayXport (lib/ebay/legacyTrading). */
+const LEGACY_EBAY_SECTIONS = new Set<string>(['title', 'price']);
+
 /** Conflict causes that only restate the conflict banner's title (not shown under it). */
 const GENERIC_CONFLICT_KEYS = new Set([
   'listings.sendError.conflict',
@@ -429,6 +432,8 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
   // A queued delete must be the only staged change (server `deleteNotExclusive`): the form is locked until the
   // banner's "Remove delete"; the footer still sends it (with the type-to-confirm dialog).
   const formLocked = readOnly || queuedDelete;
+  // A listing created on eBay (Trading API): title, description, price and stock only (lib/ebay/legacyTrading).
+  const ebayLegacy = marketplace === 'ebay' && Boolean((engine.view.meta.raw as { isLegacy?: boolean } | undefined)?.isLegacy);
   const count = changeCount(changes);
   // An open draft with no changes (e.g. after Undo) is not work: no Send/Discard, no "Not sent" pill. A failed,
   // conflicted or sending draft still needs attention even when its change list is empty.
@@ -1089,6 +1094,21 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
       />,
     );
   }
+  if (ebayLegacy && mode === 'edit') {
+    const raw = engine.view.meta.raw as { legacyItemId?: string; hasVariations?: boolean } | undefined;
+    const itemId = raw?.legacyItemId || (props.listingId?.startsWith('legacy-') ? props.listingId.slice(7) : '');
+    banners.push(
+      <Banner
+        key="ebayLegacy"
+        tone="info"
+        title={t('banner.ebayLegacy')}
+        action={itemId ? { id: 'editOnEbay', label: t('state.ebayLegacyAction'), onClick: () => window.open(`https://www.ebay.com/sl/list?mode=ReviseItem&itemId=${encodeURIComponent(itemId)}`, '_blank', 'noopener') } : undefined}
+        data-testid="le-banner-ebay-legacy"
+      >
+        {raw?.hasVariations ? t('banner.ebayLegacyVariations') : undefined}
+      </Banner>,
+    );
+  }
   if (engine.draftCheckFailed) {
     banners.push(
       <Banner
@@ -1354,9 +1374,13 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
           >
             {renderedSections.map((s) => {
               const Comp = sectionComponents[s.id]!;
+              const comp = <Comp id={s.id} {...(extraProps[s.id] ?? {})} />;
               return (
                 <Box key={s.id} data-le-section={s.id}>
-                  <Comp id={s.id} {...(extraProps[s.id] ?? {})} />
+                  {/* A listing created on eBay: only Title (title, description) and Price (price, stock) can be sent. */}
+                  {ebayLegacy && !LEGACY_EBAY_SECTIONS.has(s.id) ? (
+                    <ListingEditorContext.Provider value={{ ...(ctxValue as unknown as ListingEditorContextValue), readOnly: true }}>{comp}</ListingEditorContext.Provider>
+                  ) : comp}
                   {s.id === 'photos' && startFaster ? <Box sx={{ mt: '16px' }}>{startFaster}</Box> : null}
                 </Box>
               );

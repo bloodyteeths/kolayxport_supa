@@ -18,7 +18,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import { useTranslations } from 'next-intl';
 import { SidePanel } from '@/components/ds/overlay/SidePanel';
-import { RadioGroup } from '@/components/ds/inputs/RadioGroup';
 import { Button } from '@/components/ds/inputs/Button';
 import { Banner } from '@/components/ds/feedback/Banner';
 import { ErrorState } from '@/components/ds/state/ErrorState';
@@ -476,30 +475,6 @@ export function ReviewDifferencesPanel({
 
   const ready = load.status === 'ready';
   const nothingToReview = ready && rows.length === 0 && queued.length === 0;
-
-  const valueCell = (text: string, muted: boolean, testid?: string) => (
-    <Box
-      title={text}
-      data-testid={testid}
-      sx={{ fontSize: 14, lineHeight: '20px', color: muted ? neutral[500] : neutral[800], overflowWrap: 'anywhere', minWidth: 0 }}
-    >
-      {text}
-    </Box>
-  );
-
-  const colLabel = (text: string) => (
-    <Box component="span" sx={{ display: { xs: 'block', sm: 'none' }, fontSize: 12, lineHeight: '16px', color: neutral[500] }}>{text}</Box>
-  );
-
-  const rowSx = {
-    display: 'grid',
-    gridTemplateColumns: { xs: '1fr', sm: '132px minmax(0,1fr) minmax(0,1fr) 168px' },
-    columnGap: '16px',
-    rowGap: '6px',
-    alignItems: 'start',
-    py: '12px',
-    borderTop: `1px solid ${neutral[100]}`,
-  } as const;
 
   return (
     <SidePanel padded

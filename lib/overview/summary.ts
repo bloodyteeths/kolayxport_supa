@@ -18,7 +18,6 @@
 import { randomUUID } from 'crypto';
 import prisma from '@/lib/prisma';
 import { EMPTY_CANCELLABLE_STATUSES, emptyCheckSelect, isUncountedDraft, type DraftModelKind } from '@/lib/drafts/emptyDraft';
-import { LEGACY_EBAY_SKU_PREFIX } from '@/lib/ebay/legacy';
 import { logger } from '@/lib/logger';
 import { getExchangeRates, convertToBase, normalizeCurrency, type RatesSnapshot } from '@/lib/fx';
 import { canonicalStore } from '@/lib/marketplaces/canonical';
@@ -657,8 +656,8 @@ export async function getEtsyDraftBucket(ctx: SummaryContext): Promise<DraftBuck
 
 export async function getEbayDraftBucket(ctx: SummaryContext): Promise<DraftBucket> {
   const where = { userId: ctx.userId };
-  // First conflict / failed links never point at a legacy listing's draft (it is not counted either).
-  const sendable = { NOT: { sku: { startsWith: LEGACY_EBAY_SKU_PREFIX } } };
+  // Listings created on eBay are sent too since 2026-10-17 (lib/ebay/legacyTrading): every draft counts.
+  const sendable = {};
   const staleBefore = new Date(ctx.now.getTime() - EBAY_STALE_SYNCING_MS);
   const [groups, stale, conflict, failed] = await Promise.all([
     prisma.ebayListingDraft.groupBy({ by: ['status'], where: { ...where, status: { in: ACTIVE_DRAFT_STATUSES } }, _count: { _all: true } }),

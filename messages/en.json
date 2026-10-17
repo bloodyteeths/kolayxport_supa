@@ -6586,7 +6586,9 @@
       "imageInvalid": "eBay did not accept one of the photos (size or link). Check the photos.",
       "titleInvalid": "eBay did not accept the title (80 characters at most). Fix the title.",
       "priceInvalid": "eBay did not accept the price. Check the price.",
-      "quantityInvalid": "eBay did not accept the quantity. Check the stock."
+      "quantityInvalid": "eBay did not accept the quantity. Check the stock.",
+      "legacyUnsupportedFields": "This listing was created on eBay; KolayXport can change only its title, description, price and stock. Make other changes on eBay.",
+      "legacyVariationsPriceStock": "This listing has variations; price and stock are set per variation on eBay. Title and description changes can be sent."
     },
     "validation": {
       "variantSkuDuplicate": "Each variation needs a different SKU",
@@ -14079,7 +14081,9 @@
       "fixFields": "Fix {count, plural, one {# field} other {# fields}} before sending to {marketplace}",
       "goToFirst": "Go to first",
       "warnings": "Sent with {count, plural, one {# warning} other {# warnings}}",
-      "draftCheckFailed": "Couldn't check for unsent changes"
+      "draftCheckFailed": "Couldn't check for unsent changes",
+      "ebayLegacy": "This listing was created on eBay: title, description, price and stock can be changed here. Edit photos, specifics and shipping on eBay.",
+      "ebayLegacyVariations": "Listing with variations: price and stock are set per variation on eBay; title and description can be sent from here."
     },
     "page": {
       "editTitle": "Edit listing",

@@ -15,6 +15,7 @@ export interface HomeProps {
   shots: Record<string, Asset | null>;
   photos: Record<string, Asset | null>;
   integrations: { slug: string; name: string; kind: string; status: string }[];
+  testimonials: { quote: string; name: string; shop?: string | null }[];
 }
 
 export default function HomePage(props: HomeProps) {
@@ -37,7 +38,7 @@ export default function HomePage(props: HomeProps) {
   );
 }
 
-function HomeBody({ locale, shots, photos, integrations }: HomeProps) {
+function HomeBody({ locale, shots, photos, integrations, testimonials }: HomeProps) {
   const t = useTranslations('site.home');
   const c = useTranslations('site.common');
   const href = (p: string) => localePath(locale, p);
@@ -157,7 +158,22 @@ function HomeBody({ locale, shots, photos, integrations }: HomeProps) {
         <PricingTeaser locale={locale} />
       </Section>
 
-      {/* TRUST (real, verifiable facts; testimonials appear only with written consent) */}
+      {/* TESTIMONIALS: rendered only when real, consented entries exist (content/testimonials). */}
+      {testimonials.length ? (
+        <Section tone="white">
+          <Heading title={t('testimonialsTitle')} />
+          <ul className="mt-10 grid gap-5 md:grid-cols-3">
+            {testimonials.map((q) => (
+              <li key={q.quote} className="rounded-2xl border border-line bg-paper p-6">
+                <blockquote className="display text-[20px] leading-snug" style={{ fontWeight: 500 }}>&ldquo;{q.quote}&rdquo;</blockquote>
+                <p className="mt-4 text-sm font-semibold">{q.name}{q.shop ? <span className="font-normal text-ink-mute"> · {q.shop}</span> : null}</p>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      ) : null}
+
+      {/* TRUST (real, verifiable facts) */}
       <Section>
         <Heading title={t('trust.title')} />
         <ul className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-4">

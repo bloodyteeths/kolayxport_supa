@@ -1,6 +1,7 @@
 import { listContent } from './content';
 import { photos, screens } from './media';
 import { HOME_INTEGRATIONS } from './homeData';
+import { testimonials } from './testimonials';
 import type { SiteLocale } from './routes';
 
 export async function homeStaticProps(locale: SiteLocale) {
@@ -13,6 +14,7 @@ export async function homeStaticProps(locale: SiteLocale) {
     props: {
       locale,
       integrations,
+      testimonials: testimonials(locale),
       shots: await screens(['etsy-listings', 'etsy-listings-mobile', 'orders', 'orders-mobile', 'listing-editor', 'research', 'arbitrage', 'labels', 'stock-sync'], locale),
       photos: await photos(['hero-packing', 'textile-workshop']),
     },

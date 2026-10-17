@@ -3,7 +3,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { stripe } from '../../../lib/stripe';
 import prisma from '../../../lib/prisma';
-import { STRIPE_PRICES, type PlanKey, type IntervalKey } from '../../../lib/stripePrices';
+import { type PlanKey, type IntervalKey } from '../../../lib/stripePrices';
+import { planFromPriceId as planFromPriceIdShared } from '@/lib/billing/stripeAccountServer';
 import { logger } from '@/lib/logger';
 import { logBillingEvent, logSecurityEvent } from '@/lib/admin/events';
 
@@ -48,14 +49,9 @@ async function recordWebhookEvent(args: {
   }
 }
 
-/** Reverse-lookup: given a Stripe price ID, return the plan name. */
+/** Reverse-lookup: given a Stripe price ID, return the plan name (base, legacy and per-currency ids). */
 function planFromPriceId(priceId: string): PlanKey | null {
-  for (const [plan, intervals] of Object.entries(STRIPE_PRICES)) {
-    for (const id of Object.values(intervals)) {
-      if (id === priceId) return plan as PlanKey;
-    }
-  }
-  return null;
+  return planFromPriceIdShared(priceId)?.plan ?? null;
 }
 
 // Disable body parsing to verify the raw body

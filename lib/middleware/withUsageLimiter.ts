@@ -4,6 +4,7 @@ import { getAuthUser } from '../auth';
 import { logger } from '../logger';
 import { User } from '@prisma/client';
 import { notify, resolveByPrefix, invalidateResolveMemo, notificationKeys, NOTIFICATION_LINKS } from '../notifications';
+import { getPlanLimits, checkPlanLimit } from '../billing/planLimits';
 
 interface UserWithSubscription extends User {
   subscriptionPlan: string | null;
@@ -14,15 +15,7 @@ interface UserWithSubscription extends User {
   usageResetAt: Date | null;
 }
 
-const plans = {
-  starter: { orderSyncLimit: 200, labelLimit: 100 },
-  growth: { orderSyncLimit: 2000, labelLimit: 500 },
-  enterprise: { orderSyncLimit: Infinity, labelLimit: Infinity },
-  // Shopify-installed merchants — the app is listed free on the Shopify App
-  // Store, so we don't bill them. Limits are generous enough that the free
-  // tier remains useful but still discourages abuse.
-  shopify_free: { orderSyncLimit: Infinity, labelLimit: Infinity },
-};
+// Plan limits and the allow/deny rules live in lib/billing/planLimits.ts (shared with the UI meters).
 
 type LimitType = 'orderSync' | 'label';
 /** Mirrors LimitReason in lib/http/limitInterceptor.ts. */
@@ -82,59 +75,34 @@ const checkUsage = async (userId: string, limitType: LimitType): Promise<UsageCh
     void resolveByPrefix(userId, 'usage:');
   }
 
-  const { subscriptionPlan, subscriptionStatus, orderSyncCount, labelCount, trialExpiresAt } = user;
+  const decision = getPlanLimits(user.subscriptionPlan, user.subscriptionStatus, user.trialExpiresAt, now);
+  const used = limitType === 'orderSync' ? user.orderSyncCount : user.labelCount;
+  const result = checkPlanLimit(decision, limitType, used);
 
-  // Shopify-installed merchants short-circuit the trial/active gate: the app is
-  // free for them per Shopify App Store listing, so we don't apply Stripe-style
-  // trial counters or "no active subscription" blocks.
-  if (subscriptionPlan === 'shopify_free') {
-    return { allowed: true };
+  if (decision.state === 'invalidPlan') {
+    logger.error('User has active subscription but an invalid plan is assigned', undefined, { userId, subscriptionPlan: user.subscriptionPlan });
   }
 
-  // Check for active trial
-  if (subscriptionStatus === 'trialing' && trialExpiresAt && new Date() < trialExpiresAt) {
-    const trialLimits = { orderSync: 50, label: 10 };
-    const currentCount = limitType === 'orderSync' ? orderSyncCount : labelCount;
-    const usage = { used: currentCount, limit: trialLimits[limitType], plan: 'trial', period: 'trial' };
-    if (currentCount >= trialLimits[limitType]) {
-      return { allowed: false, error: 'Trial limit reached.', reason: 'trial', ...usage };
-    }
-    return { allowed: true, ...usage };
-  }
-
-  // If trial is over and no active subscription, block access
-  if (subscriptionStatus !== 'active') {
-    return { allowed: false, error: 'No active subscription.', reason: 'noSubscription', plan: subscriptionPlan ?? undefined };
-  }
-  
-  // Handle case where user is active but has no plan
-  if (!subscriptionPlan || !plans[subscriptionPlan]) {
-    logger.error('User has active subscription but an invalid plan is assigned', undefined, { userId, subscriptionPlan });
-    return {
-      allowed: false,
-      error: 'Subscription plan not found or invalid. Please contact support.',
-      reason: 'invalidPlan',
-      plan: subscriptionPlan ?? undefined,
-    };
-  }
-  
-  const planLimits = plans[subscriptionPlan];
-  const currentCount = limitType === 'orderSync' ? orderSyncCount : labelCount;
-
-  const planLimit: number = planLimits[`${limitType}Limit`];
-  const usage = {
-    used: currentCount,
-    // Infinity is not JSON-serialisable; omit the limit for unlimited plans.
-    limit: Number.isFinite(planLimit) ? planLimit : undefined,
-    plan: subscriptionPlan,
-    period: user.usageResetAt ? new Date(user.usageResetAt).toISOString().slice(0, 10) : 'current',
+  return {
+    allowed: result.allowed,
+    ...(result.allowed ? {} : { error: LIMIT_ERRORS[result.reason ?? 'planLimit'] }),
+    ...(result.reason ? { reason: result.reason } : {}),
+    ...(typeof result.used === 'number' ? { used: result.used } : {}),
+    ...(typeof result.limit === 'number' ? { limit: result.limit } : {}),
+    ...(decision.plan ? { plan: decision.plan } : {}),
+    ...(decision.period === 'trial'
+      ? { period: 'trial' }
+      : decision.period === 'month'
+        ? { period: user.usageResetAt ? new Date(user.usageResetAt).toISOString().slice(0, 10) : 'current' }
+        : {}),
   };
+};
 
-  if (currentCount >= planLimit) {
-    return { allowed: false, error: `${limitType} limit reached for your plan.`, reason: 'planLimit', ...usage };
-  }
-
-  return { allowed: true, ...usage };
+const LIMIT_ERRORS: Record<LimitReason, string> = {
+  trial: 'Trial limit reached.',
+  noSubscription: 'No active subscription.',
+  invalidPlan: 'Subscription plan not found or invalid. Please contact support.',
+  planLimit: 'Limit reached for your plan.',
 };
 
 /**

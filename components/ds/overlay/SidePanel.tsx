@@ -154,6 +154,9 @@ export function SidePanel({
             width,
             height: isPhone ? '100dvh' : '100%',
             maxWidth: '100vw',
+            // Home-screen app on iPhone (black-translucent status bar, viewport-fit=cover) draws under the clock:
+            // without this the header and its ✕ sat in the untouchable status-bar strip.
+            ...(isPhone && { pt: 'env(safe-area-inset-top, 0px)' }),
             display: 'flex',
             flexDirection: 'column',
             bgcolor: n[0],

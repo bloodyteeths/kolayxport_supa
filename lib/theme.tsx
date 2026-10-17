@@ -273,7 +273,12 @@ const theme = createTheme({
       styleOverrides: { tooltip: { backgroundColor: n[900], fontSize: 12, lineHeight: '16px', fontWeight: 500, borderRadius: radius.xs, padding: '4px 8px' } },
     },
     MuiDialog: {
-      styleOverrides: { paper: { borderRadius: radius.lg, boxShadow: e.e4, border: 'none' } },
+      styleOverrides: {
+        paper: { borderRadius: radius.lg, boxShadow: e.e4, border: 'none' },
+        // Full-screen dialogs on phones: keep the title/close below the iPhone status bar (home-screen app) and the
+        // actions above the home indicator.
+        paperFullScreen: { borderRadius: 0, paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' },
+      },
     },
     MuiDialogTitle: { styleOverrides: { root: { fontSize: 16, lineHeight: '24px', fontWeight: 600, padding: '20px 20px 8px' } } },
     MuiDialogContent: { styleOverrides: { root: { padding: '8px 20px', fontSize: 14 } } },

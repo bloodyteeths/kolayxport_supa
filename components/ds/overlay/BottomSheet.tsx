@@ -81,6 +81,8 @@ export function BottomSheet({ open, onClose, title, fullHeight, footer, headerAc
           borderRadius: `${radius.lg}px ${radius.lg}px 0 0`,
           height: fullHeight ? '100dvh' : 'auto',
           maxHeight: fullHeight ? '100dvh' : '90vh',
+          // Keep the header below the iPhone status bar in the home-screen app.
+          ...(fullHeight ? { pt: 'env(safe-area-inset-top, 0px)' } : { maxHeight: 'calc(90vh - env(safe-area-inset-top, 0px))' }),
           transform: drag ? `translateY(${drag}px) !important` : undefined,
           overflow: 'hidden',
         },

@@ -1,0 +1,51 @@
+slug: anahtar-kelime-arastirmasi
+order: 5
+title: "Etsy için anahtar kelime araştırması yapın"
+description: "Anahtar kelime gezgininde Etsy aramalarının talebini, rekabetini ve fiyat aralığını görün; mağazanızda eksik kalan kelimeleri bulun."
+keyword: "etsy anahtar kelime araştırması"
+inventoryRefs: [research-keywords]
+tags: [etsy seo, anahtar kelime, etsy etiket, pazar araştırması]
+startUrl: /app/research
+ready: { role: tab, name: "Anahtar kelime gezgini" }
+steps:
+  - say: "Merhaba! Bu videoda Etsy'de hangi kelimelerin arandığını ve hangilerinde rekabetin düşük olduğunu bulacağız."
+  - title: "Anahtar kelime gezginini açın"
+    say: "Pazar araştırması sayfasında Anahtar kelime gezgini sekmesine geçin."
+    do:
+      - click: { role: tab, name: "Anahtar kelime gezgini" }
+      - waitFor: { placeholder: "Bir anahtar kelime arayın" }
+  - title: "Kelimenizi yazın"
+    say: "Ürününüzü alıcının arayacağı gibi, İngilizce yazın ve Araştır'a basın. Biz turkish towel yazıyoruz."
+    do:
+      - fill: { placeholder: "Bir anahtar kelime arayın", value: "turkish towel" }
+      - click: { testid: kw-search-submit }
+      - waitFor: { text: "peshtemal", exact: true }
+      - wait: 800
+  - title: "Talep ve rekabete bakın"
+    say: "Talep sütunundaki noktalar aramanın ne kadar yoğun olduğunu gösterir. Rekabet, o kelimeyi kullanan ilan sayısıdır."
+    do:
+      - hover: { text: "Talep", exact: true }
+    zoom: { text: "Rekabet", exact: true, scale: 1.5 }
+  - title: "İlk sayfayı ve fiyatı okuyun"
+    say: "İlk kırk sekizde kullanım, ilk sayfadaki ilanların kaçında bu kelimenin geçtiğini gösterir. Fiyat aralığı da fiyatınız için fikir verir."
+    do:
+      - hover: { text: "İlk 48'de kullanım" }
+    zoom: { text: "Fiyat aralığı", exact: true, scale: 1.5 }
+  - title: "Mağazanızla karşılaştırın"
+    say: "Mağazamda sütunu, kendi ilanlarınızdan kaçının bu kelimeyi kullandığını gösterir. Boş olanlar sizin için fırsat olabilir."
+    do:
+      - hover: { text: "Mağazamda", exact: true }
+    zoom: { text: "Mağazamda", exact: true, scale: 1.6 }
+  - title: "Etikete sığanları süzün"
+    say: "Etsy etiketleri en fazla yirmi karakter olabilir. Bu filtreyle yalnızca etikete sığan kelimeleri görürsünüz."
+    do:
+      - hover: { testid: filter-maxLen }
+    zoom: { testid: filter-maxLen, scale: 1.6 }
+  - title: "Kelimeleri ilanınıza ekleyin"
+    say: "Beğendiğiniz kelimeleri soldan seçin. Üstte çıkan düğmeyle onları bir ilanınıza etiket olarak ekleyebilirsiniz."
+    do:
+      - check: { selector: "#kx-main tr:has-text('hammam towel') input[type=checkbox]" }
+      - check: { selector: "#kx-main tr:has-text('quick dry towel') input[type=checkbox]" }
+      - hover: { role: button, name: "etiketi şuna ekle" }
+    zoom: { role: button, name: "etiketi şuna ekle", scale: 1.6 }
+  - say: "Takıldığınız yerde Yardım sayfasından bize yazabilirsiniz. KolayXport'u 14 gün ücretsiz deneyebilirsiniz."

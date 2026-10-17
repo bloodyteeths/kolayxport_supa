@@ -8,6 +8,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import prisma from '@/lib/prisma';
 import { credentialsAuthorize } from '@/lib/auth/credentials';
+import { newTrialExpiry } from '@/lib/billing/planLimits';
 
 // PrismaAdapter is only needed for OAuth (Google) to auto-create User + Account records.
 // We wrap it to prevent it from interfering with CredentialsProvider sign-in,
@@ -47,14 +48,14 @@ export const authOptions = {
   },
   events: {
     async createUser({ user }: any) {
-      // Auto-provision 30-day trial for new users (Google OAuth)
+      // Auto-provision the trial for new users (Google OAuth)
       await prisma.user.update({
         where: { id: user.id },
         data: {
           subscriptionPlan: 'trial',
           subscriptionStatus: 'trialing',
-          trialExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-          usageResetAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          trialExpiresAt: newTrialExpiry(),
+          usageResetAt: newTrialExpiry(),
           orderSyncCount: 0,
           labelCount: 0,
         },

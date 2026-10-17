@@ -32,6 +32,18 @@ function txMatch(t: Row, where: any) {
 const authUser = vi.fn();
 vi.mock('@/lib/auth', () => ({ getAuthUser: (...a: any[]) => authUser(...a) }));
 vi.mock('@/lib/finance/financialAutoSync', () => ({ refreshFinancialsIfStale: vi.fn(async () => undefined) }));
+const featureLocked = { value: false };
+vi.mock('@/lib/billing/requireFeature', () => ({
+  requireFeature: async (_userId: string, feature: string) => {
+    if (featureLocked.value) {
+      const err: any = new Error('locked');
+      err.name = 'FeatureLockedError';
+      err.body = () => ({ error: 'Payment Required', limitType: 'feature', reason: 'featureLocked', feature, neutral: false });
+      throw err;
+    }
+  },
+  isFeatureLockedError: (err: any) => err?.name === 'FeatureLockedError',
+}));
 vi.mock('@/lib/fx', async (orig) => {
   const actual: any = await orig();
   // TRY per unit: 1 USD = 40 TRY, 1 GBP = 50 TRY. No EUR / CAD rate on purpose (exclusion paths).
@@ -235,6 +247,17 @@ describe('GET /api/finance/dashboard', () => {
     authUser.mockResolvedValue({ id: 'u1' });
     orderWheres.length = 0;
     seedEtsy();
+  });
+
+  it('answers 402 featureLocked when the plan has no financials (Pro feature, server-side)', async () => {
+    featureLocked.value = true;
+    try {
+      const res = await call(dashboardHandler, { marketplace: 'etsy', from: '2026-10-01', to: '2026-10-03', tz: IST, granularity: 'day' });
+      expect(res.statusCode).toBe(402);
+      expect(res.body).toMatchObject({ reason: 'featureLocked', feature: 'financials' });
+    } finally {
+      featureLocked.value = false;
+    }
   });
 
   it('builds the §6.2 shape: currency, lastSyncedAt, converted COGS, coverage, buckets = summary (B10/B11/B12)', async () => {

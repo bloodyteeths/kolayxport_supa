@@ -35,7 +35,7 @@ describe('deriveShellUsage', () => {
 
   it('falls back to the enforced table when the payload has no `limits` (no hard-coded numbers in UI)', () => {
     const u = deriveShellUsage(sub({}), NOW)!;
-    expect(u.meters.map((m) => m.limit)).toEqual([10, 50]);
+    expect(u.meters.map((m) => m.limit)).toEqual([30, 150]);
   });
 
   it('near and over the limit', () => {
@@ -57,7 +57,7 @@ describe('deriveShellUsage', () => {
   });
 
   it('active but unknown plan (invalidPlan) is not shown as "no plan" to a paying user', () => {
-    const u = deriveShellUsage(sub({ subscriptionPlan: 'pro' as never, subscriptionStatus: 'active' }), NOW)!;
+    const u = deriveShellUsage(sub({ subscriptionPlan: 'bogus' as never, subscriptionStatus: 'active' }), NOW)!;
     expect(u.state).toBe('invalidPlan');
     expect(u.blocked).toBeNull();
   });
@@ -90,7 +90,9 @@ describe('deriveShellUsage', () => {
 describe('accountBannerState', () => {
   it('maps blocked and limit states; never for Shopify-free', () => {
     expect(accountBannerState(deriveShellUsage(sub({ trialExpiresAt: '2026-10-01T00:00:00Z' }), NOW))).toEqual({ kind: 'trialEnded' });
-    expect(accountBannerState(deriveShellUsage(sub({ subscriptionPlan: 'growth', subscriptionStatus: 'past_due' }), NOW))).toEqual({ kind: 'noPlan' });
+    expect(accountBannerState(deriveShellUsage(sub({ subscriptionPlan: 'growth', subscriptionStatus: 'canceled' }), NOW))).toEqual({ kind: 'noPlan' });
+    // past_due keeps the paid plan's limits while Stripe retries the payment (planLimits PAID_STATUSES).
+    expect(accountBannerState(deriveShellUsage(sub({ subscriptionPlan: 'growth', subscriptionStatus: 'past_due' }), NOW))).toBeNull();
     expect(accountBannerState(deriveShellUsage(sub({ labelCount: 10, limits: { orderSync: 50, label: 10 } }), NOW))).toEqual({
       kind: 'limitReached',
       meter: 'label',

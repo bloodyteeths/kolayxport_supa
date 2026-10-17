@@ -1,4 +1,9 @@
-import { STRIPE_PRICES } from '@/lib/stripePrices';
+import { STRIPE_PRICES, priceIdFor, type PlanKey } from '@/lib/stripePrices';
+import { foundingCouponId, getFoundingSpots } from '@/lib/billing/foundingServer';
+import { newTrialExpiry } from '@/lib/billing/planLimits';
+import { contextFromRequest, contextToMetadata } from '@/lib/tracking/server';
+import { TRIAL_CARRY_MS } from '@/lib/billing/billingState';
+import { FOUNDING_INTERVALS } from '@/lib/billing/price';
 import prisma from '@/lib/prisma';
 import { stripe } from '@/lib/stripe';
 import { getAuthUser } from '@/lib/auth';
@@ -32,19 +37,24 @@ export default async function handler(req, res) {
     });
   }
 
-  const { plan, interval } = req.body as { plan: 'starter' | 'growth' | 'kurumsal'; interval: 'month' | 'year' };
+  const { plan, interval, currency, expectFounding } = req.body as {
+    plan: PlanKey | 'kurumsal';
+    interval: 'month' | 'year';
+    currency?: string;
+    expectFounding?: boolean;
+  };
 
   if (plan === 'kurumsal') {
     return res.status(400).json({ error: 'Kurumsal plan handled manually. Please contact sales.' });
   }
 
-  if (!plan || !interval || !STRIPE_PRICES[plan as 'starter' | 'growth'] || !STRIPE_PRICES[plan as 'starter' | 'growth'][interval]) {
+  if (!plan || !interval || !Object.prototype.hasOwnProperty.call(STRIPE_PRICES, plan) || (interval !== 'month' && interval !== 'year')) {
     return res.status(400).json({ error: 'Invalid plan or interval.' });
   }
 
   try {
     // Validate price configuration first
-    const priceId = STRIPE_PRICES[plan as 'starter' | 'growth'][interval];
+    const priceId = priceIdFor(plan, interval, currency);
     if (!priceId) {
       logger.error('Missing price ID for plan', undefined, { plan, interval });
       return res.status(400).json({ error: 'Price configuration missing for selected plan. Please check environment variables.' });
@@ -69,6 +79,7 @@ export default async function handler(req, res) {
           email: true,
           name: true,
           stripeCustomerId: true,
+          trialExpiresAt: true,
         }
       });
 
@@ -94,6 +105,7 @@ export default async function handler(req, res) {
               email: true,
               name: true,
               stripeCustomerId: true,
+              trialExpiresAt: true,
             }
           });
         }
@@ -119,7 +131,8 @@ export default async function handler(req, res) {
             subscriptionStatus: 'trialing',
             orderSyncCount: 0,
             labelCount: 0,
-            usageResetAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+            trialExpiresAt: newTrialExpiry(),
+            usageResetAt: newTrialExpiry(),
           },
           select: {
             id: true,
@@ -207,15 +220,36 @@ export default async function handler(req, res) {
       }
     }
 
+    // Founding members: 40% off for life on the first N subscriptions (Stripe coupon max_redemptions).
+    // The pricing page sends expectFounding when it showed the founding price; never charge full
+    // price silently in that case.
+    let discounts: { coupon: string }[] | undefined;
+    if (FOUNDING_INTERVALS.includes(interval)) {
+      const spots = await getFoundingSpots({ fresh: true });
+      const couponId = foundingCouponId();
+      if (couponId && spots.active && spots.remaining > 0) {
+        discounts = [{ coupon: couponId }];
+      } else if (expectFounding) {
+        return res.status(409).json({ error: 'Founding spots are full.', reason: 'founding_full' });
+      }
+    }
+
     try {
       const checkoutSession = await stripe.checkout.sessions.create({
+        // Stripe allows either a fixed discount or the promotion-code field: founding members get the
+        // coupon; everyone else can enter a code (community / partner codes, docs/gtm/social).
+        ...(discounts ? { discounts } : { allow_promotion_codes: true }),
+        // Consent + click ids for the server-side `purchase` event sent by the webhook.
+        metadata: { ...contextToMetadata(contextFromRequest(req)), plan, interval },
         payment_method_types: ['card'],
         billing_address_collection: 'required',
         customer: stripeCustomerId,
         line_items: [{ price: priceId, quantity: 1 }],
         mode: 'subscription',
         subscription_data: {
-          trial_period_days: 30,
+          // Carry over what is left of the in-app trial instead of starting a new one.
+          // Stripe needs trial_end at least 48h ahead (TRIAL_CARRY_MS = 49h), so a nearly-spent trial bills now.
+          ...(stripeTrialEnd(dbUser.trialExpiresAt) ? { trial_end: stripeTrialEnd(dbUser.trialExpiresAt) } : {}),
           metadata: {
             userId: dbUser.id,
             plan: plan,
@@ -249,4 +283,10 @@ export default async function handler(req, res) {
 
     res.status(500).json({ error: 'Internal Server Error' });
   }
+}
+
+function stripeTrialEnd(trialExpiresAt: Date | null | undefined): number | undefined {
+  if (!trialExpiresAt) return undefined;
+  const end = new Date(trialExpiresAt).getTime();
+  return end - Date.now() > TRIAL_CARRY_MS ? Math.floor(end / 1000) : undefined;
 }

@@ -1,0 +1,12 @@
+# Unified inbox (/app/mesajlar). The conversation list, threads and the AI draft are live-only (Wix, Trendyol, Gemini).
+- { url: "**/api/messages?**", query: { action: counts }, fixture: counts.json }
+- { url: "**/api/messages?**", query: { action: list, view: all }, fixture: list-all.json }
+- { url: "**/api/messages?**", query: { action: list }, fixture: list-needs-reply.json }
+- { url: "**/api/messages?**", query: { action: thread, conversationId: demo-conv-1 }, fixture: thread-demo-conv-1.json }
+- { url: "**/api/messages?**", query: { action: thread, conversationId: demo-conv-2 }, fixture: thread-demo-conv-2.json }
+- { url: "**/api/messages?**", query: { action: thread, conversationId: demo-conv-3 }, fixture: thread-demo-conv-3.json }
+- { url: "**/api/messages?**", query: { action: thread, conversationId: "650000101" }, fixture: thread-650000101.json }
+- { url: "**/api/messages?**", query: { action: thread, conversationId: "650000102" }, fixture: thread-650000102.json }
+- { url: "**/api/messages?**", query: { action: orderContext }, fixture: order-context.json }
+- { url: "**/api/messages?**", query: { action: markSeen }, empty: true, status: 204 }
+- { url: "**/api/messages/draft-reply**", fixture: draft-reply.json }

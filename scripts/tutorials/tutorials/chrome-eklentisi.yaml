@@ -1,0 +1,55 @@
+slug: chrome-eklentisi
+order: 12
+title: "KolayXport Chrome eklentisi ne işe yarar?"
+description: "Chrome eklentisi Etsy alıcı adreslerini aktarır, takip numarasını Etsy'ye girer, Etsy sayfalarına araştırma ekler. Henüz Web Mağazası'nda yok."
+keyword: "etsy chrome eklentisi"
+inventoryRefs: [ext-etsy-address, ext-etsy-tracking, ext-etsy-research, tracking-push-etsy, help-getting-started]
+tags: [chrome eklentisi, etsy, etsy adres, etsy takip numarası]
+startUrl: /app/nasil-kullanirim
+ready: { text: "Etsy adresleri için eklentiyi kurun" }
+mocks:
+  - use: etsy-editor
+steps:
+  - say: "Merhaba! Bu videoda KolayXport Chrome eklentisinin ne işe yaradığını ve neden gerektiğini anlatacağız."
+  - title: "Yardım sayfasındaki adıma bakın"
+    say: "Yardım sayfasında, KolayXport'u kurmanın dördüncü adımı Chrome eklentisi."
+    do:
+      - scrollTo: { text: "Etsy adresleri için eklentiyi kurun" }
+      - hover: { text: "Etsy adresleri için eklentiyi kurun" }
+    zoom: { text: "Etsy adresleri için eklentiyi kurun", scale: 1.4 }
+  - title: "Neden gerekli?"
+    say: "Etsy, alıcının teslimat adresini API ile paylaşmıyor. Etsy bağlantınızda da bu uyarıyı görürsünüz."
+    do:
+      - click: { testid: nav-item-settings }
+      - click: { testid: settings-nav-connections }
+      - click: { testid: tile-etsy-action }
+      - waitFor: { text: "Etsy API Kısıtlaması" }
+      - hover: { text: "Etsy API Kısıtlaması" }
+    zoom: { text: "Etsy API Kısıtlaması", scale: 1.5 }
+  - title: "Alıcı adreslerini aktarır"
+    say: "Eklenti kuruluyken Etsy'deki siparişler sayfanızı açtığınızda, alıcı adresleri KolayXport'a aktarılır. Böylece etiket için adresi elle yazmazsınız."
+    do:
+      - click: { testid: action-etsy-close }
+      - click: { testid: nav-item-orders }
+      - waitFor: { text: "Emily Carter" }
+      - hover: { text: "Emily Carter" }
+    zoom: { selector: "#kx-main tbody tr:nth-child(1)", scale: 1.3 }
+  - title: "Takip numarasını Etsy'ye girer"
+    say: "Etsy'ye takip numarası göndermek de eklentiyle olur. KolayXport numarayı sıraya koyar, eklenti Etsy'deki formu sizin yerinize doldurur."
+    do:
+      - hover: { text: "Takip gönderildi ✓" }
+    zoom: { text: "Takip gönderildi ✓", scale: 1.6 }
+  - title: "Etsy sayfalarında araştırma"
+    say: "Eklenti ayrıca Etsy'deki arama, ilan ve mağaza sayfalarına araştırma bilgileri ekler."
+    do:
+      - scroll: 500
+      - hover: { testid: nav-item-orders }
+  - title: "Kurulum durumu"
+    say: "Eklenti henüz Chrome Web Mağazası'nda yayında değil. Şimdilik kurulum için destek ekibimize yazmanız gerekiyor. Eklenti olmadan da siparişleriniz gelir; yalnızca Etsy adresleri ve takip numarası gönderimi eksik kalır."
+    do:
+      - click: { testid: nav-item-help }
+      - waitFor: { text: "Etsy adresleri için eklentiyi kurun" }
+      - scrollTo: { text: "Takıldığınız bir yer olursa" }
+      - hover: { text: "Takıldığınız bir yer olursa" }
+    zoom: { text: "Takıldığınız bir yer olursa", scale: 1.6 }
+  - say: "Takıldığınız yerde Yardım sayfasından bize yazabilirsiniz. KolayXport'u 14 gün ücretsiz deneyebilirsiniz."

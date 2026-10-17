@@ -1,0 +1,18 @@
+{
+  "id": "demo-conv-2",
+  "platform": "wix",
+  "status": "unanswered",
+  "needsReply": true,
+  "unread": false,
+  "platformStatus": "open",
+  "customerName": "Thomas Keller",
+  "customerEmail": "thomas@example.com",
+  "subject": "Engraving",
+  "lastMessageText": "Can you engrave three initials on the cognac wallet? Something like T.J.K.",
+  "lastMessageAt": "{{ago:190m}}",
+  "lastMessageDate": "{{ago:190m}}",
+  "lastFromCustomer": true,
+  "contactId": "demo-contact-2",
+  "unreadCount": 0,
+  "messages": []
+}

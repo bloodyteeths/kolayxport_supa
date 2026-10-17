@@ -1,0 +1,47 @@
+slug: etsy-baglama
+order: 1
+title: "Etsy mağazanızı KolayXport'a bağlayın"
+description: "Etsy mağazanızı Ayarlar › Bağlantılar'dan Etsy'nin kendi izin ekranıyla bağlayın; siparişleriniz ve ilanlarınız panele gelsin."
+keyword: "etsy entegrasyonu nasıl yapılır"
+inventoryRefs: [settings-connections, order-sync-etsy, listings-grid, ext-etsy-address]
+tags: [etsy, etsy entegrasyonu, etsy mağaza bağlama, etsy api]
+startUrl: /app/labels
+ready: { testid: nav-item-settings }
+steps:
+  - say: "Merhaba! Bu videoda Etsy mağazanızı KolayXport'a bağlayacağız. Sonunda Etsy siparişleriniz ve ilanlarınız panelinizde olacak."
+  - title: "Ayarlar › Bağlantılar'ı açın"
+    say: "Sol menüden Ayarlar'a, sonra Bağlantılar'a tıklayın. Mağazalarınız ve kargo firmalarınız burada listelenir."
+    do:
+      - click: { testid: nav-item-settings }
+      - click: { testid: settings-nav-connections }
+      - waitFor: { testid: tile-etsy }
+    zoom: { testid: tile-etsy, scale: 1.5 }
+  - title: "Etsy kartını açın"
+    say: "Etsy kartını bulun. Henüz bağlı değilse burada Bağla düğmesi görürsünüz. Demo hesabımız bağlı olduğu için Yönet yazıyor."
+    do:
+      - click: { testid: tile-etsy-action }
+      - waitFor: { testid: action-etsy-connect-another }
+  - title: "Mağaza ekle ile Etsy'ye geçin"
+    say: "Mağaza ekle düğmesi sizi Etsy'nin kendi giriş sayfasına götürür. Birden fazla Etsy mağazanız varsa her birini bu düğmeyle ekleyebilirsiniz."
+    do:
+      - hover: { testid: action-etsy-connect-another }
+    zoom: { testid: action-etsy-connect-another, scale: 1.6 }
+  - title: "Etsy'de izin verin"
+    say: "Etsy'de hesabınıza girip KolayXport'a izin verirsiniz. Şifreniz Etsy'de kalır, KolayXport şifrenizi hiç görmez. İzin verince bu sayfaya otomatik dönersiniz."
+    do:
+      - hover: { selector: "[data-testid=etsy-shops-panel] >> text=DemoAtolyeStudio" }
+    zoom: { selector: "[data-testid=etsy-shops-panel] >> text=DemoAtolyeStudio", scale: 1.5 }
+  - title: "Alıcı adresleri için not"
+    say: "Bir not: Etsy, alıcının adresini API ile paylaşmıyor. Tam adresler için KolayXport Chrome eklentisi gerekiyor. Bunu ayrı bir videoda anlatıyoruz."
+    do:
+      - hover: { text: "Etsy API Kısıtlaması" }
+    zoom: { text: "Etsy API Kısıtlaması", scale: 1.5 }
+  - title: "Siparişlerinizi görün"
+    say: "Bağlantı tamamlanınca Etsy siparişleriniz Siparişler sayfasına, ilanlarınız da Etsy ilanları sayfasına gelir."
+    do:
+      - click: { testid: action-etsy-close }
+      - click: { testid: nav-item-orders }
+      - waitFor: { text: "Emily Carter" }
+  - say: "Takıldığınız yerde Yardım sayfasından bize yazabilirsiniz. KolayXport'u 14 gün ücretsiz deneyebilirsiniz."
+    do:
+      - hover: { testid: nav-item-help }

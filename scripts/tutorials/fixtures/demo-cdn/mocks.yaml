@@ -1,0 +1,2 @@
+# The seed points price-gap (arbitrage) product images at a fake https host; serve them from public/demo.
+- { url: "https://demo-cdn.kolayxport.test/**", file: "public/{path}", contentType: image/jpeg }

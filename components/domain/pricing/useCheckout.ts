@@ -10,6 +10,7 @@ import { useRouter } from 'next/router';
 import { useTranslations } from 'next-intl';
 import { useToast } from '@/components/ds/feedback';
 import type { Currency, Interval, PaidPlanKey } from '@/lib/billing/types';
+import { track } from '@/lib/tracking/events';
 
 export const CHECKOUT_ENDPOINT = '/api/stripe/create-checkout-session';
 
@@ -27,6 +28,7 @@ export type CheckoutResult =
 
 /** The request (fetch injected in tests). Currency goes over the wire lower-case (`PLANS` price keys). */
 export async function requestCheckout(req: CheckoutRequest, fetchImpl: typeof fetch = fetch): Promise<CheckoutResult> {
+  track('begin_checkout', { plan: req.plan, interval: req.interval, currency: req.currency });
   try {
     const res = await fetchImpl(CHECKOUT_ENDPOINT, {
       method: 'POST',

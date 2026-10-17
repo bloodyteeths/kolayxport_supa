@@ -1,0 +1,14 @@
+# Etsy listing editor (/app/etsy-listings/1790001234?shop=48291736) and its AI buttons.
+# The editor loads the listing live from Etsy through /api/clawd/etsy; the demo token can't, so we answer here.
+- { url: "**/api/clawd/etsy**", query: { action: listing }, fixture: listing.json }
+- { url: "**/api/clawd/etsy**", query: { action: get_shop_sections }, fixture: shop-sections.json }
+- { url: "**/api/clawd/etsy**", query: { action: get_shipping_profiles }, fixture: shipping-profiles.json }
+- { url: "**/api/clawd/etsy**", query: { action: get_return_policies }, fixture: return-policies.json }
+- { url: "**/api/clawd/etsy**", query: { action: get_readiness_states }, fixture: readiness-states.json }
+- { url: "**/api/clawd/etsy**", query: { action: taxonomy }, fixture: taxonomy.json }
+- { url: "**/api/clawd/etsy**", query: { action: get_listing_inventory }, fixture: inventory.json }
+- { url: "**/api/clawd/etsy**", query: { action: search_market }, fixture: search-market.json }
+- { url: "**/api/clawd/etsy**", fixture: empty-list.json }          # every other read: empty list
+- { url: "**/api/ai/etsy**", body: { action: optimize_title }, fixture: ai-optimize-title.json }
+- { url: "**/api/ai/etsy**", body: { action: suggest_tags }, fixture: ai-suggest-tags.json }
+- { url: "**/api/ai/etsy**", json: {} }

@@ -261,7 +261,8 @@ async function handler(
       await prisma.user.update({
         where: { id: userId },
         data: {
-          orderSyncCount: { increment: results.created + results.updated },
+          // The order meter counts new orders only; updates of known orders are free.
+          orderSyncCount: { increment: results.created },
           lastSyncedAt: new Date()
         }
       });

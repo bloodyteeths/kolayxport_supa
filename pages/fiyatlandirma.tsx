@@ -1,8 +1,12 @@
-// /fiyatlandirma — public pricing page (components/domain/pricing/PricingPage.tsx, settings §17). No
-// getServerSideProps: the page stays static/cacheable; Shopify gating happens on the client before any
-// price is painted (settings §10.5).
-import PricingPage from '@/components/domain/pricing/PricingPage';
+// /fiyatlandirma — public pricing (fast, server-rendered): components/site/SitePricing.tsx.
+// Signed-in sellers are forwarded to /plan (the in-app checkout page, components/domain/pricing/PricingPage).
+import SitePricing from '@/components/site/SitePricing';
+import { siteMessageProps } from '@/lib/i18n/pageMessages';
 
-export default function FiyatlandirmaRoute() {
-  return <PricingPage />;
+export default function Page() {
+  return <SitePricing locale="tr" />;
+}
+
+export async function getStaticProps() {
+  return { props: siteMessageProps('tr', ['marketing.pricingV2']) };
 }

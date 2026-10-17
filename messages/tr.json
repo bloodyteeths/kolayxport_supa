@@ -9093,14 +9093,14 @@
     "home": {
       "seo": {
         "title": "KolayXport – AI Destekli E-Ticaret Komuta Merkezi | Etsy, eBay & Amazon Araçları",
-        "description": "AI listeleme, pazar araştırması, sipariş yönetimi ve kargo — Etsy, eBay, Amazon, Trendyol, Wix ve Shopify satıcıları için hepsi tek panelde. 30 gün ücretsiz deneyin.",
+        "description": "AI listeleme, pazar araştırması, sipariş yönetimi ve kargo — Etsy, eBay, Amazon, Trendyol, Wix ve Shopify satıcıları için hepsi tek panelde. 14 gün ücretsiz deneyin.",
         "ogAlt": "KolayXport Genel Bakış"
       },
       "hero": {
         "titlePrefix": "AI Destekli",
         "titleHighlight": "E-Ticaret Komuta Merkezi",
         "subtitle": "Pazar araştırması, AI listeleme, rakip analizi, sipariş yönetimi ve kargo — Etsy, eBay, Amazon, Trendyol, Wix ve Shopify için ihtiyacınız olan her şey, %100 Türkçe.",
-        "ctaPrimary": "30 Gün Ücretsiz Dene",
+        "ctaPrimary": "14 Gün Ücretsiz Dene",
         "ctaSecondary": "Özellikler",
         "imageAlt": "KolayXport panel önizlemesi"
       },
@@ -9278,7 +9278,7 @@
         "heading": "Araştırma, Listeleme, Satış — Hepsini Tek Yerden Yönetin.",
         "subtitle": "AI destekli araçlarla pazaryeri satışlarınızı büyütün.",
         "pricingLinkText": "Fiyatlandırma planlarını inceleyin",
-        "button": "30 Gün Ücretsiz Dene",
+        "button": "14 Gün Ücretsiz Dene",
         "contactPrompt": "Sorularınız mı var?",
         "contactLinkText": "Bize Ulaşın"
       },
@@ -9315,7 +9315,7 @@
           },
           {
             "question": "Ücretsiz deneme nasıl çalışıyor?",
-            "answer": "Hesap oluşturduğunuzda 30 günlük ücretsiz deneme otomatik başlar. Deneme süresince 50 sipariş senkronizasyonu, 10 kargo etiketi ve tüm AI ve araştırma araçları dahildir. Süre dolduğunda devam etmek için Başlangıç veya Büyüme planlarından birini seçebilirsiniz."
+            "answer": "Hesap oluşturduğunuzda 14 günlük ücretsiz deneme otomatik başlar. Deneme süresince 50 sipariş senkronizasyonu, 10 kargo etiketi ve tüm AI ve araştırma araçları dahildir. Süre dolduğunda devam etmek için Başlangıç veya Büyüme planlarından birini seçebilirsiniz."
           },
           {
             "question": "KolayXport Etsy API'sini nasıl kullanıyor?",
@@ -9395,14 +9395,14 @@
           "description": "API anahtarlarınız ve hassas verileriniz gelişmiş şifreleme yöntemleriyle korunur. Avrupa merkezli (Almanya) kurumsal sunucu altyapımızın sunduğu en yüksek güvenlik standartlarından faydalanın."
         },
         {
-          "title": "30 Gün Ücretsiz Deneme",
-          "description": "Tüm entegrasyonlar, AI araçları ve araştırma özellikleri 30 gün boyunca ücretsiz. Kredi kartı gerekmeden kaydolun, memnun kalırsanız size uygun planı seçin."
+          "title": "14 Gün Ücretsiz Deneme",
+          "description": "Tüm entegrasyonlar, AI araçları ve araştırma özellikleri 14 gün boyunca ücretsiz. Kredi kartı gerekmeden kaydolun, memnun kalırsanız size uygun planı seçin."
         }
       ],
       "cta": {
         "heading": "KolayXport'u Denemeye Hazır mısınız?",
-        "subtitle": "E-ticaret operasyonlarınızı bir üst seviyeye taşıyın. 30 gün ücretsiz deneyin ve farkı görün.",
-        "button": "30 Gün Ücretsiz Deneyin"
+        "subtitle": "E-ticaret operasyonlarınızı bir üst seviyeye taşıyın. 14 gün ücretsiz deneyin ve farkı görün.",
+        "button": "14 Gün Ücretsiz Deneyin"
       }
     },
     "integrations": {
@@ -9412,7 +9412,7 @@
       },
       "hero": {
         "title": "Etsy'den Trendyol'a, UPS'ten FedEx'e — Tek Çatı Altında",
-        "subtitle": "6 pazaryeri, 4 kargo entegrasyonu ve AI araçları. 30 gün ücretsiz denemede hepsi dahil."
+        "subtitle": "6 pazaryeri, 4 kargo entegrasyonu ve AI araçları. 14 gün ücretsiz denemede hepsi dahil."
       },
       "categories": {
         "all": "Tümü",
@@ -9651,19 +9651,19 @@
     "pricing": {
       "seo": {
         "title": "KolayXport | Fiyatlandırma",
-        "description": "KolayXport'un şeffaf ve esnek fiyatlandırma seçeneklerini keşfedin. 30 gün ücretsiz deneme ile hemen başlayın.",
+        "description": "KolayXport'un şeffaf ve esnek fiyatlandırma seçeneklerini keşfedin. 14 gün ücretsiz deneme ile hemen başlayın.",
         "ogAlt": "KolayXport Fiyatlandırma Planları"
       },
       "hero": {
-        "titlePrefix": "30 Gün",
+        "titlePrefix": "14 Gün",
         "titleHighlight": "ÜCRETSİZ",
         "titleSuffix": "Deneyin",
-        "subtitle": "KolayXport'u 30 gün boyunca ücretsiz deneyin. Tüm pazaryeri entegrasyonları, kargo etiketi oluşturma ve AI araçları deneme süresince dahil.",
+        "subtitle": "KolayXport'u 14 gün boyunca ücretsiz deneyin. Tüm pazaryeri entegrasyonları, kargo etiketi oluşturma ve AI araçları deneme süresince dahil.",
         "ctaStart": "Hemen Başla",
         "ctaCall": "Bizi Arayın"
       },
       "plansHeading": "Size Uygun Planı Seçin",
-      "plansSubheading": "Şeffaf, esnek ve işletmenizin büyümesine ayak uyduran fiyatlandırma. Tüm planlar 30 gün ücretsiz deneme içerir.",
+      "plansSubheading": "Şeffaf, esnek ve işletmenizin büyümesine ayak uyduran fiyatlandırma. Tüm planlar 14 gün ücretsiz deneme içerir.",
       "billing": {
         "monthly": "Aylık",
         "yearly": "Yıllık",
@@ -9711,7 +9711,7 @@
           "cta": "Bize Ulaşın"
         }
       },
-      "trialButton": "30 Gün Ücretsiz Dene",
+      "trialButton": "14 Gün Ücretsiz Dene",
       "comparison": {
         "heading": "Özellik Karşılaştırması",
         "subheading": "Planlar arasındaki farkları inceleyin.",
@@ -9776,7 +9776,7 @@
       "faq": [
         {
           "question": "Ücretsiz deneme nasıl çalışıyor?",
-          "answer": "Hesap oluşturduğunuzda otomatik olarak 30 günlük ücretsiz deneme başlar. Deneme süresince 50 sipariş senkronizasyonu ve 10 kargo etiketi oluşturabilirsiniz. Deneme süresi dolduktan sonra kullanmaya devam etmek için Başlangıç veya Büyüme planlarından birini seçmeniz yeterli."
+          "answer": "Hesap oluşturduğunuzda otomatik olarak 14 günlük ücretsiz deneme başlar. Deneme süresince 50 sipariş senkronizasyonu ve 10 kargo etiketi oluşturabilirsiniz. Deneme süresi dolduktan sonra kullanmaya devam etmek için Başlangıç veya Büyüme planlarından birini seçmeniz yeterli."
         },
         {
           "question": "Deneme süresinde hangi entegrasyonlar mevcut?",
@@ -9846,7 +9846,7 @@
         "continue": "Devam et",
         "notNow": "Şimdi değil"
       },
-      "mostPopular": "En çok tercih edilen",
+      "mostPopular": "Önerilen",
       "perMonth": "/ ay",
       "perYear": "/ yıl",
       "listPrice": "Normal fiyat {price}",
@@ -9941,11 +9941,11 @@
         "title": "Sık sorulan sorular",
         "trial": {
           "q": "Ücretsiz deneme nasıl işler?",
-          "a": "Kart girmeden 14 gün boyunca Pro özelliklerini kullanırsınız. Deneme bitince plan seçmek için 3 gününüz daha olur. Sonrasında sipariş aktarımı, etiketler ve AI duraklar; verileriniz silinmez."
+          "a": "Kart girmeden 14 gün boyunca Pro özelliklerini kullanırsınız. Deneme bitince plan seçmek için 3 gününüz daha olur. Sonrasında sipariş aktarımı ve yeni etiketler durur; verileriniz silinmez."
         },
         "limits": {
           "q": "Bir sınırı aşarsam ne olur?",
-          "a": "%80'e geldiğinizde size haber veririz. Alıcılarınızın verdiği siparişler gelmeye devam eder. Zamanlanmış aktarımlar sipariş sınırınızın %110'unda, yeni etiketler ve AI ise %100'de bir sonraki aya veya plan değiştirene kadar durur."
+          "a": "%80'e geldiğinizde size haber veririz. Sınıra ulaştığınızda elle başlattığınız sipariş aktarımları ve yeni etiketler, bir sonraki döneme ya da plan değiştirene kadar durur. Sipariş sınırı, panele aktarılan yeni siparişleri sayar; zaten aktarılmış siparişlerin güncellenmesi saymaz."
         },
         "founding": {
           "q": "Kurucu üye fırsatı nedir?",
@@ -13363,7 +13363,7 @@
       "near": "{meter} hakkınızın %{percent} kadarı kullanıldı.",
       "nearUpsell": "{plan} planı ayda {limit} içerir.",
       "nearUpsellStores": "{plan} planı {limit} mağaza içerir.",
-      "ordersOver": "Sınıra ulaşıldı. Zamanlanmış aktarımlar {cap} siparişte durur.",
+      "ordersOver": "Sınıra ulaşıldı. Elle başlatılan aktarımlar ve yeni etiketler bir sonraki döneme kadar durur.",
       "paused": "Sınıra ulaşıldı. {date} tarihine kadar duraklatıldı.",
       "limitReached": "Sınıra ulaşıldı.",
       "aiHelp": "Bir metin işlemi 1, bir görsel 10 kredi kullanır.",
@@ -15917,7 +15917,7 @@
       "subtitle": "KolayXport'u kurmak ve her gün kullanmak için 8 adım",
       "connect": {
         "title": "Mağazalarınızı bağlayın",
-        "body": "Ayarlar → Bağlantılar'dan Etsy, eBay, Amazon ve Shopify'ı \"Bağla\" ile; Trendyol ve Wix'i API anahtarıyla bağlayın. Kargo firmalarınızı (DHL eCommerce, FedEx, UPS) \"Kargo ve API anahtarları\" bölümüne ekleyin.",
+        "body": "Ayarlar → Bağlantılar'dan Etsy, eBay, Amazon ve Shopify'ı \"Bağla\" ile, Trendyol'u API anahtarıyla bağlayın; Wix için KolayXport uygulamasını Wix App Market'ten kurun. Kargo firmalarınızı (DHL eCommerce, FedEx, UPS) \"Kargo ve API anahtarları\" bölümüne ekleyin.",
         "action": "Bağlantılara git"
       },
       "sender": {
@@ -15927,12 +15927,12 @@
       },
       "orders": {
         "title": "Siparişleri hazırlayın ve etiket basın",
-        "body": "Tüm pazaryerlerinin siparişleri Siparişler'de toplanır. Bir siparişe dokunun, \"Etiket oluştur\" deyin; birden çok sipariş seçip toplu etiket de basabilirsiniz. Takip numarası pazaryerine otomatik gönderilir.",
+        "body": "Tüm pazaryerlerinin siparişleri Siparişler'de toplanır. Bir siparişe dokunun, \"Etiket oluştur\" deyin; birden çok sipariş seçip toplu etiket de basabilirsiniz. Takip numarası eBay, Amazon ve Wix'e otomatik gönderilir; Etsy'ye Chrome eklentisi açıkken gider. Trendyol ve Shopify için numarayı pazaryeri panelinden girmeniz gerekir.",
         "action": "Siparişlere git"
       },
       "extension": {
         "title": "Etsy adresleri için eklentiyi kurun",
-        "body": "Etsy alıcı adresini API ile vermez. KolayXport Chrome eklentisini kurun ve Etsy'de Siparişler sayfasını açın: adresler toplu aktarılır. Eklentideki \"Tüm adresleri içe aktar\" ile istediğiniz zaman tekrar alabilirsiniz.",
+        "body": "Etsy alıcı adresini API ile vermez. KolayXport Chrome eklentisi henüz Chrome Web Mağazası'nda değil; kurulum dosyasını destek@kolayxport.com'dan isteyin. Eklenti açıkken Etsy'de Siparişler sayfasını açın: adresler toplu aktarılır.",
         "action": "Bağlantılarda eklentiyi gör"
       },
       "listings": {
@@ -15955,7 +15955,404 @@
         "body": "Ürün bulucu, anahtar kelime gezgini, ilan doktoru ve mağaza takibi ile ne satacağınıza, fiyatınıza ve etiketlerinize karar verin.",
         "action": "Pazar araştırmasına git"
       },
-      "contact": "Takıldığınız bir yer olursa destek@kolayxport.com adresine yazın."
+      "contact": "Takıldığınız bir yer olursa destek@kolayxport.com adresine yazın.",
+      "library": {
+        "title": "Videolu rehberler",
+        "body": "Her iş için kısa, Türkçe seslendirmeli video ve adım adım yazılı rehber: mağaza bağlama, yapay zekâ ile ilan, toplu düzenleme, araştırma, kargo etiketi, ETGB ve daha fazlası.",
+        "action": "Rehber kütüphanesini açın"
+      }
+    }
+  },
+  "site": {
+    "nav": {
+      "solutions": "Çözümler",
+      "integrations": "Entegrasyonlar",
+      "pricing": "Fiyatlandırma",
+      "help": "Nasıl kullanılır",
+      "blog": "Blog",
+      "login": "Giriş yap",
+      "cta": "Ücretsiz deneyin",
+      "menu": "Menü",
+      "close": "Kapat",
+      "lang": "English",
+      "langShort": "EN",
+      "skip": "İçeriğe geç",
+      "allSolutions": "Tüm çözümler",
+      "home": "Ana sayfa"
+    },
+    "cases": {
+      "etsy-satici": {
+        "label": "Etsy satıcıları",
+        "desc": "İlan SEO'su, toplu düzenleme, sipariş ve kargo"
+      },
+      "ebay-satici": {
+        "label": "eBay satıcıları",
+        "desc": "Etsy'den eBay'e ilan kopyalama, toplu düzenleme"
+      },
+      "trendyoldan-dunyaya": {
+        "label": "Trendyol'dan dünyaya",
+        "desc": "Trendyol ürünlerinizi yurt dışında satın"
+      },
+      "ai-ilan-optimizasyonu": {
+        "label": "Yapay zekâ ile ilan",
+        "desc": "İngilizce başlık, etiket, açıklama ve görsel"
+      },
+      "urun-arastirma-arbitraj": {
+        "label": "Ürün araştırması",
+        "desc": "Anahtar kelime, rakip mağaza ve fiyat farkı"
+      },
+      "mikro-ihracat-kargo-etgb": {
+        "label": "Kargo ve ETGB",
+        "desc": "FedEx, UPS, DHL eCommerce etiketi ve ETGB dosyası"
+      }
+    },
+    "common": {
+      "trialLine": "14 gün ücretsiz · Kredi kartı gerekmez · İstediğiniz zaman iptal",
+      "ctaTrial": "14 gün ücretsiz deneyin",
+      "ctaPricing": "Fiyatları görün",
+      "ctaContact": "Bize yazın",
+      "readMore": "Devamını okuyun",
+      "updated": "Güncellendi",
+      "lastVerified": "Son kontrol",
+      "faqTitle": "Sık sorulan sorular",
+      "stepsTitle": "Nasıl çalışır?",
+      "featuresTitle": "KolayXport ne yapar?",
+      "painsTitle": "Tanıdık geliyor mu?",
+      "painsSource": "Kaynak",
+      "toc": "Bu sayfada",
+      "minutes": "{count} dakika",
+      "setup": "Kurulum",
+      "status": {
+        "yes": "Var",
+        "partial": "Kısmen",
+        "no": "Yok"
+      },
+      "maturity": {
+        "production": "Kullanımda",
+        "beta": "Beta",
+        "partial": "Kısmen"
+      },
+      "kinds": {
+        "marketplace": "Pazaryeri",
+        "carrier": "Kargo",
+        "accounting": "Muhasebe",
+        "tool": "Araç"
+      },
+      "screenAlt": "KolayXport ekranı: {name}",
+      "illustration": "Temsili fotoğraf",
+      "related": "İlgili sayfalar",
+      "breadcrumbHome": "Ana sayfa",
+      "notFound": "Bu sayfa bulunamadı.",
+      "statusLabel": "Durum",
+      "demoData": "Demo hesaptan ekran görüntüsü; veriler örnektir."
+    },
+    "home": {
+      "seoTitle": "KolayXport — Yurt dışına satışın tek paneli",
+      "seoDescription": "Etsy, eBay ve Amazon'da satan Türk satıcılar için: yapay zekâ ile İngilizce ilan, ürün araştırması, FedEx/UPS etiketi, ETGB ve kâr raporu tek panelde. 14 gün ücretsiz.",
+      "hero": {
+        "eyebrow": "Etsy · eBay · Amazon · Trendyol",
+        "title": "Yurt dışına satışın tek paneli",
+        "lead": "İlanlarınızı yapay zekâyla İngilizce optimize edin, ne satacağınızı veriyle bulun, siparişi etiketine ve ETGB dosyasına kadar aynı yerden halledin.",
+        "ctaSecondary": "Nasıl çalıştığını görün",
+        "stamp": "Gönderiye hazır"
+      },
+      "pains": {
+        "title": "Yurt dışına satanların ortak dertleri",
+        "lead": "Bunlar bizim cümlelerimiz değil; satıcıların forumlarda ve şikâyet sitelerinde yazdıkları."
+      },
+      "steps": {
+        "title": "Üç adımda başlayın",
+        "items": [
+          {
+            "title": "Mağazanızı bağlayın",
+            "text": "Etsy, eBay, Amazon, Trendyol, Shopify veya Wix hesabınızı birkaç dakikada bağlayın. İlanlarınız ve siparişleriniz panele gelir."
+          },
+          {
+            "title": "İlanlarınızı güçlendirin",
+            "text": "Yapay zekâ İngilizce başlık, etiket ve açıklama önerir; araştırma ekranı rakiplerin neyle sattığını gösterir. Siz onaylamadan hiçbir değişiklik pazaryerine gitmez."
+          },
+          {
+            "title": "Siparişi gönderin",
+            "text": "FedEx, UPS veya DHL eCommerce etiketini panelden basın, ETGB dosyasını gümrük müşavirinize gönderin, kârınızı pazaryeri bazında görün."
+          }
+        ]
+      },
+      "pillars": {
+        "title": "Satışın üç ayağı: ilan, araştırma, operasyon",
+        "lead": "Ayrı ayrı araçlara para ödemek yerine hepsi aynı panelde ve aynı verinin üzerinde çalışır.",
+        "listings": {
+          "eyebrow": "İlanlar",
+          "title": "İngilizce, aranır, tutarlı ilanlar",
+          "text": "Etsy ve eBay ilanlarınızı tek tek ya da toplu düzenleyin. Değişiklikler önce taslakta kalır; siz \"Gönder\" deyince gider.",
+          "bullets": [
+            "Yapay zekâ ile İngilizce başlık, 13 etiket ve açıklama",
+            "Toplu düzenleme, planlı gönderim ve sürüm geçmişi",
+            "Etsy ilanını tek tıkla eBay'e kopyalama",
+            "Yapay zekâ ile ürün görseli ve alt metin"
+          ]
+        },
+        "research": {
+          "eyebrow": "Araştırma",
+          "title": "Ne satacağınızı tahminle değil veriyle seçin",
+          "text": "Etsy, eBay, Amazon ve Trendyol'da anahtar kelime, ürün ve mağaza araştırması; ilanınıza SEO notu ve eksik listesi.",
+          "bullets": [
+            "Anahtar kelime ve ürün araştırması",
+            "İlan doktoru: SEO notu ve tek tıkla düzeltme",
+            "Trendyol ile eBay arasındaki fiyat farkını bulma (Pro)",
+            "Etsy, eBay ve Amazon sayfalarında Chrome eklentisi"
+          ]
+        },
+        "ops": {
+          "eyebrow": "Operasyon",
+          "title": "Siparişten etikete, ETGB'den kâra",
+          "text": "Bütün pazaryerlerindeki siparişler tek listede. Etiketi basın, takip numarasını pazaryerine gönderin, gerçekte ne kazandığınızı görün.",
+          "bullets": [
+            "FedEx ve UPS etiketi (kendi kargo hesabınızla), DHL eCommerce yurt içi",
+            "Elektronik ticari fatura ve toplu etiket",
+            "ETGB Excel dosyası ve Paraşüt ile e-Arşiv",
+            "Komisyon, kargo ve reklam sonrası net kâr (Pro)"
+          ]
+        }
+      },
+      "trendyol": {
+        "eyebrow": "Trendyol satıcıları için",
+        "title": "Trendyol'da satıyorsunuz. Aynı ürünler yurt dışında da satılabilir.",
+        "text": "Trendyol ürünlerinizi panelde yönetin, stokları Etsy, eBay ve Shopify ile aynı tutun, yurt dışında fiyat farkı olan ürünleri bulun.",
+        "cta": "Trendyol'dan dünyaya"
+      },
+      "integrations": {
+        "title": "Çalıştığı yerler",
+        "lead": "Resmî API'ler üzerinden, sizin verdiğiniz izinlerle bağlanır.",
+        "notYet": "Henüz yok: Hepsiburada, N11, Çiçeksepeti; Yurtiçi, Aras, Sürat etiketi. Yol haritamızda.",
+        "all": "Tüm entegrasyonlar"
+      },
+      "trust": {
+        "title": "Verinize özen",
+        "items": [
+          {
+            "title": "Siz onaylamadan değişiklik yok",
+            "text": "İlan düzenlemeleri taslakta bekler. Pazaryerinde ilan başkası tarafından değiştiyse göndermeden önce uyarırız."
+          },
+          {
+            "title": "AB'de barındırma",
+            "text": "Uygulama ve veritabanı Avrupa Birliği'ndeki sunucularda çalışır; pazaryeri anahtarlarınız şifreli saklanır."
+          },
+          {
+            "title": "Resmî API'ler",
+            "text": "Etsy, eBay, Amazon, Trendyol, Shopify ve Wix'e resmî API'leri üzerinden bağlanırız; şifrenizi istemeyiz."
+          },
+          {
+            "title": "Gerçek bir şirket",
+            "text": "Modsons Yazılım E-Ticaret İthalat İhracat Ltd. Şti., Adana. Fatura, sözleşme ve KVKK süreçleri Türkiye'de."
+          }
+        ]
+      },
+      "pricing": {
+        "title": "Aylık ödeme, gizli ücret yok",
+        "lead": "Bütün planlarda 14 gün ücretsiz deneme. Kredi kartı istemeyiz.",
+        "perMonth": "/ay",
+        "cta": "Planları karşılaştırın",
+        "plans": {
+          "starter": "2 mağaza, toplu düzenleme, temel araştırma",
+          "growth": "5 mağaza, tam yapay zekâ, kargo ve araştırma",
+          "pro": "10 mağaza, arbitraj, kâr raporları, öncelikli destek"
+        },
+        "founding": "Kurucu üye: ilk 20 aboneye ömür boyu %{percent} indirim. Kalan yer: {remaining}"
+      },
+      "faq": {
+        "items": [
+          {
+            "q": "KolayXport kimler için?",
+            "a": "Etsy, eBay veya Amazon'da yurt dışına satan ya da satmak isteyen Türkiye'deki satıcılar için. Trendyol, Shopify ve Wix mağazalarınızı da aynı panele bağlayabilirsiniz."
+          },
+          {
+            "q": "Ücretsiz deneme nasıl işliyor?",
+            "a": "Kayıt olduğunuzda 14 günlük deneme başlar; kredi kartı istemeyiz. Süre bitince plan seçmezseniz hesabınız 3 gün daha açık kalır, sonra dondurulur. Otomatik ücret çekilmez."
+          },
+          {
+            "q": "Yapay zekâ ilanlarımı kendiliğinden değiştirir mi?",
+            "a": "Hayır. Öneriler taslak olarak gelir; siz düzenleyip \"Gönder\" demeden Etsy'ye, eBay'e ya da başka bir pazaryerine hiçbir şey gitmez."
+          },
+          {
+            "q": "Kargo etiketi için anlaşmam gerekir mi?",
+            "a": "FedEx ve UPS etiketleri kendi FedEx veya UPS hesabınızla oluşturulur; anlaşmalı fiyatlarınız geçerlidir. Yurt içinde DHL eCommerce (MNG) etiketi de basabilirsiniz."
+          },
+          {
+            "q": "ETGB'yi siz mi beyan ediyorsunuz?",
+            "a": "Hayır. KolayXport siparişlerinizden ETGB için gereken Excel dosyasını hazırlayıp gümrük müşavirinize e-postayla gönderir. Beyanı müşaviriniz yapar."
+          },
+          {
+            "q": "Hepsiburada veya Yurtiçi Kargo var mı?",
+            "a": "Henüz yok. Hepsiburada, N11, Çiçeksepeti ve Yurtiçi/Aras/Sürat etiketleri yol haritamızda; eklendiğinde bu sayfada yazacak."
+          },
+          {
+            "q": "Faturayı Türk lirası ile mi kesiyorsunuz?",
+            "a": "Türkçe arayüzde planlar TL ile, İngilizce arayüzde dolar ile gösterilir; ödeme sayfasında para birimini seçebilirsiniz. Faturayı Modsons Yazılım E-Ticaret İthalat İhracat Ltd. Şti. keser."
+          },
+          {
+            "q": "İstediğim zaman iptal edebilir miyim?",
+            "a": "Evet. Ayarlar › Faturalandırma'dan iptal edersiniz; ödediğiniz dönemin sonuna kadar kullanmaya devam edersiniz."
+          }
+        ]
+      },
+      "final": {
+        "title": "İlk ilanınızı bugün güçlendirin",
+        "text": "Mağazanızı bağlayın, bir ilanı yapay zekâyla yeniden yazın, farkı kendiniz görün."
+      },
+      "testimonialsTitle": "Satıcılarımız ne diyor"
+    },
+    "footer": {
+      "tagline": "Yurt dışına satışın tek paneli.",
+      "solutions": "Çözümler",
+      "product": "Ürün",
+      "company": "Şirket",
+      "legal": "Yasal",
+      "features": "Özellikler",
+      "integrations": "Entegrasyonlar",
+      "pricing": "Fiyatlandırma",
+      "help": "Nasıl kullanılır",
+      "blog": "Blog",
+      "compare": "Karşılaştırmalar",
+      "about": "Kurumsal",
+      "contact": "İletişim",
+      "kvkk": "KVKK Aydınlatma Metni",
+      "cookies": "Çerez Politikası",
+      "privacy": "Gizlilik Politikası",
+      "terms": "Kullanım Şartları",
+      "distance": "Mesafeli Satış Sözleşmesi",
+      "preinfo": "Ön Bilgilendirme Formu",
+      "cookiePrefs": "Çerez tercihleri",
+      "taxNo": "VKN",
+      "taxOffice": "Vergi dairesi",
+      "registry": "Ticaret sicili",
+      "mersis": "MERSİS",
+      "kep": "KEP",
+      "etsyNotice": "\"Etsy\" terimi Etsy, Inc.'in ticari markasıdır. Bu uygulama Etsy API'sini kullanır ancak Etsy, Inc. tarafından onaylanmamış veya sertifikalandırılmamıştır.",
+      "marks": "Diğer pazaryeri ve kargo firması adları sahiplerinin markalarıdır; yalnızca bağlantı kurulan hizmeti belirtmek için kullanılır.",
+      "rights": "© {year} KolayXport"
+    },
+    "pricingTeaser": {},
+    "casesIndex": {
+      "title": "Çözümler",
+      "seoTitle": "Çözümler — KolayXport",
+      "seoDescription": "Etsy, eBay ve Trendyol satıcıları için yapay zekâ ile ilan, ürün araştırması, kargo etiketi ve ETGB.",
+      "lead": "Satış kanalınıza ve derdinize göre başlayın."
+    },
+    "integrationsIndex": {
+      "title": "Entegrasyonlar",
+      "seoTitle": "Entegrasyonlar: Etsy, eBay, Amazon, Trendyol, FedEx, UPS — KolayXport",
+      "seoDescription": "KolayXport'un bağlandığı pazaryerleri, kargo firmaları ve muhasebe yazılımları; her birinde tam olarak neyin çalıştığı.",
+      "lead": "Her entegrasyonda neyin çalıştığını ve neyin henüz çalışmadığını açıkça yazıyoruz.",
+      "capabilities": "Neler çalışır",
+      "connect": "Nasıl bağlanır"
+    },
+    "compare": {
+      "title": "Karşılaştırmalar",
+      "seoTitle": "KolayXport karşılaştırmaları",
+      "seoDescription": "KolayXport'u Türkiye'deki entegratörler ve global Etsy araçlarıyla karşılaştırın. Yalnızca kaynağı belli bilgiler.",
+      "lead": "Yalnızca kaynağı belli bilgiler. Rakibin önde olduğu yerleri de yazıyoruz.",
+      "feature": "Özellik",
+      "us": "KolayXport",
+      "note": "Not",
+      "sources": "Kaynaklar",
+      "disclaimer": "Rakip bilgileri {date} tarihinde rakibin kendi sayfalarından kontrol edildi. Hatalı bir bilgi görürseniz destek@kolayxport.com adresine yazın, düzeltelim."
+    },
+    "blog": {
+      "title": "Blog",
+      "seoTitle": "Blog: Etsy, eBay ve mikro ihracat rehberleri — KolayXport",
+      "seoDescription": "Etsy SEO'su, mikro ihracat, ETGB, kargo ve kâr hesabı üzerine kaynaklı rehberler.",
+      "lead": "Yurt dışına satış üzerine kaynaklı, uygulanabilir rehberler.",
+      "by": "Yazan",
+      "readTime": "{count} dk okuma"
+    },
+    "help": {
+      "title": "Nasıl kullanılır",
+      "seoTitle": "Nasıl kullanılır: adım adım rehberler ve videolar — KolayXport",
+      "seoDescription": "Mağaza bağlamaktan ilan optimizasyonuna, kargo etiketinden ETGB'ye KolayXport'un her adımı için kısa rehberler ve videolar.",
+      "lead": "Her iş için kısa bir rehber ve Türkçe seslendirmeli video.",
+      "video": "Video",
+      "steps": "Adımlar",
+      "duration": "Süre",
+      "empty": "Rehberler hazırlanıyor."
+    },
+    "legal": {
+      "draft": "Bu metin hukukçu incelemesinden geçmeden önceki taslaktır.",
+      "effective": "Yürürlük tarihi"
+    },
+    "about": {
+      "seoTitle": "Kurumsal — KolayXport",
+      "seoDescription": "KolayXport'u geliştiren Modsons Yazılım E-Ticaret İthalat İhracat Ltd. Şti. hakkında: hikâye, ilkeler ve şirket bilgileri.",
+      "eyebrow": "Kurumsal",
+      "title": "Kendi mağazamız için başladık",
+      "lead": "KolayXport, yurt dışına satan kendi mağazalarımızın her gün yaşadığı işleri tek yerde toplamak için doğdu: İngilizce ilan, kargo etiketi, ETGB, kâr hesabı. Bugün aynı araçları diğer satıcılara sunuyoruz.",
+      "principlesTitle": "İlkelerimiz",
+      "principles": [
+        {
+          "title": "Söz verdiğimizi yaparız",
+          "text": "Sitede yazan her özellik ürünün içinde çalışır. Henüz olmayanı \"henüz yok\" diye yazarız."
+        },
+        {
+          "title": "Kontrol sizde",
+          "text": "Hiçbir değişiklik siz onaylamadan pazaryerine gitmez."
+        },
+        {
+          "title": "Satıcının dilinden konuşuruz",
+          "text": "Desi, ETGB, etiket, barem: sizin kullandığınız kelimelerle."
+        }
+      ],
+      "companyTitle": "Şirket bilgileri",
+      "legalName": "Ünvan",
+      "address": "Adres",
+      "contactCta": "Bize ulaşın"
+    },
+    "contact": {
+      "seoTitle": "İletişim — KolayXport",
+      "seoDescription": "KolayXport ekibine e-posta, WhatsApp veya form ile ulaşın. Kurumsal plan ve iş birliği talepleri.",
+      "eyebrow": "İletişim",
+      "title": "Size nasıl yardımcı olabiliriz?",
+      "lead": "Hafta içi genellikle aynı gün yanıt veririz.",
+      "email": "E-posta",
+      "whatsapp": "WhatsApp'tan yazın",
+      "whatsappText": "Merhaba, KolayXport hakkında bilgi almak istiyorum.",
+      "formTitle": "Mesaj gönderin",
+      "name": "Adınız",
+      "emailField": "E-posta adresiniz",
+      "subject": "Konu",
+      "message": "Mesajınız",
+      "send": "Gönder",
+      "sending": "Gönderiliyor…",
+      "sent": "Mesajınız ulaştı. En kısa sürede dönüş yapacağız.",
+      "error": "Mesaj gönderilemedi. Lütfen destek@kolayxport.com adresine yazın.",
+      "required": "Bu alan zorunlu.",
+      "invalidEmail": "Geçerli bir e-posta adresi girin.",
+      "tooShort": "Mesajınız en az 10 karakter olmalı.",
+      "consent": "Gönderdiğiniz bilgiler yalnızca talebinizi yanıtlamak için işlenir. Ayrıntılar: KVKK Aydınlatma Metni.",
+      "presets": {
+        "enterprise": "Kurumsal plan talebi",
+        "partner": "İş birliği"
+      }
+    },
+    "features": {
+      "seoTitle": "Özellikler — KolayXport",
+      "seoDescription": "KolayXport'un tüm özellikleri: yapay zekâ ile ilan, toplu düzenleme, araştırma, arbitraj, sipariş, kargo etiketi, ETGB, stok senkronizasyonu, kâr raporu.",
+      "eyebrow": "Özellikler",
+      "title": "Her şey, durumu ile birlikte",
+      "lead": "Aşağıdaki listeyi doğrudan ürün envanterimizden üretiyoruz. \"Beta\" ya da \"Kısmen\" yazan özelliklerin sınırlarını yanında görürsünüz."
+    },
+    "cookies": {
+      "title": "Çerez tercihleri",
+      "text": "Zorunlu çerezleri her zaman, analitik ve pazarlama çerezlerini yalnızca izninizle kullanırız.",
+      "acceptAll": "Tümünü kabul et",
+      "rejectAll": "Yalnızca zorunlu",
+      "customize": "Tercihleri yönet",
+      "save": "Seçimi kaydet",
+      "necessary": "Zorunlu",
+      "necessaryDesc": "Oturum, güvenlik ve tercihleriniz. Kapatılamaz.",
+      "analytics": "Analitik",
+      "analyticsDesc": "Google Analytics ile hangi sayfaların işe yaradığını ölçeriz.",
+      "marketing": "Pazarlama",
+      "marketingDesc": "Meta, Google, X, TikTok ve LinkedIn reklamlarımızın sonucunu ölçeriz.",
+      "policy": "Çerez Politikası"
     }
   }
 }

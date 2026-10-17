@@ -1,0 +1,19 @@
+{
+  "count": 2,
+  "results": [
+    {
+      "shipping_profile_id": 61001,
+      "title": "Worldwide from Istanbul (FedEx/UPS)",
+      "min_processing_days": 1,
+      "max_processing_days": 3,
+      "origin_country_iso": "TR"
+    },
+    {
+      "shipping_profile_id": 61002,
+      "title": "Jewelry small parcel",
+      "min_processing_days": 1,
+      "max_processing_days": 2,
+      "origin_country_iso": "TR"
+    }
+  ]
+}

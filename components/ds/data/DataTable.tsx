@@ -417,6 +417,12 @@ export function DataTable<T>(props: DataTableProps<T>) {
                           </Typography>
                         ))}
                       </Box>
+                      {/* The main action sits next to ⋯ in the title row: under the date chips it wrapped onto a 4th row. */}
+                      {(actionCol || ia) && !selectMode && (
+                        <Box data-row-stop="true" sx={{ mt: px(-space[1]), flexShrink: 0 }}>
+                          {actionCol ? cell(actionCol, r) : ia ? <InlineAction action={ia} size="sm" /> : null}
+                        </Box>
+                      )}
                       {overflow.length > 0 && (
                         <Box data-row-stop="true" sx={{ mt: px(-space[1]), mr: px(-space[1]) }}>
                           <RowActionsMenu actions={overflow} label={t('moreActions')} />
@@ -446,7 +452,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
                         </Box>
                       ) : null;
                     })()}
-                    {(metas.length > 0 || statusCol || ((actionCol || ia) && !selectMode)) && (
+                    {(metas.length > 0 || statusCol) && (
                       // Row 3: dates as small chips, status, and the main action on the right (compact).
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: px(6), flexWrap: 'wrap' }}>
                         {metas.map((m) => (
@@ -459,11 +465,6 @@ export function DataTable<T>(props: DataTableProps<T>) {
                           </Box>
                         ))}
                         {statusCol && <Box>{cell(statusCol, r)}</Box>}
-                        {(actionCol || ia) && !selectMode && (
-                          <Box data-row-stop="true" sx={{ ml: 'auto' }}>
-                            {actionCol ? cell(actionCol, r) : ia ? <InlineAction action={ia} size="sm" /> : null}
-                          </Box>
-                        )}
                       </Box>
                     )}
                   </Box>

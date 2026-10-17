@@ -120,7 +120,7 @@ export function AiVideoPanel({ open, onClose, images, onUse, defaultPrompt }: Ai
     }
   };
 
-  const chips = useMemo(() => [t('chip.slower'), t('chip.closer'), t('chip.turn'), t('chip.background'), t('chip.light')], [t]);
+  const chips = useMemo(() => [t('chip.expression'), t('chip.slower'), t('chip.closer'), t('chip.turn'), t('chip.background'), t('chip.light')], [t]);
   const versionNo = (id: string) => jobs.findIndex((j) => j.id === id) + 1;
 
   return (

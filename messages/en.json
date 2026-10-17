@@ -15125,7 +15125,8 @@
         "closer": "Closer shot",
         "turn": "Product turns around",
         "background": "Change the background",
-        "light": "Brighter"
+        "light": "Brighter",
+        "expression": "More natural expression, smiling"
       },
       "versions": "Versions",
       "version": "Version {n}",

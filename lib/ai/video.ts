@@ -45,7 +45,9 @@ export function videoPrompt(description: string, changes: string[] = []): string
     'Keep the product exactly as in the photo: same shape, colours, fabric, details and any person wearing it.',
     clean(description).slice(0, 1200),
     ...changes.map((c, i) => `Change ${i + 1}: ${clean(c).slice(0, 400)}`),
-    'Smooth, realistic motion, soft natural light. No text, captions, logos or watermarks.',
+    // Founder 2026-10-17: "her face is emotionless, it has to be realistic".
+    'If a person is in the photo they must look alive and natural: a warm, happy expression with a soft genuine smile, natural blinking, small natural head and hand movements, relaxed posture, realistic skin and hair motion. Never a frozen, blank or doll-like face.',
+    'Smooth, realistic motion, soft natural light, the look of a real filmed video. No text, captions, logos or watermarks.',
   ];
   return parts.filter(Boolean).join(' ');
 }

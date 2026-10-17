@@ -163,20 +163,38 @@ async function handleMessage(request, sender, sendResponse) {
       return;
     }
 
+    // --- Amazon: official SP-API signals (BSR, offer counts) for the overlay ---
+    if (request.type === 'kx_amazon_enrich') {
+      const params = request.params || {};
+      const asins = (Array.isArray(params.asins) ? params.asins : [])
+        .filter((a) => /^[A-Z0-9]{10}$/i.test(String(a))).slice(0, 20);
+      if (!asins.length) { sendResponse({ available: false, reason: 'unavailable' }); return; }
+      const r = await apiFetch('/api/ext/amazon-enrich', {
+        method: 'POST',
+        body: { asins, marketplace: params.marketplace || 'US' }
+      });
+      sendResponse(r.ok ? r.data : { error: errorOf(r), status: r.status });
+      return;
+    }
+
     // --- eBay research ---
     if (request.type === 'kx_ebay_research') {
       const params = request.params || {};
       const enc = encodeURIComponent;
+      // Marketplace of the page the user is on (EBAY_US, EBAY_DE, ...), so API
+      // prices/currency match the cards on screen.
+      const mkt = /^EBAY_[A-Z]{2}$/.test(params.marketplace || '') ? params.marketplace : 'EBAY_US';
       let path = '';
       switch (request.action) {
         case 'search_enrich':
-          path = `/api/clawd/ebay-research?action=product_database&q=${enc(params.query || '')}&limit=50`;
+          // sort=bestMatch: same order the shopper sees (was newlyListed by default).
+          path = `/api/clawd/ebay-research?action=product_database&q=${enc(params.query || '')}&limit=50&sort=bestMatch&marketplace_id=${mkt}`;
           break;
         case 'listing_enrich':
-          path = `/api/clawd/ebay?action=get_item_details&legacy_item_id=${enc(params.itemId || '')}`;
+          path = `/api/clawd/ebay?action=get_item_details&legacy_item_id=${enc(params.itemId || '')}&marketplace_id=${mkt}`;
           break;
         case 'seo_analyze':
-          path = `/api/clawd/ebay?action=analyze_seo&q=${enc(params.query || '')}&my_title=${enc(params.title || '')}`;
+          path = `/api/clawd/ebay?action=analyze_seo&q=${enc(params.query || '')}&my_title=${enc(params.title || '')}&marketplace_id=${mkt}`;
           break;
         case 'niche_analyze':
           path = `/api/clawd/ebay-research?action=niche_analyze&q=${enc(params.query || '')}`;

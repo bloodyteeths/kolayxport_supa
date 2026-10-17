@@ -165,7 +165,8 @@ window.addEventListener('popstate', () => {
 // DOM Selectors (eBay)
 // ---------------------------------------------------------------------------
 const EBAY_SELECTORS = {
-  searchResultCard: '.s-item',
+  // New markup (2025+) is li.s-card; old is li.s-item. Parsing lives in lib/ebayMath.js.
+  searchResultCard: 'li.s-card, li.s-item',
   searchResultLink: 'a[href*="/itm/"]',
   searchQuery: () => {
     const params = new URLSearchParams(location.search);
@@ -202,9 +203,19 @@ const _ebayI18n = {
   tr: {
     loading: 'KolayXport yükleniyor...',
     loadFailed: 'Veri yüklenemedi',
-    result: 'Sonuç', avgPrice: 'Ort. Fiyat', range: 'Aralık',
+    result: 'Sonuç', avgPrice: 'Medyan Fiyat', range: 'Tipik (P25–P75)',
     sellers: 'Satıcı', competition: 'Rekabet',
-    compLow: 'Düşük', compMed: 'Orta', compHigh: 'Yüksek',
+    compLow: 'Düşük', compMed: 'Orta', compHigh: 'Yüksek', compUnknown: 'Veri yetersiz',
+    distinctOf: 'farklı / {n} ilan', sold: 'satıldı', estTag: 'tah.',
+    soldDepth: 'Satış derinliği', withSales: '{k}/{n} ilanda satış var',
+    srcApi: 'Kaynak: eBay API, en iyi eşleşen {n} ilan', srcPage: 'Kaynak: bu sayfadaki {n} ilan',
+    notEnough: 'yetersiz veri', unusual: 'olağandışı',
+    topBySold: 'satışa göre ilk %{p}', sellThrough: 'Stok satış oranı',
+    available: 'mevcut', feedback: 'değerlendirme', competingListings: 'benzer ilan',
+    vsMedian: '% medyana göre', titleCoverage: 'Başlık anahtar kelime kapsamı',
+    tipShorter: 'Başlığınız ({mine} krk.) rakiplerden kısa (tipik {typical}).',
+    tipFewKeywords: 'Başlık en sık 20 anahtar kelimeden yalnızca {count} tanesini içeriyor.',
+    tipTopKeywords: 'En sık anahtar kelimeler: {keywords}',
     fullAnalysis: 'Tam Analiz', perMonth: '/ay', vsAvg: '% ort.',
     bestSeller: 'En Çok Satan', seo: 'SEO', price: 'Fiyat',
     positive: 'olumlu', products: 'ürün',
@@ -218,9 +229,19 @@ const _ebayI18n = {
   en: {
     loading: 'KolayXport loading...',
     loadFailed: 'Failed to load data',
-    result: 'Results', avgPrice: 'Avg Price', range: 'Range',
+    result: 'Results', avgPrice: 'Median Price', range: 'Typical (P25–P75)',
     sellers: 'Sellers', competition: 'Competition',
-    compLow: 'Low', compMed: 'Medium', compHigh: 'High',
+    compLow: 'Low', compMed: 'Medium', compHigh: 'High', compUnknown: 'Not enough data',
+    distinctOf: 'distinct / {n} listings', sold: 'sold', estTag: 'est.',
+    soldDepth: 'Sold depth', withSales: '{k}/{n} listings show sales',
+    srcApi: 'Source: eBay API, top {n} best-match listings', srcPage: 'Source: {n} listings on this page',
+    notEnough: 'not enough data', unusual: 'unusual range',
+    topBySold: 'top {p}% by sold', sellThrough: 'Stock sell-through',
+    available: 'available', feedback: 'feedback', competingListings: 'similar listings',
+    vsMedian: '% vs median', titleCoverage: 'Title keyword coverage',
+    tipShorter: 'Your title ({mine} chars) is shorter than competitors (typical {typical}).',
+    tipFewKeywords: 'Title contains only {count} of the 20 most common keywords.',
+    tipTopKeywords: 'Most common keywords: {keywords}',
     fullAnalysis: 'Full Analysis', perMonth: '/mo', vsAvg: '% avg.',
     bestSeller: 'Best Seller', seo: 'SEO', price: 'Price',
     positive: 'positive', products: 'products',
@@ -233,7 +254,20 @@ const _ebayI18n = {
   },
 };
 
-function ebayT(key) { return _ebayI18n[_ebayLang]?.[key] || _ebayI18n.en[key] || key; }
+function ebayT(key, vars) {
+  let s = _ebayI18n[_ebayLang]?.[key] || _ebayI18n.en[key] || key;
+  if (vars) for (const [k, v] of Object.entries(vars)) s = s.split('{' + k + '}').join(String(v));
+  return s;
+}
+
+function ebayEscape(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+/** Marketplace of the current page: { id: 'EBAY_US', currency: 'USD', locale: 'en-US' }. */
+function getEbayMarketplace() {
+  return window.__KX_EBAY_MATH.marketplaceForHost(location.hostname);
+}
 
 // ---------------------------------------------------------------------------
 // Page Type Detection
@@ -278,14 +312,32 @@ function ebayFormatNum(n) {
   return String(n);
 }
 
-function ebayFormatPrice(n) {
-  return '$' + Number(n).toFixed(2);
+/** Format a price in its own currency (never assume $). '—' when unknown. */
+function ebayFormatPrice(n, currency) {
+  if (n == null || !Number.isFinite(Number(n))) return '—';
+  const cur = currency || getEbayMarketplace().currency || 'USD';
+  try {
+    return new Intl.NumberFormat(getEbayMarketplace().locale, { style: 'currency', currency: cur }).format(Number(n));
+  } catch (_) {
+    return cur + ' ' + Number(n).toFixed(2);
+  }
+}
+
+/** Result count as eBay shows it: 9500 + plus → "9,500+". */
+function ebayFormatCount(rc) {
+  if (!rc || !Number.isFinite(rc.count)) return '—';
+  return rc.count.toLocaleString(getEbayMarketplace().locale) + (rc.plus ? '+' : '');
 }
 
 function ebayCompetitionColor(level) {
-  if (level === 'low') return '#4caf50';
-  if (level === 'medium') return '#ff9800';
-  return '#f44336';
+  if (level === 'low') return '#a5d6a7';
+  if (level === 'medium') return '#ffcc80';
+  if (level === 'high') return '#ef9a9a';
+  return 'rgba(255,255,255,0.7)';
+}
+
+function ebayCompetitionLabel(level) {
+  return level === 'low' ? ebayT('compLow') : level === 'medium' ? ebayT('compMed') : level === 'high' ? ebayT('compHigh') : ebayT('compUnknown');
 }
 
 function ebayScoreClass(score) {
@@ -300,33 +352,12 @@ function ebaySalesColor(est) {
   return 'kx-red';
 }
 
-function ebayComputeBestSellerRanks(badges) {
-  const entries = Object.entries(badges || {});
-  if (entries.length === 0) return {};
-
-  const sorted = entries.sort((a, b) => {
-    const salesDiff = (b[1].estMonthlySales || b[1].soldQuantity || 0) - (a[1].estMonthlySales || a[1].soldQuantity || 0);
-    if (salesDiff !== 0) return salesDiff;
-    return (b[1].price || 0) - (a[1].price || 0);
-  });
-
-  const total = sorted.length;
-  const ranks = {};
-  sorted.forEach(([id], index) => {
-    const rank = index + 1;
-    const percentile = Math.round((rank / total) * 100);
-    ranks[id] = { rank, total, percentile, isBestSeller: percentile <= 10 };
-  });
-  return ranks;
-}
-
-function ebayPriceVsAvg(price, avgPrice) {
-  if (!price || !avgPrice) return null;
-  const diff = ((price - avgPrice) / avgPrice * 100).toFixed(0);
-  const isLower = price <= avgPrice;
+function ebayPriceVsMedian(price, median) {
+  const pct = window.__KX_EBAY_MATH.pctVsMedian(price, median);
+  if (pct == null) return null;
   return {
-    text: (isLower ? '' : '+') + diff + ebayT('vsAvg'),
-    cssClass: isLower ? 'kx-green' : 'kx-red',
+    text: (pct > 0 ? '+' : '') + pct + ebayT('vsMedian'),
+    cssClass: pct <= 0 ? 'kx-green' : 'kx-red',
   };
 }
 
@@ -358,11 +389,15 @@ window.__KX_EBAY_SHARED = {
   apiCall: ebayApiCall,
   formatNum: ebayFormatNum,
   formatPrice: ebayFormatPrice,
+  formatCount: ebayFormatCount,
   competitionColor: ebayCompetitionColor,
+  competitionLabel: ebayCompetitionLabel,
   scoreClass: ebayScoreClass,
   salesColor: ebaySalesColor,
-  computeBestSellerRanks: ebayComputeBestSellerRanks,
-  priceVsAvg: ebayPriceVsAvg,
+  priceVsMedian: ebayPriceVsMedian,
+  escape: ebayEscape,
+  getMarketplace: getEbayMarketplace,
+  M: window.__KX_EBAY_MATH,
   demandLabel: ebayDemandLabel,
   isOverlayEnabled: ebayIsOverlayEnabled,
   getPageType: getEbayPageType,

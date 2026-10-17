@@ -1,0 +1,14 @@
+{
+  "items": [
+    {"itemId":"v1|256789012345|0","legacyItemId":"256789012345","title":"Turkish Cotton Bath Towel Set of 4","price":{"value":"25.99","currency":"USD"},"seller":{"username":"towelhaus","feedbackPercentage":"99.6","feedbackScore":5210},"itemCreationDate":"2026-04-18T10:00:00.000Z","buyingOptions":["FIXED_PRICE"],"enriched":true,"estimatedSoldQuantity":120,"estimatedRemainingQuantity":30},
+    {"itemId":"v1|256789012346|0","legacyItemId":"256789012346","title":"Turkish Towel 100% Cotton Beach Blanket","price":{"value":"12.99","currency":"USD"},"seller":{"username":"anatolia_home","feedbackPercentage":"100.0","feedbackScore":812},"itemCreationDate":"2026-10-10T10:00:00.000Z","buyingOptions":["FIXED_PRICE"],"enriched":true,"estimatedSoldQuantity":3,"estimatedRemainingQuantity":10},
+    {"itemId":"v1|256789012347|0","legacyItemId":"256789012347","title":"Hand Loomed Turkish Hammam Towel","price":{"value":"31.50","currency":"USD"},"seller":{"username":"towelhaus","feedbackPercentage":"99.6","feedbackScore":5210},"buyingOptions":["FIXED_PRICE"],"enriched":false},
+    {"itemId":"v1|256789012348|0","legacyItemId":"256789012348","title":"Turkish Cotton Hand Towels 2 Pack","price":{"value":"18.00","currency":"USD"},"seller":{"username":"bosphorus-linen","feedbackPercentage":"98.9","feedbackScore":14100},"buyingOptions":["FIXED_PRICE"]},
+    {"itemId":"v1|256789012349|0","legacyItemId":"256789012349","title":"Turkish Bath Sheet Oversized Cotton","price":{"value":"44.95","currency":"USD"},"seller":{"username":"istanbul_textiles","feedbackPercentage":"99.0","feedbackScore":402},"buyingOptions":["FIXED_PRICE"],"enriched":true,"estimatedSoldQuantity":0,"estimatedRemainingQuantity":5}
+  ],
+  "total": 9012,
+  "priceStats": {"n":5,"total":5,"trimmed":0,"median":25.99,"p25":18,"p75":31.5,"min":12.99,"max":44.95,"currency":"USD","sampled":5,"excludedNoFx":0,"excludedImplausible":0,"quality":"small","totalResults":9012},
+  "topKeywords": [{"word":"turkish","count":5}],
+  "offset": 0,
+  "limit": 50
+}

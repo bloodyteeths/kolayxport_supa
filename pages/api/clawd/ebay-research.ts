@@ -255,6 +255,12 @@ export default async function handler(
             case 'newlyListed':
               sortParam = 'newlyListed';
               break;
+            case 'bestMatch':
+              // Browse API default order (no sort param) = eBay Best Match, the
+              // order a shopper sees on the search page. The extension overlay
+              // uses this so its sample matches the cards on screen.
+              sortParam = '';
+              break;
             default:
               sortParam = 'newlyListed';
           }
@@ -264,7 +270,7 @@ export default async function handler(
           if (q) params.set('q', q);
           if (categoryId) params.set('category_ids', categoryId);
           if (filters.length > 0) params.set('filter', filters.join(','));
-          params.set('sort', sortParam);
+          if (sortParam) params.set('sort', sortParam);
           params.set('limit', String(limit));
           params.set('offset', String(offset));
 

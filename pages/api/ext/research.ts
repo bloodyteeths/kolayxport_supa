@@ -3,7 +3,8 @@ import { getAuthUser } from '@/lib/auth';
 import { etsyFetch, etsyPublicHeaders } from '@/lib/etsy/http';
 import { EtsyPriority } from '@/lib/etsy/rateBudget';
 import { getBatchListingStats, getListingStats, getShopStats, EtsyPublicApiError } from '@/lib/etsy/listingStats';
-import { summarizePrices, buildFxTable } from '@/lib/research/stats';
+import { buildFxTable } from '@/lib/research/stats';
+import { summarizeEtsySearch } from '@/lib/etsy/searchSummary';
 import { convertCurrency } from '@/lib/finance/fx';
 
 // Rate limiting per IP for anonymous users
@@ -74,36 +75,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!query || typeof query !== 'string') return res.status(400).json({ error: 'query required' });
 
         const searchData = await etsyGet(`/listings/active?keywords=${encodeURIComponent(query.slice(0, 200))}&limit=100&sort_on=score`);
-        const items = (searchData.results || []);
-        // R0: robust USD summary (FX-normalized, Tukey-trimmed median + P25–P75).
-        // The extension's legacy `avgPrice` field now carries the median.
-        const points = items.map((i: any) => ({ amount: (i.price?.amount || 0) / (i.price?.divisor || 100), currency: i.price?.currency_code || 'USD' }));
-        const fx = await buildFxTable(points.map((p: any) => p.currency), 'USD', convertCurrency).catch(() => ({}));
-        const priceStats = summarizePrices(points, { currency: 'USD', fx });
-        const avgPrice = priceStats.median ?? 0;
-        const minPrice = priceStats.min ?? 0;
-        const maxPrice = priceStats.max ?? 0;
-        const avgFav = items.length > 0 ? items.reduce((s: number, i: any) => s + (i.num_favorers || 0), 0) / items.length : 0;
-        const uniqueShops = new Set(items.map((i: any) => i.shop_id)).size;
-        const competition = uniqueShops > 50 ? 'high' : uniqueShops > 20 ? 'medium' : 'low';
-        const currencies = new Set(items.map((i: any) => i.price?.currency_code).filter(Boolean));
-
-        return res.json({
-          summary: {
-            totalResults: searchData.count || 0,
-            avgPrice: Math.round(avgPrice * 100) / 100,
-            minPrice: Math.round(minPrice * 100) / 100,
-            maxPrice: Math.round(maxPrice * 100) / 100,
-            // Prices are FX-normalized to USD (R0), so the currency is USD.
-            currency: priceStats.currency,
-            priceStats,
-            avgFavorites: Math.round(avgFav),
-            uniqueShops,
-            competition,
-            sampled: items.length,
-          },
-          plan,
-        });
+        // Pure summary (lib/etsy/searchSummary.ts): Money objects -> amount/divisor, FX to USD,
+        // digital downloads excluded for physical queries, median + P25-P75, median favourites.
+        // API prices are LIST prices (Etsy does not expose sale prices); the extension prefers
+        // the prices displayed on the page and uses this only as a fallback.
+        const currencies = (searchData.results || []).map((i: any) => i?.price?.currency_code || 'USD');
+        const fx = await buildFxTable(currencies, 'USD', convertCurrency).catch(() => ({}));
+        const summary = summarizeEtsySearch(searchData, { query, fx });
+        return res.json({ summary, plan });
       }
 
       case 'listings_batch': {

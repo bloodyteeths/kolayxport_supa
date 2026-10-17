@@ -1894,8 +1894,10 @@ export default async function handler(
 
       const { token: appToken } = await getEbayTokenFor(userId);
       const item = await callEbayAPI(
-        `/buy/browse/v1/item/get_item_by_legacy_id?legacy_item_id=${legacyItemId}`,
-        appToken
+        `/buy/browse/v1/item/get_item_by_legacy_id?legacy_item_id=${encodeURIComponent(legacyItemId)}`,
+        appToken,
+        {},
+        (req.query.marketplace_id as string) || undefined
       );
 
       return res.status(200).json(item);

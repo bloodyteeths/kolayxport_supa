@@ -1,0 +1,131 @@
+// End-to-end render of the eBay search + listing overlays in jsdom: real content
+// scripts, stubbed chrome.* and API responses (fixtures, never the network).
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
+import path from 'path';
+import { JSDOM } from 'jsdom';
+
+const root = path.join(__dirname, '../../chrome-extension/src');
+const src = (f: string) => readFileSync(path.join(root, f), 'utf8');
+const fixture = (f: string) => readFileSync(path.join(__dirname, 'fixtures', f), 'utf8');
+
+type ApiHandler = (action: string, params: Record<string, unknown>) => unknown;
+
+function boot(url: string, html: string, onApi: ApiHandler) {
+  const dom = new JSDOM(`<!doctype html><html><head></head><body>${html}</body></html>`, { url, runScripts: 'outside-only' });
+  const w = dom.window as unknown as Record<string, unknown> & { eval: (s: string) => unknown };
+  const calls: Array<{ action: string; params: Record<string, unknown> }> = [];
+  w.chrome = {
+    i18n: { getUILanguage: () => 'en-US' },
+    storage: { local: { get: (_k: string, cb: (r: object) => void) => cb({}) } },
+    runtime: {
+      lastError: undefined,
+      sendMessage: (msg: { action: string; params: Record<string, unknown> }, cb: (r: unknown) => void) => {
+        calls.push({ action: msg.action, params: msg.params });
+        setTimeout(() => cb(onApi(msg.action, msg.params)), 0);
+      },
+    },
+  };
+  w.__KX_CACHE = { getOrFetch: (_k: string, _t: string, fetcher: () => Promise<unknown>) => fetcher() };
+  w.eval(src('lib/ebayMath.js'));
+  w.eval(src('content-ebay-shared.js'));
+  return { dom, calls, run: (f: string) => w.eval(src(f)) };
+}
+
+async function waitFor<T>(fn: () => T | null | undefined, ms = 2000): Promise<T> {
+  const start = Date.now();
+  for (;;) {
+    const v = fn();
+    if (v) return v;
+    if (Date.now() - start > ms) throw new Error('timeout');
+    await new Promise((r) => setTimeout(r, 10));
+  }
+}
+
+const barText = (dom: JSDOM) => {
+  const host = dom.window.document.getElementById('kx-ebay-search-overlay');
+  const bar = host?.shadowRoot?.querySelector('.kx-bar');
+  const t = (bar?.textContent || '').replace(/\s+/g, ' ').trim();
+  return t.includes('loading') ? '' : t;
+};
+
+describe('eBay search overlay (new markup + API fixture)', () => {
+  it('shows real numbers instead of $0.00 / 0 sellers / 9.0K', async () => {
+    const api = JSON.parse(fixture('ebay-product-database.json'));
+    const { dom, calls, run } = boot('https://www.ebay.com/sch/i.html?_nkw=turkish+cotton+towel', fixture('ebay-search-new.html'), () => api);
+    run('content-ebay-search.js');
+    const text = await waitFor(() => barText(dom));
+
+    expect(calls[0]).toMatchObject({ action: 'search_enrich', params: { query: 'turkish cotton towel', marketplace: 'EBAY_US' } });
+    expect(text).toContain('Results 9,500+');
+    expect(text).toContain('Median Price $25.99');
+    expect(text).toContain('$18.00 – $31.50');
+    expect(text).toContain('Sellers 4 distinct / 5 listings');
+    expect(text).toContain('Source: eBay API, top 5 best-match listings');
+    expect(text).toMatch(/Competition \(est\.\) (Low|Medium|High)/);
+    expect(text).not.toContain('$0.00');
+
+    const rows = Array.from(dom.window.document.querySelectorAll('.kx-data-row')).map((r) => (r.textContent || '').replace(/\s+/g, ' '));
+    // Card 1: 120 sold (API), listed 2026-04-18 → est/mo; $25.99 = median
+    expect(rows[0]).toContain('120 sold');
+    expect(rows[0]).toMatch(/≈[\d.]+\/mo \(est\.\)/);
+    expect(rows[0]).toContain('·0% vs median');
+    // Card 2 is a price range → no vs-median badge
+    expect(rows[1]).not.toContain('vs median');
+    // Ghost card got nothing
+    const ghost = dom.window.document.querySelector('li[data-listingid="123456"] .kx-data-row');
+    expect(ghost).toBeNull();
+  });
+
+  it('falls back to page numbers when the API errors, and escapes the query', async () => {
+    const { dom, run } = boot('https://www.ebay.com/sch/i.html?_nkw=%3Cimg%20src%3Dx%20onerror%3Dalert(1)%3E', fixture('ebay-search-new.html'), () => ({ error: 'NOT_AUTHENTICATED' }));
+    run('content-ebay-search.js');
+    const text = await waitFor(() => barText(dom));
+    expect(text).toContain('Source: 5 listings on this page');
+    expect(text).toContain('Median Price $25.99');
+    const host = dom.window.document.getElementById('kx-ebay-search-overlay');
+    expect(host?.shadowRoot?.querySelector('img')).toBeNull();
+  });
+
+  it('ebay.de: EUR formatting and EBAY_DE marketplace', async () => {
+    const { dom, calls, run } = boot('https://www.ebay.de/sch/i.html?_nkw=handtuch&LH_BIN=1', fixture('ebay-search-de.html'), () => ({}));
+    run('content-ebay-search.js');
+    const text = await waitFor(() => barText(dom));
+    expect(calls).toHaveLength(0); // filtered page → no API call
+    expect(text).toContain('Results 9.500+');
+    expect(text).toContain('not enough data'); // 3 cards < 5
+  });
+});
+
+describe('eBay listing overlay', () => {
+  it('maps Browse API item + analyze_seo fields', async () => {
+    const item = {
+      itemId: 'v1|256789012345|0', title: 'Turkish Cotton Bath Towel Set of 4',
+      price: { value: '31.50', currency: 'USD' },
+      seller: { username: 'towelhaus', feedbackPercentage: '99.6', feedbackScore: 5210 },
+      itemCreationDate: '2026-04-18T10:00:00.000Z',
+      estimatedAvailabilities: [{ estimatedSoldQuantity: 120, estimatedRemainingQuantity: 30 }],
+    };
+    const seo = {
+      totalCompetitors: 9012, seoScore: 65,
+      priceStats: { n: 40, median: 25.99, p25: 18, p75: 31.5, currency: 'USD', quality: 'ok' },
+      recommendations: [{ key: 'fewTopKeywords', params: { count: 3 } }],
+    };
+    const html = '<div id="mainContent"><div class="x-item-title"><h1 class="x-item-title__mainTitle"><span>Turkish Cotton Bath Towel Set of 4</span></h1></div></div>';
+    const { dom, run } = boot('https://www.ebay.com/itm/256789012345', html, (action) =>
+      action === 'listing_enrich' ? item : action === 'seo_analyze' ? seo : { items: [] });
+    run('content-ebay-listing.js');
+    const el = await waitFor(() => {
+      const e = dom.window.document.getElementById('kx-ebay-listing-stats');
+      return e && !(e.textContent || '').includes('loading') ? e : null;
+    });
+    const text = (el.textContent || '').replace(/\s+/g, ' ');
+    expect(text).toContain('SEO: 65/100');
+    expect(text).toContain('Price: +21% vs median ($25.99)');
+    expect(text).toContain('120 sold');
+    expect(text).toContain('Stock sell-through: 80% (30 available, est.)');
+    expect(text).toContain('towelhaus 99.6% positive (5,210 feedback)');
+    expect(text).toContain('9,012 similar listings');
+    expect(text).toContain('Title contains only 3 of the 20 most common keywords.');
+  });
+});

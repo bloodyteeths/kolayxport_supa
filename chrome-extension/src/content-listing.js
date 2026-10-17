@@ -44,12 +44,21 @@
 
   function scrapePageSignals() {
     const signals = {};
+    // Displayed price (sale price when the listing is on sale) beats JSON-LD; the server
+    // uses it for revenue because the Etsy API price is the pre-discount list price.
+    const S = window.__KX_SHARED;
+    const priceRegion = document.querySelector('[data-buy-box-region="price"], [data-appears-component-name="price"], [data-selector="price-only"]');
+    const shown = priceRegion && S && S.readCardPrice ? S.readCardPrice(priceRegion) : null;
     const product = readJsonLdProduct();
-    if (product) {
-      const offer = Array.isArray(product.offers) ? product.offers[0] : product.offers;
-      const price = offer ? Number(offer.price ?? offer.lowPrice) : NaN;
-      if (Number.isFinite(price)) signals.pagePrice = price;
-      if (offer && typeof offer.priceCurrency === 'string') signals.pageCurrency = offer.priceCurrency;
+    const offer = product ? (Array.isArray(product.offers) ? product.offers[0] : product.offers) : null;
+    const ldCurrency = offer && typeof offer.priceCurrency === 'string' ? offer.priceCurrency.toUpperCase() : null;
+    if (shown && shown.amount > 0) {
+      signals.pagePrice = shown.amount;
+      signals.pageCurrency = shown.currency || ldCurrency;
+    } else if (offer) {
+      const price = Number(offer.price ?? offer.lowPrice);
+      if (Number.isFinite(price) && price > 0) signals.pagePrice = price;
+      if (ldCurrency) signals.pageCurrency = ldCurrency;
     }
 
     // Prefer the buy box text; fall back to the whole page (bounded).
@@ -184,8 +193,9 @@
       return h;
     }
 
-    function metric(label, value, color) {
+    function metric(label, value, color, title) {
       const m = node('span', 'kx-metric');
+      if (title) m.title = title;
       m.appendChild(node('span', 'kx-metric-label', label));
       m.appendChild(node('span', null, value, `font-weight:700;${color ? 'color:' + color + ';' : ''}`));
       return m;
@@ -243,7 +253,14 @@
         top.appendChild(node('span', 'kx-badge kx-badge-conf', S.t(c)));
       }
       if (sales.monthlyRevenue !== null && sales.monthlyRevenue !== undefined) {
-        top.appendChild(node('span', 'kx-sales-rev', '≈ ' + fmtMoney(sales.monthlyRevenue, sales.currency) + ' ' + S.t('revenueApprox')));
+        const rev = node('span', 'kx-sales-rev', '≈ ' + fmtMoney(sales.monthlyRevenue, sales.currency) + ' ' + S.t('revenueApprox'));
+        if (sales.priceUsed) {
+          const p = S.formatMoney(sales.priceUsed, sales.currency, 2);
+          rev.title = (sales.priceSource === 'page' ? S.t('revTipPage', { sales: fmtSales(sales.monthlySales), price: p })
+            : S.t('revTipList', { sales: fmtSales(sales.monthlySales), price: p }));
+          rev.textContent += ' · ' + (sales.priceSource === 'page' ? S.t('revenueFromPage', { price: p }) : S.t('revenueFromList', { price: p }));
+        }
+        top.appendChild(rev);
       }
       box.appendChild(top);
 
@@ -317,14 +334,15 @@
       const grid = node('div', 'kx-metrics-grid');
       const seo = data.seoScore?.total ?? 0;
       grid.appendChild(metric('SEO', seo + '/100', seo >= 70 ? '#4caf50' : seo >= 40 ? '#ff9800' : '#f44336'));
-      if (L.reviewCount !== null && L.reviewCount !== undefined) grid.appendChild(metric(S.t('reviews'), S.formatNum(L.reviewCount)));
+      if (L.reviewCount !== null && L.reviewCount !== undefined) grid.appendChild(metric(S.t('itemReviews'), S.formatNum(L.reviewCount), null, S.t('itemReviewsTip')));
       if (L.favorites !== null && L.favorites !== undefined) grid.appendChild(metric(S.t('favorites'), S.formatNum(L.favorites)));
       if (L.views) grid.appendChild(metric(S.t('views'), S.formatNum(L.views)));
       if (L.ageDays !== null && L.ageDays !== undefined) {
         grid.appendChild(metric(S.t('age'), L.ageDays >= 60 ? Math.round(L.ageDays / 30) + ' ' + S.t('months') : L.ageDays + ' ' + S.t('days')));
       }
       if (L.quantity) {
-        grid.appendChild(metric(S.t('stock'), String(L.quantity), L.quantity <= 3 ? '#c62828' : L.quantity <= 10 ? '#e65100' : null));
+        // Seller-entered quantity, frequently a placeholder — never presented as real stock.
+        grid.appendChild(metric(S.t('qtySeller'), String(L.quantity), L.quantity <= 3 ? '#c62828' : null, S.t('qtyTip')));
       }
       const tagCount = L.tagCount || 0;
       grid.appendChild(metric(S.t('tags'), tagCount + '/13', tagCount >= 13 ? '#2e7d32' : tagCount >= 10 ? '#e65100' : '#c62828'));

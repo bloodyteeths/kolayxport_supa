@@ -132,6 +132,14 @@ describe('Etsy overlays', () => {
     expect(card.querySelector('.kx-limit-upgrade')).toBeNull();
   });
 
+  it('upgradeUrl: null (Shopify-connected) → neutral card without an upgrade button', async () => {
+    const { doc } = boot('https://www.etsy.com/shop/MyShop', '', [...ETSY, 'content-shop.js'],
+      (m) => (m.type === 'kx_research' ? { error: 'research_limit', status: 429, limit: { error: 'research_limit', reason: 'user_daily', limit: 500, used: 500, resetAt: '2026-10-18T21:00:00.000Z', upgradeUrl: null } } : null), 'tr');
+    const card = await waitFor(() => cardIn(shadowOf(doc, 'kx-shop-overlay')));
+    expect(norm(card.textContent)).toContain("Yarın 00:00'da yenilenir.");
+    expect(card.querySelector('.kx-limit-upgrade')).toBeNull();
+  });
+
   it('a successful answer still renders numbers (no card)', async () => {
     const { doc } = boot('https://www.etsy.com/search?q=linen+dress', '', [...ETSY, 'content-search.js'], (m) =>
       m.type === 'kx_research'

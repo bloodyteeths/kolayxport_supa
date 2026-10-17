@@ -138,7 +138,8 @@
       title = t('userTitle');
       sub = t('userSub');
       if (info && Number(info.limit) > 0) sub += ' ' + t('usage', { used: Math.min(Number(info.used) || 0, Number(info.limit)), limit: info.limit });
-      button = t('upgrade');
+      // upgradeUrl: null = no upgrade offer (Shopify-connected accounts): neutral "resets tomorrow" only.
+      button = info && info.upgradeUrl === null ? null : t('upgrade');
     }
     var titleEl = node(doc, 'span', title, 'font-weight:700;color:#222;');
     titleEl.className = 'kx-limit-title';

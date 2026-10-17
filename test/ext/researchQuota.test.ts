@@ -128,7 +128,7 @@ describe('per-plan daily lookups', () => {
     ['growth', 'active', 500],
     ['pro', 'active', 1500],
     ['enterprise', 'active', 5000],
-    ['shopify_free', 'active', 50],
+    ['shopify_free', 'active', 500], // SHOPIFY_FREE_RESEARCH_DAILY overrides the plan table
   ])('%s: lookup #%s is the last allowed one', async (plan, status, limit) => {
     store.setUser(U, plan as string, status as string, new Date(NOON.getTime() + 86400e3));
     store.setCount(U, quotaKey(DAY), (limit as number) - 1);
@@ -148,6 +148,13 @@ describe('per-plan daily lookups', () => {
     store.setUser(U, 'starter', 'canceled');
     const out = await run(ok(), { cacheKey: null });
     expect(out).toMatchObject({ kind: 'limited', body: { reason: 'user_daily', limit: 0, used: 0 } });
+  });
+
+  it('Shopify-connected accounts: 500/day and never an upgrade link (App Store 1.2.1)', async () => {
+    store.setUser(U, 'shopify_free', 'active');
+    store.setCount(U, quotaKey(DAY), 500);
+    const out = await run(ok(), { cacheKey: null });
+    expect(out).toMatchObject({ kind: 'limited', body: { reason: 'user_daily', limit: 500, upgradeUrl: null } });
   });
 
   it('several calls of one page view count as one lookup (X-KX-Page-View)', async () => {

@@ -11,13 +11,14 @@ const fixture = (f: string) => readFileSync(path.join(__dirname, 'fixtures', f),
 
 type ApiHandler = (action: string, params: Record<string, unknown>) => unknown;
 
-function boot(url: string, html: string, onApi: ApiHandler) {
+/** `lang`: the popup choice stored as kx_lang; null = nothing stored (→ Turkish). */
+function boot(url: string, html: string, onApi: ApiHandler, lang: 'tr' | 'en' | null = 'en') {
   const dom = new JSDOM(`<!doctype html><html><head></head><body>${html}</body></html>`, { url, runScripts: 'outside-only' });
   const w = dom.window as unknown as Record<string, unknown> & { eval: (s: string) => unknown };
   const calls: Array<{ action: string; params: Record<string, unknown> }> = [];
   w.chrome = {
-    i18n: { getUILanguage: () => 'en-US' },
-    storage: { local: { get: (_k: string, cb: (r: object) => void) => cb({}) } },
+    i18n: { getUILanguage: () => 'en-US' }, // ignored: the resolver never reads the browser language
+    storage: { local: { get: (_k: unknown, cb: (r: object) => void) => cb(lang ? { kx_lang: lang } : {}) } },
     runtime: {
       lastError: undefined,
       sendMessage: (msg: { action: string; params: Record<string, unknown> }, cb: (r: unknown) => void) => {
@@ -27,6 +28,7 @@ function boot(url: string, html: string, onApi: ApiHandler) {
     },
   };
   w.__KX_CACHE = { getOrFetch: (_k: string, _t: string, fetcher: () => Promise<unknown>) => fetcher() };
+  w.eval(src('lib/lang.js'));
   w.eval(src('lib/ebayMath.js'));
   w.eval(src('content-ebay-shared.js'));
   return { dom, calls, run: (f: string) => w.eval(src(f)) };
@@ -46,7 +48,7 @@ const barText = (dom: JSDOM) => {
   const host = dom.window.document.getElementById('kx-ebay-search-overlay');
   const bar = host?.shadowRoot?.querySelector('.kx-bar');
   const t = (bar?.textContent || '').replace(/\s+/g, ' ').trim();
-  return t.includes('loading') ? '' : t;
+  return t.includes('loading') || t.includes('yükleniyor') ? '' : t;
 };
 
 describe('eBay search overlay (new markup + API fixture)', () => {
@@ -87,12 +89,12 @@ describe('eBay search overlay (new markup + API fixture)', () => {
     expect(host?.shadowRoot?.querySelector('img')).toBeNull();
   });
 
-  it('ebay.de: EUR formatting and EBAY_DE marketplace', async () => {
+  it('ebay.de: EBAY_DE marketplace, English number format', async () => {
     const { dom, calls, run } = boot('https://www.ebay.de/sch/i.html?_nkw=handtuch&LH_BIN=1', fixture('ebay-search-de.html'), () => ({}));
     run('content-ebay-search.js');
     const text = await waitFor(() => barText(dom));
     expect(calls).toHaveLength(0); // filtered page → no API call
-    expect(text).toContain('Results 9.500+');
+    expect(text).toContain('Results 9,500+'); // numbers follow the overlay language (English here), not the marketplace
     expect(text).toContain('not enough data'); // 3 cards < 5
   });
 });
@@ -127,5 +129,57 @@ describe('eBay listing overlay', () => {
     expect(text).toContain('towelhaus 99.6% positive (5,210 feedback)');
     expect(text).toContain('9,012 similar listings');
     expect(text).toContain('Title contains only 3 of the 20 most common keywords.');
+  });
+});
+
+describe('eBay overlays in Turkish (default, nothing stored)', () => {
+  it('search bar + card rows: Turkish labels, tr-TR numbers, marketplace currency kept', async () => {
+    const api = JSON.parse(fixture('ebay-product-database.json'));
+    const { dom, run } = boot('https://www.ebay.com/sch/i.html?_nkw=turkish+cotton+towel', fixture('ebay-search-new.html'), () => api, null);
+    run('content-ebay-search.js');
+    const text = await waitFor(() => barText(dom));
+    expect(text).toContain('Sonuç 9.500+');
+    expect(text).toContain('Medyan Fiyat $25,99');
+    expect(text).toContain('$18,00 – $31,50');
+    expect(text).toContain('Satıcı 4 farklı / 5 ilan');
+    expect(text).toContain('Kaynak: eBay API, en iyi eşleşen 5 ilan');
+    expect(text).toMatch(/Rekabet \(tahmini\) (Düşük|Orta|Yüksek)/);
+    expect(text).toContain('Tam Analiz');
+    expect(text).not.toMatch(/Results|Median|Sellers|Competition/);
+
+    const rows = Array.from(dom.window.document.querySelectorAll('.kx-data-row')).map((r) => (r.textContent || '').replace(/\s+/g, ' '));
+    expect(rows[0]).toContain('120 satıldı');
+    expect(rows[0]).toMatch(/≈[\d.]+\/ay \(tahmini\)/);
+    expect(rows[0]).toContain('%0 medyana göre');
+  });
+
+  it('item panel in Turkish', async () => {
+    const item = {
+      price: { value: '31.50', currency: 'USD' },
+      seller: { username: 'towelhaus', feedbackPercentage: '99.6', feedbackScore: 5210 },
+      itemCreationDate: '2026-04-18T10:00:00.000Z',
+      estimatedAvailabilities: [{ estimatedSoldQuantity: 120, estimatedRemainingQuantity: 30 }],
+    };
+    const seo = {
+      totalCompetitors: 9012, seoScore: 65,
+      priceStats: { n: 40, median: 25.99, p25: 18, p75: 31.5, currency: 'USD', quality: 'ok' },
+      recommendations: [{ key: 'fewTopKeywords', params: { count: 3 } }],
+    };
+    const html = '<div id="mainContent"><div class="x-item-title"><h1 class="x-item-title__mainTitle"><span>Turkish Cotton Bath Towel Set of 4</span></h1></div></div>';
+    const { dom, run } = boot('https://www.ebay.com/itm/256789012345', html, (action) =>
+      action === 'listing_enrich' ? item : action === 'seo_analyze' ? seo : { items: [] }, null);
+    run('content-ebay-listing.js');
+    const el = await waitFor(() => {
+      const e = dom.window.document.getElementById('kx-ebay-listing-stats');
+      return e && !(e.textContent || '').includes('yükleniyor') ? e : null;
+    });
+    const text = (el.textContent || '').replace(/\s+/g, ' ');
+    expect(text).toContain('Fiyat: +%21 medyana göre ($25,99)');
+    expect(text).toContain('120 satıldı');
+    expect(text).toContain('Stok satış oranı: %80 (30 mevcut, tahmini)');
+    expect(text).toContain('towelhaus %99,6 olumlu (5.210 değerlendirme)');
+    expect(text).toContain('9.012 benzer ilan');
+    expect(text).toContain('Başlık en sık 20 anahtar kelimeden yalnızca 3 tanesini içeriyor.');
+    expect(text).not.toMatch(/sold|positive|similar listings/);
   });
 });

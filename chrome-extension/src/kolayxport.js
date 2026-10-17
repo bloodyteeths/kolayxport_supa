@@ -21,8 +21,19 @@ function safeSendMessage(msg) {
   }
 }
 
+// The app's UI language on this browser (lib/stores/useLocaleStore.ts), or null.
+function pageLocale() {
+  try {
+    var v = window.localStorage.getItem('kolayxport_locale');
+    return v === 'tr' || v === 'en' ? v : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 // Fetch a token from the extension auth endpoint (same-origin, carries the session cookie)
 // and hand it to the background worker. Resolves to { token, expiresIn, expiresAt, user } or null.
+// user.locale = the account language (server), else the app's UI language on this browser.
 async function fetchAuthToken() {
   try {
     var response = await fetch('/api/auth/extension', {
@@ -34,7 +45,10 @@ async function fetchAuthToken() {
 
     var data = await response.json();
     if (data.authenticated && data.token) {
-      var user = data.user ? { email: data.user.email || null, name: data.user.name || null } : null;
+      var locale = (data.user && data.user.locale) || data.locale || pageLocale();
+      var user = data.user
+        ? { email: data.user.email || null, name: data.user.name || null, locale: locale || null }
+        : null;
       await safeSendMessage({
         action: 'authTokenFromPage',
         token: data.token,

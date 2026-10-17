@@ -31,6 +31,10 @@
           setTimeout(processShopPage, 500);
         }
       });
+      // Language changed in the popup: re-render (cached data, same page view).
+      S.onLangChange(() => {
+        if (S.getPageType() === 'shop') processShopPage();
+      });
     });
 
     let runToken = 0;
@@ -48,6 +52,7 @@
         bar.className = 'kx-shop-bar';
         shadow.appendChild(bar);
       }
+      bar.lang = S.lang;
       setMessage(bar, S.t('shopAnalysisLoading'), 0.8);
 
       try {
@@ -132,9 +137,9 @@
       }
       bar.appendChild(S.el('div', 'kx-bar-divider'));
       if (shop.num_sales !== null && shop.num_sales !== undefined) bar.appendChild(item(S.t('topSales'), S.formatNum(shop.num_sales)));
-      bar.appendChild(item(S.t('rating'), shop.rating ? Number(shop.rating).toFixed(1) + ' ★' : 'N/A'));
+      bar.appendChild(item(S.t('rating'), shop.rating ? Number(shop.rating).toLocaleString(S.locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' ★' : S.t('notAvailable')));
       if (shop.review_count !== null && shop.review_count !== undefined) bar.appendChild(item(S.t('reviews'), S.formatNum(shop.review_count)));
-      if (shop.salesPerReview) bar.appendChild(item(S.t('salesPerReview'), String(shop.salesPerReview)));
+      if (shop.salesPerReview) bar.appendChild(item(S.t('salesPerReview'), S.formatDec(shop.salesPerReview)));
       bar.appendChild(S.el('div', 'kx-bar-divider'));
       if (shop.listing_count !== null && shop.listing_count !== undefined) bar.appendChild(item(S.t('activeListings'), S.formatNum(shop.listing_count)));
       if (avgPrice) bar.appendChild(item(S.t('medianListPriceShop'), S.formatMoney(avgPrice, cur, 2), null, S.t('priceTipShop')));

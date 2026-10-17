@@ -4,16 +4,17 @@
 
 const $ = (id) => document.getElementById(id);
 
-const _lang = (() => {
-  try { return chrome.i18n.getUILanguage().startsWith('tr') ? 'tr' : 'en'; }
-  catch { return 'en'; }
-})();
+// Language: lib/lang.js (popup choice kx_lang → account language → 'tr').
+function _lang() {
+  const L = window.__KX_LANG;
+  return (L && L.get()) || 'tr';
+}
 
 const _t = {
   tr: {
-    status: 'Durum', checking: 'Kontrol...', connected: 'Bağlı',
+    status: 'Durum', checking: 'Kontrol ediliyor...', connected: 'Bağlı',
     disconnected: 'Bağlı Değil', error: 'Hata', user: 'Kullanıcı',
-    overlayTitle: 'Overlay', allOverlays: 'Tüm overlay\'ler',
+    overlayTitle: 'Araştırma Panelleri', allOverlays: 'Tüm paneller',
     cacheTitle: 'Önbellek', researchData: 'Araştırma verileri',
     clear: 'Temizle', cleared: 'Temizlendi!',
     openApp: 'KolayXport\'u Aç', help: 'Yardım',
@@ -28,11 +29,14 @@ const _t = {
     openingOrders: 'Etsy sipariş listesi açılıyor — adresler otomatik gönderilecek',
     researchTitle: 'Araştırma',
     researchUsage: (used, limit) => `Bugün: ${used} / ${limit} araştırma`,
+    langAuto: 'Otomatik',
+    langHintAuto: 'Hesap dilinizi kullanır, yoksa Türkçe.',
+    langHintSet: 'Açık Etsy, eBay ve Amazon sayfalarındaki paneller hemen güncellenir.',
   },
   en: {
     status: 'Status', checking: 'Checking...', connected: 'Connected',
     disconnected: 'Not Connected', error: 'Error', user: 'User',
-    overlayTitle: 'Overlay', allOverlays: 'All overlays',
+    overlayTitle: 'Research Panels', allOverlays: 'All panels',
     cacheTitle: 'Cache', researchData: 'Research data',
     clear: 'Clear', cleared: 'Cleared!',
     openApp: 'Open KolayXport', help: 'Help',
@@ -47,16 +51,20 @@ const _t = {
     openingOrders: 'Opening your Etsy orders — addresses are sent automatically',
     researchTitle: 'Research',
     researchUsage: (used, limit) => `Today: ${used} / ${limit} lookups`,
+    langAuto: 'Automatic',
+    langHintAuto: 'Uses your account language, otherwise Turkish.',
+    langHintSet: 'Panels on open Etsy, eBay and Amazon pages update right away.',
   },
 };
 
 function t(key, ...args) {
-  const v = _t[_lang]?.[key] || _t.en[key] || key;
+  const v = _t[_lang()]?.[key] || _t.en[key] || key;
   return typeof v === 'function' ? v(...args) : v;
 }
 
 // Apply i18n to all elements with data-i18n attribute
 function applyI18n() {
+  document.documentElement.lang = _lang();
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
     const text = t(key);
@@ -64,9 +72,59 @@ function applyI18n() {
   });
 }
 
+// Language selector: "Otomatik" = no stored choice (account language, else Turkish).
+let _langChoice = 'auto';
+
+function renderLangHint() {
+  const hint = $('langHint');
+  if (!hint) return;
+  const key = _langChoice === 'auto' ? 'langHintAuto' : 'langHintSet';
+  hint.setAttribute('data-i18n', key);
+  hint.textContent = t(key);
+}
+
+async function loadLangChoice() {
+  try {
+    const stored = await new Promise((r) => chrome.storage.local.get(['kx_lang'], r));
+    const v = stored && stored.kx_lang;
+    _langChoice = v === 'tr' || v === 'en' ? v : 'auto';
+  } catch (_) {
+    _langChoice = 'auto';
+  }
+  const sel = $('langSelect');
+  if (sel) sel.value = _langChoice;
+  renderLangHint();
+}
+
+function onLangSelect(e) {
+  const v = e.target.value;
+  _langChoice = v === 'tr' || v === 'en' ? v : 'auto';
+  renderLangHint();
+  try {
+    // Open overlays re-render via chrome.storage.onChanged (lib/lang.js), and so does this popup.
+    if (_langChoice === 'auto') chrome.storage.local.remove('kx_lang');
+    else chrome.storage.local.set({ kx_lang: _langChoice });
+  } catch (_) { /* storage unavailable */ }
+}
+
+/** Re-render every text in the popup in the current language. */
+function refreshTexts() {
+  applyI18n();
+  renderLangHint();
+  renderAuthStatus();
+  if (_lastAddressState !== undefined) renderAddressPending(_lastAddressState);
+  renderResearchQuota();
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
+  const L = window.__KX_LANG;
+  if (L && L.ready) await L.ready;
   applyI18n();
+  await loadLangChoice();
+  const langSel = $('langSelect');
+  if (langSel) langSel.addEventListener('change', onLangSelect);
+  if (L && L.onChange) L.onChange(refreshTexts);
 
   try {
     const manifest = chrome.runtime.getManifest();
@@ -123,29 +181,34 @@ async function checkAuth() {
       });
     });
 
-    const badge = $('authBadge');
-    const status = $('authStatus');
+    _authState = response?.authenticated ? 'connected' : 'disconnected';
+    renderAuthStatus();
 
     if (response?.authenticated) {
-      badge.className = 'auth-badge connected';
-      status.textContent = t('connected');
-      status.className = 'status-badge connected';
-
       const stored = await new Promise(r => chrome.storage.local.get('kx_user', r));
       if (stored?.kx_user?.email) {
         $('userEmail').textContent = stored.kx_user.email;
         $('userRow').style.display = '';
       }
-    } else {
-      badge.className = 'auth-badge disconnected';
-      status.textContent = t('disconnected');
-      status.className = 'status-badge disconnected';
     }
   } catch (err) {
-    $('authBadge').className = 'auth-badge disconnected';
-    $('authStatus').textContent = t('error');
-    $('authStatus').className = 'status-badge disconnected';
+    _authState = 'error';
+    renderAuthStatus();
   }
+}
+
+let _authState = null; // 'connected' | 'disconnected' | 'error' | null (still checking)
+
+function renderAuthStatus() {
+  const badge = $('authBadge');
+  const status = $('authStatus');
+  if (!_authState) {
+    status.textContent = t('checking');
+    return;
+  }
+  badge.className = 'auth-badge ' + (_authState === 'connected' ? 'connected' : 'disconnected');
+  status.textContent = t(_authState);
+  status.className = 'status-badge ' + (_authState === 'connected' ? 'connected' : 'disconnected');
 }
 
 // Load settings
@@ -182,8 +245,10 @@ async function checkPendingTracking() {
 
 // Missing-address queue (v9.6.0): count + "open next order" (the scrape-on-visit fills it)
 let _nextAddressUrl = null;
+let _lastAddressState; // undefined until the card was shown once
 
 function renderAddressPending(state) {
+  _lastAddressState = state;
   $('addressCard').style.display = '';
   if (!state || !state.count) {
     $('addressPendingLabel').textContent = t('addressesComplete');

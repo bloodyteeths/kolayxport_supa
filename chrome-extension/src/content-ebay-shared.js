@@ -194,10 +194,21 @@ const EBAY_SELECTORS = {
 // ---------------------------------------------------------------------------
 // i18n — Turkish / English
 // ---------------------------------------------------------------------------
-const _ebayLang = (() => {
-  try { return chrome.i18n.getUILanguage().startsWith('tr') ? 'tr' : 'en'; }
-  catch { return (navigator.language || '').startsWith('tr') ? 'tr' : 'en'; }
-})();
+// Resolved by lib/lang.js: the popup choice (kx_lang) → account language → 'tr'.
+function ebayLang() {
+  const L = window.__KX_LANG;
+  return (L && L.get()) || 'tr';
+}
+
+/** Numbers and money follow the overlay language; the currency stays the marketplace's. */
+function ebayLocale() {
+  return ebayLang() === 'en' ? 'en-US' : 'tr-TR';
+}
+
+function onEbayLangChange(cb) {
+  const L = window.__KX_LANG;
+  if (L && L.onChange) L.onChange(cb);
+}
 
 const _ebayI18n = {
   tr: {
@@ -206,25 +217,27 @@ const _ebayI18n = {
     result: 'Sonuç', avgPrice: 'Medyan Fiyat', range: 'Tipik (P25–P75)',
     sellers: 'Satıcı', competition: 'Rekabet',
     compLow: 'Düşük', compMed: 'Orta', compHigh: 'Yüksek', compUnknown: 'Veri yetersiz',
-    distinctOf: 'farklı / {n} ilan', sold: 'satıldı', estTag: 'tah.',
+    distinctOf: 'farklı / {n} ilan', sold: 'satıldı', estTag: 'tahmini',
     soldDepth: 'Satış derinliği', withSales: '{k}/{n} ilanda satış var',
     srcApi: 'Kaynak: eBay API, en iyi eşleşen {n} ilan', srcPage: 'Kaynak: bu sayfadaki {n} ilan',
     notEnough: 'yetersiz veri', unusual: 'olağandışı',
     topBySold: 'satışa göre ilk %{p}', sellThrough: 'Stok satış oranı',
     available: 'mevcut', feedback: 'değerlendirme', competingListings: 'benzer ilan',
-    vsMedian: '% medyana göre', titleCoverage: 'Başlık anahtar kelime kapsamı',
-    tipShorter: 'Başlığınız ({mine} krk.) rakiplerden kısa (tipik {typical}).',
+    vsMedian: 'medyana göre', pctVsMedian: '{sign}%{n} medyana göre',
+    titleCoverage: 'Başlık anahtar kelime kapsamı: rakiplerin en sık 20 anahtar kelimesinden kaçı başlığınızda geçiyor',
+    tipShorter: 'Başlığınız ({mine} karakter) rakiplerinkinden kısa (tipik: {typical}).',
     tipFewKeywords: 'Başlık en sık 20 anahtar kelimeden yalnızca {count} tanesini içeriyor.',
     tipTopKeywords: 'En sık anahtar kelimeler: {keywords}',
     fullAnalysis: 'Tam Analiz', perMonth: '/ay', vsAvg: '% ort.',
+    compScore: 'skor {score}/100', pct: '%{n}', factorResults: 'sonuç', factorSold: 'satış', factorSellers: 'satıcı', factorPrice: 'fiyat',
     bestSeller: 'En Çok Satan', seo: 'SEO', price: 'Fiyat',
-    positive: 'olumlu', products: 'ürün',
-    estRevenue: 'Tah. Gelir',
+    positive: 'olumlu', products: 'ilan',
+    estRevenue: 'Tahmini Gelir',
     demand: 'Talep',
     demandHot: '🔥 Çok Yüksek', demandGood: '📈 İyi',
     demandModerate: '📊 Orta', demandLow: '📉 Düşük',
     convRate: 'Dönüşüm', lowStock: '🔥 Az Stok',
-    estMktRevenue: 'Tah. Pazar Geliri',
+    estMktRevenue: 'Tahmini Pazar Geliri',
   },
   en: {
     loading: 'KolayXport loading...',
@@ -238,11 +251,13 @@ const _ebayI18n = {
     notEnough: 'not enough data', unusual: 'unusual range',
     topBySold: 'top {p}% by sold', sellThrough: 'Stock sell-through',
     available: 'available', feedback: 'feedback', competingListings: 'similar listings',
-    vsMedian: '% vs median', titleCoverage: 'Title keyword coverage',
+    vsMedian: 'vs median', pctVsMedian: '{sign}{n}% vs median',
+    titleCoverage: 'Title keyword coverage: how many of the 20 most common competitor keywords your title contains',
     tipShorter: 'Your title ({mine} chars) is shorter than competitors (typical {typical}).',
     tipFewKeywords: 'Title contains only {count} of the 20 most common keywords.',
     tipTopKeywords: 'Most common keywords: {keywords}',
     fullAnalysis: 'Full Analysis', perMonth: '/mo', vsAvg: '% avg.',
+    compScore: 'score {score}/100', pct: '{n}%', factorResults: 'results', factorSold: 'sold', factorSellers: 'sellers', factorPrice: 'price',
     bestSeller: 'Best Seller', seo: 'SEO', price: 'Price',
     positive: 'positive', products: 'products',
     estRevenue: 'Est. Revenue',
@@ -255,7 +270,7 @@ const _ebayI18n = {
 };
 
 function ebayT(key, vars) {
-  let s = _ebayI18n[_ebayLang]?.[key] || _ebayI18n.en[key] || key;
+  let s = _ebayI18n[ebayLang()]?.[key] || _ebayI18n.en[key] || key;
   if (vars) for (const [k, v] of Object.entries(vars)) s = s.split('{' + k + '}').join(String(v));
   return s;
 }
@@ -310,9 +325,15 @@ async function ebayApiCall(action, params = {}) {
 // Helpers
 // ---------------------------------------------------------------------------
 function ebayFormatNum(n) {
-  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
-  if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
-  return String(n);
+  const dec = (s) => (ebayLang() === 'tr' ? s.replace('.', ',') : s);
+  if (n >= 1000000) return dec((n / 1000000).toFixed(1)) + 'M';
+  if (n >= 1000) return dec((n / 1000).toFixed(1)) + 'K';
+  return dec(String(n));
+}
+
+/** Integer with the overlay language's grouping ("1.234" in Turkish). */
+function ebayFormatInt(n) {
+  return Number.isFinite(Number(n)) ? Number(n).toLocaleString(ebayLocale()) : '—';
 }
 
 /** Format a price in its own currency (never assume $). '—' when unknown. */
@@ -320,7 +341,7 @@ function ebayFormatPrice(n, currency) {
   if (n == null || !Number.isFinite(Number(n))) return '—';
   const cur = currency || getEbayMarketplace().currency || 'USD';
   try {
-    return new Intl.NumberFormat(getEbayMarketplace().locale, { style: 'currency', currency: cur }).format(Number(n));
+    return new Intl.NumberFormat(ebayLocale(), { style: 'currency', currency: cur, currencyDisplay: 'narrowSymbol' }).format(Number(n));
   } catch (_) {
     return cur + ' ' + Number(n).toFixed(2);
   }
@@ -329,7 +350,7 @@ function ebayFormatPrice(n, currency) {
 /** Result count as eBay shows it: 9500 + plus → "9,500+". */
 function ebayFormatCount(rc) {
   if (!rc || !Number.isFinite(rc.count)) return '—';
-  return rc.count.toLocaleString(getEbayMarketplace().locale) + (rc.plus ? '+' : '');
+  return rc.count.toLocaleString(ebayLocale()) + (rc.plus ? '+' : '');
 }
 
 function ebayCompetitionColor(level) {
@@ -359,7 +380,7 @@ function ebayPriceVsMedian(price, median) {
   const pct = window.__KX_EBAY_MATH.pctVsMedian(price, median);
   if (pct == null) return null;
   return {
-    text: (pct > 0 ? '+' : '') + pct + ebayT('vsMedian'),
+    text: ebayT('pctVsMedian', { sign: pct > 0 ? '+' : pct < 0 ? '-' : '', n: Math.abs(pct) }),
     cssClass: pct <= 0 ? 'kx-green' : 'kx-red',
   };
 }
@@ -371,12 +392,17 @@ function ebayDemandLabel(score) {
   return { text: ebayT('demandLow'), cssClass: 'kx-red' };
 }
 
+// Overlays await this before their first render, so the language (lib/lang.js) is resolved
+// by then: no flash of the wrong language.
 async function ebayIsOverlayEnabled() {
-  return new Promise(resolve => {
+  const enabled = await new Promise(resolve => {
     chrome.storage.local.get('kx_overlays_enabled', (result) => {
-      resolve(result.kx_overlays_enabled !== false);
+      resolve((result || {}).kx_overlays_enabled !== false);
     });
   });
+  const L = window.__KX_LANG;
+  if (L && L.ready) await L.ready;
+  return enabled;
 }
 
 /** Replace an overlay's numbers with the research-limit card when `err` carries a 429 payload. */
@@ -401,6 +427,10 @@ window.__KX_EBAY_SHARED = {
   SELECTORS: EBAY_SELECTORS,
   apiCall: ebayApiCall,
   formatNum: ebayFormatNum,
+  formatInt: ebayFormatInt,
+  locale: ebayLocale,
+  get lang() { return ebayLang(); },
+  onLangChange: onEbayLangChange,
   formatPrice: ebayFormatPrice,
   formatCount: ebayFormatCount,
   competitionColor: ebayCompetitionColor,

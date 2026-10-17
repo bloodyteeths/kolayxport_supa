@@ -41,6 +41,10 @@
           setTimeout(processSearchPage, 500);
         }
       });
+      // Language changed in the popup: re-render bar + rows (cached API answer).
+      S.onLangChange(() => {
+        if (S.getPageType() === 'search') processSearchPage();
+      });
     });
 
     async function processSearchPage() {
@@ -115,8 +119,10 @@
         : '—';
 
       const comp = summary.competition;
+      const factorKey = { results: 'factorResults', sold: 'factorSold', sellers: 'factorSellers', price: 'factorPrice' };
       const compTitle = comp.score == null ? '' :
-        `score ${comp.score}/100 · ` + comp.used.map(k => `${k} ${Math.round(comp.factors[k] * 100)}`).join(', ');
+        S.t('compScore', { score: comp.score }) + ' · ' +
+        comp.used.map(k => `${factorKey[k] ? S.t(factorKey[k]) : k} ${Math.round(comp.factors[k] * 100)}`).join(', ');
 
       const sampled = summary.source === 'api' && p && p.sampled ? p.sampled : summary.items.length;
       const sourceText = summary.source === 'api'
@@ -175,7 +181,10 @@
       for (const it of summary.items) if (it.id) byId[it.id] = it;
 
       for (const card of page.items) {
-        if (!card.el || card.el.querySelector('.kx-data-row')) continue;
+        if (!card.el) continue;
+        // Re-render (e.g. language change) replaces our old row instead of stacking a second one.
+        const oldRow = card.el.querySelector('.kx-data-row');
+        if (oldRow) oldRow.remove();
         const it = byId[card.id] || card;
         const parts = [];
         const rank = ranks[card.id];
@@ -187,10 +196,10 @@
         const soldCount = Number.isFinite(it.soldCount) ? it.soldCount : card.soldCount;
         if (Number.isFinite(soldCount)) {
           const plus = it.soldCount === soldCount ? it.soldPlus : card.soldPlus;
-          parts.push(`<span>${esc(soldCount.toLocaleString())}${plus ? '+' : ''} ${esc(S.t('sold'))}</span>`);
+          parts.push(`<span>${esc(S.formatInt(soldCount))}${plus ? '+' : ''} ${esc(S.t('sold'))}</span>`);
           const perMo = M.estMonthlySales(soldCount, it.createdAt);
           if (perMo != null) {
-            parts.push(`<span class="${S.salesColor(perMo)}">≈${esc(perMo)}${esc(S.t('perMonth'))} (${esc(S.t('estTag'))})</span>`);
+            parts.push(`<span class="${S.salesColor(perMo)}">≈${esc(S.formatInt(perMo))}${esc(S.t('perMonth'))} (${esc(S.t('estTag'))})</span>`);
           }
         }
 

@@ -19,7 +19,13 @@
     extractReviewCount, extractRating, extractBoughtFromPage, requestSpApiSignals,
     detectAmazonMarketplace, observeUrlChanges, KX_AMZ_PREFIX,
   } = shared;
+  const t = shared.t;
+  const money = shared.formatMoney;
+  const compact = shared.formatCompact;
+  const int = shared.formatInt;
 
+  // Nothing renders until the language is known (lib/lang.js): no flash of the wrong language.
+  let langReady = false;
   let currentAsin = null;
   let spForAsin = { asin: null, data: null };
   let spLimit = { asin: null, resp: null }; // 429 research-limit answer for this ASIN
@@ -86,56 +92,64 @@
     let salesBlock;
     if (fig.kind === 'amazon') {
       salesBlock = `<div style="display:flex;gap:14px;margin-top:4px;flex-wrap:wrap">
-          ${stat(esc(fig.label), 'Bought last month (Amazon)', 'kx-green', "Amazon's own figure: a floor, not an exact count")}
-          ${fig.revenueFloor ? stat('≥' + esc(M.formatMoney(fig.revenueFloor, currency, true)), 'Revenue/mo (floor)', 'kx-green', "Amazon's floor × current price") : ''}
+          ${stat(esc(fig.label), esc(t('boughtLastMonth')), 'kx-green', t('boughtLastMonthTip'))}
+          ${fig.revenueFloor ? stat('≥' + esc(money(fig.revenueFloor, currency, true)), esc(t('revFloor')), 'kx-green', t('revFloorShortTip')) : ''}
         </div>
-        ${bsrEst ? `<div style="font-size:10px;color:#999;margin-top:2px">BSR model for comparison: est. ~${M.formatCompact(bsrEst.units)}/mo (range ${M.formatCompact(bsrEst.low)}–${M.formatCompact(bsrEst.high)})</div>` : ''}`;
+        ${bsrEst ? `<div style="font-size:10px;color:#999;margin-top:2px">${esc(t('bsrCompare', { units: compact(bsrEst.units), low: compact(bsrEst.low), high: compact(bsrEst.high) }))}</div>` : ''}`;
     } else if (fig.kind === 'estimate') {
       salesBlock = `<div style="display:flex;gap:14px;margin-top:4px;flex-wrap:wrap">
-          ${stat('~' + M.formatCompact(fig.units), 'Est. sales/mo', 'kx-orange', `Range ${fig.low}–${fig.high}/mo`)}
-          ${fig.revenue ? stat('~' + esc(M.formatMoney(fig.revenue, currency, true)), 'Est. revenue/mo', 'kx-orange') : ''}
+          ${stat('~' + esc(compact(fig.units)), esc(t('estSales')), 'kx-orange', t('estSalesTip', { low: int(fig.low), high: int(fig.high) }))}
+          ${fig.revenue ? stat('~' + esc(money(fig.revenue, currency, true)), esc(t('estRevenue')), 'kx-orange') : ''}
         </div>
-        <div style="font-size:10px;color:#999;margin-top:2px">Estimate from BSR (${esc(fig.curve)} curve), likely range ${M.formatCompact(fig.low)}–${M.formatCompact(fig.high)}/mo.${fig.calibrated ? '' : ' Curve is calibrated on amazon.com; likely overstates this marketplace.'} Amazon shows no "bought in past month" figure for this item.</div>`;
+        <div style="font-size:10px;color:#999;margin-top:2px">${esc(t('estFromBsr', { curve: fig.curve, low: compact(fig.low), high: compact(fig.high) }) + (fig.calibrated ? '' : t('curveUncalibrated')) + t('noBoughtFigure'))}</div>`;
     } else {
-      salesBlock = '<div style="color:#999">No sales data: no "bought in past month" figure and no Best Seller Rank on this page.</div>';
+      salesBlock = `<div style="color:#999">${esc(t('noSalesData'))}</div>`;
     }
 
+    const bsrLine = bsr
+      ? esc(t('bsrIn', { rank: int(bsr.rank), cat: bsr.category || '—' }))
+      : '';
+    const subRanks = bsr && bsr.sub && bsr.sub.length
+      ? bsr.sub.slice(0, 2).map((r) => esc(t('subRankIn', { rank: int(r.rank), cat: r.category }))).join(' · ')
+      : '';
+
+    widget.lang = shared.lang;
     widget.innerHTML = `
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #f0f0f0">
         <span class="kx-amz-badge" style="font-size:11px;padding:3px 8px">KolayXport</span>
-        <span style="font-weight:700;font-size:13px">Product Intelligence</span>
+        <span style="font-weight:700;font-size:13px">${esc(t('productIntel'))}</span>
       </div>
 
       <div style="margin-bottom:8px">
-        <div style="font-weight:600;color:#666;font-size:11px">Sales</div>
+        <div style="font-weight:600;color:#666;font-size:11px">${esc(t('sales'))}</div>
         ${salesBlock}
       </div>
 
       ${bsr ? `
       <div style="margin-bottom:8px;font-size:11px">
-        <strong>BSR #${bsr.rank.toLocaleString()}</strong> in ${esc(bsr.category || '—')}
-        ${bsr.sub && bsr.sub.length ? `<span style="color:#999"> · ${bsr.sub.slice(0, 2).map((r) => `#${r.rank.toLocaleString()} in ${esc(r.category)}`).join(' · ')}</span>` : ''}
-        ${bsr.fromApi ? '<span style="color:#999"> (official Amazon data)</span>' : ''}
+        <strong>${bsrLine}</strong>
+        ${subRanks ? `<span style="color:#999"> · ${subRanks}</span>` : ''}
+        ${bsr.fromApi ? `<span style="color:#999">${esc(t('officialData'))}</span>` : ''}
       </div>` : ''}
 
       ${(reviewCount != null || rating != null || (sp && sp.offerCountAny != null)) ? `
       <div style="display:flex;gap:8px;margin-bottom:8px;font-size:11px;flex-wrap:wrap">
-        ${rating != null ? `<span>★ ${rating.toFixed(1)}</span>` : ''}
-        ${reviewCount != null ? `<span class="kx-sep">|</span><span>${reviewCount.toLocaleString()} ratings</span>` : ''}
-        ${sp && sp.offerCountAny != null ? `<span class="kx-sep">|</span><span title="Competing offers on this ASIN (official Amazon API)">${sp.offerCountAny} offers</span>` : ''}
+        ${rating != null ? `<span>★ ${esc(shared.formatRating(rating))}</span>` : ''}
+        ${reviewCount != null ? `<span class="kx-sep">|</span><span>${esc(t('ratings', { n: int(reviewCount) }))}</span>` : ''}
+        ${sp && sp.offerCountAny != null ? `<span class="kx-sep">|</span><span title="${esc(t('offersTip'))}">${esc(t('offers', { n: int(sp.offerCountAny) }))}</span>` : ''}
       </div>` : ''}
 
       ${referral ? `
       <div style="background:#f9f9f9;border-radius:6px;padding:8px;margin-bottom:8px;font-size:11px">
-        <div style="font-weight:600;color:#666;margin-bottom:2px">Fee estimate (rough)</div>
-        Referral ~15%: <strong>${esc(M.formatMoney(referral.fee, currency))}</strong>
-        <span class="kx-sep">|</span> After referral: <strong>${esc(M.formatMoney(referral.net, currency))}</strong>
-        <div style="color:#999;font-size:10px">Referral rates vary by category (about 8–17%). FBA fulfilment fees depend on size and weight and are not included.</div>
+        <div style="font-weight:600;color:#666;margin-bottom:2px">${esc(t('feeTitle'))}</div>
+        ${esc(t('referral'))}: <strong>${esc(money(referral.fee, currency))}</strong>
+        <span class="kx-sep">|</span> ${esc(t('afterReferral'))}: <strong>${esc(money(referral.net, currency))}</strong>
+        <div style="color:#999;font-size:10px">${esc(t('feeNote'))}</div>
       </div>` : ''}
 
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="kx-ai-btn kx-btn-ai">AI Analysis</button>
-        <button class="kx-ai-btn kx-btn-research" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)">Market Research</button>
+        <button class="kx-ai-btn kx-btn-ai">${esc(t('aiAnalysis'))}</button>
+        <button class="kx-ai-btn kx-btn-research" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)">${esc(t('marketResearch'))}</button>
       </div>
 
       <div style="margin-top:8px;font-size:10px;color:#bbb;text-align:center">
@@ -175,18 +189,26 @@
   }
 
   function processListingPage() {
-    if (!isProductPage()) return;
+    if (!langReady || !isProductPage()) return;
     injectListingWidget();
   }
 
   // Re-render a few times: BSR and the "bought" badge load lazily.
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => setTimeout(processListingPage, 500));
-  } else {
-    setTimeout(processListingPage, 500);
-  }
-  setTimeout(processListingPage, 2000);
-  setTimeout(processListingPage, 4000);
+  shared.langReady().then(() => {
+    langReady = true;
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => setTimeout(processListingPage, 500));
+    } else {
+      setTimeout(processListingPage, 500);
+    }
+    setTimeout(processListingPage, 2000);
+    setTimeout(processListingPage, 4000);
+  });
+
+  // Language changed in the popup: re-render the widget in place.
+  shared.onLangChange(() => {
+    if (langReady && currentAsin && currentAsin === extractAsinFromUrl()) render(currentAsin);
+  });
 
   observeUrlChanges(() => {
     currentAsin = null;

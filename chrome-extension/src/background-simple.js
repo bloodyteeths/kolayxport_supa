@@ -68,6 +68,10 @@ function storeToken(token, meta, user) {
     kx_auth_token_time: Date.now()
   };
   if (user) data.kx_user = { email: user.email || null, name: user.name || null };
+  // KolayXport account language → overlays use it unless the popup has an explicit choice
+  // (lib/lang.js: kx_lang → kx_account_lang → 'tr').
+  const accountLang = user && typeof user.locale === 'string' ? user.locale.trim().toLowerCase().slice(0, 2) : null;
+  if (accountLang === 'tr' || accountLang === 'en') data.kx_account_lang = accountLang;
   chrome.storage.local.set(data);
 }
 

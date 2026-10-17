@@ -33,6 +33,10 @@
           setTimeout(processSearchPage, 500);
         }
       });
+      // Language changed in the popup: re-render bar + card rows (cached data, same page view).
+      S.onLangChange(() => {
+        if (S.getPageType() === 'search') processSearchPage();
+      });
     });
 
     async function processSearchPage() {
@@ -48,6 +52,7 @@
         bar.className = 'kx-bar';
         shadow.appendChild(bar);
       }
+      bar.lang = S.lang;
       bar.textContent = '';
       bar.appendChild(S.el('span', null, S.t('loading'), 'opacity:0.8'));
 

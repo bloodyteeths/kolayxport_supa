@@ -315,13 +315,15 @@ function showLimitCard(container, errOrResponse, surface, signedOutOn401) {
 // ---------------------------------------------------------------------------
 function formatNum(n) {
   n = Number(n) || 0;
-  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
-  if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
-  return String(n);
+  // Decimal comma in Turkish ("1,2K"); K/M are what sellers see on marketplace dashboards.
+  const dec = (s) => (_langNow() === 'tr' ? s.replace('.', ',') : s);
+  if (n >= 1000000) return dec((n / 1000000).toFixed(1)) + 'M';
+  if (n >= 1000) return dec((n / 1000).toFixed(1)) + 'K';
+  return dec(String(n));
 }
 
 function formatPrice(n) {
-  return '$' + Number(n).toFixed(2);
+  return formatMoney(n, 'USD', 2);
 }
 
 function competitionColor(level) {
@@ -369,21 +371,37 @@ function computeBestSellerRanks(badges) {
 // ---------------------------------------------------------------------------
 // Settings Check
 // ---------------------------------------------------------------------------
+// Every overlay awaits this before its first render, so it also waits for the language
+// (lib/lang.js) to be resolved: no flash of the wrong language.
 async function isOverlayEnabled() {
-  return new Promise(resolve => {
+  const enabled = await new Promise(resolve => {
     chrome.storage.local.get('kx_overlays_enabled', (result) => {
-      resolve(result.kx_overlays_enabled !== false); // default true
+      resolve((result || {}).kx_overlays_enabled !== false); // default true
     });
   });
+  const L = window.__KX_LANG;
+  if (L && L.ready) await L.ready;
+  return enabled;
 }
 
 // ---------------------------------------------------------------------------
 // i18n — Turkish / English
 // ---------------------------------------------------------------------------
-const _lang = (() => {
-  try { return chrome.i18n.getUILanguage().startsWith('tr') ? 'tr' : 'en'; }
-  catch { return (navigator.language || '').startsWith('tr') ? 'tr' : 'en'; }
-})();
+// Resolved by lib/lang.js: the popup choice (kx_lang) → account language → 'tr'.
+function _langNow() {
+  const L = window.__KX_LANG;
+  return (L && L.get()) || 'tr';
+}
+
+function _locale() {
+  return _langNow() === 'en' ? 'en-US' : 'tr-TR';
+}
+
+/** Re-render hook for a language change made in the popup (live, no page refresh). */
+function onLangChange(cb) {
+  const L = window.__KX_LANG;
+  if (L && L.onChange) L.onChange(cb);
+}
 
 const _i18n = {
   tr: {
@@ -392,7 +410,7 @@ const _i18n = {
     result: 'Sonuç',
     avgPrice: 'Ort. Fiyat',
     range: 'Aralık',
-    avgFav: 'Ort. Fav',
+    avgFav: 'Ort. Favori',
     shops: 'Mağaza',
     sellers: 'Satıcı',
     competition: 'Rekabet',
@@ -406,20 +424,20 @@ const _i18n = {
     sales: 'satış',
     views: 'görüntülenme',
     months: 'ay',
-    tags: 'Tagler',
+    tags: 'Etiketler',
     missing: 'eksik',
     shop: 'Mağaza',
     price: 'Fiyat',
     positive: 'olumlu',
-    products: 'ürün',
+    products: 'ilan',
     topSales: 'Toplam Satış',
     rating: 'Puan',
     reviews: 'Yorum',
-    activeListings: 'Aktif Ürün',
-    bestSellers: 'Best Sellers',
+    activeListings: 'Aktif İlan',
+    bestSellers: 'En Çok Satanlar',
     shopAnalysisLoading: 'KolayXport mağaza analizi yükleniyor...',
     shopIdNotFound: 'Mağaza ID bulunamadı',
-    estRevenue: 'Tah. Gelir',
+    estRevenue: 'Tahmini Gelir',
     estRevenueShort: 'Gelir',
     demand: 'Talep',
     demandHot: '🔥 Çok Yüksek',
@@ -428,35 +446,35 @@ const _i18n = {
     demandLow: '📉 Düşük',
     convRate: 'Dönüşüm',
     engRate: 'Etkileşim',
-    favsDay: ' fav/gün',
+    favsDay: ' favori/gün',
     totalSales: 'toplam satış',
     fromReviews: 'yorumdan',
     fromFavs: 'favorilerden',
     lowStock: '🔥 Az Stok',
-    estMktRevenue: 'Tah. Pazar Geliri',
+    estMktRevenue: 'Tahmini Pazar Geliri',
     shopAge: 'Mağaza Yaşı',
     years: 'yıl',
-    estShopRevenue: 'Tah. Aylık Gelir',
-    estShopSales: 'Tah. Aylık Satış',
-    hotListings: 'Sıcak Ürünler',
+    estShopRevenue: 'Tahmini Aylık Gelir',
+    estShopSales: 'Tahmini Aylık Satış',
+    hotListings: 'Sıcak İlanlar',
     lowStockItems: 'Az Stok',
     avgConversion: 'Ort. Dönüşüm',
-    revenuePerListing: 'Ürün Başına Gelir',
+    revenuePerListing: 'İlan Başına Gelir',
     salesPerMonth: 'satış/ay',
     badgeMeasured: 'Ölçüldü',
-    badgeEstimated: 'Tahmin',
+    badgeEstimated: 'Tahmini',
     badgeInsufficient: 'Yetersiz veri',
     confHigh: 'Güven: yüksek',
     confMedium: 'Güven: orta',
     confLow: 'Güven: düşük',
     revenueApprox: 'gelir/ay (tahmini)',
     lessThan: '<',
-    howMeasured: 'Mağaza satışları {days} günde +{delta} arttı (Etsy API, {perDay}/gün). Bu ürün mağazanın son {window} gündeki yorumlarının %{share}\'ine sahip ({mine}/{total}).',
-    howMeasuredLifetime: 'Mağaza satışları {days} günde +{delta} arttı (Etsy API, {perDay}/gün). Ürün payı tüm zamanların yorumlarından: %{share} ({mine}/{total}).',
-    howEstimated: 'Bu ürün son {window} günde {recent} yorum aldı × bu mağazanın gerçek satış/yorum oranı {ratio} ({sold} satış / {reviews} yorum).',
-    howEstimatedNone: 'Bu ürün son {window} günde hiç yorum almadı. Mağazanın satış/yorum oranı {ratio} ile aylık satış muhtemelen {upper}\'in altında.',
-    howInsufficient: 'Satış hesaplamak için yeterli gerçek veri yok (mağazada yeterli yorum yok). Tahmin göstermiyoruz.',
-    howShopOnly: 'Ölçülen mağaza hızı: {days} günde +{delta} satış ({perDay}/gün, Etsy API). Bu ürüne pay atamak için yeterli yorum yok.',
+    howMeasured: 'Mağaza satışları {days} günde +{delta} arttı (Etsy API, {perDay}/gün). Mağazanın son {window} gündeki yorumlarının %{share} kadarı bu ilana ait ({mine}/{total}).',
+    howMeasuredLifetime: 'Mağaza satışları {days} günde +{delta} arttı (Etsy API, {perDay}/gün). İlanın payı, tüm zamanların yorumlarından: %{share} ({mine}/{total}).',
+    howEstimated: 'Bu ilan son {window} günde {recent} yorum aldı × bu mağazanın gerçek satış/yorum oranı {ratio} ({sold} satış / {reviews} yorum).',
+    howEstimatedNone: 'Bu ilan son {window} günde hiç yorum almadı. Mağazanın satış/yorum oranı {ratio} ile aylık satış muhtemelen {upper} altında.',
+    howInsufficient: 'Satışı hesaplamak için yeterli gerçek veri yok (mağazada yeterli yorum yok). Tahmin göstermiyoruz.',
+    howShopOnly: 'Ölçülen mağaza hızı: {days} günde +{delta} satış ({perDay}/gün, Etsy API). Bu ilana pay ayırmak için yeterli yorum yok.',
     measuredAfter: 'Ölçülen değer, bu mağaza için ilk kayıttan 24 saat sonra görünür.',
     trackingSince: 'Takip: {date} tarihinden beri · {count} kayıt',
     updatedAgo: 'Veri: {age} önce',
@@ -467,51 +485,52 @@ const _i18n = {
     listingDeltas: 'Son {days} gün: {favs} favori, {reviews} yorum',
     bought24h: 'Etsy: son 24 saatte {n} satış',
     inCarts: 'Sepette: {n}',
-    bestsellerBadge: 'Etsy Bestseller',
-    starSeller: 'Star Seller',
+    bestsellerBadge: 'Etsy Çok Satan',
+    starSeller: 'Yıldız Satıcı',
     favorites: 'Favori',
     age: 'Yaş',
     stock: 'Stok',
-    shopSalesLifetime: 'Mağaza Satış',
+    shopSalesLifetime: 'Mağaza Satışı',
     salesPerReview: 'Satış/Yorum',
     signInRequired: 'Gerçek satış verileri için kolayxport.com\'da oturum açın.',
     sourceApi: 'Etsy API',
     sourcePage: 'Etsy sayfası',
     salesMo: 'Satış/ay',
     revenueMo: 'Gelir/ay',
-    cardTipMeasured: 'Ölçüldü: mağaza {days} günde +{delta} sattı; bu ürün son {window} günün yorumlarının {mine}/{total}\'i.',
-    cardTipEstimated: 'Tahmin: son {window} günde {recent} yorum × mağazanın satış/yorum oranı {ratio}.',
-    cardTipUpper: 'Tahmin: son {window} günde yorum yok; mağaza oranı {ratio} ile muhtemelen bu değerin altında.',
+    cardTipMeasured: 'Ölçüldü: mağaza {days} günde +{delta} sattı; son {window} günün mağaza yorumlarından {mine}/{total} bu ilana ait.',
+    cardTipEstimated: 'Tahmini: son {window} günde {recent} yorum × mağazanın satış/yorum oranı {ratio}.',
+    cardTipUpper: 'Tahmini: son {window} günde yorum yok; mağaza oranı {ratio} ile satış muhtemelen bu değerin altında.',
     cardTipInsufficient: 'Yeterli gerçek veri yok — tahmin gösterilmiyor.',
     cardTipPending: 'Mağaza verisi yükleniyor…',
     shopHowMeasured: 'Mağaza satışları {days} günde +{delta} arttı (Etsy API). Gelir = satış × medyan liste fiyatı {avg} (kaba tahmin; satıcı indirimleri hesaba katılmaz).',
     shopHowEstimated: 'Son {window} günde {recent} mağaza yorumu × satış/yorum oranı {ratio}. Gelir = satış × medyan liste fiyatı {avg} (kaba tahmin).',
-    priceTipShop: 'Mağazanın ilk 100 aktif ürününün medyan LİSTE fiyatı (Etsy API, indirim öncesi; mağaza para birimi).',
+    priceTipShop: 'Mağazanın ilk 100 aktif ilanının medyan LİSTE fiyatı (Etsy API, indirim öncesi; mağaza para birimi).',
     topRecent: 'En çok yorum alan (son dönem)',
     medianPrice: 'Medyan Fiyat',
     medianListPrice: 'Medyan Liste Fiyatı',
     typicalRange: 'Tipik (P25–P75)',
-    medianFav: 'Medyan Fav',
+    medianFav: 'Medyan Favori',
     shopsTop100: 'Mağaza (ilk 100)',
     vsMedian: 'medyana göre',
-    vsMedianTip: 'Bu ürünün fiyatı {price}, bu sayfadaki {n} ürünün medyan fiyatı {median} (reklamlar hariç).',
-    priceTipPage: 'Bu sayfadaki {n} ürünün gösterilen fiyatlarının medyanı (indirimli fiyat, reklamlar hariç). Ham aralık: {rawMin} – {rawMax}. Etsy API örneği (ilk 100, indirimsiz liste fiyatı): medyan {apiMedian}.',
-    priceTipApi: 'Etsy API anahtar kelime örneği (ilk {n} ürün, dijital ürünler hariç). Bunlar indirimsiz LİSTE fiyatlarıdır; Etsy sayfasında görünen indirimli fiyatlardan yüksek olabilir. Ham aralık: {rawMin} – {rawMax}.',
-    favTipPage: 'Bu sayfadaki {n} ürünün favori sayılarının medyanı (Etsy API, reklamlar hariç).',
-    favTipApi: 'Etsy API örneğindeki {n} ürünün favori medyanı.',
+    vsMedianTip: 'Bu ilanın fiyatı {price}; bu sayfadaki {n} ilanın medyan fiyatı {median} (reklamlar hariç).',
+    priceTipPage: 'Bu sayfadaki {n} ilanın gösterilen fiyatlarının medyanı (indirimli fiyat, reklamlar hariç). Ham aralık: {rawMin} – {rawMax}. Etsy API örneği (ilk 100, indirimsiz liste fiyatı): medyan {apiMedian}.',
+    priceTipApi: 'Etsy API anahtar kelime örneği (ilk {n} ilan, dijital ürünler hariç). Bunlar indirimsiz LİSTE fiyatlarıdır; Etsy sayfasında görünen indirimli fiyatlardan yüksek olabilir. Ham aralık: {rawMin} – {rawMax}.',
+    favTipPage: 'Bu sayfadaki {n} ilanın favori sayılarının medyanı (Etsy API, reklamlar hariç).',
+    favTipApi: 'Etsy API örneğindeki {n} ilanın favori medyanı.',
     shopsTip: 'Etsy API anahtar kelime aramasının ilk {n} sonucundaki farklı mağaza sayısı. Rekabet: >50 yüksek, >20 orta.',
     revTipPage: 'Gelir = {sales} satış/ay × kartta gösterilen fiyat {price}.',
     revTipList: 'Gelir = {sales} satış/ay × Etsy liste fiyatı {price} (kartta fiyat okunamadı; indirim öncesi fiyat olabilir).',
     revenueFromPage: 'sayfadaki fiyat {price} ile',
     revenueFromList: 'Etsy liste fiyatı {price} ile (indirim öncesi olabilir)',
     qtySeller: 'Adet (satıcı)',
-    qtyTip: 'Satıcının girdiği stok adedi. Etsy satıcıları bunu çoğu zaman yer tutucu olarak yüksek girer; gerçek stok değildir.',
-    itemReviews: 'Ürün Yorumu',
-    itemReviewsTip: 'Yalnızca bu ürünün yorumları (mağazanın tüm yorumları değil).',
+    qtyTip: 'Satıcının girdiği stok adedi. Etsy satıcıları bunu çoğu zaman 999 gibi yer tutucu bir değer olarak girer; gerçek stok değildir.',
+    itemReviews: 'İlan Yorumu',
+    itemReviewsTip: 'Yalnızca bu ilanın yorumları (mağazanın tüm yorumları değil).',
     confShortHigh: 'yüksek güven',
     confShortMedium: 'orta güven',
     confShortLow: 'düşük güven',
     medianListPriceShop: 'Medyan Liste Fiyatı',
+    notAvailable: 'Yok',
   },
   en: {
     loading: 'KolayXport loading...',
@@ -639,11 +658,12 @@ const _i18n = {
     confShortMedium: 'medium conf.',
     confShortLow: 'low conf.',
     medianListPriceShop: 'Median List Price',
+    notAvailable: 'N/A',
   },
 };
 
 function t(key, vars) {
-  let s = _i18n[_lang]?.[key] || _i18n.en[key] || key;
+  let s = _i18n[_langNow()]?.[key] || _i18n.en[key] || key;
   if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined && vars[k] !== null ? String(vars[k]) : m));
   return s;
 }
@@ -677,9 +697,9 @@ function el(tag, cls, text, style) {
 function formatMoney(amount, currency, digits) {
   if (amount === null || amount === undefined) return '—';
   const d = digits === undefined ? 0 : digits;
-  if (!currency) return Number(amount).toFixed(d);
+  if (!currency) return Number(amount).toLocaleString(_locale(), { minimumFractionDigits: d, maximumFractionDigits: d });
   try {
-    return new Intl.NumberFormat(_lang === 'tr' ? 'tr-TR' : 'en-US', { style: 'currency', currency, minimumFractionDigits: d, maximumFractionDigits: d }).format(amount);
+    return new Intl.NumberFormat(_locale(), { style: 'currency', currency, currencyDisplay: 'narrowSymbol', minimumFractionDigits: d, maximumFractionDigits: d }).format(amount);
   } catch (_) {
     return currency + ' ' + Number(amount).toFixed(d);
   }
@@ -691,7 +711,13 @@ function confShort(c) {
 
 function formatSales(n) {
   if (n === null || n === undefined) return '—';
-  return n >= 10 ? formatNum(Math.round(n)) : String(Math.round(n * 10) / 10);
+  return n >= 10 ? formatNum(Math.round(n)) : formatDec(Math.round(n * 10) / 10);
+}
+
+/** A plain decimal in the overlay language ("2,5" in Turkish). */
+function formatDec(n) {
+  if (n === null || n === undefined || !Number.isFinite(Number(n))) return '—';
+  return Number(n).toLocaleString(_locale(), { maximumFractionDigits: 2 });
 }
 
 function cardTooltip(sales) {
@@ -717,6 +743,7 @@ function cardTooltip(sales) {
 function buildCardRow(stats, ctx) {
   const M = window.__KX_MATH;
   const row = el('div', 'kx-data-row');
+  row.lang = _langNow(); // uppercase badges need lang="tr" for İ
   row.dataset.kxListing = stats.listingId;
   const sales = stats.sales || { kind: 'insufficient' };
   const tips = [cardTooltip(sales)];
@@ -940,10 +967,12 @@ window.__KX_SHARED = {
   apiCall,
   listingStatsCall,
   showLimitCard,
-  el, formatMoney, formatSales, confShort,
+  el, formatMoney, formatSales, formatDec, confShort,
   buildCardRow, renderCardRows, loadCardStats, pageListingIds, findListingCard,
   collectPageCards, pageMarket, readCardPrice, isAdCard,
-  lang: _lang,
+  get lang() { return _langNow(); },
+  locale: _locale,
+  onLangChange,
   formatNum, formatPrice,
   competitionColor, scoreClass, salesColor,
   computeBestSellerRanks,

@@ -18,19 +18,24 @@
   var SIGNUP_URL = 'https://kolayxport.com/login?mode=signup&utm_source=extension&utm_medium=limit';
   var REASONS = { user_daily: 1, global_brake: 1, signed_out: 1 };
 
-  var lang = (function () {
-    try { return chrome.i18n.getUILanguage().indexOf('tr') === 0 ? 'tr' : 'en'; }
-    catch (_) { return ((typeof navigator !== 'undefined' && navigator.language) || '').indexOf('tr') === 0 ? 'tr' : 'en'; }
-  })();
+  // Language: lib/lang.js (stored choice → account language → 'tr'), read at render time.
+  function lang() {
+    try {
+      var L = typeof window !== 'undefined' && window.__KX_LANG;
+      return (L && L.get()) || 'tr';
+    } catch (_) {
+      return 'tr';
+    }
+  }
 
   var COPY = {
     tr: {
       userTitle: 'Günlük araştırma hakkınız doldu',
       userSub: "Yarın 00:00'da yenilenir.",
-      upgrade: 'Planı yükselt',
+      upgrade: 'Planınızı yükseltin',
       signedOutTitle: 'Araştırma için ücretsiz deneyin',
-      signedOutSub: 'KolayXport hesabıyla tüm araştırma verilerini görün.',
-      trial: '14 gün ücretsiz dene',
+      signedOutSub: 'KolayXport hesabınızla tüm araştırma verilerini görün.',
+      trial: '14 gün ücretsiz deneyin',
       brakeTitle: 'Yoğunluk nedeniyle şu an yalnızca önbellekteki veriler gösteriliyor, birazdan tekrar deneyin',
       usage: 'Bugün: {used} / {limit} araştırma',
     },
@@ -47,7 +52,8 @@
   };
 
   function t(key, vars) {
-    var s = (COPY[lang] && COPY[lang][key]) || COPY.en[key] || key;
+    var l = lang();
+    var s = (COPY[l] && COPY[l][key]) || COPY.en[key] || key;
     if (vars) Object.keys(vars).forEach(function (k) { s = s.split('{' + k + '}').join(String(vars[k])); });
     return s;
   }
@@ -207,7 +213,7 @@
     pageViewId: pageViewId,
     toError: toError,
     t: t,
-    lang: lang,
+    get lang() { return lang(); },
     UPGRADE_URL: UPGRADE_URL,
     SIGNUP_URL: SIGNUP_URL,
   };

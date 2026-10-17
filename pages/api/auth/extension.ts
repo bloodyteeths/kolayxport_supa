@@ -2,6 +2,22 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser, createExtensionToken, EXTENSION_TOKEN_MAX_AGE_SECONDS } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 import { logSecurityEvent } from '@/lib/admin/events';
+import prisma from '@/lib/prisma';
+import { normalizeLocale } from '@/lib/notificationCenter/preferences';
+
+/**
+ * The account language ('tr' | 'en') the app records for this user
+ * (NotificationSettings.locale, captured from the app UI's X-KX-Locale header), or null.
+ * The extension uses it for its overlays unless the user picked a language in the popup.
+ */
+async function accountLocale(userId: string): Promise<'tr' | 'en' | null> {
+  try {
+    const row = await prisma.notificationSettings.findUnique({ where: { userId }, select: { locale: true } });
+    return normalizeLocale(row?.locale);
+  } catch {
+    return null; // never block sign-in on this
+  }
+}
 
 /**
  * Chrome Extension Authentication Endpoint
@@ -106,15 +122,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
+    const locale = await accountLocale(user.id);
+
     res.setHeader('Cache-Control', 'no-store, private');
     return res.status(200).json({
       authenticated: true,
       token,
       expiresIn: EXTENSION_TOKEN_MAX_AGE_SECONDS,
+      locale,
       user: {
         id: user.id,
         email: user.email,
         name: user.name || user.email,
+        locale,
       },
       message: 'Authentication successful',
     });

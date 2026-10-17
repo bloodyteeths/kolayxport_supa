@@ -28,15 +28,15 @@ const bg429 = (reason = 'user_daily') => ({ error: 'research_limit', status: 429
 type Msg = { type?: string; action?: string; params?: Record<string, unknown>; pv?: string; [k: string]: unknown };
 const doms: JSDOM[] = [];
 
-function boot(url: string, html: string, scripts: string[], onMsg: (m: Msg) => unknown, uiLang = 'en-US') {
+/** `lang`: the popup choice stored as kx_lang ('en' | 'tr'); null = nothing stored (→ Turkish). */
+function boot(url: string, html: string, scripts: string[], onMsg: (m: Msg) => unknown, lang: 'tr' | 'en' | null = 'en') {
   const dom = new JSDOM(`<!doctype html><html><head></head><body>${html}</body></html>`, { url, runScripts: 'outside-only' });
   doms.push(dom);
   const w = dom.window as unknown as Record<string, any> & { eval: (s: string) => unknown };
   const calls: Msg[] = [];
   const opened: string[] = [];
   w.chrome = {
-    i18n: { getUILanguage: () => uiLang },
-    storage: { local: { get: (_k: string, cb: (r: object) => void) => cb({}) } },
+    storage: { local: { get: (_k: unknown, cb: (r: object) => void) => cb(lang ? { kx_lang: lang } : {}) } },
     runtime: {
       lastError: undefined,
       sendMessage: (msg: Msg, cb?: (r: unknown) => void) => {
@@ -47,6 +47,7 @@ function boot(url: string, html: string, scripts: string[], onMsg: (m: Msg) => u
   };
   w.open = (u: string) => { opened.push(u); return null; };
   w.__KX_CACHE = { getOrFetch: (_k: string, _t: string, fetcher: () => Promise<unknown>) => fetcher() };
+  w.eval(src('lib/lang.js'));
   w.eval(src('lib/limitCard.js'));
   for (const s of scripts) w.eval(src(s));
   return { dom, w, calls, opened, doc: w.document as Document };
@@ -94,13 +95,13 @@ describe('Etsy overlays', () => {
     expect(calls.find((c) => c.type === 'kx_telemetry_event')).toMatchObject({ event: 'research_upgrade_click', reason: 'user_daily', surface: 'etsy_search' });
   });
 
-  it('Turkish UI copy', async () => {
+  it('Turkish copy by default (nothing stored)', async () => {
     const { doc } = boot('https://www.etsy.com/search?q=keten', '', [...ETSY, 'content-search.js'],
-      (m) => (m.type === 'kx_research' ? bg429() : null), 'tr-TR');
+      (m) => (m.type === 'kx_research' ? bg429() : null), null);
     const card = await waitFor(() => cardIn(shadowOf(doc, 'kx-search-overlay')));
     expect(norm(card.textContent)).toContain('Günlük araştırma hakkınız doldu');
     expect(norm(card.textContent)).toContain("Yarın 00:00'da yenilenir.");
-    expect(card.querySelector('.kx-limit-upgrade')!.textContent).toBe('Planı yükselt');
+    expect(card.querySelector('.kx-limit-upgrade')!.textContent).toBe('Planınızı yükseltin');
   });
 
   it('listing panel: 429 → card; signed out (401) → free-trial card', async () => {
@@ -112,19 +113,19 @@ describe('Etsy overlays', () => {
     expect(a.calls[0].pv).toMatch(/^pv/);
 
     const b = boot('https://www.etsy.com/listing/1234567/linen', html, [...ETSY, 'content-listing.js'],
-      (m) => (m.type === 'kx_listing_stats' ? { error: 'NOT_AUTHENTICATED', status: 401 } : null), 'tr-TR');
+      (m) => (m.type === 'kx_listing_stats' ? { error: 'NOT_AUTHENTICATED', status: 401 } : null), null);
     const so = await waitFor(() => cardIn(b.doc.getElementById('kx-listing-stats')));
     expect(so.getAttribute('data-kx-limit')).toBe('signed_out');
     expect(norm(so.textContent)).toContain('Araştırma için ücretsiz deneyin');
     const btn = so.querySelector('.kx-limit-upgrade') as HTMLButtonElement;
-    expect(btn.textContent).toBe('14 gün ücretsiz dene');
+    expect(btn.textContent).toBe('14 gün ücretsiz deneyin');
     btn.click();
     expect(b.opened).toEqual(['https://kolayxport.com/login?mode=signup&utm_source=extension&utm_medium=limit']);
   });
 
   it('shop bar: global brake → busy card without an upgrade button', async () => {
     const { doc } = boot('https://www.etsy.com/shop/MyShop', '', [...ETSY, 'content-shop.js'],
-      (m) => (m.type === 'kx_research' ? bg429('global_brake') : null), 'tr-TR');
+      (m) => (m.type === 'kx_research' ? bg429('global_brake') : null), 'tr');
     const card = await waitFor(() => cardIn(shadowOf(doc, 'kx-shop-overlay')));
     expect(card.getAttribute('data-kx-limit')).toBe('global_brake');
     expect(norm(card.textContent)).toContain('Yoğunluk nedeniyle şu an yalnızca önbellekteki veriler gösteriliyor, birazdan tekrar deneyin');
@@ -182,28 +183,67 @@ describe('Amazon overlays', () => {
 });
 
 describe('popup', () => {
-  function bootPopup(stored: Record<string, unknown>, uiLang = 'tr-TR') {
+  function bootPopup(stored: Record<string, unknown>) {
     const html = readFileSync(path.join(root, 'popup.html'), 'utf8').replace(/<script[^>]*><\/script>/g, '');
     const dom = new JSDOM(html, { url: 'chrome-extension://abc/src/popup.html', runScripts: 'outside-only' });
     doms.push(dom);
     const w = dom.window as any;
     const created: string[] = [];
     const sent: Msg[] = [];
+    const changeListeners: Array<(changes: Record<string, unknown>, area: string) => void> = [];
+    const fire = (key: string) => changeListeners.forEach((l) => l({ [key]: {} }, 'local'));
     w.chrome = {
-      i18n: { getUILanguage: () => uiLang },
       runtime: {
         lastError: undefined,
         getManifest: () => ({ version: '9.7.1' }),
         sendMessage: (msg: Msg, cb?: (r: unknown) => void) => { sent.push(msg); setTimeout(() => cb && cb(msg.action === 'getAuthStatus' ? { authenticated: true } : {}), 0); },
       },
-      storage: { local: { get: (k: string, cb: (r: object) => void) => cb(typeof k === 'string' && k in stored ? { [k]: stored[k] } : {}), set: () => {} } },
+      storage: { local: {
+        get: (k: string | string[], cb: (r: object) => void) => {
+          const out: Record<string, unknown> = {};
+          for (const key of ([] as string[]).concat(k)) if (key in stored) out[key] = stored[key];
+          cb(out);
+        },
+        set: (o: Record<string, unknown>) => { Object.assign(stored, o); Object.keys(o).forEach(fire); },
+        remove: (k: string) => { delete stored[k]; fire(k); },
+      }, onChanged: { addListener: (l: (changes: Record<string, unknown>, area: string) => void) => changeListeners.push(l) } },
       tabs: { create: ({ url }: { url: string }) => created.push(url), query: () => {} },
     };
+    w.eval(src('lib/lang.js'));
     w.eval(src('lib/limitCard.js'));
     w.eval(src('popup.js'));
     w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
-    return { doc: w.document as Document, created, sent };
+    return { doc: w.document as Document, created, sent, stored };
   }
+
+  it('language selector: Otomatik by default; picking English stores kx_lang and re-renders live', async () => {
+    const { doc, stored } = bootPopup({ kx_account_lang: 'tr' });
+    const sel = await waitFor(() => (doc.getElementById('langSelect') as HTMLSelectElement | null));
+    await waitFor(() => doc.getElementById('authStatus')!.textContent === 'Bağlı'); // popup initialised
+    expect(doc.getElementById('langHint')!.textContent).toContain('Hesap dilinizi');
+    expect(sel.value).toBe('auto');
+    expect(norm(sel.options[0].textContent)).toBe('Otomatik');
+    expect(doc.querySelector('[data-i18n="status"]')!.textContent).toBe('Durum');
+
+    sel.value = 'en';
+    sel.dispatchEvent(new (doc.defaultView as any).Event('change'));
+    expect(stored.kx_lang).toBe('en');
+    await waitFor(() => doc.querySelector('[data-i18n="status"]')!.textContent === 'Status');
+    expect(norm(sel.options[0].textContent)).toBe('Automatic');
+    expect(doc.getElementById('authStatus')!.textContent).toBe('Connected');
+    expect(doc.documentElement.lang).toBe('en');
+
+    sel.value = 'auto';
+    sel.dispatchEvent(new (doc.defaultView as any).Event('change'));
+    expect('kx_lang' in stored).toBe(false);
+    await waitFor(() => doc.querySelector('[data-i18n="status"]')!.textContent === 'Durum'); // account language
+  });
+
+  it('account language English, no explicit choice → English popup', async () => {
+    const { doc } = bootPopup({ kx_account_lang: 'en' });
+    await waitFor(() => doc.querySelector('[data-i18n="status"]')!.textContent === 'Status');
+    expect((doc.getElementById('langSelect') as HTMLSelectElement).value).toBe('auto');
+  });
 
   it('shows "Bugün: X / Y araştırma" from the last research answer', async () => {
     const { doc } = bootPopup({ kx_research_quota: { used: 12, limit: 150, resetAt: '2999-01-01T21:00:00.000Z', reason: null } });
@@ -222,7 +262,7 @@ describe('popup', () => {
   });
 
   it('a state from before the reset counts as a fresh day', async () => {
-    const { doc } = bootPopup({ kx_research_quota: { used: 150, limit: 150, resetAt: '2000-01-01T21:00:00.000Z', reason: 'user_daily' } }, 'en-US');
+    const { doc } = bootPopup({ kx_lang: 'en', kx_research_quota: { used: 150, limit: 150, resetAt: '2000-01-01T21:00:00.000Z', reason: 'user_daily' } });
     await waitFor(() => doc.getElementById('researchUsage')!.textContent!.includes('Today'));
     expect(doc.getElementById('researchUsage')!.textContent).toBe('Today: 0 / 150 lookups');
     expect(cardIn(doc.getElementById('researchLimit'))).toBeNull();
@@ -248,9 +288,19 @@ describe('background worker', () => {
     };
     const ctx = vm.createContext({ chrome, fetch: fetchImpl, self: { addEventListener() {} }, console, setTimeout, clearTimeout, Date, URLSearchParams, encodeURIComponent, Promise, JSON });
     vm.runInContext(src('background-simple.js'), ctx);
-    const send = (msg: Msg) => new Promise<any>((resolve) => listener(msg, { url: 'https://www.etsy.com/search' }, resolve));
+    const send = (msg: Msg, senderUrl = 'https://www.etsy.com/search') => new Promise<any>((resolve) => listener(msg, { url: senderUrl }, resolve));
     return { send, storage };
   }
+
+  it('stores the account language from /api/auth/extension as kx_account_lang', async () => {
+    const { send, storage } = bootBackground(async () => ({ ok: true, status: 200, json: async () => ({}) }));
+    await send({ action: 'authTokenFromPage', token: 't2', expiresIn: 3600, user: { email: 'a@b.c', name: 'A', locale: 'en' } }, 'https://kolayxport.com/app');
+    expect(storage.kx_account_lang).toBe('en');
+    expect(storage.kx_user).toEqual({ email: 'a@b.c', name: 'A' });
+    // Unknown / missing locale leaves the stored value alone.
+    await send({ action: 'authTokenFromPage', token: 't3', expiresIn: 3600, user: { email: 'a@b.c', name: 'A', locale: 'de' } }, 'https://kolayxport.com/app');
+    expect(storage.kx_account_lang).toBe('en');
+  });
 
   it('forwards the whole 429 body to the content script and tags research calls', async () => {
     const seen: Array<{ url: string; headers: Record<string, string> }> = [];

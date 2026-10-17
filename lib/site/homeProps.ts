@@ -3,6 +3,7 @@ import { photos, screens } from './media';
 import { HOME_INTEGRATIONS } from './homeData';
 import { testimonials } from './testimonials';
 import type { SiteLocale } from './routes';
+import { siteMessageProps } from '@/lib/i18n/pageMessages';
 
 export async function homeStaticProps(locale: SiteLocale) {
   const docs = listContent(locale, 'integrations');
@@ -12,6 +13,7 @@ export async function homeStaticProps(locale: SiteLocale) {
     .map((d) => ({ slug: d!.slug, name: String(d!.meta.name || d!.slug), kind: String(d!.meta.kind || 'marketplace'), status: String(d!.meta.status || 'production') }));
   return {
     props: {
+      ...siteMessageProps(locale),
       locale,
       integrations,
       testimonials: testimonials(locale),

@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
+import { pickMessages, SITE_NAMESPACES } from '@/lib/i18n/pageMessages';
 import PublicLayout from '@/components/PublicLayout';
 
 export default function Custom404() {
@@ -14,4 +15,8 @@ export default function Custom404() {
       </div>
     </PublicLayout>
   );
+}
+
+export async function getStaticProps() {
+  return { props: { messages: pickMessages('tr', [...SITE_NAMESPACES, ...[]]), messagesLocale: 'tr' } };
 }

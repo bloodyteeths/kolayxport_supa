@@ -1,8 +1,6 @@
 import { useEffect, type ReactNode } from 'react';
 import { NextSeo } from 'next-seo';
-import { NextIntlClientProvider, useTranslations } from 'next-intl';
-import trMessages from '@/messages/tr.json';
-import enMessages from '@/messages/en.json';
+import { useTranslations } from 'next-intl';
 import { SITE_URL } from '@/lib/site/company';
 import { localePath, type SiteLocale } from '@/lib/site/routes';
 import { organization, website } from '@/lib/site/schema';
@@ -24,8 +22,6 @@ export interface SiteSeo {
   type?: 'website' | 'article';
 }
 
-const MESSAGES = { tr: trMessages, en: enMessages } as const;
-
 interface Props {
   locale: SiteLocale;
   seo: SiteSeo;
@@ -36,15 +32,13 @@ interface Props {
 }
 
 /**
- * Every public marketing page. Locks the locale per route (Turkish at /, English at /en), sets
+ * Every public marketing page. The locale is fixed per route (Turkish at /, English at /en) by the page's
+ * getStaticProps (`siteMessageProps`). Sets
  * canonical + hreflang + OG, the Organization/WebSite JSON-LD, the brand fonts, header and footer.
  */
 export default function SiteLayout({ locale, seo, jsonLd = [], children, tone = 'paper' }: Props) {
-  return (
-    <NextIntlClientProvider locale={locale} messages={MESSAGES[locale]} timeZone="Europe/Istanbul">
-      <SiteShell locale={locale} seo={seo} jsonLd={jsonLd} tone={tone}>{children}</SiteShell>
-    </NextIntlClientProvider>
-  );
+  // The intl provider lives in pages/_app.tsx: marketing pages pass `siteLocale` + their message subset.
+  return <SiteShell locale={locale} seo={seo} jsonLd={jsonLd} tone={tone}>{children}</SiteShell>;
 }
 
 function SiteShell({ locale, seo, jsonLd = [], children, tone }: Props) {

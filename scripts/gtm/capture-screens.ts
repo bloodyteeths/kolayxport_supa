@@ -58,12 +58,13 @@ const json = (route: Route, body: unknown, status = 200) =>
 const img = (k: string) => `${BASE}/demo/${k}.jpg`;
 
 function etsyListingFixture() {
-  const photos = ['iznik-bowl-blue', 'iznik-bowl-turquoise', 'iznik-plate-tulip', 'iznik-plate-green', 'ceramic-mug-terracotta', 'ceramic-mug-sage', 'copper-cezve'];
+  const photos = ['iznik-bowl-blue', 'iznik-plate-tulip', 'iznik-bowl-turquoise', 'iznik-plate-green', 'iznik-bowl-blue', 'iznik-plate-tulip', 'iznik-bowl-turquoise', 'iznik-plate-green', 'iznik-bowl-blue', 'iznik-plate-tulip'];
+  const alts = ['Cobalt blue Iznik ceramic bowl with tulip pattern', 'Matching Iznik tulip plate from the same set', 'Turquoise colour option of the Iznik bowl', 'Green floral Iznik plate', 'Iznik bowl styled with fruit on a linen table', 'Tulip plate hanging on a wall', 'Turquoise bowl next to a coffee cup for scale', 'Close-up of hand painted brush strokes', 'Gift box with tissue paper', 'Bowl and plate set on a dining table'];
   return {
     listing_id: Number(LISTING_ID), shop_id: Number(ETSY_SHOP_ID),
     title: 'Handmade Iznik Ceramic Bowl, Cobalt Blue Tulip Pattern, Turkish Pottery Serving Bowl, 8 Inch',
     description: 'Hand painted in our Istanbul workshop using the 500-year-old Iznik tulip motif. Each bowl is wheel-thrown, painted by hand and fired twice, so no two are exactly alike.\n\nSize: 20 cm (8 in) diameter, 8 cm tall\nFood safe, lead free glaze. Hand wash recommended.\n\nShips from Istanbul in 1-3 business days, gift wrapped on request.',
-    tags: ['turkish ceramic', 'iznik pottery', 'handmade bowl', 'housewarming gift', 'ceramic gift', 'hand painted', 'kitchen decor', 'boho kitchen', 'pottery gift', 'serving bowl', 'stoneware', 'gift for mom', 'table decor'],
+    tags: ['housewarming gift', 'gift for mom', 'kitchen decor', 'boho kitchen', 'fruit centerpiece', 'salad server', 'anatolian art', 'ottoman design', 'bridal shower', 'hostess present', 'unique dinnerware', 'istanbul souvenir', 'mothers day'],
     materials: ['ceramic', 'glaze', 'clay'],
     price: { amount: 4800, divisor: 100, currency_code: 'USD' },
     views: 2310, num_favorers: 412, quantity: 14, state: 'active',
@@ -79,7 +80,7 @@ function etsyListingFixture() {
     images: photos.map((k, i) => ({
       listing_image_id: 6100000000 + i, rank: i + 1,
       url_75x75: img(k), url_170x135: img(k), url_570xN: img(k), url_fullxfull: img(k),
-      alt_text: i === 0 ? 'Cobalt blue Iznik ceramic bowl with tulip pattern' : '',
+      alt_text: alts[i],
     })),
   };
 }
@@ -115,11 +116,12 @@ async function mockEtsyClawd(route: Route) {
   const action = u.searchParams.get('action');
   switch (action) {
     case 'listing': return json(route, etsyListingFixture());
-    case 'get_shop_sections': return json(route, { count: 4, results: [
+    case 'get_shop_sections': return json(route, { count: 5, results: [
       { shop_section_id: 51001, title: 'Iznik Ceramics', rank: 1, active_listing_count: 9 },
       { shop_section_id: 51002, title: 'Telkari Silver', rank: 2, active_listing_count: 6 },
       { shop_section_id: 51003, title: 'Turkish Towels', rank: 3, active_listing_count: 5 },
       { shop_section_id: 51004, title: 'Leather Goods', rank: 4, active_listing_count: 3 },
+      { shop_section_id: 51005, title: 'Home Decor', rank: 5, active_listing_count: 3 },
     ] });
     case 'get_shipping_profiles': return json(route, { count: 2, results: [
       { shipping_profile_id: 61001, title: 'Worldwide from Istanbul (FedEx/UPS)', min_processing_days: 1, max_processing_days: 3, origin_country_iso: 'TR' },
@@ -235,6 +237,12 @@ async function mockDraftReply(route: Route) {
 }
 
 async function installMocks(ctx: BrowserContext) {
+  // Price-gap images must be https: the seed points them at a fake host that we serve from public/demo.
+  await ctx.route('https://demo-cdn.kolayxport.test/**', async (route) => {
+    const file = path.join(ROOT, 'public', new URL(route.request().url()).pathname);
+    if (!fs.existsSync(file)) return route.fulfill({ status: 404, body: '' });
+    return route.fulfill({ status: 200, contentType: 'image/jpeg', body: fs.readFileSync(file) });
+  });
   await ctx.route('**/api/clawd/etsy**', mockEtsyClawd);
   await ctx.route('**/api/ai/etsy**', mockAiEtsy);
   await ctx.route('**/api/messages?**', mockMessages);
@@ -266,9 +274,10 @@ const SCREENS: Screen[] = [
   {
     id: 'labels', path: '/app/labels', ready: 'text=/Emily|Michael|Sarah|Jessica|Olivia|Lena/',
     act: async (page, l) => {
-      const ok = await clickFirst(page, [`button:has-text("${l === 'tr' ? 'Etiket oluştur' : 'Create label'}")`, 'button:has-text("Etiket")', 'button:has-text("Create label")']);
-      if (!ok) console.warn('  [labels] create-label button not found');
-      await page.waitForTimeout(2500);
+      // The per-row button (exact text), not the bulk "N labels" header button.
+      const btn = page.getByRole('button', { name: l === 'tr' ? 'Etiket oluştur' : 'Create label', exact: true }).first();
+      try { await btn.click({ timeout: 8000 }); } catch { console.warn('  [labels] row create-label button not found'); }
+      await page.waitForTimeout(3000);
     },
     crop: 'page',
   },
@@ -276,12 +285,31 @@ const SCREENS: Screen[] = [
   {
     id: 'listing-editor', path: `/app/etsy-listings/${LISTING_ID}?shop=${ETSY_SHOP_ID}`, ready: 'text=/Iznik/',
     act: async (page, l) => {
-      const ok = await clickFirst(page, [`button:has-text("${l === 'tr' ? 'Başlık öner' : 'Suggest a title'}")`, '[data-testid="le-title"] button:has-text("AI")']);
+      const ok = await clickFirst(page, [`button:has-text("${l === 'tr' ? 'Başlık öner' : 'Suggest a title'}")`]);
       if (!ok) console.warn('  [listing-editor] AI title button not found');
-      await page.waitForTimeout(2500);
+      const sug = page.locator('[data-testid="le-title-suggestion"]').first();
+      try {
+        await sug.waitFor({ state: 'visible', timeout: 15000 });
+        await page.locator('#kx-main').evaluate((m) => { m.scrollTop = 0; });
+        // Scroll just enough that the whole suggestion card clears the sticky save bar (~100px).
+        const box = await sug.boundingBox();
+        const mainBox = await page.locator('#kx-main').boundingBox();
+        const limit = (mainBox ? mainBox.y + mainBox.height : 900) - 110;
+        if (box && box.y + box.height > limit) await page.locator('#kx-main').evaluate((m, dy) => { m.scrollTop += dy; }, box.y + box.height - limit);
+      } catch { console.warn('  [listing-editor] AI suggestion did not appear'); }
+      await page.waitForTimeout(1500);
     },
   },
-  { id: 'bulk-editor', path: '/app/etsy-listings/bulk', ready: 'text=/Iznik|Telkari|Peshtemal/' },
+  {
+    id: 'bulk-editor', path: '/app/etsy-listings/bulk', ready: 'text=/Iznik|Telkari|Peshtemal/',
+    act: async (page) => {
+      // Select a few rows so the bulk action bar shows, then drop focus rings.
+      const boxes = page.locator('#kx-main tbody input[type="checkbox"]');
+      for (const i of [1, 2, 3]) await boxes.nth(i).check({ timeout: 3000 }).catch(() => undefined);
+      await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+      await page.waitForTimeout(800);
+    },
+  },
   { id: 'research', path: '/app/research/keywords?q=turkish%20towel&mkt=etsy&country=US&view=suggested', ready: 'text=/peshtemal/i', settleMs: 4000 },
   { id: 'arbitrage', path: '/app/research/products?source=trendyol&from=category&cat=havlu-x-c839', ready: 'text=/Peştamal|Hamam/', settleMs: 4000 },
   { id: 'profit', path: '/app/reports/profit?mp=etsy', ready: 'text=/\\$/', settleMs: 5000 },
@@ -326,7 +354,7 @@ async function capture(ctx: BrowserContext, screen: Screen, locale: Locale) {
   if (screen.ready) {
     await page.locator(screen.ready).first().waitFor({ state: 'visible', timeout: 60_000 }).catch(() => console.warn(`  ready selector not seen: ${screen.ready}`));
   }
-  await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => undefined);
+  await page.waitForLoadState('networkidle', { timeout: 6_000 }).catch(() => undefined);
   if (screen.act) await screen.act(page, locale);
   await page.addStyleTag({ content: HIDE_CSS }).catch(() => undefined);
   // Let skeletons / images settle.

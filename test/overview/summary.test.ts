@@ -385,31 +385,31 @@ describe('labels and tracking', () => {
 describe('usage', () => {
   it('fallback snapshot: expired reset reads 0 used, trial limits, near-limit', () => {
     const trial = usageSnapshotFromUser(
-      { subscriptionPlan: null, subscriptionStatus: 'trialing', billingProvider: null, trialExpiresAt: new Date('2026-10-20T00:00:00Z'), usageResetAt: new Date('2026-11-01T00:00:00Z'), orderSyncCount: 45, labelCount: 2 },
+      { subscriptionPlan: null, subscriptionStatus: 'trialing', billingProvider: null, trialExpiresAt: new Date('2026-10-20T00:00:00Z'), usageResetAt: new Date('2026-11-01T00:00:00Z'), orderSyncCount: 140, labelCount: 2 },
       { activeShopifyShops: 0 },
       NOW,
     );
-    expect(trial).toMatchObject({ orderSync: { used: 45, limit: 50 }, label: { used: 2, limit: 10 }, nearLimit: true, blocked: null, trialEndsAt: '2026-10-20T00:00:00.000Z' });
+    expect(trial).toMatchObject({ orderSync: { used: 140, limit: 150 }, label: { used: 2, limit: 30 }, nearLimit: true, blocked: null, trialEndsAt: '2026-10-20T00:00:00.000Z' });
     const expired = usageSnapshotFromUser(
       { subscriptionPlan: 'starter', subscriptionStatus: 'active', billingProvider: 'stripe', trialExpiresAt: null, usageResetAt: new Date('2026-10-01T00:00:00Z'), orderSyncCount: 999, labelCount: 999 },
       { activeShopifyShops: 0 },
       NOW,
     );
-    expect(expired).toMatchObject({ orderSync: { used: 0, limit: 200 }, label: { used: 0, limit: 100 }, blocked: null, resetsAt: null });
+    expect(expired).toMatchObject({ orderSync: { used: 0, limit: 500 }, label: { used: 0, limit: 250 }, blocked: null, resetsAt: null });
   });
 
   it('blocked reasons, unlimited as null, hideBilling for Shopify', () => {
-    const base = { trialExpiresAt: null, usageResetAt: new Date('2026-11-01T00:00:00Z'), orderSyncCount: 200, labelCount: 0 };
+    const base = { trialExpiresAt: null, usageResetAt: new Date('2026-11-01T00:00:00Z'), orderSyncCount: 500, labelCount: 0 };
     expect(usageSnapshotFromUser({ ...base, subscriptionPlan: 'starter', subscriptionStatus: 'active', billingProvider: 'stripe' }, { activeShopifyShops: 0 }, NOW).blocked).toBe('planLimit');
     expect(usageSnapshotFromUser({ ...base, subscriptionPlan: null, subscriptionStatus: 'canceled', billingProvider: 'stripe' }, { activeShopifyShops: 0 }, NOW).blocked).toBe('noSubscription');
-    expect(usageSnapshotFromUser({ ...base, subscriptionPlan: 'pro', subscriptionStatus: 'active', billingProvider: 'stripe' }, { activeShopifyShops: 0 }, NOW).blocked).toBe('invalidPlan');
+    expect(usageSnapshotFromUser({ ...base, subscriptionPlan: 'bogus', subscriptionStatus: 'active', billingProvider: 'stripe' }, { activeShopifyShops: 0 }, NOW).blocked).toBe('invalidPlan');
     const shop = usageSnapshotFromUser({ ...base, subscriptionPlan: 'shopify_free', subscriptionStatus: null, billingProvider: 'shopify' }, { activeShopifyShops: 1 }, NOW);
     expect(shop).toMatchObject({ hideBilling: true, blocked: null, orderSync: { limit: null }, label: { limit: null }, nearLimit: false });
   });
 
   it('summary.usage comes from the fallback while getUsageSnapshot is not exported', async () => {
     const s = await getOverviewSummary({ userId: 'u1', tz: 'UTC', currency: 'TRY', now: NOW });
-    expect(s.usage).toMatchObject({ plan: 'starter', orderSync: { used: 170, limit: 200 }, nearLimit: true, hideBilling: false });
+    expect(s.usage).toMatchObject({ plan: 'starter', orderSync: { used: 170, limit: 500 }, nearLimit: false, hideBilling: false });
   });
 });
 

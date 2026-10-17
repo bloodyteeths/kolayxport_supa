@@ -2,6 +2,7 @@
 import { contentCards, contentSlugs, getContent, type ContentType } from './content';
 import { photo, screen, type Asset } from './media';
 import type { SiteLocale } from './routes';
+import { siteMessageProps } from '@/lib/i18n/pageMessages';
 
 /** Turkish base path per content type; English = /en + base. Legal pages live at the root. */
 export const BASE: Record<ContentType, string> = {
@@ -31,6 +32,7 @@ export async function docProps(locale: SiteLocale, type: ContentType, slug: stri
   const ogPath = `/og/${locale}/${type}/${slug}.png`;
   return {
     props: {
+      ...siteMessageProps(locale),
       locale,
       type,
       doc,
@@ -45,5 +47,5 @@ export async function docProps(locale: SiteLocale, type: ContentType, slug: stri
 }
 
 export function indexProps(locale: SiteLocale, type: ContentType) {
-  return { props: { locale, type, cards: contentCards(locale, type), path: BASE[type] } };
+  return { props: { ...siteMessageProps(locale), locale, type, cards: contentCards(locale, type), path: BASE[type] } };
 }

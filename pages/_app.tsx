@@ -5,19 +5,18 @@ import CssBaseline from '@mui/material/CssBaseline';
 import theme from '../lib/theme';
 import "../styles/globals.css";
 import { Toaster } from 'react-hot-toast';
-import { DefaultSeo, LogoJsonLd } from 'next-seo';
+import { DefaultSeo } from 'next-seo';
 import SEO from '../next-seo.config';
 import { SessionProvider } from 'next-auth/react';
 import { AuthProvider } from '@/lib/auth-context';
 import { ReactElement, ReactNode } from 'react';
 import { NextPage } from 'next';
 import { useRouter } from 'next/router';
-import { useEffect } from 'react';
+import { useEffect, useReducer, useRef } from 'react';
 import Head from 'next/head';
 import { NextIntlClientProvider } from 'next-intl';
 import useLocaleStore from '@/lib/stores/useLocaleStore';
-import trMessages from '@/messages/tr.json';
-import enMessages from '@/messages/en.json';
+import { cachedMessages, loadMessages } from '@/lib/i18n/clientMessages';
 import CookieConsent from '@/components/CookieConsent';
 import { captureAttribution, track } from '@/lib/tracking/events';
 
@@ -27,6 +26,12 @@ function funnelFromUrl(url: string) {
   if (u.pathname === '/fiyatlandirma') track('view_pricing');
   const ok = /^([a-z]+)_connected$/.exec(u.searchParams.get('success') || '');
   if (u.pathname === '/ayarlar' && ok) track('connect_marketplace', { marketplace: ok[1] });
+}
+
+/** Missing keys while a public page runs on its namespace subset are expected for hidden global UI; don't spam the console. */
+function intlOnError(error: { code?: string }) {
+  if (error?.code === 'MISSING_MESSAGE') return;
+  console.error(error);
 }
 
 // First path segment of Turkish marketing routes (SiteLayout sets <html lang> itself there).
@@ -64,7 +69,6 @@ type AppPropsWithLayout = AppProps & {
   Component: NextPageWithLayout;
 };
 
-const messages = { tr: trMessages, en: enMessages } as const;
 
 // Untyped on purpose: stale ambient shims in types/*.d.ts declare toastOptions without the per-type keys
 // (error/success) that react-hot-toast 2.6 supports at runtime.
@@ -177,10 +181,32 @@ function MyApp({ Component, pageProps }: AppProps) {
     hydrate();
   }, []);
 
+  // Messages: marketing/public pages pass their own subset via getStaticProps (lib/i18n/pageMessages.ts) and
+  // marketing pages fix their locale (`siteLocale`); everything else loads the full dictionary on demand.
+  const siteLocale = pageProps.siteLocale as 'tr' | 'en' | undefined;
+  const intlLocale = siteLocale ?? locale;
+  const [, rerender] = useReducer((n: number) => n + 1, 0);
+  const lastFull = useRef<{ locale: string; messages: Record<string, unknown> } | null>(null);
+  const full = cachedMessages(intlLocale);
+  if (full) lastFull.current = { locale: intlLocale, messages: full };
+  const provided = pageProps.messages && (!pageProps.messagesLocale || pageProps.messagesLocale === intlLocale) ? pageProps.messages : null;
+  const intlMessages = full ?? provided ?? lastFull.current?.messages ?? null;
+  useEffect(() => {
+    if (siteLocale || full) return;
+    let alive = true;
+    loadMessages(intlLocale).then(() => { if (alive) rerender(); });
+    return () => { alive = false; };
+  }, [intlLocale, siteLocale, full]);
+
+  if (!intlMessages) {
+    // App pages before their dictionary arrives (first visit only; cached after). Same markup on the server.
+    return <div style={{ minHeight: '100vh', background: '#F8FAFC' }} aria-busy="true" />;
+  }
+
   return (
     <SessionProvider session={pageProps.session}>
     <AuthProvider>
-      <NextIntlClientProvider locale={locale} messages={messages[locale]} timeZone="Europe/Istanbul">
+      <NextIntlClientProvider locale={intlLocale} messages={intlMessages} timeZone="Europe/Istanbul" onError={intlOnError}>
       <DsAppProviders>
       <ThemeProvider theme={theme}>
       <ConfirmProvider>
@@ -194,46 +220,7 @@ function MyApp({ Component, pageProps }: AppProps) {
           <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         </Head>
         <DefaultSeo {...SEO} />
-        <LogoJsonLd
-          logo="https://kolayxport.com/brand/kolayxport-symbol-512.png"
-          url="https://kolayxport.com"
-        />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "Organization",
-              "name": "KolayXport",
-              "url": "https://kolayxport.com",
-              "logo": "https://kolayxport.com/brand/kolayxport-symbol-512.png",
-              "email": "destek@kolayxport.com",
-              "sameAs": [
-                "https://twitter.com/kolayxport",
-                "https://linkedin.com/company/kolayxport",
-                "https://youtube.com/kolayxport"
-              ]
-            })
-          }}
-        />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "SoftwareApplication",
-              "name": "KolayXport",
-              "applicationCategory": "BusinessApplication",
-              "operatingSystem": "Web",
-              "offers": {
-                "@type": "Offer",
-                "price": "0",
-                "priceCurrency": "TRY",
-                "description": "14 gün ücretsiz deneme"
-              }
-            })
-          }}
-        />
+        {/* Organization / WebSite / SoftwareApplication JSON-LD: components/site/SiteLayout (marketing pages only). */}
         {isShellRoute(router.pathname) ? (
           <AppShellMount>
             <Component {...pageProps} />

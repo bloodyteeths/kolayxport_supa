@@ -236,7 +236,9 @@ export default async function handler(req, res) {
 
     try {
       const checkoutSession = await stripe.checkout.sessions.create({
-        ...(discounts ? { discounts } : {}),
+        // Stripe allows either a fixed discount or the promotion-code field: founding members get the
+        // coupon; everyone else can enter a code (community / partner codes, docs/gtm/social).
+        ...(discounts ? { discounts } : { allow_promotion_codes: true }),
         // Consent + click ids for the server-side `purchase` event sent by the webhook.
         metadata: { ...contextToMetadata(contextFromRequest(req)), plan, interval },
         payment_method_types: ['card'],

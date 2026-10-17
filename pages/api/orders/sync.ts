@@ -192,9 +192,9 @@ async function handler(
           combinedResult.errors.push(...(result.errors || []));
         }
 
-        // Increment usage counter after successful sync
+        // Usage meter counts newly imported orders (not sync calls).
         if (res.incrementUsage) {
-          await res.incrementUsage();
+          await res.incrementUsage(combinedResult.newOrders);
         }
 
         logger.info(`[Fast Sync] Combined sync completed for user ${userId}:`, combinedResult);

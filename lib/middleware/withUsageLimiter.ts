@@ -179,11 +179,15 @@ export const withUsageLimiter = (handler, limitType: 'orderSync' | 'label') => {
 
     // Increment the counter after a successful operation
     // The handler should call this function
-    res.incrementUsage = async () => {
+    // `amount`: labels count 1 per call; order syncs pass the number of NEW orders imported, so the
+    // meter counts orders (what pricing promises), not refresh clicks.
+    res.incrementUsage = async (amount: number = 1) => {
+      const n = Math.max(0, Math.floor(Number(amount) || 0));
+      if (n === 0) return;
       const fieldToIncrement = limitType === 'orderSync' ? 'orderSyncCount' : 'labelCount';
       await prisma.user.update({
         where: { id: user.id },
-        data: { [fieldToIncrement]: { increment: 1 } },
+        data: { [fieldToIncrement]: { increment: n } },
       });
     };
 
@@ -194,6 +198,6 @@ export const withUsageLimiter = (handler, limitType: 'orderSync' | 'label') => {
 // Extend the NextApiResponse type to include our custom function
 declare module 'http' {
   interface ServerResponse {
-    incrementUsage?: () => Promise<void>;
+    incrementUsage?: (amount?: number) => Promise<void>;
   }
 } 

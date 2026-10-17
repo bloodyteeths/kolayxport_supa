@@ -12,7 +12,8 @@
  * 2. DECIDED_PLAN_LIMITS — the launch tiers decided in design/launch/tiers.md
  *    §1 (Trial, Starter, Growth, Pro, Enterprise, shopify_free). The enforced
  *    numbers follow them; what is still different (the order meter counts sync
- *    calls, AI credits and store counts are not metered) is in ENFORCEMENT_GAP.
+ *    calls was fixed: it now counts new orders from manual/extension syncs; scheduled syncs, AI credits and store
+ *    counts are not metered) is in ENFORCEMENT_GAP.
  *
  * `null` = unlimited everywhere in this module (JSON-safe, unlike Infinity).
  */
@@ -37,7 +38,7 @@ export interface PlanLimits {
 /**
  * The limits `lib/middleware/withUsageLimiter.ts` enforces (it calls `getPlanLimits`
  * and `checkPlanLimit` below). The numbers follow DECIDED_PLAN_LIMITS; the order
- * meter still counts sync calls, not orders (D6, see ENFORCEMENT_GAP).
+ * meter counts new orders imported by manual and extension syncs (D6; scheduled syncs are not metered yet, see ENFORCEMENT_GAP).
  */
 export const ENFORCED_PLAN_LIMITS: Readonly<Record<'starter' | 'growth' | 'pro' | 'enterprise' | 'shopify_free', PlanLimits>> = {
   starter: { orderSync: 500, label: 250 },
@@ -199,10 +200,10 @@ export function getDecidedPlanLimits(plan: string | null | undefined): DecidedPl
  * Order meter: today counts sync API calls (`orderSyncCount`), decided counts orders (D6).
  */
 export const ENFORCEMENT_GAP: ReadonlyArray<{ plan: PlanKey; meter: 'orderSync→orders' | 'label→labels' | 'meter' | 'period'; enforced: string; decided: string }> = [
-  { plan: 'trial', meter: 'orderSync→orders', enforced: '150 sync calls', decided: '150 orders/month' },
-  { plan: 'starter', meter: 'orderSync→orders', enforced: '500 sync calls', decided: '500 orders/month' },
-  { plan: 'growth', meter: 'orderSync→orders', enforced: '2000 sync calls', decided: '2000 orders/month' },
-  { plan: 'pro', meter: 'orderSync→orders', enforced: '6000 sync calls', decided: '6000 orders/month' },
+  { plan: 'trial', meter: 'orderSync→orders', enforced: '150 new orders via manual / extension sync (scheduled syncs not metered yet, G16)', decided: '150 orders/month' },
+  { plan: 'starter', meter: 'orderSync→orders', enforced: '500 new orders via manual / extension sync', decided: '500 orders/month' },
+  { plan: 'growth', meter: 'orderSync→orders', enforced: '2000 new orders via manual / extension sync', decided: '2000 orders/month' },
+  { plan: 'pro', meter: 'orderSync→orders', enforced: '6000 new orders via manual / extension sync', decided: '6000 orders/month' },
   { plan: 'shopify_free', meter: 'meter', enforced: 'unlimited, no store/AI cap', decided: '1 non-Shopify store, 300 AI credits' },
   // The middleware reads only User.subscriptionPlan; /api/user/settings also shows
   // shopify_free for an active ShopifyShop or billingProvider. Its `limits` follow

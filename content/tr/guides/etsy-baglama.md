@@ -13,7 +13,7 @@ inventoryRefs:
   - ext-etsy-address
 draft: false
 order: 1
-duration: PT1M27S
+duration: PT1M14S
 video:
   file: etsy-baglama
   youtubeId: ''

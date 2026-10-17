@@ -11,6 +11,11 @@ set -euo pipefail
 STARTER=${STARTER:-prod_Shl7a7l3vXvMpJ}   # "Başlangıç" (existing live product)
 GROWTH=${GROWTH:-prod_ShlAKBtwxfUDRf}     # "Büyüme" (existing live product)
 MODE=${STRIPE_MODE---live}              # STRIPE_MODE= (empty) runs against test mode for a dry run
+# With STRIPE_API_KEY (an sk_live_ key) the CLI uses it directly; the key itself selects live mode.
+if [ -n "${STRIPE_API_KEY:-}" ]; then
+  case "$STRIPE_API_KEY" in sk_live_*|rk_live_*) MODE="" ;; *) echo "STRIPE_API_KEY must be a live key (sk_live_…)" >&2; exit 1 ;; esac
+  export STRIPE_API_KEY
+fi
 
 # Parse the CLI's JSON; on a Stripe error print its message and stop.
 json() { python3 -c "import sys,json,re

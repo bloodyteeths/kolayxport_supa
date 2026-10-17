@@ -37,7 +37,7 @@ const defaultSEOConfig = {
     site_name: 'KolayXport',
     images: [
       {
-        url: 'https://kolayxport.com/og-public.png',
+        url: 'https://kolayxport.com/og/default.png',
         width: 1200,
         height: 630,
         alt: 'KolayXport Dashboard',

@@ -6,9 +6,10 @@ export default function Document() {
     <Html lang="tr">
       <Head>
         <meta charSet="utf-8" />
-        <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" href="/favicon.ico" sizes="48x48" />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="manifest" href="/site.webmanifest" />
-        <meta name="theme-color" content="#2563eb" />
+        <meta name="theme-color" content="#0E1A2B" />
 
         {/* PWA meta tags */}
         <meta name="apple-mobile-web-app-capable" content="yes" />

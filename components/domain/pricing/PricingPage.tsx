@@ -135,7 +135,7 @@ export function PricingPage() {
       title={t('seo.title')}
       description={seoDescription}
     >
-      <NextSeo openGraph={{ images: [{ url: 'https://kolayxport.com/og-pricing.png', width: 1200, height: 630, alt: t('seo.ogAlt') }] }} />
+      <NextSeo openGraph={{ images: [{ url: 'https://kolayxport.com/og/default.png', width: 1200, height: 630, alt: t('seo.ogAlt') }] }} />
       <Box sx={{ bgcolor: neutral[50], color: neutral[800] }} data-testid="pricing-page" data-gate={gate}>
         <Box sx={{ maxWidth: layout.maxDetail, mx: 'auto', px: { xs: '16px', sm: '24px' }, pt: { xs: '24px', md: '48px' }, pb: '64px' }}>
           <PricingHeader />

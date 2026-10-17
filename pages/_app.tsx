@@ -168,7 +168,7 @@ function MyApp({ Component, pageProps }: AppProps) {
         </Head>
         <DefaultSeo {...SEO} />
         <LogoJsonLd
-          logo="https://kolayxport.com/logo.png"
+          logo="https://kolayxport.com/brand/kolayxport-symbol-512.png"
           url="https://kolayxport.com"
         />
         <script
@@ -179,7 +179,7 @@ function MyApp({ Component, pageProps }: AppProps) {
               "@type": "Organization",
               "name": "KolayXport",
               "url": "https://kolayxport.com",
-              "logo": "https://kolayxport.com/images/logo.png",
+              "logo": "https://kolayxport.com/brand/kolayxport-symbol-512.png",
               "email": "destek@kolayxport.com",
               "sameAs": [
                 "https://twitter.com/kolayxport",

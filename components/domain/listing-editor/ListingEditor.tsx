@@ -439,16 +439,27 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
   const scrollTo = React.useCallback((section: string, field?: string) => {
     if (typeof document === 'undefined') return;
     const el = document.getElementById(sectionAnchorId(section as SectionId));
-    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const fieldEl = () => (field ? document.getElementById(fieldAnchorId(field)) : null);
+    // A field deep in a long section (the shop section below 19 category details that load late) must end up on
+    // screen: scroll to the field itself, then again once late content has settled if it moved off screen.
+    const bring = (smooth: boolean) => {
+      const anchor = fieldEl();
+      if (anchor) {
+        anchor.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'center' });
+        anchor.focus({ preventScroll: true });
+        return true;
+      }
+      return false;
+    };
+    if (!bring(true)) el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     if (!field) return;
     window.setTimeout(() => {
-      const anchor = document.getElementById(fieldAnchorId(field));
-      const target = anchor ?? (el?.querySelector('input, textarea, [role="combobox"], button') as HTMLElement | null);
-      // A field deep in a long section (the shop section below 12 category details) must come into view, not only
-      // get focus while the section top is on screen.
-      if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      target?.focus({ preventScroll: true });
-    }, 350);
+      if (!bring(false)) (el?.querySelector('input, textarea, [role="combobox"], button') as HTMLElement | null)?.focus({ preventScroll: true });
+    }, 450);
+    window.setTimeout(() => {
+      const r = fieldEl()?.getBoundingClientRect();
+      if (r && (r.top < 0 || r.bottom > window.innerHeight)) bring(false);
+    }, 1500);
   }, []);
 
   // Deep links (`#photos`, `#price`, `#tags`…) from the Listing doctor / score fixes: a section id or a field key.

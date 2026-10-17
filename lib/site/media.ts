@@ -5,7 +5,7 @@ import path from 'path';
 import sharp from 'sharp';
 import type { SiteLocale } from './routes';
 
-export interface Asset { src: string; width: number; height: number; /** "url 800w, url 1200w, url 2400w" when variants exist */ srcSet?: string }
+export interface Asset { src: string; width: number; height: number; /** "url 800w, url 1200w, url 2400w" when variants exist */ srcSet?: string; /** 800px AVIF (phone captures) */ avif?: string }
 
 const PUB = path.join(process.cwd(), 'public');
 
@@ -19,7 +19,9 @@ async function asset(rel: string): Promise<Asset | null> {
     .map((w) => ({ w, rel: rel.replace(/\.webp$/, `@${w}.webp`) }))
     .filter((v) => v.w < meta.width! && fs.existsSync(path.join(PUB, v.rel)));
   const srcSet = vs.length ? [...vs.map((v) => `${v.rel} ${v.w}w`), `${rel} ${meta.width}w`].join(', ') : undefined;
-  return { src: rel, width: meta.width, height: meta.height, ...(srcSet ? { srcSet } : {}) };
+  const avifRel = rel.replace(/\.webp$/, '@800.avif');
+  const avif = fs.existsSync(path.join(PUB, avifRel)) ? avifRel : undefined;
+  return { src: rel, width: meta.width, height: meta.height, ...(srcSet ? { srcSet } : {}), ...(avif ? { avif } : {}) };
 }
 
 /** Lifestyle photo slot (public/marketing/<id>.webp), or null when not generated/approved yet. */

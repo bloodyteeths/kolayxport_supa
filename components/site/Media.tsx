@@ -8,17 +8,19 @@ export function Shot({ asset, mobile, alt, priority = false, className = '', siz
   if (!asset) return null;
   // Phones get the 800px variant of the phone capture (enough for 2x, a fraction of the bytes).
   const mobileSrc = mobile ? (mobile.srcSet?.split(',')[0]?.trim().split(' ')[0] || mobile.src) : null;
+  const mobileAvif = mobile?.avif ?? null;
   return (
     <div className={className}>
     {priority ? (
       <Head>
-        {mobileSrc ? <link rel="preload" as="image" href={mobileSrc} media="(max-width: 640px)" fetchPriority="high" /> : null}
+        {mobileSrc ? <link rel="preload" as="image" href={mobileAvif || mobileSrc} type={mobileAvif ? 'image/avif' : undefined} media="(max-width: 640px)" fetchPriority="high" /> : null}
         <link rel="preload" as="image" href={asset.src} imageSrcSet={asset.srcSet} imageSizes={asset.srcSet ? sizes : undefined} media={mobileSrc ? '(min-width: 641px)' : undefined} fetchPriority="high" />
       </Head>
     ) : null}
     <figure className={`site-shot ${mobile ? 'max-sm:aspect-[4/5]' : ''}`}>
       <picture className={mobile ? 'block max-sm:h-full' : undefined}>
       {/* Phone-sized capture (scripts/gtm/capture-screens.ts → <id>-mobile.webp) below 640px, cropped to 4:5. */}
+      {mobileSrc && mobileAvif ? <source media="(max-width: 640px)" type="image/avif" srcSet={mobileAvif} width={mobile!.width} height={mobile!.height} /> : null}
       {mobileSrc ? <source media="(max-width: 640px)" srcSet={mobileSrc} width={mobile!.width} height={mobile!.height} /> : null}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img

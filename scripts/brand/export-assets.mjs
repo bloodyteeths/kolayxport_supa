@@ -168,6 +168,8 @@ async function variants() {
         if (!meta.width || meta.width <= w) continue;
         const out = path.join(dir, f.replace(/\.webp$/, `@${w}.webp`));
         await sharp(src).resize({ width: w }).webp({ quality: 74 }).toFile(out);
+        // Phone captures are the LCP image on mobile: also ship AVIF (~40% smaller).
+        if (f.includes('-mobile') && w === 800) await sharp(src).resize({ width: w }).avif({ quality: 50, effort: 6 }).toFile(out.replace(/\.webp$/, '.avif'));
         n += 1;
       }
     }

@@ -14268,7 +14268,7 @@
       "section": "Shop section",
       "noSection": "No section",
       "newSection": "New section",
-      "currentItem": "Current (#{id})",
+      "currentItem": "Not found (#{id}) — pick another",
       "pendingItem": "{name} · created when you send",
       "profilesLoadFailed": "Couldn't load your profiles",
       "fromLastListing": "From your last listing",
@@ -14276,7 +14276,7 @@
       "newShippingProfile": "New shipping profile",
       "processing": "Processing time",
       "processingHelper": "Etsy sets processing time with processing profiles",
-      "processingCurrent": "Current profile (#{id})",
+      "processingCurrent": "Not found (#{id}) — pick another profile",
       "processingCreateNote": "The profile is created on Etsy right away. Your listing changes only when you send it",
       "newProcessingProfile": "New profile",
       "returnPolicy": "Return policy",
@@ -14307,7 +14307,8 @@
       "paymentPolicy": "Payment policy",
       "dimensions": "Length, width, height",
       "editInVariations": "Edit in variations →",
-      "priceRange": "{min} – {max}"
+      "priceRange": "{min} – {max}",
+      "sectionGone": "This section no longer exists on {marketplace}. Pick another one or \"No section\"."
     },
     "unit": {
       "days": "days"

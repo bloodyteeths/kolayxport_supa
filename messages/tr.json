@@ -14268,7 +14268,7 @@
       "section": "Mağaza bölümü",
       "noSection": "Bölüm yok",
       "newSection": "Yeni bölüm",
-      "currentItem": "Mevcut (#{id})",
+      "currentItem": "Bulunamadı (#{id}) — başka birini seçin",
       "pendingItem": "{name} · gönderdiğinizde oluşturulur",
       "profilesLoadFailed": "Profilleriniz yüklenemedi",
       "fromLastListing": "Son ilanınızdan",
@@ -14276,7 +14276,7 @@
       "newShippingProfile": "Yeni kargo profili",
       "processing": "Hazırlama süresi",
       "processingHelper": "Etsy hazırlama süresini hazırlık profilleriyle belirler",
-      "processingCurrent": "Mevcut profil (#{id})",
+      "processingCurrent": "Bulunamadı (#{id}) — başka bir profil seçin",
       "processingCreateNote": "Profil hemen Etsy'de oluşturulur. İlanınız yalnızca siz gönderdiğinizde değişir",
       "newProcessingProfile": "Yeni profil",
       "returnPolicy": "İade politikası",
@@ -14307,7 +14307,8 @@
       "paymentPolicy": "Ödeme politikası",
       "dimensions": "Uzunluk, genişlik, yükseklik",
       "editInVariations": "Varyasyonlarda düzenle →",
-      "priceRange": "{min} – {max} arası"
+      "priceRange": "{min} – {max} arası",
+      "sectionGone": "Bu bölüm {marketplace}'de artık yok. Başka bir bölüm seçin veya \"Bölüm yok\"u seçin."
     },
     "unit": {
       "days": "gün"

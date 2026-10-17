@@ -408,7 +408,7 @@ export function DetailsSection({ id = 'details', shopMeta }: DetailsSectionProps
           width="medium"
           dirty={api.isDirty('shop_section_id')}
           onRevert={() => api.revert('shop_section_id')}
-          error={meta.sections.status === 'error' ? t('field.profilesLoadFailed') : null}
+          error={meta.sections.status === 'error' ? t('field.profilesLoadFailed') : meta.sections.status === 'ready' && !sectionKnown ? t('field.sectionGone', { marketplace: 'Etsy' }) : null}
           helper={api.fromDefaults?.has('shop_section_id') ? t('field.fromLastListing') : undefined}
           labelAction={ro ? undefined : meta.sections.status === 'error' ? (
             <Button variant="ghost" size="sm" onClick={meta.sections.retry}>{t('save.retry')}</Button>

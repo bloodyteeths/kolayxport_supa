@@ -12,7 +12,7 @@ import { AuthProvider } from '@/lib/auth-context';
 import { ReactElement, ReactNode } from 'react';
 import { NextPage } from 'next';
 import { useRouter } from 'next/router';
-import { useEffect, useReducer, useRef } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import Head from 'next/head';
 import { NextIntlClientProvider } from 'next-intl';
 import useLocaleStore from '@/lib/stores/useLocaleStore';
@@ -198,16 +198,20 @@ function MyApp({ Component, pageProps }: AppProps) {
   const intlLocale = siteLocale ?? locale;
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   const lastFull = useRef<{ locale: string; messages: Record<string, unknown> } | null>(null);
-  const full = cachedMessages(intlLocale);
+  // The first client render must match the server HTML, which never has the full dictionary: only use it
+  // after mount (it is usually already downloaded by then, see the module-level prefetch above).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  const full = mounted ? cachedMessages(intlLocale) : null;
   if (full) lastFull.current = { locale: intlLocale, messages: full };
   const provided = pageProps.messages && (!pageProps.messagesLocale || pageProps.messagesLocale === intlLocale) ? pageProps.messages : null;
   const intlMessages = full ?? provided ?? lastFull.current?.messages ?? null;
   useEffect(() => {
-    if (siteLocale || full) return;
+    if (!mounted || siteLocale || full) return;
     let alive = true;
     loadMessages(intlLocale).then(() => { if (alive) rerender(); });
     return () => { alive = false; };
-  }, [intlLocale, siteLocale, full]);
+  }, [mounted, intlLocale, siteLocale, full]);
 
   if (!intlMessages) {
     // App pages before their dictionary arrives (first visit only; cached after). Same markup on the server.

@@ -37,7 +37,8 @@ export const shopifyConfig: ListingsConfig = {
   newListingHref: (storeId) => catalogNewListingHref('shopify', storeId),
   bulkEditHref: () => '/app/shopify-urunler/bulk', // M7 BulkGrid (bulk-grid §1.2 v1: title/price/qty via CatalogDraft)
   externalUrl: (row) => row.externalUrl,
-  pull: () => ({ url: '/api/shopify/products?action=sync', method: 'POST' }),
+  // Sync the store being viewed, not the account's first shop (a dead first shop failed every refresh).
+  pull: ({ storeId }) => ({ url: `/api/shopify/products?action=sync${storeId ? `&shopId=${encodeURIComponent(storeId)}` : ''}`, method: 'POST' }),
   columnStateKey: 'listings.shopify.columns',
 };
 

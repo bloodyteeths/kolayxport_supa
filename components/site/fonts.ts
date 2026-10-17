@@ -3,7 +3,9 @@ import { Fraunces, Instrument_Sans } from 'next/font/google';
 
 export const fraunces = Fraunces({
   subsets: ['latin', 'latin-ext'],
-  axes: ['SOFT', 'opsz'],
+  // SOFT keeps the rounded serifs of the logo wordmark; the optical-size axis (opsz) is dropped to keep
+  // the font files small (it roughly doubles them for no visible gain at heading sizes).
+  axes: ['SOFT'],
   display: 'swap',
   variable: '--font-fraunces',
 });

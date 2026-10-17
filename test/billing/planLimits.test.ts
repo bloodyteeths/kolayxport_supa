@@ -161,12 +161,12 @@ function sortKeys(o: Record<string, unknown>) {
 describe('decided tiers (design/launch/tiers.md §1)', () => {
   it('has Trial, Starter, Growth, Pro, Enterprise and shopify_free with the decided limits', () => {
     expect(Object.keys(DECIDED_PLAN_LIMITS).sort()).toEqual(['enterprise', 'growth', 'pro', 'shopify_free', 'starter', 'trial']);
-    expect(DECIDED_PLAN_LIMITS.trial.limits).toEqual({ orders: 150, labels: 30, connectedStores: 3, aiCredits: 100 });
+    expect(DECIDED_PLAN_LIMITS.trial.limits).toEqual({ orders: 150, labels: 30, connectedStores: 3, aiCredits: 200 });
     expect(DECIDED_PLAN_LIMITS.starter.limits).toEqual({ orders: 500, labels: 250, connectedStores: 2, aiCredits: 300 });
     expect(DECIDED_PLAN_LIMITS.growth.limits).toEqual({ orders: 2000, labels: 1000, connectedStores: 5, aiCredits: 1500 });
-    expect(DECIDED_PLAN_LIMITS.pro.limits).toEqual({ orders: 6000, labels: 3000, connectedStores: 10, aiCredits: 5000 });
-    expect(DECIDED_PLAN_LIMITS.enterprise.limits).toEqual({ orders: null, labels: null, connectedStores: null, aiCredits: null });
-    expect(DECIDED_PLAN_LIMITS.shopify_free.limits).toEqual({ orders: null, labels: null, connectedStores: 1, aiCredits: 300 });
+    expect(DECIDED_PLAN_LIMITS.pro.limits).toEqual({ orders: 6000, labels: 3000, connectedStores: 10, aiCredits: 3000 });
+    expect(DECIDED_PLAN_LIMITS.enterprise.limits).toEqual({ orders: null, labels: null, connectedStores: null, aiCredits: 10000 });
+    expect(DECIDED_PLAN_LIMITS.shopify_free.limits).toEqual({ orders: null, labels: null, connectedStores: 1, aiCredits: 100 });
   });
 
   it('never upsells Stripe to shopify_free or enterprise (rule 1.2.1)', () => {

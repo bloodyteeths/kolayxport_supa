@@ -25,6 +25,7 @@
 import { useEffect } from 'react';
 import axios from 'axios';
 import { create } from 'zustand';
+import { showCreditsDialog } from '@/lib/billing/creditsDialogStore';
 
 export type LimitType = 'orderSync' | 'label' | 'unknown';
 export type LimitReason = 'trial' | 'noSubscription' | 'planLimit' | 'invalidPlan' | 'unknown';
@@ -259,6 +260,12 @@ function isInline(headers: unknown): boolean {
 }
 
 function report(body: unknown, path: string, inlineHeader = false) {
+  // Image / video generation out of AI kredisi → the "buy credits" dialog (components/domain/credits/CreditsDialog).
+  if (body && typeof body === 'object' && (body as Record<string, unknown>).limitType === 'aiCredit') {
+    const need = (body as Record<string, unknown>).need;
+    showCreditsDialog(typeof need === 'number' ? need : null);
+    return;
+  }
   const locked = parseFeatureLocked(body, path);
   if (locked) {
     useFeatureLockStore.getState().markLocked(locked);

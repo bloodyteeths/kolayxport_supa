@@ -49,7 +49,7 @@ describe('limits and comparison', () => {
     expect(PRICING_PLANS.map((p) => limitFor(p, 'orders'))).toEqual([500, 2000, 6000, null]);
     expect(PRICING_PLANS.map((p) => limitFor(p, 'labels'))).toEqual([250, 1000, 3000, null]);
     expect(PRICING_PLANS.map((p) => limitFor(p, 'connectedStores'))).toEqual([2, 5, 10, null]);
-    expect(PRICING_PLANS.map((p) => limitFor(p, 'aiCredits'))).toEqual([300, 1500, 5000, null]);
+    expect(PRICING_PLANS.map((p) => limitFor(p, 'aiCredits'))).toEqual([300, 1500, 3000, 10000]);
   });
 
   it('Pro features only on Pro and Enterprise; support row', () => {
@@ -74,7 +74,7 @@ describe('limits and comparison', () => {
     expect(reviewerFacts()).toEqual([
       { plan: 'starter', monthTry: 2499, yearTry: 24990, monthUsd: 59, yearUsd: 590, orders: 500, labels: 250, stores: 2, ai: 300 },
       { plan: 'growth', monthTry: 4999, yearTry: 49990, monthUsd: 99, yearUsd: 990, orders: 2000, labels: 1000, stores: 5, ai: 1500 },
-      { plan: 'pro', monthTry: 7999, yearTry: 79990, monthUsd: 149, yearUsd: 1490, orders: 6000, labels: 3000, stores: 10, ai: 5000 },
+      { plan: 'pro', monthTry: 7999, yearTry: 79990, monthUsd: 149, yearUsd: 1490, orders: 6000, labels: 3000, stores: 10, ai: 3000 },
     ]);
   });
 

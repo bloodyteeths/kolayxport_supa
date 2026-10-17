@@ -8,6 +8,7 @@ import { planFromPriceId as planFromPriceIdShared } from '@/lib/billing/stripeAc
 import { logger } from '@/lib/logger';
 import { contextFromMetadata, sendServerEvent } from '@/lib/tracking/server';
 import { logBillingEvent, logSecurityEvent } from '@/lib/admin/events';
+import { fulfilStripeCreditSession } from '@/lib/billing/aiCreditsPurchase';
 
 /**
  * Upsert a WebhookEvent row with provider/eventType/status. Safe to call multiple times:
@@ -165,6 +166,12 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       switch (event.type) {
         case 'checkout.session.completed': {
           const checkoutSession = event.data.object as Stripe.Checkout.Session;
+          if (checkoutSession.mode === 'payment' && checkoutSession.metadata?.kind === 'ai_credits') {
+            // AI kredisi pack (lib/billing/aiCreditsPurchase): added once per session (the return page may be first).
+            const r = await fulfilStripeCreditSession(checkoutSession);
+            logBillingEvent('info', { message: 'AI credit pack paid', operation: 'stripe.ai_credits', details: { eventId: event.id, ok: r.ok, added: r.added, credits: r.credits } });
+            break;
+          }
           if (checkoutSession.mode === 'subscription') {
             const subscriptionId = checkoutSession.subscription as string;
             const subscription = await stripe.subscriptions.retrieve(subscriptionId);

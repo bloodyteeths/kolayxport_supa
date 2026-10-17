@@ -12,6 +12,7 @@ import { AuthProvider } from '@/lib/auth-context';
 import theme from '@/lib/theme';
 import { ConfirmProvider } from '@/components/ds/overlay/ConfirmDialog';
 import LimitReachedDialog from '@/components/billing/LimitReachedDialog';
+import CreditsDialog from '@/components/domain/credits/CreditsDialog';
 import { installLimitInterceptor } from '@/lib/http/limitInterceptor';
 import LiveAppMount from '@/components/live/LiveAppMount';
 import { zIndex as dsZ, neutral as dsN, radius as dsRadius } from '@/lib/ds/tokens';
@@ -142,6 +143,7 @@ export function AppRoot({ children, session, shell }: { children: ReactNode; ses
         {/* Live events: SSE stream, new-order chime + toast, live SWR refresh. Signed-in /app/* only. */}
         <LiveAppMount ordersPath="/app/labels" />
         <LimitReachedDialog />
+        <CreditsDialog />
       </ConfirmProvider>
       </ThemeProvider>
       </DsAppProviders>

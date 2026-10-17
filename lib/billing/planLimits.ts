@@ -166,17 +166,20 @@ export interface DecidedPlan {
 }
 
 /**
- * tiers.md §1 `PLANS[*].limits` and `stripeUpsell`, verbatim. Monthly.
+ * tiers.md §1 `PLANS[*].limits` and `stripeUpsell`. Monthly. `aiCredits` = AI kredisi for image + video generation
+ * (enforced: lib/billing/aiCreditsServer.ts; costs in lib/billing/aiCredits.ts; 1 credit ≈ $0.01 of Google cost).
+ * Re-set 2026-10-17 for Veo / Nano Banana Pro costs: trial 200, pro 3000, shopify_free 100, enterprise 10000 (never
+ * unlimited: Google bills every video — founder: "they can drain our API"; bigger deals get an 'adjust' grant). Text AI is not metered.
  * shopify_free: orders/labels unlimited as today; `connectedStores: 1` counts
  * non-Shopify stores only; the D16 founder decision may still change it.
  */
 export const DECIDED_PLAN_LIMITS: Readonly<Record<PlanKey, DecidedPlan>> = {
-  trial: { limits: { orders: 150, labels: 30, connectedStores: 3, aiCredits: 100 }, stripeUpsell: true },
+  trial: { limits: { orders: 150, labels: 30, connectedStores: 3, aiCredits: 200 }, stripeUpsell: true },
   starter: { limits: { orders: 500, labels: 250, connectedStores: 2, aiCredits: 300 }, stripeUpsell: true },
   growth: { limits: { orders: 2000, labels: 1000, connectedStores: 5, aiCredits: 1500 }, stripeUpsell: true },
-  pro: { limits: { orders: 6000, labels: 3000, connectedStores: 10, aiCredits: 5000 }, stripeUpsell: true },
-  enterprise: { limits: { orders: null, labels: null, connectedStores: null, aiCredits: null }, stripeUpsell: false },
-  shopify_free: { limits: { orders: null, labels: null, connectedStores: 1, aiCredits: 300 }, stripeUpsell: false },
+  pro: { limits: { orders: 6000, labels: 3000, connectedStores: 10, aiCredits: 3000 }, stripeUpsell: true },
+  enterprise: { limits: { orders: null, labels: null, connectedStores: null, aiCredits: 10000 }, stripeUpsell: false },
+  shopify_free: { limits: { orders: null, labels: null, connectedStores: 1, aiCredits: 100 }, stripeUpsell: false },
 };
 
 /** tiers.md §1 constants. The trial length is enforced at account creation via `newTrialExpiry`. */
@@ -204,7 +207,7 @@ export const ENFORCEMENT_GAP: ReadonlyArray<{ plan: PlanKey; meter: 'orderSync�
   { plan: 'starter', meter: 'orderSync→orders', enforced: '500 new orders via manual / extension sync', decided: '500 orders/month' },
   { plan: 'growth', meter: 'orderSync→orders', enforced: '2000 new orders via manual / extension sync', decided: '2000 orders/month' },
   { plan: 'pro', meter: 'orderSync→orders', enforced: '6000 new orders via manual / extension sync', decided: '6000 orders/month' },
-  { plan: 'shopify_free', meter: 'meter', enforced: 'unlimited, no store/AI cap', decided: '1 non-Shopify store, 300 AI credits' },
+  { plan: 'shopify_free', meter: 'meter', enforced: 'unlimited, no store/AI cap', decided: '1 non-Shopify store, 100 AI credits' },
   // The middleware reads only User.subscriptionPlan; /api/user/settings also shows
   // shopify_free for an active ShopifyShop or billingProvider. Its `limits` follow
   // the middleware (raw plan), so such an account is reported trial/blocked, not unlimited.

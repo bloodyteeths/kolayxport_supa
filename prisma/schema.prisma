@@ -82,6 +82,7 @@ model User {
   aiPreferences           AiPreference[]
   aiUsage                 AiUsage[]
   aiVideoJobs             AiVideoJob[]
+  aiCreditEntries         AiCreditEntry[]
   notificationSettings    NotificationSettings?
   stockSettings           StockSettings?
   stockItems              StockItem[]
@@ -2391,10 +2392,40 @@ model AiVideoJob {
   /// listing it was made for: "<marketplace>:<listingId>[:<storeId>]" + its title
   listingRef    String?
   title         String?
+  /// AI kredisi charged for this request (lib/billing/aiCredits); refunded when Veo fails
+  credits       Int      @default(0)
+  /// Quality check after generation (lib/ai/videoProduct checkVideo): { status, match, realism, diffs, issues }
+  qa            Json?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
   @@index([groupId])
+}
+
+/// AI kredisi ledger (image + video generation). Balance = this month's plan allowance minus plan-bucket spend,
+/// plus the pack bucket (purchased credits, never expire). lib/billing/aiCreditsServer.ts.
+model AiCreditEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  /// − spend, + refund / purchase / adjust
+  delta     Int
+  /// spend | refund | purchase | adjust
+  kind      String
+  /// plan (the month's allowance) | pack (purchased)
+  bucket    String
+  /// plan bucket: calendar month (UTC) "2026-10"
+  period    String?
+  /// video | image | pack id
+  feature   String?
+  /// idempotency: job id, Stripe checkout session id, Shopify purchase id
+  ref       String?
+  note      String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([kind, bucket, ref])
+  @@index([userId, createdAt])
+  @@index([userId, bucket, period])
 }

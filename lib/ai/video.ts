@@ -8,8 +8,10 @@
 //    gown) — the route for kids' clothing. Used automatically when configured. Up to 4 variants per request.
 //  - 'gemini' (GEMINI_API_KEY): fallback; refuses photos showing children; 1 video per request.
 // Veo 3.1 modes: image→video ('image'), first + last frame ('interpolate'), up to 3 reference images ('reference',
-// 8 s only), extend a Veo video by 7 s ('extend', 720p only). Post-processing (ffmpeg on the VPS): square / 4:5 crop,
-// mute, trim — `editVideo`.
+// 8 s only), extend a Veo video by 7 s ('extend', 720p only). Image + reference images in one request is refused by Veo
+// ("Image and reference images cannot be both set", tested 2026-10-17), so the product lock uses anchor frames and
+// AI keyframes instead (lib/ai/videoProduct). Post-processing (ffmpeg on the VPS): `finishInPlace` (crop, mute,
+// grain) for fresh videos, `editVideo` (crop, mute, trim) for the seller's edits.
 import fs from 'fs';
 import path from 'path';
 import { execFile } from 'child_process';
@@ -216,18 +218,30 @@ export async function editVideo(userId: string, inputFile: string, newJobId: str
   return out;
 }
 
-/** Strips the audio track in place (videos made with sound "off" on the Gemini API, which always adds audio). */
-export async function muteInPlace(file: string): Promise<void> {
-  const tmp = `${file}.mute.mp4`;
-  await run('ffmpeg', ['-y', '-v', 'error', '-i', file, '-c:v', 'copy', '-an', '-movflags', '+faststart', tmp], { timeout: 120_000 });
-  await fs.promises.rename(tmp, file);
+/** ffmpeg arguments for finishing a fresh Veo video in one pass: crop to 1:1 / 4:5, mute, light film grain. Exported for tests. */
+export function finishArgs(input: string, output: string, f: { mute?: boolean; format?: string; grain?: boolean }): string[] {
+  const vf: string[] = [];
+  if (f.format === '1:1') vf.push("crop='min(iw,ih)':'min(iw,ih)'");
+  if (f.format === '4:5') vf.push("crop='if(gt(iw/ih,4/5),ih*4/5,iw)':'if(gt(iw/ih,4/5),ih,iw*5/4)'");
+  // Real camera sensors have a little temporal noise; perfectly clean AI pixels read as fake. Luma only, light.
+  if (f.grain) vf.push('noise=c0s=6:c0f=t+u');
+  const args = ['-y', '-v', 'error', '-i', input];
+  if (vf.length) args.push('-vf', vf.join(','), '-c:v', 'libx264', '-preset', 'medium', '-crf', '17', '-pix_fmt', 'yuv420p');
+  else args.push('-c:v', 'copy');
+  if (f.mute) args.push('-an');
+  else args.push('-c:a', 'copy');
+  args.push('-movflags', '+faststart', output);
+  return args;
 }
 
-/** Centre-crops a stored video in place to 1:1 or 4:5 (marketplace format). */
-export async function cropInPlace(file: string, format: '1:1' | '4:5'): Promise<void> {
-  const tmp = `${file}.crop.mp4`;
-  await run('ffmpeg', ffmpegArgs(file, tmp, format === '1:1' ? { square: true } : { portrait45: true }), { timeout: 180_000 });
-  // Keep Veo's uncropped original: extending needs a 16:9 / 9:16 Veo video.
+/**
+ * Finishes a stored Veo video in place (marketplace format, sound, grain). Veo's untouched original is kept next to
+ * it: extending needs a 16:9 / 9:16 Veo video without our processing.
+ */
+export async function finishInPlace(file: string, f: { mute?: boolean; format?: string; grain?: boolean }): Promise<void> {
+  if (!f.mute && !f.grain && f.format !== '1:1' && f.format !== '4:5') return;
+  const tmp = `${file}.fin.mp4`;
+  await run('ffmpeg', finishArgs(file, tmp, f), { timeout: 240_000 });
   await fs.promises.rename(file, originalOf(file));
   await fs.promises.rename(tmp, file);
 }

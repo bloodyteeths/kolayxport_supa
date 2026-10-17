@@ -1,10 +1,16 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useRouter } from 'next/router';
 import PublicLayout from '../components/PublicLayout';
 import { motion } from 'framer-motion';
 import { useForm, Controller } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { Mail, MapPin, Send, Building, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
+
+// Subjects that other pages link to via /iletisim?subject=<key> (pricing → enterprise).
+const PRESET_SUBJECTS = {
+  enterprise: 'Kurumsal plan talebi',
+};
 
 const sectionVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -58,6 +64,7 @@ export default function IletisimPage() {
     handleSubmit,
     control,
     reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm({
     defaultValues: {
@@ -67,6 +74,12 @@ export default function IletisimPage() {
       message: ''
     }
   });
+
+  const router = useRouter();
+  const subjectKey = Array.isArray(router.query.subject) ? router.query.subject[0] : router.query.subject;
+  useEffect(() => {
+    if (router.isReady && PRESET_SUBJECTS[subjectKey]) setValue('subject', PRESET_SUBJECTS[subjectKey]);
+  }, [router.isReady, subjectKey, setValue]);
 
   const onSubmit = async (data) => {
     try {

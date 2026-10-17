@@ -1,6 +1,13 @@
 import nodemailer from 'nodemailer';
 import { rateLimit } from '@/lib/middleware/rateLimit';
 
+const escapeHtml = (value) => value
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
 export default async function handler(req, res) {
   if (req.method === 'POST') {
     if (!rateLimit(60_000, 3)(req, res)) return;
@@ -8,7 +15,7 @@ export default async function handler(req, res) {
     const { name, email, subject, message } = req.body;
 
     // Basic validation (can be more robust)
-    if (!name || !email || !subject || !message) {
+    if ([name, email, subject, message].some((v) => typeof v !== 'string' || !v.trim())) {
       return res.status(400).json({ error: 'Tüm alanlar zorunludur.' });
     }
 
@@ -31,16 +38,18 @@ export default async function handler(req, res) {
     });
 
     const mailOptions = {
-      from: `"${safeName}" <${safeEmail}>`, // Sender address (shows name and their email)
+      // Send from our own mailbox; Gmail rejects or rewrites a visitor's address as sender.
+      from: `"${safeName.replace(/"/g, '')} (iletişim formu)" <${process.env.GMAIL_USER}>`,
       replyTo: safeEmail, // So you can reply directly to the user
       to: 'destek@kolayxport.com', // Your receiving email address
       subject: `Yeni İletişim Formu Mesajı: ${safeSubject}`,
       text: `Gönderen Adı: ${safeName}\nGönderen E-posta: ${safeEmail}\n\nMesaj:\n${message}`,
-      html: `<p><strong>Gönderen Adı:</strong> ${safeName}</p>
-             <p><strong>Gönderen E-posta:</strong> ${safeEmail}</p>
+      html: `<p><strong>Gönderen Adı:</strong> ${escapeHtml(safeName)}</p>
+             <p><strong>Gönderen E-posta:</strong> ${escapeHtml(safeEmail)}</p>
+             <p><strong>Konu:</strong> ${escapeHtml(safeSubject)}</p>
              <hr>
              <p><strong>Mesaj:</strong></p>
-             <p>${message.replace(/\n/g, '<br>')}</p>`,
+             <p>${escapeHtml(message).replace(/\n/g, '<br>')}</p>`,
     };
 
     try {
@@ -48,7 +57,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, message: 'Mesaj başarıyla gönderildi.' });
     } catch (error) {
       console.error('Error sending email:', error);
-      return res.status(500).json({ error: 'Mesaj gönderilirken bir hata oluştu.', details: error.message });
+      return res.status(500).json({ error: 'Mesaj gönderilirken bir hata oluştu.' });
     }
   } else {
     // Handle any other HTTP method

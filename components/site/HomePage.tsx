@@ -61,7 +61,7 @@ function HomeBody({ locale, shots, photos, integrations, testimonials }: HomePro
       <JsonLdFaq items={faq} />
       {/* HERO */}
       <section className="site-rules relative overflow-hidden">
-        <div className="pointer-events-none absolute -right-40 -top-40 hidden h-[620px] w-[620px] rounded-full border-2 border-dashed border-kx/20 lg:block" aria-hidden />
+        <div className="site-blade pointer-events-none absolute -right-10 -top-24 hidden h-[560px] w-[560px] opacity-40 lg:block" aria-hidden />
         <div className="relative mx-auto grid max-w-[1200px] items-center gap-12 px-5 pb-16 pt-12 md:px-8 md:pb-24 md:pt-20 lg:grid-cols-[1.05fr_1fr]">
           <div>
             <p className="site-tag site-rise">{t('hero.eyebrow')}</p>

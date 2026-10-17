@@ -56,7 +56,7 @@ export function chromePath() {
 
 export function fontFaceCss() {
   const u = (f) => `"file://${encodeURI(path.join(ROOT, '.cache/fonts', f))}"`;
-  return `@font-face{font-family:Fraunces;src:url(${u('Fraunces.ttf')});font-weight:100 900}
+  return `@font-face{font-family:Jakarta;src:url(${u('PlusJakartaSans.ttf')});font-weight:200 800}
 @font-face{font-family:Instrument;src:url(${u('InstrumentSans.ttf')});font-weight:400 700}`;
 }
 

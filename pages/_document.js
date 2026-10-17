@@ -25,7 +25,7 @@ export default function MyDocument({ lang }) {
         <link rel="icon" href="/favicon.ico" sizes="48x48" />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="manifest" href="/site.webmanifest" />
-        <meta name="theme-color" content="#0E1A2B" />
+        <meta name="theme-color" content="#0B1220" />
         {process.env.NEXT_PUBLIC_GSC_VERIFICATION ? <meta name="google-site-verification" content={process.env.NEXT_PUBLIC_GSC_VERIFICATION} /> : null}
         {process.env.NEXT_PUBLIC_BING_VERIFICATION ? <meta name="msvalidate.01" content={process.env.NEXT_PUBLIC_BING_VERIFICATION} /> : null}
 

@@ -224,7 +224,7 @@ function FeaturesBody({ locale, rows }: { locale: SiteLocale; rows: InventoryRow
                       <span className="block text-sm text-ink-mute">{r.where.replace(/\*/g, '')}</span>
                     </span>
                     <span className="flex shrink-0 flex-col items-end gap-1">
-                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${r.level === 'production' ? 'bg-[#E7F7EE] text-[#0F7A4A]' : 'bg-kraft-wash text-[#7A5418]'}`}>{c(`maturity.${r.level === 'production' ? 'production' : r.level === 'beta' ? 'beta' : 'partial'}` as any)}</span>
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${r.level === 'production' ? 'bg-[#E7F7EE] text-[#0F7A4A]' : 'bg-[#FFF4DB] text-[#7A5418]'}`}>{c(`maturity.${r.level === 'production' ? 'production' : r.level === 'beta' ? 'beta' : 'partial'}` as any)}</span>
                       {/pro/i.test(r.plan) ? <span className="text-xs font-semibold text-kx">Pro</span> : null}
                     </span>
                   </li>

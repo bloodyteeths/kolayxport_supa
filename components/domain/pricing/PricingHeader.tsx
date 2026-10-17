@@ -16,7 +16,7 @@ export function PricingHeader() {
         variant="display"
         component="h1"
         className="display"
-        sx={{ m: 0, color: '#0E1A2B', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: { xs: 40, md: 60 }, lineHeight: 1.05, letterSpacing: '-0.02em' }}
+        sx={{ m: 0, color: '#0B1220', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: { xs: 40, md: 60 }, lineHeight: 1.05, letterSpacing: '-0.02em' }}
       >
         {t('title')}
       </Typography>

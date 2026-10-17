@@ -4,8 +4,8 @@
   "description": "Etsy, eBay ve Amazon ilanları, ürün araştırması, kargo etiketi ve ETGB tek panelde.",
   "start_url": "/app",
   "display": "standalone",
-  "background_color": "#FAF7F0",
-  "theme_color": "#0E1A2B",
+  "background_color": "#F7F8FB",
+  "theme_color": "#0B1220",
   "orientation": "portrait-primary",
   "icons": [
     {

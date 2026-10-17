@@ -40,8 +40,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const plainToken = await issueToken({ identifier: email, purpose: 'email_verify' });
       const base = process.env.NEXTAUTH_URL || 'https://kolayxport.com';
       const url = `${base.replace(/\/$/, '')}/api/auth/verify-email?token=${encodeURIComponent(plainToken)}`;
-      const { subject, textBody } = verificationEmailBody(url);
-      const sendResult = await sendEmail({ to: email, subject, textBody });
+      const { subject, textBody, htmlBody } = verificationEmailBody(url);
+      const sendResult = await sendEmail({ to: email, subject, textBody, htmlBody });
       logAuthEvent('info', {
         message: 'Verification email re-sent',
         operation: 'email.verify_resent',

@@ -13,8 +13,8 @@ const CURSOR_SCRIPT = `
 (() => {
   if (window.__kxCursor) return; window.__kxCursor = true;
   const style = document.createElement('style');
-  style.textContent = '#kx-cursor{position:fixed;left:0;top:0;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:rgba(43,69,224,.25);border:2px solid #2B45E0;z-index:2147483647;pointer-events:none;transition:transform .12s ease;box-shadow:0 0 0 6px rgba(43,69,224,.10)}' +
-    '#kx-cursor.down{transform:scale(.7)}.kx-ripple{position:fixed;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;border:3px solid #2B45E0;z-index:2147483646;pointer-events:none;animation:kxr .6s ease-out forwards}@keyframes kxr{to{transform:scale(4);opacity:0}}' +
+  style.textContent = '#kx-cursor{position:fixed;left:0;top:0;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:rgba(43,69,224,.25);border:2px solid #2F5BFF;z-index:2147483647;pointer-events:none;transition:transform .12s ease;box-shadow:0 0 0 6px rgba(43,69,224,.10)}' +
+    '#kx-cursor.down{transform:scale(.7)}.kx-ripple{position:fixed;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;border:3px solid #2F5BFF;z-index:2147483646;pointer-events:none;animation:kxr .6s ease-out forwards}@keyframes kxr{to{transform:scale(4);opacity:0}}' +
     'html.kx-zoom{transition:transform .7s cubic-bezier(.2,.7,.2,1)}' +
     '[data-nextjs-toast],nextjs-portal,#__next-build-watcher,[data-sonner-toaster]{display:none!important}' +
     '*,*::before,*::after{caret-color:transparent!important}';

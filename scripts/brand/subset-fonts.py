@@ -4,7 +4,7 @@ Builds the marketing web fonts as tight subsets (GTM perf budget: LCP < 2 s on m
     .venv-brand/bin/pip install fonttools brotli uharfbuzz
     .venv-brand/bin/python scripts/brand/subset-fonts.py
 
-- Fraunces: SOFT pinned to 100 (the logo's rounded serifs), opsz pinned to 72, weight range 500–600.
+- Plus Jakarta Sans (the logo face): weight range 700–800, for headings.
 - Instrument Sans: width pinned to 100, weight range 400–600.
 - Glyphs: Basic Latin + Latin-1 + Turkish (ğ Ğ ı İ ş Ş) + the punctuation/symbols the copy uses (₺ – — ' ' " " … • → ·).
 Writes public/fonts/*.woff2, loaded by components/site/fonts.ts (next/font/local).
@@ -18,7 +18,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 CACHE = os.path.join(ROOT, '.cache', 'fonts')
 OUT = os.path.join(ROOT, 'public', 'fonts')
 SRC = {
-    'Fraunces.ttf': 'https://github.com/google/fonts/raw/main/ofl/fraunces/Fraunces%5BSOFT,WONK,opsz,wght%5D.ttf',
+    'PlusJakartaSans.ttf': 'https://github.com/google/fonts/raw/main/ofl/plusjakartasans/PlusJakartaSans%5Bwght%5D.ttf',
     'InstrumentSans.ttf': 'https://github.com/google/fonts/raw/main/ofl/instrumentsans/InstrumentSans%5Bwdth,wght%5D.ttf',
 }
 UNICODES = (
@@ -36,6 +36,8 @@ def fetch(name):
 def build(name, axes, out):
     f = TTFont(fetch(name))
     f = instantiateVariableFont(f, axes)
+    # Round-trip so the subsetter sees fully loaded tables (Jakarta's gvar is lazily keyed otherwise).
+    buf = io.BytesIO(); f.save(buf); buf.seek(0); f = TTFont(buf, lazy=False)
     opts = subset.Options()
     opts.flavor = 'woff2'
     opts.layout_features = ['kern', 'liga', 'calt', 'locl', 'case', 'tnum', 'lnum']
@@ -50,5 +52,5 @@ def build(name, axes, out):
     f.save(path)
     print(out, os.path.getsize(path), 'bytes')
 
-build('Fraunces.ttf', {'SOFT': 100, 'WONK': 0, 'opsz': 72, 'wght': (500, 600)}, 'fraunces-soft-500-600.woff2')
+build('PlusJakartaSans.ttf', {'wght': (700, 800)}, 'jakarta-700-800.woff2')
 build('InstrumentSans.ttf', {'wdth': 100, 'wght': (400, 600)}, 'instrument-sans-400-600.woff2')

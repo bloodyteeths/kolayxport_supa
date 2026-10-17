@@ -42,7 +42,7 @@ export function PainQuotes({ items, sourceLabel }: { items: { quote: string; sou
     <ul className="grid gap-4 md:grid-cols-3">
       {items.map((p) => (
         <li key={p.quote} className="relative rounded-2xl border border-line bg-white p-6">
-          <Quote size={22} className="text-kraft" aria-hidden />
+          <Quote size={22} className="text-kx" aria-hidden />
           <blockquote className="display mt-3 text-[21px] leading-snug text-ink" style={{ fontWeight: 500 }}>&ldquo;{p.quote}&rdquo;</blockquote>
           {p.source ? <p className="mt-4 text-xs font-medium uppercase tracking-[.12em] text-ink-mute">{sourceLabel}: {p.source}</p> : null}
         </li>
@@ -137,7 +137,7 @@ export function Breadcrumbs({ items }: { items: { href: string; label: string }[
 export function CtaBand({ title, text }: { title: string; text: string }) {
   return (
     <section className="site-rules-dark relative overflow-hidden bg-ink text-paper">
-      <div className="pointer-events-none absolute -right-24 -top-24 h-[420px] w-[420px] rounded-full border-2 border-dashed border-kx-soft/30" aria-hidden />
+      <div className="site-blade pointer-events-none absolute -right-10 -top-10 h-[420px] w-[420px] opacity-70" aria-hidden />
       <div className="pointer-events-none absolute -right-6 -top-6 h-[280px] w-[280px] rounded-full border border-kx-soft/25" aria-hidden />
       <div className="relative mx-auto max-w-[1200px] px-5 py-20 md:px-8 md:py-28">
         <h2 className="display max-w-3xl text-[34px] text-paper md:text-[54px]">{title}</h2>

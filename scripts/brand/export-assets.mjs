@@ -16,7 +16,7 @@ const ROOT = process.cwd();
 const BRAND = path.join(ROOT, 'public/brand');
 const PUB = path.join(ROOT, 'public');
 const FONTS = path.join(ROOT, '.cache/fonts');
-const C = { ink: '#0E1A2B', paper: '#FAF7F0', accent: '#2B45E0', kraft: '#C9A57B', inkSoft: '#3A4658' };
+const C = { ink: '#0B1220', paper: '#F7F8FB', accent: '#2F5BFF', cyan: '#00C6FF', inkSoft: '#3A465A' };
 
 const read = (f) => fs.readFileSync(path.join(BRAND, f));
 
@@ -46,33 +46,33 @@ async function ico(svgFile, sizes, out) {
 
 function fontFace() {
   const u = (f) => `"file://${encodeURI(path.join(FONTS, f))}"`;
-  return `@font-face{font-family:Fraunces;src:url(${u('Fraunces.ttf')});font-weight:100 900}
+  return `@font-face{font-family:Jakarta;src:url(${u('PlusJakartaSans.ttf')});font-weight:200 800}
 @font-face{font-family:Instrument;src:url(${u('InstrumentSans.ttf')});font-weight:400 700}`;
 }
 
 const logoSvg = () => fs.readFileSync(path.join(BRAND, 'kolayxport-logo.svg'), 'utf8');
 const logoDarkSvg = () => fs.readFileSync(path.join(BRAND, 'kolayxport-logo-dark.svg'), 'utf8');
-const symbolSvg = () => fs.readFileSync(path.join(BRAND, 'kolayxport-symbol.svg'), 'utf8');
 
-/** Card template shared by OG images and banners: paper ground, manifest rule lines, stamp. */
-function cardHtml({ w, h, eyebrow = '', title = '', sub = '', dark = false, logoOnly = false, safe = null, lang = 'tr' }) {
-  const bg = dark ? C.ink : C.paper; const fg = dark ? C.paper : C.ink;
-  const tsize = title.length > 60 ? 58 : title.length > 40 ? 68 : 80;
+/** Card template shared by OG images and banners: ink ground, the blade streak from the logo, white type. */
+function cardHtml({ w, h, eyebrow = '', title = '', sub = '', dark = true, logoOnly = false, safe = null, lang = 'tr' }) {
+  const bg = dark ? C.ink : '#FFFFFF'; const fg = dark ? '#FFFFFF' : C.ink;
+  const tsize = title.length > 60 ? 56 : title.length > 40 ? 66 : 78;
   const area = safe ? `width:${safe.w}px;height:${safe.h}px;` : `width:${w - 160}px;height:${h - 140}px;`;
+  // The streak echoes the logo's blade: a long tapering diagonal, bottom-left to top-right.
+  const streak = `<svg class="streak" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><defs><linearGradient id="sg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="${C.accent}" stop-opacity="0"/><stop offset=".55" stop-color="${C.accent}" stop-opacity="${dark ? '.55' : '.35'}"/><stop offset="1" stop-color="${C.cyan}" stop-opacity="${dark ? '.95' : '.7'}"/></linearGradient></defs><path d="M${w * 0.42} ${h + 40} L${w + 60} ${-h * 0.12} L${w + 60} ${-h * 0.02} L${w * 0.42 + 120} ${h + 40} Z" fill="url(#sg)"/></svg>`;
   // lang drives text-transform: uppercase (Turkish İ/I) — must match the copy's language.
   return `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><style>${fontFace()}
 *{margin:0;box-sizing:border-box}body{width:${w}px;height:${h}px;background:${bg};color:${fg};font-family:Instrument,sans-serif;position:relative;overflow:hidden}
-.rules{position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent 0 47px,${dark ? 'rgba(250,247,240,.05)' : 'rgba(14,26,43,.045)'} 47px 48px)}
-.edge{position:absolute;right:-120px;top:-120px;width:520px;height:520px;border-radius:50%;border:2px dashed ${dark ? 'rgba(142,160,255,.35)' : 'rgba(43,69,224,.25)'}}
-.edge2{position:absolute;right:-40px;top:-40px;width:360px;height:360px;border-radius:50%;border:2px solid ${dark ? 'rgba(142,160,255,.25)' : 'rgba(43,69,224,.18)'}}
+.glow{position:absolute;right:-20%;top:-40%;width:70%;height:120%;background:radial-gradient(closest-side,${dark ? 'rgba(47,91,255,.28)' : 'rgba(47,91,255,.10)'},transparent)}
+.streak{position:absolute;inset:0;width:100%;height:100%}
 .wrap{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);${area}display:flex;flex-direction:column;justify-content:${logoOnly ? 'center' : 'space-between'};align-items:${logoOnly ? 'center' : 'flex-start'}}
-.logo svg{height:${logoOnly ? Math.round(h * 0.22) : 56}px;width:auto}
-.eyebrow{font-weight:600;letter-spacing:.14em;text-transform:uppercase;font-size:22px;color:${dark ? '#8EA0FF' : C.accent}}
-h1{font-family:Fraunces;font-variation-settings:'opsz' 96,'SOFT' 100;font-weight:600;font-size:${tsize}px;line-height:1.04;letter-spacing:-.02em;max-width:${(safe ? safe.w : w - 160) - 40}px;margin-top:14px}
-.sub{font-size:28px;line-height:1.35;color:${dark ? 'rgba(250,247,240,.75)' : C.inkSoft};margin-top:18px;max-width:${(safe ? safe.w : w - 160) - 160}px}
+.logo svg{height:${logoOnly ? Math.round(h * 0.24) : 54}px;width:auto;display:block}
+.eyebrow{font-weight:600;letter-spacing:.14em;text-transform:uppercase;font-size:22px;color:${dark ? C.cyan : C.accent}}
+h1{font-family:Jakarta;font-weight:800;font-size:${tsize}px;line-height:1.05;letter-spacing:-.025em;max-width:${(safe ? safe.w : w - 160) - 120}px;margin-top:16px}
+.sub{font-size:28px;line-height:1.35;color:${dark ? 'rgba(255,255,255,.72)' : C.inkSoft};margin-top:18px;max-width:${(safe ? safe.w : w - 160) - 220}px}
 .foot{display:flex;align-items:center;justify-content:space-between;width:100%}
-.url{font-weight:600;font-size:22px;letter-spacing:.04em;border:2px solid currentColor;border-radius:999px;padding:8px 18px;opacity:.85}
-</style></head><body><div class="rules"></div><div class="edge"></div><div class="edge2"></div>
+.url{font-weight:600;font-size:22px;letter-spacing:.04em;color:${dark ? 'rgba(255,255,255,.8)' : C.inkSoft}}
+</style></head><body><div class="glow"></div>${streak}
 <div class="wrap">${logoOnly ? `<div class="logo">${dark ? logoDarkSvg() : logoSvg()}</div>` : `
 <div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ''}</div>
 <div class="foot"><div class="logo">${dark ? logoDarkSvg() : logoSvg()}</div><div class="url">kolayxport.com</div></div>`}
@@ -94,11 +94,6 @@ async function render(browser, html, w, h, out) {
   await sharp(buf).png({ compressionLevel: 9, palette: true, quality: 90 }).toFile(out);
 }
 
-function avatarHtml(size, dark) {
-  const svg = symbolSvg();
-  return `<!doctype html><html><head><style>*{margin:0}body{width:${size}px;height:${size}px;display:grid;place-items:center;background:${dark ? C.paper : C.ink}}svg{width:${Math.round(size * 0.62)}px;height:auto}</style></head><body>${svg.replace('fill="#0E1A2B"', `fill="${C.ink}"`)}</body></html>`;
-}
-
 async function launch() {
   const executablePath = process.env.CHROME_PATH || ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/Applications/Google Chrome 2.app/Contents/MacOS/Google Chrome'].find((p) => fs.existsSync(p));
   return chromium.launch({ ...(executablePath ? { executablePath } : {}), args: ['--allow-file-access-from-files'] });
@@ -108,11 +103,32 @@ async function core() {
   // Icons
   await ico('favicon.svg', [16, 32, 48], path.join(PUB, 'favicon.ico'));
   fs.copyFileSync(path.join(BRAND, 'favicon.svg'), path.join(PUB, 'favicon.svg'));
-  await png('kolayxport-symbol.svg', 180, path.join(PUB, 'apple-touch-icon.png'), { pad: 0.08, bg: C.paper });
+  // iOS and Android mask the icon themselves: give them the full-bleed square tile.
+  await png('kolayxport-symbol-square.svg', 180, path.join(PUB, 'apple-touch-icon.png'));
   await png('kolayxport-symbol.svg', 192, path.join(PUB, 'icon-192x192.png'));
   await png('kolayxport-symbol.svg', 512, path.join(PUB, 'icon-512x512.png'));
-  await png('favicon.svg', 512, path.join(PUB, 'icon-maskable-512x512.png'), { pad: 0.12, bg: C.ink });
+  await png('kolayxport-symbol-square.svg', 512, path.join(PUB, 'icon-maskable-512x512.png'));
   await png('kolayxport-symbol.svg', 512, path.join(BRAND, 'kolayxport-symbol-512.png'));
+
+  // PNG copies of the logo for tools that can't take SVG (slides, Canva, marketplaces, email).
+  const pngDir = path.join(BRAND, 'png');
+  fs.mkdirSync(pngDir, { recursive: true });
+  await png('kolayxport-symbol.svg', 1024, path.join(pngDir, 'kolayxport-symbol-1024.png'));
+  for (const [svg, out, width] of [
+    ['kolayxport-logo.svg', 'kolayxport-logo-1600.png', 1600],
+    ['kolayxport-logo-dark.svg', 'kolayxport-logo-dark-1600.png', 1600],
+    ['kolayxport-logo-mono.svg', 'kolayxport-logo-mono-1600.png', 1600],
+    ['kolayxport-logo-mono-white.svg', 'kolayxport-logo-mono-white-1600.png', 1600],
+    ['kolayxport-mark.svg', 'kolayxport-mark-512.png', 512],
+    ['kolayxport-mark-dark.svg', 'kolayxport-mark-dark-512.png', 512],
+  ]) await sharp(read(svg), { density: 1200 }).resize({ width }).png().toFile(path.join(pngDir, out));
+
+  // Email: hosted PNGs (mail clients don't render SVG). Shown at 160 px wide, exported at 3x.
+  const mailDir = path.join(BRAND, 'email');
+  fs.mkdirSync(mailDir, { recursive: true });
+  await sharp(read('kolayxport-logo.svg'), { density: 1200 }).resize({ width: 480 }).png().toFile(path.join(mailDir, 'kolayxport-logo.png'));
+  await sharp(read('kolayxport-logo-dark.svg'), { density: 1200 }).resize({ width: 480 }).png().toFile(path.join(mailDir, 'kolayxport-logo-dark.png'));
+  await png('kolayxport-symbol.svg', 144, path.join(mailDir, 'kolayxport-symbol.png'));
 
   const b = await launch();
   const T = 'Yurt dışına satışın tek paneli';
@@ -123,12 +139,13 @@ async function core() {
   for (const [name, w, h, opts] of [
     ['x-header-1500x500.png', 1500, 500, { logoOnly: true }],
     ['facebook-cover-1640x624.png', 1640, 624, { logoOnly: true }],
-    ['linkedin-banner-1584x396.png', 1584, 396, { logoOnly: true, dark: true }],
+    ['linkedin-banner-1584x396.png', 1584, 396, { logoOnly: true }],
     ['youtube-banner-2560x1440.png', 2560, 1440, { logoOnly: true, safe: { w: 1546, h: 423 } }],
   ]) await render(b, cardHtml({ w, h, ...opts }), w, h, path.join(social, name));
-  for (const [name, size, dark] of [['avatar-400.png', 400, false], ['avatar-800.png', 800, false], ['avatar-light-400.png', 400, true]]) {
-    await render(b, avatarHtml(size, dark), size, size, path.join(social, name));
-  }
+  // Avatars: full-bleed square tile (platforms crop to a circle; the X sits inside the safe circle).
+  await png('kolayxport-symbol-square.svg', 400, path.join(social, 'avatar-400.png'));
+  await png('kolayxport-symbol-square.svg', 800, path.join(social, 'avatar-800.png'));
+  await png('kolayxport-symbol-light.svg', 400, path.join(social, 'avatar-light-400.png'), { bg: { r: 255, g: 255, b: 255, alpha: 1 } });
   await b.close();
 }
 

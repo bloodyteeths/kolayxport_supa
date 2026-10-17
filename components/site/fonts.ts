@@ -1,16 +1,16 @@
 // Marketing fonts (docs/brand.md §4), self-hosted subsets built by scripts/brand/subset-fonts.py:
-// Fraunces with SOFT 100 / opsz 72 baked in (weights 500–600) and Instrument Sans (400–600), Latin +
-// Turkish glyphs only — ~28 KB each instead of ~160 KB of Google subsets (GTM perf budget).
+// Plus Jakarta Sans 700–800 (the logo face, headings) and Instrument Sans (400–600, body), Latin +
+// Turkish glyphs only — small self-hosted subsets instead of Google's (GTM perf budget).
 import localFont from 'next/font/local';
 
-export const fraunces = localFont({
-  src: '../../public/fonts/fraunces-soft-500-600.woff2',
-  weight: '500 600',
+export const jakarta = localFont({
+  src: '../../public/fonts/jakarta-700-800.woff2',
+  weight: '700 800',
   style: 'normal',
   display: 'swap',
-  variable: '--font-fraunces',
-  fallback: ['Georgia', 'Times New Roman', 'serif'],
-  adjustFontFallback: 'Times New Roman',
+  variable: '--font-jakarta',
+  fallback: ['ui-sans-serif', 'system-ui', 'Arial', 'sans-serif'],
+  adjustFontFallback: 'Arial',
 });
 
 export const instrument = localFont({
@@ -23,4 +23,4 @@ export const instrument = localFont({
   adjustFontFallback: 'Arial',
 });
 
-export const siteFontClass = `${fraunces.variable} ${instrument.variable}`;
+export const siteFontClass = `${jakarta.variable} ${instrument.variable}`;

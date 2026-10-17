@@ -14,7 +14,7 @@ const OUTRO = 3.2;
 const V_CROP_W = 1280;
 const V_VIDEO_Y = 520;                                  // 1280×1080 → 1080×911, so the video ends at y≈1431
 const V_CAPTION_Y = 1460;
-const C = { ink: '#0E1A2B', paper: '#FAF7F0', accent: '#2B45E0', soft: '#8EA0FF' };
+const C = { ink: '#0B1220', paper: '#F7F8FB', accent: '#2F5BFF', soft: '#8FA8FF' };
 
 const logo = (dark) => fs.readFileSync(path.join(ROOT, 'public/brand', dark ? 'kolayxport-logo-dark.svg' : 'kolayxport-logo.svg'), 'utf8');
 
@@ -25,7 +25,7 @@ background-image:repeating-linear-gradient(0deg,transparent 0 47px,rgba(250,247,
 .ring{position:absolute;right:-${Math.round(w * .08)}px;top:-${Math.round(w * .08)}px;width:${Math.round(w * .4)}px;height:${Math.round(w * .4)}px;border-radius:50%;border:3px dashed rgba(142,160,255,.35)}
 .logo svg{height:${Math.round(h * .07)}px;width:auto}
 .eyebrow{margin-top:${Math.round(h * .06)}px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:${C.soft};font-size:${Math.round(h * .028)}px}
-h1{font-family:Fraunces;font-variation-settings:'opsz' 96,'SOFT' 100;font-weight:600;font-size:${Math.round(h * (w > h ? .085 : .05))}px;line-height:1.05;letter-spacing:-.02em;margin-top:${Math.round(h * .02)}px;max-width:${Math.round(w * .84)}px}
+h1{font-family:Jakarta;font-weight:800;font-size:${Math.round(h * (w > h ? .085 : .05))}px;line-height:1.05;letter-spacing:-.02em;margin-top:${Math.round(h * .02)}px;max-width:${Math.round(w * .84)}px}
 .sub{margin-top:${Math.round(h * .03)}px;font-size:${Math.round(h * .03)}px;opacity:.8;max-width:${Math.round(w * .8)}px;line-height:1.35}
 </style></head><body><div class="ring"></div><div class="logo">${logo(dark)}</div>
 ${eyebrow ? `<div class="eyebrow">${eyebrow}</div>` : ''}<h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ''}</body></html>`;
@@ -34,7 +34,7 @@ ${eyebrow ? `<div class="eyebrow">${eyebrow}</div>` : ''}<h1>${title}</h1>${sub 
 function captionHtml(text, w) {
   return `<!doctype html><html><head><meta charset="utf-8"><style>${fontFaceCss()}
 *{margin:0}body{width:${w}px;background:transparent;font-family:Instrument,sans-serif;display:flex;justify-content:center}
-p{max-width:${w - 120}px;background:rgba(14,26,43,.92);color:#FAF7F0;font-size:40px;line-height:1.28;font-weight:600;padding:20px 28px;border-radius:24px;text-align:center}
+p{max-width:${w - 120}px;background:rgba(11,18,32,.92);color:#F7F8FB;font-size:40px;line-height:1.28;font-weight:600;padding:20px 28px;border-radius:24px;text-align:center}
 </style></head><body><p>${text}</p></body></html>`;
 }
 
@@ -65,7 +65,7 @@ export async function compose(slug) {
   await renderPng(browser, card({ w: 1080, h: 1920, eyebrow: 'Nasıl kullanılır', title: t.title }), 1080, 1920, introV);
   await renderPng(browser, card({ w: 1080, h: 1920, eyebrow: '14 gün ücretsiz', title: 'kolayxport.com', sub: t.outro || 'Yurt dışına satışın tek paneli.' }), 1080, 1920, outroV);
   await renderPng(browser, `<!doctype html><html><head><meta charset="utf-8"><style>${fontFaceCss()}*{margin:0}body{width:1080px;height:1920px;background:${C.ink};background-image:repeating-linear-gradient(0deg,transparent 0 47px,rgba(250,247,240,.05) 47px 48px);font-family:Instrument,sans-serif;color:${C.paper}}
-.top{position:absolute;top:110px;left:70px;right:70px}.top svg{height:60px;width:auto}h1{font-family:Fraunces;font-variation-settings:'opsz' 96,'SOFT' 100;font-weight:600;font-size:64px;line-height:1.08;margin-top:40px;letter-spacing:-.02em}</style></head>
+.top{position:absolute;top:110px;left:70px;right:70px}.top svg{height:60px;width:auto}h1{font-family:Jakarta;font-weight:800;font-size:64px;line-height:1.08;margin-top:40px;letter-spacing:-.02em}</style></head>
 <body><div class="top">${logo(true)}<h1>${t.title}</h1></div></body></html>`, 1080, 1920, frameV);
   const caps = [];
   for (const [i, n] of narration.entries()) {

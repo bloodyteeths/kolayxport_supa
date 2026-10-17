@@ -1,4 +1,5 @@
 import { logAuthEvent } from '@/lib/admin/events';
+import { renderEmailHtml } from '@/lib/email/layout';
 
 /**
  * Outbound transactional email via Postmark HTTP API.
@@ -7,6 +8,7 @@ import { logAuthEvent } from '@/lib/admin/events';
  * - Never logs the request body or the destination address in full; the address is
  *   masked (first 2 chars + ***@domain) so the admin cockpit can see *that* a send
  *   happened without leaking buyer-style PII.
+ * - Every email also gets the branded HTML version (lib/email/layout.ts) unless `htmlBody` is given.
  * - Failures don't throw; they return `{ sent:false, reason }` so the surrounding
  *   no-enumeration flows can still return their generic success response to the user.
  */
@@ -15,6 +17,8 @@ export interface SendEmailArgs {
   to: string;
   subject: string;
   textBody: string;
+  /** Defaults to the branded HTML rendering of textBody. */
+  htmlBody?: string;
 }
 
 export interface SendEmailResult {
@@ -54,6 +58,7 @@ export async function sendEmail(args: SendEmailArgs): Promise<SendEmailResult> {
         To: args.to,
         Subject: args.subject,
         TextBody: args.textBody,
+        HtmlBody: args.htmlBody || renderEmailHtml({ text: args.textBody }),
         MessageStream: 'outbound',
       }),
     });
@@ -85,32 +90,56 @@ export async function sendEmail(args: SendEmailArgs): Promise<SendEmailResult> {
   }
 }
 
-// Templates kept inline + plaintext-only for now. HTML can come later.
+// Auth templates: Turkish first, English below (we don't know the locale before sign-in).
 
-export function verificationEmailBody(verifyUrl: string): { subject: string; textBody: string } {
-  return {
-    subject: 'KolayXport — confirm your email',
-    textBody:
-`Confirm your KolayXport email by opening the link below:
+export interface EmailBody {
+  subject: string;
+  textBody: string;
+  htmlBody: string;
+}
+
+export function verificationEmailBody(verifyUrl: string): EmailBody {
+  const textBody =
+`KolayXport hesabınızı etkinleştirmek için e-posta adresinizi doğrulayın:
 
 ${verifyUrl}
 
-This link expires in 24 hours. If you didn't sign up for KolayXport, ignore this email.
+Bu bağlantı 24 saat geçerlidir. KolayXport'a siz kaydolmadıysanız bu e-postayı yok sayabilirsiniz.
 
-— KolayXport`,
+---
+
+Confirm your KolayXport email with the link above. It expires in 24 hours. If you didn't sign up, ignore this email.`;
+  return {
+    subject: 'KolayXport — e-posta adresinizi doğrulayın / confirm your email',
+    textBody,
+    htmlBody: renderEmailHtml({
+      text: textBody,
+      title: 'E-posta adresinizi doğrulayın',
+      action: { url: verifyUrl, label: 'E-postamı doğrula' },
+      preheader: 'Hesabınızı etkinleştirmek için tek tık kaldı.',
+    }),
   };
 }
 
-export function passwordResetEmailBody(resetUrl: string): { subject: string; textBody: string } {
-  return {
-    subject: 'KolayXport — reset your password',
-    textBody:
-`A password reset was requested for your KolayXport account. Open the link below to set a new password:
+export function passwordResetEmailBody(resetUrl: string): EmailBody {
+  const textBody =
+`KolayXport hesabınız için şifre sıfırlama istendi. Yeni şifrenizi belirlemek için:
 
 ${resetUrl}
 
-This link expires in 1 hour. If you didn't request this, ignore this email — your password is unchanged.
+Bu bağlantı 1 saat geçerlidir. Bu isteği siz yapmadıysanız bu e-postayı yok sayın; şifreniz değişmedi.
 
-— KolayXport`,
+---
+
+A password reset was requested for your KolayXport account. Use the link above to set a new password; it expires in 1 hour. If you didn't request this, ignore this email — your password is unchanged.`;
+  return {
+    subject: 'KolayXport — şifrenizi sıfırlayın / reset your password',
+    textBody,
+    htmlBody: renderEmailHtml({
+      text: textBody,
+      title: 'Şifrenizi sıfırlayın',
+      action: { url: resetUrl, label: 'Yeni şifre belirle' },
+      preheader: 'Bağlantı 1 saat geçerlidir.',
+    }),
   };
 }

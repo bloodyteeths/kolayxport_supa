@@ -64,7 +64,7 @@ export default function SiteFooter({ locale }: { locale: SiteLocale }) {
           <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
             {cols.map((c) => (
               <nav key={c.title} aria-label={c.title}>
-                <h2 className="text-xs font-semibold uppercase tracking-[.14em] text-kraft">{c.title}</h2>
+                <h2 className="text-xs font-semibold uppercase tracking-[.14em] text-kx-soft">{c.title}</h2>
                 <ul className="mt-4 grid gap-2.5 text-[15px]">
                   {c.links.map((l) => (
                     <li key={l.href}><Link prefetch={false} href={l.href} className="text-paper/80 hover:text-paper">{l.label}</Link></li>

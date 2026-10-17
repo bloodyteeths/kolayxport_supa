@@ -42,10 +42,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         tokenExpiresAt: null,
       },
     });
+    // Legacy copy of the token on Credential (written by the OAuth callback).
+    const creds = await prisma.credential.updateMany({
+      where: { shopifyShopDomain: shopDomain },
+      data: { shopifyAccessToken: null },
+    });
     logIntegrationEvent('info', {
       message: 'Shopify app uninstalled — shop deactivated',
       operation: 'shopify.app_uninstalled',
-      details: { shopDomain, updated: result.count },
+      details: { shopDomain, updated: result.count, credentialsCleared: creds.count },
     });
   } catch (err: any) {
     logger.error('Shopify app/uninstalled handling failed', err, { shopDomain });

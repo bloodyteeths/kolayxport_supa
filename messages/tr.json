@@ -1576,7 +1576,8 @@
       "shopifyPanel": {
         "storeAddress": "Mağaza adresi",
         "connect": "Shopify bağla",
-        "enterAddress": "Önce mağaza adresinizi girin"
+        "enterAddress": "Önce mağaza adresinizi girin",
+        "addAnotherViaAppStore": "Başka bir mağaza bağlamak için Shopify yönetim panelinizi açın ve KolayXport'u Shopify App Store'dan yükleyin."
       },
       "storeLimit": {
         "title": "{limit} mağaza hakkının tamamını kullandınız",

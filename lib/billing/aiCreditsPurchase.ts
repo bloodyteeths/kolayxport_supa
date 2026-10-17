@@ -13,8 +13,7 @@ import { CREDIT_PACKS, creditPack, type CreditPack } from './aiCredits';
 import { grantPack } from './aiCreditsServer';
 import { appBaseUrl } from './stripeAccountServer';
 import type { Currency } from './types';
-
-const SHOPIFY_API_VERSION = '2024-10';
+import { SHOPIFY_API_VERSION } from '@/lib/integrations/shopifyApiVersion';
 
 /** A same-site path to come back to (never an absolute URL: no open redirect). */
 export function safeReturnPath(v: unknown, fallback = '/app/video-studio'): string {

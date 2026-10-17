@@ -9,10 +9,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '../../../../lib/auth';
 import { logger } from '../../../../lib/logger';
-import crypto from 'crypto';
-
-// Keep in sync with /api/integrations/shopify/install.ts (scope-minimized).
-const SCOPES = 'read_orders,read_products,write_products,read_inventory,write_inventory';
+import { SHOPIFY_SCOPES, createOAuthState, normalizeShopDomain } from '@/lib/integrations/shopify/oauth';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -20,9 +17,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY;
+  const SHOPIFY_API_SECRET = process.env.SHOPIFY_API_SECRET;
   const SHOPIFY_REDIRECT_URI = process.env.SHOPIFY_REDIRECT_URI;
 
-  if (!SHOPIFY_API_KEY || !SHOPIFY_REDIRECT_URI) {
+  if (!SHOPIFY_API_KEY || !SHOPIFY_API_SECRET || !SHOPIFY_REDIRECT_URI) {
     logger.error('Shopify env vars missing', undefined, {
       hasKey: !!SHOPIFY_API_KEY,
       hasRedirect: !!SHOPIFY_REDIRECT_URI,
@@ -35,23 +33,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
-  let shop = (req.query.shop as string || '').trim();
+  const shop = normalizeShopDomain(typeof req.query.shop === 'string' ? req.query.shop : '');
   if (!shop) {
-    return res.status(400).json({ error: 'Missing shop name' });
-  }
-  if (!shop.includes('.myshopify.com')) {
-    shop = `${shop}.myshopify.com`;
+    return res.status(400).json({ error: 'Invalid shop domain' });
   }
 
-  // Encode userId in state for callback verification
-  const nonce = crypto.randomBytes(16).toString('hex');
-  const state = Buffer.from(JSON.stringify({ userId: user.id, nonce })).toString('base64url');
+  const state = createOAuthState(res, { userId: user.id, shop }, SHOPIFY_API_SECRET);
 
   const authUrl = `https://${shop}/admin/oauth/authorize?` +
     `client_id=${SHOPIFY_API_KEY}` +
-    `&scope=${SCOPES}` +
+    `&scope=${encodeURIComponent(SHOPIFY_SCOPES)}` +
     `&redirect_uri=${encodeURIComponent(SHOPIFY_REDIRECT_URI)}` +
-    `&state=${state}`;
+    `&state=${encodeURIComponent(state)}`;
 
   logger.info('Shopify OAuth connect initiated', { userId: user.id, shop });
 

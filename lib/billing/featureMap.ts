@@ -3,7 +3,7 @@
 // `REPORTS_TAB_FEATURE` and nothing else changes.
 //
 // Which plan includes which feature mirrors tiers.md §1 `PLANS[*].features` (trial and Pro/Enterprise on,
-// Starter/Growth/shopify_free off). The entitlement endpoint is the runtime truth (`Entitlement.features`);
+// Starter/Growth off). The entitlement endpoint is the runtime truth (`Entitlement.features`);
 // `PLAN_FEATURES` is only for copy that names a plan (Billing "Included in your plan", pricing page) and
 // for the `/api/user/settings` fallback.
 import type { Feature, PlanKey } from './types';
@@ -17,7 +17,8 @@ export const PLAN_FEATURES: Readonly<Record<PlanKey, Readonly<Record<Feature, bo
   growth: ALL_OFF,
   pro: ALL_ON,
   enterprise: ALL_ON,
-  shopify_free: ALL_OFF,
+  // Shopify-installed merchants are never charged (App Store 1.2.1), so nothing may look locked behind a plan.
+  shopify_free: ALL_ON,
 };
 
 /** The cheapest plan that includes every Pro feature. */

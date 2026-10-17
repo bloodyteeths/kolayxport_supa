@@ -5,14 +5,16 @@
  * variantRef = inventory_item_id. Location = StockSettings.shopifyLocationId,
  * else the shop's primary location.
  *
- * Write = Admin GraphQL inventorySetQuantities (API 2024-10, the version the
- * existing client uses) with compareQuantity = the fresh read: a concurrent
- * sale makes Shopify reject the write (COMPARE_QUANTITY_STALE); we re-read and
- * retry once. NOTE: from API 2026-04 the compare field is renamed
- * changeFromQuantity — update both together if API_VERSION is bumped.
+ * Write = Admin GraphQL inventorySetQuantities (SHOPIFY_API_VERSION, shared with the client)
+ * with changeFromQuantity = the fresh read (compare-and-set; the field was compareQuantity
+ * before API 2026-04): a concurrent sale makes Shopify reject the write
+ * (CHANGE_FROM_QUANTITY_STALE); we re-read and retry once. Each attempt carries its own
+ * @idempotent key (required since 2026-04); throttle retries resend the same key.
  */
+import { randomUUID } from 'crypto';
 import prisma from '@/lib/prisma';
 import { getValidAccessToken } from '@/lib/integrations/shopifyClient';
+import { gidStr, shopifyGraphql, toGid } from '@/lib/integrations/shopifyGraphql';
 import { decideSendQty } from '../math';
 import type { RemoteCandidate } from '../matching';
 import {
@@ -24,8 +26,6 @@ import {
   type StockAdapter,
 } from './types';
 
-const API_VERSION = '2024-10';
-
 type Ctx = { domain: string; token: string };
 
 async function ctxFor(userId: string, accountRef: string): Promise<Ctx | null> {
@@ -35,47 +35,44 @@ async function ctxFor(userId: string, accountRef: string): Promise<Ctx | null> {
   return { domain: shop.shopDomain, token };
 }
 
-async function gql(ctx: Ctx, query: string, variables: Record<string, unknown>): Promise<any> {
-  const res = await fetch(`https://${ctx.domain}/admin/api/${API_VERSION}/graphql.json`, {
-    method: 'POST',
-    headers: { 'X-Shopify-Access-Token': ctx.token, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables }),
-    signal: AbortSignal.timeout(30_000),
-  });
-  const text = await res.text();
-  if (!res.ok) throw Object.assign(new Error(`Shopify GraphQL ${res.status}: ${text.slice(0, 300)}`), { status: res.status });
-  const json = JSON.parse(text);
-  if (json.errors?.length) throw Object.assign(new Error(`Shopify GraphQL: ${JSON.stringify(json.errors).slice(0, 300)}`), { status: 400 });
-  return json.data;
+function gql(ctx: Ctx, query: string, variables: Record<string, unknown>): Promise<any> {
+  return shopifyGraphql(ctx.domain, ctx.token, query, variables, { timeoutMs: 30_000 });
 }
 
 async function primaryLocationId(ctx: Ctx): Promise<string | null> {
-  const data = await gql(ctx, '{ location { id } }', {});
-  const gid = String(data?.location?.id || '');
-  return gid ? gid.split('/').pop() || null : null;
+  const data = await gql(ctx, 'query KxStockPrimaryLocation { location { id } }', {});
+  return gidStr(data?.location?.id) || null;
 }
 
+const LEVELS_QUERY = `
+query KxStockLevels($ids: [ID!]!, $locationId: ID!) {
+  nodes(ids: $ids) {
+    ... on InventoryItem {
+      id
+      inventoryLevel(locationId: $locationId) { quantities(names: ["available"]) { name quantity } }
+    }
+  }
+}`;
+
+/** Available quantity per inventory item at one location (items not stocked there are absent). */
 async function readLevels(ctx: Ctx, itemIds: string[], locationId: string): Promise<Map<string, number>> {
   const out = new Map<string, number>();
   for (let i = 0; i < itemIds.length; i += 50) {
-    const ids = itemIds.slice(i, i + 50).join(',');
-    const res = await fetch(
-      `https://${ctx.domain}/admin/api/${API_VERSION}/inventory_levels.json?inventory_item_ids=${encodeURIComponent(ids)}&location_ids=${encodeURIComponent(locationId)}`,
-      { headers: { 'X-Shopify-Access-Token': ctx.token }, signal: AbortSignal.timeout(30_000) },
-    );
-    if (!res.ok) throw Object.assign(new Error(`Shopify inventory_levels ${res.status}`), { status: res.status });
-    const json = await res.json();
-    for (const lvl of json?.inventory_levels || []) {
-      if (lvl?.available === null || lvl?.available === undefined) continue;
-      out.set(String(lvl.inventory_item_id), Math.trunc(Number(lvl.available)));
+    const ids = itemIds.slice(i, i + 50).map((id) => toGid('InventoryItem', id));
+    const data = await gql(ctx, LEVELS_QUERY, { ids, locationId: toGid('Location', locationId) });
+    for (const node of Array.isArray(data?.nodes) ? data.nodes : []) {
+      if (!node?.id || !node.inventoryLevel) continue;
+      const q = (node.inventoryLevel.quantities || []).find((x: any) => x?.name === 'available');
+      if (q?.quantity === null || q?.quantity === undefined) continue;
+      out.set(gidStr(node.id), Math.trunc(Number(q.quantity)));
     }
   }
   return out;
 }
 
 const SET_MUTATION = `
-mutation kxStockSet($input: InventorySetQuantitiesInput!) {
-  inventorySetQuantities(input: $input) {
+mutation KxStockSet($input: InventorySetQuantitiesInput!, $key: String!) {
+  inventorySetQuantities(input: $input) @idempotent(key: $key) {
     inventoryAdjustmentGroup { id }
     userErrors { code field message }
   }
@@ -83,23 +80,23 @@ mutation kxStockSet($input: InventorySetQuantitiesInput!) {
 
 async function setQuantity(ctx: Ctx, itemId: string, locationId: string, qty: number, compare: number): Promise<{ ok: true } | { ok: false; stale: boolean; error: string }> {
   const data = await gql(ctx, SET_MUTATION, {
+    key: randomUUID(),
     input: {
       name: 'available',
       reason: 'correction',
-      ignoreCompareQuantity: false,
       quantities: [
         {
-          inventoryItemId: `gid://shopify/InventoryItem/${itemId}`,
-          locationId: `gid://shopify/Location/${locationId}`,
+          inventoryItemId: toGid('InventoryItem', itemId),
+          locationId: toGid('Location', locationId),
           quantity: qty,
-          compareQuantity: compare,
+          changeFromQuantity: compare,
         },
       ],
     },
   });
   const errs: any[] = data?.inventorySetQuantities?.userErrors || [];
   if (!errs.length) return { ok: true };
-  const stale = errs.some((e) => String(e?.code || '').includes('COMPARE_QUANTITY') || /compare/i.test(String(e?.message || '')));
+  const stale = errs.some((e) => /CHANGE_FROM_QUANTITY_STALE|COMPARE_QUANTITY_STALE/.test(String(e?.code || '')) || /changeFrom|compare/i.test(String(e?.message || '')));
   return { ok: false, stale, error: JSON.stringify(errs).slice(0, 300) };
 }
 

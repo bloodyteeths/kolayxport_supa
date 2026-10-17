@@ -58,7 +58,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const payload = JSON.parse(rawBody);
+  let payload: any = {};
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    await recordShopifyWebhook({ rawBody, topic, status: 'failed', errorMessage: 'invalid_json' });
+    return res.status(200).json({ success: true });
+  }
+  const shopDomain = (req.headers['x-shopify-shop-domain'] as string | undefined) || payload.shop_domain;
 
   switch (topic) {
     case 'customers/data_request':
@@ -66,7 +73,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         message: 'Shopify customers/data_request received',
         operation: 'shopify.compliance.data_request',
         details: {
-          shopDomain: req.headers['x-shopify-shop-domain'],
+          shopDomain,
           customerIdSuffix: String(payload.customer?.id ?? '').slice(-4),
         },
       });
@@ -77,22 +84,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         message: 'Shopify customers/redact received',
         operation: 'shopify.compliance.customer_redact',
         details: {
-          shopDomain: req.headers['x-shopify-shop-domain'],
+          shopDomain,
           customerIdSuffix: String(payload.customer?.id ?? '').slice(-4),
         },
       });
       break;
 
-    case 'shop/redact':
+    case 'shop/redact': {
+      // Sent 48h after uninstall: drop the shop, its synced products (cascade)
+      // and the legacy token copy on Credential.
+      let shopsDeleted = 0;
+      if (shopDomain) {
+        try {
+          shopsDeleted = (await prisma.shopifyShop.deleteMany({ where: { shopDomain } })).count;
+          await prisma.credential.updateMany({
+            where: { shopifyShopDomain: shopDomain },
+            data: { shopifyAccessToken: null, shopifyShopDomain: null },
+          });
+        } catch (err: any) {
+          logger.error('Shopify shop/redact cleanup failed', err, { shopDomain });
+        }
+      }
       logIntegrationEvent('info', {
-        message: 'Shopify shop/redact received',
+        message: 'Shopify shop/redact processed',
         operation: 'shopify.compliance.shop_redact',
-        details: {
-          shopDomain: req.headers['x-shopify-shop-domain'],
-          shopId: payload.shop_id,
-        },
+        details: { shopDomain, shopId: payload.shop_id, shopsDeleted },
       });
       break;
+    }
 
     default:
       logger.info('Shopify compliance webhook received', { topic });

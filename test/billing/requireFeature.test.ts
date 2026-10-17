@@ -45,12 +45,12 @@ describe('hasFeature / requireFeature', () => {
     expect((await hasFeature('u1', 'bulkPhotoStudio')).allowed).toBe(false);
   });
 
-  it('shopify_free (provider or an active Shopify store) is locked and neutral', async () => {
+  it('shopify_free (provider or an active Shopify store) includes every feature (App Store 1.2.1)', async () => {
     h.shopifyShops = 1;
-    expect(await hasFeature('u1', 'bulkPhotoStudio')).toEqual({ allowed: false, neutral: true });
+    expect(await hasFeature('u1', 'bulkPhotoStudio')).toEqual({ allowed: true, neutral: true });
     h.shopifyShops = 0;
     h.dbUser = user({ billingProvider: 'shopify_free' });
-    expect((await requireFeature('u1', 'bulkPhotoStudio').catch((e) => e)).neutral).toBe(true);
+    expect((await hasFeature('u1', 'bulkPhotoStudio')).allowed).toBe(true);
   });
 
   it('an unknown user is locked and neutral', async () => {

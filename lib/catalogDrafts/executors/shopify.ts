@@ -24,6 +24,9 @@
  */
 import prisma from '@/lib/prisma';
 import { ShopifyClient, getValidAccessToken } from '@/lib/integrations/shopifyClient';
+import { resolveImageId } from '@/lib/integrations/shopifyImageIds';
+import { assertNoUserErrors, toGid } from '@/lib/integrations/shopifyGraphql';
+import { SEO_QUERY, SEO_UPDATE_MUTATION } from '@/lib/integrations/shopifySeo';
 import {
   CatalogExecutorError,
   ERR,
@@ -44,9 +47,7 @@ import { shopifyValuesFromApi, splitShopifyTags } from '../values';
 
 export { splitShopifyTags };
 
-const API_VERSION = '2024-10';
-
-/** Canonical values of a Shopify REST product (kept under its v1 name). */
+/** Canonical values of a Shopify product in the client's REST shape (kept under its v1 name). */
 export function shopifyRemoteValues(p: any, seo?: ShopifySeo | null): CanonicalValues {
   return shopifyValuesFromApi(p, seo);
 }
@@ -361,7 +362,14 @@ export function createShopifySession(
       if (imageOps.length) {
         const failed: NonNullable<ExecutorFailureDetails['ops']> = [];
         const currentIds = (remote.values.mediaItems || []).map((m) => m.id);
-        const res = await writeImages(draft.externalId, imageOps, currentIds, failed);
+        // Ids staged before the GraphQL migration are REST ProductImage ids: map them to the MediaImage id.
+        const liveImages: any[] = Array.isArray(product.images) ? product.images : [];
+        const resolvedOps = imageOps.map((o) => {
+          if (o.op === 'add') return o;
+          const id = resolveImageId(o.id, liveImages);
+          return id && id !== o.id ? { ...o, id } : o;
+        });
+        const res = await writeImages(draft.externalId, resolvedOps, currentIds, failed);
         if (res.wrote) wrote = true;
         if (res.remaining.length !== imageOps.length) remainingPatch = { images: res.remaining };
         if (failed.length) {
@@ -406,55 +414,27 @@ export function createShopifySession(
   };
 }
 
-/** Inventory levels of one item (REST, read_inventory), with a bounded 429 retry. */
-function levelReader(shopDomain: string, accessToken: string): LevelReader {
+/** Inventory levels of one item (Admin GraphQL, read_inventory); throttling handled by the client. */
+function levelReader(client: Pick<ShopifyClient, 'getInventoryLevelsForItems'>): LevelReader {
   return async (inventoryItemId) => {
-    const url = `https://${shopDomain}/admin/api/${API_VERSION}/inventory_levels.json?limit=50&inventory_item_ids=${encodeURIComponent(inventoryItemId)}`;
-    let res: Response | null = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      res = await fetch(url, { headers: { 'X-Shopify-Access-Token': accessToken }, signal: AbortSignal.timeout(15_000) });
-      if (res.status !== 429) break;
-      await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
-    }
-    if (!res || !res.ok) throw new Error(`Shopify inventory read failed: ${res?.status ?? 'no response'}`);
-    const json = await res.json();
-    const levels: any[] = Array.isArray(json?.inventory_levels) ? json.inventory_levels : [];
-    return levels.map((l) => ({ location_id: l.location_id, available: l.available ?? null }));
+    const byItem = await client.getInventoryLevelsForItems([inventoryItemId]);
+    return byItem.get(String(inventoryItemId)) || [];
   };
 }
 
 /**
- * Product SEO over Admin GraphQL (the REST product has no SEO fields). Same queries as the
- * `/api/shopify/products` `seo` / `update` actions.
+ * Product SEO over Admin GraphQL. Same documents as the `/api/shopify/products` `seo` / `update` actions.
  */
-export function shopifySeoIO(shopDomain: string, accessToken: string): ShopifySeoIO {
-  const gql = async (query: string, variables: Record<string, unknown>) => {
-    const res = await fetch(`https://${shopDomain}/admin/api/${API_VERSION}/graphql.json`, {
-      method: 'POST',
-      headers: { 'X-Shopify-Access-Token': accessToken, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, variables }),
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!res.ok) throw new Error(`Shopify API GraphQL failed: ${res.status} - ${await res.text().catch(() => '')}`);
-    const json = await res.json();
-    if (json?.errors?.length) throw new Error(`Shopify GraphQL error: ${json.errors.map((e: any) => e.message).join('; ')}`);
-    return json?.data;
-  };
+export function shopifySeoIO(client: Pick<ShopifyClient, 'graphql'>): ShopifySeoIO {
   return {
     async read(productId) {
-      const data = await gql('query productSeo($id: ID!) { product(id: $id) { seo { title description } } }', { id: `gid://shopify/Product/${productId}` });
+      const data = await client.graphql(SEO_QUERY, { id: toGid('Product', productId) });
       const seo = data?.product?.seo || {};
       return { title: seo.title ?? '', description: seo.description ?? '' };
     },
     async write(productId, seo) {
-      const data = await gql(
-        `mutation productSeoUpdate($input: ProductInput!) {
-          productUpdate(input: $input) { product { id seo { title description } } userErrors { field message } }
-        }`,
-        { input: { id: `gid://shopify/Product/${productId}`, seo } },
-      );
-      const userErrors = data?.productUpdate?.userErrors || [];
-      if (userErrors.length) throw new Error(`Shopify SEO update failed: ${userErrors.map((e: any) => e.message).join('; ')}`);
+      const data = await client.graphql(SEO_UPDATE_MUTATION, { product: { id: toGid('Product', productId), seo } });
+      assertNoUserErrors(data?.productUpdate, 'productUpdate(seo)');
       const saved = data?.productUpdate?.product?.seo || {};
       return { title: saved.title ?? '', description: saved.description ?? '' };
     },
@@ -467,6 +447,6 @@ export const shopifyExecutor: CatalogExecutor = {
     if (!shop) throw new CatalogExecutorError(`${ERR}.notConnected`, 'Shopify store not connected');
     const accessToken = await getValidAccessToken(shop.id);
     const client = new ShopifyClient({ accessToken, shopDomain: shop.shopDomain });
-    return createShopifySession(client, userId, shop.id, levelReader(shop.shopDomain, accessToken), shopifySeoIO(shop.shopDomain, accessToken));
+    return createShopifySession(client, userId, shop.id, levelReader(client), shopifySeoIO(client));
   },
 };

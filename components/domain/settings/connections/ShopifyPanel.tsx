@@ -28,6 +28,9 @@ export function ShopifyPanel({ open, onClose, accounts, status }: ShopifyPanelPr
   const f = useFormatters();
   const [domain, setDomain] = useState('');
   const sub = domain.trim();
+  // App Store rule 2.3.1: a Shopify-installed account never types a myshopify domain;
+  // further stores are added by installing from the App Store.
+  const hasShop = accounts.length > 0;
 
   return (
     <SidePanel padded
@@ -38,7 +41,7 @@ export function ShopifyPanel({ open, onClose, accounts, status }: ShopifyPanelPr
       leading={<LogoTile brand="shopify" size={32} />}
       status={status ? <StatusPill domain="connection" status={status} /> : undefined}
       secondary={{ id: 'shopify-cancel', label: t('credentials.cancel'), onClick: onClose }}
-      primary={{
+      primary={hasShop ? undefined : {
         id: 'shopify-connect',
         label: tc('shopifyPanel.connect'),
         href: sub ? shopifyConnectHref(sub) : undefined,
@@ -61,6 +64,9 @@ export function ShopifyPanel({ open, onClose, accounts, status }: ShopifyPanelPr
             ))}
           </div>
         )}
+        {hasShop ? (
+          <p style={{ margin: 0 }}>{tc('shopifyPanel.addAnotherViaAppStore')}</p>
+        ) : (
         <FormField label={tc('shopifyPanel.storeAddress')}>
           <TextField
             value={domain}
@@ -72,6 +78,7 @@ export function ShopifyPanel({ open, onClose, accounts, status }: ShopifyPanelPr
             data-testid="shopify-domain"
           />
         </FormField>
+        )}
       </div>
     </SidePanel>
   );

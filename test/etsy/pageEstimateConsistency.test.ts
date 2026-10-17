@@ -23,3 +23,13 @@ describe('search card uses the listing page estimate (same number in both places
     expect(out['9'].sales.monthlySales).toBe(7);
   });
 });
+
+import { rememberListingResult } from '@/lib/etsy/listingStats';
+describe('cached listing-page answers still feed the search cards', () => {
+  beforeEach(() => __clearPageEstimates());
+  it('records the estimate from a listing result body', () => {
+    rememberListingResult({ listingId: '42', sales: { kind: 'estimated', confidence: 'medium', monthlySales: 25.6, monthlySalesUpperBound: null, inputs: {} } });
+    const out = applyPageEstimates({ '42': card('42', 35) })!;
+    expect(out['42'].sales.monthlySales).toBe(25.6);
+  });
+});

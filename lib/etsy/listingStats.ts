@@ -741,6 +741,13 @@ export function applyPageEstimates(listings: Record<string, CardStats> | undefin
   return listings;
 }
 
+/** Record a listing page's estimate from a (possibly cached) getListingStats() result body. */
+export function rememberListingResult(body: any) {
+  const sales = body?.sales;
+  const id = body?.listingId;
+  if (id && sales && (sales.kind === 'estimated' || sales.kind === 'measured')) rememberPageEstimate(String(id), sales);
+}
+
 /** Test hook: store a listing-page estimate directly. */
 export function __rememberPageEstimateForTest(listingId: string, sales: any) { rememberPageEstimate(listingId, sales); }
 const LISTING_BASIC_TTL_MS = 30 * 60 * 1000;

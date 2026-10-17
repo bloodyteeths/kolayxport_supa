@@ -35,6 +35,8 @@ vi.mock('@/lib/etsy/listingStats', () => {
     sanitizePageSignals: (p: any) => ({ pagePrice: p?.pagePrice ?? null, pageCurrency: p?.pageCurrency ?? null, inCarts: p?.inCarts ?? null }),
     getBatchListingStats: vi.fn(async (ids: string[]) => ({ listings: Object.fromEntries(ids.map((i) => [i, { sales: 1 }])), pendingIds: [] })),
     getShopStats: vi.fn(async (id: string) => ({ shop: { shop_name: id } })),
+    rememberListingResult: vi.fn(),
+    applyPageEstimates: (l: any) => l,
   };
 });
 vi.mock('@/lib/integrations/amazonClient', () => ({

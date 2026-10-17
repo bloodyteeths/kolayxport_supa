@@ -536,6 +536,27 @@ function delegateOf(db: ListingsDb, adapter: ListingsAdapter): ModelDelegate {
   return d as ModelDelegate;
 }
 
+/**
+ * Failed / conflicted drafts whose listing is no longer in the store (deleted on the marketplace) can never be sent
+ * and never appear in the list: counting them kept a permanent "7 failed" banner over 5 rows. Pending drafts are
+ * kept (a draft creating a new listing has no row yet). Exported for tests.
+ */
+export async function dropOrphanFailures(db: ListingsDb, adapter: ListingsAdapter, ctx: StoreContext, drafts: Map<string, DraftLite>, now: Date): Promise<Map<string, DraftLite>> {
+  const stale = Array.from(drafts.values()).filter((d) => {
+    const k = draftSyncKey(d, now);
+    return (k === 'sync_failed' || k === 'conflict') && d.extId && adapter.toDbId(d.extId) !== undefined;
+  });
+  if (!stale.length) return drafts;
+  const rows = await delegateOf(db, adapter).findMany({
+    where: { AND: [ctx.storeWhere, idsWhere(adapter, stale.map((d) => d.extId))] },
+    select: { [adapter.idField]: true },
+  });
+  const present = new Set(rows.map((r) => String(r[adapter.idField])));
+  const out = new Map(drafts);
+  for (const d of stale) if (!present.has(d.extId)) out.delete(d.extId);
+  return out;
+}
+
 // ─── Plan: resolve store, drafts and the where once ─────────────────────────
 
 export type ListingsPlan = {
@@ -555,7 +576,7 @@ export async function planListingsQuery(db: ListingsDb, adapter: ListingsAdapter
   const ctx = await adapter.resolveStore(db, userId, q.store);
   if (!ctx) throw new ListingsQueryError('not_connected', 404);
   const caps = schemaCaps(adapter);
-  const drafts = await loadStoreDrafts(db, adapter.drafts, ctx, caps, now);
+  const drafts = await dropOrphanFailures(db, adapter, ctx, await loadStoreDrafts(db, adapter.drafts, ctx, caps, now), now);
   const and: Where[] = [ctx.storeWhere, ...filterWheres(adapter, q, caps)];
   if (q.sync?.length) {
     const wanted = new Set<string>(q.sync);

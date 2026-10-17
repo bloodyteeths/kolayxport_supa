@@ -152,11 +152,12 @@ export function SidePanel({
           onKeyDown,
           sx: {
             width,
-            height: isPhone ? '100dvh' : '100%',
+            // Phones: a bottom sheet as tall as its content (a short form no longer leaves a screen of white), up to
+            // just below the status bar — the home-screen iPhone app draws under the clock (black-translucent +
+            // viewport-fit=cover), where the header and its ✕ could not be tapped.
+            height: isPhone ? 'auto' : '100%',
+            ...(isPhone && { maxHeight: 'calc(100dvh - env(safe-area-inset-top, 0px) - 12px)' }),
             maxWidth: '100vw',
-            // Home-screen app on iPhone (black-translucent status bar, viewport-fit=cover) draws under the clock:
-            // without this the header and its ✕ sat in the untouchable status-bar strip.
-            ...(isPhone && { pt: 'env(safe-area-inset-top, 0px)' }),
             display: 'flex',
             flexDirection: 'column',
             bgcolor: n[0],
@@ -205,7 +206,8 @@ export function SidePanel({
             <SectionNav sections={sectionNav} sticky={false} scrollRoot={bodyRef} aria-label={t('sections')} data-testid="panel-section-nav" />
           </Box>
         )}
-        {headerSlot && <Box sx={{ flexShrink: 0 }}>{headerSlot}</Box>}
+        {/* Inset like the body: a banner here ran edge to edge, touching the panel sides. */}
+        {headerSlot && <Box sx={{ flexShrink: 0, px: '16px', pt: '12px' }}>{headerSlot}</Box>}
         <Box ref={bodyRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', ...(padded ? { p: '16px', display: 'flex', flexDirection: 'column', gap: '16px' } : null) }}>
           {children}
         </Box>

@@ -32,7 +32,7 @@ export interface EtsyShopsPanelProps {
   isPhone?: boolean;
 }
 
-export function EtsyShopsPanel({ open, onClose, accounts, loading, storesFull, showCompare, onDisconnect, busyKey, isPhone }: EtsyShopsPanelProps) {
+export function EtsyShopsPanel({ open, onClose, accounts, loading, storesFull, showCompare, onDisconnect, busyKey }: EtsyShopsPanelProps) {
   const t = useTranslations('settings');
   const tc = useTranslations('settings.connections');
   const f = useFormatters();
@@ -66,7 +66,6 @@ export function EtsyShopsPanel({ open, onClose, accounts, loading, storesFull, s
             <ListRow
               key={shop.id}
               divider={i > 0}
-              stacked={isPhone}
               data-testid={`etsy-shop-${shop.id}`}
               title={shop.name}
               status={<StatusPill domain="connection" status={shop.needsReauth ? 'needs_reconnect' : 'connected'} size="sm" />}
@@ -74,7 +73,6 @@ export function EtsyShopsPanel({ open, onClose, accounts, loading, storesFull, s
                 shop.externalId ? tc('etsyPanel.shopId', { id: shop.externalId }) : null,
                 shop.lastSyncAt ? tc('meta.refreshed', { time: f.relative(shop.lastSyncAt) }) : null,
               ].filter(Boolean).join(' · ')}
-              captionMono
               trailing={
                 <OverflowMenu
                   label={tc('menu.more', { provider: shop.name })}

@@ -175,9 +175,14 @@ export const DECIDED_PLAN_LIMITS: Readonly<Record<PlanKey, DecidedPlan>> = {
   shopify_free: { limits: { orders: null, labels: null, connectedStores: 1, aiCredits: 300 }, stripeUpsell: false },
 };
 
-/** tiers.md §1 constants (display only until the billing track enforces them). */
+/** tiers.md §1 constants. The trial length is enforced at account creation via `newTrialExpiry`. */
 export const DECIDED_TRIAL_DAYS = 14;
 export const DECIDED_GRACE_DAYS = 3;
+
+/** Trial end for an account created at `now` (signup, Google OAuth, Shopify install). */
+export function newTrialExpiry(now: number = Date.now()): Date {
+  return new Date(now + DECIDED_TRIAL_DAYS * 24 * 60 * 60 * 1000);
+}
 
 /** Decided limits for a plan key; `undefined` for an unknown key. */
 export function getDecidedPlanLimits(plan: string | null | undefined): DecidedPlan | undefined {

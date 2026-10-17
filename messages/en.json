@@ -9054,14 +9054,14 @@
     "home": {
       "seo": {
         "title": "KolayXport – AI-Powered E-Commerce Command Center | Etsy, eBay & Amazon Tools",
-        "description": "AI listing optimization, market research, order management & shipping — everything for Etsy, eBay, Amazon, Trendyol, Wix and Shopify sellers in one dashboard. Try free for 30 days.",
+        "description": "AI listing optimization, market research, order management & shipping — everything for Etsy, eBay, Amazon, Trendyol, Wix and Shopify sellers in one dashboard. Try free for 14 days.",
         "ogAlt": "KolayXport Overview"
       },
       "hero": {
         "titlePrefix": "AI-Powered",
         "titleHighlight": "E-Commerce Command Center",
         "subtitle": "Market research, AI listing optimization, competitor analysis, order management & shipping — everything you need for Etsy, eBay, Amazon, Trendyol, Wix and Shopify, in one dashboard.",
-        "ctaPrimary": "Start 30-Day Free Trial",
+        "ctaPrimary": "Start 14-Day Free Trial",
         "ctaSecondary": "Features",
         "imageAlt": "KolayXport dashboard preview"
       },
@@ -9239,7 +9239,7 @@
         "heading": "Research, List, Sell — All From One Place.",
         "subtitle": "Grow your marketplace sales with AI-powered tools.",
         "pricingLinkText": "See our pricing plans",
-        "button": "Start 30-Day Free Trial",
+        "button": "Start 14-Day Free Trial",
         "contactPrompt": "Have questions?",
         "contactLinkText": "Contact Us"
       },
@@ -9276,7 +9276,7 @@
           },
           {
             "question": "How does the free trial work?",
-            "answer": "A 30-day free trial starts automatically when you create an account. The trial includes 50 order syncs, 10 shipping labels, and all AI and research tools. When it ends, simply pick the Starter or Growth plan to continue."
+            "answer": "A 14-day free trial starts automatically when you create an account. The trial includes 50 order syncs, 10 shipping labels, and all AI and research tools. When it ends, simply pick the Starter or Growth plan to continue."
           },
           {
             "question": "How does KolayXport use the Etsy API?",
@@ -9356,14 +9356,14 @@
           "description": "Your API keys and sensitive data are protected with advanced encryption. Benefit from the highest security standards on our enterprise European (Germany) server infrastructure."
         },
         {
-          "title": "30-Day Free Trial",
-          "description": "All integrations, AI tools and research features free for 30 days. Sign up without a credit card, and pick the plan that fits when you're ready."
+          "title": "14-Day Free Trial",
+          "description": "All integrations, AI tools and research features free for 14 days. Sign up without a credit card, and pick the plan that fits when you're ready."
         }
       ],
       "cta": {
         "heading": "Ready to Try KolayXport?",
-        "subtitle": "Take your e-commerce operations to the next level. Try free for 30 days and see the difference.",
-        "button": "Start 30-Day Free Trial"
+        "subtitle": "Take your e-commerce operations to the next level. Try free for 14 days and see the difference.",
+        "button": "Start 14-Day Free Trial"
       }
     },
     "integrations": {
@@ -9373,7 +9373,7 @@
       },
       "hero": {
         "title": "From Etsy to Trendyol, UPS to FedEx — Under One Roof",
-        "subtitle": "6 marketplaces, 4 shipping integrations and AI tools. All included in the 30-day free trial."
+        "subtitle": "6 marketplaces, 4 shipping integrations and AI tools. All included in the 14-day free trial."
       },
       "categories": {
         "all": "All",
@@ -9612,19 +9612,19 @@
     "pricing": {
       "seo": {
         "title": "KolayXport | Pricing",
-        "description": "Discover KolayXport's transparent and flexible pricing options. Get started with a 30-day free trial.",
+        "description": "Discover KolayXport's transparent and flexible pricing options. Get started with a 14-day free trial.",
         "ogAlt": "KolayXport Pricing Plans"
       },
       "hero": {
         "titlePrefix": "Try",
         "titleHighlight": "FREE",
-        "titleSuffix": "for 30 Days",
-        "subtitle": "Try KolayXport free for 30 days. All marketplace integrations, shipping label creation and AI tools are included during the trial.",
+        "titleSuffix": "for 14 Days",
+        "subtitle": "Try KolayXport free for 14 days. All marketplace integrations, shipping label creation and AI tools are included during the trial.",
         "ctaStart": "Get Started",
         "ctaCall": "Call Us"
       },
       "plansHeading": "Choose the Plan That Fits You",
-      "plansSubheading": "Transparent, flexible pricing that keeps pace with your business growth. All plans include a 30-day free trial.",
+      "plansSubheading": "Transparent, flexible pricing that keeps pace with your business growth. All plans include a 14-day free trial.",
       "billing": {
         "monthly": "Monthly",
         "yearly": "Yearly",
@@ -9672,7 +9672,7 @@
           "cta": "Contact Us"
         }
       },
-      "trialButton": "Start 30-Day Free Trial",
+      "trialButton": "Start 14-Day Free Trial",
       "comparison": {
         "heading": "Feature Comparison",
         "subheading": "See the differences between plans.",
@@ -9737,7 +9737,7 @@
       "faq": [
         {
           "question": "How does the free trial work?",
-          "answer": "A 30-day free trial starts automatically when you create an account. During the trial you can sync 50 orders and create 10 shipping labels. When it ends, simply pick the Starter or Growth plan to continue."
+          "answer": "A 14-day free trial starts automatically when you create an account. During the trial you can sync 50 orders and create 10 shipping labels. When it ends, simply pick the Starter or Growth plan to continue."
         },
         {
           "question": "Which integrations are available during the trial?",

@@ -7,6 +7,7 @@ import { issueToken } from '@/lib/auth/tokens';
 import { sendEmail, verificationEmailBody, maskEmail } from '@/lib/auth/email';
 import { logAuthEvent } from '@/lib/admin/events';
 import { validatePassword } from '@/lib/auth/passwordPolicy';
+import { newTrialExpiry } from '@/lib/billing/planLimits';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -46,8 +47,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // emailVerified stays null until the user clicks the verification link.
         subscriptionPlan: 'trial',
         subscriptionStatus: 'trialing',
-        trialExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        usageResetAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        trialExpiresAt: newTrialExpiry(),
+        usageResetAt: newTrialExpiry(),
         orderSyncCount: 0,
         labelCount: 0,
       },

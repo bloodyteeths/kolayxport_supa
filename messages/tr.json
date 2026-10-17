@@ -9054,14 +9054,14 @@
     "home": {
       "seo": {
         "title": "KolayXport – AI Destekli E-Ticaret Komuta Merkezi | Etsy, eBay & Amazon Araçları",
-        "description": "AI listeleme, pazar araştırması, sipariş yönetimi ve kargo — Etsy, eBay, Amazon, Trendyol, Wix ve Shopify satıcıları için hepsi tek panelde. 30 gün ücretsiz deneyin.",
+        "description": "AI listeleme, pazar araştırması, sipariş yönetimi ve kargo — Etsy, eBay, Amazon, Trendyol, Wix ve Shopify satıcıları için hepsi tek panelde. 14 gün ücretsiz deneyin.",
         "ogAlt": "KolayXport Genel Bakış"
       },
       "hero": {
         "titlePrefix": "AI Destekli",
         "titleHighlight": "E-Ticaret Komuta Merkezi",
         "subtitle": "Pazar araştırması, AI listeleme, rakip analizi, sipariş yönetimi ve kargo — Etsy, eBay, Amazon, Trendyol, Wix ve Shopify için ihtiyacınız olan her şey, %100 Türkçe.",
-        "ctaPrimary": "30 Gün Ücretsiz Dene",
+        "ctaPrimary": "14 Gün Ücretsiz Dene",
         "ctaSecondary": "Özellikler",
         "imageAlt": "KolayXport panel önizlemesi"
       },
@@ -9239,7 +9239,7 @@
         "heading": "Araştırma, Listeleme, Satış — Hepsini Tek Yerden Yönetin.",
         "subtitle": "AI destekli araçlarla pazaryeri satışlarınızı büyütün.",
         "pricingLinkText": "Fiyatlandırma planlarını inceleyin",
-        "button": "30 Gün Ücretsiz Dene",
+        "button": "14 Gün Ücretsiz Dene",
         "contactPrompt": "Sorularınız mı var?",
         "contactLinkText": "Bize Ulaşın"
       },
@@ -9276,7 +9276,7 @@
           },
           {
             "question": "Ücretsiz deneme nasıl çalışıyor?",
-            "answer": "Hesap oluşturduğunuzda 30 günlük ücretsiz deneme otomatik başlar. Deneme süresince 50 sipariş senkronizasyonu, 10 kargo etiketi ve tüm AI ve araştırma araçları dahildir. Süre dolduğunda devam etmek için Başlangıç veya Büyüme planlarından birini seçebilirsiniz."
+            "answer": "Hesap oluşturduğunuzda 14 günlük ücretsiz deneme otomatik başlar. Deneme süresince 50 sipariş senkronizasyonu, 10 kargo etiketi ve tüm AI ve araştırma araçları dahildir. Süre dolduğunda devam etmek için Başlangıç veya Büyüme planlarından birini seçebilirsiniz."
           },
           {
             "question": "KolayXport Etsy API'sini nasıl kullanıyor?",
@@ -9356,14 +9356,14 @@
           "description": "API anahtarlarınız ve hassas verileriniz gelişmiş şifreleme yöntemleriyle korunur. Avrupa merkezli (Almanya) kurumsal sunucu altyapımızın sunduğu en yüksek güvenlik standartlarından faydalanın."
         },
         {
-          "title": "30 Gün Ücretsiz Deneme",
-          "description": "Tüm entegrasyonlar, AI araçları ve araştırma özellikleri 30 gün boyunca ücretsiz. Kredi kartı gerekmeden kaydolun, memnun kalırsanız size uygun planı seçin."
+          "title": "14 Gün Ücretsiz Deneme",
+          "description": "Tüm entegrasyonlar, AI araçları ve araştırma özellikleri 14 gün boyunca ücretsiz. Kredi kartı gerekmeden kaydolun, memnun kalırsanız size uygun planı seçin."
         }
       ],
       "cta": {
         "heading": "KolayXport'u Denemeye Hazır mısınız?",
-        "subtitle": "E-ticaret operasyonlarınızı bir üst seviyeye taşıyın. 30 gün ücretsiz deneyin ve farkı görün.",
-        "button": "30 Gün Ücretsiz Deneyin"
+        "subtitle": "E-ticaret operasyonlarınızı bir üst seviyeye taşıyın. 14 gün ücretsiz deneyin ve farkı görün.",
+        "button": "14 Gün Ücretsiz Deneyin"
       }
     },
     "integrations": {
@@ -9373,7 +9373,7 @@
       },
       "hero": {
         "title": "Etsy'den Trendyol'a, UPS'ten FedEx'e — Tek Çatı Altında",
-        "subtitle": "6 pazaryeri, 4 kargo entegrasyonu ve AI araçları. 30 gün ücretsiz denemede hepsi dahil."
+        "subtitle": "6 pazaryeri, 4 kargo entegrasyonu ve AI araçları. 14 gün ücretsiz denemede hepsi dahil."
       },
       "categories": {
         "all": "Tümü",
@@ -9612,19 +9612,19 @@
     "pricing": {
       "seo": {
         "title": "KolayXport | Fiyatlandırma",
-        "description": "KolayXport'un şeffaf ve esnek fiyatlandırma seçeneklerini keşfedin. 30 gün ücretsiz deneme ile hemen başlayın.",
+        "description": "KolayXport'un şeffaf ve esnek fiyatlandırma seçeneklerini keşfedin. 14 gün ücretsiz deneme ile hemen başlayın.",
         "ogAlt": "KolayXport Fiyatlandırma Planları"
       },
       "hero": {
-        "titlePrefix": "30 Gün",
+        "titlePrefix": "14 Gün",
         "titleHighlight": "ÜCRETSİZ",
         "titleSuffix": "Deneyin",
-        "subtitle": "KolayXport'u 30 gün boyunca ücretsiz deneyin. Tüm pazaryeri entegrasyonları, kargo etiketi oluşturma ve AI araçları deneme süresince dahil.",
+        "subtitle": "KolayXport'u 14 gün boyunca ücretsiz deneyin. Tüm pazaryeri entegrasyonları, kargo etiketi oluşturma ve AI araçları deneme süresince dahil.",
         "ctaStart": "Hemen Başla",
         "ctaCall": "Bizi Arayın"
       },
       "plansHeading": "Size Uygun Planı Seçin",
-      "plansSubheading": "Şeffaf, esnek ve işletmenizin büyümesine ayak uyduran fiyatlandırma. Tüm planlar 30 gün ücretsiz deneme içerir.",
+      "plansSubheading": "Şeffaf, esnek ve işletmenizin büyümesine ayak uyduran fiyatlandırma. Tüm planlar 14 gün ücretsiz deneme içerir.",
       "billing": {
         "monthly": "Aylık",
         "yearly": "Yıllık",
@@ -9672,7 +9672,7 @@
           "cta": "Bize Ulaşın"
         }
       },
-      "trialButton": "30 Gün Ücretsiz Dene",
+      "trialButton": "14 Gün Ücretsiz Dene",
       "comparison": {
         "heading": "Özellik Karşılaştırması",
         "subheading": "Planlar arasındaki farkları inceleyin.",
@@ -9737,7 +9737,7 @@
       "faq": [
         {
           "question": "Ücretsiz deneme nasıl çalışıyor?",
-          "answer": "Hesap oluşturduğunuzda otomatik olarak 30 günlük ücretsiz deneme başlar. Deneme süresince 50 sipariş senkronizasyonu ve 10 kargo etiketi oluşturabilirsiniz. Deneme süresi dolduktan sonra kullanmaya devam etmek için Başlangıç veya Büyüme planlarından birini seçmeniz yeterli."
+          "answer": "Hesap oluşturduğunuzda otomatik olarak 14 günlük ücretsiz deneme başlar. Deneme süresince 50 sipariş senkronizasyonu ve 10 kargo etiketi oluşturabilirsiniz. Deneme süresi dolduktan sonra kullanmaya devam etmek için Başlangıç veya Büyüme planlarından birini seçmeniz yeterli."
         },
         {
           "question": "Deneme süresinde hangi entegrasyonlar mevcut?",

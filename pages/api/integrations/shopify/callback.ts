@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import prisma from '../../../../lib/prisma';
 import { logger } from '../../../../lib/logger';
 import { encryptIfNeeded } from '@/lib/crypto/credentials';
+import { DECIDED_TRIAL_DAYS } from '@/lib/billing/planLimits';
 import { clearConnectionAuthState } from '@/lib/integrations/authFailures';
 import crypto from 'crypto';
 
@@ -51,7 +52,7 @@ async function provisionUserFromShop(args: {
     return { userId: existing.id, created: false };
   }
 
-  const trialMs = 30 * 24 * 60 * 60 * 1000;
+  const trialMs = DECIDED_TRIAL_DAYS * 24 * 60 * 60 * 1000;
   const user = await prisma.user.create({
     data: {
       id: uuidv4(),

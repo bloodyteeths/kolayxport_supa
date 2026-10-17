@@ -187,7 +187,7 @@ export default function SupportPage() {
             {[
               {
                 q: "KolayXport ücretsiz mi?",
-                a: "KolayXport 30 günlük ücretsiz deneme sunuyor. Bu süre sonunda kullanım ihtiyacınıza göre planlarımızdan birini seçebilirsiniz."
+                a: "KolayXport 14 günlük ücretsiz deneme sunuyor. Bu süre sonunda kullanım ihtiyacınıza göre planlarımızdan birini seçebilirsiniz."
               },
               {
                 q: "Kaç pazaryerine aynı anda bağlanabilirim?",

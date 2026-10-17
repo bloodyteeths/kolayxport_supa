@@ -202,7 +202,7 @@ function MyApp({ Component, pageProps }: AppProps) {
                 "@type": "Offer",
                 "price": "0",
                 "priceCurrency": "TRY",
-                "description": "30 gun ucretsiz deneme"
+                "description": "14 gün ücretsiz deneme"
               }
             })
           }}

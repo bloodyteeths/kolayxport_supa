@@ -69,6 +69,7 @@ export default async function handler(req, res) {
           email: true,
           name: true,
           stripeCustomerId: true,
+          trialExpiresAt: true,
         }
       });
 
@@ -94,6 +95,7 @@ export default async function handler(req, res) {
               email: true,
               name: true,
               stripeCustomerId: true,
+              trialExpiresAt: true,
             }
           });
         }
@@ -215,7 +217,9 @@ export default async function handler(req, res) {
         line_items: [{ price: priceId, quantity: 1 }],
         mode: 'subscription',
         subscription_data: {
-          trial_period_days: 30,
+          // Carry over what is left of the in-app trial instead of starting a new one.
+          // Stripe needs trial_end at least 48h ahead, so a nearly-spent trial bills now.
+          ...(stripeTrialEnd(dbUser.trialExpiresAt) ? { trial_end: stripeTrialEnd(dbUser.trialExpiresAt) } : {}),
           metadata: {
             userId: dbUser.id,
             plan: plan,
@@ -249,4 +253,10 @@ export default async function handler(req, res) {
 
     res.status(500).json({ error: 'Internal Server Error' });
   }
+}
+
+function stripeTrialEnd(trialExpiresAt: Date | null | undefined): number | undefined {
+  if (!trialExpiresAt) return undefined;
+  const end = new Date(trialExpiresAt).getTime();
+  return end - Date.now() > 48 * 60 * 60 * 1000 ? Math.floor(end / 1000) : undefined;
 }

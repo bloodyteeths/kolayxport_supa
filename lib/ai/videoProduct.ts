@@ -106,7 +106,9 @@ function notes(v: unknown, max: number): { text: string; fix: string }[] {
 
 /** Normalises the model's QA answer (wrong types, out-of-range scores, garbled lists). Pure, exported for tests. */
 export function normalizeQa(raw: unknown): VideoQa {
-  const o = (raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}) as Record<string, unknown>;
+  // Gemini sometimes wraps the object in an array.
+  const one = Array.isArray(raw) ? raw.find((x) => x && typeof x === 'object' && !Array.isArray(x)) : raw;
+  const o = (one && typeof one === 'object' && !Array.isArray(one) ? one : {}) as Record<string, unknown>;
   const match = clampScore(o.productMatch ?? o.match);
   const realism = clampScore(o.realism);
   if (match === undefined && realism === undefined) return { status: 'failed' };
@@ -133,8 +135,9 @@ export async function checkVideo(input: { userId: string; file: string; refs: Vi
     {
       text: [
         'You check AI product videos for an online shop before a buyer sees them. Compare the product in every VIDEO FRAME with the PRODUCT PHOTOS, image against image, like a careful buyer.',
-        'productMatch 0–10: 10 = the exact same product in every frame (cut, colours, pattern, lace, embroidery, flowers/appliqués — their number, size and position —, sleeves, neckline, length, accessories). Any changed, added or missing detail lowers it a lot.',
-        'realism 0–10: 10 = nobody could tell it is not a real filmed video (faces, eyes, hands, skin, hair, fabric movement and physics, lighting, no morphing or warping).',
+        'The photos show the product from different angles, poses and crops (front, back, side, close-up): never count a different pose, angle, crop, camera distance or framing as a difference. Judge only the product\'s own design. Motion blur in a frame of a moving shot is normal.',
+        'productMatch 0–10: 10 = the same design in every frame (cut, colours, pattern, lace, embroidery, flowers/appliqués — roughly the same number, size and placement —, sleeves, neckline, length, bows, accessories). 8–9: only tiny differences a buyer would not notice. 6–7: a difference a buyer could notice. 4–5: clearly changed details. 0–3: a different product.',
+        'realism 0–10, judged as a shopper watching on a phone: 10 = nobody could tell it is not a real filmed video. Lower it for distorted faces, eyes or hands, plastic skin, melting or morphing fabric, impossible physics, on-screen interfaces, black bars or borders.',
         `diffs: up to 4 concrete differences from the photos (most visible first). issues: up to 3 things that look artificial. Each item: "text" = short, specific, in ${lang}, for the seller; "fix" = one short English instruction for the video model to fix it.`,
         'Only list real problems; empty lists when there are none. Return JSON: {"productMatch": number, "realism": number, "diffs": [{"text","fix"}], "issues": [{"text","fix"}]}',
       ].join('\n'),
@@ -142,4 +145,108 @@ export async function checkVideo(input: { userId: string; file: string; refs: Vi
   ];
   const raw = await aiJson({ tier: 'deep', feature: 'video.qa', userId: input.userId, temperature: 0.2 }, parts);
   return normalizeQa(raw);
+}
+
+type Box = [number, number, number, number]; // ymin, xmin, ymax, xmax (0–1000)
+
+const validBox = (b: unknown): b is Box =>
+  Array.isArray(b) && b.length === 4 && b.every((v) => typeof v === 'number' && v >= 0 && v <= 1000) && b[2] > b[0] && b[3] > b[1];
+
+/**
+ * Where the crop window for the end frame goes so its subject matches the start frame's (same height, same place).
+ * Inputs and output in pixels of a W×H frame. Pure, exported for tests. null = nothing to do / cannot.
+ */
+export function matchWindow(start: Box, end: Box, W: number, H: number): { left: number; top: number; width: number; height: number } | null {
+  const sh = ((start[2] - start[0]) / 1000) * H;
+  const eh = ((end[2] - end[0]) / 1000) * H;
+  if (sh <= 0 || eh <= 0) return null;
+  const s = sh / eh; // > 1: the end subject is smaller → zoom in on it
+  if (s < 1.06 || s > 2.2) return null; // already alike, or too far apart to fix by cropping
+  const width = Math.round(W / s);
+  const height = Math.round(H / s);
+  // Same subject centre (x) and same feet line (y = box bottom) as in the start frame.
+  const ecx = (((end[1] + end[3]) / 2) / 1000) * W;
+  const scx = (((start[1] + start[3]) / 2) / 1000) * W;
+  const eb = (end[2] / 1000) * H;
+  const sb = (start[2] / 1000) * H;
+  let left = Math.round(ecx - scx / s);
+  let top = Math.round(eb - sb / s);
+  left = Math.max(0, Math.min(W - width, left));
+  top = Math.max(0, Math.min(H - height, top));
+  return { left, top, width, height };
+}
+
+/**
+ * Real start + end photos are often taken from different distances (the back photo farther away): Veo then zooms
+ * and the model "shrinks" at the end (seen on production 2026-10-17). The subject is found in both frames (Gemini
+ * boxes) and the end frame is cropped so the subject has the same size and place as in the start frame.
+ * Both frames must already be the video's shape (fitToAspect).
+ */
+export async function matchSubjectScale(userId: string, start: VideoMedia, end: VideoMedia, aspect: '9:16' | '16:9'): Promise<VideoMedia> {
+  try {
+    const [W, H] = aspect === '9:16' ? [1080, 1920] : [1920, 1080];
+    const small = await Promise.all([shrink(start, 768), shrink(end, 768)]);
+    const raw = await aiJson<any>({ tier: 'fast', feature: 'video.frameMatch', userId, temperature: 0 }, [
+      { inlineData: { mimeType: small[0].mimeType, data: small[0].data } },
+      { inlineData: { mimeType: small[1].mimeType, data: small[1].data } },
+      { text: 'Image 1 and image 2 are two frames of the same product video. For each, give the bounding box of the main subject — the whole person with the whole outfit from the top of the head to the bottom of the hem or feet (or the whole product if there is no person) — as [ymin, xmin, ymax, xmax] normalised to 0–1000. Return JSON: {"start": [..4 numbers], "end": [..4 numbers]}' },
+    ]);
+    const o = Array.isArray(raw) ? raw[0] : raw;
+    if (!validBox(o?.start) || !validBox(o?.end)) return end;
+    const win = matchWindow(o.start, o.end, W, H);
+    if (!win) return end;
+    const sharpMod = (await import('sharp')).default;
+    const out = await sharpMod(Buffer.from(end.data, 'base64')).resize(W, H, { fit: 'fill' }).extract(win).resize(W, H).jpeg({ quality: 92 }).toBuffer();
+    return { data: out.toString('base64'), mimeType: 'image/jpeg' };
+  } catch {
+    return end;
+  }
+}
+
+export type PhotoView = 'front' | 'back' | 'side' | 'detail' | 'flat' | 'other';
+export type PhotoAnalysis = { photos: { view: PhotoView; fullBody: boolean; person: boolean; quality: number }[]; start: number | null; end: number | null };
+
+const VIEWS: readonly PhotoView[] = ['front', 'back', 'side', 'detail', 'flat', 'other'];
+
+/** Cleans the model's photo analysis (indices 1-based in the prompt → 0-based). Pure, exported for tests. */
+export function normalizePhotoAnalysis(raw: unknown, count: number): PhotoAnalysis {
+  const o = (Array.isArray(raw) ? raw.find((x) => x && typeof x === 'object' && !Array.isArray(x)) : raw) as Record<string, any> | undefined;
+  const list = Array.isArray(o?.photos) ? o!.photos : [];
+  const photos = Array.from({ length: count }, (_, i) => {
+    const p = list[i] ?? {};
+    const view = VIEWS.includes(p.view) ? p.view : 'other';
+    const q = Math.round(Number(p.quality));
+    return { view: view as PhotoView, fullBody: p.fullBody === true, person: p.person === true, quality: Number.isFinite(q) ? Math.max(0, Math.min(10, q)) : 5 };
+  });
+  const idx = (v: unknown) => {
+    const n = Math.round(Number(v)) - 1;
+    return Number.isInteger(n) && n >= 0 && n < count ? n : null;
+  };
+  let start = idx(o?.start);
+  let end = idx(o?.end);
+  // Fall back to the rules when the model's pick is missing or unusable (a close-up never anchors a video).
+  const score = (i: number) => (photos[i].fullBody ? 20 : 0) + photos[i].quality;
+  const best = (views: PhotoView[], not: number | null) =>
+    photos.map((p, i) => i).filter((i) => i !== not && views.includes(photos[i].view) && photos[i].view !== 'detail').sort((a, b) => score(b) - score(a))[0] ?? null;
+  if (start === null || photos[start].view === 'detail') start = best(['front'], null) ?? best(['side', 'other', 'flat'], null);
+  if (end !== null && (end === start || photos[end].view === 'detail')) end = null;
+  if (end === null) end = best(['back'], start);
+  return { photos, start, end };
+}
+
+/** Looks at every product photo once: its view, whether the whole product is in it, and the best start / end frame. */
+export async function analyzePhotos(userId: string, refs: VideoMedia[]): Promise<PhotoAnalysis> {
+  const small = await Promise.all(refs.slice(0, 12).map((m) => shrink(m, 512)));
+  const raw = await aiJson<any>({ tier: 'fast', feature: 'video.photos', userId, temperature: 0 }, [
+    ...small.map((m) => ({ inlineData: { mimeType: m.mimeType, data: m.data } })),
+    {
+      text: [
+        `Images 1–${small.length} are photos of one product for a product video.`,
+        'For each image (in order) return: view = "front" | "back" | "side" | "detail" (a close-up where the whole product is not visible) | "flat" (laid flat or on a hanger) | "other"; fullBody = true when the whole product — and the whole person wearing it, head to feet or hem — is in the photo; person = true when a person wears or holds it; quality 0–10 (sharp, well lit, usable as a video frame).',
+        'Then pick start = the number of the best full-body front photo (natural pose, sharp) and end = the number of the best full-body back photo of the same person and setting (if there is none, a full-body side photo; null if none).',
+        'Return JSON: {"photos": [{"view","fullBody","person","quality"}], "start": number, "end": number | null}',
+      ].join('\n'),
+    },
+  ]);
+  return normalizePhotoAnalysis(raw, small.length);
 }

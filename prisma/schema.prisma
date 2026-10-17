@@ -2396,6 +2396,8 @@ model AiVideoJob {
   credits       Int      @default(0)
   /// Quality check after generation (lib/ai/videoProduct checkVideo): { status, match, realism, diffs, issues }
   qa            Json?
+  /// Sent to marketplace listings (lib/ai/videoPublish): { [marketplace]: { status, listingId, remoteId, error, at } }
+  published     Json?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)

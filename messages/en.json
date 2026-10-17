@@ -16427,13 +16427,14 @@
         "wix": "Wix: at least 7 s, Full HD (1080p).",
         "trendyol": "Trendyol publishes no official video rule: vertical, 1080p, silent for mobile.",
         "social": "Instagram Reels / TikTok: vertical 9:16, 1080p, with music."
-      }
+      },
+      "auto": "Set up for this marketplace: {summary}"
     },
     "photos": {
       "title": "Product photos and videos",
       "hint": "Pick a listing or add your own photos and videos. The more angles (front, back, details), the fewer changes.",
       "marketplace": "Marketplace",
-      "search": "Search listings…",
+      "search": "Search your {marketplace} listings…",
       "noResults": "No listings found",
       "change": "Change",
       "loading": "Loading photos…",
@@ -16447,15 +16448,6 @@
     "role": {
       "start": "Start",
       "end": "End"
-    },
-    "mode": {
-      "title": "How should it start?",
-      "image": "From my photo",
-      "scene": "New scene",
-      "hint": {
-        "image": "The video starts on your real photo (the most exact result). Pick an end frame and it ends on that photo.",
-        "scene": "AI builds the first and last frame in the new setting from all your photos, then animates them."
-      }
     },
     "shot": {
       "title": "Shot type",
@@ -16552,7 +16544,8 @@
       "christmas": "Christmas",
       "beach": "Beach",
       "home": "Home",
-      "custom": "Custom"
+      "custom": "Custom",
+      "aiHint": "In a new setting the first and last frames are built from your photos by AI (+15 credits per frame)."
     },
     "light": {
       "daylight": "Daylight",
@@ -16574,12 +16567,11 @@
       "eightOnly": "1080p and 4K can only be 8 s.",
       "quality": "Quality",
       "variants": "Options",
-      "seed": "Seed (to repeat)",
-      "seedPlaceholder": "random",
       "showPrompt": "Show the prompt sent to the AI",
       "hidePrompt": "Hide the prompt",
       "grain": "Natural camera texture",
-      "grainHint": "Adds the light grain real cameras have; overly smooth footage looks artificial."
+      "grainHint": "Adds the light grain real cameras have; overly smooth footage looks artificial.",
+      "variantsHint": "With several options the quality check marks the best one."
     },
     "format": {
       "9x16": "Vertical 9:16",
@@ -16588,8 +16580,8 @@
       "4x5": "Portrait 4:5"
     },
     "quality": {
-      "fast": "Fast",
-      "best": "Best"
+      "fast": "Standard",
+      "best": "Most realistic"
     },
     "seconds": "{count} s",
     "consent": "I own the rights to these photos and have the consent of the models in them (a parent's, for children).",
@@ -16620,7 +16612,6 @@
       "variant": "Option {n}",
       "history": "Version history",
       "version": "Version {n}",
-      "seed": "Seed: {seed}",
       "error": {
         "childPhoto": "Google didn't make a video from this photo (it shows a child).",
         "filtered": "Google refused this request for safety reasons. Try another photo or description.",
@@ -16657,8 +16648,7 @@
       "from": "start (s)",
       "to": "end (s)",
       "trimApply": "Apply",
-      "useEtsy": "Add to the Etsy listing",
-      "useOther": "Download the video and upload it in the {marketplace} seller panel."
+      "useEtsy": "Add to the Etsy listing"
     },
     "delete": "Delete",
     "deleteTitle": "Delete this video?",
@@ -16695,7 +16685,8 @@
       "startHint": "Tap a photo below",
       "endHint": "Optional (e.g. the back)",
       "endAi": "AI builds it from your photos",
-      "clear": "Remove"
+      "clear": "Remove",
+      "auto": "Frames chosen automatically from your photos. Tap a photo to change."
     },
     "lock": {
       "label": "Lock the product",
@@ -16712,8 +16703,8 @@
       "cinematic": "Like a fashion film, shallow depth of field."
     },
     "qualityHint": {
-      "fast": "Fast: for tries. \"Best\" gives the most realistic result.",
-      "best": "Best: more realistic faces, hands and fabric movement; more credits."
+      "fast": "Quick and affordable.",
+      "best": "The most natural faces, hands and fabric."
     },
     "qa": {
       "title": "Quality check",
@@ -16725,7 +16716,66 @@
       "issues": "Looks artificial:",
       "clean": "No differences: the product matches the photos.",
       "fix": "Fix these",
-      "best": "best"
+      "best": "best",
+      "autoFixRunning": "The quality check found product differences: a corrected version is being made automatically (free).",
+      "autoFixReady": "The corrected version is ready.",
+      "autoFixFailed": "The automatic fix could not run; try \"Fix these\".",
+      "autoFixShow": "Show",
+      "isAutoFix": "This version was corrected automatically from what the quality check found (free)."
+    },
+    "publish": {
+      "button": "Add to {marketplace} listing",
+      "again": "Send to {marketplace} again",
+      "send": "Send",
+      "confirmTitle": "Add the video to the {marketplace} listing?",
+      "confirmBody": "The video is uploaded straight to your marketplace listing and the listing updates right away. eBay shows one video per listing: it replaces the old one.",
+      "sending": {
+        "ebay": "Sending… eBay is processing the video (can take a few minutes).",
+        "other": "Sending…"
+      },
+      "done": {
+        "ebay": "✓ Added to the eBay listing.",
+        "shopify": "✓ Added to the Shopify product (Shopify processes it within minutes).",
+        "wix": "✓ Sent to the Wix product (Wix imports it within minutes)."
+      },
+      "error": {
+        "start": "Could not start sending. Try again.",
+        "busy": "This video is being sent right now.",
+        "reconnect": "The {marketplace} connection needs renewing: reconnect it in Settings → Connections.",
+        "tooLarge": "The video is too large for {marketplace}. Trim it or make it in 720p.",
+        "rejected": "{marketplace} did not accept the video. Try another version.",
+        "processing": "{marketplace} is still processing the video. Send again in a few minutes.",
+        "listingNotFound": "The listing was not found on your {marketplace} account. Refresh your listings.",
+        "failed": "Could not add it to the {marketplace} listing. Try again."
+      },
+      "manual": {
+        "amazon": "Amazon has no video upload API: download the video and add it to the ASIN in Seller Central → Catalog → \"Upload & manage videos\".",
+        "trendyol": "Trendyol has no video upload API: download the video and add it to the product in the Trendyol seller panel."
+      },
+      "open": {
+        "amazon": "Seller Central guide",
+        "trendyol": "Trendyol panel"
+      },
+      "noListing": "To send it automatically, make the video from a listing; for now you can download and upload it."
+    },
+    "step": {
+      "where": "1. Where will you use it?",
+      "product": "2. Your product",
+      "video": "3. What kind of video?"
+    },
+    "advanced": {
+      "show": "Advanced settings",
+      "hide": "Hide advanced settings",
+      "title": "Advanced settings",
+      "hint": "All set for the marketplace already; you do not need to change them."
+    },
+    "view": {
+      "front": "Front",
+      "back": "Back",
+      "side": "Side",
+      "detail": "Detail",
+      "flat": "Flat",
+      "other": "Other"
     }
   },
   "credits": {

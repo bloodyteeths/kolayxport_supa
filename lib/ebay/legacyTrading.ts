@@ -172,3 +172,9 @@ export async function reviseLegacyItem(token: string, item: LegacyItem, changes:
   }
   return sent;
 }
+
+/** Attaches an eBay Media API video (LIVE) to a legacy listing: ReviseFixedPriceItem → Item.VideoDetails.VideoID. */
+export async function setLegacyItemVideo(token: string, itemId: string, videoId: string): Promise<void> {
+  assertOk(await trading(token, 'ReviseFixedPriceItem',
+    `<Item><ItemID>${escapeXml(itemId)}</ItemID><VideoDetails><VideoID>${escapeXml(videoId)}</VideoID></VideoDetails></Item>`));
+}

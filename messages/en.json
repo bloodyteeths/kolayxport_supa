@@ -218,7 +218,8 @@
       "overview": "Overview",
       "reportsProfit": "Profit report",
       "reportsPayouts": "Payouts report",
-      "reportsTransactions": "Transactions report"
+      "reportsTransactions": "Transactions report",
+      "videoStudio": "Video studio"
     },
     "groups": {
       "listings": "Listings"
@@ -16006,5 +16007,276 @@
       },
       "contact": "Stuck somewhere? Write to destek@kolayxport.com."
     }
+  },
+  "videoStudio": {
+    "title": "Video studio",
+    "subtitle": "Realistic product videos from your product photos, made to each marketplace's rules. Refine until you like it.",
+    "target": {
+      "title": "Where will it be used?",
+      "name": {
+        "etsy": "Etsy",
+        "ebay": "eBay",
+        "shopify": "Shopify",
+        "amazon": "Amazon",
+        "wix": "Wix",
+        "trendyol": "Trendyol",
+        "social": "Instagram / TikTok"
+      },
+      "rules": {
+        "etsy": "Etsy: 5–15 s, no sound (Etsy removes it), 1080p recommended, up to 100 MB. Square works best.",
+        "ebay": "eBay: up to 60 s and 150 MB, MP4, up to 1080p.",
+        "shopify": "Shopify: file uploads up to 60 s, 1 GB, 4K.",
+        "amazon": "Amazon: 15–60 s recommended, at least 720p (1080p recommended), up to 500 MB.",
+        "wix": "Wix: at least 7 s, Full HD (1080p).",
+        "trendyol": "Trendyol publishes no official video rule: vertical, 1080p, silent for mobile.",
+        "social": "Instagram Reels / TikTok: vertical 9:16, 1080p, with music."
+      }
+    },
+    "photos": {
+      "title": "Product photos",
+      "hint": "Pick a listing or upload your own photos. Tap a photo to set its role.",
+      "marketplace": "Marketplace",
+      "search": "Search listings…",
+      "noResults": "No listings found",
+      "change": "Change",
+      "loading": "Loading photos…",
+      "upload": "Upload photo"
+    },
+    "role": {
+      "start": "Start",
+      "end": "End",
+      "reference": "Reference"
+    },
+    "mode": {
+      "title": "Video type",
+      "image": "Animate a photo",
+      "interpolate": "Front to back",
+      "reference": "New scene",
+      "hint": {
+        "image": "The chosen photo comes to life.",
+        "interpolate": "Pick two photos (e.g. front and back): the video moves from one to the other.",
+        "reference": "Pick up to 3 photos: the same product and model in a new scene (8 s)."
+      }
+    },
+    "shot": {
+      "title": "Shot type"
+    },
+    "preset": {
+      "twirl": {
+        "label": "Twirl",
+        "hint": "The model turns, the skirt flares"
+      },
+      "walk": {
+        "label": "Runway walk",
+        "hint": "Walks toward the camera, poses"
+      },
+      "pose": {
+        "label": "Natural pose",
+        "hint": "Changes pose like a real shoot"
+      },
+      "detail": {
+        "label": "Detail close-up",
+        "hint": "Fabric and craft up close"
+      },
+      "hanger": {
+        "label": "Hanger breeze",
+        "hint": "Gently sways on the hanger"
+      },
+      "flatlay": {
+        "label": "Flat lay",
+        "hint": "From above, slow push-in"
+      },
+      "turntable": {
+        "label": "360° turn",
+        "hint": "Shows every side"
+      },
+      "lifestyle": {
+        "label": "Lifestyle",
+        "hint": "A real, natural moment"
+      },
+      "frontBack": {
+        "label": "Front to back",
+        "hint": "From the front view to the back"
+      },
+      "custom": {
+        "label": "Free",
+        "hint": "Follows your notes"
+      }
+    },
+    "director": {
+      "title": "Director controls",
+      "person": "A model is in the photo",
+      "personHint": "Turns on expression and movement so the model looks alive and natural.",
+      "expression": "Expression",
+      "camera": "Camera",
+      "motion": "Motion",
+      "scene": "Setting",
+      "scenePlaceholder": "e.g. a spring picnic in a garden",
+      "light": "Light",
+      "audio": "Sound",
+      "audioRemoved": "{marketplace} removes the sound of videos: no sound is added.",
+      "notes": "Extra direction (optional)",
+      "notesPlaceholder": "e.g. she walks holding her mother's hand and smiles at the camera at the end",
+      "avoid": "Avoid (optional)",
+      "avoidPlaceholder": "e.g. other children, toys"
+    },
+    "expression": {
+      "smiling": "Smiling",
+      "joyful": "Joyful, laughing",
+      "natural": "Natural",
+      "calm": "Calm"
+    },
+    "camera": {
+      "auto": "Auto",
+      "static": "Static",
+      "dollyIn": "Slow push-in",
+      "orbit": "Orbit",
+      "pan": "Pan",
+      "craneDown": "Crane down",
+      "handheld": "Handheld"
+    },
+    "motion": {
+      "subtle": "Subtle",
+      "medium": "Medium",
+      "lively": "Lively"
+    },
+    "scene": {
+      "keep": "As in the photo",
+      "studio": "White studio",
+      "garden": "Garden",
+      "birthday": "Birthday",
+      "wedding": "Wedding",
+      "christmas": "Christmas",
+      "beach": "Beach",
+      "home": "Home",
+      "custom": "Custom"
+    },
+    "light": {
+      "daylight": "Daylight",
+      "golden": "Golden hour",
+      "studio": "Studio",
+      "warm": "Warm indoor"
+    },
+    "audio": {
+      "none": "Silent",
+      "ambient": "Ambient sound",
+      "music": "Light music"
+    },
+    "output": {
+      "title": "Output",
+      "hint": "On this marketplace a video can be {min}–{max} s.",
+      "format": "Format",
+      "length": "Length",
+      "resolution": "Resolution",
+      "eightOnly": "1080p, 4K and \"New scene\" can only be 8 s.",
+      "quality": "Quality",
+      "variants": "Options",
+      "seed": "Seed (to repeat)",
+      "seedPlaceholder": "random",
+      "showPrompt": "Show the prompt sent to the AI",
+      "hidePrompt": "Hide the prompt"
+    },
+    "format": {
+      "9x16": "Vertical 9:16",
+      "16x9": "Horizontal 16:9",
+      "1x1": "Square 1:1",
+      "4x5": "Portrait 4:5"
+    },
+    "quality": {
+      "fast": "Fast",
+      "best": "Best"
+    },
+    "seconds": "{count} s",
+    "consent": "I own the rights to these photos and have the consent of the models in them (a parent's, for children).",
+    "need": {
+      "start": "Pick a start photo.",
+      "end": "Pick the end photo.",
+      "references": "Pick at least one reference photo."
+    },
+    "generate": "{count, plural, one {Create video} other {Create # options}}",
+    "eta": "Usually takes {minutes} min. You can leave the page; the video keeps being made.",
+    "ready": {
+      "ok": "Meets the {marketplace} rules",
+      "notOk": "To fix for {marketplace}",
+      "issue": {
+        "tooShort": "Too short: at least {min} s. Use \"+7 s extend\".",
+        "tooLong": "Too long: at most {max} s. Trim it.",
+        "lowRes": "Resolution too low: at least {min} px tall.",
+        "soundRemoved": "This marketplace removes the sound.",
+        "belowIdeal": "Recommended length is {ideal} s: \"+7 s extend\" gives a better result."
+      }
+    },
+    "result": {
+      "title": "Result",
+      "titleVersion": "Version {n}",
+      "empty": "Choose the settings and press \"Create video\". The result shows here.",
+      "running": "Making the video…",
+      "runningHint": "Takes 1–2 minutes. You can start another video meanwhile.",
+      "variants": "Options",
+      "variant": "Option {n}",
+      "history": "Version history",
+      "version": "Version {n}",
+      "seed": "Seed: {seed}",
+      "error": {
+        "childPhoto": "Google didn't make a video from this photo (it shows a child).",
+        "filtered": "Google refused this request for safety reasons. Try another photo or description.",
+        "failed": "Couldn't make the video. Try again."
+      }
+    },
+    "refine": {
+      "title": "Anything to change?",
+      "placeholder": "e.g. she smiles more, the camera films from a bit further away",
+      "send": "New version"
+    },
+    "chip": {
+      "expression": "More natural expression, smiling",
+      "slower": "Slower motion",
+      "closer": "Closer shot",
+      "showDress": "Show the dress more",
+      "background": "Change the background",
+      "brighter": "Brighter",
+      "staticCam": "Keep the camera still"
+    },
+    "action": {
+      "extend": "+7 s extend",
+      "square": "Crop square",
+      "portrait45": "Crop 4:5",
+      "mute": "Remove sound",
+      "download": "Download",
+      "favorite": "Add to favourites",
+      "unfavorite": "Remove from favourites",
+      "trim": "Trim:",
+      "from": "start (s)",
+      "to": "end (s)",
+      "trimApply": "Apply",
+      "useEtsy": "Add to the Etsy listing",
+      "useOther": "Download the video and upload it in the {marketplace} seller panel."
+    },
+    "delete": "Delete",
+    "deleteTitle": "Delete this video?",
+    "deleteBody": "The video and its file are deleted permanently.",
+    "library": {
+      "title": "My videos",
+      "all": "All",
+      "favorites": "Favourites",
+      "thisListing": "This listing",
+      "running": "Making…",
+      "failed": "Didn't work",
+      "untitled": "Untitled",
+      "empty": "No videos yet."
+    },
+    "error": {
+      "photos": "Couldn't load the listing photos.",
+      "uploadType": "JPG, PNG or WEBP, up to 10 MB.",
+      "upload": "Couldn't upload the photo.",
+      "consent": "Tick the photo consent box to continue.",
+      "start": "Couldn't start the video. Try again.",
+      "videoBusy": "At most 4 videos can be made at once.",
+      "imageRequired": "Couldn't read the start photo.",
+      "endImageRequired": "Couldn't read the end photo.",
+      "referencesRequired": "Couldn't read the reference photos.",
+      "nothingToEdit": "Nothing to change was chosen."
+    },
+    "readyToast": "Your video is ready"
   }
 }

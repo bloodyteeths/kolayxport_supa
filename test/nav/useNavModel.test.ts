@@ -31,7 +31,7 @@ const build = (over: Partial<BuildNavModelInput>) =>
 
 const ids = (m: ReturnType<typeof buildNavModel>) => m.groups.flatMap((g) => g.items.map((i) => i.id));
 
-const ALWAYS = ['home', 'orders', 'research', 'notifications', 'settings', 'help'];
+const ALWAYS = ['home', 'orders', 'research', 'video-studio', 'notifications', 'settings', 'help'];
 
 describe('gating parity with legacy AppLayout (6 fixtures)', () => {
   it('1. unknown, no cache: every gated row is shown, no Connect CTA', () => {
@@ -40,6 +40,7 @@ describe('gating parity with legacy AppLayout (6 fixtures)', () => {
       'home', 'orders', 'messages',
       'listings-etsy', 'listings-ebay', 'listings-trendyol', 'listings-wix', 'listings-shopify', 'stock-sync',
       'research',
+      'video-studio',
       'notifications', 'settings', 'help',
     ]);
     expect(m.showConnectCta).toBe(false);
@@ -68,6 +69,7 @@ describe('gating parity with legacy AppLayout (6 fixtures)', () => {
       'home', 'orders',
       'listings-etsy', 'listings-ebay', 'stock-sync', 'connect-store',
       'research',
+      'video-studio',
       'notifications', 'settings', 'help',
     ]);
     expect(m.showConnectCta).toBe(true);

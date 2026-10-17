@@ -2359,24 +2359,42 @@ model AiUsage {
 /// (uploads/ai-videos/<userId>/<id>.mp4). A follow-up ("slower camera") is a new job with parentId. provider =
 /// 'gemini' (API key) or 'vertex' (Google Cloud project, needed for photos with child models — allowlisted).
 model AiVideoJob {
-  id          String   @id @default(cuid())
-  userId      String
-  parentId    String?
-  provider    String   @default("gemini")
-  model       String
-  status      String   @default("running") // running | done | failed
-  prompt      String
-  instruction String?
-  sourceUrl   String?
-  aspectRatio String   @default("9:16")
-  durationSec Int      @default(8)
-  operation   String?
-  filePath    String?
-  errorKey    String?
-  errorDetail String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String   @id @default(cuid())
+  userId        String
+  parentId      String?
+  provider      String   @default("gemini")
+  model         String
+  status        String   @default("running") // running | done | failed
+  prompt        String
+  instruction   String?
+  sourceUrl     String?
+  aspectRatio   String   @default("9:16")
+  durationSec   Int      @default(8)
+  operation     String?
+  filePath      String?
+  errorKey      String?
+  errorDetail   String?
+  /// Video Studio: image | interpolate | reference | extend | edit
+  mode          String   @default("image")
+  /// lib/ai/videoDirector VideoDirection (preset, camera, expression, scene, …)
+  direction     Json?
+  /// last frame + reference images (https urls or studio-upload:<id>)
+  endUrl        String?
+  referenceUrls String[] @default([])
+  resolution    String   @default("720p")
+  quality       String   @default("fast")
+  seed          Int?
+  /// one generation with N variants shares a groupId; variantIndex 0..N-1
+  groupId       String?
+  variantIndex  Int      @default(0)
+  favorite      Boolean  @default(false)
+  /// listing it was made for: "<marketplace>:<listingId>[:<storeId>]" + its title
+  listingRef    String?
+  title         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+  @@index([groupId])
 }

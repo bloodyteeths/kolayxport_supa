@@ -5,6 +5,8 @@
 // Etsy staging stays inside `components/etsy/{ImageManager,VideoUploader}` (embedded mode, same draft calls and
 // mediaSafety rules); eBay pictures stay the `images` field the eBay adapter stages. Nothing here sends anything:
 // photos reach the marketplace only with the footer's "Send changes".
+import { useRouter } from 'next/router';
+import { useToast } from '@/components/ds/feedback/toast';
 import * as React from 'react';
 import Box from '@mui/material/Box';
 import { useTranslations } from 'next-intl';
@@ -21,7 +23,6 @@ import { fieldAnchorId, sectionAnchorId } from '@/lib/listingEditor/sections';
 import type { DraftRow, ListingSectionProps } from '@/lib/listingEditor/types';
 import EtsyImageManager, { type ImageManagerHandle } from '@/components/etsy/ImageManager';
 import VideoUploader, { type VideoUploaderHandle } from '@/components/etsy/VideoUploader';
-import { AiVideoPanel } from '../AiVideoPanel';
 import EbayImageManager, { type EbayImageManagerHandle } from '@/components/ebay/ImageManager';
 import { useListingEditor, useRegisterDraftSection } from '../useListingDraft';
 import type { WriteAltText } from './PhotoPanel';
@@ -131,11 +132,37 @@ function EtsyPhotos({ id = 'photos', writeAltText, removeStagedMedia, handleRef 
   const isLocal = !listingId || Number(listingId) < 0;
   const imagesRef = React.useRef<ImageManagerHandle | null>(null);
   const videoRef = React.useRef<VideoUploaderHandle | null>(null);
-  const [aiVideoOpen, setAiVideoOpen] = React.useState(false);
+  const router = useRouter();
+  const toast = useToast();
+  // "Create video" opens the Video Studio with this listing; "Add to the Etsy listing" there comes back with
+  // ?aiVideo=<job>, which stages that video here (same path as an uploaded file) and drops the parameter.
+  const openVideoStudio = React.useCallback(() => {
+    const q = new URLSearchParams({ mp: 'etsy', listing: String(listingId), store: String(shopId ?? ''), title: String(ed.view.fields.title ?? '').slice(0, 140) });
+    void router.push(`/app/video-studio?${q}`);
+  }, [router, listingId, shopId, ed.view.fields.title]);
   const [summary, setSummary] = React.useState<PhotosSummary | null>(null);
   const [videoTile, setVideoTile] = React.useState<StripVideo | null>(null);
   const [videoLoad, setVideoLoad] = React.useState<VideoLoad>({ status: 'idle', videos: [] });
   const [videoReload, setVideoReload] = React.useState(0);
+  const stagedAiVideo = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    const id = typeof router.query.aiVideo === 'string' ? router.query.aiVideo : null;
+    if (!id || stagedAiVideo.current === id || videoLoad.status !== 'ready' || readOnly) return;
+    stagedAiVideo.current = id;
+    void (async () => {
+      try {
+        const blob = await (await fetch(`/api/ai/video/file?id=${encodeURIComponent(id)}`, { credentials: 'same-origin' })).blob();
+        if (!blob.size) throw new Error('empty');
+        await videoRef.current?.stageFile(new File([blob], `ai-video-${id}.mp4`, { type: 'video/mp4' }));
+        toast.success(t('aiVideo.used'));
+      } catch {
+        toast.error(t('aiVideo.error.use'));
+      } finally {
+        const { aiVideo: _drop, ...rest } = router.query;
+        void router.replace({ pathname: router.pathname, query: rest, hash: 'photos' }, undefined, { shallow: true });
+      }
+    })();
+  }, [router, videoLoad.status, readOnly, t, toast]);
 
   // Etsy photos as the legacy ImageManager reads them (decoded alt text comes from the adapter).
   const remoteImages = ed.view.meta.images;
@@ -297,13 +324,6 @@ function EtsyPhotos({ id = 'photos', writeAltText, removeStagedMedia, handleRef 
         {mode === 'create' && count === 0 ? (
           <Box sx={{ fontSize: 12, color: neutral[500] }}>{t('photos.hint', { max: PHOTO_MAX.etsy })}</Box>
         ) : null}
-        <AiVideoPanel
-          open={aiVideoOpen}
-          onClose={() => setAiVideoOpen(false)}
-          images={remoteImages.map((i) => ({ id: String(i.id), src: i.src, fullSrc: i.fullSrc }))}
-          onUse={async (file) => { await videoRef.current?.stageFile(file); }}
-          defaultPrompt={t('aiVideo.defaultPrompt')}
-        />
         {videoLoad.status === 'error' ? (
           <ErrorState
             variant="inline"
@@ -320,7 +340,7 @@ function EtsyPhotos({ id = 'photos', writeAltText, removeStagedMedia, handleRef 
             primary={[
               ...(!full ? [{ id: 'choose', anchor: 'photos', label: t('photos.choose'), icon: icons.upload, onClick: () => imagesRef.current?.openUpload() }] : []),
               ...(!full ? [{ id: 'generate', label: t('ai.generatePhoto'), icon: icons.ai, onClick: () => imagesRef.current?.openGenerate() }] : []),
-              ...(remoteImages.length ? [{ id: 'aiVideo', label: t('aiVideo.open'), icon: icons.video, onClick: () => setAiVideoOpen(true) }] : []),
+              ...(listingId ? [{ id: 'aiVideo', label: t('aiVideo.open'), icon: icons.video, onClick: openVideoStudio }] : []),
               // Desktop keeps the alt-text fix in the row; on a phone it joins ⋯ (the heading still says how many miss it).
               ...(altEnabled && missingAlt > 0 && !isMobile
                 ? [{ id: 'alt', label: t('ai.writeAlt', { count: missingAlt }), icon: icons.ai, onClick: () => imagesRef.current?.writeMissingAlt() }]

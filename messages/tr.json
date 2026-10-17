@@ -218,7 +218,8 @@
       "overview": "Genel bakış",
       "reportsProfit": "Kâr raporu",
       "reportsPayouts": "Ödemeler raporu",
-      "reportsTransactions": "İşlemler raporu"
+      "reportsTransactions": "İşlemler raporu",
+      "videoStudio": "Video stüdyosu"
     },
     "groups": {
       "listings": "İlanlar"
@@ -16006,5 +16007,276 @@
       },
       "contact": "Takıldığınız bir yer olursa destek@kolayxport.com adresine yazın."
     }
+  },
+  "videoStudio": {
+    "title": "Video stüdyosu",
+    "subtitle": "Ürün fotoğraflarından, pazaryeri kurallarına uygun, gerçekçi ürün videoları. Beğenene kadar düzeltin.",
+    "target": {
+      "title": "Nerede kullanılacak?",
+      "name": {
+        "etsy": "Etsy",
+        "ebay": "eBay",
+        "shopify": "Shopify",
+        "amazon": "Amazon",
+        "wix": "Wix",
+        "trendyol": "Trendyol",
+        "social": "Instagram / TikTok"
+      },
+      "rules": {
+        "etsy": "Etsy: 5–15 sn, ses yok (Etsy sesi kaldırır), 1080p önerilir, en fazla 100 MB. Kare en iyi sonuç verir.",
+        "ebay": "eBay: en fazla 60 sn ve 150 MB, MP4, en fazla 1080p.",
+        "shopify": "Shopify: dosya yüklemede en fazla 60 sn, 1 GB, 4K.",
+        "amazon": "Amazon: 15–60 sn önerilir, en az 720p (1080p önerilir), en fazla 500 MB.",
+        "wix": "Wix: en az 7 sn, Full HD (1080p).",
+        "trendyol": "Trendyol resmî bir video kuralı yayınlamıyor: mobil için dikey, 1080p, sessiz.",
+        "social": "Instagram Reels / TikTok: dikey 9:16, 1080p, müzikli."
+      }
+    },
+    "photos": {
+      "title": "Ürün fotoğrafları",
+      "hint": "Bir ilan seçin veya kendi fotoğraflarınızı yükleyin. Fotoğrafa dokunarak rolünü seçin.",
+      "marketplace": "Pazaryeri",
+      "search": "İlan ara…",
+      "noResults": "İlan bulunamadı",
+      "change": "Değiştir",
+      "loading": "Fotoğraflar yükleniyor…",
+      "upload": "Fotoğraf yükle"
+    },
+    "role": {
+      "start": "Başlangıç",
+      "end": "Bitiş",
+      "reference": "Referans"
+    },
+    "mode": {
+      "title": "Video türü",
+      "image": "Fotoğrafı canlandır",
+      "interpolate": "Önden arkaya",
+      "reference": "Yeni sahne",
+      "hint": {
+        "image": "Seçtiğiniz fotoğraf hareketlenir.",
+        "interpolate": "İki fotoğraf seçin (ör. ön ve arka): video birinden diğerine geçer.",
+        "reference": "En fazla 3 fotoğraf seçin: aynı ürün ve model yeni bir sahnede gösterilir (8 sn)."
+      }
+    },
+    "shot": {
+      "title": "Çekim türü"
+    },
+    "preset": {
+      "twirl": {
+        "label": "Kendi etrafında dönüş",
+        "hint": "Model döner, etek açılır"
+      },
+      "walk": {
+        "label": "Podyum yürüyüşü",
+        "hint": "Kameraya doğru yürür, poz verir"
+      },
+      "pose": {
+        "label": "Doğal poz",
+        "hint": "Gerçek çekim gibi poz değiştirir"
+      },
+      "detail": {
+        "label": "Detay yakın çekim",
+        "hint": "Kumaş ve işçilik yakından"
+      },
+      "hanger": {
+        "label": "Askıda esinti",
+        "hint": "Askıda hafif dalgalanma"
+      },
+      "flatlay": {
+        "label": "Serili ürün",
+        "hint": "Yukarıdan, yavaş yaklaşma"
+      },
+      "turntable": {
+        "label": "360° tur",
+        "hint": "Her açıdan gösterir"
+      },
+      "lifestyle": {
+        "label": "Yaşam tarzı",
+        "hint": "Gerçek bir anda, doğal"
+      },
+      "frontBack": {
+        "label": "Önden arkaya geçiş",
+        "hint": "Ön görünümden arkaya"
+      },
+      "custom": {
+        "label": "Serbest",
+        "hint": "Notlarınıza göre"
+      }
+    },
+    "director": {
+      "title": "Yönetmen ayarları",
+      "person": "Fotoğrafta model var",
+      "personHint": "Modelin canlı ve doğal görünmesi için ifade ve hareket ayarları açılır.",
+      "expression": "İfade",
+      "camera": "Kamera",
+      "motion": "Hareket",
+      "scene": "Ortam",
+      "scenePlaceholder": "ör. bahar bahçesinde piknik",
+      "light": "Işık",
+      "audio": "Ses",
+      "audioRemoved": "{marketplace} videoların sesini kaldırır: ses eklenmez.",
+      "notes": "Ek yönlendirme (isteğe bağlı)",
+      "notesPlaceholder": "ör. kız annesinin elinden tutup yürüsün, sonunda kameraya gülümsesin",
+      "avoid": "Kaçınılacaklar (isteğe bağlı)",
+      "avoidPlaceholder": "ör. başka çocuk, oyuncak"
+    },
+    "expression": {
+      "smiling": "Gülümseyen",
+      "joyful": "Neşeli, gülen",
+      "natural": "Doğal",
+      "calm": "Sakin"
+    },
+    "camera": {
+      "auto": "Otomatik",
+      "static": "Sabit",
+      "dollyIn": "Yavaş yaklaşma",
+      "orbit": "Etrafında dönme",
+      "pan": "Yana kayma",
+      "craneDown": "Yukarıdan iniş",
+      "handheld": "Elde çekim"
+    },
+    "motion": {
+      "subtle": "Hafif",
+      "medium": "Orta",
+      "lively": "Canlı"
+    },
+    "scene": {
+      "keep": "Fotoğraftaki gibi",
+      "studio": "Beyaz stüdyo",
+      "garden": "Bahçe",
+      "birthday": "Doğum günü",
+      "wedding": "Düğün",
+      "christmas": "Yılbaşı",
+      "beach": "Plaj",
+      "home": "Ev",
+      "custom": "Özel"
+    },
+    "light": {
+      "daylight": "Gün ışığı",
+      "golden": "Gün batımı",
+      "studio": "Stüdyo",
+      "warm": "Sıcak iç mekân"
+    },
+    "audio": {
+      "none": "Sessiz",
+      "ambient": "Ortam sesi",
+      "music": "Hafif müzik"
+    },
+    "output": {
+      "title": "Çıktı",
+      "hint": "Bu pazaryerinde video {min}–{max} sn olabilir.",
+      "format": "Biçim",
+      "length": "Süre",
+      "resolution": "Çözünürlük",
+      "eightOnly": "1080p, 4K ve \"Yeni sahne\" yalnızca 8 sn olabilir.",
+      "quality": "Kalite",
+      "variants": "Seçenek sayısı",
+      "seed": "Tohum (tekrar için)",
+      "seedPlaceholder": "rastgele",
+      "showPrompt": "Yapay zekâya giden komutu göster",
+      "hidePrompt": "Komutu gizle"
+    },
+    "format": {
+      "9x16": "Dikey 9:16",
+      "16x9": "Yatay 16:9",
+      "1x1": "Kare 1:1",
+      "4x5": "Dikey 4:5"
+    },
+    "quality": {
+      "fast": "Hızlı",
+      "best": "En iyi"
+    },
+    "seconds": "{count} sn",
+    "consent": "Fotoğrafların hakları ve fotoğraftaki modellerin (çocuklarda velisinin) izni bende.",
+    "need": {
+      "start": "Bir başlangıç fotoğrafı seçin.",
+      "end": "Bitiş fotoğrafını seçin.",
+      "references": "En az bir referans fotoğraf seçin."
+    },
+    "generate": "{count, plural, one {Video oluştur} other {# seçenek oluştur}}",
+    "eta": "Genelde {minutes} dakika sürer. Sayfadan çıkabilirsiniz; video hazırlanmaya devam eder.",
+    "ready": {
+      "ok": "{marketplace} kurallarına uygun",
+      "notOk": "{marketplace} için düzeltilmesi gerekenler",
+      "issue": {
+        "tooShort": "Çok kısa: en az {min} sn olmalı. \"+7 sn uzat\" kullanın.",
+        "tooLong": "Çok uzun: en fazla {max} sn olabilir. Kırpın.",
+        "lowRes": "Çözünürlük düşük: en az {min} piksel yükseklik gerekir.",
+        "soundRemoved": "Bu pazaryeri sesi kaldırır.",
+        "belowIdeal": "Önerilen süre {ideal} sn: \"+7 sn uzat\" ile daha iyi sonuç alınır."
+      }
+    },
+    "result": {
+      "title": "Sonuç",
+      "titleVersion": "Sürüm {n}",
+      "empty": "Ayarları seçip \"Video oluştur\"a basın. Sonuç burada görünür.",
+      "running": "Video hazırlanıyor…",
+      "runningHint": "1–2 dakika sürer. Bu sırada başka bir video da başlatabilirsiniz.",
+      "variants": "Seçenekler",
+      "variant": "Seçenek {n}",
+      "history": "Sürüm geçmişi",
+      "version": "Sürüm {n}",
+      "seed": "Tohum: {seed}",
+      "error": {
+        "childPhoto": "Google bu fotoğraftan video oluşturmadı (fotoğrafta çocuk var).",
+        "filtered": "Google bu isteği güvenlik nedeniyle reddetti. Başka bir fotoğraf veya açıklama deneyin.",
+        "failed": "Video oluşturulamadı. Tekrar deneyin."
+      }
+    },
+    "refine": {
+      "title": "Değiştirmek istediğiniz bir şey var mı?",
+      "placeholder": "ör. kız daha çok gülümsesin, kamera biraz daha uzaktan çeksin",
+      "send": "Yeni sürüm"
+    },
+    "chip": {
+      "expression": "Daha doğal ifade, gülümsesin",
+      "slower": "Daha yavaş hareket",
+      "closer": "Daha yakın çekim",
+      "showDress": "Elbise daha çok görünsün",
+      "background": "Arka planı değiştir",
+      "brighter": "Daha aydınlık",
+      "staticCam": "Kamera sabit kalsın"
+    },
+    "action": {
+      "extend": "+7 sn uzat",
+      "square": "Kare kırp",
+      "portrait45": "4:5 kırp",
+      "mute": "Sesi kaldır",
+      "download": "İndir",
+      "favorite": "Favorilere ekle",
+      "unfavorite": "Favorilerden çıkar",
+      "trim": "Kırp:",
+      "from": "baş (sn)",
+      "to": "son (sn)",
+      "trimApply": "Uygula",
+      "useEtsy": "Etsy ilanına ekle",
+      "useOther": "Videoyu indirip {marketplace} satıcı panelinden yükleyin."
+    },
+    "delete": "Sil",
+    "deleteTitle": "Bu video silinsin mi?",
+    "deleteBody": "Video ve dosyası kalıcı olarak silinir.",
+    "library": {
+      "title": "Videolarım",
+      "all": "Tümü",
+      "favorites": "Favoriler",
+      "thisListing": "Bu ilan",
+      "running": "Hazırlanıyor…",
+      "failed": "Olmadı",
+      "untitled": "Başlıksız",
+      "empty": "Henüz video yok."
+    },
+    "error": {
+      "photos": "İlan fotoğrafları alınamadı.",
+      "uploadType": "JPG, PNG veya WEBP, en fazla 10 MB.",
+      "upload": "Fotoğraf yüklenemedi.",
+      "consent": "Devam etmek için fotoğraf izni kutusunu işaretleyin.",
+      "start": "Video başlatılamadı. Tekrar deneyin.",
+      "videoBusy": "Aynı anda en fazla 4 video hazırlanabilir.",
+      "imageRequired": "Başlangıç fotoğrafı okunamadı.",
+      "endImageRequired": "Bitiş fotoğrafı okunamadı.",
+      "referencesRequired": "Referans fotoğraflar okunamadı.",
+      "nothingToEdit": "Değiştirilecek bir şey seçilmedi."
+    },
+    "readyToast": "Videonuz hazır"
   }
 }

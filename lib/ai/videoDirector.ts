@@ -75,7 +75,7 @@ export const DEFAULT_DIRECTION: VideoDirection = {
 const PRESET_ACTION: Record<VideoPreset, { person: string; product: string }> = {
   turntable: {
     person: 'The model slowly turns through a full circle, showing the product from the front, the side and the back.',
-    product: 'The product turns slowly through a full circle, showing every side.',
+    product: 'The product turns slowly through a full circle on a turntable as one rigid piece, showing every side.',
   },
   hero: {
     person: 'The model stands naturally while the camera slowly moves in to a sharp hero shot of the product.',
@@ -215,6 +215,7 @@ export function directVideo(d: VideoDirection, changes: string[] = []): string {
     CAMERA[d.camera],
     MOTION[d.motion],
     d.person ? personSentence(d) : '',
+    d.person || d.productKind === 'worn' ? '' : 'The product is one solid, rigid object: it never bends, stretches, melts or changes shape, and no part of it appears or disappears; only the camera and the light move unless the shot says it turns.',
     'Everything moves at real-time speed, never slow motion, with real weight and physics; light and shadows stay consistent; nothing morphs, melts or flickers.',
     sceneSentence(d),
     look.finish,

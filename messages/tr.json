@@ -16459,7 +16459,7 @@
     "preset": {
       "turntable": {
         "label": "360° tur",
-        "hint": "Ürün yavaşça döner, her yanı görünür"
+        "hint": "Her yanının fotoğrafı varsa en iyisi"
       },
       "hero": {
         "label": "Vitrin çekimi",
@@ -16729,7 +16729,8 @@
       "autoFixReady": "Düzeltilmiş sürüm hazır.",
       "autoFixFailed": "Otomatik düzeltme yapılamadı; \"Bunları düzelt\" ile deneyin.",
       "autoFixShow": "Göster",
-      "isAutoFix": "Bu sürüm kalite kontrolünün bulduğu farklara göre otomatik düzeltildi (ücretsiz)."
+      "isAutoFix": "Bu sürüm kalite kontrolünün bulduğu farklara göre otomatik düzeltildi (ücretsiz).",
+      "autoFixSafer": "Ürün bu çekimde fazla değişti: daha güvenli bir çekimle (ürün sabit, kamera yaklaşıyor) otomatik yeniden hazırlanıyor (ücretsiz)."
     },
     "publish": {
       "button": "{marketplace} ilanına ekle",

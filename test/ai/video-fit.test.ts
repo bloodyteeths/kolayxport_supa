@@ -26,3 +26,17 @@ describe('anchor frames shaped like the video', () => {
     expect([meta.width, meta.height]).toEqual([1080, 1920]);
   });
 });
+
+describe('square / 4:5 videos keep the whole product inside the crop', () => {
+  it('a tall product photo for a square video sits inside the centre square of the 9:16 frame', async () => {
+    const out = await fitToAspect(await photo({ r: 250, g: 250, b: 250 }, 400, 1000), '9:16', '1:1');
+    const buf = Buffer.from(out.data, 'base64');
+    expect((await sharp(buf).metadata()).height).toBe(1920);
+    // The dark subject (80% of the photo height) must end inside the centre square (rows 420–1500), not above it.
+    const strip = await sharp(buf).extract({ left: 520, top: 0, width: 40, height: 1920 }).raw().toBuffer();
+    const rows = Array.from({ length: 1920 }, (_, y) => strip[y * 40 * 3]);
+    const dark = rows.map((v, y) => (v < 100 ? y : -1)).filter((y) => y >= 0);
+    expect(dark[0]).toBeGreaterThanOrEqual(420);
+    expect(dark[dark.length - 1]).toBeLessThanOrEqual(1500);
+  });
+});

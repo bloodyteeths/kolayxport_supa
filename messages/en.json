@@ -16459,7 +16459,7 @@
     "preset": {
       "turntable": {
         "label": "360° turn",
-        "hint": "The product turns slowly, every side shown"
+        "hint": "Best with photos of every side"
       },
       "hero": {
         "label": "Hero shot",
@@ -16729,7 +16729,8 @@
       "autoFixReady": "The corrected version is ready.",
       "autoFixFailed": "The automatic fix could not run; try \"Fix these\".",
       "autoFixShow": "Show",
-      "isAutoFix": "This version was corrected automatically from what the quality check found (free)."
+      "isAutoFix": "This version was corrected automatically from what the quality check found (free).",
+      "autoFixSafer": "The product changed too much in this shot: it is being remade automatically with a safer shot (product still, camera moving in), free."
     },
     "publish": {
       "button": "Add to {marketplace} listing",

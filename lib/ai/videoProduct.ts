@@ -46,6 +46,9 @@ export function keyframePrompt(d: VideoDirection, opts: { which: 'start' | 'end'
     lockSentence(d.person, d.productKind),
     d.person ? personSentence(d) : '',
     opts.which === 'start' || !opts.hasStart ? sceneSentence(d) : '',
+    d.format === '1:1' || d.format === '4:5'
+      ? `The video is cropped to ${d.format === '1:1' ? 'a square' : '4:5'} from the centre: the whole product must fit inside that centre area, with background above and below it.`
+      : '',
     'A real photograph, a frame from an unedited video: true-to-life colours, natural light and shadows, real textures. No added text, logos or watermarks.',
   ];
   return parts.filter(Boolean).join(' ');
@@ -272,7 +275,7 @@ export async function analyzePhotos(userId: string, refs: VideoMedia[], ctx: { t
         'For each image (in order) return: view = "front" | "back" | "side" | "detail" (a close-up where the whole product is not visible) | "flat" (laid flat or on a hanger) | "other"; fullBody = true when the whole product — and the whole person wearing or holding it, if any — is in the photo; person = true when a person wears or holds it; quality 0–10 (sharp, well lit, usable as a video frame).',
         'Pick start = the number of the best photo to open the video (the whole product, front, sharp) and end = the number of the best back view of the same product, person and setting (null if there is none).',
         'product: kind = "worn" for clothing, shoes, jewellery or accessories worn by a person, otherwise "object"; category = 2–4 English words.',
-        `shots: 5 video shots that suit THIS product and these photos — what a good e-commerce videographer would film for it (for an object e.g. a slow turntable, a macro glide over a key detail, the product in use, in its natural place; for a worn product the person moving naturally). Physically simple, real-time, the product always recognisable. Each: label (≤ 4 words, ${lang}), hint (≤ 8 words, ${lang}), action (one English sentence of what happens on camera), showsBack (true if the shot ends showing the back).`,
+        `shots: 5 video shots that suit THIS product and these photos — what a good e-commerce videographer would film for it. AI video invents every side the photos do not show, so: never turn or rotate an object unless the photos show its back and sides; prefer the CAMERA moving around a still product (a slow push-in, a gentle arc of at most 30 degrees, a rising or lowering move), light gliding across it, a macro glide over a key detail, the product in use or in its natural place; for a worn product, the person moving naturally. Physically simple, real-time, the product always recognisable and rigid. Order them safest first. Each: label (≤ 4 words, ${lang}), hint (≤ 8 words, ${lang}), action (one English sentence of what happens on camera), showsBack (true only if the shot ends showing the back, which must be in the photos).`,
         `scenes: 4 real settings where this product would naturally be filmed. Each: label (≤ 3 words, ${lang}), prompt (one English sentence describing the place and light).`,
         'Return JSON: {"photos": [{"view","fullBody","person","quality"}], "start": number, "end": number | null, "product": {"kind","category"}, "shots": [{"label","hint","action","showsBack"}], "scenes": [{"label","prompt"}]}',
       ].join('\n'),

@@ -29,7 +29,7 @@ import { refreshCredits, useCredits } from '@/components/domain/credits/useCredi
 import { LIMIT_UI_HEADER } from '@/lib/http/limitInterceptor';
 
 type Photo = { key: string; ref: string; src: string; landscape?: boolean; fromVideo?: boolean };
-type Qa = { status: 'running' | 'done' | 'failed'; match?: number; realism?: number; diffs?: { text: string; fix: string }[]; issues?: { text: string; fix: string }[]; autoFix?: string };
+type Qa = { status: 'running' | 'done' | 'failed'; match?: number; realism?: number; diffs?: { text: string; fix: string }[]; issues?: { text: string; fix: string }[]; autoFix?: string; autoFixMode?: 'fix' | 'safer' };
 type PhotoInfo = { view: 'front' | 'back' | 'side' | 'detail' | 'flat' | 'other'; fullBody: boolean; person: boolean };
 type Ideas = { kind: 'worn' | 'object'; shots: { label: string; hint: string; action: string; showsBack: boolean }[]; scenes: { label: string; prompt: string }[] };
 type Job = {
@@ -801,7 +801,7 @@ export function VideoStudio() {
 
             {autoFixJob && autoFixJob.id !== cur?.id ? (
               <Box sx={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', p: '10px', borderRadius: '8px', bgcolor: autoFixJob.status === 'done' ? tone.success.bg : accent[50], border: `1px solid ${autoFixJob.status === 'done' ? tone.success.border : accent[200]}` }} data-testid="video-autofix">
-                <Box sx={{ flex: 1, minWidth: 0, fontSize: 13, color: n[800] }}>{autoFixJob.status === 'done' ? t('qa.autoFixReady') : autoFixJob.status === 'failed' ? t('qa.autoFixFailed') : t('qa.autoFixRunning')}</Box>
+                <Box sx={{ flex: 1, minWidth: 0, fontSize: 13, color: n[800] }}>{autoFixJob.status === 'done' ? t('qa.autoFixReady') : autoFixJob.status === 'failed' ? t('qa.autoFixFailed') : groupMain?.qa?.autoFixMode === 'safer' ? t('qa.autoFixSafer') : t('qa.autoFixRunning')}</Box>
                 {autoFixJob.status === 'done' ? <Button variant="secondary" size="sm" onClick={() => setCurrent(autoFixJob.id)}>{t('qa.autoFixShow')}</Button> : null}
               </Box>
             ) : null}

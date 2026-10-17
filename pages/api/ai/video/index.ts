@@ -85,20 +85,29 @@ async function runQa(jobIds: string[]) {
   }
   const main = results[0]?.job;
   let autoFix: string | null = null;
+  let autoFixMode: 'fix' | 'safer' = 'fix';
   const d = (main?.direction ?? {}) as Dir;
   const scored = results.filter((r) => r.qa.status === 'done').sort((a, b) => qaScore(b.qa) - qaScore(a.qa));
   const best = scored[0];
   if (main && best && !d.autoFixOf && main.mode !== 'extend' && main.mode !== 'edit'
     && ((best.qa.match ?? 10) < AUTO_FIX_MATCH || (best.qa.realism ?? 10) < AUTO_FIX_REALISM)) {
     const fixes = [...(best.qa.diffs ?? []), ...(best.qa.issues ?? [])].map((x) => x.fix).filter(Boolean).slice(0, 5);
-    if (fixes.length) {
-      const r = await launchTake(main.userId, { parentId: best.job.id, instruction: `Fix: ${fixes.join('; ')}`.slice(0, 400), variants: 1 }, d.locale === 'en' ? 'en' : 'tr', { free: true, autoFixOf: main.groupId ?? main.id })
+    // A badly changed product (≤ 4/10) means the shot itself is too hard (an object turned through sides the photos
+    // never showed): the fix is a safer shot — the product still, the camera slowly moving in — from the real start.
+    const safer = (best.qa.match ?? 10) <= 4;
+    const body = safer
+      ? { parentId: best.job.id, instruction: 'Keep the product perfectly still and exactly as in the photos; only the camera moves', variants: 1, dropEnd: true,
+          direction: { ...(best.job.direction as object), preset: 'hero', shotText: undefined, showsBack: false } }
+      : fixes.length ? { parentId: best.job.id, instruction: `Fix: ${fixes.join('; ')}`.slice(0, 400), variants: 1 } : null;
+    if (body) {
+      const r = await launchTake(main.userId, body, d.locale === 'en' ? 'en' : 'tr', { free: true, autoFixOf: main.groupId ?? main.id })
         .catch((err) => { logger.warn('AI video auto-fix failed to start', { jobId: main.id, error: err?.message }); return null; });
       autoFix = r?.json?.job?.id ?? null;
+      if (autoFix && safer) autoFixMode = 'safer';
     }
   }
   for (const r of results) {
-    const qa = r.job.id === main?.id && autoFix ? { ...r.qa, autoFix } : r.qa;
+    const qa = r.job.id === main?.id && autoFix ? { ...r.qa, autoFix, autoFixMode } : r.qa;
     await prisma.aiVideoJob.update({ where: { id: r.job.id }, data: { qa: qa as any } }).catch(() => undefined);
   }
 }
@@ -182,9 +191,9 @@ async function prepareAndStart(l: Launch) {
       endRef = await saveSourceImage(job.userId, Buffer.from(end.data, 'base64'), extOf(end));
     }
     // Anchor frames shaped like the video (no black bars for Veo to animate).
-    const first = await fitToAspect(start, l.aspectRatio);
+    const first = await fitToAspect(start, l.aspectRatio, d.format);
     // …and the end subject the same size and place as the start one (no zoom / "shrinking" at the end).
-    const last = end ? await matchSubjectScale(job.userId, first, await fitToAspect(end, l.aspectRatio), l.aspectRatio) : null;
+    const last = end ? await matchSubjectScale(job.userId, first, await fitToAspect(end, l.aspectRatio, d.format), l.aspectRatio) : null;
     const started = await startVideo({
       mode: last ? 'interpolate' : 'image', prompt: l.prompt, negativePrompt: negativePrompt(d), image: first, lastFrame: last ?? undefined,
       aspectRatio: l.aspectRatio, durationSec: l.durationSec, resolution: l.resolution, quality: l.quality, variants: l.variants, seed: l.seed, audio: d.audio !== 'none',
@@ -218,7 +227,8 @@ async function launchTake(userId: string, body: any, locale: 'tr' | 'en', opts: 
   let productRefs: string[];
   if (parent) {
     startRef = parent.sourceUrl;
-    endRef = parent.endUrl;
+    // The safer automatic fix drops the end frame (it forced the turn that went wrong).
+    endRef = body.dropEnd === true ? null : parent.endUrl;
     productRefs = parent.referenceUrls;
   } else {
     startRef = direction.mode === 'scene' ? null : (typeof body.sources?.start === 'string' ? body.sources.start : null);

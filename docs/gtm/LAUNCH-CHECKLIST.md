@@ -13,7 +13,7 @@ Work through this list in order. Steps marked 👤 need your logins. Everything 
    - Create any community **promotion codes** (Checkout now shows a code field whenever the founding coupon doesn't apply).
 3. 👤 **Server `.env`** (`/home/deploy/kolayxport/.env`, set via stdin). `NEXT_PUBLIC_*` values are baked in at build time, so set them before the merge.
    - `PRICE_PRO_MONTH`, `PRICE_PRO_YEAR` (+ optional `_TRY` / `_USD`), and `STRIPE_FOUNDING_COUPON_ID`
-   - `NEXT_PUBLIC_WHATSAPP_NUMBER` (e.g. `905XXXXXXXXX`); without it the WhatsApp button is hidden
+   - WhatsApp: done, +90 542 568 33 62 is built in (`lib/site/company.ts`)
    - `NEXT_PUBLIC_SOCIAL_*`, only for accounts that exist
    - The tracking IDs can wait until step C.
    - **Gemini for the SaaS:** use a key from a Google project **with billing enabled** (the free tier allows ~10–20 requests per model per day, so a few customers would exhaust it).

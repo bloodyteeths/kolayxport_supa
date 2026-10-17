@@ -18,8 +18,8 @@ export const COMPANY = {
   kep: null as string | null, // TODO(owner): KEP adresi
   foundingDate: '2025-09-09',
   email: 'destek@kolayxport.com',
-  /** E.164 without "+", e.g. 905321234567. Set NEXT_PUBLIC_WHATSAPP_NUMBER; the button is hidden when empty. */
-  whatsapp: (process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '').replace(/\D/g, '') || null,
+  /** WhatsApp Business, E.164 without "+". NEXT_PUBLIC_WHATSAPP_NUMBER overrides it. */
+  whatsapp: (process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '905425683362').replace(/\D/g, '') || null,
   phone: null as string | null,
   /** Only accounts that exist. Empty = nothing rendered (no dead social links). */
   social: {

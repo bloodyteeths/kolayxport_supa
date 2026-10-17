@@ -113,7 +113,7 @@ The step-by-step version is in [`LAUNCH-CHECKLIST.md`](LAUNCH-CHECKLIST.md).
   - Have a lawyer review `content/*/legal/*` and set `lawyerReviewed: true`.
 - **Server environment** (`.env` on Hetzner, set via stdin):
   - GTM and pixel IDs, `META_CAPI_TOKEN`, `GA4_API_SECRET`
-  - `NEXT_PUBLIC_WHATSAPP_NUMBER`, social profile URLs
+  - Social profile URLs (`NEXT_PUBLIC_SOCIAL_*`), once the accounts exist
   - `PRICE_PRO_*`, `STRIPE_FOUNDING_COUPON_ID`
   - The full list is in [`tracking/README.md`](tracking/README.md#4-environment-variables-hetzner-env-set-via-stdin-never-in-git).
 - **Search Console and Bing:** follow [`seo/search-console-checklist.md`](seo/search-console-checklist.md).

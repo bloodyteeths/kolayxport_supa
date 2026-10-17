@@ -97,16 +97,18 @@ const PRESET_ACTION: Record<VideoPreset, { person: string; product: string }> = 
 };
 
 const LOOK: Record<VideoDirection['look'], { intro: string; finish: string }> = {
+  // Never the words "phone" / "smartphone": Veo then draws a camera-app screen (icons, shutter button) around the
+  // shot — seen on production 2026-10-17. Describe how real handheld footage looks instead.
   phone: {
-    intro: 'A real, unedited smartphone video filmed by the shop owner — it must look exactly like real footage, not like AI.',
-    finish: 'Natural phone-camera exposure and true-to-life colours, slight natural handheld micro-movement, real lens depth of field, natural motion blur on fast movement.',
+    intro: 'Real, unedited handheld footage filmed by the shop owner — it must look exactly like a real video, not like AI. The image fills the whole frame.',
+    finish: 'Natural exposure and true-to-life colours, slight natural hand-held camera movement, real lens depth of field, natural motion blur on fast movement.',
   },
   studio: {
-    intro: 'A real product video filmed by a professional photographer with a camera in a photo studio — real footage, not CGI or AI.',
+    intro: 'A real product video filmed by a professional photographer in a photo studio — real footage, not CGI or AI. The image fills the whole frame.',
     finish: 'Real camera exposure, accurate colours, crisp natural detail.',
   },
   cinematic: {
-    intro: 'A real fashion film shot on a cinema camera — real footage, not CGI or AI.',
+    intro: 'A real fashion film shot on a cinema camera — real footage, not CGI or AI. The image fills the whole frame.',
     finish: 'Natural film look with shallow depth of field and gentle, real camera movement.',
   },
 };
@@ -208,6 +210,7 @@ export function negativePrompt(d: Pick<VideoDirection, 'avoid' | 'person'>): str
     'slow motion', 'floaty or dreamlike motion', 'morphing', 'warping', 'melting', 'flickering details',
     'changing the product', 'changing the pattern or colours', 'added or missing details', 'extra accessories',
     'oversaturated colours', 'glow', 'haze', 'blurry', 'low quality', 'text', 'watermark', 'logo',
+    'phone screen', 'camera app interface', 'on-screen buttons or icons', 'screen recording', 'black bars', 'letterbox', 'border', 'picture frame',
   ];
   if (d.person) base.push('plastic or waxy skin', 'airbrushed skin', 'beauty filter', 'uncanny face', 'dead eyes', 'frozen expression', 'distorted face', 'deformed hands', 'extra fingers', 'extra limbs');
   const extra = clean(d.avoid, 300);

@@ -16427,13 +16427,14 @@
         "wix": "Wix: en az 7 sn, Full HD (1080p).",
         "trendyol": "Trendyol resmî bir video kuralı yayınlamıyor: mobil için dikey, 1080p, sessiz.",
         "social": "Instagram Reels / TikTok: dikey 9:16, 1080p, müzikli."
-      }
+      },
+      "auto": "Bu pazaryerine göre ayarlandı: {summary}"
     },
     "photos": {
       "title": "Ürün fotoğrafları ve videoları",
       "hint": "İlan seçin veya kendi fotoğraflarınızı ve videolarınızı ekleyin. Ne kadar çok açı (ön, arka, detay), o kadar az değişiklik.",
       "marketplace": "Pazaryeri",
-      "search": "İlan ara…",
+      "search": "{marketplace} ilanlarınızda arayın…",
       "noResults": "İlan bulunamadı",
       "change": "Değiştir",
       "loading": "Fotoğraflar yükleniyor…",
@@ -16447,15 +16448,6 @@
     "role": {
       "start": "Başlangıç",
       "end": "Bitiş"
-    },
-    "mode": {
-      "title": "Nasıl başlasın?",
-      "image": "Fotoğrafımdan",
-      "scene": "Yeni sahne",
-      "hint": {
-        "image": "Video sizin gerçek fotoğrafınızla başlar (en doğru sonuç). Bitiş karesi seçerseniz o fotoğrafla biter.",
-        "scene": "İlk ve son kareyi yapay zekâ tüm fotoğraflarınızdan yeni ortamda oluşturur, sonra canlandırır."
-      }
     },
     "shot": {
       "title": "Çekim türü",
@@ -16552,7 +16544,8 @@
       "christmas": "Yılbaşı",
       "beach": "Plaj",
       "home": "Ev",
-      "custom": "Özel"
+      "custom": "Özel",
+      "aiHint": "Yeni ortamda ilk ve son kare, fotoğraflarınızdan yapay zekâ ile kurulur (+15 kredi kare başına)."
     },
     "light": {
       "daylight": "Gün ışığı",
@@ -16574,12 +16567,11 @@
       "eightOnly": "1080p ve 4K yalnızca 8 sn olabilir.",
       "quality": "Kalite",
       "variants": "Seçenek sayısı",
-      "seed": "Tohum (tekrar için)",
-      "seedPlaceholder": "rastgele",
       "showPrompt": "Yapay zekâya giden komutu göster",
       "hidePrompt": "Komutu gizle",
       "grain": "Doğal kamera dokusu",
-      "grainHint": "Gerçek kameralardaki hafif gren eklenir; fazla pürüzsüz görüntü yapay görünür."
+      "grainHint": "Gerçek kameralardaki hafif gren eklenir; fazla pürüzsüz görüntü yapay görünür.",
+      "variantsHint": "Birden fazla seçenekte kalite kontrolü en iyisini işaretler."
     },
     "format": {
       "9x16": "Dikey 9:16",
@@ -16588,8 +16580,8 @@
       "4x5": "Dikey 4:5"
     },
     "quality": {
-      "fast": "Hızlı",
-      "best": "En iyi"
+      "fast": "Standart",
+      "best": "En gerçekçi"
     },
     "seconds": "{count} sn",
     "consent": "Fotoğrafların hakları ve fotoğraftaki modellerin (çocuklarda velisinin) izni bende.",
@@ -16620,7 +16612,6 @@
       "variant": "Seçenek {n}",
       "history": "Sürüm geçmişi",
       "version": "Sürüm {n}",
-      "seed": "Tohum: {seed}",
       "error": {
         "childPhoto": "Google bu fotoğraftan video oluşturmadı (fotoğrafta çocuk var).",
         "filtered": "Google bu isteği güvenlik nedeniyle reddetti. Başka bir fotoğraf veya açıklama deneyin.",
@@ -16657,8 +16648,7 @@
       "from": "baş (sn)",
       "to": "son (sn)",
       "trimApply": "Uygula",
-      "useEtsy": "Etsy ilanına ekle",
-      "useOther": "Videoyu indirip {marketplace} satıcı panelinden yükleyin."
+      "useEtsy": "Etsy ilanına ekle"
     },
     "delete": "Sil",
     "deleteTitle": "Bu video silinsin mi?",
@@ -16712,8 +16702,8 @@
       "cinematic": "Moda filmi gibi, sığ alan derinliği."
     },
     "qualityHint": {
-      "fast": "Hızlı: denemeler için. En gerçekçi sonuç için \"En iyi\".",
-      "best": "En iyi: daha gerçekçi yüz, el ve kumaş hareketi; daha fazla kredi."
+      "fast": "Hızlı ve uygun fiyatlı.",
+      "best": "Yüz, el ve kumaş en doğal hâliyle."
     },
     "qa": {
       "title": "Kalite kontrolü",
@@ -16726,6 +16716,52 @@
       "clean": "Fark bulunmadı: ürün fotoğraflarla aynı.",
       "fix": "Bunları düzelt",
       "best": "en iyi"
+    },
+    "publish": {
+      "button": "{marketplace} ilanına ekle",
+      "again": "{marketplace} ilanına tekrar gönder",
+      "send": "Gönder",
+      "confirmTitle": "Video {marketplace} ilanına eklensin mi?",
+      "confirmBody": "Video doğrudan pazaryerindeki ilanınıza yüklenir ve ilan hemen güncellenir. eBay ilanda tek video gösterir: varsa eskisinin yerini alır.",
+      "sending": {
+        "ebay": "Gönderiliyor… eBay videoyu işliyor (birkaç dakika sürebilir).",
+        "other": "Gönderiliyor…"
+      },
+      "done": {
+        "ebay": "✓ eBay ilanına eklendi.",
+        "shopify": "✓ Shopify ürününe eklendi (Shopify birkaç dakika içinde işler).",
+        "wix": "✓ Wix ürününe gönderildi (Wix birkaç dakika içinde içe aktarır)."
+      },
+      "error": {
+        "start": "Gönderim başlatılamadı. Tekrar deneyin.",
+        "busy": "Bu video şu an gönderiliyor.",
+        "reconnect": "{marketplace} bağlantısı yenilenmeli: Ayarlar → Bağlantılar'dan tekrar bağlayın.",
+        "tooLarge": "Video {marketplace} için çok büyük. Kırpın veya 720p ile oluşturun.",
+        "rejected": "{marketplace} videoyu kabul etmedi. Başka bir sürümü deneyin.",
+        "processing": "{marketplace} videoyu hâlâ işliyor. Birkaç dakika sonra tekrar gönderin.",
+        "listingNotFound": "İlan {marketplace} hesabınızda bulunamadı. İlanları yenileyin.",
+        "failed": "{marketplace} ilanına eklenemedi. Tekrar deneyin."
+      },
+      "manual": {
+        "amazon": "Amazon video yükleme için API sunmuyor: videoyu indirin, Seller Central → Katalog → \"Upload & manage videos\" ile ASIN'e ekleyin.",
+        "trendyol": "Trendyol video yükleme için API sunmuyor: videoyu indirin ve Trendyol satıcı panelinden ürüne ekleyin."
+      },
+      "open": {
+        "amazon": "Seller Central rehberi",
+        "trendyol": "Trendyol paneli"
+      },
+      "noListing": "Pazaryerine otomatik göndermek için videoyu bir ilan seçerek oluşturun; şimdilik indirip yükleyebilirsiniz."
+    },
+    "step": {
+      "where": "1. Nerede kullanacaksınız?",
+      "product": "2. Ürününüz",
+      "video": "3. Nasıl bir video?"
+    },
+    "advanced": {
+      "show": "Gelişmiş ayarlar",
+      "hide": "Gelişmiş ayarları gizle",
+      "title": "Gelişmiş ayarlar",
+      "hint": "Hepsi pazaryerine göre ayarlıdır; değiştirmeniz gerekmez."
     }
   },
   "credits": {

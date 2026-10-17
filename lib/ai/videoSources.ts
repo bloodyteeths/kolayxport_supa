@@ -124,3 +124,33 @@ export async function framesFromVideo(userId: string, file: string, keep = 6): P
   for (const buf of picks) refs.push(await saveSourceImage(userId, buf, 'jpg'));
   return refs;
 }
+
+/**
+ * An anchor frame shaped like the video (9:16 / 16:9). Veo pads a photo of another shape with black bars (and then
+ * animates them — a camera-app screen appeared on production). A small difference is cropped (the subject kept by
+ * sharp's attention strategy); when a crop would cut more than 15 % of the product, the photo sits whole on a soft,
+ * blurred copy of itself instead.
+ */
+export async function fitToAspect(m: VideoMedia, aspect: '9:16' | '16:9'): Promise<VideoMedia> {
+  const [W, H] = aspect === '9:16' ? [1080, 1920] : [1920, 1080];
+  try {
+    const buf = await sharp(Buffer.from(m.data, 'base64')).rotate().toBuffer();
+    const meta = await sharp(buf).metadata();
+    const w = meta.width ?? W;
+    const h = meta.height ?? H;
+    const target = W / H;
+    const ratio = w / h;
+    const loss = ratio > target ? 1 - target / ratio : 1 - ratio / target;
+    let out: Buffer;
+    if (loss <= 0.15) {
+      out = await sharp(buf).resize(W, H, { fit: 'cover', position: sharp.strategy.attention }).jpeg({ quality: 92 }).toBuffer();
+    } else {
+      const bg = await sharp(buf).resize(W, H, { fit: 'cover' }).blur(40).modulate({ brightness: 1.03 }).toBuffer();
+      const fg = await sharp(buf).resize(W, H, { fit: 'inside' }).toBuffer();
+      out = await sharp(bg).composite([{ input: fg, gravity: 'center' }]).jpeg({ quality: 92 }).toBuffer();
+    }
+    return { data: out.toString('base64'), mimeType: 'image/jpeg' };
+  } catch {
+    return m;
+  }
+}

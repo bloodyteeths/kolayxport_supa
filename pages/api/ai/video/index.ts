@@ -22,7 +22,7 @@ import { logger } from '@/lib/logger';
 import { logUsage } from '@/lib/ai/gemini';
 import { directVideo, negativePrompt, normalizeDirection, type VideoDirection } from '@/lib/ai/videoDirector';
 import { finishInPlace, originalOf, pollVideo, saveVideo, startVideo, veoConstraints, VIDEO_UPLOAD_ROOT, type VideoMedia } from '@/lib/ai/video';
-import { loadSource, loadSources, saveSourceImage } from '@/lib/ai/videoSources';
+import { fitToAspect, loadSource, loadSources, saveSourceImage } from '@/lib/ai/videoSources';
 import { checkVideo, generateKeyframe, keyframePrompt, MAX_PRODUCT_REFS } from '@/lib/ai/videoProduct';
 import { extendCredits, imageCredits, videoCredits } from '@/lib/billing/aiCredits';
 import { isAiBudgetError, isNoCreditsError, refundCredits, spendCredits } from '@/lib/billing/aiCreditsServer';
@@ -43,7 +43,7 @@ export function viewJob(j: Job) {
     instruction: j.instruction, aspectRatio: j.aspectRatio, durationSec: j.durationSec, resolution: j.resolution,
     quality: j.quality, seed: j.seed, model: j.model, provider: j.provider, errorKey: j.errorKey, favorite: j.favorite,
     listingRef: j.listingRef, title: j.title, direction: j.direction, sourceUrl: j.sourceUrl, endUrl: j.endUrl,
-    referenceUrls: j.referenceUrls, credits: j.credits, qa: j.qa, createdAt: j.createdAt,
+    referenceUrls: j.referenceUrls, credits: j.credits, qa: j.qa, published: j.published, createdAt: j.createdAt,
     url: j.status === 'done' ? `/api/ai/video/file?id=${encodeURIComponent(j.id)}` : null,
   };
 }
@@ -98,7 +98,7 @@ async function refresh(job: Job): Promise<Job> {
     const { id: _id, createdAt: _c, updatedAt: _u, ...base } = job;
     const done: string[] = [job.id];
     for (let i = 1; i < r.videos.length; i++) {
-      const sib = await prisma.aiVideoJob.create({ data: { ...base, id: newJobId(), direction: (job.direction as any) ?? undefined, qa: undefined, credits: 0, status: 'running', variantIndex: i, operation: null } });
+      const sib = await prisma.aiVideoJob.create({ data: { ...base, id: newJobId(), direction: (job.direction as any) ?? undefined, qa: undefined, published: undefined, credits: 0, status: 'running', variantIndex: i, operation: null } });
       const file = await saveVideo(job.userId, sib.id, r.videos[i]);
       await finish(file);
       await prisma.aiVideoJob.update({ where: { id: sib.id }, data: { status: 'done', filePath: file } });
@@ -154,8 +154,11 @@ async function prepareAndStart(l: Launch) {
       end = await generateKeyframe({ userId: job.userId, refs: l.products, first: start, prompt: keyframePrompt(d, { which: 'end', refCount: l.products.length, hasStart: true }), aspectRatio: l.aspectRatio });
       endRef = await saveSourceImage(job.userId, Buffer.from(end.data, 'base64'), extOf(end));
     }
+    // Anchor frames shaped like the video (no black bars for Veo to animate).
+    const first = await fitToAspect(start, l.aspectRatio);
+    const last = end ? await fitToAspect(end, l.aspectRatio) : null;
     const started = await startVideo({
-      mode: end ? 'interpolate' : 'image', prompt: l.prompt, negativePrompt: negativePrompt(d), image: start, lastFrame: end ?? undefined,
+      mode: last ? 'interpolate' : 'image', prompt: l.prompt, negativePrompt: negativePrompt(d), image: first, lastFrame: last ?? undefined,
       aspectRatio: l.aspectRatio, durationSec: l.durationSec, resolution: l.resolution, quality: l.quality, variants: l.variants, seed: l.seed, audio: d.audio !== 'none',
     });
     await prisma.aiVideoJob.update({ where: { id: job.id }, data: { status: 'running', operation: started.operation, provider: started.provider, model: started.model, sourceUrl: startRef, endUrl: endRef } });

@@ -14,7 +14,9 @@ describe('video director', () => {
     expect(p).toMatch(/Never a frozen, blank or doll-like face/);
     expect(p).toMatch(/exactly the one in the photos in every frame/);
     expect(p).toMatch(/never slow motion/);
-    expect(p).toMatch(/smartphone video/);
+    expect(p).toMatch(/handheld footage/);
+    expect(p).not.toMatch(/phone/i);
+    expect(negativePrompt({ person: false })).toMatch(/camera app interface/);
     expect(p).toMatch(/no retouching or beauty filter/);
     const neg = negativePrompt({ person: true });
     expect(neg).toMatch(/frozen expression/);

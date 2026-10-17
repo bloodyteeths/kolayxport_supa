@@ -35,6 +35,7 @@ type Job = {
   mode: string; instruction: string | null; aspectRatio: string; durationSec: number; resolution: string; quality: string;
   seed: number | null; errorKey: string | null; favorite: boolean; listingRef: string | null; title: string | null;
   direction: Partial<VideoDirection> | null; url: string | null; createdAt: string; credits?: number; qa?: Qa | null;
+  published?: Record<string, { status: 'sending' | 'done' | 'failed'; error?: string; at: string }> | null;
 };
 type ListingHit = { id: string; title: string; thumbUrl: string | null };
 const MARKETPLACES = ['etsy', 'ebay', 'shopify', 'trendyol', 'wix'] as const;
@@ -144,7 +145,7 @@ export function VideoStudio() {
   const [resolution, setResolution] = useState<'720p' | '1080p' | '4k'>('1080p');
   const [quality, setQuality] = useState<'fast' | 'best'>('fast');
   const [variants, setVariants] = useState(2);
-  const [seed, setSeed] = useState('');
+  const [advanced, setAdvanced] = useState(false);
 
   // ── Product photos ──
   const [mp, setMp] = useState<Mp>('etsy');
@@ -187,7 +188,11 @@ export function VideoStudio() {
     setDurationSec(p.durationSec);
     setResolution(p.resolution);
     setDir((d) => ({ ...d, audio: p.audio, target: tg }));
+    // Listings come from the same marketplace (Amazon / social: the seller picks where the photos are).
+    const m = MARKETPLACES.find((x) => x === tg);
+    if (m) { setMp(m); setQuery(''); }
   }, []);
+  const setScene = (v: VideoDirection['scene']) => setDir((d) => ({ ...d, scene: v, mode: v === 'keep' ? 'image' : 'scene' }));
 
   // Deep link from a listing editor: ?mp=etsy&listing=123&store=456&title=…
   useEffect(() => {
@@ -323,16 +328,20 @@ export function VideoStudio() {
   const aiEnd = !end && lock && TURNING.has(dir.preset) && productRefs.length > 0;
   const cost = videoCredits({ quality, resolution: effective.resolution, durationSec: effective.durationSec, variants }) + (aiStart ? imageCredits() : 0) + (aiEnd ? imageCredits() : 0);
   const affordable = canAfford(balance, cost);
+  const costFor = (q: 'fast' | 'best') => videoCredits({ quality: q, resolution: effective.resolution, durationSec: effective.durationSec, variants }) + (aiStart ? imageCredits() : 0) + (aiEnd ? imageCredits() : 0);
+  const listingMarket = (MARKETPLACES as readonly string[]).includes(target);
+  const autoSummary = [t(`format.${format.replace(':', 'x')}`), t('seconds', { count: effective.durationSec }), effective.resolution === '4k' ? '4K' : effective.resolution, profile.audioRemoved || dir.audio === 'none' ? t('audio.none') : t(`audio.${dir.audio}`)].join(' · ');
 
   const cur = jobs.find((j) => j.id === current) ?? null;
-  const pending = jobs.some((j) => j.status === 'running' || j.status === 'preparing' || j.qa?.status === 'running'
-    || (j.status === 'done' && !j.qa && Date.now() - new Date(j.createdAt).getTime() < 10 * 60_000 && j.mode !== 'edit'));
+  const watching = (j: Job) => j.status === 'running' || j.status === 'preparing' || j.qa?.status === 'running'
+    || Object.values(j.published ?? {}).some((x) => x.status === 'sending')
+    || (j.status === 'done' && !j.qa && Date.now() - new Date(j.createdAt).getTime() < 10 * 60_000 && j.mode !== 'edit');
+  const pending = jobs.some(watching);
 
   // Poll running jobs and quality checks.
   useEffect(() => {
     if (!pending) return undefined;
-    const ids = jobs.filter((j) => j.status === 'running' || j.status === 'preparing' || j.qa?.status === 'running'
-      || (j.status === 'done' && !j.qa && Date.now() - new Date(j.createdAt).getTime() < 10 * 60_000 && j.mode !== 'edit')).map((j) => j.id).slice(0, 40).join(',');
+    const ids = jobs.filter(watching).map((j) => j.id).slice(0, 40).join(',');
     const h = window.setInterval(async () => {
       try {
         const r = await fetch(`/api/ai/video?ids=${encodeURIComponent(ids)}`, { credentials: 'same-origin' });
@@ -353,7 +362,7 @@ export function VideoStudio() {
       } catch { /* next tick */ }
     }, POLL_MS);
     return () => window.clearInterval(h);
-  }, [pending, jobs, t, toast]);
+  }, [pending, jobs, t, toast]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const addJob = (j: Job) => {
     setJobs((prev) => [j, ...prev.filter((x) => x.id !== j.id)]);
@@ -387,7 +396,7 @@ export function VideoStudio() {
     await post('/api/ai/video', {
       sources: { start: dir.mode === 'scene' ? null : start?.ref, end: dir.mode === 'scene' ? null : end?.ref, product: productRefs },
       direction, lock, aspectRatio: generationAspect(format, sourceLandscape), durationSec: effective.durationSec, resolution: effective.resolution,
-      quality, variants, seed: seed.trim() || null,
+      quality, variants, seed: null,
       listingRef: listing ? `${listing.mp}:${listing.id}${listing.store ? `:${listing.store}` : ''}` : null, title: listing?.title ?? null,
     }, 'generate', cost);
   };
@@ -423,6 +432,19 @@ export function VideoStudio() {
     }
   };
 
+  const publish = async (j: Job, mpName: string) => {
+    if (!(await confirm({ title: t('publish.confirmTitle', { marketplace: t(`target.name.${mpName}`) }), body: t('publish.confirmBody'), confirmLabel: t('publish.send') }))) return;
+    setBusy('publish');
+    try {
+      const r = await fetch('/api/ai/video/publish', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: j.id }) });
+      const d = await r.json().catch(() => null);
+      if (!r.ok || !d?.job) { toast.error(t(`publish.error.${d?.code === 'publishBusy' ? 'busy' : 'start'}`)); return; }
+      setJobs((prev) => prev.map((x) => (x.id === d.job.id ? d.job : x)));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const curDir = (cur?.direction ?? {}) as Partial<VideoDirection>;
   const curTarget = (curDir.target as VideoTarget | undefined) ?? target;
   const readiness = cur && cur.status === 'done'
@@ -440,7 +462,11 @@ export function VideoStudio() {
     return out;
   }, [cur, jobs]);
   const library = jobs.filter((j) => (libFilter === 'favorite' ? j.favorite : libFilter === 'listing' ? listing && j.listingRef?.startsWith(`${listing.mp}:${listing.id}`) : true));
-  const etsyListing = (cur?.listingRef ?? '').startsWith('etsy:');
+  const listingMp = (cur?.listingRef ?? '').split(':')[0];
+  const etsyListing = listingMp === 'etsy';
+  const directMp = ['ebay', 'shopify', 'wix'].includes(listingMp) ? listingMp : null;
+  const manualMp = curTarget === 'amazon' || listingMp === 'trendyol' || (!listingMp && curTarget === 'trendyol') ? (curTarget === 'amazon' ? 'amazon' : 'trendyol') : null;
+  const sent = directMp ? cur?.published?.[directMp] ?? null : null;
   const qa = cur?.qa ?? null;
   const fixes = qa?.status === 'done' ? [...(qa.diffs ?? []), ...(qa.issues ?? [])].map((x) => x.fix).filter(Boolean) : [];
 
@@ -454,17 +480,20 @@ export function VideoStudio() {
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(380px, 460px) minmax(0, 1fr)' }, gap: '16px', alignItems: 'start' }}>
         {/* ───────────── Left: setup ───────────── */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '12px', minWidth: 0 }}>
-          <Block title={t('target.title')} hint={t(`target.rules.${target}`)}>
-            <Pills label={t('target.title')} value={target} onChange={applyTarget} options={VIDEO_TARGETS.map((x) => ({ value: x, label: t(`target.name.${x}`) }))} />
+          <Block title={t('step.where')} hint={t(`target.rules.${target}`)}>
+            <Pills label={t('step.where')} value={target} onChange={applyTarget} options={VIDEO_TARGETS.map((x) => ({ value: x, label: t(`target.name.${x}`) }))} />
+            <Box sx={{ fontSize: 12, color: n[600] }}>{t('target.auto', { summary: autoSummary })}</Box>
           </Block>
 
-          <Block title={t('photos.title')} hint={t('photos.hint')}>
+          <Block title={t('step.product')} hint={t('photos.hint')}>
             <Box sx={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <Box sx={{ width: 140 }}>
-                <Select<Mp> value={mp} onChange={(v) => { setMp(v); setQuery(''); }} options={MARKETPLACES.map((m) => ({ value: m, label: t(`target.name.${m}`) }))} aria-label={t('photos.marketplace')} size="sm" />
-              </Box>
+              {!listingMarket ? (
+                <Box sx={{ width: 140 }}>
+                  <Select<Mp> value={mp} onChange={(v) => { setMp(v); setQuery(''); }} options={MARKETPLACES.map((m) => ({ value: m, label: t(`target.name.${m}`) }))} aria-label={t('photos.marketplace')} size="sm" />
+                </Box>
+              ) : null}
               <Box sx={{ flex: 1, minWidth: 160 }}>
-                <SearchField value={query} onChange={setQuery} placeholder={t('photos.search')} aria-label={t('photos.search')} />
+                <SearchField value={query} onChange={setQuery} placeholder={t('photos.search', { marketplace: t(`target.name.${mp}`) })} aria-label={t('photos.search', { marketplace: t(`target.name.${mp}`) })} />
               </Box>
             </Box>
             {!listing || query ? (
@@ -484,11 +513,6 @@ export function VideoStudio() {
                 <Button variant="ghost" size="sm" onClick={() => { setListing(null); setPhotos((p) => p.filter((x) => x.ref.startsWith('upload:'))); setStart(null); setEnd(null); }}>{t('photos.change')}</Button>
               </Box>
             )}
-
-            <Labeled label={t('mode.title')}>
-              <Pills label={t('mode.title')} value={dir.mode} onChange={(v) => set('mode', v)} options={L('mode', ['image', 'scene'])} />
-              <Box sx={{ fontSize: 12, color: n[500] }}>{t(`mode.hint.${dir.mode}`)}</Box>
-            </Labeled>
 
             {dir.mode === 'image' ? (
               <Box sx={{ display: 'flex', gap: '8px' }}>
@@ -523,10 +547,9 @@ export function VideoStudio() {
               <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,video/*" multiple hidden onChange={(e) => { void upload(e.target.files); e.target.value = ''; }} />
             </Box>
             {photos.length ? <Box sx={{ fontSize: 12, color: n[500] }}>{t('photos.used', { count: productRefs.length, max: MAX_PRODUCT_PHOTOS })}</Box> : null}
-            <Switch checked={lock} onChange={setLock} label={t('lock.label')} description={t('lock.hint')} />
           </Block>
 
-          <Block title={t('shot.title')}>
+          <Block title={t('step.video')}>
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '6px' }}>
               {VIDEO_PRESETS.map((x) => {
                 const on = dir.preset === x;
@@ -540,72 +563,85 @@ export function VideoStudio() {
               })}
             </Box>
             {TURNING.has(dir.preset) && !end && !lock ? <Box sx={{ fontSize: 12, color: tone.warning.fg }}>{t('shot.backWarning')}</Box> : null}
-          </Block>
-
-          <Block title={t('director.title')}>
-            <Labeled label={t('director.look')}>
-              <Pills label={t('director.look')} value={dir.look} onChange={(v) => set('look', v)} options={L('look', VIDEO_LOOKS)} />
-              <Box sx={{ fontSize: 12, color: n[500] }}>{t(`lookHint.${dir.look}`)}</Box>
-            </Labeled>
-            <Switch checked={dir.person} onChange={(v) => set('person', v)} label={t('director.person')} description={t('director.personHint')} />
-            {dir.person ? (
-              <Labeled label={t('director.expression')}><Pills label={t('director.expression')} value={dir.expression} onChange={(v) => set('expression', v)} options={L('expression', VIDEO_EXPRESSIONS)} /></Labeled>
-            ) : null}
-            <Labeled label={t('director.camera')}><Pills label={t('director.camera')} value={dir.camera} onChange={(v) => set('camera', v)} options={L('camera', VIDEO_CAMERAS)} /></Labeled>
-            <Labeled label={t('director.motion')}>
-              <Pills label={t('director.motion')} value={dir.motion} onChange={(v) => set('motion', v)} options={L('motion', VIDEO_MOTIONS)} />
-              {dir.motion === 'lively' ? <Box sx={{ fontSize: 12, color: n[500] }}>{t('director.motionHint')}</Box> : null}
-            </Labeled>
             <Labeled label={t('director.scene')}>
-              <Pills label={t('director.scene')} value={dir.scene} onChange={(v) => set('scene', v)} options={L('scene', VIDEO_SCENES)} />
+              <Pills label={t('director.scene')} value={dir.scene} onChange={setScene} options={L('scene', VIDEO_SCENES)} />
               {dir.scene === 'custom' ? <TextField value={dir.sceneText ?? ''} onChange={(v) => set('sceneText', v.slice(0, 300))} placeholder={t('director.scenePlaceholder')} /> : null}
-              {dir.mode === 'image' && dir.scene !== 'keep' ? <Box sx={{ fontSize: 12, color: n[500] }}>{t('director.sceneNeedsScene')}</Box> : null}
+              {dir.scene !== 'keep' ? <Box sx={{ fontSize: 12, color: n[500] }}>{t('scene.aiHint')}</Box> : null}
             </Labeled>
-            <Labeled label={t('director.light')}><Pills label={t('director.light')} value={dir.light} onChange={(v) => set('light', v)} options={L('light', VIDEO_LIGHTS)} /></Labeled>
-            {profile.audioRemoved ? (
-              <Box sx={{ fontSize: 12, color: n[500] }}>{t('director.audioRemoved', { marketplace: t(`target.name.${target}`) })}</Box>
-            ) : (
-              <Labeled label={t('director.audio')}><Pills label={t('director.audio')} value={dir.audio} onChange={(v) => set('audio', v)} options={L('audio', VIDEO_AUDIO)} /></Labeled>
-            )}
             <Labeled label={t('director.notes')}>
               <TextArea value={dir.notes ?? ''} onChange={(v) => set('notes', v.slice(0, 800))} minRows={2} maxRows={6} placeholder={t('director.notesPlaceholder')} />
             </Labeled>
-            <Labeled label={t('director.avoid')}>
-              <TextField value={dir.avoid ?? ''} onChange={(v) => set('avoid', v.slice(0, 300))} placeholder={t('director.avoidPlaceholder')} />
+            <Labeled label={t('output.quality')}>
+              <Box role="radiogroup" aria-label={t('output.quality')} sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                {(['fast', 'best'] as const).map((q) => {
+                  const on = quality === q;
+                  return (
+                    <Box key={q} component="button" type="button" role="radio" aria-checked={on} onClick={() => setQuality(q)}
+                      sx={{ textAlign: 'left', font: 'inherit', p: '8px 10px', borderRadius: '8px', cursor: 'pointer', border: `1px solid ${on ? accent[500] : n[200]}`, bgcolor: on ? accent[50] : n[0] }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: '6px' }}>
+                        <Box sx={{ fontSize: 13, fontWeight: 600, color: on ? accent[700] : n[800] }}>{t(`quality.${q}`)}</Box>
+                        <Box sx={{ fontSize: 12, color: n[500], whiteSpace: 'nowrap' }}>{creditsLabel(costFor(q))}</Box>
+                      </Box>
+                      <Box sx={{ fontSize: 11, lineHeight: '15px', color: n[500], mt: '2px' }}>{t(`qualityHint.${q}`)}</Box>
+                    </Box>
+                  );
+                })}
+              </Box>
             </Labeled>
           </Block>
 
-          <Block title={t('output.title')} hint={t('output.hint', { min: profile.minSec, max: profile.maxSec })}>
-            <Labeled label={t('output.format')}>
-              <Pills<VideoFormat> label={t('output.format')} value={format} onChange={(v) => setFormat(v)} options={profile.formats.map((x) => ({ value: x, label: t(`format.${x.replace(':', 'x')}`) }))} />
-            </Labeled>
-            <Box sx={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-              <Labeled label={t('output.length')}>
-                <Pills label={t('output.length')} value={String(effective.durationSec) as '4' | '6' | '8'} onChange={(v) => setDurationSec(Number(v) as 4 | 6 | 8)} options={(['4', '6', '8'] as const).map((s) => ({ value: s, label: t('seconds', { count: Number(s) }) }))} />
+          <Box component="button" type="button" onClick={() => setAdvanced((v) => !v)} aria-expanded={advanced}
+            sx={{ alignSelf: 'flex-start', border: 0, bgcolor: 'transparent', p: '2px 0', color: accent[700], fontSize: 13, fontWeight: 600, cursor: 'pointer', font: 'inherit' }}>
+            {advanced ? `▾ ${t('advanced.hide')}` : `▸ ${t('advanced.show')}`}
+          </Box>
+          {advanced ? (
+            <Block title={t('advanced.title')} hint={t('advanced.hint')}>
+              <Switch checked={lock} onChange={setLock} label={t('lock.label')} description={t('lock.hint')} />
+              <Labeled label={t('director.look')}>
+                <Pills label={t('director.look')} value={dir.look} onChange={(v) => set('look', v)} options={L('look', VIDEO_LOOKS)} />
+                <Box sx={{ fontSize: 12, color: n[500] }}>{t(`lookHint.${dir.look}`)}</Box>
               </Labeled>
-              <Labeled label={t('output.resolution')}>
-                <Pills<'720p' | '1080p' | '4k'> label={t('output.resolution')} value={resolution} onChange={(v) => setResolution(v)} options={[{ value: '720p', label: '720p' }, { value: '1080p', label: '1080p' }, { value: '4k', label: '4K' }]} />
+              <Switch checked={dir.person} onChange={(v) => set('person', v)} label={t('director.person')} description={t('director.personHint')} />
+              {dir.person ? (
+                <Labeled label={t('director.expression')}><Pills label={t('director.expression')} value={dir.expression} onChange={(v) => set('expression', v)} options={L('expression', VIDEO_EXPRESSIONS)} /></Labeled>
+              ) : null}
+              <Labeled label={t('director.camera')}><Pills label={t('director.camera')} value={dir.camera} onChange={(v) => set('camera', v)} options={L('camera', VIDEO_CAMERAS)} /></Labeled>
+              <Labeled label={t('director.motion')}>
+                <Pills label={t('director.motion')} value={dir.motion} onChange={(v) => set('motion', v)} options={L('motion', VIDEO_MOTIONS)} />
+                {dir.motion === 'lively' ? <Box sx={{ fontSize: 12, color: n[500] }}>{t('director.motionHint')}</Box> : null}
               </Labeled>
-            </Box>
-            {resolution !== '720p' ? <Box sx={{ fontSize: 12, color: n[500] }}>{t('output.eightOnly')}</Box> : null}
-            <Box sx={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-              <Labeled label={t('output.quality')}>
-                <Pills<'fast' | 'best'> label={t('output.quality')} value={quality} onChange={(v) => setQuality(v)} options={[{ value: 'fast', label: t('quality.fast') }, { value: 'best', label: t('quality.best') }]} />
+              <Labeled label={t('director.light')}><Pills label={t('director.light')} value={dir.light} onChange={(v) => set('light', v)} options={L('light', VIDEO_LIGHTS)} /></Labeled>
+              {profile.audioRemoved ? (
+                <Box sx={{ fontSize: 12, color: n[500] }}>{t('director.audioRemoved', { marketplace: t(`target.name.${target}`) })}</Box>
+              ) : (
+                <Labeled label={t('director.audio')}><Pills label={t('director.audio')} value={dir.audio} onChange={(v) => set('audio', v)} options={L('audio', VIDEO_AUDIO)} /></Labeled>
+              )}
+              <Labeled label={t('director.avoid')}>
+                <TextField value={dir.avoid ?? ''} onChange={(v) => set('avoid', v.slice(0, 300))} placeholder={t('director.avoidPlaceholder')} />
               </Labeled>
+              <Labeled label={t('output.format')}>
+                <Pills<VideoFormat> label={t('output.format')} value={format} onChange={(v) => setFormat(v)} options={profile.formats.map((x) => ({ value: x, label: t(`format.${x.replace(':', 'x')}`) }))} />
+              </Labeled>
+              <Box sx={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                <Labeled label={t('output.length')}>
+                  <Pills label={t('output.length')} value={String(effective.durationSec) as '4' | '6' | '8'} onChange={(v) => setDurationSec(Number(v) as 4 | 6 | 8)} options={(['4', '6', '8'] as const).map((x) => ({ value: x, label: t('seconds', { count: Number(x) }) }))} />
+                </Labeled>
+                <Labeled label={t('output.resolution')}>
+                  <Pills<'720p' | '1080p' | '4k'> label={t('output.resolution')} value={resolution} onChange={(v) => setResolution(v)} options={[{ value: '720p', label: '720p' }, { value: '1080p', label: '1080p' }, { value: '4k', label: '4K' }]} />
+                </Labeled>
+              </Box>
+              {resolution !== '720p' ? <Box sx={{ fontSize: 12, color: n[500] }}>{t('output.eightOnly')}</Box> : null}
               <Labeled label={t('output.variants')}>
-                <Pills label={t('output.variants')} value={String(variants) as '1' | '2' | '3' | '4'} onChange={(v) => setVariants(Number(v))} options={(['1', '2', '3', '4'] as const).map((s) => ({ value: s, label: s }))} />
+                <Pills label={t('output.variants')} value={String(variants) as '1' | '2' | '3' | '4'} onChange={(v) => setVariants(Number(v))} options={(['1', '2', '3', '4'] as const).map((x) => ({ value: x, label: x }))} />
+                <Box sx={{ fontSize: 12, color: n[500] }}>{t('output.variantsHint')}</Box>
               </Labeled>
-              <Labeled label={t('output.seed')}>
-                <Box sx={{ width: 120 }}><TextField value={seed} onChange={(v) => setSeed(v.replace(/\D/g, '').slice(0, 9))} placeholder={t('output.seedPlaceholder')} /></Box>
-              </Labeled>
-            </Box>
-            <Box sx={{ fontSize: 12, color: n[500] }}>{t(`qualityHint.${quality}`)}</Box>
-            <Switch checked={dir.grain} onChange={(v) => set('grain', v)} label={t('output.grain')} description={t('output.grainHint')} />
-            <Box component="button" type="button" onClick={() => setShowPrompt((s) => !s)} sx={{ alignSelf: 'flex-start', border: 0, bgcolor: 'transparent', p: 0, color: accent[700], fontSize: 12, cursor: 'pointer', font: 'inherit' }}>
-              {showPrompt ? t('output.hidePrompt') : t('output.showPrompt')}
-            </Box>
-            {showPrompt ? <Box component="pre" sx={{ m: 0, p: '10px', bgcolor: n[50], borderRadius: '8px', fontSize: 12, lineHeight: '18px', whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: n[700] }}>{promptPreview}</Box> : null}
-          </Block>
+              <Switch checked={dir.grain} onChange={(v) => set('grain', v)} label={t('output.grain')} description={t('output.grainHint')} />
+              <Box component="button" type="button" onClick={() => setShowPrompt((x) => !x)} sx={{ alignSelf: 'flex-start', border: 0, bgcolor: 'transparent', p: 0, color: accent[700], fontSize: 12, cursor: 'pointer', font: 'inherit' }}>
+                {showPrompt ? t('output.hidePrompt') : t('output.showPrompt')}
+              </Box>
+              {showPrompt ? <Box component="pre" sx={{ m: 0, p: '10px', bgcolor: n[50], borderRadius: '8px', fontSize: 12, lineHeight: '18px', whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: n[700] }}>{promptPreview}</Box> : null}
+            </Block>
+          ) : null}
 
           {dir.person ? (
             <Checkbox checked={consent} onChange={(v) => { setConsent(v); try { window.localStorage.setItem(CONSENT_KEY, v ? '1' : '0'); } catch { /* ignore */ } }} label={t('consent')} />
@@ -725,10 +761,28 @@ export function VideoStudio() {
                 </Box>
                 {etsyListing ? (
                   <Button variant="primary" onClick={() => useOnListing(cur)}>{t('action.useEtsy')}</Button>
+                ) : directMp ? (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <Button variant="primary" onClick={() => void publish(cur, directMp)} disabled={Boolean(busy) || sent?.status === 'sending'} loading={busy === 'publish'}>
+                      {sent?.status === 'done' ? t('publish.again', { marketplace: t(`target.name.${directMp}`) }) : t('publish.button', { marketplace: t(`target.name.${directMp}`) })}
+                    </Button>
+                    {sent ? (
+                      <Box sx={{ fontSize: 12, color: sent.status === 'failed' ? tone.danger.fg : sent.status === 'done' ? tone.success.fg : n[600] }} data-testid="video-publish-status">
+                        {sent.status === 'sending' ? t(`publish.sending.${directMp === 'ebay' ? 'ebay' : 'other'}`) : sent.status === 'done' ? t(`publish.done.${directMp}`) : t(`publish.error.${['reconnect', 'tooLarge', 'rejected', 'processing', 'listingNotFound'].includes(sent.error ?? '') ? sent.error : 'failed'}`, { marketplace: t(`target.name.${directMp}`) })}
+                      </Box>
+                    ) : null}
+                  </Box>
+                ) : manualMp ? (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <Box sx={{ fontSize: 12, color: n[600] }}>{t(`publish.manual.${manualMp}`)}</Box>
+                    <Box sx={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      <Button variant="primary" size="sm" href={`${cur.url}&download=1`}>{t('action.download')}</Button>
+                      <Button variant="secondary" size="sm" href={manualMp === 'amazon' ? 'https://sellercentral.amazon.com/gp/help/external/200216080' : 'https://partner.trendyol.com/'} external>{t(`publish.open.${manualMp}`)}</Button>
+                    </Box>
+                  </Box>
                 ) : (
-                  <Box sx={{ fontSize: 12, color: n[500] }}>{t('action.useOther', { marketplace: t(`target.name.${curTarget}`) })}</Box>
+                  <Box sx={{ fontSize: 12, color: n[500] }}>{t('publish.noListing')}</Box>
                 )}
-                {cur.seed !== null ? <Box sx={{ fontSize: 11, color: n[400] }}>{t('result.seed', { seed: cur.seed })}</Box> : null}
               </>
             ) : null}
 

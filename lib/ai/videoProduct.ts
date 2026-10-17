@@ -106,7 +106,9 @@ function notes(v: unknown, max: number): { text: string; fix: string }[] {
 
 /** Normalises the model's QA answer (wrong types, out-of-range scores, garbled lists). Pure, exported for tests. */
 export function normalizeQa(raw: unknown): VideoQa {
-  const o = (raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}) as Record<string, unknown>;
+  // Gemini sometimes wraps the object in an array.
+  const one = Array.isArray(raw) ? raw.find((x) => x && typeof x === 'object' && !Array.isArray(x)) : raw;
+  const o = (one && typeof one === 'object' && !Array.isArray(one) ? one : {}) as Record<string, unknown>;
   const match = clampScore(o.productMatch ?? o.match);
   const realism = clampScore(o.realism);
   if (match === undefined && realism === undefined) return { status: 'failed' };
@@ -133,8 +135,9 @@ export async function checkVideo(input: { userId: string; file: string; refs: Vi
     {
       text: [
         'You check AI product videos for an online shop before a buyer sees them. Compare the product in every VIDEO FRAME with the PRODUCT PHOTOS, image against image, like a careful buyer.',
-        'productMatch 0–10: 10 = the exact same product in every frame (cut, colours, pattern, lace, embroidery, flowers/appliqués — their number, size and position —, sleeves, neckline, length, accessories). Any changed, added or missing detail lowers it a lot.',
-        'realism 0–10: 10 = nobody could tell it is not a real filmed video (faces, eyes, hands, skin, hair, fabric movement and physics, lighting, no morphing or warping).',
+        'The photos show the product from different angles, poses and crops (front, back, side, close-up): never count a different pose, angle, crop, camera distance or framing as a difference. Judge only the product\'s own design. Motion blur in a frame of a moving shot is normal.',
+        'productMatch 0–10: 10 = the same design in every frame (cut, colours, pattern, lace, embroidery, flowers/appliqués — roughly the same number, size and placement —, sleeves, neckline, length, bows, accessories). 8–9: only tiny differences a buyer would not notice. 6–7: a difference a buyer could notice. 4–5: clearly changed details. 0–3: a different product.',
+        'realism 0–10, judged as a shopper watching on a phone: 10 = nobody could tell it is not a real filmed video. Lower it for distorted faces, eyes or hands, plastic skin, melting or morphing fabric, impossible physics, on-screen interfaces, black bars or borders.',
         `diffs: up to 4 concrete differences from the photos (most visible first). issues: up to 3 things that look artificial. Each item: "text" = short, specific, in ${lang}, for the seller; "fix" = one short English instruction for the video model to fix it.`,
         'Only list real problems; empty lists when there are none. Return JSON: {"productMatch": number, "realism": number, "diffs": [{"text","fix"}], "issues": [{"text","fix"}]}',
       ].join('\n'),

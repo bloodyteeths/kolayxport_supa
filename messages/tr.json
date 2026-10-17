@@ -10360,7 +10360,7 @@
     "prefs": {
       "title": "Bildirim tercihleri",
       "subtitle": "Uygulamada ve e-postayla nelerin size ulaşacağını seçin",
-      "levelTitle": "Bildirim düzeyi",
+      "levelTitle": "Hızlı ayar",
       "presets": {
         "critical": "Sadece kritik",
         "recommended": "Önerilen",
@@ -10374,7 +10374,7 @@
       "custom": "Özel",
       "customHint": "Bazı bildirim türlerini değiştirdiniz. Bir düzey seçmek bunları sıfırlar.",
       "emailTitle": "E-posta",
-      "emailEnabled": "E-posta bildirimleri gönder",
+      "emailEnabled": "E-posta bildirimleri",
       "emailHint": "Hesabınızın e-posta adresine gönderilir.",
       "quietTitle": "Sessiz saatler",
       "quietEnabled": "Kritik olmayan e-postaları sessiz saatlerde beklet",
@@ -10398,7 +10398,24 @@
       "saved": "Tercihler kaydedildi",
       "saveFailed": "Tercihler kaydedilemedi",
       "loadFailed": "Tercihler yüklenemedi",
-      "hour": "{hour}:00"
+      "hour": "{hour}:00",
+      "groupHints": {
+        "orders": "Yeni siparişler, iptaller",
+        "dispatch": "Kargo süresi yaklaşan veya geçen siparişler",
+        "listings": "Süresi dolan, kapanan veya hatalı ilanlar",
+        "stock": "Tükenen stok, başarısız stok güncellemeleri",
+        "research": "Takip edilen mağazalar ve kelimeler",
+        "account": "Bağlantılar, plan ve fatura",
+        "system": "Hizmet duyuruları"
+      },
+      "emailChoice": {
+        "off": "Kapalı",
+        "instant": "Anında",
+        "digest": "Günlük özet"
+      },
+      "details": "Ayrıntı",
+      "hideDetails": "Gizle",
+      "mixed": "Karışık — Ayrıntı altından tek tek ayarlı"
     },
     "email": {
       "open": "KolayXport'ta aç",

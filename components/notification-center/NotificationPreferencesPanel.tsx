@@ -1,18 +1,15 @@
 /**
  * Notification preferences (owner W5) — rendered on /app/bildirimler?tab=preferences.
  *
- * Preset chips (Sadece kritik / Önerilen / Hepsi), email master switch, quiet
- * hours, daily summary hour, timezone, and an "Advanced" accordion with per-type
- * In-app / Email / Daily-summary switches grouped by category. Telegram is shown
+ * Email first: a master switch and one Off / Instant / Daily summary choice per kind of notification
+ * (orders, ship-by, listings, stock, research, account), each with its per-type switches under "Details".
+ * Then a compact preset row, quiet hours, daily summary hour and timezone. Telegram is shown
  * disabled ("coming soon"). Every change saves immediately (PUT) and the
  * server's fresh view replaces the local one.
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
   Autocomplete,
   Chip,
   FormControl,
@@ -23,7 +20,7 @@ import {
   Switch,
   TextField,
 } from '@mui/material';
-import { ChevronDown, Send } from 'lucide-react';
+import { Send } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import ErrorState from '@/components/ui/ErrorState';
 import { notify } from '@/lib/notify';
@@ -127,6 +124,17 @@ function applyLocal(view: PrefsView, patch: Patch): PrefsView {
   return next;
 }
 
+export type EmailChoice = 'off' | 'instant' | 'digest';
+const EMAIL_CHOICES: readonly EmailChoice[] = ['off', 'instant', 'digest'];
+
+/** The email setting a group shows: all off, all instant, all digest, or mixed. Pure. */
+export function groupEmailChoice(types: Pick<TypeView, 'email' | 'emailMode'>[]): EmailChoice | 'mixed' {
+  if (types.every((x) => !x.email)) return 'off';
+  if (types.every((x) => x.email && x.emailMode === 'instant')) return 'instant';
+  if (types.every((x) => x.email && x.emailMode === 'digest')) return 'digest';
+  return 'mixed';
+}
+
 export interface NotificationPreferencesPanelProps {
   locale: string;
 }
@@ -136,6 +144,7 @@ export default function NotificationPreferencesPanel({ locale }: NotificationPre
   const { typeLabel } = useNotificationText();
   const { data, error, isLoading, mutate } = useSWR<PrefsView>(PREFERENCES_API, fetchPrefs, { revalidateOnFocus: false });
   const [saving, setSaving] = useState(false);
+  const [openGroup, setOpenGroup] = useState<NotificationGroup | null>(null);
 
   const save = useCallback(
     async (patch: Patch) => {
@@ -196,50 +205,118 @@ export default function NotificationPreferencesPanel({ locale }: NotificationPre
   const card = 'rounded-xl border border-slate-200 bg-white p-4';
   const hourLabel = (h: number) => t('prefs.hour', { hour: String(h).padStart(2, '0') });
 
-  return (
-    <div className="flex flex-col gap-4" aria-busy={saving}>
-      {/* Level presets */}
-      <section className={card} aria-labelledby="np-level">
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <h2 id="np-level" className="text-sm font-semibold text-slate-800">
-            {t('prefs.levelTitle')}
-          </h2>
-          {data.customized && <Chip size="small" label={t('prefs.custom')} color="secondary" variant="outlined" />}
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2" role="radiogroup" aria-labelledby="np-level">
-          {NOTIFICATION_PRESETS.map((p) => {
-            const active = data.preset === p && !data.customized;
-            return (
-              <button
-                key={p}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                onClick={() => void save({ preset: p })}
-                className={`text-left rounded-lg border px-3 py-2.5 transition-colors ${
-                  active ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 hover:bg-slate-50 text-slate-700'
-                }`}
-                style={{ minHeight: 44 }}
-              >
-                <span className="block text-sm font-semibold">{t(`prefs.presets.${p}` as any)}</span>
-                <span className="block text-xs text-slate-500 mt-0.5">{t(`prefs.presetHints.${p}` as any)}</span>
-              </button>
-            );
-          })}
-        </div>
-        {data.customized && <p className="text-xs text-slate-500 mt-2">{t('prefs.customHint')}</p>}
-      </section>
+  // One email choice per kind of notification (founder 2026-10-17: "users should be able to subscribe to
+  // notification emails of different kinds"). The per-type switches stay one tap away under "Details".
+  const groups = NOTIFICATION_GROUPS.filter((g) => byGroup.has(g));
+  const saveGroup = (g: NotificationGroup, mode: EmailChoice) => {
+    const types = (byGroup.get(g) || []).map((tv) =>
+      mode === 'off' ? { type: tv.type, email: false } : { type: tv.type, email: true, emailMode: mode },
+    );
+    void save(mode !== 'off' && !s.emailEnabled ? { types, settings: { emailEnabled: true } } : { types });
+  };
 
-      {/* Email */}
+  return (
+    <div className="flex flex-col gap-3" aria-busy={saving}>
+      {/* Email: which kinds, how often */}
       <section className={card} aria-labelledby="np-email">
-        <h2 id="np-email" className="text-sm font-semibold text-slate-800 mb-1">
-          {t('prefs.emailTitle')}
-        </h2>
-        <label className="flex items-center justify-between gap-3" style={{ minHeight: 44 }}>
-          <span className="text-sm text-slate-700">{t('prefs.emailEnabled')}</span>
+        <label className="flex items-center justify-between gap-3" style={{ minHeight: 40 }}>
+          <span className="min-w-0">
+            <span id="np-email" className="block text-sm font-semibold text-slate-800">{t('prefs.emailEnabled')}</span>
+            <span className="block text-xs text-slate-500">{t('prefs.emailHint')}</span>
+          </span>
           <Switch checked={s.emailEnabled} onChange={(e) => void save({ settings: { emailEnabled: e.target.checked } })} />
         </label>
-        <p className="text-xs text-slate-500">{t('prefs.emailHint')}</p>
+        <ul className={`mt-2 -mx-4 border-t border-slate-100 ${s.emailEnabled ? '' : 'opacity-50'}`} data-testid="np-email-groups">
+          {groups.map((g) => {
+            const list = byGroup.get(g) || [];
+            const choice = groupEmailChoice(list);
+            const open = openGroup === g;
+            return (
+              <li key={g} className="border-b border-slate-100 last:border-b-0 px-4 py-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                  <button
+                    type="button"
+                    className="min-w-0 text-left flex-1"
+                    onClick={() => setOpenGroup(open ? null : g)}
+                    aria-expanded={open}
+                  >
+                    <span className="block text-sm font-medium text-slate-800">{t(`groups.${g}` as any)}</span>
+                    <span className="block text-xs text-slate-500">
+                      {t(`prefs.groupHints.${g}` as any)} · <span className="text-blue-600">{open ? t('prefs.hideDetails') : t('prefs.details')}</span>
+                    </span>
+                  </button>
+                  <div role="radiogroup" aria-label={t(`groups.${g}` as any)} className="flex rounded-lg bg-slate-100 p-0.5 flex-shrink-0">
+                    {EMAIL_CHOICES.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        role="radio"
+                        aria-checked={choice === c}
+                        disabled={!s.emailEnabled && c === 'off'}
+                        onClick={() => saveGroup(g, c)}
+                        className={`px-2.5 h-8 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${
+                          choice === c ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        {t(`prefs.emailChoice.${c}` as any)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {choice === 'mixed' && !open && <p className="text-[11px] text-slate-400 mt-1">{t('prefs.mixed')}</p>}
+                {open && (
+                  <ul className="mt-2 flex flex-col">
+                    {list.map((tv) => {
+                      const label = typeLabel(tv.type);
+                      return (
+                        <li key={tv.type} className="flex items-center justify-between gap-3 py-1.5 border-t border-slate-50 first:border-t-0">
+                          <span className="min-w-0 text-[13px] text-slate-700 break-words">{label}</span>
+                          <span className="flex items-center gap-1 flex-shrink-0">
+                            <label className="flex items-center text-[11px] text-slate-500">
+                              {t('prefs.columns.inApp')}
+                              <Switch size="small" checked={tv.inApp} inputProps={{ 'aria-label': `${label}: ${t('prefs.columns.inApp')}` }} onChange={(e) => void save({ types: [{ type: tv.type, inApp: e.target.checked }] })} />
+                            </label>
+                            <label className="flex items-center text-[11px] text-slate-500">
+                              {t('prefs.columns.email')}
+                              <Switch size="small" checked={tv.email} disabled={!s.emailEnabled} inputProps={{ 'aria-label': `${label}: ${t('prefs.columns.email')}` }} onChange={(e) => void save({ types: [{ type: tv.type, email: e.target.checked }] })} />
+                            </label>
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
+      {/* Quick presets: one compact row, the active one's hint below */}
+      <section className={card} aria-labelledby="np-level">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="np-level" className="text-sm font-semibold text-slate-800">{t('prefs.levelTitle')}</h2>
+          <div role="radiogroup" aria-labelledby="np-level" className="flex rounded-lg bg-slate-100 p-0.5">
+            {NOTIFICATION_PRESETS.map((p) => {
+              const active = data.preset === p && !data.customized;
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => void save({ preset: p })}
+                  className={`px-2.5 h-8 rounded-md text-xs font-medium whitespace-nowrap ${active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                >
+                  {t(`prefs.presets.${p}` as any)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <p className="text-xs text-slate-500 mt-2">
+          {data.customized ? t('prefs.customHint') : t(`prefs.presetHints.${data.preset}` as any)}
+        </p>
       </section>
 
       {/* Quiet hours + digest + timezone */}
@@ -329,83 +406,6 @@ export default function NotificationPreferencesPanel({ locale }: NotificationPre
           />
         </div>
       </section>
-
-      {/* Advanced per-type */}
-      <Accordion
-        disableGutters
-        elevation={0}
-        sx={{ border: '1px solid #e2e8f0', borderRadius: '12px !important', '&:before': { display: 'none' } }}
-      >
-        <AccordionSummary expandIcon={<ChevronDown size={18} />} sx={{ minHeight: 52 }}>
-          <span className="text-sm font-semibold text-slate-800">{t('prefs.advanced')}</span>
-        </AccordionSummary>
-        <AccordionDetails sx={{ px: { xs: 1.5, sm: 2 }, pt: 0 }}>
-          {NOTIFICATION_GROUPS.filter((g) => byGroup.has(g)).map((g) => (
-            <div key={g} className="mb-4 last:mb-0">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">{t(`groups.${g}` as any)}</h3>
-              <div className="hidden sm:grid grid-cols-[1fr_88px_88px_104px] items-center px-3 pb-1 text-[11px] text-slate-400">
-                <span />
-                <span className="text-center">{t('prefs.columns.inApp')}</span>
-                <span className="text-center">{t('prefs.columns.email')}</span>
-                <span className="text-center">{t('prefs.columns.digest')}</span>
-              </div>
-              <ul className="flex flex-col gap-2">
-                {(byGroup.get(g) || []).map((tv) => {
-                  const dot = (SEVERITY_COLOR[tv.severity] || SEVERITY_COLOR.info).dot;
-                  const label = typeLabel(tv.type);
-                  return (
-                    <li
-                      key={tv.type}
-                      className="rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2 sm:grid sm:grid-cols-[1fr_88px_88px_104px] sm:items-center"
-                    >
-                      <div className="flex items-start gap-2 min-w-0 mb-1 sm:mb-0">
-                        <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5" style={{ backgroundColor: dot }} aria-hidden="true" />
-                        <span className="min-w-0">
-                          <span className="block text-sm text-slate-700 break-words">{label}</span>
-                          {!tv.badge && <span className="block text-[11px] text-slate-400">{t('prefs.activityOnly')}</span>}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-3 sm:contents">
-                        <label className="flex flex-col sm:flex-row items-center justify-center text-[11px] text-slate-500">
-                          <span className="sm:sr-only">{t('prefs.columns.inApp')}</span>
-                          <Switch
-                            size="small"
-                            checked={tv.inApp}
-                            inputProps={{ 'aria-label': `${label}: ${t('prefs.columns.inApp')}` }}
-                            onChange={(e) => void save({ types: [{ type: tv.type, inApp: e.target.checked }] })}
-                          />
-                        </label>
-                        <label className="flex flex-col sm:flex-row items-center justify-center text-[11px] text-slate-500">
-                          <span className="sm:sr-only">{t('prefs.columns.email')}</span>
-                          <Switch
-                            size="small"
-                            checked={tv.email}
-                            disabled={!s.emailEnabled}
-                            inputProps={{ 'aria-label': `${label}: ${t('prefs.columns.email')}` }}
-                            onChange={(e) => void save({ types: [{ type: tv.type, email: e.target.checked }] })}
-                          />
-                        </label>
-                        <label className="flex flex-col sm:flex-row items-center justify-center text-[11px] text-slate-500">
-                          <span className="sm:sr-only">{t('prefs.columns.digest')}</span>
-                          <Switch
-                            size="small"
-                            checked={tv.email && tv.emailMode === 'digest'}
-                            disabled={!s.emailEnabled || !tv.email}
-                            inputProps={{ 'aria-label': `${label}: ${t('prefs.columns.digest')}` }}
-                            onChange={(e) =>
-                              void save({ types: [{ type: tv.type, emailMode: e.target.checked ? 'digest' : 'instant' }] })
-                            }
-                          />
-                        </label>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
-        </AccordionDetails>
-      </Accordion>
 
       {/* Telegram (inert) */}
       <section className={`${card} opacity-80`} aria-labelledby="np-tg">

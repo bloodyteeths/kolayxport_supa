@@ -10360,7 +10360,7 @@
     "prefs": {
       "title": "Notification preferences",
       "subtitle": "Choose what reaches you in the app and by email",
-      "levelTitle": "Notification level",
+      "levelTitle": "Quick setup",
       "presets": {
         "critical": "Critical only",
         "recommended": "Recommended",
@@ -10374,7 +10374,7 @@
       "custom": "Custom",
       "customHint": "You changed some notification types. Picking a level resets them.",
       "emailTitle": "Email",
-      "emailEnabled": "Send email notifications",
+      "emailEnabled": "Email notifications",
       "emailHint": "Sent to your account email address.",
       "quietTitle": "Quiet hours",
       "quietEnabled": "Hold non-critical emails during quiet hours",
@@ -10398,7 +10398,24 @@
       "saved": "Preferences saved",
       "saveFailed": "Couldn't save preferences",
       "loadFailed": "Couldn't load preferences",
-      "hour": "{hour}:00"
+      "hour": "{hour}:00",
+      "groupHints": {
+        "orders": "New orders, cancellations",
+        "dispatch": "Orders close to or past ship-by",
+        "listings": "Expired, deactivated or failed listings",
+        "stock": "Out of stock, failed stock updates",
+        "research": "Watched shops and keywords",
+        "account": "Connections, plan and billing",
+        "system": "Service notices"
+      },
+      "emailChoice": {
+        "off": "Off",
+        "instant": "Instant",
+        "digest": "Daily summary"
+      },
+      "details": "Details",
+      "hideDetails": "Hide",
+      "mixed": "Mixed — set per notification under Details"
     },
     "email": {
       "open": "Open in KolayXport",

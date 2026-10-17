@@ -139,7 +139,7 @@ const M_PRODUCT_UPDATE = `mutation KxProductUpdate($product: ProductUpdateInput!
 
 const M_PRODUCT_ADD_MEDIA = `mutation KxProductAddMedia($product: ProductUpdateInput!, $media: [CreateMediaInput!]) {
   productUpdate(product: $product, media: $media) {
-    product { id media(last: 1) { nodes { ${MEDIA_FIELDS} } } }
+    product { id media(first: 250) { nodes { ${MEDIA_FIELDS} } } }
     userErrors { field message }
   }
 }`;

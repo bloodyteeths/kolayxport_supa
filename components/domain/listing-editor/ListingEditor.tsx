@@ -1167,7 +1167,7 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
 
   const subtitleParts: string[] = [];
   // A listing created on eBay has the synthetic id `legacy-<itemId>`: show the eBay item number the seller knows.
-  const shownId = view.meta.id && marketplace === 'ebay' ? view.meta.id.replace(/^legacy-/, '') : view.meta.id;
+  const shownId = (view.meta.id && marketplace === 'ebay' ? view.meta.id.replace(/^legacy-/, '') : view.meta.id) ?? '';
   if (mode === 'edit' && view.meta.id) {
     subtitleParts.push(
       // Phones: the ID alone (the "refreshed" line right below already says how fresh it is).

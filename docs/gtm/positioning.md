@@ -75,3 +75,10 @@ Short form: **"Yurt dışına satışın tek paneli."**
 3. Trendyol/Shopify "Add tracking" button saves the number locally only: label it honestly or hide it.
 4. The `financials` gate is UI-only: add `requireFeature` on `/api/finance/*`, or the Pro tier sells a free feature.
 5. Already done on `gtm/overhaul`: 14-day trial, Pro purchasable, founding-member offer backed by a real Stripe coupon, signup-intent links.
+
+---
+
+## Decision (owner, 2026-10-17)
+
+**A + C.** The brand story is export-first: "Yurt dışına satışın tek paneli". "Trendyol'dan dünyaya" runs as its own campaign and landing-page track. Domestic features are supporting proof only.
+Company address on the site and legal pages: the registered address in Çukurova / Adana (see [company.md](company.md)).

@@ -6,9 +6,9 @@ name: Deploy to Hetzner
 # the remote side, which broke earlier inline if/then/else logic; keeping
 # the logic in a real shell script avoids that pitfall entirely.
 
+# Deploys run on the VPS itself (cron → scripts/deploy/autodeploy.sh, every 2 minutes): pushing to main no longer
+# spends GitHub Actions minutes. This workflow is a manual button only (e.g. a restart-only deploy).
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       mode:
@@ -54,4 +54,4 @@ jobs:
             # work, so restore it before pulling or a lockfile change on main blocks the pull.
             git checkout -- yarn.lock 2>/dev/null || true
             git pull --ff-only origin main
-            bash scripts/deploy/hetzner-deploy.sh "$MODE"
+            FORCE=1 bash /home/deploy/bin/kx-autodeploy.sh "$MODE"

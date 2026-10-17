@@ -10414,8 +10414,7 @@
         "digest": "Daily summary"
       },
       "details": "Details",
-      "hideDetails": "Hide",
-      "mixed": "Mixed — set per notification under Details"
+      "hideDetails": "Hide"
     },
     "email": {
       "open": "Open in KolayXport",

@@ -10414,8 +10414,7 @@
         "digest": "Günlük özet"
       },
       "details": "Ayrıntı",
-      "hideDetails": "Gizle",
-      "mixed": "Karışık — Ayrıntı altından tek tek ayarlı"
+      "hideDetails": "Gizle"
     },
     "email": {
       "open": "KolayXport'ta aç",

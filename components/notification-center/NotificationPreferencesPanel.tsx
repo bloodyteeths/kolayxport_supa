@@ -127,12 +127,14 @@ function applyLocal(view: PrefsView, patch: Patch): PrefsView {
 export type EmailChoice = 'off' | 'instant' | 'digest';
 const EMAIL_CHOICES: readonly EmailChoice[] = ['off', 'instant', 'digest'];
 
-/** The email setting a group shows: all off, all instant, all digest, or mixed. Pure. */
-export function groupEmailChoice(types: Pick<TypeView, 'email' | 'emailMode'>[]): EmailChoice | 'mixed' {
-  if (types.every((x) => !x.email)) return 'off';
-  if (types.every((x) => x.email && x.emailMode === 'instant')) return 'instant';
-  if (types.every((x) => x.email && x.emailMode === 'digest')) return 'digest';
-  return 'mixed';
+/**
+ * The email setting a group shows: off when nothing in it emails, else instant when anything emails instantly,
+ * else daily summary. (A preset mixes them inside a group; the exact per-type state is under Details.) Pure.
+ */
+export function groupEmailChoice(types: Pick<TypeView, 'email' | 'emailMode'>[]): EmailChoice {
+  const on = types.filter((x) => x.email);
+  if (!on.length) return 'off';
+  return on.some((x) => x.emailMode === 'instant') ? 'instant' : 'digest';
 }
 
 export interface NotificationPreferencesPanelProps {
@@ -233,7 +235,7 @@ export default function NotificationPreferencesPanel({ locale }: NotificationPre
             const open = openGroup === g;
             return (
               <li key={g} className="border-b border-slate-100 last:border-b-0 px-4 py-2.5">
-                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-x-3 gap-y-2">
                   <button
                     type="button"
                     className="min-w-0 text-left flex-1"
@@ -245,7 +247,7 @@ export default function NotificationPreferencesPanel({ locale }: NotificationPre
                       {t(`prefs.groupHints.${g}` as any)} · <span className="text-blue-600">{open ? t('prefs.hideDetails') : t('prefs.details')}</span>
                     </span>
                   </button>
-                  <div role="radiogroup" aria-label={t(`groups.${g}` as any)} className="flex rounded-lg bg-slate-100 p-0.5 flex-shrink-0">
+                  <div role="radiogroup" aria-label={t(`groups.${g}` as any)} className="flex rounded-lg bg-slate-100 p-0.5 flex-shrink-0 w-full sm:w-auto">
                     {EMAIL_CHOICES.map((c) => (
                       <button
                         key={c}
@@ -254,7 +256,7 @@ export default function NotificationPreferencesPanel({ locale }: NotificationPre
                         aria-checked={choice === c}
                         disabled={!s.emailEnabled && c === 'off'}
                         onClick={() => saveGroup(g, c)}
-                        className={`px-2.5 h-8 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${
+                        className={`flex-1 sm:flex-none px-2.5 h-8 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${
                           choice === c ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
@@ -263,7 +265,6 @@ export default function NotificationPreferencesPanel({ locale }: NotificationPre
                     ))}
                   </div>
                 </div>
-                {choice === 'mixed' && !open && <p className="text-[11px] text-slate-400 mt-1">{t('prefs.mixed')}</p>}
                 {open && (
                   <ul className="mt-2 flex flex-col">
                     {list.map((tv) => {

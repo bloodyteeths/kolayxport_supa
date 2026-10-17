@@ -431,12 +431,18 @@ export function listingColumns(t: ListingsT, ctx: ListingCellContext): Column<Li
                 </Box>
               )
             : undefined,
-          mobileRender: (r) => (
-            <Box component="span" sx={{ display: 'inline-flex', gap: '6px', flexWrap: 'wrap' }}>
-              <StatusPill domain="listing" status={r.status} raw={r.statusNote ?? r.statusRaw} />
-              <SyncCell row={r} t={t} ctx={ctx} />
-            </Box>
-          ),
+          // Phone cards: a plain "Active" pill on almost every card took a row of its own; show the listing pill only
+          // when the status says something (inactive, expired, draft, sold out…). Change / failure pills always show.
+          mobileRender: (r) => {
+            const sync = <SyncCell row={r} t={t} ctx={ctx} />;
+            if (r.status === 'active' && !r.sync) return null;
+            return (
+              <Box component="span" sx={{ display: 'inline-flex', gap: '6px', flexWrap: 'wrap' }}>
+                {r.status !== 'active' ? <StatusPill domain="listing" status={r.status} raw={r.statusNote ?? r.statusRaw} /> : null}
+                {sync}
+              </Box>
+            );
+          },
         });
         break;
       case 'changes':

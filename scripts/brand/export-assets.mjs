@@ -55,11 +55,12 @@ const logoDarkSvg = () => fs.readFileSync(path.join(BRAND, 'kolayxport-logo-dark
 const symbolSvg = () => fs.readFileSync(path.join(BRAND, 'kolayxport-symbol.svg'), 'utf8');
 
 /** Card template shared by OG images and banners: paper ground, manifest rule lines, stamp. */
-function cardHtml({ w, h, eyebrow = '', title = '', sub = '', dark = false, logoOnly = false, safe = null }) {
+function cardHtml({ w, h, eyebrow = '', title = '', sub = '', dark = false, logoOnly = false, safe = null, lang = 'tr' }) {
   const bg = dark ? C.ink : C.paper; const fg = dark ? C.paper : C.ink;
   const tsize = title.length > 60 ? 58 : title.length > 40 ? 68 : 80;
   const area = safe ? `width:${safe.w}px;height:${safe.h}px;` : `width:${w - 160}px;height:${h - 140}px;`;
-  return `<!doctype html><html><head><meta charset="utf-8"><style>${fontFace()}
+  // lang drives text-transform: uppercase (Turkish İ/I) — must match the copy's language.
+  return `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><style>${fontFace()}
 *{margin:0;box-sizing:border-box}body{width:${w}px;height:${h}px;background:${bg};color:${fg};font-family:Instrument,sans-serif;position:relative;overflow:hidden}
 .rules{position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent 0 47px,${dark ? 'rgba(250,247,240,.05)' : 'rgba(14,26,43,.045)'} 47px 48px)}
 .edge{position:absolute;right:-120px;top:-120px;width:520px;height:520px;border-radius:50%;border:2px dashed ${dark ? 'rgba(142,160,255,.35)' : 'rgba(43,69,224,.25)'}}
@@ -117,7 +118,7 @@ async function core() {
   const T = 'Yurt dışına satışın tek paneli';
   const S = 'Etsy, eBay ve Amazon ilanlarınızı yapay zekâyla İngilizce optimize edin, ne satacağınızı veriyle bulun, kargo ve ETGB\'yi aynı yerden halledin.';
   await render(b, cardHtml({ w: 1200, h: 630, eyebrow: 'KolayXport', title: T, sub: S }), 1200, 630, path.join(PUB, 'og/default.png'));
-  await render(b, cardHtml({ w: 1200, h: 630, eyebrow: 'KolayXport', title: 'One dashboard for selling abroad', sub: 'AI-optimised Etsy, eBay and Amazon listings, product research, labels and export paperwork — built for sellers in Türkiye.' }), 1200, 630, path.join(PUB, 'og/default-en.png'));
+  await render(b, cardHtml({ w: 1200, h: 630, lang: 'en', eyebrow: 'KolayXport', title: 'One dashboard for selling abroad', sub: 'AI-optimised Etsy, eBay and Amazon listings, product research, labels and export paperwork — built for sellers in Türkiye.' }), 1200, 630, path.join(PUB, 'og/default-en.png'));
   const social = path.join(BRAND, 'social');
   for (const [name, w, h, opts] of [
     ['x-header-1500x500.png', 1500, 500, { logoOnly: true }],
@@ -146,7 +147,7 @@ async function og() {
         const fm = yaml.load(m[1]) || {};
         if (fm.draft) continue;
         const eyebrow = fm.eyebrow || fm.name || ({ cases: 'Çözümler', integrations: 'Entegrasyon', compare: 'Karşılaştırma', guides: 'Nasıl kullanılır', blog: 'Blog' })[type];
-        await render(b, cardHtml({ w: 1200, h: 630, eyebrow, title: fm.h1 || fm.title }), 1200, 630,
+        await render(b, cardHtml({ w: 1200, h: 630, eyebrow, title: fm.h1 || fm.title, lang: locale }), 1200, 630,
           path.join(PUB, 'og', locale, type, f.replace(/\.md$/, '.png')));
       }
     }

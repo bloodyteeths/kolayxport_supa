@@ -14,7 +14,7 @@ const C = { ink: '#0E1A2B', paper: '#FAF7F0', accent: '#2B45E0', soft: '#8EA0FF'
 const logo = (dark) => fs.readFileSync(path.join(ROOT, 'public/brand', dark ? 'kolayxport-logo-dark.svg' : 'kolayxport-logo.svg'), 'utf8');
 
 function card({ w, h, eyebrow, title, sub, dark = true }) {
-  return `<!doctype html><html><head><meta charset="utf-8"><style>${fontFaceCss()}
+  return `<!doctype html><html lang="tr"><head><meta charset="utf-8"><style>${fontFaceCss()}
 *{margin:0;box-sizing:border-box}body{width:${w}px;height:${h}px;background:${dark ? C.ink : C.paper};color:${dark ? C.paper : C.ink};font-family:Instrument,sans-serif;display:flex;flex-direction:column;justify-content:center;padding:0 ${Math.round(w * 0.08)}px;position:relative;overflow:hidden;
 background-image:repeating-linear-gradient(0deg,transparent 0 47px,rgba(250,247,240,.05) 47px 48px)}
 .ring{position:absolute;right:-${Math.round(w * .08)}px;top:-${Math.round(w * .08)}px;width:${Math.round(w * .4)}px;height:${Math.round(w * .4)}px;border-radius:50%;border:3px dashed rgba(142,160,255,.35)}

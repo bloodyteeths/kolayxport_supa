@@ -116,6 +116,13 @@
         S.injectInlineCSS();
         setTimeout(processListingPage, 500);
       });
+      // Language changed in the popup: rebuild the panel (cached data, same page view).
+      S.onLangChange(() => {
+        if (S.getPageType() !== 'listing') return;
+        const old = document.getElementById('kx-listing-stats');
+        if (old) old.remove();
+        processListingPage();
+      });
     });
 
     async function processListingPage(retries = 0) {
@@ -133,6 +140,7 @@
       const statsBar = document.createElement('div');
       statsBar.id = 'kx-listing-stats';
       statsBar.className = 'kx-stats-bar';
+      statsBar.lang = S.lang; // uppercase labels need lang="tr" for İ
       statsBar.appendChild(header(S.t('loading')));
       anchor.insertAdjacentElement('afterend', statsBar);
 
@@ -148,6 +156,8 @@
         // Page signals are always the live ones from this render, not the cached copy.
         renderStatsBar(statsBar, data, page);
       } catch (err) {
+        // Daily research limit / busy / signed out (401 → sign-up card): one card instead of the numbers.
+        if (S.showLimitCard(statsBar, err, 'etsy_listing', true)) return;
         statsBar.textContent = '';
         const msg = err && err.status === 401 ? S.t('signInRequired') : (err && err.message) || S.t('loadFailed');
         statsBar.appendChild(header(msg));
@@ -203,14 +213,14 @@
 
     function fmtSales(n) {
       if (n === null || n === undefined) return '—';
-      return n >= 10 ? S.formatNum(Math.round(n)) : String(Math.round(n * 10) / 10);
+      return S.formatSales(n);
     }
 
     function fmtMoney(amount, currency) {
       if (amount === null || amount === undefined) return '—';
       const cur = currency || 'USD';
       try {
-        return new Intl.NumberFormat(S.lang === 'tr' ? 'tr-TR' : 'en-US', { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(amount);
+        return new Intl.NumberFormat(S.locale(), { style: 'currency', currency: cur, currencyDisplay: 'narrowSymbol', maximumFractionDigits: 0 }).format(amount);
       } catch (_) {
         return cur + ' ' + S.formatNum(amount);
       }
@@ -225,7 +235,7 @@
     }
 
     function fmtDate(iso) {
-      try { return new Date(iso).toLocaleDateString(S.lang === 'tr' ? 'tr-TR' : 'en-US'); } catch (_) { return iso; }
+      try { return new Date(iso).toLocaleDateString(S.locale()); } catch (_) { return iso; }
     }
 
     function signed(n) {
@@ -348,8 +358,8 @@
       grid.appendChild(metric(S.t('tags'), tagCount + '/13', tagCount >= 13 ? '#2e7d32' : tagCount >= 10 ? '#e65100' : '#c62828'));
       if (shop) {
         if (shop.soldCount !== null && shop.soldCount !== undefined) grid.appendChild(metric(S.t('shopSalesLifetime'), S.formatNum(shop.soldCount)));
-        if (shop.salesPerReview) grid.appendChild(metric(S.t('salesPerReview'), String(shop.salesPerReview)));
-        if (shop.rating) grid.appendChild(metric(S.t('rating'), Number(shop.rating).toFixed(1) + '★'));
+        if (shop.salesPerReview) grid.appendChild(metric(S.t('salesPerReview'), S.formatDec(shop.salesPerReview)));
+        if (shop.rating) grid.appendChild(metric(S.t('rating'), Number(shop.rating).toLocaleString(S.locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '★'));
       }
       body.appendChild(grid);
 

@@ -6,8 +6,9 @@ import { getBatchListingStats, getListingStats, getShopStats, EtsyPublicApiError
 import { buildFxTable } from '@/lib/research/stats';
 import { summarizeEtsySearch } from '@/lib/etsy/searchSummary';
 import { convertCurrency } from '@/lib/finance/fx';
+import { withResearchQuota, sendResearchOutcome, sharedCacheKey, RESEARCH_TTL, limitBody, istanbulDay } from '@/lib/ext/researchQuota';
 
-// Rate limiting per IP for anonymous users
+// Anonymous (signed-out) allowance per IP: only marketplace calls count; shared-cache hits are free.
 const anonLimitMap = new Map<string, { count: number; resetAt: number }>();
 const ANON_LIMIT = 3; // 3 requests per day
 const ANON_WINDOW = 86400000; // 24h
@@ -41,7 +42,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // CORS for extension
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-KX-Client, X-KX-Page-View');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
@@ -56,16 +57,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   } catch { /* anonymous access */ }
 
-  // Anonymous rate limit
-  if (!userId) {
-    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.socket?.remoteAddress || 'unknown';
-    if (!checkAnonLimit(ip)) {
-      return res.status(429).json({ error: 'Daily free limit reached (3/day). Sign in with KolayXport account.' });
-    }
-  }
+  const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.socket?.remoteAddress || 'unknown';
+  const allowAnonymous = () => checkAnonLimit(ip);
 
   const { action, ...params } = req.body || {};
 
+  // Research quota (lib/ext/researchQuota.ts): shared cache → global brake → daily lookups.
+  // Every action below calls the Etsy API on a miss, so all of them go through the wrapper.
   try {
     switch (action) {
       case 'search_enrich': {
@@ -73,40 +71,70 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // which uses measured/estimated shop data instead of the old reviews x 8 formula.
         const { query } = params;
         if (!query || typeof query !== 'string') return res.status(400).json({ error: 'query required' });
-
-        const searchData = await etsyGet(`/listings/active?keywords=${encodeURIComponent(query.slice(0, 200))}&limit=100&sort_on=score`);
-        // Pure summary (lib/etsy/searchSummary.ts): Money objects -> amount/divisor, FX to USD,
-        // digital downloads excluded for physical queries, median + P25-P75, median favourites.
-        // API prices are LIST prices (Etsy does not expose sale prices); the extension prefers
-        // the prices displayed on the page and uses this only as a fallback.
-        const currencies = (searchData.results || []).map((i: any) => i?.price?.currency_code || 'USD');
-        const fx = await buildFxTable(currencies, 'USD', convertCurrency).catch(() => ({}));
-        const summary = summarizeEtsySearch(searchData, { query, fx });
-        return res.json({ summary, plan });
+        const q = query.slice(0, 200);
+        const outcome = await withResearchQuota(
+          { req, userId, marketplace: 'etsy', cacheKey: sharedCacheKey('etsy', 'search', 'etsy.com', q), ttl: RESEARCH_TTL.search, apiCallsEstimate: 1, allowAnonymous },
+          async () => {
+            const searchData = await etsyGet(`/listings/active?keywords=${encodeURIComponent(q)}&limit=100&sort_on=score`);
+            // Pure summary (lib/etsy/searchSummary.ts): Money objects -> amount/divisor, FX to USD,
+            // digital downloads excluded for physical queries, median + P25-P75, median favourites.
+            // API prices are LIST prices (Etsy does not expose sale prices); the extension prefers
+            // the prices displayed on the page and uses this only as a fallback.
+            const currencies = (searchData.results || []).map((i: any) => i?.price?.currency_code || 'USD');
+            const fx = await buildFxTable(currencies, 'USD', convertCurrency).catch(() => ({}));
+            return { status: 200, body: { summary: summarizeEtsySearch(searchData, { query, fx }) } };
+          },
+        );
+        return sendResearchOutcome(res, outcome, { plan });
       }
 
       case 'listings_batch': {
         // Per-card stats for search results / shop grids. Signed-in users only (costs Etsy QPD).
-        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-        const ids = Array.isArray(params.listingIds) ? params.listingIds.map(String) : [];
-        const result = await getBatchListingStats(ids, { maxNewShops: Number(params.maxNewShops) || undefined });
-        return res.json({ ...result, fetchedAt: new Date().toISOString(), plan });
+        if (!userId) return signedOut(res);
+        const ids: string[] = Array.isArray(params.listingIds) ? params.listingIds.map(String) : [];
+        const maxNewShops = Number(params.maxNewShops) || undefined;
+        const outcome = await withResearchQuota(
+          {
+            req, userId, marketplace: 'etsy',
+            cacheKey: ids.length ? sharedCacheKey('etsy', 'listings_batch', 'etsy.com', [...ids].sort().join(','), maxNewShops ?? '') : null,
+            // Search-grid card stats: the search TTL (6 h), so they pick up listing-page estimates soon.
+            ttl: RESEARCH_TTL.search,
+            // 1 /listings/batch call + 2 calls per freshly fetched shop (capped server-side).
+            apiCallsEstimate: 7,
+          },
+          async () => {
+            const result = await getBatchListingStats(ids, { maxNewShops });
+            const body = { ...result, fetchedAt: new Date().toISOString() };
+            // Still-pending shop data is re-polled by the extension: never freeze it in the shared cache.
+            return { status: 200, body, cacheable: !(result as any).pendingIds?.length };
+          },
+        );
+        return sendResearchOutcome(res, outcome, { plan });
       }
 
       case 'listing_enrich': {
         // Legacy action (pre-9.5 extensions). Same data as /api/ext/listing-stats.
-        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+        if (!userId) return signedOut(res);
         const listingId = String(params.listingId || '');
         if (!/^\d{4,20}$/.test(listingId)) return res.status(400).json({ error: 'listingId required' });
-        return res.json({ ...(await getListingStats(listingId, {})), plan });
+        const outcome = await withResearchQuota(
+          { req, userId, marketplace: 'etsy', cacheKey: sharedCacheKey('etsy', 'listing', 'etsy.com', listingId, 'nopage'), ttl: RESEARCH_TTL.detail, apiCallsEstimate: 5 },
+          async () => ({ status: 200, body: await getListingStats(listingId, {}) }),
+        );
+        return sendResearchOutcome(res, outcome, { plan });
       }
 
       case 'shop_enrich': {
         const shopId = String(params.shopId || '');
         if (!shopId || shopId.length > 100) return res.status(400).json({ error: 'shopId required' });
-        const stats = await getShopStats(shopId);
-        if (!stats) return res.status(404).json({ error: 'Shop not found' });
-        return res.json({ ...stats, plan });
+        const outcome = await withResearchQuota(
+          { req, userId, marketplace: 'etsy', cacheKey: sharedCacheKey('etsy', 'shop', 'etsy.com', shopId), ttl: RESEARCH_TTL.detail, apiCallsEstimate: 3, allowAnonymous },
+          async () => {
+            const stats = await getShopStats(shopId);
+            return stats ? { status: 200, body: stats } : { status: 404, body: { error: 'Shop not found' } };
+          },
+        );
+        return sendResearchOutcome(res, outcome, outcome.kind === 'ok' && outcome.status === 200 ? { plan } : undefined);
       }
 
       default:
@@ -119,3 +147,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
+/** Signed-out caller on a signed-in-only action: 429 limit payload (the extension shows the sign-up card). */
+function signedOut(res: NextApiResponse) {
+  res.setHeader('Cache-Control', 'no-store');
+  return res.status(429).json(limitBody('signed_out', 0, 0, istanbulDay().resetAt));
+}

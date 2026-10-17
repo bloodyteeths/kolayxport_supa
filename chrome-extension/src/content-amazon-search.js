@@ -19,14 +19,16 @@
     injectAmazonCSS, extractSearchCards, parseSearchCard, extractTotalResults,
     requestSpApiSignals, detectAmazonMarketplace, observeUrlChanges, KX_AMZ_PREFIX,
   } = shared;
+  const t = shared.t;
+  const money = shared.formatMoney;
+  const compact = shared.formatCompact;
+  const int = shared.formatInt;
 
-  const SP_REASON_TEXT = {
-    not_signed_in: 'sign in to KolayXport in this browser to add official Amazon data',
-    not_connected: 'connect your Amazon seller account in KolayXport to add BSR and offer counts',
-    marketplace_not_connected: 'your Amazon seller account is not registered in this marketplace',
-    access_denied: 'Amazon has not granted the KolayXport app the catalog/pricing role yet',
-    unavailable: 'Amazon API did not respond',
-  };
+  const SP_REASONS = { not_signed_in: 1, not_connected: 1, marketplace_not_connected: 1, access_denied: 1, unavailable: 1 };
+  const spReasonText = (r) => t('reason_' + (SP_REASONS[r] ? r : 'unavailable'));
+
+  // Nothing renders until the language is known (lib/lang.js): no flash of the wrong language.
+  let langReady = false;
 
   let spApi = null;            // server response for this page (or null)
   let spApiRequestedFor = null;
@@ -55,38 +57,38 @@
     });
     if (fig.kind === 'amazon') {
       const rev = fig.revenueFloor
-        ? `<span class="kx-sep">|</span><span class="kx-green" title="Amazon's floor × current price. Real revenue is higher if more than ${esc(fig.label)} were sold.">≥${esc(M.formatMoney(fig.revenueFloor, data.currency, true))}/mo</span>`
+        ? `<span class="kx-sep">|</span><span class="kx-green" title="${esc(t('revFloorTip', { label: fig.label }))}">≥${esc(money(fig.revenueFloor, data.currency, true))}${esc(t('perMonth'))}</span>`
         : '';
-      return `<span class="kx-green" title="Amazon's own figure, shown on the listing: '${esc(fig.label)} bought in past month'. It is a floor, not an exact count.">Amazon: ${esc(fig.label)} bought/mo</span>${rev}`;
+      return `<span class="kx-green" title="${esc(t('amazonFigTip', { label: fig.label }))}">${esc(t('amazonFig', { label: fig.label }))}</span>${rev}`;
     }
     if (fig.kind === 'estimate') {
-      const band = `${M.formatCompact(fig.low)}–${M.formatCompact(fig.high)}`;
-      const cal = fig.calibrated ? '' : ' Model is calibrated on amazon.com and likely overstates this marketplace.';
-      const tip = `Estimate, not measured: Best Seller Rank #${fig.bsr.toLocaleString()} in ${sp.bsrCategory || 'its category'} (official Amazon data) run through a ${fig.curve} BSR-to-sales curve. Likely range ${band}/mo.${cal}`;
+      const band = `${compact(fig.low)}–${compact(fig.high)}`;
+      const cal = fig.calibrated ? '' : t('uncalibrated');
+      const tip = t('estTip', { bsr: int(fig.bsr), cat: sp.bsrCategory || t('itsCategory'), curve: fig.curve, band }) + cal;
       const rev = fig.revenue
-        ? `<span class="kx-sep">|</span><span class="kx-orange" title="${esc(tip)}">est. ~${esc(M.formatMoney(fig.revenue, data.currency, true))}/mo</span>`
+        ? `<span class="kx-sep">|</span><span class="kx-orange" title="${esc(tip)}">${esc(t('estRev', { money: money(fig.revenue, data.currency, true) }))}</span>`
         : '';
-      return `<span class="kx-orange" title="${esc(tip)}">est. ~${M.formatCompact(fig.units)}/mo</span>${rev}`;
+      return `<span class="kx-orange" title="${esc(tip)}">${esc(t('estUnits', { n: compact(fig.units) }))}</span>${rev}`;
     }
-    return '<span class="kx-muted" title="Amazon shows no \'bought in past month\' badge for this item (usually under ~50/mo, not guaranteed) and no official rank data is available. We do not guess.">sales: no data</span>';
+    return `<span class="kx-muted" title="${esc(t('noSalesTip'))}">${esc(t('noSales'))}</span>`;
   }
 
   function renderCardRow(card, data, mkt) {
     const sp = spItem(data.asin);
-    const sig = `${data.asin}|${sp ? 1 : 0}|${data.reviews}|${data.price}|${data.bought ? data.bought.min : ''}`;
+    const sig = `${shared.lang}|${data.asin}|${sp ? 1 : 0}|${data.reviews}|${data.price}|${data.bought ? data.bought.min : ''}`;
     let row = card.querySelector(`.${KX_AMZ_PREFIX}-row`);
     if (row && row.getAttribute('data-kx-sig') === sig) return;
 
     const parts = [
       '<span class="kx-amz-badge">KX</span>',
-      data.sponsored ? '<span class="kx-tag" title="Sponsored result (ad)">Ad</span>' : '',
+      data.sponsored ? `<span class="kx-tag" title="${esc(t('adTip'))}">${esc(t('ad'))}</span>` : '',
       salesHtml(data, mkt, sp),
-      data.reviews != null ? `<span class="kx-sep">|</span><span>${M.formatCompact(data.reviews)} ratings</span>` : '',
-      data.rating != null ? `<span class="kx-sep">|</span><span>★ ${data.rating.toFixed(1)}</span>` : '',
-      sp && sp.bsr ? `<span class="kx-sep">|</span><span title="Best Seller Rank from the official Amazon API">BSR #${sp.bsr.toLocaleString()}</span>` : '',
-      sp && sp.offerCountAny != null ? `<span class="kx-sep">|</span><span title="Competing offers on this ASIN (official Amazon API)">${sp.offerCountAny} offers</span>` : '',
+      data.reviews != null ? `<span class="kx-sep">|</span><span>${esc(t('ratings', { n: compact(data.reviews) }))}</span>` : '',
+      data.rating != null ? `<span class="kx-sep">|</span><span>★ ${esc(shared.formatRating(data.rating))}</span>` : '',
+      sp && sp.bsr ? `<span class="kx-sep">|</span><span title="${esc(t('bsrTip'))}">BSR #${esc(int(sp.bsr))}</span>` : '',
+      sp && sp.offerCountAny != null ? `<span class="kx-sep">|</span><span title="${esc(t('offersTip'))}">${esc(t('offers', { n: int(sp.offerCountAny) }))}</span>` : '',
       `<span class="kx-sep">|</span><span class="kx-muted">${esc(data.asin)}</span>`,
-      `<button class="kx-ai-btn" data-asin="${esc(data.asin)}" title="Analyze with KolayXport AI">AI</button>`,
+      `<button class="kx-ai-btn" data-asin="${esc(data.asin)}" title="${esc(t('aiTip'))}">AI</button>`,
     ];
 
     if (!row) {
@@ -113,10 +115,20 @@
     if (!resultsContainer) return;
 
     const total = extractTotalResults();
-    const sig = `${parsed.length}|${spApi ? (spApi.available ? 'y' : 'n') : '-'}|${total ? total.total : ''}`;
+    const sig = `${shared.lang}|${parsed.length}|${spApi ? (spApi.available ? 'y' : 'n') : '-'}|${total ? total.total : ''}`;
     const existing = document.getElementById(`${KX_AMZ_PREFIX}-summary`);
     if (existing && sig === lastBarSignature) return;
     lastBarSignature = sig;
+
+    // Daily research limit / busy: one card instead of the numbers.
+    if (spApi && spApi.reason === 'research_limit' && spApi.limit) {
+      const card = existing || document.createElement('div');
+      card.id = `${KX_AMZ_PREFIX}-summary`;
+      card.className = 'kx-stats-bar';
+      shared.showLimitCard(card, spApi, 'amazon_search');
+      if (!existing) resultsContainer.parentElement?.insertBefore(card, resultsContainer);
+      return;
+    }
 
     const organic = parsed.filter((p) => !p.sponsored);
     const sponsoredCount = parsed.length - organic.length;
@@ -145,57 +157,65 @@
     });
     const s = comp.signals;
     const compColor = comp.level === 'Low' ? 'kx-green' : comp.level === 'Medium' ? 'kx-orange' : comp.level === 'High' ? 'kx-red' : 'kx-muted';
-    const pct = (v) => (v == null ? '—' : `${Math.round(v * 100)}%`);
+    const pct = (v) => (v == null ? '—' : (shared.lang === 'tr' ? `%${Math.round(v * 100)}` : `${Math.round(v * 100)}%`));
+    const totalText = total ? (total.isLowerBound ? t('overN', { n: int(total.total) }) : int(total.total)) : null;
     const compTip = [
-      `Score ${comp.score ?? '—'}/100 (High ≥ ${M.COMPETITION_CONFIG.high}, Medium ≥ ${M.COMPETITION_CONFIG.medium}).`,
-      `Results: ${total ? (total.isLowerBound ? 'over ' : '') + total.total.toLocaleString() : 'unknown'}.`,
-      `Median ratings (organic, this page): ${s.pageMedianReviews ?? '—'}; top-10 median: ${s.top10MedianReviews ?? '—'}.`,
-      `Organic results with 1K+ ratings: ${pct(s.shareOver1kReviews)}. Ads on page: ${pct(s.sponsoredShare)}.`,
-      s.medianOfferCount != null ? `Median competing offers (Amazon API): ${s.medianOfferCount}.` : '',
-      comp.reasons.length ? `Note: ${comp.reasons.join('; ')}.` : '',
+      t('compTipScore', { score: comp.score ?? '—', high: M.COMPETITION_CONFIG.high, medium: M.COMPETITION_CONFIG.medium }),
+      t('compTipResults', { results: totalText || t('unknown') }),
+      t('compTipMedians', { page: s.pageMedianReviews != null ? int(s.pageMedianReviews) : '—', top10: s.top10MedianReviews != null ? int(s.top10MedianReviews) : '—' }),
+      t('compTipShares', { big: pct(s.shareOver1kReviews), ads: pct(s.sponsoredShare) }),
+      s.medianOfferCount != null ? t('compTipOffers', { n: int(s.medianOfferCount) }) : '',
+      comp.reasons.length ? t('compTipNote', { reasons: comp.reasons.map(shared.reasonText).join('; ') }) : '',
     ].filter(Boolean).join(' ');
 
     const withBadge = unique.filter((p) => p.bought);
     const boughtFloor = withBadge.reduce((sum, p) => sum + p.bought.min, 0);
 
-    let sourceNote = 'Source: this page';
+    let sourceNote = t('sourcePage');
     if (spApi && spApi.available) {
       const n = Object.keys(spApi.items || {}).length;
-      sourceNote += ` + official Amazon data (SP-API) for ${n} product${n === 1 ? '' : 's'}`;
+      sourceNote += t(n === 1 ? 'sourceSpOne' : 'sourceSp', { n });
     } else if (spApi && !spApi.available) {
-      sourceNote += ` · Official Amazon data off: ${esc(SP_REASON_TEXT[spApi.reason] || SP_REASON_TEXT.unavailable)}`;
+      sourceNote += t('sourceOff', { reason: spReasonText(spApi.reason) });
     }
 
     const bar = existing || document.createElement('div');
     bar.id = `${KX_AMZ_PREFIX}-summary`;
     bar.className = 'kx-stats-bar';
+    const snapshot = t('snapshot', {
+      organic: parsed.length - sponsoredCount,
+      ads: sponsoredCount,
+      adWord: t(sponsoredCount === 1 ? 'adWordOne' : 'adWordMany'),
+      total: totalText ? t('snapshotTotal', { total: totalText }) : '',
+    });
+    bar.lang = shared.lang;
     bar.innerHTML = `
       <div class="kx-stats-header">
         <span class="kx-stats-logo">KolayXport</span>
-        Amazon Market Snapshot · ${parsed.length} results on this page${total ? ` (of ${total.isLowerBound ? 'over ' : ''}${total.total.toLocaleString()})` : ''}
+        ${esc(snapshot)}
       </div>
       <div class="kx-stats-row">
-        <span>Median price: <strong>${esc(M.formatMoney(M.median(prices), currency))}</strong></span>
+        <span>${esc(t('medianPrice'))}: <strong>${esc(money(M.median(prices), currency))}</strong></span>
         <span class="kx-sep">|</span>
-        <span>Range: <strong>${prices.length ? esc(M.formatMoney(Math.min(...prices), currency)) + ' – ' + esc(M.formatMoney(Math.max(...prices), currency)) : '—'}</strong></span>
+        <span>${esc(t('range'))}: <strong>${prices.length ? esc(money(Math.min(...prices), currency)) + ' – ' + esc(money(Math.max(...prices), currency)) : '—'}</strong></span>
         <span class="kx-sep">|</span>
-        <span title="Median rating count of organic (non-ad) results on this page">Median ratings: <strong>${s.pageMedianReviews != null ? M.formatCompact(s.pageMedianReviews) : '—'}</strong></span>
+        <span title="${esc(t('medianRatingsTip'))}">${esc(t('medianRatings'))}: <strong>${s.pageMedianReviews != null ? esc(compact(s.pageMedianReviews)) : '—'}</strong></span>
         <span class="kx-sep">|</span>
-        <span title="Median rating count of the first 10 organic results">Top-10 median: <strong>${s.top10MedianReviews != null ? M.formatCompact(s.top10MedianReviews) : '—'}</strong></span>
+        <span title="${esc(t('top10MedianTip'))}">${esc(t('top10Median'))}: <strong>${s.top10MedianReviews != null ? esc(compact(s.top10MedianReviews)) : '—'}</strong></span>
         <span class="kx-sep">|</span>
-        <span>Avg rating: <strong>${ratings.length ? '★ ' + M.mean(ratings).toFixed(1) : '—'}</strong></span>
+        <span>${esc(t('avgRating'))}: <strong>${ratings.length ? '★ ' + esc(shared.formatRating(M.mean(ratings))) : '—'}</strong></span>
         <span class="kx-sep">|</span>
-        <span>Ads: <strong>${sponsoredCount}/${parsed.length}</strong></span>
+        <span>${esc(t('ads'))}: <strong>${sponsoredCount}/${parsed.length}</strong></span>
         <span class="kx-sep">|</span>
-        <span title="${esc(compTip)}">Competition: <strong class="${compColor}">${comp.level}</strong></span>
+        <span title="${esc(compTip)}">${esc(t('competition'))}: <strong class="${compColor}">${esc(shared.compLabel(comp.level))}</strong></span>
         <span class="kx-sep">|</span>
-        <button class="kx-ai-btn kx-deep-ai">Deep AI Analysis</button>
+        <button class="kx-ai-btn kx-deep-ai">${esc(t('deepAi'))}</button>
       </div>
       <div class="kx-stats-note">
-        ${withBadge.length
-          ? `Amazon "bought in past month": ${withBadge.length} of ${unique.length} products show it, together at least ${M.formatCompact(boughtFloor)} units/mo (Amazon's floors, not estimates).`
-          : 'No product on this page shows Amazon\'s "bought in past month" figure.'}
-        · ${sourceNote}
+        ${esc(withBadge.length
+          ? t('boughtNote', { k: withBadge.length, n: unique.length, units: compact(boughtFloor) })
+          : t('boughtNone'))}
+        · ${esc(sourceNote)}
       </div>
     `;
     bar.querySelector('.kx-deep-ai')?.addEventListener('click', () => {
@@ -226,7 +246,7 @@
   }
 
   function processSearchPage() {
-    if (!isSearchPage()) return;
+    if (!langReady || !isSearchPage()) return;
     const cards = extractSearchCards();
     if (cards.length < 3) return;
 
@@ -251,8 +271,15 @@
     timer = setTimeout(() => { timer = null; processSearchPage(); }, delay == null ? 500 : delay);
   }
 
-  // Initial run
-  schedule(1000);
+  // Initial run, once the language is known.
+  shared.langReady().then(() => {
+    langReady = true;
+    schedule(1000);
+  });
+
+  // Language changed in the popup: rows and bar carry the language in their signature,
+  // so the next run re-renders them in place.
+  shared.onLangChange(() => schedule(0));
 
   // Amazon lazy-loads results; re-run (debounced). Our own rows/bar only
   // re-render when their data signature changes, so this does not loop.

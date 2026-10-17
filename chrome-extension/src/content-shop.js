@@ -31,6 +31,10 @@
           setTimeout(processShopPage, 500);
         }
       });
+      // Language changed in the popup: re-render (cached data, same page view).
+      S.onLangChange(() => {
+        if (S.getPageType() === 'shop') processShopPage();
+      });
     });
 
     let runToken = 0;
@@ -48,6 +52,7 @@
         bar.className = 'kx-shop-bar';
         shadow.appendChild(bar);
       }
+      bar.lang = S.lang;
       setMessage(bar, S.t('shopAnalysisLoading'), 0.8);
 
       try {
@@ -56,6 +61,8 @@
         if (!data?.shop) { bar.textContent = ''; return; }
         renderShopBar(bar, data);
       } catch (err) {
+        // Daily research limit / busy / signed out: one card instead of the numbers.
+        if (S.showLimitCard(bar, err, 'etsy_shop')) return;
         setMessage(bar, '⚠ ' + ((err && err.message) || S.t('loadFailed')), 0.7);
       }
 
@@ -66,7 +73,10 @@
           const page = S.collectPageCards();
           const ids = page.ids.slice(0, 96);
           if (ids.length && isCurrent()) await S.loadCardStats(ids, { display: page.display }, isCurrent);
-        } catch (_) { /* best-effort */ }
+        } catch (err) {
+          // Best-effort, but a research-limit answer replaces the bar.
+          if (isCurrent()) S.showLimitCard(bar, err, 'etsy_shop');
+        }
       }, 500);
     }
 
@@ -127,9 +137,9 @@
       }
       bar.appendChild(S.el('div', 'kx-bar-divider'));
       if (shop.num_sales !== null && shop.num_sales !== undefined) bar.appendChild(item(S.t('topSales'), S.formatNum(shop.num_sales)));
-      bar.appendChild(item(S.t('rating'), shop.rating ? Number(shop.rating).toFixed(1) + ' ★' : 'N/A'));
+      bar.appendChild(item(S.t('rating'), shop.rating ? Number(shop.rating).toLocaleString(S.locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' ★' : S.t('notAvailable')));
       if (shop.review_count !== null && shop.review_count !== undefined) bar.appendChild(item(S.t('reviews'), S.formatNum(shop.review_count)));
-      if (shop.salesPerReview) bar.appendChild(item(S.t('salesPerReview'), String(shop.salesPerReview)));
+      if (shop.salesPerReview) bar.appendChild(item(S.t('salesPerReview'), S.formatDec(shop.salesPerReview)));
       bar.appendChild(S.el('div', 'kx-bar-divider'));
       if (shop.listing_count !== null && shop.listing_count !== undefined) bar.appendChild(item(S.t('activeListings'), S.formatNum(shop.listing_count)));
       if (avgPrice) bar.appendChild(item(S.t('medianListPriceShop'), S.formatMoney(avgPrice, cur, 2), null, S.t('priceTipShop')));

@@ -32,6 +32,13 @@
           setTimeout(processListingPage, 500);
         }
       });
+      // Language changed in the popup: rebuild the panel (cached API answers).
+      S.onLangChange(() => {
+        if (S.getPageType() !== 'listing') return;
+        const old = document.getElementById('kx-ebay-listing-stats');
+        if (old) old.remove();
+        processListingPage();
+      });
     });
 
     async function processListingPage(retries = 0) {
@@ -64,18 +71,23 @@
       const pageData = M.parseListingPage(document, { currency: mkt.currency });
 
       try {
+        let limitErr = null;
+        const keepLimit = (e) => { if (!limitErr && e && e.limitInfo) limitErr = e; return null; };
         const [itemData, seoData] = await Promise.all([
           C.getOrFetch(
             `ebay_listing:v2:${mkt.id}:${itemId}`,
             'listing',
             () => S.apiCall('listing_enrich', { itemId, marketplace: mkt.id })
-          ).catch(() => null),
+          ).catch(keepLimit),
           title ? C.getOrFetch(
             `ebay_seo:v2:${mkt.id}:${itemId}`,
             'listing',
             () => S.apiCall('seo_analyze', { query: title.split(/\s+/).slice(0, 5).join(' '), title, marketplace: mkt.id })
-          ).catch(() => null) : null,
+          ).catch(keepLimit) : null,
         ]);
+
+        // Daily research limit / busy: one card instead of the numbers.
+        if (limitErr && S.showLimitCard(statsBar, limitErr, 'ebay_listing')) return;
 
         if (!itemData && !seoData && pageData.soldCount == null) {
           statsBar.remove();
@@ -185,24 +197,24 @@
       const statParts = [];
 
       if (soldCount != null) {
-        let txt = `${soldCount.toLocaleString()}${soldPlus ? '+' : ''} ${S.t('sold')}`;
+        let txt = `${S.formatInt(soldCount)}${soldPlus ? '+' : ''} ${S.t('sold')}`;
         const perMo = M.estMonthlySales(soldCount, item.itemCreationDate);
-        if (perMo != null) txt += ` · ≈${perMo}${S.t('perMonth')} (${S.t('estTag')})`;
+        if (perMo != null) txt += ` · ≈${S.formatInt(perMo)}${S.t('perMonth')} (${S.t('estTag')})`;
         statParts.push(`<span>${esc(txt)}</span>`);
         const st = M.sellThrough(apiSold, apiRemaining);
         if (st != null) {
-          statParts.push(`<span>${esc(S.t('sellThrough'))}: ${Math.round(st * 100)}% (${esc(apiRemaining.toLocaleString())} ${esc(S.t('available'))}, ${esc(S.t('estTag'))})</span>`);
+          statParts.push(`<span>${esc(S.t('sellThrough'))}: ${esc(S.t('pct', { n: Math.round(st * 100) }))} (${esc(S.formatInt(apiRemaining))} ${esc(S.t('available'))}, ${esc(S.t('estTag'))})</span>`);
         }
       }
 
       if (Number.isFinite(seo.totalCompetitors) && seo.totalCompetitors > 0) {
         const comp = M.computeCompetition({ resultCount: seo.totalCompetitors, price: ps });
         const compClass = comp.level === 'low' ? 'kx-green' : comp.level === 'medium' ? 'kx-orange' : comp.level === 'high' ? 'kx-red' : '';
-        statParts.push(`<span>${esc(S.t('competition'))} (${esc(S.t('estTag'))}): <span class="${compClass}">${esc(S.competitionLabel(comp.level))}</span> (${esc(seo.totalCompetitors.toLocaleString())} ${esc(S.t('competingListings'))})</span>`);
+        statParts.push(`<span>${esc(S.t('competition'))} (${esc(S.t('estTag'))}): <span class="${compClass}">${esc(S.competitionLabel(comp.level))}</span> (${esc(S.formatInt(seo.totalCompetitors))} ${esc(S.t('competingListings'))})</span>`);
       }
 
       if (sellerPct != null && Number.isFinite(sellerPct)) {
-        statParts.push(`<span>${esc(seller.username || '')} ${sellerPct}% ${esc(S.t('positive'))}${sellerScore != null ? ` (${esc(sellerScore.toLocaleString())} ${esc(S.t('feedback'))})` : ''}</span>`);
+        statParts.push(`<span>${esc(seller.username || '')} ${esc(S.t('pct', { n: sellerPct.toLocaleString(S.locale(), { maximumFractionDigits: 1 }) }))} ${esc(S.t('positive'))}${sellerScore != null ? ` (${esc(S.formatInt(sellerScore))} ${esc(S.t('feedback'))})` : ''}</span>`);
       }
 
       // SEO tips

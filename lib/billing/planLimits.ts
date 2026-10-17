@@ -213,3 +213,56 @@ export const ENFORCEMENT_GAP: ReadonlyArray<{ plan: PlanKey; meter: 'orderSync�
   // the middleware (raw plan), so such an account is reported trial/blocked, not unlimited.
   { plan: 'shopify_free', meter: 'meter', enforced: "only when User.subscriptionPlan = 'shopify_free' (an active ShopifyShop alone stays trial-limited / noSubscription)", decided: 'every account with a connected Shopify store' },
 ];
+
+/* ------------------------------- 3. extension research (daily lookups) */
+
+/**
+ * Chrome-extension research lookups per day (00:00 Europe/Istanbul reset), enforced by
+ * lib/ext/researchQuota.ts. One lookup = one extension research request that misses the
+ * shared cross-user cache and calls a marketplace API (a page view with several calls counts once).
+ * Founder decision 2026-10-18: the marketplace APIs are on basic commercial tiers, so one heavy
+ * user must not drain the shared quota.
+ */
+export const EXT_RESEARCH_DAILY_LOOKUPS: Readonly<Record<PlanKey, number>> = {
+  trial: 50,
+  starter: 150,
+  growth: 500,
+  pro: 1500,
+  enterprise: 5000,
+  shopify_free: 50,
+};
+
+export interface ExtResearchLimit {
+  /** Plan key the limit came from; null when the account has no usable plan (limit 0). */
+  plan: PlanKey | null;
+  state: LimitState;
+  /** Lookups per Istanbul day. 0 = blocked (trial over / no subscription / invalid plan). */
+  limit: number;
+}
+
+/**
+ * Daily extension research limit for a user. Resolves the plan exactly like the usage
+ * middleware (`getPlanLimits`): shopify_free → paid plan (active / trialing / past_due) →
+ * app trial incl. grace → blocked. Pure; `now` is injectable for tests.
+ */
+export function getExtResearchDailyLimit(
+  plan: string | null | undefined,
+  status: string | null | undefined,
+  trialExpiresAt: Date | string | number | null | undefined,
+  now: Date = new Date(),
+): ExtResearchLimit {
+  const decision = getPlanLimits(plan, status, trialExpiresAt, now);
+  switch (decision.state) {
+    case 'shopify_free':
+      return { plan: 'shopify_free', state: decision.state, limit: EXT_RESEARCH_DAILY_LOOKUPS.shopify_free };
+    case 'trial':
+      return { plan: 'trial', state: decision.state, limit: EXT_RESEARCH_DAILY_LOOKUPS.trial };
+    case 'active': {
+      const key = decision.plan as PlanKey;
+      const limit = Object.prototype.hasOwnProperty.call(EXT_RESEARCH_DAILY_LOOKUPS, key) ? EXT_RESEARCH_DAILY_LOOKUPS[key] : 0;
+      return { plan: limit ? key : null, state: decision.state, limit };
+    }
+    default:
+      return { plan: null, state: decision.state, limit: 0 };
+  }
+}

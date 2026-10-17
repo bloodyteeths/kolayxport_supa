@@ -576,6 +576,12 @@ export async function getListingStats(listingId: string, rawPage: any): Promise<
     }
   }
 
+  // One number per listing: the listing page reads this listing's own reviews, which is more direct than
+  // the search card's share-of-shop-reviews, so search cards reuse it for a day (see getBatchListingStats).
+  if (sales && (sales.kind === 'estimated' || sales.kind === 'measured')) {
+    rememberPageEstimate(listingId, sales);
+  }
+
   const shopAgeYears = shopCreatedSec ? round((now - shopCreatedSec * 1000) / (365 * DAY_MS), 1) : null;
 
   return {
@@ -695,6 +701,30 @@ export interface CardStats {
 }
 
 const listingBasicCache = new Map<string, { at: number; item: any }>();
+
+/** The listing page's estimate per listing id, reused by search cards for 24h so both show the same figure. */
+const PAGE_ESTIMATE_TTL_MS = 24 * 60 * 60 * 1000;
+const pageEstimateCache = new Map<string, { at: number; sales: { kind: SalesKind; confidence: Confidence | null; monthlySales: number | null; monthlySalesUpperBound: number | null; inputs: Record<string, any> } }>();
+
+function rememberPageEstimate(listingId: string, sales: any) {
+  pageEstimateCache.set(String(listingId), {
+    at: Date.now(),
+    sales: {
+      kind: sales.kind,
+      confidence: sales.confidence ?? null,
+      monthlySales: sales.monthlySales ?? null,
+      monthlySalesUpperBound: sales.monthlySalesUpperBound ?? null,
+      inputs: { ...(sales.inputs || {}), source: 'listing_page' },
+    },
+  });
+  if (pageEstimateCache.size > 50000) {
+    const oldest = [...pageEstimateCache.entries()].sort((x, y) => x[1].at - y[1].at).slice(0, 10000);
+    for (const [k] of oldest) pageEstimateCache.delete(k);
+  }
+}
+
+/** Test hook. */
+export function __clearPageEstimates() { pageEstimateCache.clear(); }
 const LISTING_BASIC_TTL_MS = 30 * 60 * 1000;
 /** Max shops fetched fresh from Etsy per batch request (2 calls each); the rest come back as 'pending'. */
 const DEFAULT_MAX_NEW_SHOPS = 12;
@@ -821,6 +851,14 @@ export async function getBatchListingStats(
     };
     listings[id] = base;
     if (!item) continue;
+    const pageEst = pageEstimateCache.get(id);
+    if (pageEst && now - pageEst.at < PAGE_ESTIMATE_TTL_MS) {
+      base.sales = {
+        ...pageEst.sales,
+        monthlyRevenue: revenueFor(pageEst.sales.monthlySales, base.price),
+      } as CardStats['sales'];
+      continue;
+    }
     const sb = base.shopId ? shops.get(base.shopId) : undefined;
     if (!sb) {
       base.sales.kind = 'pending';

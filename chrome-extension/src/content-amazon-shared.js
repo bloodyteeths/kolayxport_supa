@@ -378,11 +378,15 @@ function requestSpApiSignals(asins, marketplace) {
   return new Promise((resolve) => {
     try {
       if (!chrome?.runtime?.sendMessage || !asins.length) return resolve(null);
+      const L = window.__KX_LIMIT;
       chrome.runtime.sendMessage(
-        { type: 'kx_amazon_enrich', params: { asins: asins.slice(0, 20), marketplace } },
+        { type: 'kx_amazon_enrich', params: { asins: asins.slice(0, 20), marketplace }, pv: L ? L.pageViewId() : undefined },
         (response) => {
           if (chrome.runtime.lastError || !response) return resolve(null);
           if (response.error) {
+            // 429 research limit: the overlays show the limit card instead of numbers.
+            const limit = L ? L.fromResponse(response) : null;
+            if (limit) return resolve({ available: false, reason: 'research_limit', limit });
             return resolve({ available: false, reason: response.status === 401 ? 'not_signed_in' : 'unavailable' });
           }
           resolve(response);
@@ -423,8 +427,261 @@ function observeUrlChanges(callback) {
   return observer;
 }
 
+/** Replace an overlay's content with the research-limit card for a `research_limit` SP-API answer. */
+function amzShowLimitCard(container, resp, surface) {
+  const L = window.__KX_LIMIT;
+  if (!L || !container || !resp || !resp.limit) return false;
+  L.render(container, resp.limit, { surface });
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// i18n — Turkish / English (language from lib/lang.js: popup choice → account → 'tr')
+// ---------------------------------------------------------------------------
+
+function amzLang() {
+  const L = window.__KX_LANG;
+  return (L && L.get()) || 'tr';
+}
+
+/** Numbers and money follow the overlay language; the currency stays the marketplace's. */
+function amzLocale() {
+  return amzLang() === 'en' ? 'en-US' : 'tr-TR';
+}
+
+/** Resolves once the language is known; overlays render only after this. */
+function amzLangReady() {
+  const L = window.__KX_LANG;
+  return L && L.ready ? L.ready : Promise.resolve(amzLang());
+}
+
+function onAmzLangChange(cb) {
+  const L = window.__KX_LANG;
+  if (L && L.onChange) L.onChange(cb);
+}
+
+const KX_AMZ_I18N = {
+  tr: {
+    perMonth: '/ay',
+    ad: 'Reklam',
+    adTip: 'Sponsorlu sonuç (reklam)',
+    ratings: '{n} değerlendirme',
+    offers: '{n} teklif',
+    offersTip: 'Bu ASIN\'deki rakip teklifler (resmi Amazon API)',
+    bsrTip: 'Resmi Amazon API\'sinden En Çok Satanlar sıralaması (BSR)',
+    aiTip: 'KolayXport AI ile analiz edin',
+    amazonFig: 'Amazon: {label} satış/ay',
+    amazonFigTip: 'Amazon\'un ilanda gösterdiği kendi verisi: "geçen ay {label} satın alındı". Kesin sayı değil, alt sınırdır.',
+    revFloorTip: 'Amazon\'un alt sınırı × güncel fiyat. {label} adetten fazla satıldıysa gerçek gelir daha yüksektir.',
+    estUnits: 'tahmini ~{n}/ay',
+    estRev: 'tahmini ~{money}/ay',
+    estTip: 'Ölçüm değil, tahmin: {cat} kategorisinde BSR #{bsr} (resmi Amazon verisi), {curve} BSR→satış eğrisiyle hesaplandı. Olası aralık {band}/ay.',
+    itsCategory: 'kendi',
+    uncalibrated: ' Model amazon.com verisiyle kalibre edildi; bu pazaryerinde muhtemelen olduğundan yüksek gösterir.',
+    noSales: 'satış: veri yok',
+    noSalesTip: 'Amazon bu ürün için "geçen ay satın alındı" rozeti göstermiyor (genellikle ayda ~50\'nin altı, kesin değil) ve resmi sıralama verisi yok. Tahmin yürütmüyoruz.',
+    reason_not_signed_in: 'resmi Amazon verilerini eklemek için bu tarayıcıda KolayXport\'a giriş yapın',
+    reason_not_connected: 'BSR ve teklif sayılarını eklemek için Amazon satıcı hesabınızı KolayXport\'a bağlayın',
+    reason_marketplace_not_connected: 'Amazon satıcı hesabınız bu pazaryerinde kayıtlı değil',
+    reason_access_denied: 'Amazon, KolayXport uygulamasına katalog/fiyat rolünü henüz vermedi',
+    reason_unavailable: 'Amazon API yanıt vermedi',
+    compLow: 'Düşük', compMedium: 'Orta', compHigh: 'Yüksek', compUnknown: 'Veri yetersiz',
+    compTipScore: 'Skor {score}/100 (Yüksek ≥ {high}, Orta ≥ {medium}).',
+    compTipResults: 'Sonuç: {results}.',
+    unknown: 'bilinmiyor',
+    overN: '{n}+',
+    compTipMedians: 'Medyan değerlendirme (organik, bu sayfa): {page}; ilk 10 medyanı: {top10}.',
+    compTipShares: '1K+ değerlendirmeli organik sonuçlar: {big}. Sayfadaki reklamlar: {ads}.',
+    compTipOffers: 'Medyan rakip teklif (Amazon API): {n}.',
+    compTipNote: 'Not: {reasons}.',
+    'reason:not enough organic results with review counts': 'değerlendirme sayısı okunabilen yeterli organik sonuç yok',
+    'reason:deep review moat among top results': 'üst sıralardaki ürünlerin çok sayıda değerlendirmesi var',
+    'reason:top results already have hundreds of reviews': 'üst sıralardaki ürünlerin şimdiden yüzlerce değerlendirmesi var',
+    sourcePage: 'Kaynak: bu sayfa',
+    sourceSp: ' + {n} ürün için resmi Amazon verisi (SP-API)',
+    sourceSpOne: ' + {n} ürün için resmi Amazon verisi (SP-API)',
+    sourceOff: ' · Resmi Amazon verisi kapalı: {reason}',
+    snapshot: 'Amazon Pazar Özeti · bu sayfada {organic} sonuç + {ads} reklam{total}',
+    snapshotTotal: ' (toplam {total})',
+    adWordOne: 'reklam', adWordMany: 'reklam',
+    medianPrice: 'Medyan fiyat',
+    range: 'Aralık',
+    medianRatings: 'Medyan değerlendirme',
+    medianRatingsTip: 'Bu sayfadaki organik (reklamsız) sonuçların medyan değerlendirme sayısı',
+    top10Median: 'İlk 10 medyanı',
+    top10MedianTip: 'İlk 10 organik sonucun medyan değerlendirme sayısı',
+    avgRating: 'Ort. puan',
+    ads: 'Reklam',
+    competition: 'Rekabet',
+    deepAi: 'Detaylı AI Analizi',
+    boughtNote: 'Amazon "geçen ay satın alındı": {n} üründen {k} tanesinde var; toplamda en az {units} adet/ay (Amazon\'un alt sınırları, tahmin değil).',
+    boughtNone: 'Bu sayfadaki hiçbir üründe Amazon\'un "geçen ay satın alındı" verisi yok.',
+    productIntel: 'Ürün Analizi',
+    sales: 'Satış',
+    boughtLastMonth: 'Geçen ay satılan (Amazon)',
+    boughtLastMonthTip: 'Amazon\'un kendi verisi: kesin sayı değil, alt sınır',
+    revFloor: 'Gelir/ay (alt sınır)',
+    revFloorShortTip: 'Amazon\'un alt sınırı × güncel fiyat',
+    bsrCompare: 'Karşılaştırma için BSR modeli: tahmini ~{units}/ay (aralık {low}–{high})',
+    estSales: 'Tahmini satış/ay',
+    estSalesTip: 'Aralık {low}–{high}/ay',
+    estRevenue: 'Tahmini gelir/ay',
+    estFromBsr: 'BSR\'den tahmin ({curve} eğrisi), olası aralık {low}–{high}/ay.',
+    curveUncalibrated: ' Eğri amazon.com verisiyle kalibre edildi; bu pazaryerinde muhtemelen olduğundan yüksek gösterir.',
+    noBoughtFigure: ' Amazon bu ürün için "geçen ay satın alındı" verisi göstermiyor.',
+    noSalesData: 'Satış verisi yok: bu sayfada "geçen ay satın alındı" verisi ve BSR yok.',
+    bsrIn: '{cat} kategorisinde BSR #{rank}',
+    subRankIn: '{cat}: #{rank}',
+    officialData: ' (resmi Amazon verisi)',
+    feeTitle: 'Komisyon tahmini (kaba)',
+    referral: 'Satış komisyonu ~%15',
+    afterReferral: 'Komisyon sonrası',
+    feeNote: 'Komisyon oranları kategoriye göre değişir (yaklaşık %8–17). FBA gönderim ücretleri boyut ve ağırlığa bağlıdır ve dahil değildir.',
+    aiAnalysis: 'AI Analizi',
+    marketResearch: 'Pazar Araştırması',
+  },
+  en: {
+    perMonth: '/mo',
+    ad: 'Ad',
+    adTip: 'Sponsored result (ad)',
+    ratings: '{n} ratings',
+    offers: '{n} offers',
+    offersTip: 'Competing offers on this ASIN (official Amazon API)',
+    bsrTip: 'Best Seller Rank from the official Amazon API',
+    aiTip: 'Analyze with KolayXport AI',
+    amazonFig: 'Amazon: {label} bought/mo',
+    amazonFigTip: 'Amazon\'s own figure, shown on the listing: \'{label} bought in past month\'. It is a floor, not an exact count.',
+    revFloorTip: 'Amazon\'s floor × current price. Real revenue is higher if more than {label} were sold.',
+    estUnits: 'est. ~{n}/mo',
+    estRev: 'est. ~{money}/mo',
+    estTip: 'Estimate, not measured: Best Seller Rank #{bsr} in {cat} (official Amazon data) run through a {curve} BSR-to-sales curve. Likely range {band}/mo.',
+    itsCategory: 'its category',
+    uncalibrated: ' Model is calibrated on amazon.com and likely overstates this marketplace.',
+    noSales: 'sales: no data',
+    noSalesTip: 'Amazon shows no \'bought in past month\' badge for this item (usually under ~50/mo, not guaranteed) and no official rank data is available. We do not guess.',
+    reason_not_signed_in: 'sign in to KolayXport in this browser to add official Amazon data',
+    reason_not_connected: 'connect your Amazon seller account in KolayXport to add BSR and offer counts',
+    reason_marketplace_not_connected: 'your Amazon seller account is not registered in this marketplace',
+    reason_access_denied: 'Amazon has not granted the KolayXport app the catalog/pricing role yet',
+    reason_unavailable: 'Amazon API did not respond',
+    compLow: 'Low', compMedium: 'Medium', compHigh: 'High', compUnknown: 'Unknown',
+    compTipScore: 'Score {score}/100 (High ≥ {high}, Medium ≥ {medium}).',
+    compTipResults: 'Results: {results}.',
+    unknown: 'unknown',
+    overN: 'over {n}',
+    compTipMedians: 'Median ratings (organic, this page): {page}; top-10 median: {top10}.',
+    compTipShares: 'Organic results with 1K+ ratings: {big}. Ads on page: {ads}.',
+    compTipOffers: 'Median competing offers (Amazon API): {n}.',
+    compTipNote: 'Note: {reasons}.',
+    sourcePage: 'Source: this page',
+    sourceSp: ' + official Amazon data (SP-API) for {n} products',
+    sourceSpOne: ' + official Amazon data (SP-API) for {n} product',
+    sourceOff: ' · Official Amazon data off: {reason}',
+    snapshot: 'Amazon Market Snapshot · {organic} results + {ads} {adWord} on this page{total}',
+    snapshotTotal: ' (of {total})',
+    adWordOne: 'ad', adWordMany: 'ads',
+    medianPrice: 'Median price',
+    range: 'Range',
+    medianRatings: 'Median ratings',
+    medianRatingsTip: 'Median rating count of organic (non-ad) results on this page',
+    top10Median: 'Top-10 median',
+    top10MedianTip: 'Median rating count of the first 10 organic results',
+    avgRating: 'Avg rating',
+    ads: 'Ads',
+    competition: 'Competition',
+    deepAi: 'Deep AI Analysis',
+    boughtNote: 'Amazon "bought in past month": {k} of {n} products show it, together at least {units} units/mo (Amazon\'s floors, not estimates).',
+    boughtNone: 'No product on this page shows Amazon\'s "bought in past month" figure.',
+    productIntel: 'Product Intelligence',
+    sales: 'Sales',
+    boughtLastMonth: 'Bought last month (Amazon)',
+    boughtLastMonthTip: 'Amazon\'s own figure: a floor, not an exact count',
+    revFloor: 'Revenue/mo (floor)',
+    revFloorShortTip: 'Amazon\'s floor × current price',
+    bsrCompare: 'BSR model for comparison: est. ~{units}/mo (range {low}–{high})',
+    estSales: 'Est. sales/mo',
+    estSalesTip: 'Range {low}–{high}/mo',
+    estRevenue: 'Est. revenue/mo',
+    estFromBsr: 'Estimate from BSR ({curve} curve), likely range {low}–{high}/mo.',
+    curveUncalibrated: ' Curve is calibrated on amazon.com; likely overstates this marketplace.',
+    noBoughtFigure: ' Amazon shows no "bought in past month" figure for this item.',
+    noSalesData: 'No sales data: no "bought in past month" figure and no Best Seller Rank on this page.',
+    bsrIn: 'BSR #{rank} in {cat}',
+    subRankIn: '#{rank} in {cat}',
+    officialData: ' (official Amazon data)',
+    feeTitle: 'Fee estimate (rough)',
+    referral: 'Referral ~15%',
+    afterReferral: 'After referral',
+    feeNote: 'Referral rates vary by category (about 8–17%). FBA fulfilment fees depend on size and weight and are not included.',
+    aiAnalysis: 'AI Analysis',
+    marketResearch: 'Market Research',
+  },
+};
+
+function amzT(key, vars) {
+  const table = KX_AMZ_I18N[amzLang()] || KX_AMZ_I18N.tr;
+  let s = table[key] !== undefined ? table[key] : (KX_AMZ_I18N.en[key] !== undefined ? KX_AMZ_I18N.en[key] : key);
+  if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined && vars[k] !== null ? String(vars[k]) : m));
+  return s;
+}
+
+/** Competition level from amazonMath ('Low' | 'Medium' | 'High' | 'Unknown') in the overlay language. */
+function amzCompLabel(level) {
+  return amzT({ Low: 'compLow', Medium: 'compMedium', High: 'compHigh' }[level] || 'compUnknown');
+}
+
+/** A reason string from amazonMath.computeCompetition in the overlay language. */
+function amzReason(r) {
+  const k = 'reason:' + r;
+  const table = KX_AMZ_I18N[amzLang()] || {};
+  return table[k] || r;
+}
+
+/** "3.2K" → "3,2K" in Turkish (K/M kept: what sellers see on Amazon). */
+function amzFormatCompact(n) {
+  const s = kxAmzMath.formatCompact(n);
+  return amzLang() === 'tr' ? s.replace('.', ',') : s;
+}
+
+/** Integer with the language's grouping ("1.234" in Turkish). */
+function amzFormatInt(n) {
+  return n == null || !isFinite(n) ? '—' : Number(n).toLocaleString(amzLocale());
+}
+
+/** Money in the marketplace currency, formatted for the overlay language ("$24,99" in Turkish). */
+function amzFormatMoney(value, currency, compact) {
+  if (value == null || !isFinite(value)) return '—';
+  if (compact) {
+    const m = kxAmzMath.formatMoney(value, currency, true);
+    return amzLang() === 'tr' ? m.replace(/(\d)\.(\d)/, '$1,$2') : m;
+  }
+  if (currency) {
+    try {
+      return new Intl.NumberFormat(amzLocale(), { style: 'currency', currency, currencyDisplay: 'narrowSymbol', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+    } catch (_) { /* unknown currency code */ }
+  }
+  return kxAmzMath.formatMoney(value, currency, false);
+}
+
+/** Rating with one decimal ("4,4" in Turkish). */
+function amzFormatRating(r) {
+  return Number(r).toLocaleString(amzLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
+
 // Make shared functions available to other content scripts
 window.__kxAmzShared = {
+  showLimitCard: amzShowLimitCard,
+  t: amzT,
+  get lang() { return amzLang(); },
+  locale: amzLocale,
+  langReady: amzLangReady,
+  onLangChange: onAmzLangChange,
+  compLabel: amzCompLabel,
+  reasonText: amzReason,
+  formatCompact: amzFormatCompact,
+  formatInt: amzFormatInt,
+  formatMoney: amzFormatMoney,
+  formatRating: amzFormatRating,
   math: kxAmzMath,
   injectAmazonCSS,
   extractAsinFromUrl,

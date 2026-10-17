@@ -68,6 +68,10 @@ function storeToken(token, meta, user) {
     kx_auth_token_time: Date.now()
   };
   if (user) data.kx_user = { email: user.email || null, name: user.name || null };
+  // KolayXport account language → overlays use it unless the popup has an explicit choice
+  // (lib/lang.js: kx_lang → kx_account_lang → 'tr').
+  const accountLang = user && typeof user.locale === 'string' ? user.locale.trim().toLowerCase().slice(0, 2) : null;
+  if (accountLang === 'tr' || accountLang === 'en') data.kx_account_lang = accountLang;
   chrome.storage.local.set(data);
 }
 
@@ -96,23 +100,33 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 /**
  * Authenticated fetch. Adds the Bearer token, and on 401 refreshes the token via
  * an open kolayxport.com tab and retries exactly once.
+ * `research: { pv }` marks a research-overlay call: adds `X-KX-Client: ext/<version>`
+ * (the server applies the research quota only to calls carrying it) and the page-view id.
+ * `allowAnonymous`: send without a token when signed out (the server answers with its
+ * signed-out allowance or a 429 `research_limit` / `signed_out` card payload).
  * Returns { ok, status, data } — data is parsed JSON (or { error } text).
  */
-async function apiFetch(path, { method = 'GET', body } = {}) {
+async function apiFetch(path, { method = 'GET', body, research, allowAnonymous = false } = {}) {
   if (!authToken || !tokenStillValid(authTokenExpiresAt)) {
     if (authToken) clearToken();
     await checkAuthentication();
   }
-  if (!authToken) return { ok: false, status: 401, data: { error: 'NOT_AUTHENTICATED' } };
+  const anonymous = !authToken;
+  if (anonymous && !allowAnonymous) return { ok: false, status: 401, data: { error: 'NOT_AUTHENTICATED' } };
 
   const doFetch = async () => {
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Extension-Version': extVersion()
+    };
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+    if (research) {
+      headers['X-KX-Client'] = `ext/${extVersion()}`;
+      if (typeof research.pv === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(research.pv)) headers['X-KX-Page-View'] = research.pv;
+    }
     const res = await fetch(`${API_BASE}${path}`, {
       method,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`,
-        'X-Extension-Version': extVersion()
-      },
+      headers,
       body: body !== undefined ? JSON.stringify(body) : undefined
     });
     let data;
@@ -121,7 +135,7 @@ async function apiFetch(path, { method = 'GET', body } = {}) {
   };
 
   let result = await doFetch();
-  if (result.status === 401) {
+  if (result.status === 401 && !anonymous) {
     clearToken();
     await checkAuthentication({ force: true });
     if (!authToken) {
@@ -141,15 +155,54 @@ function errorOf(result, fallback) {
   return (result.data && result.data.error) || fallback || `HTTP ${result.status}`;
 }
 
+/** 429 research-limit payload from the server, or null. */
+function researchLimitOf(result) {
+  const d = result && result.data;
+  return result && result.status === 429 && d && d.error === 'research_limit' ? d : null;
+}
+
+/** Today's research usage for the popup ("Bugün: X / Y araştırma"). */
+function rememberQuota(result) {
+  try {
+    const limit = researchLimitOf(result);
+    const q = limit || (result.ok && result.data && result.data.quota);
+    if (!q || typeof q.limit !== 'number') return;
+    chrome.storage.local.set({
+      kx_research_quota: {
+        used: Number(q.used) || 0,
+        limit: q.limit,
+        resetAt: q.resetAt || null,
+        reason: limit ? limit.reason : null,
+        upgradeUrl: limit ? limit.upgradeUrl : null,
+        at: Date.now()
+      }
+    });
+  } catch (_) { /* best effort */ }
+}
+
+/**
+ * Response for a research call. Errors keep their message, and a 429 research-limit
+ * body reaches the content script whole (`limit`), so the overlay can show the card.
+ */
+function researchResponse(r, fallback) {
+  rememberQuota(r);
+  if (r.ok) return r.data;
+  const out = { error: errorOf(r, fallback), status: r.status };
+  const limit = researchLimitOf(r);
+  if (limit) out.limit = limit;
+  return out;
+}
+
 async function handleMessage(request, sender, sendResponse) {
   try {
     // --- Etsy listing stats (measured vs estimated) ---
     if (request.type === 'kx_listing_stats') {
       const r = await apiFetch('/api/ext/listing-stats', {
         method: 'POST',
-        body: { listingId: request.params?.listingId, page: request.params?.page || {} }
+        body: { listingId: request.params?.listingId, page: request.params?.page || {} },
+        research: { pv: request.pv }
       });
-      sendResponse(r.ok ? r.data : { error: errorOf(r), status: r.status });
+      sendResponse(researchResponse(r));
       return;
     }
 
@@ -157,9 +210,12 @@ async function handleMessage(request, sender, sendResponse) {
     if (request.type === 'kx_research') {
       const r = await apiFetch('/api/ext/research', {
         method: 'POST',
-        body: { action: request.action, ...(request.params || {}) }
+        body: { action: request.action, ...(request.params || {}) },
+        research: { pv: request.pv },
+        // Signed out: the server serves a small daily allowance, then the sign-up card.
+        allowAnonymous: true
       });
-      sendResponse(r.ok ? r.data : { error: errorOf(r), status: r.status });
+      sendResponse(researchResponse(r));
       return;
     }
 
@@ -171,9 +227,10 @@ async function handleMessage(request, sender, sendResponse) {
       if (!asins.length) { sendResponse({ available: false, reason: 'unavailable' }); return; }
       const r = await apiFetch('/api/ext/amazon-enrich', {
         method: 'POST',
-        body: { asins, marketplace: params.marketplace || 'US' }
+        body: { asins, marketplace: params.marketplace || 'US' },
+        research: { pv: request.pv }
       });
-      sendResponse(r.ok ? r.data : { error: errorOf(r), status: r.status });
+      sendResponse(researchResponse(r));
       return;
     }
 
@@ -203,8 +260,26 @@ async function handleMessage(request, sender, sendResponse) {
           sendResponse({ error: `Unknown eBay action: ${request.action}` });
           return;
       }
-      const r = await apiFetch(path);
-      sendResponse(r.ok ? r.data : { error: errorOf(r, 'eBay API error'), status: r.status });
+      const r = await apiFetch(path, { research: { pv: request.pv } });
+      sendResponse(researchResponse(r, 'eBay API error'));
+      return;
+    }
+
+    // --- Product telemetry from the limit card (lib/limitCard.js) ---
+    if (request.type === 'kx_telemetry_event') {
+      if (request.event !== 'research_upgrade_click') { sendResponse({ success: false }); return; }
+      const r = await apiFetch('/api/ext/telemetry', {
+        method: 'POST',
+        body: {
+          events: [{
+            event: request.event,
+            reason: typeof request.reason === 'string' ? request.reason : undefined,
+            surface: typeof request.surface === 'string' ? request.surface : undefined,
+            extensionVersion: extVersion()
+          }]
+        }
+      });
+      sendResponse({ success: !!r.ok });
       return;
     }
 

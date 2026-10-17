@@ -12,12 +12,14 @@ const fixture = (f: string) => readFileSync(path.join(__dirname, 'fixtures', f),
 type Handler = (msg: { type: string; params: Record<string, unknown> }) => unknown;
 const doms: JSDOM[] = [];
 
-function boot(url: string, html: string, onMsg: Handler) {
+/** `lang`: the popup choice stored as kx_lang; null = nothing stored (→ Turkish). */
+function boot(url: string, html: string, onMsg: Handler, lang: 'tr' | 'en' | null = 'en') {
   const dom = new JSDOM(`<!doctype html><html><head></head><body>${html}</body></html>`, { url, runScripts: 'outside-only' });
   doms.push(dom);
   const w = dom.window as unknown as Record<string, any> & { eval: (s: string) => unknown };
   const calls: Array<{ type: string; params: Record<string, unknown> }> = [];
   w.chrome = {
+    storage: { local: { get: (_k: unknown, cb: (r: object) => void) => cb(lang ? { kx_lang: lang } : {}) } },
     runtime: {
       lastError: undefined,
       sendMessage: (msg: { type: string; params: Record<string, unknown> }, cb: (r: unknown) => void) => {
@@ -27,6 +29,7 @@ function boot(url: string, html: string, onMsg: Handler) {
     },
   };
   w.open = () => null;
+  w.eval(src('lib/lang.js'));
   w.eval(src('lib/amazonMath.js'));
   w.eval(src('content-amazon-shared.js'));
   return { dom, w, calls, run: (f: string) => w.eval(src(f)) };
@@ -81,7 +84,7 @@ describe('Amazon search overlay', () => {
     run('content-amazon-search.js');
     const doc = w.document as Document;
     const bar = await waitFor(() => doc.getElementById('kx-amz-research-summary'));
-    expect(bar.textContent).toContain('6 results on this page');
+    expect(bar.textContent).toContain('5 results + 1 ad on this page');
     expect(bar.textContent).toContain('of over 3,000');
     expect(bar.textContent).toContain('Ads: 1/6');
 
@@ -141,5 +144,50 @@ describe('Amazon product overlay', () => {
     expect(t).toContain('likely overstates this marketplace');
     expect(t).toContain('€');
     expect(t).not.toContain('$');
+  });
+});
+
+describe('Amazon overlays in Turkish (default, nothing stored)', () => {
+  it('search bar + rows: Turkish labels, tr-TR numbers, marketplace currency kept', async () => {
+    const { w, run } = boot('https://www.amazon.com/s?k=turkish+towel', fixture('amazon-search-us.html'), (msg) =>
+      msg.type === 'kx_amazon_enrich'
+        ? { available: true, items: { B0ORGANIC2: { asin: 'B0ORGANIC2', bsr: 1234, bsrCategory: 'Home & Kitchen', offerCountAny: 3 } } }
+        : null, null);
+    run('content-amazon-search.js');
+    const doc = w.document as Document;
+    const bar = await waitFor(() => doc.getElementById('kx-amz-research-summary'));
+    const text = (bar.textContent || '').replace(/\s+/g, ' ');
+    expect(text).toContain('Amazon Pazar Özeti · bu sayfada 5 sonuç + 1 reklam (toplam 3.000+)');
+    expect(text).toContain('Medyan fiyat:');
+    expect(text).toContain('Reklam: 1/6');
+    expect(text).toMatch(/Rekabet: (Düşük|Orta|Yüksek|Veri yetersiz)/);
+    expect(text).toContain('Detaylı AI Analizi');
+    expect(text).toMatch(/\$\d+,\d{2}/); // "$24,99": dollar kept, Turkish decimal comma
+    expect(text).not.toMatch(/Median price|Competition|Ads:|results \+/);
+
+    const rowOf = (asin: string) => doc.querySelector(`[data-asin="${asin}"] .kx-amz-research-row`)?.textContent || '';
+    expect(rowOf('B0ORGANIC1')).toContain('Amazon: 100+ satış/ay');
+    expect(rowOf('B0ORGANIC1')).toContain('≥$2,5K/ay');
+    expect(rowOf('B0SPONSOR1')).toContain('Reklam');
+    await waitFor(() => rowOf('B0ORGANIC2').includes('tahmini ~'));
+    expect(rowOf('B0ORGANIC2')).toContain('BSR #1.234');
+    expect(rowOf('B0ORGANIC2')).toContain('3 teklif');
+    expect(rowOf('B0ORGANIC5')).toContain('satış: veri yok');
+    await waitFor(() => (doc.getElementById('kx-amz-research-summary')?.textContent || '').includes('1 ürün için resmi Amazon verisi (SP-API)'));
+  });
+
+  it('product panel in Turkish', async () => {
+    const { w, run } = boot('https://www.amazon.com/Turkish-Towel/dp/B0ORGANIC1', fixture('amazon-product-us.html'), () => ({ available: false, reason: 'not_connected' }), null);
+    run('content-amazon-listing.js');
+    const widget = await waitFor(() => w.document.getElementById('kx-amz-research-widget'));
+    const t = (widget.textContent || '').replace(/\s+/g, ' ');
+    expect(t).toContain('Ürün Analizi');
+    expect(t).toContain('Geçen ay satılan (Amazon)');
+    expect(t).toContain('Karşılaştırma için BSR modeli: tahmini ~110/ay');
+    expect(t).toContain('Home & Kitchen kategorisinde BSR #1.234');
+    expect(t).toContain('15.234 değerlendirme');
+    expect(t).toContain('Satış komisyonu ~%15: $3,75');
+    expect(t).toContain('Pazar Araştırması');
+    expect(t).not.toMatch(/Product Intelligence|ratings|Bought last month/);
   });
 });

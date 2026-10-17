@@ -12,11 +12,13 @@ export const OUT = path.join(ROOT, 'public/media/tutorials');      // final mp4/
 export const STEPS_IMG = path.join(ROOT, 'public/media/guides');   // per-step screenshots for the written guides (committed)
 
 export const CONFIG = {
-  ttsModel: process.env.TTS_MODEL || 'gemini-2.5-flash-preview-tts',
+  ttsModel: process.env.TTS_MODEL || 'gemini-3.8-flash-tts',
   // One consistent voice for every video. Change only with a full re-render.
   voice: process.env.TTS_VOICE || 'Kore',
   // Delivery instruction for the TTS model. Keep it clearly separate from the spoken text: an earlier Turkish
   // instruction ("Sakin, samimi … konuş") was sometimes read aloud as part of the narration.
+  // Delivery direction for the final voice (sent as system instruction, never as spoken content).
+  voiceDirection: 'Sen deneyimli bir Türkçe seslendirme sanatçısısın. Sana verilen Türkçe metni aynen, eksiksiz ve fazlasız oku. Sakin, sıcak ve net konuş; bir arkadaşına ekranı gösterir gibi, acele etmeden. Marka adlarını şöyle telaffuz et: eBay "i-bey", Etsy "et-si", KolayXport "kolay eks-port", FedEx "fed-eks", UPS "yu-pi-es", ETGB "e-te-ge-be", Shopify "şo-pi-fay", Wix "viks". Metin dışında hiçbir şey söyleme.',
   voiceStyle: 'Read the Turkish text below aloud in a calm, warm and clear voice, like showing a friend a screen. Do not rush. Speak only the text between the quotation marks, nothing else.',
   baseUrl: process.env.TUTORIAL_BASE_URL || 'http://localhost:3100',
   width: 1920,

@@ -8,14 +8,16 @@ import { CONFIG, WORK, ensure, ffmpeg } from './lib.mjs';
 
 const VOICES = (process.env.VOICES || 'Kore,Leda,Aoede,Sulafat,Charon,Iapetus').split(',');
 const LINE = process.env.LINE || "Merhaba! Bu videoda Etsy mağazanızı KolayXport'a bağlayacağız. Siparişleriniz, eBay ve Trendyol ilanlarınızla birlikte tek panelde olacak; FedEx ya da UPS etiketinizi ve ETGB dosyanızı da buradan hazırlayacaksınız.";
-const MODEL = process.env.TTS_MODEL || 'gemini-2.5-pro-preview-tts';
+const MODEL = process.env.TTS_MODEL || 'gemini-3.8-flash-tts';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const dir = ensure(path.join(WORK, 'audition'));
 for (const voice of VOICES) {
   const r = await ai.models.generateContent({
     model: MODEL,
-    contents: [{ parts: [{ text: `${CONFIG.voiceStyle}\n\n"${LINE}"` }] }],
+    // Only the script, no delivery instruction: inline instructions got read aloud by 4 of 6 voices and this
+    // model rejects a system instruction. Delivery comes from the chosen voice.
+    contents: [{ parts: [{ text: LINE }] }],
     config: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } },
   });
   const part = r.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);

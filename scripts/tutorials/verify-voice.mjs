@@ -7,7 +7,7 @@ import path from 'node:path';
 import { GoogleGenAI } from '@google/genai';
 import { WORK, allSlugs } from './lib.mjs';
 
-const MODEL = process.env.STT_MODEL || 'gemini-2.5-flash';
+const MODEL = process.env.STT_MODEL || 'gemini-flash-latest';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Compare loosely: lower case, Turkish letters folded, no punctuation; "KolayXport" may come back as "Kolay Export".
 const norm = (s) => s.toLocaleLowerCase('tr').replace(/kolay\s*e?xport/g, 'kolayxport').normalize('NFD').replace(/[̀-ͯ]/g, '')

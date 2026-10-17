@@ -31,13 +31,13 @@ export const PRONUNCIATION = {
 };
 
 export function termsIn(text) {
-  return Object.keys(PRONUNCIATION).filter((t) => new RegExp(`(^|[^\\p{L}])${t.replace(/[-]/g, '\\-')}($|[^\\p{L}])`, 'u').test(text));
+  return Object.keys(PRONUNCIATION).filter((t) => new RegExp(`(^|[^\\p{L}])${t}($|[^\\p{L}])`, 'u').test(text));
 }
 
 /** TTS text with the given terms respelled (only terms a previous take got wrong). */
 export function respell(text, terms) {
   let out = text;
-  for (const t of terms) out = out.replace(new RegExp(t.replace(/[-]/g, '\\-'), 'g'), PRONUNCIATION[t].say);
+  for (const t of terms) out = out.split(t).join(PRONUNCIATION[t].say);
   return out;
 }
 
@@ -55,40 +55,66 @@ function lcsRatio(a, b) {
  * Transcribe + judge one take with a Gemini audio-understanding model.
  * Returns { transcript, similarity, mispronounced: [term], issues: [text], natural: 1-5 }.
  */
-export async function judgeTake(ai, wavFile, script, model = process.env.STT_MODEL || 'gemini-2.5-flash') {
-  const terms = termsIn(script);
-  const guide = terms.map((t) => `- ${t}: ${PRONUNCIATION[t].sound}`).join('\n') || '(none)';
-  const prompt = `You are a strict Turkish voice-over director. Listen to the audio.
-Script (Turkish): """${script}"""
-Expected pronunciation of these terms:
-${guide}
-Return JSON only:
-{"transcript": "<exact words you hear, Turkish spelling>",
- "mispronounced": ["<term from the list that was pronounced wrongly>"],
- "issues": ["<any other problem: missing/extra/garbled words, wrong stress, unnatural pause, robotic intonation, English accent on Turkish words, instruction read aloud>"],
- "natural": <1-5, 5 = sounds like a natural native Turkish narrator>}`;
-  const audio = fs.readFileSync(wavFile).toString('base64');
-  for (let attempt = 1; attempt <= 4; attempt++) {
-    try {
-      const r = await ai.models.generateContent({
-        model,
-        contents: [{ role: 'user', parts: [{ inlineData: { mimeType: 'audio/wav', data: audio } }, { text: prompt }] }],
-        config: { responseMimeType: 'application/json', temperature: 0 },
-      });
-      const j = JSON.parse(r.text || '{}');
-      const transcript = String(j.transcript || '');
-      return {
-        transcript,
-        similarity: lcsRatio(norm(script), norm(transcript)),
-        mispronounced: (Array.isArray(j.mispronounced) ? j.mispronounced : []).filter((t) => terms.includes(t)),
-        issues: Array.isArray(j.issues) ? j.issues.map(String).filter(Boolean) : [],
-        natural: Number(j.natural) || 0,
-      };
-    } catch (e) {
-      if (attempt === 4) throw e;
-      await new Promise((r) => setTimeout(r, 8000 * attempt));
+async function withRetry(fn) {
+  for (let attempt = 1; ; attempt++) {
+    try { return await fn(); } catch (e) {
+      if (attempt >= 5 || !/429|500|503|UNAVAILABLE|RESOURCE_EXHAUSTED|fetch failed|JSON/.test(String(e.message || e))) throw e;
+      await new Promise((r) => setTimeout(r, 6000 * attempt));
     }
   }
+}
+
+/** Verbatim transcript from the dedicated transcription model (deterministic word check). */
+async function transcribe(ai, audio) {
+  const model = process.env.STT_MODEL || 'gemini-3.5-transcribe';
+  return withRetry(async () => {
+    const r = await ai.models.generateContent({
+      model,
+      contents: [{ role: 'user', parts: [{ inlineData: { mimeType: 'audio/wav', data: audio } }, { text: 'Transcribe this Turkish audio verbatim. Output only the words that are spoken, nothing else.' }] }],
+      config: { temperature: 0 },
+    });
+    // The transcription model returns its words in an `audioTranscription` part, not as text.
+    const parts = r.candidates?.[0]?.content?.parts || [];
+    const fromParts = parts.map((p) => p.text || p.audioTranscription?.text || (typeof p.audioTranscription === 'string' ? p.audioTranscription : '')).join(' ');
+    return String(fromParts || r.text || '').replace(/\s+/g, ' ').trim();
+  });
+}
+
+/** Pronunciation + naturalness opinion from an audio-understanding model. */
+async function listen(ai, audio, script, terms) {
+  const model = process.env.JUDGE_MODEL || 'gemini-flash-latest';
+  const guide = terms.map((t) => `- ${t}: ${PRONUNCIATION[t].sound}`).join('\n') || '(none)';
+  const prompt = `You are a strict Turkish voice-over director. Listen carefully to the audio.
+Script: """${script}"""
+Expected pronunciation:
+${guide}
+Judge ONLY what you actually hear. Return JSON only:
+{"mispronounced": ["<term from the list pronounced wrongly>"], "issues": ["<audible problem: wrong stress, unnatural pause, robotic intonation, English accent on Turkish words>"], "natural": <1-5>}`;
+  return withRetry(async () => {
+    const r = await ai.models.generateContent({
+      model,
+      contents: [{ role: 'user', parts: [{ inlineData: { mimeType: 'audio/wav', data: audio } }, { text: prompt }] }],
+      config: { responseMimeType: 'application/json', temperature: 0 },
+    });
+    return JSON.parse(r.text || '{}');
+  });
+}
+
+/**
+ * Transcribe + judge one take. Words come from the transcription model; pronunciation/naturalness from two
+ * independent listens — a term counts as mispronounced or an issue counts only when BOTH listens report it
+ * (one listen alone was seen re-scoring identical audio differently).
+ */
+export async function judgeTake(ai, wavFile, script) {
+  const terms = termsIn(script);
+  const audio = fs.readFileSync(wavFile).toString('base64');
+  const [transcript, a, b] = await Promise.all([transcribe(ai, audio), listen(ai, audio, script, terms), listen(ai, audio, script, terms)]);
+  const list = (x) => (Array.isArray(x) ? x.map(String).filter(Boolean) : []);
+  const mis = list(a.mispronounced).filter((t) => terms.includes(t) && list(b.mispronounced).includes(t));
+  const both = list(a.issues).length && list(b.issues).length ? [...list(a.issues), ...list(b.issues)] : [];
+  const similarity = lcsRatio(norm(script), norm(transcript));
+  if (similarity < 0.97) both.unshift(`words: ${(similarity * 100).toFixed(0)}% match (heard: "${transcript.slice(0, 160)}")`);
+  return { transcript, similarity, mispronounced: mis, issues: both, natural: Math.min(Number(a.natural) || 0, Number(b.natural) || 0) };
 }
 
 /** A take is final when every word is there, every term sounds right and it sounds natural. */

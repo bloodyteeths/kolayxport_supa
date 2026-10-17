@@ -18,7 +18,7 @@ import { judgeTake, isPerfect, score, respell, writeReport } from './voiceQa.mjs
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const ENGINE = process.env.TTS_ENGINE === 'say' ? 'say' : 'gemini';
 // Final quality (default with a Pro TTS model): one line per request, transcribe + judge every take, keep the best.
-const FINAL = process.env.TTS_QUALITY === 'final' || /pro/.test(CONFIG.ttsModel);
+const FINAL = process.env.TTS_QUALITY !== 'draft';
 const MAX_TAKES = Number(process.env.TTS_TAKES || 3);
 const BATCH = !FINAL && process.env.TTS_BATCH !== '0';
 const QA_ROWS = [];
@@ -97,7 +97,8 @@ async function voiceFinal(ai, text, file, meta = {}) {
   let respellTerms = [];
   for (let take = 1; take <= MAX_TAKES; take++) {
     const spoken = respell(text, respellTerms);
-    const { pcm, rate } = await tts(ai, `${CONFIG.voiceStyle}\n\n"${spoken}"`);
+    // Final mode: the content is only the script — no instruction that could be read aloud.
+    const { pcm, rate } = await tts(ai, spoken);
     const out = file.replace(/\.wav$/, `.take${take}.wav`);
     pcmToWav(pcm, rate, out, POLISH);
     const q = await judgeTake(ai, out, text);

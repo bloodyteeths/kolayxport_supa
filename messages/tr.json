@@ -16010,7 +16010,7 @@
   },
   "videoStudio": {
     "title": "Video stüdyosu",
-    "subtitle": "Ürün fotoğraflarından, pazaryeri kurallarına uygun, gerçekçi ürün videoları. Beğenene kadar düzeltin.",
+    "subtitle": "Kendi fotoğraf ve videolarınızdan, pazaryeri kurallarına uygun, gerçek çekim gibi ürün videoları. Ürün her karede aynı kalır.",
     "target": {
       "title": "Nerede kullanılacak?",
       "name": {
@@ -16033,33 +16033,36 @@
       }
     },
     "photos": {
-      "title": "Ürün fotoğrafları",
-      "hint": "Bir ilan seçin veya kendi fotoğraflarınızı yükleyin. Fotoğrafa dokunarak rolünü seçin.",
+      "title": "Ürün fotoğrafları ve videoları",
+      "hint": "İlan seçin veya kendi fotoğraflarınızı ve videolarınızı ekleyin. Ne kadar çok açı (ön, arka, detay), o kadar az değişiklik.",
       "marketplace": "Pazaryeri",
       "search": "İlan ara…",
       "noResults": "İlan bulunamadı",
       "change": "Değiştir",
       "loading": "Fotoğraflar yükleniyor…",
-      "upload": "Fotoğraf yükle"
+      "upload": "Fotoğraf / video",
+      "uploading": "Yükleniyor…",
+      "readingVideo": "Video okunuyor…",
+      "fromVideo": "videodan",
+      "remove": "Kaldır",
+      "used": "{count} fotoğraf ürünü korumak için kullanılacak (en fazla {max})."
     },
     "role": {
       "start": "Başlangıç",
-      "end": "Bitiş",
-      "reference": "Referans"
+      "end": "Bitiş"
     },
     "mode": {
-      "title": "Video türü",
-      "image": "Fotoğrafı canlandır",
-      "interpolate": "Önden arkaya",
-      "reference": "Yeni sahne",
+      "title": "Nasıl başlasın?",
+      "image": "Fotoğrafımdan",
+      "scene": "Yeni sahne",
       "hint": {
-        "image": "Seçtiğiniz fotoğraf hareketlenir.",
-        "interpolate": "İki fotoğraf seçin (ör. ön ve arka): video birinden diğerine geçer.",
-        "reference": "En fazla 3 fotoğraf seçin: aynı ürün ve model yeni bir sahnede gösterilir (8 sn)."
+        "image": "Video sizin gerçek fotoğrafınızla başlar (en doğru sonuç). Bitiş karesi seçerseniz o fotoğrafla biter.",
+        "scene": "İlk ve son kareyi yapay zekâ tüm fotoğraflarınızdan yeni ortamda oluşturur, sonra canlandırır."
       }
     },
     "shot": {
-      "title": "Çekim türü"
+      "title": "Çekim türü",
+      "backWarning": "Bu çekimde ürünün arkası görünür. Arka fotoğrafını bitiş karesi yapın veya \"Ürünü kilitle\"yi açın; yoksa yapay zekâ arkayı tahmin eder."
     },
     "preset": {
       "twirl": {
@@ -16118,7 +16121,10 @@
       "notes": "Ek yönlendirme (isteğe bağlı)",
       "notesPlaceholder": "ör. kız annesinin elinden tutup yürüsün, sonunda kameraya gülümsesin",
       "avoid": "Kaçınılacaklar (isteğe bağlı)",
-      "avoidPlaceholder": "ör. başka çocuk, oyuncak"
+      "avoidPlaceholder": "ör. başka çocuk, oyuncak",
+      "look": "Görünüm",
+      "motionHint": "Hızlı hareket ürün detaylarını değiştirebilir; en doğru sonuç için \"Hafif\".",
+      "sceneNeedsScene": "Ortamı değiştirmek için \"Yeni sahne\"yi seçin; \"Fotoğrafımdan\" fotoğraftaki ortamı korur."
     },
     "expression": {
       "smiling": "Gülümseyen",
@@ -16168,13 +16174,15 @@
       "format": "Biçim",
       "length": "Süre",
       "resolution": "Çözünürlük",
-      "eightOnly": "1080p, 4K ve \"Yeni sahne\" yalnızca 8 sn olabilir.",
+      "eightOnly": "1080p ve 4K yalnızca 8 sn olabilir.",
       "quality": "Kalite",
       "variants": "Seçenek sayısı",
       "seed": "Tohum (tekrar için)",
       "seedPlaceholder": "rastgele",
       "showPrompt": "Yapay zekâya giden komutu göster",
-      "hidePrompt": "Komutu gizle"
+      "hidePrompt": "Komutu gizle",
+      "grain": "Doğal kamera dokusu",
+      "grainHint": "Gerçek kameralardaki hafif gren eklenir; fazla pürüzsüz görüntü yapay görünür."
     },
     "format": {
       "9x16": "Dikey 9:16",
@@ -16189,9 +16197,8 @@
     "seconds": "{count} sn",
     "consent": "Fotoğrafların hakları ve fotoğraftaki modellerin (çocuklarda velisinin) izni bende.",
     "need": {
-      "start": "Bir başlangıç fotoğrafı seçin.",
-      "end": "Bitiş fotoğrafını seçin.",
-      "references": "En az bir referans fotoğraf seçin."
+      "start": "Başlangıç karesi için bir fotoğraf seçin.",
+      "photos": "En az bir ürün fotoğrafı veya videosu ekleyin."
     },
     "generate": "{count, plural, one {Video oluştur} other {# seçenek oluştur}}",
     "eta": "Genelde {minutes} dakika sürer. Sayfadan çıkabilirsiniz; video hazırlanmaya devam eder.",
@@ -16220,8 +16227,12 @@
       "error": {
         "childPhoto": "Google bu fotoğraftan video oluşturmadı (fotoğrafta çocuk var).",
         "filtered": "Google bu isteği güvenlik nedeniyle reddetti. Başka bir fotoğraf veya açıklama deneyin.",
-        "failed": "Video oluşturulamadı. Tekrar deneyin."
-      }
+        "failed": "Video oluşturulamadı. Tekrar deneyin.",
+        "keyframe": "Fotoğraflardan kare oluşturulamadı. \"Fotoğrafımdan\" ile deneyin."
+      },
+      "preparing": "Kareler fotoğraflarınızdan hazırlanıyor…",
+      "preparingHint": "Yapay zekâ ürünü fotoğraflarınızdan birebir kuruyor, ardından video başlar (2–3 dakika).",
+      "refunded": "{count} kredi iade edildi."
     },
     "refine": {
       "title": "Değiştirmek istediğiniz bir şey var mı?",
@@ -16233,9 +16244,9 @@
       "slower": "Daha yavaş hareket",
       "closer": "Daha yakın çekim",
       "showDress": "Elbise daha çok görünsün",
-      "background": "Arka planı değiştir",
-      "brighter": "Daha aydınlık",
-      "staticCam": "Kamera sabit kalsın"
+      "staticCam": "Kamera sabit kalsın",
+      "keepDress": "Elbise fotoğraftakiyle birebir aynı kalsın",
+      "realer": "Daha gerçek, telefon çekimi gibi"
     },
     "action": {
       "extend": "+7 sn uzat",
@@ -16267,16 +16278,95 @@
     },
     "error": {
       "photos": "İlan fotoğrafları alınamadı.",
-      "uploadType": "JPG, PNG veya WEBP, en fazla 10 MB.",
+      "uploadType": "Fotoğraf: JPG, PNG veya WEBP (en fazla 10 MB). Video: MP4 / MOV (en fazla 200 MB).",
       "upload": "Fotoğraf yüklenemedi.",
       "consent": "Devam etmek için fotoğraf izni kutusunu işaretleyin.",
       "start": "Video başlatılamadı. Tekrar deneyin.",
       "videoBusy": "Aynı anda en fazla 4 video hazırlanabilir.",
       "imageRequired": "Başlangıç fotoğrafı okunamadı.",
-      "endImageRequired": "Bitiş fotoğrafı okunamadı.",
-      "referencesRequired": "Referans fotoğraflar okunamadı.",
-      "nothingToEdit": "Değiştirilecek bir şey seçilmedi."
+      "nothingToEdit": "Değiştirilecek bir şey seçilmedi.",
+      "video": "Video okunamadı. MP4 veya MOV deneyin.",
+      "videoTooLarge": "Video en fazla 200 MB olabilir.",
+      "productPhotosRequired": "Ürün fotoğrafları okunamadı.",
+      "aiBudget": "Bugünkü AI üretim kapasitesi doldu. Yarın tekrar deneyin; krediniz düşülmedi."
     },
-    "readyToast": "Videonuz hazır"
+    "readyToast": "Videonuz hazır",
+    "videoFrames": "Videodan {count} net kare alındı",
+    "slot": {
+      "start": "Başlangıç karesi",
+      "end": "Bitiş karesi",
+      "startHint": "Aşağıdan bir fotoğrafa dokunun",
+      "endHint": "İsteğe bağlı (ör. arkadan çekim)",
+      "endAi": "Fotoğraflarınızdan AI oluşturur",
+      "clear": "Kaldır"
+    },
+    "lock": {
+      "label": "Ürünü kilitle",
+      "hint": "Model dönerken veya yürürken görünen taraf (ör. elbisenin arkası) yapay zekâ tarafından uydurulmaz: fotoğraflarınızdan son kare oluşturulur ve video ona varır. +15 kredi."
+    },
+    "look": {
+      "phone": "Telefon çekimi",
+      "studio": "Stüdyo",
+      "cinematic": "Sinematik"
+    },
+    "lookHint": {
+      "phone": "Satıcının telefonla çektiği gerçek bir video gibi: en az \"yapay zekâ\" hissi veren görünüm.",
+      "studio": "Profesyonel fotoğrafçı çekimi gibi, temiz ve net.",
+      "cinematic": "Moda filmi gibi, sığ alan derinliği."
+    },
+    "qualityHint": {
+      "fast": "Hızlı: denemeler için. En gerçekçi sonuç için \"En iyi\".",
+      "best": "En iyi: daha gerçekçi yüz, el ve kumaş hareketi; daha fazla kredi."
+    },
+    "qa": {
+      "title": "Kalite kontrolü",
+      "running": "Video kareleri fotoğraflarınızla karşılaştırılıyor…",
+      "failed": "Kontrol yapılamadı.",
+      "match": "Ürün uyumu",
+      "realism": "Doğallık",
+      "diffs": "Fotoğraftan farklı:",
+      "issues": "Yapay görünen:",
+      "clean": "Fark bulunmadı: ürün fotoğraflarla aynı.",
+      "fix": "Bunları düzelt",
+      "best": "en iyi"
+    }
+  },
+  "credits": {
+    "title": "AI kredisi al",
+    "subtitle": "Görsel ve video üretimi kredi kullanır. Satın alınan krediler süresiz geçerlidir.",
+    "needLine": "Bu işlem {need} kredi gerektiriyor; bakiyeniz {have}.",
+    "buy": "Satın al · {price}",
+    "close": "Kapat",
+    "balance": "Bakiye",
+    "unlimited": "Sınırsız",
+    "monthly": "Plan: {left}/{of} kaldı · {date} yenilenir",
+    "packs": "Satın alınan: {count}",
+    "popular": "En popüler",
+    "creditsUnit": "kredi",
+    "saving": "%{percent} tasarruf",
+    "approx": "≈ {videos} video veya {images} görsel",
+    "unavailable": "Bu hesapta kredi satın alma şu an kullanılamıyor.",
+    "costs": "Görsel {image} kredi; 8 sn 1080p video {video} kredi.",
+    "never": "Başarısız üretimlerin kredisi iade edilir.",
+    "shopifyNote": "Ödeme Shopify faturanıza eklenir (USD).",
+    "added": "{count} kredi eklendi",
+    "addedSoon": "Ödeme alındı; krediler birazdan eklenecek.",
+    "addedShopify": "Krediler hesabınıza eklendi",
+    "checkoutFailed": "Ödeme sayfası açılamadı. Tekrar deneyin.",
+    "cost": "{count} kredi",
+    "buyFor": "Kredi al ({count} kredi gerekli)",
+    "balanceShort": "Bakiye: {count} kredi ·",
+    "buyShort": "Kredi al",
+    "cardTitle": "AI kredisi",
+    "cardHint": "Görsel ve video üretimi kredi kullanır. Plan kredileriniz her ay yenilenir; satın aldıklarınız süresizdir. Başarısız üretimlerin kredisi iade edilir.",
+    "planCredits": "Bu ayın plan kredisi",
+    "packCredits": "Satın alınan kredi",
+    "entry": {
+      "video": "Video",
+      "image": "Görsel",
+      "purchase": "Kredi paketi",
+      "refund": "İade",
+      "adjust": "Düzeltme"
+    }
   }
 }

@@ -1,30 +1,41 @@
 // Video Studio API. Session user only: every job is read and written with userId = session user.
-// POST   /api/ai/video   new take:   { mode, sources: { start, end, references }, direction, aspectRatio, durationSec,
-//                                     resolution, quality, variants, seed, listingRef, title }
-//                        follow-up:  { parentId, instruction, direction? }   → new version (same sources, + change)
-//                        extend:     { extendOf, instruction? }              → +7 s continuation of a finished video
+// POST   /api/ai/video   new take:   { sources: { start, end, product[] }, direction, aspectRatio, durationSec, resolution,
+//                                     quality, variants, seed, listingRef, title, locale }
+//                        follow-up:  { parentId, instruction }   → new version (same frames + photos, + the change)
+//                        extend:     { extendOf, instruction? }  → +7 s continuation of a finished video
 // GET    /api/ai/video?ids=a,b  jobs (polls Veo while running; stores the mp4s when done) · no ids: the library
 // PATCH  /api/ai/video   { id, favorite?, title? }
 // DELETE /api/ai/video?id=  the video and its file
-// Sources are https URLs (listing photos) or `upload:<id>` (pages/api/ai/video/source).
+//
+// Product lock (lib/ai/videoProduct): the video starts on a real photo ('image'; a real end photo makes Veo land on
+// it too) or on AI keyframes built from ALL the product photos ('scene'). When the shot turns or moves and no end
+// photo is given, an AI end keyframe is built from the photos so the side Veo would invent comes from the photos.
+// After generation every variant is checked against the photos (qa). AI kredisi (lib/billing/aiCredits) are charged
+// before anything starts and refunded when Veo fails or returns fewer variants.
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { getAuthUser } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 import { logUsage } from '@/lib/ai/gemini';
-import { isUnsafeUrl } from '@/lib/ai/safeUrl';
 import { directVideo, negativePrompt, normalizeDirection, type VideoDirection } from '@/lib/ai/videoDirector';
-import { cropInPlace, muteInPlace, originalOf, pollVideo, saveVideo, startVideo, veoConstraints, VIDEO_SOURCE_ROOT, VIDEO_UPLOAD_ROOT, type VideoMedia } from '@/lib/ai/video';
+import { finishInPlace, originalOf, pollVideo, saveVideo, startVideo, veoConstraints, VIDEO_UPLOAD_ROOT, type VideoMedia } from '@/lib/ai/video';
+import { loadSource, loadSources, saveSourceImage } from '@/lib/ai/videoSources';
+import { checkVideo, generateKeyframe, keyframePrompt, MAX_PRODUCT_REFS } from '@/lib/ai/videoProduct';
+import { extendCredits, imageCredits, videoCredits } from '@/lib/billing/aiCredits';
+import { isAiBudgetError, isNoCreditsError, refundCredits, spendCredits } from '@/lib/billing/aiCreditsServer';
 
 export const config = { api: { bodyParser: { sizeLimit: '2mb' } } };
 
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const RUNNING_PER_USER = 4;
 const STALE_MS = 20 * 60 * 1000;
+/** Shot types that turn or move: the end of the video shows what the first frame does not. */
+const TURNING = new Set(['twirl', 'turntable', 'frontBack', 'walk', 'pose', 'lifestyle']);
 
 type Job = NonNullable<Awaited<ReturnType<typeof prisma.aiVideoJob.findFirst>>>;
+type Dir = VideoDirection & { genAspect?: '9:16' | '16:9'; variants?: number; locale?: 'tr' | 'en' };
 
 export function viewJob(j: Job) {
   return {
@@ -32,75 +43,79 @@ export function viewJob(j: Job) {
     instruction: j.instruction, aspectRatio: j.aspectRatio, durationSec: j.durationSec, resolution: j.resolution,
     quality: j.quality, seed: j.seed, model: j.model, provider: j.provider, errorKey: j.errorKey, favorite: j.favorite,
     listingRef: j.listingRef, title: j.title, direction: j.direction, sourceUrl: j.sourceUrl, endUrl: j.endUrl,
-    referenceUrls: j.referenceUrls, createdAt: j.createdAt,
+    referenceUrls: j.referenceUrls, credits: j.credits, qa: j.qa, createdAt: j.createdAt,
     url: j.status === 'done' ? `/api/ai/video/file?id=${encodeURIComponent(j.id)}` : null,
   };
 }
 
-/** A source → image bytes. `upload:<id>` reads the seller's own upload (path checked); URLs are https + public. */
-async function loadSource(userId: string, ref: string | null | undefined): Promise<VideoMedia | null> {
-  if (!ref) return null;
-  if (ref.startsWith('upload:')) {
-    const id = ref.slice(7).replace(/[^a-f0-9]/g, '');
-    if (!id) return null;
-    const dir = path.join(VIDEO_SOURCE_ROOT, userId.replace(/[^a-zA-Z0-9_-]/g, ''));
-    const file = (await fs.promises.readdir(dir).catch(() => [] as string[])).find((f) => f.startsWith(`${id}.`));
-    if (!file) return null;
-    const buf = await fs.promises.readFile(path.join(dir, file));
-    const ext = path.extname(file).slice(1).toLowerCase();
-    return { data: buf.toString('base64'), mimeType: ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg' };
-  }
-  if (isUnsafeUrl(ref)) return null;
-  // Etsy CDN: ask for the full-size photo (570xN thumbnails make soft videos).
-  const full = ref.replace(/il_\d+x\w+\./, 'il_fullxfull.');
-  for (const u of full === ref ? [ref] : [full, ref]) {
+const newJobId = () => `v${crypto.randomBytes(12).toString('hex')}`;
+const extOf = (m: VideoMedia): 'jpg' | 'png' | 'webp' => (m.mimeType === 'image/png' ? 'png' : m.mimeType === 'image/webp' ? 'webp' : 'jpg');
+
+/** Marks a job failed once and refunds its credits. */
+async function failJob(job: Job, errorKey: string, detail: string): Promise<Job> {
+  const r = await prisma.aiVideoJob.updateMany({ where: { id: job.id, status: { in: ['running', 'preparing'] } }, data: { status: 'failed', errorKey, errorDetail: detail.slice(0, 300), operation: null } });
+  if (r.count && job.credits > 0) await refundCredits(job.userId, job.id).catch((e) => logger.warn('AI video refund failed', { jobId: job.id, error: e?.message }));
+  return (await prisma.aiVideoJob.findFirst({ where: { id: job.id } })) ?? job;
+}
+
+/** Background: compares each finished video with the product photos (one at a time). */
+async function runQa(jobIds: string[]) {
+  for (const id of jobIds) {
+    const job = await prisma.aiVideoJob.findFirst({ where: { id, status: 'done' } });
+    if (!job?.filePath) continue;
     try {
-      const r = await fetch(u);
-      if (!r.ok) continue;
-      const buf = Buffer.from(await r.arrayBuffer());
-      const ct = (r.headers.get('content-type') || 'image/jpeg').split(';')[0];
-      if (!buf.length || buf.length > MAX_IMAGE_BYTES || !ct.startsWith('image/')) continue;
-      return { data: buf.toString('base64'), mimeType: ct };
-    } catch { /* next */ }
+      await prisma.aiVideoJob.update({ where: { id }, data: { qa: { status: 'running' } } });
+      const refs = await loadSources(job.userId, job.referenceUrls.slice(0, 5));
+      const locale = (job.direction as Dir | null)?.locale === 'en' ? 'en' : 'tr';
+      const qa = refs.length ? await checkVideo({ userId: job.userId, file: job.filePath, refs, locale }) : { status: 'failed' as const };
+      await prisma.aiVideoJob.update({ where: { id }, data: { qa: qa as any } });
+    } catch (err: any) {
+      logger.warn('AI video quality check failed', { jobId: id, error: err?.message });
+      await prisma.aiVideoJob.update({ where: { id }, data: { qa: { status: 'failed' } } }).catch(() => undefined);
+    }
   }
-  return null;
 }
 
 /** Polls a running job once; when done stores every variant (siblings share the group). */
 async function refresh(job: Job): Promise<Job> {
-  if (job.status !== 'running' || !job.operation) return job;
-  if (Date.now() - new Date(job.createdAt).getTime() > STALE_MS) {
-    return prisma.aiVideoJob.update({ where: { id: job.id }, data: { status: 'failed', errorKey: 'videoFailed', errorDetail: 'timed out' } });
-  }
+  if (job.status !== 'running' && job.status !== 'preparing') return job;
+  if (Date.now() - new Date(job.createdAt).getTime() > STALE_MS) return failJob(job, 'videoFailed', 'timed out');
+  if (job.status === 'preparing' || !job.operation) return job;
   try {
     const r = await pollVideo({ operation: job.operation, provider: job.provider, model: job.model });
     if (!r.done) return job;
     const ms = Date.now() - new Date(job.createdAt).getTime();
     if (!r.ok) {
       void logUsage({ userId: job.userId, feature: 'video.generate', model: job.model, ok: false, ms, refine: Boolean(job.parentId), error: r.detail });
-      return prisma.aiVideoJob.update({ where: { id: job.id }, data: { status: 'failed', errorKey: r.errorKey, errorDetail: r.detail } });
+      return failJob(job, r.errorKey, r.detail);
     }
     // Claim the job first so two pollers never save it twice.
     const claimed = await prisma.aiVideoJob.updateMany({ where: { id: job.id, status: 'running', operation: job.operation }, data: { operation: null } });
     if (!claimed.count) return (await prisma.aiVideoJob.findFirst({ where: { id: job.id } })) ?? job;
-    const dir = job.direction as VideoDirection | null;
-    const mute = dir?.audio === 'none';
-    // 1:1 / 4:5 are centre crops of the 9:16 / 16:9 Veo output (marketplace format, lib/ai/videoTargets).
-    const finish = async (file: string) => {
-      if (mute) await muteInPlace(file).catch(() => undefined);
-      if (dir?.format === '1:1' || dir?.format === '4:5') await cropInPlace(file, dir.format).catch((e) => logger.warn('AI video crop failed', { error: e?.message }));
-    };
+    const dir = (job.direction ?? {}) as Partial<Dir>;
+    const finish = (file: string) => finishInPlace(file, { mute: dir.audio === 'none', format: dir.format, grain: dir.grain !== false })
+      .catch((e) => logger.warn('AI video finish failed', { jobId: job.id, error: e?.message }));
     const { id: _id, createdAt: _c, updatedAt: _u, ...base } = job;
+    const done: string[] = [job.id];
     for (let i = 1; i < r.videos.length; i++) {
-      const sib = await prisma.aiVideoJob.create({ data: { ...base, direction: (job.direction as any) ?? undefined, status: 'running', variantIndex: i, operation: null } });
+      const sib = await prisma.aiVideoJob.create({ data: { ...base, id: newJobId(), direction: (job.direction as any) ?? undefined, qa: undefined, credits: 0, status: 'running', variantIndex: i, operation: null } });
       const file = await saveVideo(job.userId, sib.id, r.videos[i]);
       await finish(file);
       await prisma.aiVideoJob.update({ where: { id: sib.id }, data: { status: 'done', filePath: file } });
+      done.push(sib.id);
     }
     const filePath = await saveVideo(job.userId, job.id, r.videos[0]);
     await finish(filePath);
     void logUsage({ userId: job.userId, feature: 'video.generate', model: job.model, ok: true, ms, refine: Boolean(job.parentId), images: job.durationSec * r.videos.length });
-    return prisma.aiVideoJob.update({ where: { id: job.id }, data: { status: 'done', filePath } });
+    const updated = await prisma.aiVideoJob.update({ where: { id: job.id }, data: { status: 'done', filePath } });
+    // Veo filtered some of the variants: those are refunded.
+    const asked = Math.max(1, Number(dir.variants ?? 1));
+    if (job.credits > 0 && r.videos.length < asked && job.mode !== 'extend') {
+      const per = videoCredits({ quality: job.quality, resolution: job.resolution, durationSec: job.durationSec, variants: 1 });
+      void refundCredits(job.userId, job.id, { amount: per * (asked - r.videos.length), key: 'partial' }).catch(() => undefined);
+    }
+    void runQa(done);
+    return updated;
   } catch (err: any) {
     logger.warn('AI video poll failed', { jobId: job.id, error: err?.message });
     return job;
@@ -116,6 +131,40 @@ async function changesOf(userId: string, start: Job | null): Promise<string[]> {
   return out;
 }
 
+type Launch = {
+  job: Job; direction: Dir; prompt: string; aspectRatio: '9:16' | '16:9'; durationSec: number; resolution: string;
+  quality: 'fast' | 'best'; variants: number; seed: number | null;
+  start: VideoMedia | null; end: VideoMedia | null; products: VideoMedia[]; aiStart: boolean; aiEnd: boolean;
+};
+
+/** Builds the missing keyframes (Nano Banana Pro, from every product photo), then starts Veo. Runs in the background. */
+async function prepareAndStart(l: Launch) {
+  const { job, direction: d } = l;
+  try {
+    let start = l.start;
+    let startRef = job.sourceUrl;
+    if (l.aiStart) {
+      start = await generateKeyframe({ userId: job.userId, refs: l.products, prompt: keyframePrompt(d, { which: 'start', refCount: l.products.length, hasStart: false }), aspectRatio: l.aspectRatio });
+      startRef = await saveSourceImage(job.userId, Buffer.from(start.data, 'base64'), extOf(start));
+    }
+    if (!start) throw Object.assign(new Error('no start frame'), { key: 'imageRequired' });
+    let end = l.end;
+    let endRef = job.endUrl;
+    if (l.aiEnd) {
+      end = await generateKeyframe({ userId: job.userId, refs: l.products, first: start, prompt: keyframePrompt(d, { which: 'end', refCount: l.products.length, hasStart: true }), aspectRatio: l.aspectRatio });
+      endRef = await saveSourceImage(job.userId, Buffer.from(end.data, 'base64'), extOf(end));
+    }
+    const started = await startVideo({
+      mode: end ? 'interpolate' : 'image', prompt: l.prompt, negativePrompt: negativePrompt(d), image: start, lastFrame: end ?? undefined,
+      aspectRatio: l.aspectRatio, durationSec: l.durationSec, resolution: l.resolution, quality: l.quality, variants: l.variants, seed: l.seed, audio: d.audio !== 'none',
+    });
+    await prisma.aiVideoJob.update({ where: { id: job.id }, data: { status: 'running', operation: started.operation, provider: started.provider, model: started.model, sourceUrl: startRef, endUrl: endRef } });
+  } catch (err: any) {
+    logger.warn('AI video start failed', { jobId: job.id, error: err?.message });
+    await failJob(job, err?.key ?? (l.aiStart || l.aiEnd ? 'keyframeFailed' : 'videoFailed'), String(err?.message || 'failed'));
+  }
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const user = await getAuthUser(req, res);
   if (!user) return res.status(401).json({ code: 'unauthorized' });
@@ -129,7 +178,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (req.query.favorite === '1') where.favorite = true;
         if (typeof req.query.listing === 'string' && req.query.listing) where.listingRef = req.query.listing;
         const recent = await prisma.aiVideoJob.findMany({ where, orderBy: { createdAt: 'desc' }, take: 60 });
-        const fresh = await Promise.all(recent.map((j) => (j.status === 'running' ? refresh(j) : j)));
+        const fresh = await Promise.all(recent.map((j) => (j.status === 'running' || j.status === 'preparing' ? refresh(j) : j)));
         return res.status(200).json({ jobs: fresh.map(viewJob) });
       }
       const jobs = await prisma.aiVideoJob.findMany({ where: { userId: user.id, id: { in: ids } }, orderBy: { createdAt: 'asc' } });
@@ -168,10 +217,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(405).json({ code: 'methodNotAllowed' });
     }
 
-    const running = await prisma.aiVideoJob.count({ where: { userId: user.id, status: 'running', createdAt: { gt: new Date(Date.now() - STALE_MS) } } });
+    const running = await prisma.aiVideoJob.count({ where: { userId: user.id, status: { in: ['running', 'preparing'] }, createdAt: { gt: new Date(Date.now() - STALE_MS) } } });
     if (running >= RUNNING_PER_USER) return res.status(429).json({ code: 'videoBusy' });
 
     const body = req.body || {};
+    const locale: 'tr' | 'en' = body.locale === 'en' ? 'en' : 'tr';
+
     // ── Extend: continue a finished video by 7 s ──
     if (body.extendOf) {
       const src = await prisma.aiVideoJob.findFirst({ where: { id: String(body.extendOf), userId: user.id, status: 'done' } });
@@ -179,25 +230,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const direction = normalizeDirection(src.direction ?? {});
       const instruction = typeof body.instruction === 'string' ? body.instruction.trim().slice(0, 400) : '';
       const changes = [...(await changesOf(user.id, src)), ...(instruction ? [instruction] : [])];
-      // A square / 4:5 video is a crop: extend Veo's uncropped original, then crop the result again.
+      // A processed video (crop / grain) is extended from Veo's untouched original; the result is processed again.
       const orig = originalOf(src.filePath);
       const input = (await fs.promises.stat(orig).then(() => true).catch(() => false)) ? orig : src.filePath;
       const video = { data: (await fs.promises.readFile(input)).toString('base64'), mimeType: 'video/mp4' };
-      const genAspect = (src.direction as any)?.genAspect === '16:9' || src.aspectRatio === '16:9' ? '16:9' : '9:16';
-      const started = await startVideo({
-        mode: 'extend', prompt: directVideo(direction, [...changes, 'Continue the same shot seamlessly from the last frame']), negativePrompt: negativePrompt(direction),
-        video, aspectRatio: genAspect, durationSec: 7, resolution: '720p', quality: src.quality === 'best' ? 'best' : 'fast', audio: direction.audio !== 'none',
-      });
+      const genAspect = (src.direction as Dir | null)?.genAspect === '16:9' || src.aspectRatio === '16:9' ? '16:9' : '9:16';
+      const quality = src.quality === 'best' ? 'best' : 'fast';
+      const id = newJobId();
+      const cost = extendCredits(quality);
+      try {
+        await spendCredits(user.id, cost, { feature: 'video', ref: id, note: 'extend' });
+      } catch (err) {
+        if (isNoCreditsError(err)) return res.status(402).json(err.body());
+        if (isAiBudgetError(err)) return res.status(503).json(err.body());
+        throw err;
+      }
+      let started;
+      try {
+        started = await startVideo({
+          mode: 'extend', prompt: directVideo(direction, [...changes, 'Continue the same shot seamlessly from the last frame']), negativePrompt: negativePrompt(direction),
+          video, aspectRatio: genAspect, durationSec: 7, resolution: '720p', quality, audio: direction.audio !== 'none',
+        });
+      } catch (err) {
+        await refundCredits(user.id, id).catch(() => undefined);
+        throw err;
+      }
       const job = await prisma.aiVideoJob.create({
         data: {
-          userId: user.id, parentId: src.id, provider: started.provider, model: started.model, status: 'running', mode: 'extend',
-          prompt: src.prompt, instruction: instruction || null, direction: { ...(src.direction as any), ...direction, genAspect } as any, sourceUrl: src.sourceUrl, endUrl: src.endUrl,
+          id, userId: user.id, parentId: src.id, groupId: id, provider: started.provider, model: started.model, status: 'running', mode: 'extend',
+          prompt: src.prompt, instruction: instruction || null, direction: { ...(src.direction as any), ...direction, genAspect, variants: 1 } as any, sourceUrl: src.sourceUrl, endUrl: src.endUrl,
           referenceUrls: src.referenceUrls, aspectRatio: src.aspectRatio, durationSec: src.durationSec + 7, resolution: '720p',
-          quality: src.quality, operation: started.operation, listingRef: src.listingRef, title: src.title,
+          quality: src.quality, operation: started.operation, listingRef: src.listingRef, title: src.title, credits: cost,
         },
       });
-      const withGroup = await prisma.aiVideoJob.update({ where: { id: job.id }, data: { groupId: job.id } });
-      return res.status(200).json({ job: viewJob(withGroup) });
+      return res.status(200).json({ job: viewJob(job), credits: cost });
     }
 
     // ── New take or follow-up ──
@@ -209,48 +275,74 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const instruction = typeof body.instruction === 'string' ? body.instruction.trim().slice(0, 400) : '';
     if (parent && !instruction && !body.direction) return res.status(400).json({ code: 'instructionRequired' });
 
-    const direction = normalizeDirection(body.direction ?? parent?.direction ?? {});
-    const parentMode = parent?.mode;
-    const mode: 'image' | 'interpolate' | 'reference' = parent
-      ? (parentMode === 'interpolate' || parentMode === 'reference' ? parentMode : 'image')
-      : direction.mode;
-    const startRef: string | null = parent ? parent.sourceUrl : body.sources?.start ?? null;
-    const endRef: string | null = parent ? parent.endUrl : body.sources?.end ?? null;
-    const refRefs: string[] = parent ? parent.referenceUrls : (Array.isArray(body.sources?.references) ? body.sources.references.slice(0, 3).map(String) : []);
+    const direction: Dir = { ...normalizeDirection(body.direction ?? parent?.direction ?? {}), locale };
+    const lock = body.lock !== false && (parent ? (parent.direction as any)?.lock !== false : true);
 
-    const image = mode === 'reference' ? null : await loadSource(user.id, startRef);
-    if (mode !== 'reference' && !image) return res.status(400).json({ code: 'imageRequired' });
-    const lastFrame = mode === 'interpolate' ? await loadSource(user.id, endRef) : null;
-    if (mode === 'interpolate' && !lastFrame) return res.status(400).json({ code: 'endImageRequired' });
-    const references = mode === 'reference' ? (await Promise.all(refRefs.map((r) => loadSource(user.id, r)))).filter((x): x is VideoMedia => Boolean(x)) : [];
-    if (mode === 'reference' && !references.length) return res.status(400).json({ code: 'referencesRequired' });
+    // Frames + product photos. A follow-up re-uses its parent's frames (real photos or the keyframes already built).
+    let startRef: string | null;
+    let endRef: string | null;
+    let productRefs: string[];
+    if (parent) {
+      startRef = parent.sourceUrl;
+      endRef = parent.endUrl;
+      productRefs = parent.referenceUrls;
+    } else {
+      startRef = direction.mode === 'scene' ? null : (typeof body.sources?.start === 'string' ? body.sources.start : null);
+      endRef = direction.mode === 'scene' ? null : (typeof body.sources?.end === 'string' ? body.sources.end : null);
+      const listed = Array.isArray(body.sources?.product) ? body.sources.product : Array.isArray(body.sources?.references) ? body.sources.references : [];
+      productRefs = Array.from(new Set([startRef, endRef, ...listed.map(String)].filter((x): x is string => Boolean(x)))).slice(0, MAX_PRODUCT_REFS);
+    }
+    const products = await loadSources(user.id, productRefs);
+    const start = startRef ? await loadSource(user.id, startRef) : null;
+    const end = endRef ? await loadSource(user.id, endRef) : null;
+    const aiStart = !start;
+    if (aiStart && !products.length) return res.status(400).json({ code: direction.mode === 'scene' ? 'productPhotosRequired' : 'imageRequired' });
+    // The end the first frame cannot show (the back after a turn, the next pose) is built from the photos.
+    const aiEnd = !end && !parent && lock && TURNING.has(direction.preset) && products.length > 0;
 
     const changes = [...(await changesOf(user.id, parent)), ...(instruction ? [instruction] : [])];
     // Veo renders 16:9 / 9:16; the client sends the generation aspect (from the format and the photo orientation).
-    const aspectRatio = (body.aspectRatio ?? (parent?.aspectRatio === '16:9' ? '16:9' : parent?.aspectRatio === '1:1' || parent?.aspectRatio === '4:5' ? (parent?.direction as any)?.genAspect : parent?.aspectRatio)) === '16:9' ? '16:9' : '9:16';
-    (direction as any).genAspect = aspectRatio;
-    const { durationSec, resolution } = veoConstraints({ mode, durationSec: Number(body.durationSec ?? parent?.durationSec ?? 8), resolution: String(body.resolution ?? parent?.resolution ?? '720p') });
+    const parentGen = (parent?.direction as Dir | null)?.genAspect ?? (parent?.aspectRatio === '16:9' ? '16:9' : parent ? '9:16' : null);
+    const aspectRatio: '9:16' | '16:9' = (body.aspectRatio ?? parentGen) === '16:9' ? '16:9' : '9:16';
+    direction.genAspect = aspectRatio;
+    const { durationSec, resolution } = veoConstraints({ mode: 'image', durationSec: Number(body.durationSec ?? parent?.durationSec ?? 8), resolution: String(body.resolution ?? parent?.resolution ?? '720p') });
     const quality = (body.quality ?? parent?.quality) === 'best' ? 'best' : 'fast';
     const variants = Math.min(4, Math.max(1, Number(body.variants ?? 1) || 1));
+    direction.variants = variants;
+    (direction as any).lock = lock;
     const seedRaw = body.seed;
     const seed = seedRaw !== undefined && seedRaw !== null && seedRaw !== '' && Number.isFinite(Number(seedRaw)) ? Math.round(Number(seedRaw)) : (parent?.seed ?? null);
     const prompt = directVideo(direction, changes);
 
-    const started = await startVideo({
-      mode, prompt, negativePrompt: negativePrompt(direction), image: image ?? undefined, lastFrame: lastFrame ?? undefined, references,
-      aspectRatio, durationSec, resolution, quality, variants, seed, audio: direction.audio !== 'none',
-    });
+    const id = newJobId();
+    const cost = videoCredits({ quality, resolution, durationSec, variants }) + (aiStart ? imageCredits() : 0) + (aiEnd ? imageCredits() : 0);
+    try {
+      await spendCredits(user.id, cost, { feature: 'video', ref: id, note: `${quality} ${resolution} ${durationSec}s x${variants}` });
+    } catch (err) {
+      if (isNoCreditsError(err)) return res.status(402).json(err.body());
+      if (isAiBudgetError(err)) return res.status(503).json(err.body());
+      throw err;
+    }
+
     const job = await prisma.aiVideoJob.create({
       data: {
-        userId: user.id, parentId: parent?.id ?? null, provider: started.provider, model: started.model, status: 'running', mode,
-        prompt, instruction: instruction || null, direction: direction as any, sourceUrl: startRef, endUrl: endRef, referenceUrls: refRefs,
-        aspectRatio: direction.format ?? aspectRatio, durationSec, resolution, quality, seed, operation: started.operation,
+        id, groupId: id, userId: user.id, parentId: parent?.id ?? null, provider: 'pending', model: 'pending', status: 'preparing',
+        mode: aiStart ? 'scene' : end || aiEnd ? 'interpolate' : 'image',
+        prompt, instruction: instruction || null, direction: direction as any, sourceUrl: startRef, endUrl: endRef, referenceUrls: productRefs,
+        aspectRatio: direction.format ?? aspectRatio, durationSec, resolution, quality, seed, credits: cost,
         listingRef: (parent?.listingRef ?? (typeof body.listingRef === 'string' ? body.listingRef.slice(0, 120) : null)) || null,
         title: (parent?.title ?? (typeof body.title === 'string' ? body.title.slice(0, 140) : null)) || null,
       },
     });
-    const withGroup = await prisma.aiVideoJob.update({ where: { id: job.id }, data: { groupId: job.id } });
-    return res.status(200).json({ job: viewJob(withGroup) });
+    const launch: Launch = { job, direction, prompt, aspectRatio, durationSec, resolution, quality, variants, seed, start, end, products, aiStart, aiEnd };
+    if (aiStart || aiEnd) {
+      void prepareAndStart(launch); // keyframes take ~20–60 s: the client polls 'preparing' → 'running' → 'done'
+      return res.status(200).json({ job: viewJob(job), credits: cost });
+    }
+    await prepareAndStart(launch);
+    const fresh = (await prisma.aiVideoJob.findFirst({ where: { id } })) ?? job;
+    if (fresh.status === 'failed') return res.status(502).json({ code: 'videoFailed', job: viewJob(fresh) });
+    return res.status(200).json({ job: viewJob(fresh), credits: cost });
   } catch (err: any) {
     logger.error('AI video request failed', err, { userId: user.id });
     return res.status(502).json({ code: 'videoFailed' });

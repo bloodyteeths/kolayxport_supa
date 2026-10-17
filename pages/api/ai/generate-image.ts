@@ -4,6 +4,9 @@ import { GoogleGenAI } from '@google/genai';
 import { isRetryableAiError, logUsage } from '@/lib/ai/gemini';
 import { modelChain } from '@/lib/ai/models';
 import sharp from 'sharp';
+import crypto from 'crypto';
+import { imageCredits } from '@/lib/billing/aiCredits';
+import { isAiBudgetError, isNoCreditsError, refundCredits, spendCredits } from '@/lib/billing/aiCreditsServer';
 
 export const config = {
   api: {
@@ -123,6 +126,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // legacy (non-Etsy) callers; Etsy callers opt in explicitly.
   const whiteBackground = typeof white_background === 'boolean' ? white_background : !isEtsy;
 
+  // AI kredisi: charged before the call, refunded in `finally` unless an image is delivered.
+  const creditRef = `img_${crypto.randomBytes(10).toString('hex')}`;
+  try {
+    await spendCredits(user.id, imageCredits(), { feature: 'image', ref: creditRef, note: typeof marketplace === 'string' ? marketplace : undefined });
+  } catch (err) {
+    if (isNoCreditsError(err)) return res.status(402).json(err.body());
+    if (isAiBudgetError(err)) return res.status(503).json(err.body());
+    console.error('AI credits spend failed:', err);
+    return res.status(500).json({ error: 'AI image generation failed', code: 'ai_image_failed' });
+  }
+  let delivered = false;
+
   try {
     const ai = new GoogleGenAI({ apiKey });
 
@@ -241,6 +256,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.warn('Image post-processing failed, returning raw:', processErr);
     }
 
+    delivered = true;
     return res.status(200).json({
       image_base64: imageData,
       mime_type: imageMimeType,
@@ -256,5 +272,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     return res.status(500).json({ error: 'AI image generation failed', code: 'ai_image_failed' });
+  } finally {
+    if (!delivered) void refundCredits(user.id, creditRef).catch((e) => console.error('AI credits refund failed:', e));
   }
 }

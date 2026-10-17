@@ -20,6 +20,7 @@ import { useEntitlement } from '@/lib/billing/useEntitlement';
 import { PlanCard } from './PlanCard';
 import { UsageCard } from './UsageCard';
 import { IncludedCard } from './IncludedCard';
+import { CreditsCard } from './CreditsCard';
 import { InvoicesCard } from './InvoicesCard';
 import { useBillingSummary } from './useBillingSummary';
 import { usePortal } from './usePortal';
@@ -127,6 +128,7 @@ export function BillingPanel({ heading = true }: BillingPanelProps) {
             onManageStores={manageStores}
           />
         ) : null}
+        <CreditsCard />
         <IncludedCard entitlement={e} />
         {showInvoices ? (
           <InvoicesCard

@@ -1,18 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import { directVideo, negativePrompt, normalizeDirection, DEFAULT_DIRECTION } from '@/lib/ai/videoDirector';
 import { VIDEO_TARGET_PROFILES, generationAspect, videoReadiness } from '@/lib/ai/videoTargets';
-import { ffmpegArgs, veoConstraints, veoRequest } from '@/lib/ai/video';
+import { ffmpegArgs, finishArgs, veoConstraints, veoRequest } from '@/lib/ai/video';
+import { keyframePrompt, normalizeQa } from '@/lib/ai/videoProduct';
 
 const img = { data: 'AAA', mimeType: 'image/jpeg' };
 
 describe('video director', () => {
-  it('a person gets a living, natural face; the product stays exact', () => {
+  it('reads as real footage: real-time speed, real skin, phone look; the product is locked to the photos, never described', () => {
     const p = directVideo({ ...DEFAULT_DIRECTION, person: true, expression: 'joyful', product: 'pink flower girl dress' });
     expect(p).toMatch(/pink flower girl dress/);
     expect(p).toMatch(/joyful/);
     expect(p).toMatch(/Never a frozen, blank or doll-like face/);
-    expect(p).toMatch(/Keep the product exactly as in the photo/);
-    expect(negativePrompt({ person: true })).toMatch(/frozen expression/);
+    expect(p).toMatch(/exactly the one in the photos in every frame/);
+    expect(p).toMatch(/never slow motion/);
+    expect(p).toMatch(/smartphone video/);
+    expect(p).toMatch(/no retouching or beauty filter/);
+    const neg = negativePrompt({ person: true });
+    expect(neg).toMatch(/frozen expression/);
+    expect(neg).toMatch(/slow motion/);
+    expect(neg).toMatch(/plastic or waxy skin/);
   });
   it('product-only shots drop the person lines; follow-ups are numbered', () => {
     const p = directVideo({ ...DEFAULT_DIRECTION, person: false, preset: 'hanger' }, ['slower', 'closer']);
@@ -20,8 +27,34 @@ describe('video director', () => {
     expect(p).toMatch(/hanger/);
     expect(p).toMatch(/Change 1: slower\. Change 2: closer\./);
   });
-  it('unknown client values fall back to defaults', () => {
-    expect(normalizeDirection({ preset: 'x', camera: 'drone', target: 'etsy', format: '1:1' })).toMatchObject({ preset: 'twirl', camera: 'auto', target: 'etsy', format: '1:1' });
+  it('studio and cinematic looks change the intro', () => {
+    expect(directVideo({ ...DEFAULT_DIRECTION, look: 'studio' })).toMatch(/professional photographer/);
+    expect(directVideo({ ...DEFAULT_DIRECTION, look: 'cinematic' })).toMatch(/cinema camera/);
+  });
+  it('unknown client values fall back to defaults; old modes map to today\'s', () => {
+    expect(normalizeDirection({ preset: 'x', camera: 'drone', target: 'etsy', format: '1:1' })).toMatchObject({ preset: 'twirl', camera: 'auto', target: 'etsy', format: '1:1', look: 'phone', grain: true });
+    expect(normalizeDirection({ mode: 'reference' }).mode).toBe('scene');
+    expect(normalizeDirection({ mode: 'interpolate' }).mode).toBe('image');
+  });
+});
+
+describe('product lock keyframes', () => {
+  it('the end keyframe continues the first frame and shows the back after a twirl', () => {
+    const p = keyframePrompt({ ...DEFAULT_DIRECTION, preset: 'twirl' }, { which: 'end', refCount: 4, hasStart: true });
+    expect(p).toMatch(/Image 1 is the first frame/);
+    expect(p).toMatch(/Images 2–5 are real photos/);
+    expect(p).toMatch(/back of the outfit/);
+    expect(p).toMatch(/Never add, remove, move or redesign/);
+  });
+  it('the start keyframe puts the product in the chosen scene', () => {
+    const p = keyframePrompt({ ...DEFAULT_DIRECTION, scene: 'garden' }, { which: 'start', refCount: 3, hasStart: false });
+    expect(p).toMatch(/Images 1–3/);
+    expect(p).toMatch(/flower garden/);
+  });
+  it('quality check answers are clamped and cleaned', () => {
+    expect(normalizeQa({ productMatch: 14, realism: '7', diffs: [{ text: 'hem flowers missing', fix: 'keep the hem flowers' }, { text: '' }], issues: 'x' }))
+      .toEqual({ status: 'done', match: 10, realism: 7, diffs: [{ text: 'hem flowers missing', fix: 'keep the hem flowers' }], issues: [] });
+    expect(normalizeQa(['garbled'])).toEqual({ status: 'failed' });
   });
 });
 
@@ -58,6 +91,15 @@ describe('Veo request', () => {
   it('reference mode sends up to 3 asset images', () => {
     const b = veoRequest({ mode: 'reference', prompt: 'p', references: [img, img, img, img], aspectRatio: '16:9', durationSec: 8, resolution: '720p', quality: 'best' }, 'vertex');
     expect((b.instances[0].referenceImages as unknown[]).length).toBe(3);
+  });
+});
+
+describe('ffmpeg finish', () => {
+  it('one pass: crop + grain re-encode, mute drops audio; nothing to do copies', () => {
+    const a = finishArgs('in', 'out', { format: '1:1', grain: true, mute: true }).join(' ');
+    expect(a).toMatch(/crop='min\(iw,ih\)'.*,noise=c0s=6:c0f=t\+u.*libx264/);
+    expect(a).toMatch(/-an/);
+    expect(finishArgs('in', 'out', { mute: true })).toEqual(expect.arrayContaining(['-c:v', 'copy', '-an']));
   });
 });
 

@@ -13,7 +13,7 @@
 import prisma from '@/lib/prisma';
 import { entitlementFromSettings } from './entitlementCore';
 import { isNeutralBilling } from './billingState';
-import type { Feature } from './types';
+import type { Entitlement, Feature } from './types';
 
 export interface FeatureAccess {
   allowed: boolean;
@@ -37,13 +37,13 @@ export function isFeatureLockedError(err: unknown): err is FeatureLockedError {
   return Boolean(err) && (err as { name?: unknown }).name === 'FeatureLockedError';
 }
 
-/** Non-throwing check. An unknown user is locked (and neutral, so no prices are shown). */
-export async function hasFeature(userId: string, feature: Feature, now: Date = new Date()): Promise<FeatureAccess> {
+/** The account's entitlement as the UI derives it (plan, state, features); null for an unknown user. */
+export async function accountEntitlement(userId: string, now: Date = new Date()): Promise<{ ent: Entitlement; neutral: boolean; shopify: boolean } | null> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { subscriptionPlan: true, subscriptionStatus: true, billingInterval: true, billingProvider: true, trialExpiresAt: true },
   });
-  if (!user) return { allowed: false, neutral: true };
+  if (!user) return null;
   const activeShopify = await prisma.shopifyShop.count({ where: { userId, isActive: true } });
   const shopify = user.billingProvider === 'shopify_free' || activeShopify > 0;
   const ent = entitlementFromSettings({
@@ -53,8 +53,15 @@ export async function hasFeature(userId: string, feature: Feature, now: Date = n
     billingProvider: shopify ? 'shopify_free' : user.billingProvider,
     trialExpiresAt: user.trialExpiresAt ? new Date(user.trialExpiresAt).toISOString() : null,
   }, now);
-  if (!ent) return { allowed: false, neutral: true };
-  return { allowed: ent.features[feature] === true, neutral: isNeutralBilling(ent) };
+  if (!ent) return null;
+  return { ent, neutral: isNeutralBilling(ent), shopify };
+}
+
+/** Non-throwing check. An unknown user is locked (and neutral, so no prices are shown). */
+export async function hasFeature(userId: string, feature: Feature, now: Date = new Date()): Promise<FeatureAccess> {
+  const a = await accountEntitlement(userId, now);
+  if (!a) return { allowed: false, neutral: true };
+  return { allowed: a.ent.features[feature] === true, neutral: a.neutral };
 }
 
 /** Throws FeatureLockedError unless the account's plan includes `feature`. */

@@ -21,6 +21,7 @@ import enMessages from '@/messages/en.json';
 import CookieConsent from '@/components/CookieConsent';
 import { ConfirmProvider } from '@/components/ds/overlay/ConfirmDialog';
 import LimitReachedDialog from '@/components/billing/LimitReachedDialog';
+import CreditsDialog from '@/components/domain/credits/CreditsDialog';
 import { installLimitInterceptor } from '@/lib/http/limitInterceptor';
 import LiveAppMount from '@/components/live/LiveAppMount';
 import { zIndex as dsZ, neutral as dsN, radius as dsRadius } from '@/lib/ds/tokens';
@@ -223,6 +224,7 @@ function MyApp({ Component, pageProps }: AppProps) {
         {/* Live events: SSE stream, new-order chime + toast, live SWR refresh. Signed-in /app/* only. */}
         <LiveAppMount ordersPath="/app/labels" />
         <LimitReachedDialog />
+        <CreditsDialog />
         <CookieConsent />
       </ConfirmProvider>
       </ThemeProvider>

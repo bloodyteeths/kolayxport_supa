@@ -20,7 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { id: _id, createdAt: _c, updatedAt: _u, ...base } = src;
     const job = await prisma.aiVideoJob.create({
       data: {
-        ...base, direction: src.direction ?? undefined, parentId: src.id, status: 'running', mode: 'edit', operation: null, favorite: false,
+        ...base, direction: src.direction ?? undefined, qa: (src.qa as any) ?? undefined, credits: 0, parentId: src.id, status: 'running', mode: 'edit', operation: null, favorite: false,
         instruction: [edit.square && 'square', edit.portrait45 && '4:5', edit.mute && 'muted', (edit.trimStart || edit.trimEnd) && `trim ${edit.trimStart ?? 0}-${edit.trimEnd ?? ''}s`].filter(Boolean).join(', '),
         aspectRatio: edit.square ? '1:1' : edit.portrait45 ? '4:5' : src.aspectRatio,
       },

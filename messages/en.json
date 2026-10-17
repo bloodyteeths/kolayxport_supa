@@ -16010,7 +16010,7 @@
   },
   "videoStudio": {
     "title": "Video studio",
-    "subtitle": "Realistic product videos from your product photos, made to each marketplace's rules. Refine until you like it.",
+    "subtitle": "Product videos that look filmed for real, made from your own photos and videos and fitted to each marketplace. The product stays the same in every frame.",
     "target": {
       "title": "Where will it be used?",
       "name": {
@@ -16033,33 +16033,36 @@
       }
     },
     "photos": {
-      "title": "Product photos",
-      "hint": "Pick a listing or upload your own photos. Tap a photo to set its role.",
+      "title": "Product photos and videos",
+      "hint": "Pick a listing or add your own photos and videos. The more angles (front, back, details), the fewer changes.",
       "marketplace": "Marketplace",
       "search": "Search listings…",
       "noResults": "No listings found",
       "change": "Change",
       "loading": "Loading photos…",
-      "upload": "Upload photo"
+      "upload": "Photo / video",
+      "uploading": "Uploading…",
+      "readingVideo": "Reading video…",
+      "fromVideo": "from video",
+      "remove": "Remove",
+      "used": "{count} photos will be used to keep the product exact (up to {max})."
     },
     "role": {
       "start": "Start",
-      "end": "End",
-      "reference": "Reference"
+      "end": "End"
     },
     "mode": {
-      "title": "Video type",
-      "image": "Animate a photo",
-      "interpolate": "Front to back",
-      "reference": "New scene",
+      "title": "How should it start?",
+      "image": "From my photo",
+      "scene": "New scene",
       "hint": {
-        "image": "The chosen photo comes to life.",
-        "interpolate": "Pick two photos (e.g. front and back): the video moves from one to the other.",
-        "reference": "Pick up to 3 photos: the same product and model in a new scene (8 s)."
+        "image": "The video starts on your real photo (the most exact result). Pick an end frame and it ends on that photo.",
+        "scene": "AI builds the first and last frame in the new setting from all your photos, then animates them."
       }
     },
     "shot": {
-      "title": "Shot type"
+      "title": "Shot type",
+      "backWarning": "This shot shows the back. Set a back photo as the end frame or turn on \"Lock the product\"; otherwise the AI guesses the back."
     },
     "preset": {
       "twirl": {
@@ -16118,7 +16121,10 @@
       "notes": "Extra direction (optional)",
       "notesPlaceholder": "e.g. she walks holding her mother's hand and smiles at the camera at the end",
       "avoid": "Avoid (optional)",
-      "avoidPlaceholder": "e.g. other children, toys"
+      "avoidPlaceholder": "e.g. other children, toys",
+      "look": "Look",
+      "motionHint": "Fast movement can change product details; \"Subtle\" is the most exact.",
+      "sceneNeedsScene": "To change the setting choose \"New scene\"; \"From my photo\" keeps the photo's setting."
     },
     "expression": {
       "smiling": "Smiling",
@@ -16168,13 +16174,15 @@
       "format": "Format",
       "length": "Length",
       "resolution": "Resolution",
-      "eightOnly": "1080p, 4K and \"New scene\" can only be 8 s.",
+      "eightOnly": "1080p and 4K can only be 8 s.",
       "quality": "Quality",
       "variants": "Options",
       "seed": "Seed (to repeat)",
       "seedPlaceholder": "random",
       "showPrompt": "Show the prompt sent to the AI",
-      "hidePrompt": "Hide the prompt"
+      "hidePrompt": "Hide the prompt",
+      "grain": "Natural camera texture",
+      "grainHint": "Adds the light grain real cameras have; overly smooth footage looks artificial."
     },
     "format": {
       "9x16": "Vertical 9:16",
@@ -16189,12 +16197,11 @@
     "seconds": "{count} s",
     "consent": "I own the rights to these photos and have the consent of the models in them (a parent's, for children).",
     "need": {
-      "start": "Pick a start photo.",
-      "end": "Pick the end photo.",
-      "references": "Pick at least one reference photo."
+      "start": "Choose a photo for the start frame.",
+      "photos": "Add at least one product photo or video."
     },
     "generate": "{count, plural, one {Create video} other {Create # options}}",
-    "eta": "Usually takes {minutes} min. You can leave the page; the video keeps being made.",
+    "eta": "Usually takes {minutes} min. You can leave the page; the video keeps going.",
     "ready": {
       "ok": "Meets the {marketplace} rules",
       "notOk": "To fix for {marketplace}",
@@ -16220,8 +16227,12 @@
       "error": {
         "childPhoto": "Google didn't make a video from this photo (it shows a child).",
         "filtered": "Google refused this request for safety reasons. Try another photo or description.",
-        "failed": "Couldn't make the video. Try again."
-      }
+        "failed": "Couldn't make the video. Try again.",
+        "keyframe": "Could not build the frames from the photos. Try \"From my photo\"."
+      },
+      "preparing": "Building the frames from your photos…",
+      "preparingHint": "AI rebuilds the product exactly from your photos, then the video starts (2–3 min).",
+      "refunded": "{count} credits were refunded."
     },
     "refine": {
       "title": "Anything to change?",
@@ -16233,9 +16244,9 @@
       "slower": "Slower motion",
       "closer": "Closer shot",
       "showDress": "Show the dress more",
-      "background": "Change the background",
-      "brighter": "Brighter",
-      "staticCam": "Keep the camera still"
+      "staticCam": "Keep the camera still",
+      "keepDress": "Keep the dress exactly as in the photos",
+      "realer": "More real, like a phone video"
     },
     "action": {
       "extend": "+7 s extend",
@@ -16267,16 +16278,95 @@
     },
     "error": {
       "photos": "Couldn't load the listing photos.",
-      "uploadType": "JPG, PNG or WEBP, up to 10 MB.",
+      "uploadType": "Photo: JPG, PNG or WEBP (max 10 MB). Video: MP4 / MOV (max 200 MB).",
       "upload": "Couldn't upload the photo.",
       "consent": "Tick the photo consent box to continue.",
       "start": "Couldn't start the video. Try again.",
       "videoBusy": "At most 4 videos can be made at once.",
       "imageRequired": "Couldn't read the start photo.",
-      "endImageRequired": "Couldn't read the end photo.",
-      "referencesRequired": "Couldn't read the reference photos.",
-      "nothingToEdit": "Nothing to change was chosen."
+      "nothingToEdit": "Nothing to change was chosen.",
+      "video": "Could not read the video. Try MP4 or MOV.",
+      "videoTooLarge": "The video can be at most 200 MB.",
+      "productPhotosRequired": "Could not read the product photos.",
+      "aiBudget": "Today's AI generation capacity is full. Try again tomorrow; no credits were used."
     },
-    "readyToast": "Your video is ready"
+    "readyToast": "Your video is ready",
+    "videoFrames": "{count} sharp frames taken from the video",
+    "slot": {
+      "start": "Start frame",
+      "end": "End frame",
+      "startHint": "Tap a photo below",
+      "endHint": "Optional (e.g. the back)",
+      "endAi": "AI builds it from your photos",
+      "clear": "Remove"
+    },
+    "lock": {
+      "label": "Lock the product",
+      "hint": "When the model turns or walks, the side that shows (e.g. the back of the dress) is not made up: an end frame is built from your photos and the video lands on it. +15 credits."
+    },
+    "look": {
+      "phone": "Phone video",
+      "studio": "Studio",
+      "cinematic": "Cinematic"
+    },
+    "lookHint": {
+      "phone": "Like a real video the seller filmed on a phone: the look that feels least like AI.",
+      "studio": "Like a professional photographer's shoot, clean and sharp.",
+      "cinematic": "Like a fashion film, shallow depth of field."
+    },
+    "qualityHint": {
+      "fast": "Fast: for tries. \"Best\" gives the most realistic result.",
+      "best": "Best: more realistic faces, hands and fabric movement; more credits."
+    },
+    "qa": {
+      "title": "Quality check",
+      "running": "Comparing video frames with your photos…",
+      "failed": "The check could not run.",
+      "match": "Product match",
+      "realism": "Realism",
+      "diffs": "Differs from the photos:",
+      "issues": "Looks artificial:",
+      "clean": "No differences: the product matches the photos.",
+      "fix": "Fix these",
+      "best": "best"
+    }
+  },
+  "credits": {
+    "title": "Buy AI credits",
+    "subtitle": "Image and video generation use credits. Purchased credits never expire.",
+    "needLine": "This needs {need} credits; you have {have}.",
+    "buy": "Buy · {price}",
+    "close": "Close",
+    "balance": "Balance",
+    "unlimited": "Unlimited",
+    "monthly": "Plan: {left}/{of} left · renews {date}",
+    "packs": "Purchased: {count}",
+    "popular": "Most popular",
+    "creditsUnit": "credits",
+    "saving": "Save {percent}%",
+    "approx": "≈ {videos} videos or {images} images",
+    "unavailable": "Buying credits is not available on this account right now.",
+    "costs": "An image is {image} credits; an 8 s 1080p video {video} credits.",
+    "never": "Failed generations are refunded.",
+    "shopifyNote": "The charge is added to your Shopify bill (USD).",
+    "added": "{count} credits added",
+    "addedSoon": "Payment received; the credits will appear shortly.",
+    "addedShopify": "Credits added to your account",
+    "checkoutFailed": "Could not open the payment page. Try again.",
+    "cost": "{count} credits",
+    "buyFor": "Buy credits ({count} needed)",
+    "balanceShort": "Balance: {count} credits ·",
+    "buyShort": "Buy credits",
+    "cardTitle": "AI credits",
+    "cardHint": "Image and video generation use credits. Your plan credits renew every month; purchased ones never expire. Failed generations are refunded.",
+    "planCredits": "Plan credits this month",
+    "packCredits": "Purchased credits",
+    "entry": {
+      "video": "Video",
+      "image": "Image",
+      "purchase": "Credit pack",
+      "refund": "Refund",
+      "adjust": "Adjustment"
+    }
   }
 }

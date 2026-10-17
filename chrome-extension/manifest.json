@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "KolayXport — Etsy, eBay & Amazon Research Tool",
-  "version": "9.6.2",
+  "version": "9.7.1",
   "description": "Research overlays for Etsy, eBay & Amazon (tracked sales, SEO, competition) plus Etsy order sync and tracking entry for KolayXport.",
   "author": "Kolayxport",
   "icons": {
@@ -39,6 +39,7 @@
       ],
       "js": [
         "src/cache.js",
+        "src/lib/etsyMath.js",
         "src/content-shared.js",
         "src/content-search.js",
         "src/content-listing.js",
@@ -88,6 +89,7 @@
       ],
       "js": [
         "src/cache.js",
+        "src/lib/ebayMath.js",
         "src/content-ebay-shared.js",
         "src/content-ebay-search.js",
         "src/content-ebay-listing.js"
@@ -104,6 +106,7 @@
       ],
       "js": [
         "src/cache.js",
+        "src/lib/amazonMath.js",
         "src/content-amazon-shared.js",
         "src/content-amazon-search.js",
         "src/content-amazon-listing.js"

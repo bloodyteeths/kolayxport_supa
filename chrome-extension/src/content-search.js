@@ -51,36 +51,53 @@
       bar.textContent = '';
       bar.appendChild(S.el('span', null, S.t('loading'), 'opacity:0.8'));
 
+      // What the shopper sees on this page (displayed/sale prices, ads flagged) — read now,
+      // before the API answers, so the bar and the per-card comparisons share one basis.
+      const page = S.collectPageCards();
+      const ctx = { display: page.display, market: S.pageMarket(page.display, {}) };
+
       let summary = null;
       try {
-        const data = await C.getOrFetch(`search2:${query}`, 'search', () => S.apiCall('search_enrich', { query }));
+        const data = await C.getOrFetch(`search3:${query}`, 'search', () => S.apiCall('search_enrich', { query }));
         if (!isCurrent()) return;
         summary = data?.summary || null;
-        if (summary) renderSummaryBar(bar, summary, query);
+        if (summary) renderSummaryBar(bar, summary, query, ctx.market);
       } catch (err) {
         bar.textContent = '';
         bar.appendChild(S.el('span', null, (err && err.message) || S.t('loadFailed'), 'opacity:0.7'));
       }
 
       try {
-        const ids = S.pageListingIds().slice(0, 96);
+        const ids = page.ids.slice(0, 96);
         if (ids.length) {
-          await S.loadCardStats(ids, summary ? { price: summary.avgPrice, currency: summary.currency } : null, isCurrent);
+          await S.loadCardStats(ids, ctx, isCurrent, (_all, c) => {
+            if (summary && isCurrent()) renderSummaryBar(bar, summary, query, c.market);
+          });
         }
       } catch (_) { /* per-card rows are best-effort */ }
     }
 
-    function item(label, value, valueStyle) {
+    function item(label, value, valueStyle, title) {
       const wrap = S.el('div', 'kx-bar-item');
+      if (title) wrap.title = title;
       wrap.appendChild(S.el('span', 'kx-bar-label', label));
       wrap.appendChild(S.el('span', 'kx-bar-value', value, valueStyle));
       return wrap;
     }
 
-    function renderSummaryBar(bar, summary, query) {
+    /**
+     * Results = Etsy API count. Price/favourites prefer the cards on this page (what the
+     * shopper sees: sale prices, ads excluded, >= 5 cards); otherwise the Etsy API sample,
+     * labelled as LIST prices. Range = P25–P75 ("typical"); raw min–max only in the tooltip.
+     */
+    function renderSummaryBar(bar, summary, query, market) {
       const compColor = S.competitionColor(summary.competition);
       const compLabel = summary.competition === 'low' ? S.t('compLow') : summary.competition === 'medium' ? S.t('compMed') : S.t('compHigh');
-      const money = (n) => summary.currency ? S.formatMoney(n, summary.currency) : S.formatPrice(n);
+      const apiCur = summary.currency || 'USD';
+      const apiMedian = summary.medianPrice ?? summary.avgPrice;
+      const usePage = !!(market && market.price && market.price.n >= 5);
+      const cur = usePage ? market.currency : apiCur;
+      const money = (n) => S.formatMoney(n, cur, 2);
 
       bar.textContent = '';
       const title = S.el('div', null, null, 'display:flex;align-items:center;gap:4px;font-weight:700;');
@@ -88,15 +105,39 @@
       title.appendChild(S.el('span', null, '"' + query + '"'));
       bar.appendChild(title);
       bar.appendChild(S.el('div', 'kx-bar-divider'));
-      bar.appendChild(item(S.t('result'), S.formatNum(summary.totalResults)));
+      bar.appendChild(item(S.t('result'), S.formatNum(summary.totalResults), null, S.t('sourceApi')));
       bar.appendChild(S.el('div', 'kx-bar-divider'));
-      bar.appendChild(item(S.t('avgPrice'), money(summary.avgPrice)));
-      bar.appendChild(item(S.t('range'), money(summary.minPrice) + ' - ' + money(summary.maxPrice), 'font-size:12px'));
+
+      if (usePage) {
+        const p = market.price;
+        const tip = S.t('priceTipPage', {
+          n: p.n, rawMin: money(p.rawMin), rawMax: money(p.rawMax),
+          apiMedian: apiMedian ? S.formatMoney(apiMedian, apiCur, 2) : '—',
+        });
+        bar.appendChild(item(S.t('medianPrice'), money(p.median), null, tip));
+        bar.appendChild(item(S.t('typicalRange'), money(p.p25) + ' – ' + money(p.p75), 'font-size:12px', tip));
+      } else {
+        const tip = S.t('priceTipApi', {
+          n: summary.used ?? summary.sampled ?? 0,
+          rawMin: money(summary.rawMinPrice ?? summary.minPrice), rawMax: money(summary.rawMaxPrice ?? summary.maxPrice),
+        });
+        bar.appendChild(item(S.t('medianListPrice'), money(apiMedian), null, tip));
+        if (summary.p25Price != null && summary.p75Price != null) {
+          bar.appendChild(item(S.t('typicalRange'), money(summary.p25Price) + ' – ' + money(summary.p75Price), 'font-size:12px', tip));
+        }
+      }
       bar.appendChild(S.el('div', 'kx-bar-divider'));
-      bar.appendChild(item(S.t('avgFav'), S.formatNum(summary.avgFavorites)));
-      bar.appendChild(item(S.t('shops'), String(summary.uniqueShops)));
+
+      if (market && market.favoritesN >= 5) {
+        bar.appendChild(item(S.t('medianFav'), S.formatNum(market.favoritesMedian), null, S.t('favTipPage', { n: market.favoritesN })));
+      } else {
+        const fav = summary.medianFavorites ?? summary.avgFavorites;
+        bar.appendChild(item(S.t('medianFav'), S.formatNum(fav), null, S.t('favTipApi', { n: summary.used ?? summary.sampled ?? 0 })));
+      }
+      const shopsTip = S.t('shopsTip', { n: summary.used ?? summary.sampled ?? 100 });
+      bar.appendChild(item(S.t('shopsTop100'), String(summary.uniqueShops), null, shopsTip));
       bar.appendChild(S.el('div', 'kx-bar-divider'));
-      bar.appendChild(item(S.t('competition'), compLabel, 'color:' + compColor));
+      bar.appendChild(item(S.t('competition'), compLabel, 'color:' + compColor, shopsTip));
 
       const right = S.el('div', null, null, 'margin-left:auto;');
       const link = S.el('a', 'kx-btn kx-btn-sm', S.t('fullAnalysis'), 'background:rgba(255,255,255,0.2);text-decoration:none;color:#fff;');

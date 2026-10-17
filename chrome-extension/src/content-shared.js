@@ -336,16 +336,6 @@ function computeBestSellerRanks(badges) {
   return ranks;
 }
 
-function priceVsAvg(price, avgPrice) {
-  if (!price || !avgPrice) return null;
-  const diff = ((price - avgPrice) / avgPrice * 100).toFixed(0);
-  const isLower = price <= avgPrice;
-  return {
-    text: (isLower ? '' : '+') + diff + t('vsAvg'),
-    cssClass: isLower ? 'kx-green' : 'kx-red',
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Settings Check
 // ---------------------------------------------------------------------------
@@ -381,7 +371,6 @@ const _i18n = {
     compHigh: 'Yüksek',
     fullAnalysis: 'Tam Analiz',
     perMonth: '/ay',
-    vsAvg: '% ort.',
     bestSeller: 'En Çok Satan',
     seo: 'SEO',
     sales: 'satış',
@@ -465,9 +454,34 @@ const _i18n = {
     cardTipUpper: 'Tahmin: son {window} günde yorum yok; mağaza oranı {ratio} ile muhtemelen bu değerin altında.',
     cardTipInsufficient: 'Yeterli gerçek veri yok — tahmin gösterilmiyor.',
     cardTipPending: 'Mağaza verisi yükleniyor…',
-    shopHowMeasured: 'Mağaza satışları {days} günde +{delta} arttı (Etsy API). Gelir = satış × ort. fiyat {avg}.',
-    shopHowEstimated: 'Son {window} günde {recent} mağaza yorumu × satış/yorum oranı {ratio}. Gelir = satış × ort. fiyat {avg}.',
+    shopHowMeasured: 'Mağaza satışları {days} günde +{delta} arttı (Etsy API). Gelir = satış × medyan liste fiyatı {avg} (kaba tahmin; satıcı indirimleri hesaba katılmaz).',
+    shopHowEstimated: 'Son {window} günde {recent} mağaza yorumu × satış/yorum oranı {ratio}. Gelir = satış × medyan liste fiyatı {avg} (kaba tahmin).',
+    priceTipShop: 'Mağazanın ilk 100 aktif ürününün medyan LİSTE fiyatı (Etsy API, indirim öncesi; mağaza para birimi).',
     topRecent: 'En çok yorum alan (son dönem)',
+    medianPrice: 'Medyan Fiyat',
+    medianListPrice: 'Medyan Liste Fiyatı',
+    typicalRange: 'Tipik (P25–P75)',
+    medianFav: 'Medyan Fav',
+    shopsTop100: 'Mağaza (ilk 100)',
+    vsMedian: 'medyana göre',
+    vsMedianTip: 'Bu ürünün fiyatı {price}, bu sayfadaki {n} ürünün medyan fiyatı {median} (reklamlar hariç).',
+    priceTipPage: 'Bu sayfadaki {n} ürünün gösterilen fiyatlarının medyanı (indirimli fiyat, reklamlar hariç). Ham aralık: {rawMin} – {rawMax}. Etsy API örneği (ilk 100, indirimsiz liste fiyatı): medyan {apiMedian}.',
+    priceTipApi: 'Etsy API anahtar kelime örneği (ilk {n} ürün, dijital ürünler hariç). Bunlar indirimsiz LİSTE fiyatlarıdır; Etsy sayfasında görünen indirimli fiyatlardan yüksek olabilir. Ham aralık: {rawMin} – {rawMax}.',
+    favTipPage: 'Bu sayfadaki {n} ürünün favori sayılarının medyanı (Etsy API, reklamlar hariç).',
+    favTipApi: 'Etsy API örneğindeki {n} ürünün favori medyanı.',
+    shopsTip: 'Etsy API anahtar kelime aramasının ilk {n} sonucundaki farklı mağaza sayısı. Rekabet: >50 yüksek, >20 orta.',
+    revTipPage: 'Gelir = {sales} satış/ay × kartta gösterilen fiyat {price}.',
+    revTipList: 'Gelir = {sales} satış/ay × Etsy liste fiyatı {price} (kartta fiyat okunamadı; indirim öncesi fiyat olabilir).',
+    revenueFromPage: 'sayfadaki fiyat {price} ile',
+    revenueFromList: 'Etsy liste fiyatı {price} ile (indirim öncesi olabilir)',
+    qtySeller: 'Adet (satıcı)',
+    qtyTip: 'Satıcının girdiği stok adedi. Etsy satıcıları bunu çoğu zaman yer tutucu olarak yüksek girer; gerçek stok değildir.',
+    itemReviews: 'Ürün Yorumu',
+    itemReviewsTip: 'Yalnızca bu ürünün yorumları (mağazanın tüm yorumları değil).',
+    confShortHigh: 'yüksek güven',
+    confShortMedium: 'orta güven',
+    confShortLow: 'düşük güven',
+    medianListPriceShop: 'Medyan Liste Fiyatı',
   },
   en: {
     loading: 'KolayXport loading...',
@@ -484,7 +498,6 @@ const _i18n = {
     compHigh: 'High',
     fullAnalysis: 'Full Analysis',
     perMonth: '/mo',
-    vsAvg: '% avg.',
     bestSeller: 'Best Seller',
     seo: 'SEO',
     sales: 'sales',
@@ -568,9 +581,34 @@ const _i18n = {
     cardTipUpper: 'Estimate: no reviews in the last {window} days; with the shop ratio {ratio} sales are likely below this.',
     cardTipInsufficient: 'Not enough real data — no guess shown.',
     cardTipPending: 'Loading shop data…',
-    shopHowMeasured: 'Shop sold +{delta} in {days} days (Etsy API). Revenue = sales × avg price {avg}.',
-    shopHowEstimated: '{recent} shop reviews in the last {window} days × sales-per-review ratio {ratio}. Revenue = sales × avg price {avg}.',
+    shopHowMeasured: 'Shop sold +{delta} in {days} days (Etsy API). Revenue = sales × median list price {avg} (rough; ignores seller discounts).',
+    shopHowEstimated: '{recent} shop reviews in the last {window} days × sales-per-review ratio {ratio}. Revenue = sales × median list price {avg} (rough).',
+    priceTipShop: 'Median LIST price of the shop\'s top 100 active listings (Etsy API, before discounts; shop currency).',
     topRecent: 'Most reviewed (recent)',
+    medianPrice: 'Median Price',
+    medianListPrice: 'Median List Price',
+    typicalRange: 'Typical (P25–P75)',
+    medianFav: 'Median Fav',
+    shopsTop100: 'Shops (top 100)',
+    vsMedian: 'vs median',
+    vsMedianTip: 'This listing costs {price}; the median of the {n} listings on this page is {median} (ads excluded).',
+    priceTipPage: 'Median of the prices shown for the {n} listings on this page (sale prices, ads excluded). Raw range: {rawMin} – {rawMax}. Etsy API sample (top 100, pre-discount list prices): median {apiMedian}.',
+    priceTipApi: 'Etsy API keyword sample (top {n} listings, digital downloads excluded). These are pre-discount LIST prices and can be higher than the sale prices Etsy shows. Raw range: {rawMin} – {rawMax}.',
+    favTipPage: 'Median favorites of the {n} listings on this page (Etsy API, ads excluded).',
+    favTipApi: 'Median favorites of {n} listings in the Etsy API sample.',
+    shopsTip: 'Distinct shops in the top {n} Etsy API keyword results. Competition: >50 high, >20 medium.',
+    revTipPage: 'Revenue = {sales} sales/mo × the price shown on this card {price}.',
+    revTipList: 'Revenue = {sales} sales/mo × Etsy list price {price} (card price not readable; may be before a seller discount).',
+    revenueFromPage: 'at the page price {price}',
+    revenueFromList: 'at the Etsy list price {price} (may be before a discount)',
+    qtySeller: 'Qty (seller-set)',
+    qtyTip: 'Quantity the seller entered. Sellers often set a placeholder like 999; this is not real stock.',
+    itemReviews: 'Item Reviews',
+    itemReviewsTip: 'Reviews of this listing only (not the whole shop).',
+    confShortHigh: 'high conf.',
+    confShortMedium: 'medium conf.',
+    confShortLow: 'low conf.',
+    medianListPriceShop: 'Median List Price',
   },
 };
 
@@ -606,14 +644,19 @@ function el(tag, cls, text, style) {
   return n;
 }
 
-function formatMoney(amount, currency) {
+function formatMoney(amount, currency, digits) {
   if (amount === null || amount === undefined) return '—';
-  const cur = currency || 'USD';
+  const d = digits === undefined ? 0 : digits;
+  if (!currency) return Number(amount).toFixed(d);
   try {
-    return new Intl.NumberFormat(_lang === 'tr' ? 'tr-TR' : 'en-US', { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(amount);
+    return new Intl.NumberFormat(_lang === 'tr' ? 'tr-TR' : 'en-US', { style: 'currency', currency, minimumFractionDigits: d, maximumFractionDigits: d }).format(amount);
   } catch (_) {
-    return cur + ' ' + formatNum(amount);
+    return currency + ' ' + Number(amount).toFixed(d);
   }
+}
+
+function confShort(c) {
+  return c === 'high' ? t('confShortHigh') : c === 'medium' ? t('confShortMedium') : c === 'low' ? t('confShortLow') : '';
 }
 
 function formatSales(n) {
@@ -637,13 +680,18 @@ function cardTooltip(sales) {
   }
 }
 
-/** Inline row under a listing card. `stats` is a CardStats from listings_batch. */
-function buildCardRow(stats, avg) {
+/**
+ * Inline row under a listing card. `stats` is a CardStats from listings_batch.
+ * ctx = { display: { [id]: { price: {amount, currency}|null, isAd } }, market: pageMarketSummary() }
+ */
+function buildCardRow(stats, ctx) {
+  const M = window.__KX_MATH;
   const row = el('div', 'kx-data-row');
   row.dataset.kxListing = stats.listingId;
   const sales = stats.sales || { kind: 'insufficient' };
-  row.title = cardTooltip(sales);
+  const tips = [cardTooltip(sales)];
   const sep = () => row.appendChild(el('span', 'kx-sep', '·'));
+  const disp = (ctx && ctx.display && ctx.display[stats.listingId]) || {};
 
   if (sales.kind === 'pending') {
     row.appendChild(el('span', null, '…'));
@@ -656,25 +704,45 @@ function buildCardRow(stats, avg) {
   }
   if (sales.kind !== 'pending') {
     const cls = sales.kind === 'measured' ? 'kx-mini-measured' : sales.kind === 'estimated' ? 'kx-mini-estimated' : 'kx-mini-none';
-    const label = sales.kind === 'measured' ? t('badgeMeasured') : sales.kind === 'estimated' ? t('badgeEstimated') : t('badgeInsufficient');
+    let label = sales.kind === 'measured' ? t('badgeMeasured') : sales.kind === 'estimated' ? t('badgeEstimated') : t('badgeInsufficient');
+    if (sales.confidence) label += ' · ' + confShort(sales.confidence);
     row.appendChild(el('span', 'kx-mini-badge ' + cls, label));
   }
-  if (sales.monthlyRevenue) {
+
+  // Revenue = shown sales x the price shown on this card (fallback: API list price).
+  const rev = M ? M.cardRevenue(stats, disp.price) : null;
+  if (rev && rev.amount) {
     sep();
-    row.appendChild(el('span', 'kx-green', '≈' + formatMoney(sales.monthlyRevenue, stats.currency) + t('perMonth')));
+    row.appendChild(el('span', 'kx-green', '≈' + formatMoney(rev.amount, rev.currency) + t('perMonth')));
+    tips.push(t(rev.source === 'page' ? 'revTipPage' : 'revTipList', {
+      sales: formatSales(sales.monthlySales), price: formatMoney(rev.unitPrice, rev.currency, 2),
+    }));
   }
   if (stats.favorites !== null && stats.favorites !== undefined) {
     sep();
     row.appendChild(el('span', null, '♥ ' + formatNum(stats.favorites)));
   }
-  if (stats.quantity !== null && stats.quantity !== undefined && stats.quantity > 0 && stats.quantity <= 3) {
+  if (M && M.quantitySignal(stats.quantity) === 'low') {
     sep();
     row.appendChild(el('span', 'kx-red', t('lowStock'), 'font-weight:700;'));
   }
-  if (avg && avg.price && stats.price && (!avg.currency || avg.currency === stats.currency)) {
-    const diff = priceVsAvg(stats.price, avg.price);
-    if (diff) { sep(); row.appendChild(el('span', diff.cssClass, diff.text)); }
+
+  // Price vs the median of the cards on this page, both as displayed (same currency).
+  const market = ctx && ctx.market;
+  if (M && market && market.price && market.price.n >= 5 && disp.price && !disp.isAd) {
+    const diff = M.priceVsMedian(disp.price.amount, market.price.median, disp.price.currency, market.currency);
+    if (diff) {
+      sep();
+      const span = el('span', null, diff.text + ' ' + t('vsMedian'), 'color:#666;');
+      span.title = t('vsMedianTip', {
+        price: formatMoney(disp.price.amount, disp.price.currency, 2),
+        median: formatMoney(market.price.median, market.currency, 2),
+        n: market.price.n,
+      });
+      row.appendChild(span);
+    }
   }
+  row.title = tips.join('\n');
   return row;
 }
 
@@ -688,17 +756,78 @@ function findListingCard(link) {
          link.parentElement?.parentElement || link.parentElement;
 }
 
-function pageListingIds() {
+const STRIKE_SEL = 's, del, .wt-text-strikethrough, [class*="strikethrough"], [class*="original-price"], [class*="promotion-price"]';
+
+/** Text of a node without the KX row we injected into it. */
+function cardText(card) {
+  const own = card.querySelector('.kx-data-row');
+  const full = card.innerText || card.textContent || '';
+  return own ? full.replace(own.innerText || own.textContent || '', '') : full;
+}
+
+/** The price a shopper sees on the card (sale price when on sale), or null. */
+function readCardPrice(card) {
+  const M = window.__KX_MATH;
+  if (!M || !card) return null;
+  for (const v of card.querySelectorAll('.currency-value')) {
+    if (v.closest(STRIKE_SEL) || v.closest('.kx-data-row')) continue;
+    const parent = v.parentElement || v;
+    const sym = parent.querySelector('.currency-symbol');
+    const amount = M.parseAmount(v.textContent);
+    if (!amount) continue;
+    const currency = (sym && M.currencyFromSymbol(sym.textContent)) || (M.parseDisplayedPrice(parent.textContent) || {}).currency || null;
+    return { amount, currency };
+  }
+  return M.pickCardPriceFromText(cardText(card));
+}
+
+/** Etsy promoted listings ("Ad by Etsy seller", "Sponsored"). Heuristic — verify live. */
+function isAdCard(card) {
+  if (!card) return false;
+  if (card.matches('[data-is-ad="true"], [data-ad]') || card.querySelector('[data-is-ad="true"], [data-ad-label]')) return true;
+  const head = cardText(card).slice(0, 600);
+  // Case-sensitive "Ad by"/"Ad from" with no left word boundary: textContent can glue it
+  // to the previous node ("…titleAd by Etsy seller").
+  return /Ad(?:vertisement)?\s+(?:by|from)\s/.test(head) || /\bSponsored\b|\bReklam\b|satıcısının\s+reklamı/i.test(head);
+}
+
+/**
+ * Listing ids on the page in order, with what the shopper sees on each card.
+ * Returns { ids: [...], display: { [id]: { price, isAd } } }.
+ */
+function collectPageCards() {
   const ids = [];
+  const display = {};
   document.querySelectorAll('a[href*="/listing/"]').forEach(link => {
     const match = link.href.match(/\/listing\/(\d+)/);
-    if (match && !ids.includes(match[1])) ids.push(match[1]);
+    if (!match || display[match[1]]) return;
+    const card = findListingCard(link);
+    ids.push(match[1]);
+    display[match[1]] = { price: readCardPrice(card), isAd: isAdCard(card) };
   });
-  return ids;
+  return { ids, display };
+}
+
+function pageListingIds() {
+  return collectPageCards().ids;
+}
+
+/** Page market summary from displayed prices + API favourites/shops of the loaded cards. */
+function pageMarket(display, statsById) {
+  const M = window.__KX_MATH;
+  if (!M) return null;
+  const cards = Object.keys(display || {}).map(id => ({
+    price: display[id].price ? display[id].price.amount : null,
+    currency: display[id].price ? display[id].price.currency : null,
+    isAd: display[id].isAd,
+    favorites: statsById && statsById[id] ? statsById[id].favorites : null,
+    shopId: statsById && statsById[id] ? statsById[id].shopId : null,
+  }));
+  return M.pageMarketSummary(cards);
 }
 
 /** Render/replace the KX row on each visible card for the given stats map. */
-function renderCardRows(statsById, avg) {
+function renderCardRows(statsById, ctx) {
   const processed = new Set();
   document.querySelectorAll('a[href*="/listing/"]').forEach(link => {
     const match = link.href.match(/\/listing\/(\d+)/);
@@ -709,7 +838,7 @@ function renderCardRows(statsById, avg) {
     const card = findListingCard(link);
     if (!card) return;
     const old = card.querySelector('.kx-data-row');
-    const row = buildCardRow(stats, avg);
+    const row = buildCardRow(stats, ctx);
     if (old) old.replaceWith(row); else card.appendChild(row);
   });
 }
@@ -718,8 +847,14 @@ function renderCardRows(statsById, avg) {
  * Fetch per-card stats in batches of 48, then re-poll the ids whose shop data
  * was still 'pending' (the server caps fresh shop fetches per request).
  */
-async function loadCardStats(ids, avg, isStillCurrent) {
+async function loadCardStats(ids, ctx, isStillCurrent, onUpdate) {
   const all = {};
+  ctx = ctx || {};
+  const refresh = () => {
+    if (ctx.display) ctx.market = pageMarket(ctx.display, all);
+    renderCardRows(all, ctx);
+    if (onUpdate) onUpdate(all, ctx);
+  };
   const chunks = [];
   for (let i = 0; i < ids.length; i += 48) chunks.push(ids.slice(i, i + 48));
   let pending = [];
@@ -728,14 +863,14 @@ async function loadCardStats(ids, avg, isStillCurrent) {
     const res = await apiCall('listings_batch', { listingIds: chunk });
     Object.assign(all, res.listings || {});
     pending = pending.concat(res.pendingIds || []);
-    renderCardRows(all, avg);
+    refresh();
   }
   for (let round = 0; round < 3 && pending.length && isStillCurrent(); round++) {
     await new Promise(r => setTimeout(r, 2500));
     const res = await apiCall('listings_batch', { listingIds: pending.slice(0, 48) });
     Object.assign(all, res.listings || {});
     pending = (res.pendingIds || []).concat(pending.slice(48));
-    renderCardRows(all, avg);
+    refresh();
   }
   return all;
 }
@@ -765,12 +900,13 @@ window.__KX_SHARED = {
   SELECTORS,
   apiCall,
   listingStatsCall,
-  el, formatMoney, formatSales,
+  el, formatMoney, formatSales, confShort,
   buildCardRow, renderCardRows, loadCardStats, pageListingIds, findListingCard,
+  collectPageCards, pageMarket, readCardPrice, isAdCard,
   lang: _lang,
   formatNum, formatPrice,
   competitionColor, scoreClass, salesColor,
-  computeBestSellerRanks, priceVsAvg,
+  computeBestSellerRanks,
   demandLabel, demandColor,
   isOverlayEnabled,
   getPageType,

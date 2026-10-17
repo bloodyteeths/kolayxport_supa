@@ -50,13 +50,11 @@
       }
       setMessage(bar, S.t('shopAnalysisLoading'), 0.8);
 
-      let avg = null;
       try {
         const data = await C.getOrFetch(`shop2:${shopName.toLowerCase()}`, 'lstats', () => S.apiCall('shop_enrich', { shopId: shopName }));
         if (!isCurrent()) return;
         if (!data?.shop) { bar.textContent = ''; return; }
         renderShopBar(bar, data);
-        avg = { price: data.avgPrice, currency: data.shop.currency };
       } catch (err) {
         setMessage(bar, '⚠ ' + ((err && err.message) || S.t('loadFailed')), 0.7);
       }
@@ -64,8 +62,10 @@
       // Per-listing rows on the shop grid (all one shop → one shop fetch server-side)
       setTimeout(async () => {
         try {
-          const ids = S.pageListingIds().slice(0, 96);
-          if (ids.length && isCurrent()) await S.loadCardStats(ids, avg, isCurrent);
+          // Cards compare against the median of the prices shown on this shop page.
+          const page = S.collectPageCards();
+          const ids = page.ids.slice(0, 96);
+          if (ids.length && isCurrent()) await S.loadCardStats(ids, { display: page.display }, isCurrent);
         } catch (_) { /* best-effort */ }
       }, 500);
     }
@@ -83,13 +83,14 @@
       return wrap;
     }
 
-    function badge(kind) {
+    function badge(kind, confidence) {
       const styles = {
         measured: 'background:#e8f5e9;color:#1b5e20;',
         estimated: 'background:#fff3e0;color:#e65100;',
         insufficient: 'background:#eee;color:#666;',
       };
-      const label = kind === 'measured' ? S.t('badgeMeasured') : kind === 'estimated' ? S.t('badgeEstimated') : S.t('badgeInsufficient');
+      let label = kind === 'measured' ? S.t('badgeMeasured') : kind === 'estimated' ? S.t('badgeEstimated') : S.t('badgeInsufficient');
+      if (confidence && kind !== 'insufficient') label += ' · ' + S.confShort(confidence);
       return S.el('span', null, label,
         (styles[kind] || styles.insufficient) + 'font-size:9px;font-weight:800;text-transform:uppercase;padding:1px 6px;border-radius:8px;margin-left:4px;');
     }
@@ -99,9 +100,9 @@
       const cur = shop.currency || 'USD';
       const i = sales?.inputs || {};
       const how = sales?.kind === 'measured'
-        ? S.t('shopHowMeasured', { delta: S.formatNum(i.shopSoldDelta), days: i.spanDays, avg: S.formatMoney(i.avgPrice, cur) })
+        ? S.t('shopHowMeasured', { delta: S.formatNum(i.shopSoldDelta), days: i.spanDays, avg: S.formatMoney(i.avgPrice, cur, 2) })
         : sales?.kind === 'estimated'
-          ? S.t('shopHowEstimated', { recent: i.recentShopReviews, window: i.windowDays, ratio: i.salesPerReview, avg: S.formatMoney(i.avgPrice, cur) })
+          ? S.t('shopHowEstimated', { recent: i.recentShopReviews, window: i.windowDays, ratio: i.salesPerReview, avg: S.formatMoney(i.avgPrice, cur, 2) })
           : S.t('howInsufficient');
       const conf = sales?.confidence ? ' · ' + S.t(sales.confidence === 'high' ? 'confHigh' : sales.confidence === 'medium' ? 'confMedium' : 'confLow') : '';
 
@@ -119,7 +120,7 @@
         ? (sales.kind === 'estimated' ? '~' : '') + S.formatSales(sales.monthlySales)
         : '—';
       salesItem.appendChild(S.el('span', 'kx-bar-value', val, 'font-size:15px;'));
-      salesItem.appendChild(badge(sales?.kind || 'insufficient'));
+      salesItem.appendChild(badge(sales?.kind || 'insufficient', sales?.confidence));
       bar.appendChild(salesItem);
       if (sales?.monthlyRevenue) {
         bar.appendChild(item(S.t('revenueMo'), '≈' + S.formatMoney(sales.monthlyRevenue, cur), 'color:#a5d6a7;', how));
@@ -131,7 +132,7 @@
       if (shop.salesPerReview) bar.appendChild(item(S.t('salesPerReview'), String(shop.salesPerReview)));
       bar.appendChild(S.el('div', 'kx-bar-divider'));
       if (shop.listing_count !== null && shop.listing_count !== undefined) bar.appendChild(item(S.t('activeListings'), S.formatNum(shop.listing_count)));
-      if (avgPrice) bar.appendChild(item(S.t('avgPrice'), S.formatMoney(avgPrice, cur)));
+      if (avgPrice) bar.appendChild(item(S.t('medianListPriceShop'), S.formatMoney(avgPrice, cur, 2), null, S.t('priceTipShop')));
       if (shop.shopAgeYears !== null && shop.shopAgeYears !== undefined) bar.appendChild(item(S.t('shopAge'), shop.shopAgeYears + ' ' + S.t('years')));
       if (lowStockCount > 0) bar.appendChild(item(S.t('lowStockItems'), String(lowStockCount), 'color:#ffcdd2;'));
 

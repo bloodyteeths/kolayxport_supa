@@ -25,6 +25,11 @@ const KX_AMZ_INLINE_CSS = `
 .kx-data-row .kx-green { color: #2e7d32; }
 .kx-data-row .kx-orange { color: #e65100; }
 .kx-data-row .kx-red { color: #c62828; }
+.kx-data-row .kx-muted, .kx-stats-bar .kx-muted { color: #999; font-weight: 400; }
+.kx-data-row .kx-tag {
+  background: #eee; color: #666; border-radius: 3px; padding: 0 4px; font-size: 10px; font-weight: 700;
+}
+.kx-stats-bar .kx-stats-note { margin-top: 4px; font-size: 11px; color: #888; }
 .kx-amz-badge {
   display: inline-flex; align-items: center; gap: 3px;
   background: linear-gradient(135deg, #FF9900 0%, #FF6600 100%);
@@ -108,47 +113,184 @@ function extractAsinFromElement(el) {
 }
 
 // ---------------------------------------------------------------------------
-// BSR Extraction
+// Pure math/parsing lives in lib/amazonMath.js (unit-tested); this file only
+// does DOM lookups and hands text to those parsers.
+// ---------------------------------------------------------------------------
+const kxAmzMath = window.__kxAmzMath;
+
+const KX_AMZ_DEFAULT_CURRENCY = { US: 'USD', UK: 'GBP', DE: 'EUR', TR: 'TRY' };
+
+function kxText(el) {
+  return el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : '';
+}
+
+// ---------------------------------------------------------------------------
+// Search results — card discovery and per-card fields
 // ---------------------------------------------------------------------------
 
 /**
- * Extract Best Seller Rank from product detail page.
+ * Real search-result cards only. `[data-asin]` alone also matches carousel
+ * tiles, "Related searches", sponsored-brand video widgets and nested
+ * elements, which is how a 48-result page was reported as "141 products".
  */
-function extractBsr() {
-  // Method 1: Product details table
-  const detailBullets = document.querySelectorAll('#detailBulletsWrapper_feature_div li, #productDetails_detailBullets_sections1 tr');
-  for (const el of detailBullets) {
-    const text = el.textContent || '';
-    if (/best\s*seller/i.test(text)) {
-      const match = text.match(/#?([\d,]+)\s+in\s+/i);
-      if (match) return parseInt(match[1].replace(/,/g, ''), 10);
+function extractSearchCards(root) {
+  const scope = root || document;
+  const valid = (el) => /^[A-Z0-9]{10}$/i.test(el.getAttribute('data-asin') || '');
+  let cards = Array.from(scope.querySelectorAll('[data-component-type="s-search-result"][data-asin]')).filter(valid);
+  if (!cards.length) {
+    cards = Array.from(scope.querySelectorAll('.s-main-slot > .s-result-item[data-asin], .s-search-results > .s-result-item[data-asin]'))
+      .filter(valid)
+      .filter((el) => !el.parentElement || !el.parentElement.closest('[data-asin]'));
+  }
+  return cards;
+}
+
+const KX_SPONSORED_WORDS = /^(sponsored|gesponsert|sponsorlu|sponsorisé|sponsorizzato|patrocinado)\b/i;
+
+function isSponsoredCard(card) {
+  if (card.classList.contains('AdHolder')) return true;
+  if (card.querySelector('.puis-sponsored-label-text, .s-sponsored-label-text, .puis-sponsored-label-info-icon, [data-component-type="sp-sponsored-result"], a[href*="/sspa/click"]')) {
+    return true;
+  }
+  const labels = card.querySelectorAll('.puis-label-popover, .s-label-popover-default, .a-color-secondary');
+  for (const l of labels) {
+    if (KX_SPONSORED_WORDS.test(kxText(l))) return true;
+  }
+  return false;
+}
+
+// "4.4 out of 5 stars" / "4,4 von 5 Sternen" — never a review count.
+const KX_RATING_LABEL = /out of 5|von 5|üzerinden|sur 5|su 5|de 5|stars?\b|sterne/i;
+// "(633)", "(1.2K)", "15,234", "1.234"
+const KX_BARE_COUNT = /^\(?\s*\d[\d.,  ]*\s*[KkMm]?\+?\s*\)?$/;
+
+/**
+ * Review (rating) count on a search card. Order of trust:
+ *  1. aria-label of the link to #customerReviews ("15,234 ratings" — full number)
+ *  2. its visible text ("(15,234)" or abbreviated "(15K)")
+ *  3. any bare "(633)" count in the reviews block
+ * The old selector `.a-size-small .a-link-normal` picked whatever link came
+ * first in the card (variant links, "More buying choices $19.99", the rating
+ * popover) and could not read "1.2K", which dragged the average to ~68.
+ */
+function extractCardReviewCount(card, marketplace) {
+  const opts = { marketplace };
+  const links = card.querySelectorAll('a[href*="#customerReviews"], a[href*="customerReviews"]');
+  for (const a of links) {
+    const aria = a.getAttribute('aria-label') || '';
+    if (aria && !KX_RATING_LABEL.test(aria)) {
+      const n = kxAmzMath.parseCount(aria, opts);
+      if (n != null) return n;
+    }
+    const t = kxText(a);
+    if (KX_BARE_COUNT.test(t)) {
+      const n = kxAmzMath.parseCount(t, opts);
+      if (n != null) return n;
     }
   }
-
-  // Method 2: SalesRank in product info
-  const rankEl = document.querySelector('#SalesRank');
-  if (rankEl) {
-    const match = (rankEl.textContent || '').match(/#?([\d,]+)/);
-    if (match) return parseInt(match[1].replace(/,/g, ''), 10);
-  }
-
-  // Method 3: Product information section
-  const infoRows = document.querySelectorAll('.a-keyvalue tr, #productDetails_detailBullets_sections1 tr');
-  for (const row of infoRows) {
-    const label = row.querySelector('th, .a-span3');
-    const value = row.querySelector('td, .a-span9');
-    if (label && value && /best\s*seller/i.test(label.textContent || '')) {
-      const match = (value.textContent || '').match(/#?([\d,]+)/);
-      if (match) return parseInt(match[1].replace(/,/g, ''), 10);
+  const block = card.querySelector('[data-cy="reviews-block"]') || card;
+  const candidates = block.querySelectorAll('[aria-label], .s-underline-text, .a-size-base, .a-size-small');
+  for (const el of candidates) {
+    const aria = el.getAttribute('aria-label') || '';
+    if (aria && /\d/.test(aria) && !KX_RATING_LABEL.test(aria) && /rating|review|bewertung|değerlendirme|^\s*[\d.,]+\s*$/i.test(aria)) {
+      const n = kxAmzMath.parseCount(aria, opts);
+      if (n != null) return n;
+    }
+    const t = kxText(el);
+    if (el.children.length === 0 && KX_BARE_COUNT.test(t) && /^\(|\)$/.test(t)) {
+      const n = kxAmzMath.parseCount(t, opts);
+      if (n != null) return n;
     }
   }
-
   return null;
 }
 
+function extractCardRating(card) {
+  const alt = card.querySelector('[data-cy="reviews-block"] .a-icon-alt, i[class*="a-star"] .a-icon-alt, .a-icon-star-small .a-icon-alt, .a-icon-star-mini .a-icon-alt');
+  const r = alt ? kxAmzMath.parseRating(kxText(alt)) : null;
+  if (r != null) return r;
+  const trigger = card.querySelector('[aria-label*="out of 5"], [aria-label*="von 5"], [aria-label*="üzerinden"]');
+  return trigger ? kxAmzMath.parseRating(trigger.getAttribute('aria-label')) : null;
+}
+
+/** Current price on a card. Skips list/strike-through and per-unit prices (.a-text-price). */
+function extractCardPrice(card, marketplace) {
+  const cur = KX_AMZ_DEFAULT_CURRENCY[marketplace];
+  const prices = card.querySelectorAll('[data-cy="price-recipe"] .a-price, .a-price');
+  for (const p of prices) {
+    if (p.classList.contains('a-text-price') || p.closest('.a-text-price')) continue;
+    const parsed = extractPrice(p, cur);
+    if (parsed) return parsed;
+  }
+  return null;
+}
+
+/** "5K+ bought in past month" — Amazon's own demand floor. */
+function extractCardBought(card, marketplace) {
+  const spans = card.querySelectorAll('[data-cy="reviews-block"] span, .a-row.a-size-base span, span.a-color-secondary, span');
+  for (const s of spans) {
+    if (s.children.length > 2) continue;
+    const t = kxText(s);
+    if (!t || t.length > 90) continue;
+    const b = kxAmzMath.parseBoughtPastMonth(t, { marketplace });
+    if (b) return b;
+  }
+  return null;
+}
+
+function parseSearchCard(card, marketplace) {
+  const price = extractCardPrice(card, marketplace);
+  return {
+    asin: extractAsinFromElement(card),
+    sponsored: isSponsoredCard(card),
+    price: price ? price.value : null,
+    currency: price ? price.currency : KX_AMZ_DEFAULT_CURRENCY[marketplace] || null,
+    reviews: extractCardReviewCount(card, marketplace),
+    rating: extractCardRating(card),
+    bought: extractCardBought(card, marketplace),
+  };
+}
+
+/** "1-48 of over 3,000 results for "turkish towel"" → { total, isLowerBound } */
+function extractTotalResults() {
+  const el = document.querySelector('[data-component-type="s-result-info-bar"] h1, [data-component-type="s-result-info-bar"] .a-section, .s-desktop-toolbar h1, #search .s-breadcrumb');
+  return el ? kxAmzMath.parseTotalResults(kxText(el)) : null;
+}
+
+// ---------------------------------------------------------------------------
+// Product page
+// ---------------------------------------------------------------------------
+
+const KX_BSR_LABEL = /best\s*sellers?\s*rank|bestseller-rang|amazon bestseller|en çok satanlar|çok satanlar sıralaması|classement des meilleures ventes/i;
+
 /**
- * Extract category from product page.
+ * Best Seller Rank on a product page: { rank, category, sub: [{rank, category}] }.
+ * Handles the product-details table, detail bullets, and de "Nr. 1.234 in …".
  */
+function extractBsrInfo() {
+  const texts = [];
+  document.querySelectorAll('#productDetails_detailBullets_sections1 tr, #productDetails_techSpec_section_1 tr, #productDetails_db_sections tr, .prodDetTable tr').forEach((row) => {
+    const th = row.querySelector('th');
+    const td = row.querySelector('td');
+    if (th && td && KX_BSR_LABEL.test(kxText(th))) texts.push(kxText(td));
+  });
+  document.querySelectorAll('#detailBulletsWrapper_feature_div li, #detailBullets_feature_div li, #SalesRank').forEach((li) => {
+    const t = kxText(li);
+    if (KX_BSR_LABEL.test(t) || li.id === 'SalesRank') texts.push(t);
+  });
+  for (const t of texts) {
+    const ranks = kxAmzMath.parseBsrText(t);
+    if (ranks.length) return { rank: ranks[0].rank, category: ranks[0].category, sub: ranks.slice(1) };
+  }
+  return null;
+}
+
+/** Back-compat: just the top-level rank number. */
+function extractBsr() {
+  const info = extractBsrInfo();
+  return info ? info.rank : null;
+}
+
 function extractCategory() {
   const breadcrumbs = document.querySelectorAll('#wayfinding-breadcrumbs_feature_div a, .a-breadcrumb a');
   if (breadcrumbs.length > 0) {
@@ -157,104 +299,99 @@ function extractCategory() {
   return null;
 }
 
-// ---------------------------------------------------------------------------
-// Price Extraction
-// ---------------------------------------------------------------------------
-
-function extractPrice(el) {
-  // Try whole + fraction pattern
-  const whole = el?.querySelector('.a-price-whole');
-  const fraction = el?.querySelector('.a-price-fraction');
+/**
+ * Price from an `.a-price` element → { value, currency }.
+ * Prefers the localized `.a-offscreen` string ("1.234,56 €"); falls back to
+ * whole + fraction digits.
+ */
+function extractPrice(el, fallbackCurrency) {
+  if (!el) return null;
+  const offscreen = el.querySelector('.a-offscreen') || (el.classList.contains('a-offscreen') ? el : null);
+  const offText = kxText(offscreen);
+  if (offText) {
+    const p = kxAmzMath.parsePrice(offText, fallbackCurrency);
+    if (p) return p;
+  }
+  const whole = el.querySelector('.a-price-whole');
   if (whole) {
-    const w = whole.textContent.replace(/[^0-9]/g, '');
-    const f = fraction ? fraction.textContent.replace(/[^0-9]/g, '') : '00';
-    return parseFloat(`${w}.${f}`);
+    const w = (whole.textContent || '').replace(/[^0-9]/g, '');
+    const fEl = el.querySelector('.a-price-fraction');
+    const f = fEl ? (fEl.textContent || '').replace(/[^0-9]/g, '') : '00';
+    const value = parseFloat(`${w}.${f || '00'}`);
+    if (value > 0) {
+      const sym = kxText(el.querySelector('.a-price-symbol'));
+      const p = kxAmzMath.parsePrice(`${sym}${value}`, fallbackCurrency);
+      return p || { value, currency: fallbackCurrency || null };
+    }
   }
-
-  // Try offscreen price
-  const offscreen = el?.querySelector('.a-offscreen');
-  if (offscreen) {
-    const match = offscreen.textContent.match(/[\d,.]+/);
-    if (match) return parseFloat(match[0].replace(/,/g, ''));
-  }
-
-  return null;
+  const own = kxText(el);
+  return own ? kxAmzMath.parsePrice(own, fallbackCurrency) : null;
 }
 
-function extractPriceFromPage() {
+function extractPriceFromPage(marketplace) {
+  const cur = KX_AMZ_DEFAULT_CURRENCY[marketplace || detectAmazonMarketplace()];
   const selectors = [
-    '#corePrice_feature_div .a-price',
+    '#corePrice_feature_div .a-price.priceToPay',
+    '#corePriceDisplay_desktop_feature_div .a-price.priceToPay',
+    '#corePriceDisplay_desktop_feature_div .a-price:not(.a-text-price)',
+    '#corePrice_feature_div .a-price:not(.a-text-price)',
+    '#apex_desktop .a-price:not(.a-text-price)',
     '#price_inside_buybox',
     '#priceblock_dealprice',
     '#priceblock_ourprice',
-    '.a-price.aok-align-center',
   ];
   for (const sel of selectors) {
     const el = document.querySelector(sel);
-    const price = extractPrice(el);
+    const price = extractPrice(el, cur);
     if (price) return price;
   }
   return null;
 }
 
-// ---------------------------------------------------------------------------
-// Review Extraction
-// ---------------------------------------------------------------------------
-
-function extractReviewCount() {
-  const el = document.querySelector('#acrCustomerReviewCount, #ratings-summary .a-link-normal');
-  if (el) {
-    const match = (el.textContent || '').match(/([\d,]+)/);
-    if (match) return parseInt(match[1].replace(/,/g, ''), 10);
-  }
-  return null;
+function extractReviewCount(marketplace) {
+  const el = document.querySelector('#acrCustomerReviewText, #acrCustomerReviewLink');
+  if (!el) return null;
+  const aria = el.getAttribute('aria-label') || '';
+  const n = kxAmzMath.parseCount(aria && !KX_RATING_LABEL.test(aria) ? aria : kxText(el), { marketplace });
+  return n;
 }
 
 function extractRating() {
-  const el = document.querySelector('#acrPopover .a-icon-alt, .reviewCountTextLinkedHistogram .a-icon-alt');
-  if (el) {
-    const match = (el.textContent || '').match(/([\d.]+)/);
-    if (match) return parseFloat(match[1]);
-  }
-  return null;
+  const pop = document.querySelector('#acrPopover');
+  const fromTitle = pop ? kxAmzMath.parseRating(pop.getAttribute('title') || '') : null;
+  if (fromTitle != null) return fromTitle;
+  const el = document.querySelector('#acrPopover .a-icon-alt, [data-hook="rating-out-of-text"], .reviewCountTextLinkedHistogram .a-icon-alt');
+  return el ? kxAmzMath.parseRating(kxText(el)) : null;
+}
+
+function extractBoughtFromPage(marketplace) {
+  const el = document.querySelector('#social-proofing-faceout-title-tk_bought, #socialProofingAsinFaceout_feature_div');
+  return el ? kxAmzMath.parseBoughtPastMonth(kxText(el), { marketplace }) : null;
 }
 
 // ---------------------------------------------------------------------------
-// BSR-to-Sales Estimation (simplified — matches server-side algorithm)
+// Official Amazon data (SP-API via KolayXport server) — optional enrichment.
+// Resolves to null on any failure; callers fall back to page data.
 // ---------------------------------------------------------------------------
 
-const AMZ_CATEGORY_CURVES = {
-  _default: { base: 5000, exponent: 0.57 },
-  'Electronics': { base: 5000, exponent: 0.57 },
-  'Home & Kitchen': { base: 8000, exponent: 0.60 },
-  'Toys & Games': { base: 7000, exponent: 0.60 },
-  'Books': { base: 10000, exponent: 0.63 },
-  'Clothing': { base: 8000, exponent: 0.60 },
-  'Sports': { base: 6000, exponent: 0.58 },
-  'Health': { base: 6000, exponent: 0.58 },
-  'Beauty': { base: 6000, exponent: 0.58 },
-  'Pet Supplies': { base: 5000, exponent: 0.57 },
-  'Baby': { base: 5000, exponent: 0.57 },
-  'Garden': { base: 5000, exponent: 0.57 },
-  'Tools': { base: 5000, exponent: 0.57 },
-  'Automotive': { base: 4000, exponent: 0.55 },
-  'Grocery': { base: 6000, exponent: 0.58 },
-  'Office': { base: 4000, exponent: 0.55 },
-};
-
-function estimateMonthlySales(bsr, categoryName) {
-  if (!bsr || bsr < 1) return 0;
-
-  let curve = AMZ_CATEGORY_CURVES._default;
-  if (categoryName) {
-    const lower = categoryName.toLowerCase();
-    for (const [key, val] of Object.entries(AMZ_CATEGORY_CURVES)) {
-      if (key === '_default') continue;
-      if (lower.includes(key.toLowerCase())) { curve = val; break; }
+function requestSpApiSignals(asins, marketplace) {
+  return new Promise((resolve) => {
+    try {
+      if (!chrome?.runtime?.sendMessage || !asins.length) return resolve(null);
+      chrome.runtime.sendMessage(
+        { type: 'kx_amazon_enrich', params: { asins: asins.slice(0, 20), marketplace } },
+        (response) => {
+          if (chrome.runtime.lastError || !response) return resolve(null);
+          if (response.error) {
+            return resolve({ available: false, reason: response.status === 401 ? 'not_signed_in' : 'unavailable' });
+          }
+          resolve(response);
+        }
+      );
+    } catch (_) {
+      resolve(null);
     }
-  }
-
-  return Math.max(1, Math.round(curve.base * Math.pow(bsr, -curve.exponent)));
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -286,38 +423,28 @@ function observeUrlChanges(callback) {
   return observer;
 }
 
-// ---------------------------------------------------------------------------
-// Formatting helpers
-// ---------------------------------------------------------------------------
-
-function formatNumber(n) {
-  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
-  if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
-  return String(n);
-}
-
-function salesColor(sales) {
-  if (sales >= 300) return 'kx-green';
-  if (sales >= 50) return 'kx-orange';
-  return 'kx-red';
-}
-
 // Make shared functions available to other content scripts
 window.__kxAmzShared = {
+  math: kxAmzMath,
   injectAmazonCSS,
   extractAsinFromUrl,
   extractAsinFromElement,
+  extractSearchCards,
+  parseSearchCard,
+  isSponsoredCard,
+  extractTotalResults,
   extractBsr,
+  extractBsrInfo,
   extractCategory,
   extractPrice,
   extractPriceFromPage,
   extractReviewCount,
   extractRating,
-  estimateMonthlySales,
+  extractBoughtFromPage,
+  requestSpApiSignals,
   detectAmazonMarketplace,
   observeUrlChanges,
-  formatNumber,
-  salesColor,
+  KX_AMZ_DEFAULT_CURRENCY,
   KX_AMZ_PREFIX,
   KX_AMZ_API_BASE,
 };

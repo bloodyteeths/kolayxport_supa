@@ -401,7 +401,9 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, userId: stri
 
       try {
         const data = await callSpApiWithRetry(
-          `/products/pricing/v0/competitivePrice?Asin=${asin}&MarketplaceId=${mktId}`,
+          // getCompetitivePricing requires `Asins` (plural) + `ItemType=Asin`; the
+          // old `Asin=` form was rejected by Amazon with 400 on every call.
+          `/products/pricing/v0/competitivePrice?MarketplaceId=${mktId}&Asins=${encodeURIComponent(asin)}&ItemType=Asin`,
           token,
           region,
         );

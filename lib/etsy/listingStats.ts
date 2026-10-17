@@ -17,6 +17,8 @@
  */
 import prisma from '@/lib/prisma';
 import { etsyFetch } from './http';
+import { moneyToNumber } from './searchSummary';
+import { groupMedian } from '@/lib/research/stats';
 
 const ETSY_BASE = 'https://openapi.etsy.com/v3/application';
 const DAY_MS = 24 * 3600 * 1000;
@@ -232,6 +234,40 @@ function round(n: number, digits = 1): number {
   return Math.round(n * f) / f;
 }
 
+/**
+ * The monthly-sales figure exactly as the extension displays it
+ * (formatSales: >= 10 -> whole number, otherwise one decimal).
+ */
+export function shownMonthlySales(monthly: number): number {
+  return monthly >= 10 ? Math.round(monthly) : Math.round(monthly * 10) / 10;
+}
+
+/**
+ * Revenue = displayed sales x unit price, so the two numbers on screen multiply out.
+ * Returns null when either side is unknown.
+ */
+export function revenueFor(monthly: number | null | undefined, price: number | null | undefined): number | null {
+  if (monthly == null || price == null || !Number.isFinite(monthly) || !Number.isFinite(price) || price <= 0) return null;
+  return Math.round(shownMonthlySales(monthly) * price);
+}
+
+/**
+ * Unit price for revenue on the listing page. The price the shopper sees on the page
+ * (sale price, in the page currency) wins over the API price, which is the pre-discount
+ * LIST price (Etsy's public API does not expose sales). Page price needs a currency.
+ */
+export function pickRevenuePrice(
+  page: Pick<PageSignals, 'pagePrice' | 'pageCurrency'>,
+  apiPrice: number | null,
+  apiCurrency: string | null,
+): { price: number | null; currency: string | null; source: 'page' | 'list_price' | 'none' } {
+  if (page.pagePrice != null && page.pagePrice > 0 && page.pageCurrency) {
+    return { price: page.pagePrice, currency: page.pageCurrency, source: 'page' };
+  }
+  if (apiPrice != null && apiPrice > 0) return { price: apiPrice, currency: apiCurrency, source: 'list_price' };
+  return { price: null, currency: apiCurrency, source: 'none' };
+}
+
 function seoScore(listing: any, imageCount: number) {
   const titleLen = (listing.title || '').length;
   const tagCount = (listing.tags || []).length;
@@ -249,10 +285,12 @@ export interface ListingStatsResult {
   listing: {
     title: string;
     state: string | null;
+    /** Etsy API list price (before any seller sale). */
     price: number | null;
     currency: string | null;
     favorites: number | null;
     views: number | null;
+    /** Seller-set available quantity — often a placeholder (e.g. 999), not real stock. */
     quantity: number | null;
     tags: string[];
     tagCount: number;
@@ -299,8 +337,13 @@ export interface ListingStatsResult {
     monthlySales: number | null;
     /** When kind=estimated but there were no recent reviews: upper bound only. */
     monthlySalesUpperBound: number | null;
+    /** = shownMonthlySales(monthlySales) x priceUsed. */
     monthlyRevenue: number | null;
     currency: string | null;
+    /** Unit price behind monthlyRevenue. */
+    priceUsed: number | null;
+    /** 'page' = price displayed on etsy.com (sale price); 'list_price' = Etsy API pre-discount price. */
+    priceSource: 'page' | 'list_price' | 'none';
     inputs: Record<string, number | string | null>;
   };
   tracking: {
@@ -321,8 +364,11 @@ export async function getListingStats(listingId: string, rawPage: any): Promise<
   const shopId = L.shop_id ? String(L.shop_id) : '';
 
   // ---- Listing basics (Etsy API) ----
-  const price = L.price ? (Number(L.price.amount) || 0) / (Number(L.price.divisor) || 100) : null;
+  // `price` is a Money object (amount in minor units / divisor). It is the LIST price:
+  // Etsy's public API does not reflect seller sales, so revenue prefers the page price.
+  const price = moneyToNumber(L.price);
   const currency = L.price?.currency_code || null;
+  const rev = pickRevenuePrice(page, price, currency);
   const favorites = num(L.num_favorers);
   // Etsy has been phasing `views` out of public responses — treat 0/absent as unknown.
   const views = num(L.views) && Number(L.views) > 0 ? Number(L.views) : null;
@@ -437,7 +483,8 @@ export async function getListingStats(listingId: string, rawPage: any): Promise<
   // ---- Sales: measured > estimated > insufficient ----
   let sales: ListingStatsResult['sales'] = {
     kind: 'insufficient', method: 'none', confidence: null,
-    monthlySales: null, monthlySalesUpperBound: null, monthlyRevenue: null, currency,
+    monthlySales: null, monthlySalesUpperBound: null, monthlyRevenue: null, currency: rev.currency,
+    priceUsed: rev.price, priceSource: rev.source,
     inputs: {},
   };
 
@@ -454,8 +501,10 @@ export async function getListingStats(listingId: string, rawPage: any): Promise<
       confidence,
       monthlySales: round(monthly, 1),
       monthlySalesUpperBound: null,
-      monthlyRevenue: price !== null ? Math.round(monthly * price) : null,
-      currency,
+      monthlyRevenue: revenueFor(round(monthly, 1), rev.price),
+      currency: rev.currency,
+      priceUsed: rev.price,
+      priceSource: rev.source,
       inputs: {
         shopSoldDelta: shopVelocity.delta,
         spanDays: span,
@@ -488,8 +537,10 @@ export async function getListingStats(listingId: string, rawPage: any): Promise<
         confidence: recent >= 10 ? 'medium' : 'low',
         monthlySales: round(monthly, 1),
         monthlySalesUpperBound: null,
-        monthlyRevenue: price !== null ? Math.round(monthly * price) : null,
-        currency,
+        monthlyRevenue: revenueFor(round(monthly, 1), rev.price),
+        currency: rev.currency,
+        priceUsed: rev.price,
+        priceSource: rev.source,
         inputs: {
           recentListingReviews: recent,
           windowDays: round(windowDays, 0),
@@ -510,7 +561,9 @@ export async function getListingStats(listingId: string, rawPage: any): Promise<
         monthlySales: null,
         monthlySalesUpperBound: round(upper, 1),
         monthlyRevenue: null,
-        currency,
+        currency: rev.currency,
+        priceUsed: rev.price,
+        priceSource: rev.source,
         inputs: {
           recentListingReviews: 0,
           windowDays: round(windowDays, 0),
@@ -634,6 +687,7 @@ export interface CardStats {
     confidence: Confidence | null;
     monthlySales: number | null;
     monthlySalesUpperBound: number | null;
+    /** shownMonthlySales x API LIST price (pre-discount). The extension prefers the card's displayed price. */
     monthlyRevenue: number | null;
     /** Compact inputs for a tooltip: reviews in window, window days, ratio, measured shop delta. */
     inputs: Record<string, number | string | null>;
@@ -757,7 +811,9 @@ export async function getBatchListingStats(
     const base: CardStats = {
       listingId: id,
       shopId: item?.shop_id ? String(item.shop_id) : null,
-      price: item?.price ? (Number(item.price.amount) || 0) / (Number(item.price.divisor) || 100) : null,
+      // List price (Money object). Etsy's API does not include sale discounts; the extension
+      // recomputes revenue with the price displayed on the card when it can read it.
+      price: moneyToNumber(item?.price),
       currency: item?.price?.currency_code || null,
       favorites: item ? num(item.num_favorers) : null,
       quantity: item ? num(item.quantity) : null,
@@ -790,7 +846,7 @@ export async function getBatchListingStats(
       base.sales = {
         kind: 'measured', confidence,
         monthlySales: round(monthly, 1), monthlySalesUpperBound: null,
-        monthlyRevenue: base.price !== null ? Math.round(monthly * base.price) : null,
+        monthlyRevenue: revenueFor(round(monthly, 1), base.price),
         inputs: {
           shopSoldDelta: mv.delta, spanDays: round(mv.spanDays, 1),
           shareListingReviews: mine, shareShopReviews: rw.inWindow.length, shareWindowDays: round(rw.windowDays, 0),
@@ -803,7 +859,7 @@ export async function getBatchListingStats(
         base.sales = {
           kind: 'estimated', confidence: mine >= 10 ? 'medium' : 'low',
           monthlySales: round(monthly, 1), monthlySalesUpperBound: null,
-          monthlyRevenue: base.price !== null ? Math.round(monthly * base.price) : null,
+          monthlyRevenue: revenueFor(round(monthly, 1), base.price),
           inputs: { recentListingReviews: mine, windowDays: round(days, 0), salesPerReview: round(spr, 1) },
         };
       } else {
@@ -870,6 +926,7 @@ export interface ShopStatsResult {
     currency: string;
     inputs: Record<string, number | string | null>;
   };
+  /** Median LIST price (shop currency). Legacy name kept for older extensions. */
   avgPrice: number;
   lowStockCount: number;
   topListings: Array<{ listing_id: string; title: string; recentReviews: number; price: number | null }>;
@@ -901,8 +958,14 @@ export async function getShopStats(shopIdOrName: string): Promise<ShopStatsResul
   const spr = salesPerReviewOf(shopSold, shopReviewCount);
   const currency = S.currency_code || 'USD';
   const items: any[] = active?.results || [];
-  const prices = items.map(l => (l.price ? (Number(l.price.amount) || 0) / (Number(l.price.divisor) || 100) : 0)).filter(p => p > 0);
-  const avgPrice = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
+  // Median LIST price of the shop's top-100 active listings, in the shop currency. Only
+  // listings priced in the shop currency are used (never mix currencies). Median, not mean:
+  // one $500 custom piece must not double a $20 shop's revenue.
+  const prices = items
+    .filter(l => !l.price?.currency_code || l.price.currency_code === currency)
+    .map(l => moneyToNumber(l.price))
+    .filter((p): p is number => p !== null);
+  const avgPrice = groupMedian(prices) ?? 0;
 
   const rw = shopReviewWindow(sb.shopReviews, now);
   const mv = measuredShopVelocity(await findShopBaseline(shopId, now), shopSold, now);
@@ -914,7 +977,7 @@ export async function getShopStats(shopIdOrName: string): Promise<ShopStatsResul
       kind: 'measured',
       confidence: mv.spanDays >= 7 ? 'high' : mv.spanDays >= 2 ? 'medium' : 'low',
       monthlySales: round(monthly, 1),
-      monthlyRevenue: avgPrice ? Math.round(monthly * avgPrice) : null,
+      monthlyRevenue: revenueFor(round(monthly, 1), avgPrice || null),
       currency,
       inputs: { shopSoldDelta: mv.delta, spanDays: round(mv.spanDays, 1), avgPrice: round(avgPrice, 2) },
     };
@@ -924,7 +987,7 @@ export async function getShopStats(shopIdOrName: string): Promise<ShopStatsResul
       kind: 'estimated',
       confidence: rw.inWindow.length >= 30 ? 'medium' : 'low',
       monthlySales: round(monthly, 1),
-      monthlyRevenue: avgPrice ? Math.round(monthly * avgPrice) : null,
+      monthlyRevenue: revenueFor(round(monthly, 1), avgPrice || null),
       currency,
       inputs: {
         recentShopReviews: rw.inWindow.length, windowDays: round(rw.windowDays, 0),
@@ -946,7 +1009,7 @@ export async function getShopStats(shopIdOrName: string): Promise<ShopStatsResul
         listing_id: lid,
         title: l?.title || '',
         recentReviews: n,
-        price: l?.price ? (Number(l.price.amount) || 0) / (Number(l.price.divisor) || 100) : null,
+        price: moneyToNumber(l?.price),
       };
     });
 

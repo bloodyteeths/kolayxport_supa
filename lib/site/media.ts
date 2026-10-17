@@ -5,7 +5,7 @@ import path from 'path';
 import sharp from 'sharp';
 import type { SiteLocale } from './routes';
 
-export interface Asset { src: string; width: number; height: number }
+export interface Asset { src: string; width: number; height: number; /** "url 800w, url 1200w, url 2400w" when variants exist */ srcSet?: string }
 
 const PUB = path.join(process.cwd(), 'public');
 
@@ -13,7 +13,13 @@ async function asset(rel: string): Promise<Asset | null> {
   const file = path.join(PUB, rel);
   if (!fs.existsSync(file)) return null;
   const meta = await sharp(file).metadata();
-  return meta.width && meta.height ? { src: rel, width: meta.width, height: meta.height } : null;
+  if (!meta.width || !meta.height) return null;
+  // Responsive variants made by `node scripts/brand/export-assets.mjs variants`.
+  const vs = [800, 1200]
+    .map((w) => ({ w, rel: rel.replace(/\.webp$/, `@${w}.webp`) }))
+    .filter((v) => v.w < meta.width! && fs.existsSync(path.join(PUB, v.rel)));
+  const srcSet = vs.length ? [...vs.map((v) => `${v.rel} ${v.w}w`), `${rel} ${meta.width}w`].join(', ') : undefined;
+  return { src: rel, width: meta.width, height: meta.height, ...(srcSet ? { srcSet } : {}) };
 }
 
 /** Lifestyle photo slot (public/marketing/<id>.webp), or null when not generated/approved yet. */

@@ -331,13 +331,15 @@ describe('PricingPage signed-in CTAs (§10.4)', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('mobile: Growth first in the DOM (reading + tab order) and 48px CTAs', () => {
+  it('mobile: same DOM as server render (no reorder after hydration → no layout shift); Growth first via CSS order', () => {
     h.mobile = true;
     renderPage('en');
+    // DOM order never depends on the viewport: re-ordering after hydration moved every card ~360px (CLS 0.29).
     const ids = Array.from(plans().querySelectorAll('article')).map((a) => a.getAttribute('data-testid'));
-    expect(ids).toEqual(['plan-card-growth', 'plan-card-starter', 'plan-card-pro', 'plan-card-enterprise']);
-    const buttons = Array.from(plans().querySelectorAll('[data-testid^="plan-cta-"]')).map((b) => b.getAttribute('data-testid'));
-    expect(buttons.slice(0, 2)).toEqual(['plan-cta-growth', 'plan-cta-starter']);
+    expect(ids).toEqual(['plan-card-starter', 'plan-card-growth', 'plan-card-pro', 'plan-card-enterprise']);
+    // The visual mobile order (Growth first) is a CSS rule on the grid below 900px.
+    const css = Array.from(document.querySelectorAll('style')).map((s) => s.textContent || '').join('\n');
+    expect(css).toMatch(/max-width:\s*899\.95px[\s\S]*#plan-card-growth[\s\S]*order:\s*0/);
   });
 
   it('desktop: Starter first; anonymous SEO description carries the from-price', () => {

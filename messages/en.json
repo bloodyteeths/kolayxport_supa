@@ -16280,7 +16280,7 @@
     },
     "cookies": {
       "title": "Cookie preferences",
-      "text": "We use necessary cookies to run the site. With your permission we also use cookies to measure visits (analytics) and our ads (marketing).",
+      "text": "We always use necessary cookies; analytics and marketing cookies only with your permission.",
       "acceptAll": "Accept all",
       "rejectAll": "Necessary only",
       "customize": "Manage preferences",

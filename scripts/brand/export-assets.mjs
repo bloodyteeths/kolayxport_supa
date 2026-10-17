@@ -155,5 +155,25 @@ async function og() {
   await b.close();
 }
 
+/** Responsive variants of product screenshots and photos: <id>@800.webp / @1200.webp next to the original. */
+async function variants() {
+  const roots = [path.join(PUB, 'marketing/screens'), path.join(PUB, 'marketing/screens/en'), path.join(PUB, 'marketing')];
+  let n = 0;
+  for (const dir of roots) {
+    if (!fs.existsSync(dir)) continue;
+    for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.webp') && !x.includes('@'))) {
+      const src = path.join(dir, f);
+      const meta = await sharp(src).metadata();
+      for (const w of [800, 1200]) {
+        if (!meta.width || meta.width <= w) continue;
+        const out = path.join(dir, f.replace(/\.webp$/, `@${w}.webp`));
+        await sharp(src).resize({ width: w }).webp({ quality: 74 }).toFile(out);
+        n += 1;
+      }
+    }
+  }
+  console.log(`${n} responsive variants`);
+}
+
 const mode = process.argv[2];
-(mode === 'og' ? og() : core()).then(() => console.log('assets exported')).catch((e) => { console.error(e); process.exit(1); });
+(mode === 'og' ? og() : mode === 'variants' ? variants() : core()).then(() => console.log('assets exported')).catch((e) => { console.error(e); process.exit(1); });

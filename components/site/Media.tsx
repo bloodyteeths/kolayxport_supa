@@ -1,19 +1,30 @@
+import Head from 'next/head';
 import { useTranslations } from 'next-intl';
 import type { Asset } from '@/lib/site/media';
 
 /** A real product screenshot in the brand frame. Renders nothing when the capture doesn't exist. */
-export function Shot({ asset, mobile, alt, priority = false, className = '' }: { asset: Asset | null | undefined; mobile?: Asset | null; alt: string; priority?: boolean; className?: string }) {
+export function Shot({ asset, mobile, alt, priority = false, className = '', sizes = '(max-width: 1024px) 100vw, 600px' }: { asset: Asset | null | undefined; mobile?: Asset | null; alt: string; priority?: boolean; className?: string; sizes?: string }) {
   const t = useTranslations('site.common');
   if (!asset) return null;
+  // Phones get the 800px variant of the phone capture (enough for 2x, a fraction of the bytes).
+  const mobileSrc = mobile ? (mobile.srcSet?.split(',')[0]?.trim().split(' ')[0] || mobile.src) : null;
   return (
     <div className={className}>
-    <figure className="site-shot">
-      <picture>
-      {/* Phone-sized capture (scripts/gtm/capture-screens.ts → <id>-mobile.webp) below 640px. */}
-      {mobile ? <source media="(max-width: 640px)" srcSet={mobile.src} width={mobile.width} height={mobile.height} /> : null}
+    {priority ? (
+      <Head>
+        {mobileSrc ? <link rel="preload" as="image" href={mobileSrc} media="(max-width: 640px)" fetchPriority="high" /> : null}
+        <link rel="preload" as="image" href={asset.src} imageSrcSet={asset.srcSet} imageSizes={asset.srcSet ? sizes : undefined} media={mobileSrc ? '(min-width: 641px)' : undefined} fetchPriority="high" />
+      </Head>
+    ) : null}
+    <figure className={`site-shot ${mobile ? 'max-sm:aspect-[4/5]' : ''}`}>
+      <picture className={mobile ? 'block max-sm:h-full' : undefined}>
+      {/* Phone-sized capture (scripts/gtm/capture-screens.ts → <id>-mobile.webp) below 640px, cropped to 4:5. */}
+      {mobileSrc ? <source media="(max-width: 640px)" srcSet={mobileSrc} width={mobile!.width} height={mobile!.height} /> : null}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={asset.src}
+        srcSet={asset.srcSet}
+        sizes={asset.srcSet ? sizes : undefined}
         alt={alt}
         width={asset.width}
         height={asset.height}
@@ -21,7 +32,7 @@ export function Shot({ asset, mobile, alt, priority = false, className = '' }: {
         decoding="async"
         // @ts-expect-error fetchpriority is valid HTML, React 18 types lag behind
         fetchpriority={priority ? 'high' : 'auto'}
-        className="block h-auto w-full"
+        className={`block w-full ${mobile ? 'max-sm:h-full max-sm:object-cover max-sm:object-top' : 'h-auto'}`}
       />
       </picture>
     </figure>
@@ -37,7 +48,7 @@ export function Photo({ asset, alt, label, className = '', priority = false }: {
   return (
     <figure className={`relative overflow-hidden rounded-[24px] ${className}`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={asset.src} alt={`${alt} (${label})`} width={asset.width} height={asset.height} loading={priority ? 'eager' : 'lazy'} decoding="async" className="block h-full w-full object-cover" />
+      <img src={asset.src} srcSet={asset.srcSet} sizes={asset.srcSet ? '(max-width: 1024px) 100vw, 600px' : undefined} alt={`${alt} (${label})`} width={asset.width} height={asset.height} loading={priority ? 'eager' : 'lazy'} decoding="async" className="block h-full w-full object-cover" />
     </figure>
   );
 }

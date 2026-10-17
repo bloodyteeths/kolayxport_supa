@@ -13610,18 +13610,19 @@
       "roundNone": "Don't round",
       "stage": "Stage {count} price changes",
       "preview": "{count, plural, one {# listing} other {# listings}} · {from} → {to} (example)",
-      "previewEmpty": "{count, plural, one {# listing} other {# listings}} selected",
+      "previewEmpty": "Enter a value to see the new price",
       "skippedVariations": "{count} listings with variations skipped: change them in the grid",
       "skippedInvalid": "{count, plural, one {# listing} other {# listings}} skipped: the new price would be too low",
       "nothingToStage": "Nothing would change",
       "variations": "{count, plural, one {# listing has} other {# listings have}} variations: every variation's price changes the same way",
       "variationsSkipped": "{count, plural, one {# listing} other {# listings}} with variations skipped: their variations couldn't be read. Try again or change them in the editor",
       "matchHelp": "Leave empty to change every variation",
-      "matchProperty": "Only variations where",
+      "matchProperty": "Variation property",
       "matchPropertyPlaceholder": "Property, e.g. Size",
       "matchSkipsPlain": "{count, plural, one {# listing} other {# listings}} without variations won't change",
-      "matchValue": "is",
-      "matchValuePlaceholder": "Value, e.g. Large"
+      "matchValue": "Value",
+      "matchValuePlaceholder": "Value, e.g. Large",
+      "matchOpen": "Only change some variations"
     },
     "stock": {
       "in": "In stock",

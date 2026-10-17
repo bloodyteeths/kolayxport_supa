@@ -13,6 +13,7 @@ import { Select } from '@/components/ds/inputs/Select';
 import { MoneyField } from '@/components/ds/inputs/MoneyField';
 import { NumberField } from '@/components/ds/inputs/NumberField';
 import { TextField } from '@/components/ds/inputs/TextField';
+import { Button } from '@/components/ds/inputs/Button';
 import { activeMatch, type VariationMatch } from '@/lib/bulk/variationPriceOps';
 import { neutral } from '@/lib/ds/tokens';
 import type { ListingRow, StagePatch } from '@/lib/listings/types';
@@ -128,6 +129,8 @@ export function ChangePriceModal({ open, onClose, rows, currency, priceMin, curr
   // variations, and leaves listings without variations alone.
   const [matchProperty, setMatchProperty] = React.useState('');
   const [matchValue, setMatchValue] = React.useState('');
+  // Most price changes cover every variation: the property/value filter stays behind a link until asked for.
+  const [showMatch, setShowMatch] = React.useState(false);
 
   React.useEffect(() => {
     if (open) {
@@ -233,6 +236,13 @@ export function ChangePriceModal({ open, onClose, rows, currency, priceMin, curr
             <Typography variant="caption" sx={{ color: neutral[600] }} data-testid="listings-change-price-variations">
               {t('listings.price.variations', { count: variationRows.length })}
             </Typography>
+            {!showMatch && !matchProperty && !matchValue ? (
+              <Box>
+                <Button variant="ghost" size="sm" onClick={() => setShowMatch(true)} data-testid="listings-change-price-match-open">
+                  {t('listings.price.matchOpen')}
+                </Button>
+              </Box>
+            ) : (
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: '8px' }}>
               <FormField label={t('listings.price.matchProperty')} helper={t('listings.price.matchHelp')}>
                 <TextField value={matchProperty} onChange={setMatchProperty} placeholder={t('listings.price.matchPropertyPlaceholder')} data-testid="listings-change-price-match-property" />
@@ -241,6 +251,7 @@ export function ChangePriceModal({ open, onClose, rows, currency, priceMin, curr
                 <TextField value={matchValue} onChange={setMatchValue} placeholder={t('listings.price.matchValuePlaceholder')} data-testid="listings-change-price-match-value" />
               </FormField>
             </Box>
+            )}
             {match && plan.patches.length > 0 ? (
               <Typography variant="caption" sx={{ color: neutral[600] }}>
                 {t('listings.price.matchSkipsPlain', { count: plan.patches.length })}

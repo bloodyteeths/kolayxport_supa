@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { directVideo, negativePrompt, normalizeDirection, DEFAULT_DIRECTION } from '@/lib/ai/videoDirector';
 import { VIDEO_TARGET_PROFILES, generationAspect, videoReadiness } from '@/lib/ai/videoTargets';
 import { ffmpegArgs, finishArgs, veoConstraints, veoRequest } from '@/lib/ai/video';
-import { keyframePrompt, matchWindow, normalizeQa } from '@/lib/ai/videoProduct';
+import { keyframePrompt, matchWindow, normalizePhotoAnalysis, normalizeQa } from '@/lib/ai/videoProduct';
 
 const img = { data: 'AAA', mimeType: 'image/jpeg' };
 
@@ -61,6 +61,18 @@ describe('product lock keyframes', () => {
     // feet line kept: end bottom (1536 px) maps to the start bottom (1728 px of 1920)
     expect(Math.round(((1536 - w.top) / w.height) * 1920)).toBe(1728);
     expect(matchWindow([100, 300, 900, 700], [110, 300, 905, 700], 1080, 1920)).toBeNull();
+  });
+  it('frames are picked automatically: full-body front starts, back ends, a close-up never anchors', () => {
+    const photos = [
+      { view: 'side', fullBody: true, person: true, quality: 8 },
+      { view: 'front', fullBody: true, person: true, quality: 9 },
+      { view: 'back', fullBody: true, person: true, quality: 8 },
+      { view: 'detail', fullBody: false, person: true, quality: 9 },
+    ];
+    expect(normalizePhotoAnalysis({ photos, start: 2, end: 3 }, 4)).toMatchObject({ start: 1, end: 2 });
+    // the model picked the close-up and no end: the rules fall back to the front and the back photo
+    expect(normalizePhotoAnalysis([{ photos, start: 4, end: null }], 4)).toMatchObject({ start: 1, end: 2 });
+    expect(normalizePhotoAnalysis(null, 2)).toMatchObject({ start: null, end: null });
   });
   it('quality check answers are clamped and cleaned', () => {
     expect(normalizeQa({ productMatch: 14, realism: '7', diffs: [{ text: 'hem flowers missing', fix: 'keep the hem flowers' }, { text: '' }], issues: 'x' }))

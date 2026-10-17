@@ -23,7 +23,7 @@ import { logUsage } from '@/lib/ai/gemini';
 import { directVideo, negativePrompt, normalizeDirection, type VideoDirection } from '@/lib/ai/videoDirector';
 import { finishInPlace, originalOf, pollVideo, saveVideo, startVideo, veoConstraints, VIDEO_UPLOAD_ROOT, type VideoMedia } from '@/lib/ai/video';
 import { fitToAspect, loadSource, loadSources, saveSourceImage } from '@/lib/ai/videoSources';
-import { checkVideo, generateKeyframe, keyframePrompt, matchSubjectScale, MAX_PRODUCT_REFS } from '@/lib/ai/videoProduct';
+import { checkVideo, generateKeyframe, keyframePrompt, matchSubjectScale, MAX_PRODUCT_REFS, type VideoQa } from '@/lib/ai/videoProduct';
 import { extendCredits, imageCredits, videoCredits } from '@/lib/billing/aiCredits';
 import { isAiBudgetError, isNoCreditsError, refundCredits, spendCredits } from '@/lib/billing/aiCreditsServer';
 
@@ -35,7 +35,7 @@ const STALE_MS = 20 * 60 * 1000;
 const TURNING = new Set(['twirl', 'turntable', 'frontBack', 'walk', 'pose', 'lifestyle']);
 
 type Job = NonNullable<Awaited<ReturnType<typeof prisma.aiVideoJob.findFirst>>>;
-type Dir = VideoDirection & { genAspect?: '9:16' | '16:9'; variants?: number; locale?: 'tr' | 'en' };
+type Dir = VideoDirection & { genAspect?: '9:16' | '16:9'; variants?: number; locale?: 'tr' | 'en'; autoFixOf?: string };
 
 export function viewJob(j: Job) {
   return {
@@ -58,8 +58,18 @@ async function failJob(job: Job, errorKey: string, detail: string): Promise<Job>
   return (await prisma.aiVideoJob.findFirst({ where: { id: job.id } })) ?? job;
 }
 
-/** Background: compares each finished video with the product photos (one at a time). */
+/** Below these the best variant is fixed automatically, once (founder: "the video editor should do all that itself"). */
+const AUTO_FIX_MATCH = 7;
+const AUTO_FIX_REALISM = 6;
+const qaScore = (q: VideoQa) => (q.match ?? 0) * 2 + (q.realism ?? 0);
+
+/**
+ * Background: compares each finished variant with the product photos (one at a time). When even the best one
+ * changed the product or looks artificial, a corrected version is started from it at once — free, never twice for
+ * a take — before the results are stored, so the studio sees the fix as soon as it sees the scores.
+ */
 async function runQa(jobIds: string[]) {
+  const results: { job: Job; qa: VideoQa }[] = [];
   for (const id of jobIds) {
     const job = await prisma.aiVideoJob.findFirst({ where: { id, status: 'done' } });
     if (!job?.filePath) continue;
@@ -67,12 +77,29 @@ async function runQa(jobIds: string[]) {
       await prisma.aiVideoJob.update({ where: { id }, data: { qa: { status: 'running' } } });
       const refs = await loadSources(job.userId, job.referenceUrls.slice(0, 5));
       const locale = (job.direction as Dir | null)?.locale === 'en' ? 'en' : 'tr';
-      const qa = refs.length ? await checkVideo({ userId: job.userId, file: job.filePath, refs, locale }) : { status: 'failed' as const };
-      await prisma.aiVideoJob.update({ where: { id }, data: { qa: qa as any } });
+      results.push({ job, qa: refs.length ? await checkVideo({ userId: job.userId, file: job.filePath, refs, locale }) : { status: 'failed' } });
     } catch (err: any) {
       logger.warn('AI video quality check failed', { jobId: id, error: err?.message });
-      await prisma.aiVideoJob.update({ where: { id }, data: { qa: { status: 'failed' } } }).catch(() => undefined);
+      results.push({ job, qa: { status: 'failed' } });
     }
+  }
+  const main = results[0]?.job;
+  let autoFix: string | null = null;
+  const d = (main?.direction ?? {}) as Dir;
+  const scored = results.filter((r) => r.qa.status === 'done').sort((a, b) => qaScore(b.qa) - qaScore(a.qa));
+  const best = scored[0];
+  if (main && best && !d.autoFixOf && main.mode !== 'extend' && main.mode !== 'edit'
+    && ((best.qa.match ?? 10) < AUTO_FIX_MATCH || (best.qa.realism ?? 10) < AUTO_FIX_REALISM)) {
+    const fixes = [...(best.qa.diffs ?? []), ...(best.qa.issues ?? [])].map((x) => x.fix).filter(Boolean).slice(0, 5);
+    if (fixes.length) {
+      const r = await launchTake(main.userId, { parentId: best.job.id, instruction: `Fix: ${fixes.join('; ')}`.slice(0, 400), variants: 1 }, d.locale === 'en' ? 'en' : 'tr', { free: true, autoFixOf: main.groupId ?? main.id })
+        .catch((err) => { logger.warn('AI video auto-fix failed to start', { jobId: main.id, error: err?.message }); return null; });
+      autoFix = r?.json?.job?.id ?? null;
+    }
+  }
+  for (const r of results) {
+    const qa = r.job.id === main?.id && autoFix ? { ...r.qa, autoFix } : r.qa;
+    await prisma.aiVideoJob.update({ where: { id: r.job.id }, data: { qa: qa as any } }).catch(() => undefined);
   }
 }
 
@@ -169,6 +196,91 @@ async function prepareAndStart(l: Launch) {
   }
 }
 
+/**
+ * A new take or a follow-up version (also started by the automatic fix after a failed quality check, `opts.free`).
+ * Returns the HTTP status + body for the handler.
+ */
+async function launchTake(userId: string, body: any, locale: 'tr' | 'en', opts: { free?: boolean; autoFixOf?: string } = {}): Promise<{ status: number; json: any }> {
+  let parent: Job | null = null;
+  if (body.parentId) {
+    parent = await prisma.aiVideoJob.findFirst({ where: { id: String(body.parentId), userId: userId } });
+    if (!parent) return { status: 404, json: { code: 'notFound' } };
+  }
+  const instruction = typeof body.instruction === 'string' ? body.instruction.trim().slice(0, 400) : '';
+  if (parent && !instruction && !body.direction) return { status: 400, json: { code: 'instructionRequired' } };
+
+  const direction: Dir = { ...normalizeDirection(body.direction ?? parent?.direction ?? {}), locale };
+  const lock = body.lock !== false && (parent ? (parent.direction as any)?.lock !== false : true);
+
+  // Frames + product photos. A follow-up re-uses its parent's frames (real photos or the keyframes already built).
+  let startRef: string | null;
+  let endRef: string | null;
+  let productRefs: string[];
+  if (parent) {
+    startRef = parent.sourceUrl;
+    endRef = parent.endUrl;
+    productRefs = parent.referenceUrls;
+  } else {
+    startRef = direction.mode === 'scene' ? null : (typeof body.sources?.start === 'string' ? body.sources.start : null);
+    endRef = direction.mode === 'scene' ? null : (typeof body.sources?.end === 'string' ? body.sources.end : null);
+    const listed = Array.isArray(body.sources?.product) ? body.sources.product : Array.isArray(body.sources?.references) ? body.sources.references : [];
+    productRefs = Array.from(new Set([startRef, endRef, ...listed.map(String)].filter((x): x is string => Boolean(x)))).slice(0, MAX_PRODUCT_REFS);
+  }
+  const products = await loadSources(userId, productRefs);
+  const start = startRef ? await loadSource(userId, startRef) : null;
+  const end = endRef ? await loadSource(userId, endRef) : null;
+  const aiStart = !start;
+  if (aiStart && !products.length) return { status: 400, json: { code: direction.mode === 'scene' ? 'productPhotosRequired' : 'imageRequired' } };
+  // The end the first frame cannot show (the back after a turn, the next pose) is built from the photos.
+  const aiEnd = !end && !parent && lock && TURNING.has(direction.preset) && products.length > 0;
+
+  const changes = [...(await changesOf(userId, parent)), ...(instruction ? [instruction] : [])];
+  // Veo renders 16:9 / 9:16; the client sends the generation aspect (from the format and the photo orientation).
+  const parentGen = (parent?.direction as Dir | null)?.genAspect ?? (parent?.aspectRatio === '16:9' ? '16:9' : parent ? '9:16' : null);
+  const aspectRatio: '9:16' | '16:9' = (body.aspectRatio ?? parentGen) === '16:9' ? '16:9' : '9:16';
+  direction.genAspect = aspectRatio;
+  const { durationSec, resolution } = veoConstraints({ mode: 'image', durationSec: Number(body.durationSec ?? parent?.durationSec ?? 8), resolution: String(body.resolution ?? parent?.resolution ?? '720p') });
+  const quality = (body.quality ?? parent?.quality) === 'best' ? 'best' : 'fast';
+  const variants = Math.min(4, Math.max(1, Number(body.variants ?? 1) || 1));
+  direction.variants = variants;
+  (direction as any).lock = lock;
+  const seedRaw = body.seed;
+  const seed = seedRaw !== undefined && seedRaw !== null && seedRaw !== '' && Number.isFinite(Number(seedRaw)) ? Math.round(Number(seedRaw)) : (parent?.seed ?? null);
+  const prompt = directVideo(direction, changes);
+
+  const id = newJobId();
+  // An automatic fix (after a failed quality check) is on us: never charged.
+  const cost = opts.free ? 0 : videoCredits({ quality, resolution, durationSec, variants }) + (aiStart ? imageCredits() : 0) + (aiEnd ? imageCredits() : 0);
+  if (opts.autoFixOf) direction.autoFixOf = opts.autoFixOf;
+  try {
+    await spendCredits(userId, cost, { feature: 'video', ref: id, note: `${quality} ${resolution} ${durationSec}s x${variants}` });
+  } catch (err) {
+    if (isNoCreditsError(err)) return { status: 402, json: err.body() };
+    if (isAiBudgetError(err)) return { status: 503, json: err.body() };
+    throw err;
+  }
+
+  const job = await prisma.aiVideoJob.create({
+    data: {
+      id, groupId: id, userId: userId, parentId: parent?.id ?? null, provider: 'pending', model: 'pending', status: 'preparing',
+      mode: aiStart ? 'scene' : end || aiEnd ? 'interpolate' : 'image',
+      prompt, instruction: instruction || null, direction: direction as any, sourceUrl: startRef, endUrl: endRef, referenceUrls: productRefs,
+      aspectRatio: direction.format ?? aspectRatio, durationSec, resolution, quality, seed, credits: cost,
+      listingRef: (parent?.listingRef ?? (typeof body.listingRef === 'string' ? body.listingRef.slice(0, 120) : null)) || null,
+      title: (parent?.title ?? (typeof body.title === 'string' ? body.title.slice(0, 140) : null)) || null,
+    },
+  });
+  const launch: Launch = { job, direction, prompt, aspectRatio, durationSec, resolution, quality, variants, seed, start, end, products, aiStart, aiEnd };
+  if (aiStart || aiEnd) {
+    void prepareAndStart(launch); // keyframes take ~20–60 s: the client polls 'preparing' → 'running' → 'done'
+    return { status: 200, json: { job: viewJob(job), credits: cost } };
+  }
+  await prepareAndStart(launch);
+  const fresh = (await prisma.aiVideoJob.findFirst({ where: { id } })) ?? job;
+  if (fresh.status === 'failed') return { status: 502, json: { code: 'videoFailed', job: viewJob(fresh) } };
+  return { status: 200, json: { job: viewJob(fresh), credits: cost } };
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const user = await getAuthUser(req, res);
   if (!user) return res.status(401).json({ code: 'unauthorized' });
@@ -190,7 +302,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Variants created on completion belong to the asked groups: return them too.
       const groups = Array.from(new Set(fresh.map((j) => j.groupId).filter(Boolean))) as string[];
       const siblings = groups.length ? await prisma.aiVideoJob.findMany({ where: { userId: user.id, groupId: { in: groups }, id: { notIn: ids } } }) : [];
-      return res.status(200).json({ jobs: [...fresh, ...siblings].map(viewJob) });
+      // …and versions the studio started by itself (the automatic fix) from the asked jobs.
+      const known = new Set([...ids, ...siblings.map((j) => j.id)]);
+      const children = await prisma.aiVideoJob.findMany({ where: { userId: user.id, parentId: { in: [...known] }, createdAt: { gt: new Date(Date.now() - STALE_MS) } } });
+      return res.status(200).json({ jobs: [...fresh, ...siblings, ...children.filter((j) => !known.has(j.id))].map(viewJob) });
     }
 
     if (req.method === 'PATCH') {
@@ -271,82 +386,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // ── New take or follow-up ──
-    let parent: Job | null = null;
-    if (body.parentId) {
-      parent = await prisma.aiVideoJob.findFirst({ where: { id: String(body.parentId), userId: user.id } });
-      if (!parent) return res.status(404).json({ code: 'notFound' });
-    }
-    const instruction = typeof body.instruction === 'string' ? body.instruction.trim().slice(0, 400) : '';
-    if (parent && !instruction && !body.direction) return res.status(400).json({ code: 'instructionRequired' });
-
-    const direction: Dir = { ...normalizeDirection(body.direction ?? parent?.direction ?? {}), locale };
-    const lock = body.lock !== false && (parent ? (parent.direction as any)?.lock !== false : true);
-
-    // Frames + product photos. A follow-up re-uses its parent's frames (real photos or the keyframes already built).
-    let startRef: string | null;
-    let endRef: string | null;
-    let productRefs: string[];
-    if (parent) {
-      startRef = parent.sourceUrl;
-      endRef = parent.endUrl;
-      productRefs = parent.referenceUrls;
-    } else {
-      startRef = direction.mode === 'scene' ? null : (typeof body.sources?.start === 'string' ? body.sources.start : null);
-      endRef = direction.mode === 'scene' ? null : (typeof body.sources?.end === 'string' ? body.sources.end : null);
-      const listed = Array.isArray(body.sources?.product) ? body.sources.product : Array.isArray(body.sources?.references) ? body.sources.references : [];
-      productRefs = Array.from(new Set([startRef, endRef, ...listed.map(String)].filter((x): x is string => Boolean(x)))).slice(0, MAX_PRODUCT_REFS);
-    }
-    const products = await loadSources(user.id, productRefs);
-    const start = startRef ? await loadSource(user.id, startRef) : null;
-    const end = endRef ? await loadSource(user.id, endRef) : null;
-    const aiStart = !start;
-    if (aiStart && !products.length) return res.status(400).json({ code: direction.mode === 'scene' ? 'productPhotosRequired' : 'imageRequired' });
-    // The end the first frame cannot show (the back after a turn, the next pose) is built from the photos.
-    const aiEnd = !end && !parent && lock && TURNING.has(direction.preset) && products.length > 0;
-
-    const changes = [...(await changesOf(user.id, parent)), ...(instruction ? [instruction] : [])];
-    // Veo renders 16:9 / 9:16; the client sends the generation aspect (from the format and the photo orientation).
-    const parentGen = (parent?.direction as Dir | null)?.genAspect ?? (parent?.aspectRatio === '16:9' ? '16:9' : parent ? '9:16' : null);
-    const aspectRatio: '9:16' | '16:9' = (body.aspectRatio ?? parentGen) === '16:9' ? '16:9' : '9:16';
-    direction.genAspect = aspectRatio;
-    const { durationSec, resolution } = veoConstraints({ mode: 'image', durationSec: Number(body.durationSec ?? parent?.durationSec ?? 8), resolution: String(body.resolution ?? parent?.resolution ?? '720p') });
-    const quality = (body.quality ?? parent?.quality) === 'best' ? 'best' : 'fast';
-    const variants = Math.min(4, Math.max(1, Number(body.variants ?? 1) || 1));
-    direction.variants = variants;
-    (direction as any).lock = lock;
-    const seedRaw = body.seed;
-    const seed = seedRaw !== undefined && seedRaw !== null && seedRaw !== '' && Number.isFinite(Number(seedRaw)) ? Math.round(Number(seedRaw)) : (parent?.seed ?? null);
-    const prompt = directVideo(direction, changes);
-
-    const id = newJobId();
-    const cost = videoCredits({ quality, resolution, durationSec, variants }) + (aiStart ? imageCredits() : 0) + (aiEnd ? imageCredits() : 0);
-    try {
-      await spendCredits(user.id, cost, { feature: 'video', ref: id, note: `${quality} ${resolution} ${durationSec}s x${variants}` });
-    } catch (err) {
-      if (isNoCreditsError(err)) return res.status(402).json(err.body());
-      if (isAiBudgetError(err)) return res.status(503).json(err.body());
-      throw err;
-    }
-
-    const job = await prisma.aiVideoJob.create({
-      data: {
-        id, groupId: id, userId: user.id, parentId: parent?.id ?? null, provider: 'pending', model: 'pending', status: 'preparing',
-        mode: aiStart ? 'scene' : end || aiEnd ? 'interpolate' : 'image',
-        prompt, instruction: instruction || null, direction: direction as any, sourceUrl: startRef, endUrl: endRef, referenceUrls: productRefs,
-        aspectRatio: direction.format ?? aspectRatio, durationSec, resolution, quality, seed, credits: cost,
-        listingRef: (parent?.listingRef ?? (typeof body.listingRef === 'string' ? body.listingRef.slice(0, 120) : null)) || null,
-        title: (parent?.title ?? (typeof body.title === 'string' ? body.title.slice(0, 140) : null)) || null,
-      },
-    });
-    const launch: Launch = { job, direction, prompt, aspectRatio, durationSec, resolution, quality, variants, seed, start, end, products, aiStart, aiEnd };
-    if (aiStart || aiEnd) {
-      void prepareAndStart(launch); // keyframes take ~20–60 s: the client polls 'preparing' → 'running' → 'done'
-      return res.status(200).json({ job: viewJob(job), credits: cost });
-    }
-    await prepareAndStart(launch);
-    const fresh = (await prisma.aiVideoJob.findFirst({ where: { id } })) ?? job;
-    if (fresh.status === 'failed') return res.status(502).json({ code: 'videoFailed', job: viewJob(fresh) });
-    return res.status(200).json({ job: viewJob(fresh), credits: cost });
+    const r = await launchTake(user.id, body, locale);
+    return res.status(r.status).json(r.json);
   } catch (err: any) {
     logger.error('AI video request failed', err, { userId: user.id });
     return res.status(502).json({ code: 'videoFailed' });

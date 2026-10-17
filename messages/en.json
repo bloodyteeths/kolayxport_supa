@@ -16685,7 +16685,8 @@
       "startHint": "Tap a photo below",
       "endHint": "Optional (e.g. the back)",
       "endAi": "AI builds it from your photos",
-      "clear": "Remove"
+      "clear": "Remove",
+      "auto": "Frames chosen automatically from your photos. Tap a photo to change."
     },
     "lock": {
       "label": "Lock the product",
@@ -16715,7 +16716,12 @@
       "issues": "Looks artificial:",
       "clean": "No differences: the product matches the photos.",
       "fix": "Fix these",
-      "best": "best"
+      "best": "best",
+      "autoFixRunning": "The quality check found product differences: a corrected version is being made automatically (free).",
+      "autoFixReady": "The corrected version is ready.",
+      "autoFixFailed": "The automatic fix could not run; try \"Fix these\".",
+      "autoFixShow": "Show",
+      "isAutoFix": "This version was corrected automatically from what the quality check found (free)."
     },
     "publish": {
       "button": "Add to {marketplace} listing",
@@ -16762,6 +16768,14 @@
       "hide": "Hide advanced settings",
       "title": "Advanced settings",
       "hint": "All set for the marketplace already; you do not need to change them."
+    },
+    "view": {
+      "front": "Front",
+      "back": "Back",
+      "side": "Side",
+      "detail": "Detail",
+      "flat": "Flat",
+      "other": "Other"
     }
   },
   "credits": {

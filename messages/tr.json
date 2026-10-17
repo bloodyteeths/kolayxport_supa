@@ -16685,7 +16685,8 @@
       "startHint": "Aşağıdan bir fotoğrafa dokunun",
       "endHint": "İsteğe bağlı (ör. arkadan çekim)",
       "endAi": "Fotoğraflarınızdan AI oluşturur",
-      "clear": "Kaldır"
+      "clear": "Kaldır",
+      "auto": "Kareler fotoğraflarınızdan otomatik seçildi. Değiştirmek için bir fotoğrafa dokunun."
     },
     "lock": {
       "label": "Ürünü kilitle",
@@ -16715,7 +16716,12 @@
       "issues": "Yapay görünen:",
       "clean": "Fark bulunmadı: ürün fotoğraflarla aynı.",
       "fix": "Bunları düzelt",
-      "best": "en iyi"
+      "best": "en iyi",
+      "autoFixRunning": "Kalite kontrolü ürün detaylarında fark buldu: düzeltilmiş sürüm otomatik hazırlanıyor (ücretsiz).",
+      "autoFixReady": "Düzeltilmiş sürüm hazır.",
+      "autoFixFailed": "Otomatik düzeltme yapılamadı; \"Bunları düzelt\" ile deneyin.",
+      "autoFixShow": "Göster",
+      "isAutoFix": "Bu sürüm kalite kontrolünün bulduğu farklara göre otomatik düzeltildi (ücretsiz)."
     },
     "publish": {
       "button": "{marketplace} ilanına ekle",
@@ -16762,6 +16768,14 @@
       "hide": "Gelişmiş ayarları gizle",
       "title": "Gelişmiş ayarlar",
       "hint": "Hepsi pazaryerine göre ayarlıdır; değiştirmeniz gerekmez."
+    },
+    "view": {
+      "front": "Ön",
+      "back": "Arka",
+      "side": "Yan",
+      "detail": "Detay",
+      "flat": "Serili",
+      "other": "Diğer"
     }
   },
   "credits": {

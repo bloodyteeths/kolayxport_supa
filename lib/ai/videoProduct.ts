@@ -202,3 +202,51 @@ export async function matchSubjectScale(userId: string, start: VideoMedia, end: 
     return end;
   }
 }
+
+export type PhotoView = 'front' | 'back' | 'side' | 'detail' | 'flat' | 'other';
+export type PhotoAnalysis = { photos: { view: PhotoView; fullBody: boolean; person: boolean; quality: number }[]; start: number | null; end: number | null };
+
+const VIEWS: readonly PhotoView[] = ['front', 'back', 'side', 'detail', 'flat', 'other'];
+
+/** Cleans the model's photo analysis (indices 1-based in the prompt → 0-based). Pure, exported for tests. */
+export function normalizePhotoAnalysis(raw: unknown, count: number): PhotoAnalysis {
+  const o = (Array.isArray(raw) ? raw.find((x) => x && typeof x === 'object' && !Array.isArray(x)) : raw) as Record<string, any> | undefined;
+  const list = Array.isArray(o?.photos) ? o!.photos : [];
+  const photos = Array.from({ length: count }, (_, i) => {
+    const p = list[i] ?? {};
+    const view = VIEWS.includes(p.view) ? p.view : 'other';
+    const q = Math.round(Number(p.quality));
+    return { view: view as PhotoView, fullBody: p.fullBody === true, person: p.person === true, quality: Number.isFinite(q) ? Math.max(0, Math.min(10, q)) : 5 };
+  });
+  const idx = (v: unknown) => {
+    const n = Math.round(Number(v)) - 1;
+    return Number.isInteger(n) && n >= 0 && n < count ? n : null;
+  };
+  let start = idx(o?.start);
+  let end = idx(o?.end);
+  // Fall back to the rules when the model's pick is missing or unusable (a close-up never anchors a video).
+  const score = (i: number) => (photos[i].fullBody ? 20 : 0) + photos[i].quality;
+  const best = (views: PhotoView[], not: number | null) =>
+    photos.map((p, i) => i).filter((i) => i !== not && views.includes(photos[i].view) && photos[i].view !== 'detail').sort((a, b) => score(b) - score(a))[0] ?? null;
+  if (start === null || photos[start].view === 'detail') start = best(['front'], null) ?? best(['side', 'other', 'flat'], null);
+  if (end !== null && (end === start || photos[end].view === 'detail')) end = null;
+  if (end === null) end = best(['back'], start);
+  return { photos, start, end };
+}
+
+/** Looks at every product photo once: its view, whether the whole product is in it, and the best start / end frame. */
+export async function analyzePhotos(userId: string, refs: VideoMedia[]): Promise<PhotoAnalysis> {
+  const small = await Promise.all(refs.slice(0, 12).map((m) => shrink(m, 512)));
+  const raw = await aiJson<any>({ tier: 'fast', feature: 'video.photos', userId, temperature: 0 }, [
+    ...small.map((m) => ({ inlineData: { mimeType: m.mimeType, data: m.data } })),
+    {
+      text: [
+        `Images 1–${small.length} are photos of one product for a product video.`,
+        'For each image (in order) return: view = "front" | "back" | "side" | "detail" (a close-up where the whole product is not visible) | "flat" (laid flat or on a hanger) | "other"; fullBody = true when the whole product — and the whole person wearing it, head to feet or hem — is in the photo; person = true when a person wears or holds it; quality 0–10 (sharp, well lit, usable as a video frame).',
+        'Then pick start = the number of the best full-body front photo (natural pose, sharp) and end = the number of the best full-body back photo of the same person and setting (if there is none, a full-body side photo; null if none).',
+        'Return JSON: {"photos": [{"view","fullBody","person","quality"}], "start": number, "end": number | null}',
+      ].join('\n'),
+    },
+  ]);
+  return normalizePhotoAnalysis(raw, small.length);
+}

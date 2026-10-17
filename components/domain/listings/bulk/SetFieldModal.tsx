@@ -308,7 +308,9 @@ function SetFieldModalBody({ onClose, rows, shopId, onStage, loadMaterials, load
   };
   const readinessLabel = (s: ReadinessStateOption) => {
     const state = s.readiness_state === 'ready_to_ship' ? tEtsy('processingProfile.readyToShip') : tEtsy('processingProfile.madeToOrder');
-    const range = s.processing_days_display_label || tEtsy('processingProfile.daysRange', { min: s.min_processing_days ?? '?', max: s.max_processing_days ?? '?' });
+    const range = s.min_processing_days != null && s.max_processing_days != null
+      ? tEtsy('processingProfile.daysRange', { min: s.min_processing_days, max: s.max_processing_days })
+      : s.processing_days_display_label || tEtsy('processingProfile.daysRange', { min: s.min_processing_days ?? '?', max: s.max_processing_days ?? '?' });
     return `${state} · ${range}`;
   };
   const keep = { value: '', label: t('setField.keep') };

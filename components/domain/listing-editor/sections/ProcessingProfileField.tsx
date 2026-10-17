@@ -54,8 +54,10 @@ export function ProcessingProfileField({
 
   const label = (s: ReadinessStateOption) => {
     const state = s.readiness_state === 'ready_to_ship' ? tEtsy('processingProfile.readyToShip') : tEtsy('processingProfile.madeToOrder');
-    const range = s.processing_days_display_label
-      || tEtsy('processingProfile.daysRange', { min: s.min_processing_days ?? '?', max: s.max_processing_days ?? '?' });
+    // Our own "1-2 gün" when the days are known: Etsy's display label is English ("1-2 days").
+    const range = s.min_processing_days != null && s.max_processing_days != null
+      ? tEtsy('processingProfile.daysRange', { min: s.min_processing_days, max: s.max_processing_days })
+      : s.processing_days_display_label || tEtsy('processingProfile.daysRange', { min: s.min_processing_days ?? '?', max: s.max_processing_days ?? '?' });
     return `${state} · ${range}`;
   };
 

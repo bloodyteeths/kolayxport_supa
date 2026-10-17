@@ -237,6 +237,8 @@ export function negativePrompt(d: Pick<VideoDirection, 'avoid' | 'person'>): str
     'oversaturated colours', 'glow', 'haze', 'blurry', 'low quality', 'added captions', 'subtitles', 'watermark', 'added logos',
     'phone screen', 'camera app interface', 'on-screen buttons or icons', 'screen recording', 'black bars', 'letterbox', 'border', 'picture frame',
   ];
+  // No person in the photos: no hands reaching in to hold the product (seen on an eBay statue video).
+  if (!d.person) base.push('hands', 'fingers', 'people');
   if (d.person) base.push('plastic or waxy skin', 'airbrushed skin', 'beauty filter', 'uncanny face', 'dead eyes', 'frozen expression', 'distorted face', 'deformed hands', 'extra fingers', 'extra limbs');
   const extra = clean(d.avoid, 300);
   return [...base, ...(extra ? [extra] : [])].join(', ');

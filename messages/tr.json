@@ -16632,7 +16632,7 @@
     },
     "refine": {
       "title": "Değiştirmek istediğiniz bir şey var mı?",
-      "placeholder": "ör. kız daha çok gülümsesin, kamera biraz daha uzaktan çeksin",
+      "placeholder": "ör. kamera biraz daha uzaktan çeksin, ışık daha sıcak olsun",
       "send": "Yeni sürüm"
     },
     "chip": {
@@ -16698,7 +16698,7 @@
     },
     "lock": {
       "label": "Ürünü kilitle",
-      "hint": "Model dönerken veya yürürken görünen taraf (ör. elbisenin arkası) yapay zekâ tarafından uydurulmaz: fotoğraflarınızdan son kare oluşturulur ve video ona varır. +15 kredi."
+      "hint": "Ürünün fotoğrafta görünmeyen tarafı (ör. arkası) yapay zekâ tarafından uydurulmaz: fotoğraflarınızdan son kare oluşturulur ve video ona varır. +15 kredi."
     },
     "look": {
       "phone": "Telefon çekimi",
@@ -16712,7 +16712,7 @@
     },
     "qualityHint": {
       "fast": "Hızlı ve uygun fiyatlı.",
-      "best": "Yüz, el ve kumaş en doğal hâliyle."
+      "best": "En doğal ışık, doku ve hareket."
     },
     "qa": {
       "title": "Kalite kontrolü",

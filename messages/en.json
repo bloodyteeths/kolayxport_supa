@@ -16632,7 +16632,7 @@
     },
     "refine": {
       "title": "Anything to change?",
-      "placeholder": "e.g. she smiles more, the camera films from a bit further away",
+      "placeholder": "e.g. film from a little farther away, warmer light",
       "send": "New version"
     },
     "chip": {
@@ -16698,7 +16698,7 @@
     },
     "lock": {
       "label": "Lock the product",
-      "hint": "When the model turns or walks, the side that shows (e.g. the back of the dress) is not made up: an end frame is built from your photos and the video lands on it. +15 credits."
+      "hint": "The side of the product the photo does not show (e.g. its back) is not made up: an end frame is built from your photos and the video lands on it. +15 credits."
     },
     "look": {
       "phone": "Phone video",
@@ -16712,7 +16712,7 @@
     },
     "qualityHint": {
       "fast": "Quick and affordable.",
-      "best": "The most natural faces, hands and fabric."
+      "best": "The most natural light, texture and movement."
     },
     "qa": {
       "title": "Quality check",

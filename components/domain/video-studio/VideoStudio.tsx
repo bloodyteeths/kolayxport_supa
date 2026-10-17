@@ -539,6 +539,15 @@ export function VideoStudio() {
   const groupMain = cur ? jobs.find((j) => j.id === cur.groupId) ?? cur : null;
   const autoFixJob = groupMain?.qa?.autoFix ? jobs.find((j) => j.id === groupMain.qa!.autoFix) ?? null : null;
   const autoFixDone = useRef<Set<string>>(new Set());
+  // When every variant of a take is checked, show the best one (unless the seller picked a variant).
+  const pickedVariant = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!bestInGroup || !cur || cur.groupId !== bestInGroup.groupId || cur.id === bestInGroup.id) return;
+    if (pickedVariant.current.has(bestInGroup.groupId ?? '')) return;
+    pickedVariant.current.add(bestInGroup.groupId ?? '');
+    setCurrent(bestInGroup.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bestInGroup?.id]);
   useEffect(() => {
     if (!autoFixJob || autoFixJob.status !== 'done' || autoFixDone.current.has(autoFixJob.id)) return;
     autoFixDone.current.add(autoFixJob.id);
@@ -788,7 +797,7 @@ export function VideoStudio() {
               <Box sx={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <Box component="span" sx={{ fontSize: 12, color: n[500] }}>{t('result.variants')}</Box>
                 {group.map((g) => (
-                  <Box key={g.id} component="button" type="button" onClick={() => setCurrent(g.id)}
+                  <Box key={g.id} component="button" type="button" onClick={() => { pickedVariant.current.add(g.groupId ?? ''); setCurrent(g.id); }}
                     sx={{ font: 'inherit', fontSize: 12, px: '8px', py: '3px', borderRadius: '6px', cursor: 'pointer', border: `1px solid ${g.id === current ? accent[500] : n[200]}`, bgcolor: g.id === current ? accent[50] : n[0] }}>
                     {t('result.variant', { n: g.variantIndex + 1 })}
                     {g.qa?.status === 'done' && g.qa.match !== undefined ? ` · ${g.qa.match}/10` : ''}

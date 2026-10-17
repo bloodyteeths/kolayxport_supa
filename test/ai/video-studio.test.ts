@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { directVideo, negativePrompt, normalizeDirection, DEFAULT_DIRECTION } from '@/lib/ai/videoDirector';
 import { VIDEO_TARGET_PROFILES, generationAspect, videoReadiness } from '@/lib/ai/videoTargets';
 import { ffmpegArgs, finishArgs, veoConstraints, veoRequest } from '@/lib/ai/video';
-import { keyframePrompt, normalizeQa } from '@/lib/ai/videoProduct';
+import { keyframePrompt, matchWindow, normalizeQa } from '@/lib/ai/videoProduct';
 
 const img = { data: 'AAA', mimeType: 'image/jpeg' };
 
@@ -52,6 +52,15 @@ describe('product lock keyframes', () => {
     const p = keyframePrompt({ ...DEFAULT_DIRECTION, scene: 'garden' }, { which: 'start', refCount: 3, hasStart: false });
     expect(p).toMatch(/Images 1–3/);
     expect(p).toMatch(/flower garden/);
+  });
+  it('an end photo taken from farther away is cropped so the model keeps her size', () => {
+    // start: subject 10%–90% of the height; end: 30%–80% (smaller, farther away) → zoom 1.6×
+    const w = matchWindow([100, 300, 900, 700], [300, 350, 800, 650], 1080, 1920)!;
+    expect(w.height).toBe(Math.round(1920 / 1.6));
+    expect(w.width).toBe(Math.round(1080 / 1.6));
+    // feet line kept: end bottom (1536 px) maps to the start bottom (1728 px of 1920)
+    expect(Math.round(((1536 - w.top) / w.height) * 1920)).toBe(1728);
+    expect(matchWindow([100, 300, 900, 700], [110, 300, 905, 700], 1080, 1920)).toBeNull();
   });
   it('quality check answers are clamped and cleaned', () => {
     expect(normalizeQa({ productMatch: 14, realism: '7', diffs: [{ text: 'hem flowers missing', fix: 'keep the hem flowers' }, { text: '' }], issues: 'x' }))

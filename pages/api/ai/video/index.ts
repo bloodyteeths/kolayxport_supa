@@ -23,7 +23,7 @@ import { logUsage } from '@/lib/ai/gemini';
 import { directVideo, negativePrompt, normalizeDirection, type VideoDirection } from '@/lib/ai/videoDirector';
 import { finishInPlace, originalOf, pollVideo, saveVideo, startVideo, veoConstraints, VIDEO_UPLOAD_ROOT, type VideoMedia } from '@/lib/ai/video';
 import { fitToAspect, loadSource, loadSources, saveSourceImage } from '@/lib/ai/videoSources';
-import { checkVideo, generateKeyframe, keyframePrompt, MAX_PRODUCT_REFS } from '@/lib/ai/videoProduct';
+import { checkVideo, generateKeyframe, keyframePrompt, matchSubjectScale, MAX_PRODUCT_REFS } from '@/lib/ai/videoProduct';
 import { extendCredits, imageCredits, videoCredits } from '@/lib/billing/aiCredits';
 import { isAiBudgetError, isNoCreditsError, refundCredits, spendCredits } from '@/lib/billing/aiCreditsServer';
 
@@ -156,7 +156,8 @@ async function prepareAndStart(l: Launch) {
     }
     // Anchor frames shaped like the video (no black bars for Veo to animate).
     const first = await fitToAspect(start, l.aspectRatio);
-    const last = end ? await fitToAspect(end, l.aspectRatio) : null;
+    // …and the end subject the same size and place as the start one (no zoom / "shrinking" at the end).
+    const last = end ? await matchSubjectScale(job.userId, first, await fitToAspect(end, l.aspectRatio), l.aspectRatio) : null;
     const started = await startVideo({
       mode: last ? 'interpolate' : 'image', prompt: l.prompt, negativePrompt: negativePrompt(d), image: first, lastFrame: last ?? undefined,
       aspectRatio: l.aspectRatio, durationSec: l.durationSec, resolution: l.resolution, quality: l.quality, variants: l.variants, seed: l.seed, audio: d.audio !== 'none',

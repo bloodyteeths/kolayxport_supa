@@ -146,3 +146,59 @@ export async function checkVideo(input: { userId: string; file: string; refs: Vi
   const raw = await aiJson({ tier: 'deep', feature: 'video.qa', userId: input.userId, temperature: 0.2 }, parts);
   return normalizeQa(raw);
 }
+
+type Box = [number, number, number, number]; // ymin, xmin, ymax, xmax (0–1000)
+
+const validBox = (b: unknown): b is Box =>
+  Array.isArray(b) && b.length === 4 && b.every((v) => typeof v === 'number' && v >= 0 && v <= 1000) && b[2] > b[0] && b[3] > b[1];
+
+/**
+ * Where the crop window for the end frame goes so its subject matches the start frame's (same height, same place).
+ * Inputs and output in pixels of a W×H frame. Pure, exported for tests. null = nothing to do / cannot.
+ */
+export function matchWindow(start: Box, end: Box, W: number, H: number): { left: number; top: number; width: number; height: number } | null {
+  const sh = ((start[2] - start[0]) / 1000) * H;
+  const eh = ((end[2] - end[0]) / 1000) * H;
+  if (sh <= 0 || eh <= 0) return null;
+  const s = sh / eh; // > 1: the end subject is smaller → zoom in on it
+  if (s < 1.06 || s > 2.2) return null; // already alike, or too far apart to fix by cropping
+  const width = Math.round(W / s);
+  const height = Math.round(H / s);
+  // Same subject centre (x) and same feet line (y = box bottom) as in the start frame.
+  const ecx = (((end[1] + end[3]) / 2) / 1000) * W;
+  const scx = (((start[1] + start[3]) / 2) / 1000) * W;
+  const eb = (end[2] / 1000) * H;
+  const sb = (start[2] / 1000) * H;
+  let left = Math.round(ecx - scx / s);
+  let top = Math.round(eb - sb / s);
+  left = Math.max(0, Math.min(W - width, left));
+  top = Math.max(0, Math.min(H - height, top));
+  return { left, top, width, height };
+}
+
+/**
+ * Real start + end photos are often taken from different distances (the back photo farther away): Veo then zooms
+ * and the model "shrinks" at the end (seen on production 2026-10-17). The subject is found in both frames (Gemini
+ * boxes) and the end frame is cropped so the subject has the same size and place as in the start frame.
+ * Both frames must already be the video's shape (fitToAspect).
+ */
+export async function matchSubjectScale(userId: string, start: VideoMedia, end: VideoMedia, aspect: '9:16' | '16:9'): Promise<VideoMedia> {
+  try {
+    const [W, H] = aspect === '9:16' ? [1080, 1920] : [1920, 1080];
+    const small = await Promise.all([shrink(start, 768), shrink(end, 768)]);
+    const raw = await aiJson<any>({ tier: 'fast', feature: 'video.frameMatch', userId, temperature: 0 }, [
+      { inlineData: { mimeType: small[0].mimeType, data: small[0].data } },
+      { inlineData: { mimeType: small[1].mimeType, data: small[1].data } },
+      { text: 'Image 1 and image 2 are two frames of the same product video. For each, give the bounding box of the main subject — the whole person with the whole outfit from the top of the head to the bottom of the hem or feet (or the whole product if there is no person) — as [ymin, xmin, ymax, xmax] normalised to 0–1000. Return JSON: {"start": [..4 numbers], "end": [..4 numbers]}' },
+    ]);
+    const o = Array.isArray(raw) ? raw[0] : raw;
+    if (!validBox(o?.start) || !validBox(o?.end)) return end;
+    const win = matchWindow(o.start, o.end, W, H);
+    if (!win) return end;
+    const sharpMod = (await import('sharp')).default;
+    const out = await sharpMod(Buffer.from(end.data, 'base64')).resize(W, H, { fit: 'fill' }).extract(win).resize(W, H).jpeg({ quality: 92 }).toBuffer();
+    return { data: out.toString('base64'), mimeType: 'image/jpeg' };
+  } catch {
+    return end;
+  }
+}

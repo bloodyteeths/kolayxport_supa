@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
-import { getListingStats, sanitizePageSignals, EtsyPublicApiError } from '@/lib/etsy/listingStats';
+import { getListingStats, sanitizePageSignals, EtsyPublicApiError, rememberListingResult } from '@/lib/etsy/listingStats';
 import { withResearchQuota, sendResearchOutcome, sharedCacheKey, RESEARCH_TTL } from '@/lib/ext/researchQuota';
 
 /**
@@ -62,6 +62,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (outcome.kind === 'ok' && outcome.source === 'shared_cache' && outcome.body && typeof outcome.body === 'object') {
       outcome.body = { ...outcome.body, pageSignals: page };
     }
+    // Cached answers skip getListingStats(), so record the estimate here too: search cards reuse it.
+    if (outcome.kind === 'ok' && outcome.status === 200) rememberListingResult(outcome.body);
     return sendResearchOutcome(res, outcome);
   } catch (err) {
     if (err instanceof EtsyPublicApiError) {

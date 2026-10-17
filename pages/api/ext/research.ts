@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import { etsyFetch, etsyPublicHeaders } from '@/lib/etsy/http';
 import { EtsyPriority } from '@/lib/etsy/rateBudget';
-import { getBatchListingStats, applyPageEstimates, getListingStats, getShopStats, EtsyPublicApiError } from '@/lib/etsy/listingStats';
+import { getBatchListingStats, applyPageEstimates, rememberListingResult, getListingStats, getShopStats, EtsyPublicApiError } from '@/lib/etsy/listingStats';
 import { buildFxTable } from '@/lib/research/stats';
 import { summarizeEtsySearch } from '@/lib/etsy/searchSummary';
 import { convertCurrency } from '@/lib/finance/fx';
@@ -125,6 +125,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           { req, userId, marketplace: 'etsy', cacheKey: sharedCacheKey('etsy', 'listing', 'etsy.com', listingId, 'nopage'), ttl: RESEARCH_TTL.detail, apiCallsEstimate: 5 },
           async () => ({ status: 200, body: await getListingStats(listingId, {}) }),
         );
+        if (outcome.kind === 'ok' && outcome.status === 200) rememberListingResult(outcome.body);
         return sendResearchOutcome(res, outcome, { plan });
       }
 

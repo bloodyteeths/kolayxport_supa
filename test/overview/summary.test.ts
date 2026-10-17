@@ -289,7 +289,7 @@ describe('drafts', () => {
     expect(countArgs.where.updatedAt.lt.toISOString()).toBe('2026-10-15T11:50:00.000Z');
   });
 
-  it('eBay drafts of legacy listings (`legacy-<itemId>`) are not counted and never linked as first conflict/failed', async () => {
+  it('eBay drafts of legacy listings (`legacy-<itemId>`) are counted like any other (sent via Trading API since 2026-10-17)', async () => {
     p.ebayListingDraft.groupBy.mockResolvedValue([
       { status: 'draft', _count: { _all: 3 } },
       { status: 'failed', _count: { _all: 1 } },
@@ -303,9 +303,9 @@ describe('drafts', () => {
     ]);
     const ctx = createSummaryContext({ userId: 'u1', tz: 'UTC', currency: 'TRY', now: NOW });
     const b = await getEbayDraftBucket(ctx);
-    expect(b).toMatchObject({ draft: 1, failed: 0 });
+    expect(b).toMatchObject({ draft: 3, failed: 1 });
     for (const [args] of p.ebayListingDraft.findFirst.mock.calls as any[]) {
-      expect(args.where.NOT).toEqual({ sku: { startsWith: 'legacy-' } });
+      expect(args.where.NOT).toBeUndefined();
     }
     expect(p.ebayListingDraft.findMany.mock.calls[0][0].select).toMatchObject({ sku: true });
   });

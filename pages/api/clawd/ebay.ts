@@ -1,3 +1,4 @@
+import { getLegacyItem } from '@/lib/ebay/legacyTrading';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';
@@ -559,7 +560,21 @@ export default async function handler(
       if (cached?.isLegacy) {
         const legacyId = cached.listingId || sku.replace(/^legacy-/, '');
         try {
-          const data = await fetchLegacy(legacyId);
+          const data: any = await fetchLegacy(legacyId);
+          // The editor's starting values must be the seller's real ones (Trading API GetItem), the same the send
+          // compares against: Browse shows a buyer view (estimated / capped quantity, reformatted description).
+          try {
+            const item = await getLegacyItem(accessToken, legacyId);
+            data.product = { ...(data.product || {}), title: item.title, description: item.description };
+            data.availability = { shipToLocationAvailability: { quantity: item.quantity } };
+            if (data.offers?.[0]) {
+              if (item.price) data.offers[0].pricingSummary = { ...(data.offers[0].pricingSummary || {}), price: item.price };
+              if (item.status) data.offers[0].status = item.status === 'Active' ? 'ACTIVE' : 'ENDED';
+            }
+            data.hasVariations = item.hasVariations;
+          } catch (err: any) {
+            logger.warn('Legacy GetItem overlay failed', { sku, legacyId, error: err?.message });
+          }
           return res.status(200).json(data);
         } catch (err: any) {
           logger.error('Legacy listing fetch failed', err, { sku, legacyId });

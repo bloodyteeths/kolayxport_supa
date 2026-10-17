@@ -6586,7 +6586,9 @@
       "imageInvalid": "eBay fotoğraflardan birini kabul etmedi (boyut veya bağlantı). Fotoğrafları kontrol edin.",
       "titleInvalid": "eBay başlığı kabul etmedi (en fazla 80 karakter). Başlığı düzeltin.",
       "priceInvalid": "eBay fiyatı kabul etmedi. Fiyatı kontrol edin.",
-      "quantityInvalid": "eBay stok adedini kabul etmedi. Stoğu kontrol edin."
+      "quantityInvalid": "eBay stok adedini kabul etmedi. Stoğu kontrol edin.",
+      "legacyUnsupportedFields": "Bu ilan eBay'de oluşturulmuş; KolayXport'tan yalnızca başlık, açıklama, fiyat ve stok değiştirilebilir. Diğer değişiklikleri eBay'de yapın.",
+      "legacyVariationsPriceStock": "Bu ilanın varyasyonları var; fiyat ve stok her varyasyon için eBay'de ayarlanır. Başlık ve açıklama değişiklikleri gönderilebilir."
     },
     "validation": {
       "variantSkuDuplicate": "Her varyasyonun SKU kodu farklı olmalı",
@@ -12800,7 +12802,8 @@
       "trackingCopied": "Takip numarası kopyalandı",
       "fbaNoLabel": "Bu siparişi Amazon gönderir. Etiket gerekmez.",
       "upgradePaid": "Alıcı {upgrade} kargo için ödeme yaptı",
-      "trendyolCargo": "Trendyol kargo numarası"
+      "trendyolCargo": "Trendyol kargo numarası",
+      "orderedChip": "Sipariş"
     },
     "problem": {
       "addressIncomplete": "Adres eksik: {fields} yok",
@@ -14079,7 +14082,9 @@
       "fixFields": "{mp, select, etsy {Etsy'ye} ebay {eBay'e} trendyol {Trendyol'a} wix {Wix'e} shopify {Shopify'a} amazon {Amazon'a} other {Pazaryerine}} göndermeden önce {count} alanı düzeltin",
       "goToFirst": "İlkine git",
       "warnings": "{count} uyarıyla gönderildi",
-      "draftCheckFailed": "Gönderilmemiş değişiklikler kontrol edilemedi"
+      "draftCheckFailed": "Gönderilmemiş değişiklikler kontrol edilemedi",
+      "ebayLegacy": "Bu ilan eBay'de oluşturulmuş: buradan başlık, açıklama, fiyat ve stok değiştirilebilir. Fotoğraf, özellikler ve kargo için eBay'de düzenleyin.",
+      "ebayLegacyVariations": "Varyasyonlu ilan: fiyat ve stok varyasyon başına eBay'de ayarlanır; başlık ve açıklama buradan gönderilebilir."
     },
     "page": {
       "editTitle": "İlanı düzenle",
@@ -14707,8 +14712,8 @@
         "personalizationInstructions": "Kişiselleştirme talimatı"
       },
       "title": "Farkları incele",
-      "intro": "{marketplace} bu ilanı taslağınızdan sonra değiştirdi. Taslak başlangıcı: {draftTime} · {marketplace} değişikliği: {remoteTime}. Her alan için neyi tutacağınızı seçin",
-      "introShort": "{marketplace} bu ilanı taslağınız başladıktan sonra değiştirdi. Her alan için neyi tutacağınızı seçin",
+      "intro": "Sizin düzenlemeniz: {draftTime} · {marketplace}'deki değişiklik: {remoteTime}. Her alan için hangisinin kalacağını seçin.",
+      "introShort": "Her alan için hangisinin kalacağını seçin.",
       "field": "Alan",
       "mine": "Taslağınız",
       "remote": "Şu an {marketplace}'de",
@@ -14737,7 +14742,9 @@
       "unavailable": "Farkları inceleme henüz kullanılamıyor",
       "unavailableCause": "{marketplace}'den yenileyip düzenlemeye devam edebilir veya değişikliklerinizi atabilirsiniz",
       "refreshKeep": "Yenile ve düzenlemeye devam et",
-      "discardMine": "Değişikliklerimi at"
+      "discardMine": "Değişikliklerimi at",
+      "introTitle": "Bu ilan, siz düzenledikten sonra {marketplace}'de değişti",
+      "mineCard": "Sizin değişikliğiniz"
     },
     "start": {
       "title": "Hızlı başlayın",

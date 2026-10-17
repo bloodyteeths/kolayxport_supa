@@ -353,7 +353,8 @@ export function DataTable<T>(props: DataTableProps<T>) {
             </Box>
           );
         })()}
-        <Box component="ul" aria-label={ariaLabel} sx={{ listStyle: 'none', m: 0, p: 0, display: 'flex', flexDirection: 'column', ...surface, overflow: 'hidden', '& > li + li': { borderTop: `1px solid ${n[200]}` } }}>
+        {/* Phones: the list runs edge to edge (no side gutter, no outer box) — founder: "max width for each card". */}
+        <Box component="ul" aria-label={ariaLabel} sx={{ listStyle: 'none', m: 0, p: 0, display: 'flex', flexDirection: 'column', ...surface, overflow: 'hidden', '& > li + li': { borderTop: `1px solid ${n[200]}` }, mx: { xs: `-${layout.gutterMobile}px`, sm: 0 }, borderRadius: { xs: 0, sm: px(radius.md) }, borderLeftWidth: { xs: 0, sm: '1px' }, borderRightWidth: { xs: 0, sm: '1px' } }}>
           {state === 'loading'
             ? (showSkeleton
               ? Array.from({ length: 5 }, (_, i) => (
@@ -381,7 +382,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
                   onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget && onRowOpen) onRowOpen(r); }}
                   // Mobile cards: one joined list (dividers, no floating boxes) and tight padding — founder: "full of whitespace".
                   sx={{
-                    px: px(space[3]),
+                    px: { xs: `${layout.gutterMobile}px`, sm: px(space[3]) },
                     py: px(10),
                     display: 'flex',
                     gap: px(10),
@@ -416,6 +417,12 @@ export function DataTable<T>(props: DataTableProps<T>) {
                           </Typography>
                         ))}
                       </Box>
+                      {/* The main action sits next to ⋯ in the title row: under the date chips it wrapped onto a 4th row. */}
+                      {(actionCol || ia) && !selectMode && (
+                        <Box data-row-stop="true" sx={{ mt: px(-space[1]), flexShrink: 0 }}>
+                          {actionCol ? cell(actionCol, r) : ia ? <InlineAction action={ia} size="sm" /> : null}
+                        </Box>
+                      )}
                       {overflow.length > 0 && (
                         <Box data-row-stop="true" sx={{ mt: px(-space[1]), mr: px(-space[1]) }}>
                           <RowActionsMenu actions={overflow} label={t('moreActions')} />
@@ -425,40 +432,40 @@ export function DataTable<T>(props: DataTableProps<T>) {
                     {(() => {
                       // Empty values ("—") are dropped like meta values: no "SKU 123 · —" on cards.
                       const subs = subtitleCols.map((c) => ({ key: c.key, node: cell(c, r) })).filter((m) => m.node !== null && m.node !== undefined && m.node !== '' && m.node !== '—');
-                      return subs.length > 0 ? (
-                        <Typography variant="caption" component="div" sx={{ color: n[600], display: 'flex', alignItems: 'center', gap: px(space[1]), flexWrap: 'wrap' }}>
-                          {subs.map((m, i) => (
-                            <Box component="span" key={m.key} sx={{ display: 'inline-flex', alignItems: 'center', gap: px(space[1]) }}>
-                              {i > 0 && <Box component="span" aria-hidden>{'·'}</Box>}
-                              {m.node}
-                            </Box>
-                          ))}
-                        </Typography>
+                      const price = trailingCol ? cell(trailingCol, r) : null;
+                      // Row 2: who / where on the left, the price on the right.
+                      return subs.length > 0 || price ? (
+                        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: px(space[2]) }}>
+                          <Typography variant="caption" component="div" sx={{ color: n[600], display: 'flex', alignItems: 'center', gap: px(space[1]), flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
+                            {subs.map((m, i) => (
+                              <Box component="span" key={m.key} sx={{ display: 'inline-flex', alignItems: 'center', gap: px(space[1]), minWidth: 0 }}>
+                                {i > 0 && <Box component="span" aria-hidden>{'·'}</Box>}
+                                {m.node}
+                              </Box>
+                            ))}
+                          </Typography>
+                          {price !== null && (
+                            <Typography variant="label" component="div" sx={{ color: n[900], fontVariantNumeric: 'tabular-nums', flexShrink: 0, fontWeight: 600 }}>
+                              {price}
+                            </Typography>
+                          )}
+                        </Box>
                       ) : null;
                     })()}
-                    {(trailingCol || statusCol || ((actionCol || ia) && !selectMode)) && (
-                      // Price · status on the left, the main action on the right: one row, not three.
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: px(space[2]), flexWrap: 'wrap' }}>
-                        <Typography variant="label" component="div" sx={{ color: n[900], fontVariantNumeric: 'tabular-nums' }}>
-                          {trailingCol ? cell(trailingCol, r) : null}
-                        </Typography>
-                        {statusCol && <Box>{cell(statusCol, r)}</Box>}
-                        {(actionCol || ia) && !selectMode && (
-                          <Box data-row-stop="true" sx={{ ml: 'auto' }}>
-                            {actionCol ? cell(actionCol, r) : ia ? <InlineAction action={ia} size="md" /> : null}
-                          </Box>
-                        )}
-                      </Box>
-                    )}
-                    {metas.length > 0 && (
-                      <Typography variant="caption" component="div" sx={{ color: n[600] }}>
-                        {metas.map((m, i) => (
-                          <Box component="span" key={m.key}>
-                            {i > 0 && <Box component="span" aria-hidden sx={{ px: px(space[1]) }}>{'·'}</Box>}
+                    {(metas.length > 0 || statusCol) && (
+                      // Row 3: dates as small chips, status, and the main action on the right (compact).
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: px(6), flexWrap: 'wrap' }}>
+                        {metas.map((m) => (
+                          <Box
+                            key={m.key}
+                            component="span"
+                            sx={{ display: 'inline-flex', alignItems: 'center', gap: '4px', px: '6px', py: '2px', borderRadius: px(radius.sm), bgcolor: n[100], fontSize: 12, lineHeight: '16px', color: n[700], fontVariantNumeric: 'tabular-nums' }}
+                          >
                             {m.node}
                           </Box>
                         ))}
-                      </Typography>
+                        {statusCol && <Box>{cell(statusCol, r)}</Box>}
+                      </Box>
                     )}
                   </Box>
                 </Box>

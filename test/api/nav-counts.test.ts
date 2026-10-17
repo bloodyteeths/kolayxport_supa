@@ -186,12 +186,12 @@ describe('GET /api/nav/counts', () => {
     expect(res.headers['Cache-Control']).toMatch(/private/);
   });
 
-  it('eBay drafts of legacy listings (created on eBay, `legacy-<itemId>`) are not unsent changes', async () => {
+  it('eBay drafts of legacy listings (created on eBay, `legacy-<itemId>`) are unsent changes too (sent via Trading API since 2026-10-17)', async () => {
     const staged = { sku: 'SKU-1', status: 'draft', inventoryPatch: { product: { title: 'x' } }, offerPatch: {}, variationPatch: null, queuedActions: [], _count: { media: 0 } };
     ebayCount.mockResolvedValue([staged, { ...staged, sku: 'legacy-198020866463' }, { ...staged, sku: 'legacy-197008549496', status: 'failed' }]);
     const res = await run();
-    expect(res.body.drafts.ebay).toBe(1);
-    // the eBay select reads the SKU for that check
+    expect(res.body.drafts.ebay).toBe(3);
+    // the eBay select still reads the SKU (emptiness check)
     expect(ebayCount.mock.calls[0][0].select).toMatchObject({ sku: true });
   });
 

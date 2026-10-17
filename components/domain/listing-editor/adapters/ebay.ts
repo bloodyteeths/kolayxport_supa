@@ -1129,8 +1129,8 @@ const q = (v: string) => encodeURIComponent(v);
 export async function loadEbayListing(ctx: AdapterContext): Promise<LoadedListing<EbayEditorFields>> {
   if (!ctx.listingId) throw new EbayEditorLoadError(404);
   const data = (await getJson(`/api/clawd/ebay?action=listing&sku=${q(ctx.listingId)}`)) as EbayListingData;
-  // Legacy (Trading API) items cannot be edited through the Inventory API; "Copy listing" still works.
-  if (data?.isLegacy) throw new EbayEditorLoadError(409, 'Legacy eBay listing', 'LEGACY');
+  // Listings created on eBay (legacy) load like the others: title, description, price and stock are sent through the
+  // Trading API (lib/ebay/legacyTrading); the editor locks the other sections for them.
   return { fields: ebayFieldsFromListing(data), meta: ebayMetaFromListing(data) };
 }
 

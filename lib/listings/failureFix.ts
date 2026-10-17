@@ -68,6 +68,8 @@ const EXPLICIT: Record<string, FailureFix> = {
   // eBay legacy
   'ebay.draftSync.legacyNotEditable': { kind: 'onMarketplace' },
   'ebay.draftSync.legacyListing': { kind: 'onMarketplace' },
+  'ebay.draftSync.legacyUnsupportedFields': { kind: 'onMarketplace' },
+  'ebay.draftSync.legacyVariationsPriceStock': { kind: 'onMarketplace' },
   'etsy.draftSync.listingDeleted': { kind: 'discard' },
   'etsy.draftSync.billingRequired': { kind: 'onMarketplace' },
   'ebay.draftSync.sellingLimit': { kind: 'onMarketplace' },

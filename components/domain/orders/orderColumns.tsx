@@ -149,7 +149,8 @@ function OrderMetaLine({ row, t, withStore, hideNumber }: { row: OrderRow; t: Or
   }
   if (row.shipTo.country && !hideNumber) parts.push(<span key="c">{row.shipTo.country}</span>); // cards (hideNumber) skip it: one line
   // When the order came in (founder: "orders are not showing when the order came"): on every row and card.
-  if (row.orderedAt) parts.push(<DateText key="d" value={row.orderedAt} mode="datetime" />);
+  // Cards (hideNumber) show the order date as its own chip next to the ship-by date instead.
+  if (row.orderedAt && !hideNumber) parts.push(<DateText key="d" value={row.orderedAt} mode="datetime" />);
   return (
     <Box component="span" className="mono" sx={{ ...captionSx, display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '4px' }}>
       {parts.map((p, i) => (
@@ -353,8 +354,10 @@ export function orderColumns(t: OrdersT, ctx: OrderColumnsContext): Column<Order
       sortable: true,
       hideable: true,
       defaultHidden: true,
-      mobile: 'hidden',
+      mobile: 'meta',
       render: (r) => (r.orderedAt ? <DateText value={r.orderedAt} mode="date" /> : <span>{'—'}</span>),
+      // Phone cards: "Sipariş 17 Eki 18:42" chip beside the ship-by chip.
+      mobileRender: (r) => (r.orderedAt ? <span>{t('row.orderedChip')} <DateText value={r.orderedAt} mode="datetime" /></span> : null),
     },
     {
       key: 'tracking',

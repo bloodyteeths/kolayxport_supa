@@ -31,7 +31,6 @@ import { isKnownType } from '@/lib/notificationCenter/registry';
 import { syncDraft as syncEtsyDraft } from '@/lib/etsy/draftService';
 import { syncDraft as syncEbayDraft } from '@/lib/ebay/draftService';
 import type { ScheduledJob } from '@/lib/scheduler/types';
-import { isLegacyEbaySku } from '@/lib/ebay/legacy';
 import {
   CatalogDraftError,
   catalogDraftsAvailable,
@@ -274,11 +273,6 @@ export async function runScheduledSends(opts: RunScheduledSendsOptions = {}): Pr
         select: { status: true, queuedActions: true, ...(kind === 'ebay' ? { sku: true } : {}) },
       });
       if (!fresh || !DUE_STATUSES.includes(fresh.status)) continue;
-      if (kind === 'ebay' && isLegacyEbaySku(fresh.sku)) {
-        // Created on eBay: the Inventory API can't edit it. Not sent, not a failure, eBay never called.
-        tally(summary, row.userId, kind, 'legacy');
-        continue;
-      }
       if (hasPendingDeleteAction(fresh.queuedActions)) {
         tally(summary, row.userId, kind, 'skipped');
         continue;

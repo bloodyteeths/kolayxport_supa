@@ -6,7 +6,6 @@
  * such drafts, the send paths to skip them, and the counters to exclude them.
  */
 
-import { isLegacyEbaySku } from '@/lib/ebay/legacy';
 
 /** Open statuses an empty draft is auto-cancelled from (never `syncing`: a send owns that row). */
 export const EMPTY_CANCELLABLE_STATUSES = ['draft', 'failed', 'conflict'];
@@ -89,11 +88,11 @@ export function isOpenEmptyDraft(model: DraftModelKind, draft: Record<string, an
 }
 
 /**
- * An eBay draft for a listing created on eBay (`legacy-<itemId>`, lib/ebay/legacy): it can never be sent from
- * KolayXport (send paths skip it), so it is not a "change not sent". The row stays for the editor's Discard.
+ * Kept for callers: since 2026-10-17 drafts of listings created on eBay (`legacy-<itemId>`) ARE sent (Trading API,
+ * lib/ebay/legacyTrading — title, description, price, quantity), so no draft is unsendable for being legacy.
  */
-export function isUnsendableLegacyDraft(model: DraftModelKind, draft: Record<string, any>): boolean {
-  return model === 'EbayListingDraft' && isLegacyEbaySku(draft?.sku);
+export function isUnsendableLegacyDraft(_model: DraftModelKind, _draft: Record<string, any>): boolean {
+  return false;
 }
 
 /**

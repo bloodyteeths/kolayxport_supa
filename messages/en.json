@@ -6586,7 +6586,9 @@
       "imageInvalid": "eBay did not accept one of the photos (size or link). Check the photos.",
       "titleInvalid": "eBay did not accept the title (80 characters at most). Fix the title.",
       "priceInvalid": "eBay did not accept the price. Check the price.",
-      "quantityInvalid": "eBay did not accept the quantity. Check the stock."
+      "quantityInvalid": "eBay did not accept the quantity. Check the stock.",
+      "legacyUnsupportedFields": "This listing was created on eBay; KolayXport can change only its title, description, price and stock. Make other changes on eBay.",
+      "legacyVariationsPriceStock": "This listing has variations; price and stock are set per variation on eBay. Title and description changes can be sent."
     },
     "validation": {
       "variantSkuDuplicate": "Each variation needs a different SKU",
@@ -12800,7 +12802,8 @@
       "trackingCopied": "Tracking number copied",
       "fbaNoLabel": "Amazon ships this order. No label needed.",
       "upgradePaid": "Buyer paid for {upgrade} shipping",
-      "trendyolCargo": "Trendyol cargo number"
+      "trendyolCargo": "Trendyol cargo number",
+      "orderedChip": "Ordered"
     },
     "problem": {
       "addressIncomplete": "Address incomplete: {fields} missing",
@@ -14079,7 +14082,9 @@
       "fixFields": "Fix {count, plural, one {# field} other {# fields}} before sending to {marketplace}",
       "goToFirst": "Go to first",
       "warnings": "Sent with {count, plural, one {# warning} other {# warnings}}",
-      "draftCheckFailed": "Couldn't check for unsent changes"
+      "draftCheckFailed": "Couldn't check for unsent changes",
+      "ebayLegacy": "This listing was created on eBay: title, description, price and stock can be changed here. Edit photos, specifics and shipping on eBay.",
+      "ebayLegacyVariations": "Listing with variations: price and stock are set per variation on eBay; title and description can be sent from here."
     },
     "page": {
       "editTitle": "Edit listing",
@@ -14707,8 +14712,8 @@
         "personalizationInstructions": "Personalization instructions"
       },
       "title": "Review differences",
-      "intro": "{marketplace} changed this listing at {remoteTime}, after your draft started at {draftTime}. Pick what to keep for each field",
-      "introShort": "{marketplace} changed this listing after your draft started. Pick what to keep for each field",
+      "intro": "Your edit: {draftTime} · Change on {marketplace}: {remoteTime}. Pick which one to keep for each field.",
+      "introShort": "Pick which one to keep for each field.",
       "field": "Field",
       "mine": "Your draft",
       "remote": "On {marketplace} now",
@@ -14737,7 +14742,9 @@
       "unavailable": "Review differences isn't available yet",
       "unavailableCause": "You can refresh from {marketplace} and keep editing, or discard your changes",
       "refreshKeep": "Refresh and keep editing",
-      "discardMine": "Discard my changes"
+      "discardMine": "Discard my changes",
+      "introTitle": "This listing changed on {marketplace} after you edited it",
+      "mineCard": "Your change"
     },
     "start": {
       "title": "Start faster",

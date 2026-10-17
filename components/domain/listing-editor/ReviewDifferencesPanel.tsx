@@ -18,14 +18,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import { useTranslations } from 'next-intl';
 import { SidePanel } from '@/components/ds/overlay/SidePanel';
-import { RadioGroup } from '@/components/ds/inputs/RadioGroup';
 import { Button } from '@/components/ds/inputs/Button';
 import { Banner } from '@/components/ds/feedback/Banner';
 import { ErrorState } from '@/components/ds/state/ErrorState';
 import { PanelSkeleton } from '@/components/ds/state/Skeletons';
 import { useFormatters } from '@/lib/format';
 import { icons } from '@/lib/ds/icons';
-import { neutral, tone, radius } from '@/lib/ds/tokens';
+import { accent, neutral, tone, radius } from '@/lib/ds/tokens';
 import { removeEtsyDraftQueuedActions } from '@/lib/etsy/draftClient';
 import { useConfirm } from '@/components/ds/overlay/ConfirmDialog';
 import { decodeEntities } from '@/lib/text/decodeEntities';
@@ -97,7 +96,7 @@ export function orderQueued(actions: ReviewDiff['queuedActions'] | null | undefi
 }
 
 const PRICE_KEYS = new Set(['price', 'pricingSummary.price', 'offer.price']);
-const MAX_TEXT = 140;
+const MAX_TEXT = 220;
 
 /** Full i18n key for a field label; keys not listed get `review.fields.other` ("Other field"). */
 export const FIELD_LABEL_KEYS: Record<string, string> = {
@@ -254,6 +253,45 @@ function toDate(v: Date | string | number | null | undefined): Date | null {
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+/** One side of a conflict as a tappable card: selected = accent border, tint and a check (replaces radio + text). */
+function ChoiceCard({ selected, onSelect, heading, ariaLabel, value }: { selected: boolean; onSelect: () => void; heading: string; ariaLabel: string; value: string }) {
+  return (
+    <Box
+      component="button"
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      aria-label={ariaLabel}
+      onClick={onSelect}
+      sx={{
+        textAlign: 'left', font: 'inherit', cursor: 'pointer', minWidth: 0, width: '100%',
+        p: '10px 12px', borderRadius: `${radius.md}px`,
+        border: `${selected ? 2 : 1}px solid ${selected ? accent[500] : neutral[200]}`,
+        m: selected ? 0 : '1px',
+        bgcolor: selected ? accent[50] : neutral[0],
+        transition: 'border-color .12s, background-color .12s',
+        '&:hover': { borderColor: selected ? accent[500] : neutral[300] },
+        '&:focus-visible': { outline: `2px solid ${accent[300]}`, outlineOffset: '2px' },
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', mb: '6px' }}>
+        <Box
+          component="span"
+          aria-hidden
+          sx={{
+            width: 18, height: 18, borderRadius: '50%', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            border: selected ? 'none' : `1.5px solid ${neutral[300]}`, bgcolor: selected ? accent[600] : 'transparent', color: neutral[0],
+          }}
+        >
+          {selected ? <icons.check size={12} strokeWidth={3} /> : null}
+        </Box>
+        <Box component="span" sx={{ fontSize: 12, lineHeight: '16px', fontWeight: 600, color: selected ? accent[700] : neutral[600] }}>{heading}</Box>
+      </Box>
+      <Box sx={{ fontSize: 14, lineHeight: '20px', color: selected ? neutral[900] : neutral[600], overflowWrap: 'anywhere' }}>{value}</Box>
+    </Box>
+  );
+}
 
 export interface ReviewDifferencesPanelProps {
   open: boolean;
@@ -438,30 +476,6 @@ export function ReviewDifferencesPanel({
   const ready = load.status === 'ready';
   const nothingToReview = ready && rows.length === 0 && queued.length === 0;
 
-  const valueCell = (text: string, muted: boolean, testid?: string) => (
-    <Box
-      title={text}
-      data-testid={testid}
-      sx={{ fontSize: 14, lineHeight: '20px', color: muted ? neutral[500] : neutral[800], overflowWrap: 'anywhere', minWidth: 0 }}
-    >
-      {text}
-    </Box>
-  );
-
-  const colLabel = (text: string) => (
-    <Box component="span" sx={{ display: { xs: 'block', sm: 'none' }, fontSize: 12, lineHeight: '16px', color: neutral[500] }}>{text}</Box>
-  );
-
-  const rowSx = {
-    display: 'grid',
-    gridTemplateColumns: { xs: '1fr', sm: '132px minmax(0,1fr) minmax(0,1fr) 168px' },
-    columnGap: '16px',
-    rowGap: '6px',
-    alignItems: 'start',
-    py: '12px',
-    borderTop: `1px solid ${neutral[100]}`,
-  } as const;
-
   return (
     <SidePanel padded
       open={open}
@@ -505,7 +519,16 @@ export function ReviewDifferencesPanel({
 
       {ready ? (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <Box component="p" sx={{ m: 0, fontSize: 14, lineHeight: '20px', color: neutral[700] }} data-testid="le-review-intro">{intro}</Box>
+          <Box
+            data-testid="le-review-intro"
+            sx={{ display: 'flex', gap: '10px', p: '12px', borderRadius: `${radius.md}px`, bgcolor: tone.warning.bg, border: `1px solid ${tone.warning.border}` }}
+          >
+            <Box component="span" sx={{ display: 'inline-flex', color: tone.warning.fg, mt: '2px' }}><icons.warning size={18} aria-hidden /></Box>
+            <Box sx={{ minWidth: 0 }}>
+              <Box sx={{ fontSize: 14, lineHeight: '20px', fontWeight: 600, color: neutral[900] }}>{t('listingEditor.review.introTitle', { marketplace: mp })}</Box>
+              <Box sx={{ fontSize: 13, lineHeight: '18px', color: neutral[700], mt: '2px' }}>{intro}</Box>
+            </Box>
+          </Box>
 
           {actionError ? <Banner tone="danger" title={actionError} data-testid="le-review-action-error" /> : null}
 
@@ -552,13 +575,7 @@ export function ReviewDifferencesPanel({
           ) : null}
 
           {conflicts.length || remoteOnly.length ? (
-            <Box role="table" aria-label={t('listingEditor.review.title')} sx={{ display: 'flex', flexDirection: 'column' }}>
-              <Box role="row" sx={{ ...rowSx, display: { xs: 'none', sm: 'grid' }, borderTop: 'none', py: '4px', fontSize: 12, lineHeight: '16px', color: neutral[500], fontWeight: 500 }}>
-                <span role="columnheader">{t('listingEditor.review.field')}</span>
-                <span role="columnheader">{t('listingEditor.review.mine')}</span>
-                <span role="columnheader">{t('listingEditor.review.remote', { marketplace: mp })}</span>
-                <Box role="columnheader" component="span" sx={{ display: 'flex', alignItems: 'center', gap: '4px' }}>{t('listingEditor.review.keepCol')}</Box>
-              </Box>
+            <Box aria-label={t('listingEditor.review.title')} sx={{ display: 'flex', flexDirection: 'column' }}>
 
               {conflicts.length > 1 ? (
                 <Box sx={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap', pb: '4px' }}>
@@ -567,34 +584,40 @@ export function ReviewDifferencesPanel({
                 </Box>
               ) : null}
 
-              {conflicts.map((r) => (
-                <Box role="row" key={r.key} sx={rowSx} data-testid={`le-review-row-${r.key}`}>
-                  <Box role="rowheader" sx={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: neutral[800] }}>{label(r.key)}</Box>
-                  <Box role="cell" sx={{ minWidth: 0 }}>{colLabel(t('listingEditor.review.mine'))}{valueCell(show(r.key, r.draft), choices[r.key] === 'remote')}</Box>
-                  <Box role="cell" sx={{ minWidth: 0 }}>{colLabel(t('listingEditor.review.remote', { marketplace: mp }))}{valueCell(show(r.key, r.remote), choices[r.key] !== 'remote')}</Box>
-                  <Box role="cell">
-                    <RadioGroup<ReviewChoice>
-                      value={choices[r.key] ?? 'mine'}
-                      onChange={(v) => setChoices((c) => ({ ...c, [r.key]: v }))}
-                      options={[
-                        { value: 'mine', label: t('listingEditor.review.keepMine') },
-                        { value: 'remote', label: t('listingEditor.review.keepRemote', { marketplace: mp }) },
-                      ]}
-                      direction="row"
-                      name={`review-${r.key}`}
+              {conflicts.map((r) => {
+                const pick = choices[r.key] ?? 'mine';
+                return (
+                  <Box key={r.key} sx={{ py: '12px', borderTop: `1px solid ${neutral[100]}` }} data-testid={`le-review-row-${r.key}`}>
+                    <Box sx={{ fontSize: 14, lineHeight: '20px', fontWeight: 600, color: neutral[900], mb: '8px' }}>{label(r.key)}</Box>
+                    <Box
+                      role="radiogroup"
                       aria-label={t('listingEditor.review.keepFor', { field: label(r.key) })}
                       data-testid={`le-review-choice-${r.key}`}
-                    />
+                      sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: '8px' }}
+                    >
+                      {(['mine', 'remote'] as const).map((side) => (
+                        <ChoiceCard
+                          key={side}
+                          selected={pick === side}
+                          onSelect={() => setChoices((c) => ({ ...c, [r.key]: side }))}
+                          heading={side === 'mine' ? t('listingEditor.review.mineCard') : t('listingEditor.review.remote', { marketplace: mp })}
+                          ariaLabel={side === 'mine' ? t('listingEditor.review.keepMine') : t('listingEditor.review.keepRemote', { marketplace: mp })}
+                          value={show(r.key, side === 'mine' ? r.draft : r.remote)}
+                        />
+                      ))}
+                    </Box>
                   </Box>
-                </Box>
-              ))}
+                );
+              })}
 
               {remoteOnly.map((r) => (
-                <Box role="row" key={r.key} sx={rowSx} data-testid={`le-review-row-${r.key}`}>
-                  <Box role="rowheader" sx={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: neutral[800] }}>{label(r.key)}</Box>
-                  <Box role="cell" sx={{ minWidth: 0 }}>{colLabel(t('listingEditor.review.mine'))}{valueCell(t('listingEditor.review.notInDraft'), true)}</Box>
-                  <Box role="cell" sx={{ minWidth: 0 }}>{colLabel(t('listingEditor.review.remote', { marketplace: mp }))}{valueCell(show(r.key, r.remote), false)}</Box>
-                  <Box role="cell" sx={{ fontSize: 13, lineHeight: '20px', color: neutral[600] }}>{t('listingEditor.review.remoteNoChoice', { marketplace: mp })}</Box>
+                <Box key={r.key} sx={{ py: '12px', borderTop: `1px solid ${neutral[100]}` }} data-testid={`le-review-row-${r.key}`}>
+                  <Box sx={{ fontSize: 14, lineHeight: '20px', fontWeight: 600, color: neutral[900], mb: '8px' }}>{label(r.key)}</Box>
+                  <Box sx={{ p: '10px 12px', borderRadius: `${radius.md}px`, border: `1px solid ${neutral[200]}`, bgcolor: neutral[25] }}>
+                    <Box sx={{ fontSize: 12, lineHeight: '16px', color: neutral[500], mb: '4px' }}>{t('listingEditor.review.remote', { marketplace: mp })} · {t('listingEditor.review.remoteNoChoice', { marketplace: mp })}</Box>
+                    <Box sx={{ fontSize: 14, lineHeight: '20px', color: neutral[800], overflowWrap: 'anywhere' }}>{show(r.key, r.remote)}</Box>
+                    <Box sx={{ fontSize: 12, lineHeight: '16px', color: neutral[500], mt: '4px' }}>{t('listingEditor.review.notInDraft')}</Box>
+                  </Box>
                 </Box>
               ))}
             </Box>
@@ -606,7 +629,10 @@ export function ReviewDifferencesPanel({
             </Box>
           ) : null}
 
-          <Box sx={{ fontSize: 12, lineHeight: '16px', color: neutral[500] }}>{t('listingEditor.review.noSend', { marketplace: mp })}</Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', p: '10px 12px', borderRadius: `${radius.md}px`, bgcolor: neutral[50], fontSize: 12, lineHeight: '16px', color: neutral[600] }}>
+            <icons.info size={16} aria-hidden />
+            <span>{t('listingEditor.review.noSend', { marketplace: mp })}</span>
+          </Box>
         </Box>
       ) : null}
     </SidePanel>

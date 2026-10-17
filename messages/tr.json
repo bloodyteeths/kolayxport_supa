@@ -14707,8 +14707,8 @@
         "personalizationInstructions": "Kişiselleştirme talimatı"
       },
       "title": "Farkları incele",
-      "intro": "{marketplace} bu ilanı taslağınızdan sonra değiştirdi. Taslak başlangıcı: {draftTime} · {marketplace} değişikliği: {remoteTime}. Her alan için neyi tutacağınızı seçin",
-      "introShort": "{marketplace} bu ilanı taslağınız başladıktan sonra değiştirdi. Her alan için neyi tutacağınızı seçin",
+      "intro": "Sizin düzenlemeniz: {draftTime} · {marketplace}'deki değişiklik: {remoteTime}. Her alan için hangisinin kalacağını seçin.",
+      "introShort": "Her alan için hangisinin kalacağını seçin.",
       "field": "Alan",
       "mine": "Taslağınız",
       "remote": "Şu an {marketplace}'de",
@@ -14737,7 +14737,9 @@
       "unavailable": "Farkları inceleme henüz kullanılamıyor",
       "unavailableCause": "{marketplace}'den yenileyip düzenlemeye devam edebilir veya değişikliklerinizi atabilirsiniz",
       "refreshKeep": "Yenile ve düzenlemeye devam et",
-      "discardMine": "Değişikliklerimi at"
+      "discardMine": "Değişikliklerimi at",
+      "introTitle": "Bu ilan, siz düzenledikten sonra {marketplace}'de değişti",
+      "mineCard": "Sizin değişikliğiniz"
     },
     "start": {
       "title": "Hızlı başlayın",

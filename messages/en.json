@@ -14707,8 +14707,8 @@
         "personalizationInstructions": "Personalization instructions"
       },
       "title": "Review differences",
-      "intro": "{marketplace} changed this listing at {remoteTime}, after your draft started at {draftTime}. Pick what to keep for each field",
-      "introShort": "{marketplace} changed this listing after your draft started. Pick what to keep for each field",
+      "intro": "Your edit: {draftTime} · Change on {marketplace}: {remoteTime}. Pick which one to keep for each field.",
+      "introShort": "Pick which one to keep for each field.",
       "field": "Field",
       "mine": "Your draft",
       "remote": "On {marketplace} now",
@@ -14737,7 +14737,9 @@
       "unavailable": "Review differences isn't available yet",
       "unavailableCause": "You can refresh from {marketplace} and keep editing, or discard your changes",
       "refreshKeep": "Refresh and keep editing",
-      "discardMine": "Discard my changes"
+      "discardMine": "Discard my changes",
+      "introTitle": "This listing changed on {marketplace} after you edited it",
+      "mineCard": "Your change"
     },
     "start": {
       "title": "Start faster",

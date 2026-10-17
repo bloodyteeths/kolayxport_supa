@@ -1563,7 +1563,7 @@
       "etsyPanel": {
         "title": "Etsy mağazaları",
         "shopId": "Mağaza ID {id}",
-        "connectAnother": "Başka bir mağaza bağla",
+        "connectAnother": "Mağaza ekle",
         "limitReached": "Mağaza sınırına ulaşıldı",
         "empty": "Henüz Etsy mağazası yok"
       },

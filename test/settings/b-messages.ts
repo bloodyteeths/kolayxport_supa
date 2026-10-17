@@ -73,7 +73,7 @@ export const settingsBEn = {
       chrome: 'Sends tracking to Etsy and fills buyer details',
     },
     etsyPanel: {
-      title: 'Etsy shops', shopId: 'Shop ID {id}', connectAnother: 'Connect another shop',
+      title: 'Etsy shops', shopId: 'Shop ID {id}', connectAnother: 'Add shop',
       limitReached: 'Store limit reached', empty: 'No Etsy shops yet',
     },
     amazonPanel: { connect: 'Connect Amazon', save: 'Save marketplaces' },
@@ -184,7 +184,7 @@ export const settingsBTr = {
       chrome: "Takip numarasını Etsy'ye gönderir, alıcı bilgilerini tamamlar",
     },
     etsyPanel: {
-      title: 'Etsy mağazaları', shopId: 'Mağaza ID {id}', connectAnother: 'Başka bir mağaza bağla',
+      title: 'Etsy mağazaları', shopId: 'Mağaza ID {id}', connectAnother: 'Mağaza ekle',
       limitReached: 'Mağaza sınırına ulaşıldı', empty: 'Henüz Etsy mağazası yok',
     },
     amazonPanel: { connect: 'Amazon bağla', save: 'Pazaryerlerini kaydet' },

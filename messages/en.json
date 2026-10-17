@@ -1645,7 +1645,7 @@
       "etsyPanel": {
         "title": "Etsy shops",
         "shopId": "Shop ID {id}",
-        "connectAnother": "Connect another shop",
+        "connectAnother": "Add shop",
         "limitReached": "Store limit reached",
         "empty": "No Etsy shops yet"
       },

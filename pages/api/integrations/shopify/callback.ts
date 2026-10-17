@@ -5,9 +5,14 @@ import { v4 as uuidv4 } from 'uuid';
 import prisma from '../../../../lib/prisma';
 import { logger } from '../../../../lib/logger';
 import { encryptIfNeeded } from '@/lib/crypto/credentials';
-import { DECIDED_TRIAL_DAYS } from '@/lib/billing/planLimits';
 import { clearConnectionAuthState } from '@/lib/integrations/authFailures';
-import crypto from 'crypto';
+import { SHOPIFY_API_VERSION } from '@/lib/integrations/shopifyApiVersion';
+import {
+  clearOAuthNonceCookie,
+  isValidShopDomain,
+  verifyOAuthState,
+  verifyShopifyQueryHmac,
+} from '@/lib/integrations/shopify/oauth';
 
 const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 
@@ -37,35 +42,63 @@ async function setSessionCookie(res: NextApiResponse, userId: string) {
   res.setHeader('Set-Cookie', cookieParts.join('; '));
 }
 
+type ShopInfo = { email?: string; shop_owner?: string; name?: string };
+
+async function fetchShopInfo(shop: string, accessToken: string): Promise<ShopInfo | null> {
+  const response = await fetch(`https://${shop}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`, {
+    method: 'POST',
+    headers: { 'X-Shopify-Access-Token': accessToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: '{ shop { name email shopOwnerName } }' }),
+  });
+  if (!response.ok) return null;
+  const data = (await response.json())?.data?.shop;
+  return data ? { name: data.name, email: data.email, shop_owner: data.shopOwnerName } : null;
+}
+
 async function provisionUserFromShop(args: {
   shopDomain: string;
-  shopInfo: { email?: string; shop_owner?: string; name?: string } | null;
+  shopInfo: ShopInfo | null;
 }): Promise<{ userId: string; created: boolean }> {
-  // Prefer the shop owner's contact email (returned by /admin/api/shop.json),
-  // fall back to a deterministic placeholder so we never leave email null.
-  const rawEmail = (args.shopInfo?.email || '').toLowerCase().trim();
-  const fallbackEmail = `${args.shopDomain.replace('.myshopify.com', '')}@shopify-install.kolayxport.com`;
-  const email = rawEmail || fallbackEmail;
-
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    return { userId: existing.id, created: false };
+  // Only log back into an account this shop is already linked to. Matching on the
+  // shop email alone would let anyone who sets their store's email to a victim's
+  // address get a session for the victim's account.
+  const linked = await prisma.shopifyShop.findUnique({
+    where: { shopDomain: args.shopDomain },
+    select: { userId: true },
+  });
+  if (linked) {
+    return { userId: linked.userId, created: false };
   }
 
-  const trialMs = DECIDED_TRIAL_DAYS * 24 * 60 * 60 * 1000;
+  // New shop: create a fresh account. Prefer the shop owner's email; if another
+  // account already uses it, fall back to a per-shop placeholder (that user can
+  // link this shop to their own account from Settings while logged in).
+  const handle = args.shopDomain.replace('.myshopify.com', '');
+  const rawEmail = (args.shopInfo?.email || '').toLowerCase().trim();
+  const candidates = [
+    rawEmail,
+    `${handle}@shopify-install.kolayxport.com`,
+    `${handle}+${uuidv4().slice(0, 8)}@shopify-install.kolayxport.com`,
+  ].filter(Boolean);
+  let email = candidates[candidates.length - 1];
+  for (const candidate of candidates) {
+    if (!(await prisma.user.findUnique({ where: { email: candidate }, select: { id: true } }))) {
+      email = candidate;
+      break;
+    }
+  }
+
   const user = await prisma.user.create({
     data: {
       id: uuidv4(),
       email,
       name: args.shopInfo?.shop_owner || args.shopInfo?.name || args.shopDomain,
       // Shopify-installed merchants are on the free Shopify tier — no Stripe upsell.
-      // emailVerified is set to now() because we trust Shopify's HMAC-verified shop info.
-      emailVerified: rawEmail ? new Date() : null,
+      // emailVerified only when we kept the shop's own email (HMAC-verified via Shopify).
+      emailVerified: email === rawEmail ? new Date() : null,
       subscriptionPlan: 'shopify_free',
       subscriptionStatus: 'active',
       billingProvider: 'shopify_free',
-      trialExpiresAt: new Date(Date.now() + trialMs),
-      usageResetAt: new Date(Date.now() + trialMs),
       orderSyncCount: 0,
       labelCount: 0,
     },
@@ -92,19 +125,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.redirect('/ayarlar?error=shopify_missing_params');
   }
 
-  // Verify HMAC
-  const queryWithoutHmac = Object.entries(req.query)
-    .filter(([key]) => key !== 'hmac')
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([k, v]) => `${k}=${v}`)
-    .join('&');
+  if (!isValidShopDomain(shop)) {
+    logger.error('Shopify callback invalid shop domain', undefined, { shop });
+    return res.redirect('/ayarlar?error=shopify_missing_params');
+  }
 
-  const generatedHmac = crypto
-    .createHmac('sha256', SHOPIFY_API_SECRET)
-    .update(queryWithoutHmac)
-    .digest('hex');
-
-  if (generatedHmac !== hmac) {
+  if (!verifyShopifyQueryHmac(req.query as Record<string, string | string[] | undefined>, SHOPIFY_API_SECRET)) {
     logger.error('Shopify HMAC verification failed');
     return res.redirect('/ayarlar?error=shopify_hmac_failed');
   }
@@ -113,17 +139,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   //   1) App Store install (state.appStoreInstall === true): no userId yet —
   //      auto-provision a KolayXport user from the shop email after token exchange.
   //   2) Settings-page connect (state.userId set): an existing user linking a shop.
-  let userId: string | null = null;
-  let appStoreInstall = false;
-  try {
-    const decoded = JSON.parse(Buffer.from(state, 'base64url').toString());
-    appStoreInstall = decoded.appStoreInstall === true;
-    userId = typeof decoded.userId === 'string' ? decoded.userId : null;
-    if (!appStoreInstall && !userId) {
-      throw new Error('No userId in state and not an install');
-    }
-  } catch (e) {
-    logger.error('Shopify callback invalid state', undefined, { state });
+  const verifiedState = verifyOAuthState(req, state, shop, SHOPIFY_API_SECRET);
+  clearOAuthNonceCookie(res);
+  const appStoreInstall = verifiedState?.appStoreInstall === true;
+  let userId: string | null = typeof verifiedState?.userId === 'string' ? verifiedState.userId : null;
+  if (!verifiedState || (!appStoreInstall && !userId)) {
+    logger.error('Shopify callback invalid state', undefined, { shop });
     return res.redirect('/ayarlar?error=shopify_invalid_state');
   }
 
@@ -175,10 +196,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Fetch shop info — used for shop name AND (for App Store installs) owner email.
-    const shopInfoResponse = await fetch(`https://${shop}/admin/api/2024-10/shop.json`, {
-      headers: { 'X-Shopify-Access-Token': access_token },
-    });
-    const shopInfo = shopInfoResponse.ok ? (await shopInfoResponse.json()).shop : null;
+    const shopInfo = await fetchShopInfo(shop, access_token);
 
     // App Store install: auto-provision the KolayXport user from the shop email
     // before we persist ShopifyShop (which requires a userId).
@@ -271,6 +289,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // inside the app instead of hitting the login wall.
     if (appStoreInstall) {
       await setSessionCookie(res, userId);
+      clearOAuthNonceCookie(res);
       const successKey = provisionedNow ? 'shopify_install_complete' : 'shopify_connected';
       logger.info('Shopify App Store install complete', { userId, shop, provisionedNow });
       return res.redirect(`/ayarlar?success=${successKey}`);

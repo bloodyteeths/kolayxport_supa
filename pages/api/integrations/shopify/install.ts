@@ -7,41 +7,13 @@
 // a user from the shop's owner email.
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import crypto from 'crypto';
 import { logger } from '../../../../lib/logger';
-
-// Scope-minimized per App Store policy 3.2: order sync reads orders, product
-// tools read/write products and inventory. No order/fulfillment writes exist.
-const SCOPES = 'read_orders,read_products,write_products,read_inventory,write_inventory';
-
-function isValidShopDomain(shop: string): boolean {
-  return /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.com$/.test(shop);
-}
-
-function verifyShopifyQueryHmac(
-  query: Record<string, string | string[] | undefined>,
-  secret: string,
-): boolean {
-  const hmac = query.hmac;
-  if (typeof hmac !== 'string') return false;
-
-  const message = Object.entries(query)
-    .filter(([k]) => k !== 'hmac' && k !== 'signature')
-    .map(([k, v]) => [k, Array.isArray(v) ? v.join(',') : String(v ?? '')])
-    .sort(([a], [b]) => (a as string).localeCompare(b as string))
-    .map(([k, v]) => `${k}=${v}`)
-    .join('&');
-
-  const expected = crypto.createHmac('sha256', secret).update(message).digest('hex');
-  try {
-    const a = Buffer.from(expected, 'utf-8');
-    const b = Buffer.from(hmac, 'utf-8');
-    if (a.length !== b.length) return false;
-    return crypto.timingSafeEqual(a, b);
-  } catch {
-    return false;
-  }
-}
+import {
+  SHOPIFY_SCOPES,
+  createOAuthState,
+  isValidShopDomain,
+  verifyShopifyQueryHmac,
+} from '@/lib/integrations/shopify/oauth';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -84,17 +56,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // App Store policy 2.3.4 requires OAuth to run on every install/reinstall hit,
   // even when a valid token exists server-side. Token-reuse belongs in API call
   // paths, not the install entry point.
-  const nonce = crypto.randomBytes(16).toString('hex');
-  const state = Buffer.from(
-    JSON.stringify({ appStoreInstall: true, shop, nonce }),
-  ).toString('base64url');
+  const state = createOAuthState(res, { appStoreInstall: true, shop }, SHOPIFY_API_SECRET);
 
   const authUrl =
     `https://${shop}/admin/oauth/authorize?` +
     `client_id=${SHOPIFY_API_KEY}` +
-    `&scope=${encodeURIComponent(SCOPES)}` +
+    `&scope=${encodeURIComponent(SHOPIFY_SCOPES)}` +
     `&redirect_uri=${encodeURIComponent(SHOPIFY_REDIRECT_URI)}` +
-    `&state=${state}`;
+    `&state=${encodeURIComponent(state)}`;
 
   logger.info('Shopify App Store install initiated', { shop });
   return res.redirect(authUrl);

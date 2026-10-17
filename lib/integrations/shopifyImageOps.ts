@@ -1,12 +1,13 @@
 /**
- * Shopify product image writes over the existing REST client methods
+ * Shopify product image writes over the client's image methods
  * (`getProductImages`, `createProductImage`, `updateProductImage`,
- * `deleteProductImage`). Used by `/api/shopify/products?action=images` and
+ * `deleteProductImage`; Admin GraphQL product media underneath). Used by `/api/shopify/products?action=images` and
  * importable by the catalog-draft Shopify executor (M6b-A) for the staged
  * `fieldPatch.images` ops (marketplace-editors §6.3).
  * Server-only (calls the client), but no Prisma and no Next imports.
  */
 import type { ShopifyClient } from './shopifyClient';
+import { resolveImageId } from './shopifyImageIds';
 import {
   failResult,
   isPublicHttpsUrl,
@@ -113,11 +114,14 @@ export async function applyShopifyImageOps(
   const adds: { i: number; add: ShopifyImageAdd }[] = [];
   const updates = new Map<string, { alt?: { i: number; v: string }; pos?: { i: number; v: number } }>();
 
-  ops.forEach((op, i) => {
-    if (op.op === 'add') {
-      adds.push({ i, add: op });
+  ops.forEach((raw, i) => {
+    if (raw.op === 'add') {
+      adds.push({ i, add: raw });
       return;
     }
+    // An id staged before the GraphQL migration (REST ProductImage id) maps to its MediaImage id.
+    const resolved = resolveImageId(raw.id, live);
+    const op = resolved && resolved !== raw.id ? { ...raw, id: resolved } : raw;
     if (!liveIds.includes(op.id)) {
       results.push(skippedResult(i, op.op, 'NOT_FOUND', op.id));
       return;

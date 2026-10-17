@@ -100,11 +100,10 @@ describe('GET /api/research/price-gap — gate and validation', () => {
     expect(h.p.trendyolProductIndex.findMany).not.toHaveBeenCalled();
   });
 
-  it('402 neutral for shopify_free', async () => {
+  it('shopify_free is not gated', async () => {
     h.shopify = 1;
     const res = await run();
-    expect(res.statusCode).toBe(402);
-    expect(res.body.neutral).toBe(true);
+    expect(res.statusCode).not.toBe(402);
   });
 
   it('400 for a bad source or a non-Trendyol link', async () => {

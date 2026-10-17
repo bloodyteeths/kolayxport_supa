@@ -41,9 +41,13 @@ function mapStatus(order: any): string {
  * Map a raw Shopify order to UIOrder format.
  */
 export function toOrder(shopifyOrder: any, shopDomain?: string): UIOrder {
+  // Order shape from ShopifyClient.getOrders (REST-shaped, built from Admin GraphQL). `customer`
+  // is null there (Order.customer needs read_customers), so names fall back to the billing address.
   const shipping = shopifyOrder.shipping_address || {};
+  const billing = shopifyOrder.billing_address || {};
   const customer = shopifyOrder.customer || {};
   const customerName = shipping.name
+    || billing.name
     || `${customer.first_name || ''} ${customer.last_name || ''}`.trim()
     || 'Unknown Customer';
 
@@ -73,7 +77,7 @@ export function toOrder(shopifyOrder: any, shopDomain?: string): UIOrder {
     shippingAddress: shippingAddressStr || null,
     to_address: {
       name: shipping.name || customerName,
-      phone: shipping.phone || customer.phone || '',
+      phone: shipping.phone || shopifyOrder.phone || billing.phone || customer.phone || '',
       street1: shipping.address1 || '',
       street2: shipping.address2 || '',
       city: shipping.city || '',

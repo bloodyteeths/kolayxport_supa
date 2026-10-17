@@ -12,6 +12,8 @@ import {
   type ShopifyImageOp,
 } from '@/lib/integrations/shopifyImageOps';
 import { OP_KEYS, type ProductOpCode } from '@/lib/integrations/productOpResults';
+import { assertNoUserErrors, toGid } from '@/lib/integrations/shopifyGraphql';
+import { SEO_QUERY, SEO_UPDATE_MUTATION } from '@/lib/integrations/shopifySeo';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '4mb' } },
@@ -45,38 +47,16 @@ async function getAuthAndClient(req: NextApiRequest, res: NextApiResponse) {
 }
 
 /**
- * Write a product's SEO title/description. The REST product endpoint has no
- * readable SEO fields, so this goes through Admin GraphQL productUpdate.
+ * Write a product's SEO title/description (Admin GraphQL `productUpdate`).
  */
 async function updateProductSeo(
-  shopDomain: string,
-  accessToken: string,
+  client: ShopifyClient,
   productId: string,
   seo: { title?: string; description?: string }
 ): Promise<{ title: string | null; description: string | null }> {
-  const res = await fetch(`https://${shopDomain}/admin/api/2024-10/graphql.json`, {
-    method: 'POST',
-    headers: { 'X-Shopify-Access-Token': accessToken, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      query: `mutation productSeoUpdate($input: ProductInput!) {
-        productUpdate(input: $input) {
-          product { id seo { title description } }
-          userErrors { field message }
-        }
-      }`,
-      variables: { input: { id: `gid://shopify/Product/${productId}`, seo } },
-    }),
-  });
-  if (!res.ok) {
-    throw new Error(`Shopify SEO update failed: ${res.status} - ${await res.text().catch(() => '')}`);
-  }
-  const json = await res.json();
-  const userErrors = json?.data?.productUpdate?.userErrors || [];
-  if (json?.errors?.length || userErrors.length) {
-    const msg = [...(json.errors || []), ...userErrors].map((e: any) => e.message).join('; ');
-    throw new Error(`Shopify SEO update failed: ${msg}`);
-  }
-  const saved = json?.data?.productUpdate?.product?.seo || {};
+  const data = await client.graphql(SEO_UPDATE_MUTATION, { product: { id: toGid('Product', productId), seo } });
+  assertNoUserErrors(data?.productUpdate, 'productUpdate(seo)');
+  const saved = data?.productUpdate?.product?.seo || {};
   return { title: saved.title ?? null, description: saved.description ?? null };
 }
 
@@ -84,68 +64,12 @@ async function updateProductSeo(
  * Read a product's current SEO title/description through Admin GraphQL.
  */
 async function getProductSeo(
-  shopDomain: string,
-  accessToken: string,
+  client: ShopifyClient,
   productId: string
 ): Promise<{ title: string | null; description: string | null }> {
-  const res = await fetch(`https://${shopDomain}/admin/api/2024-10/graphql.json`, {
-    method: 'POST',
-    headers: { 'X-Shopify-Access-Token': accessToken, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      query: `query productSeo($id: ID!) { product(id: $id) { seo { title description } } }`,
-      variables: { id: `gid://shopify/Product/${productId}` },
-    }),
-  });
-  if (!res.ok) {
-    throw new Error(`Shopify SEO read failed: ${res.status} - ${await res.text().catch(() => '')}`);
-  }
-  const json = await res.json();
-  if (json?.errors?.length) {
-    throw new Error(`Shopify SEO read failed: ${json.errors.map((e: any) => e.message).join('; ')}`);
-  }
-  const seo = json?.data?.product?.seo || {};
+  const data = await client.graphql(SEO_QUERY, { id: toGid('Product', productId) });
+  const seo = data?.product?.seo || {};
   return { title: seo.title ?? null, description: seo.description ?? null };
-}
-
-/**
- * Live inventory levels for a set of inventory items (REST; needs only read_inventory).
- * One request per 50 ids, with a timeout and a bounded retry on 429 throttling.
- * Returns levels grouped by inventory_item_id.
- */
-async function getInventoryLevelsForItems(
-  shopDomain: string,
-  accessToken: string,
-  inventoryItemIds: string[]
-): Promise<Map<string, { location_id: number; available: number | null }[]>> {
-  const byItem = new Map<string, { location_id: number; available: number | null }[]>();
-  const unique = Array.from(new Set(inventoryItemIds));
-  for (let i = 0; i < unique.length; i += 50) {
-    const chunk = unique.slice(i, i + 50);
-    const url = `https://${shopDomain}/admin/api/2024-10/inventory_levels.json?limit=250&inventory_item_ids=${encodeURIComponent(chunk.join(','))}`;
-    let res: Response | null = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      res = await fetch(url, {
-        headers: { 'X-Shopify-Access-Token': accessToken },
-        signal: AbortSignal.timeout(15_000),
-      });
-      if (res.status !== 429) break;
-      const retryAfter = Number(res.headers.get('Retry-After'));
-      const waitMs = Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter * 1000, 5_000) : 1_000 * (attempt + 1);
-      await new Promise((r) => setTimeout(r, waitMs));
-    }
-    if (!res || !res.ok) {
-      throw new Error(`Shopify inventory read failed: ${res?.status ?? 'no response'}`);
-    }
-    const json = await res.json();
-    const levels: any[] = Array.isArray(json?.inventory_levels) ? json.inventory_levels : [];
-    for (const lvl of levels) {
-      const key = String(lvl.inventory_item_id);
-      const list = byItem.get(key) || [];
-      list.push({ location_id: lvl.location_id, available: lvl.available ?? null });
-      byItem.set(key, list);
-    }
-  }
-  return byItem;
 }
 
 type VariantEditInput = {
@@ -190,7 +114,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if ('error' in auth) {
       return res.status(auth.status || 401).json({ error: auth.error });
     }
-    const { userId, shop, client, accessToken } = auth;
+    const { userId, shop, client } = auth;
 
     // ================================================================
     // LIST PRODUCTS (from cache or API)
@@ -261,13 +185,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // ================================================================
-    // GET PRODUCT SEO (live from Shopify; REST does not expose it)
+    // GET PRODUCT SEO (live from Shopify, Admin GraphQL)
     // ================================================================
     if (action === 'seo' && req.method === 'GET') {
       const productId = req.query.id as string;
       if (!productId) return res.status(400).json({ error: 'Missing product id' });
 
-      const seo = await getProductSeo(shop.shopDomain, accessToken, productId);
+      const seo = await getProductSeo(client, productId);
       return res.status(200).json({ seo });
     }
 
@@ -290,7 +214,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const productId = req.query.id as string || req.body.id;
       if (!productId) return res.status(400).json({ error: 'Missing product id' });
 
-      // `seo` is not a REST product field; it is written separately via GraphQL.
+      // `seo` is written separately (its own productUpdate, read back for the cache).
       const { seo, ...restUpdates } = req.body || {};
       const product = await client.updateProduct(String(productId), restUpdates);
 
@@ -298,7 +222,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await upsertProductCache(userId, shop.id, product);
 
       if (seo && typeof seo === 'object') {
-        const savedSeo = await updateProductSeo(shop.shopDomain, accessToken, String(product.id), {
+        const savedSeo = await updateProductSeo(client, String(product.id), {
           title: typeof seo.title === 'string' ? seo.title : undefined,
           description: typeof seo.description === 'string' ? seo.description : undefined,
         });
@@ -513,7 +437,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       let levelsFailed = false;
       if (needLevels.length > 0) {
         try {
-          levelsByItem = await getInventoryLevelsForItems(shop.shopDomain, accessToken, needLevels);
+          levelsByItem = await client.getInventoryLevelsForItems(needLevels);
         } catch (err: any) {
           levelsFailed = true;
           logger.error('Shopify inventory levels read failed', err as Error, { productId });

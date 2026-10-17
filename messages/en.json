@@ -1658,7 +1658,8 @@
       "shopifyPanel": {
         "storeAddress": "Store address",
         "connect": "Connect Shopify",
-        "enterAddress": "Enter your store address first"
+        "enterAddress": "Enter your store address first",
+        "addAnotherViaAppStore": "To connect another store, open your Shopify admin and install KolayXport from the Shopify App Store."
       },
       "storeLimit": {
         "title": "You've used all {limit} store slots",

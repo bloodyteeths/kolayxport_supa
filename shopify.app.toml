@@ -7,7 +7,7 @@ embedded = false
 redirect_urls = ["https://kolayxport.com/api/integrations/shopify/callback"]
 
 [webhooks]
-api_version = "2024-10"
+api_version = "2026-07"
 
   [webhooks.privacy_compliance]
   customer_deletion_url = "https://kolayxport.com/api/shopify/webhooks/compliance"

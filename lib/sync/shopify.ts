@@ -82,9 +82,9 @@ export async function syncShopifyRecentOrdersForUser(userId: string): Promise<Sy
 
         logger.info(`[SHOPIFY SYNC] Fetched ${rawOrders.length} orders from ${shop.shopDomain}`, { userId, shop: shop.shopDomain, orderCount: rawOrders.length });
 
-        // Shopify order line_items don't include an image field. Fetch each unique
-        // product_id once and stamp the featured image onto every line_item that
-        // references it, so the order/label UI shows product thumbnails.
+        // Line items carry their variant/product image (GraphQL LineItem.image). For the ones
+        // without one, fetch each unique product_id once and stamp the featured image onto every
+        // line_item that references it, so the order/label UI shows product thumbnails.
         const productIdsNeeded = new Set<string>();
         for (const o of rawOrders) {
           for (const li of (o.line_items || [])) {

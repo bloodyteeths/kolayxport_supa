@@ -98,11 +98,10 @@ describe('POST /api/etsy-drafts/batch-media', () => {
     expect(h.upsert).not.toHaveBeenCalled();
   });
 
-  it('402 neutral for shopify_free (an active Shopify store counts)', async () => {
+  it('shopify_free (an active Shopify store counts) is not gated', async () => {
     h.shopifyShops = 1;
     const r = await post({ shopId: '555', items: [{ listingId: '1', media: [del(1)] }] });
-    expect(r.statusCode).toBe(402);
-    expect(r.body.neutral).toBe(true);
+    expect(r.statusCode).not.toBe(402);
   });
 
   it('trial includes the studio; an expired trial does not', async () => {

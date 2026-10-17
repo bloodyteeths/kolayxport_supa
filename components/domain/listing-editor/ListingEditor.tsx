@@ -442,9 +442,11 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
     el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     if (!field) return;
     window.setTimeout(() => {
-      const target =
-        document.getElementById(fieldAnchorId(field)) ??
-        (el?.querySelector('input, textarea, [role="combobox"], button') as HTMLElement | null);
+      const anchor = document.getElementById(fieldAnchorId(field));
+      const target = anchor ?? (el?.querySelector('input, textarea, [role="combobox"], button') as HTMLElement | null);
+      // A field deep in a long section (the shop section below 12 category details) must come into view, not only
+      // get focus while the section top is on screen.
+      if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'center' });
       target?.focus({ preventScroll: true });
     }, 350);
   }, []);

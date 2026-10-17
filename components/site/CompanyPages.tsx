@@ -67,7 +67,7 @@ function AboutBody({ locale }: { locale: SiteLocale }) {
         <div className="grid gap-10 lg:grid-cols-[1fr_1.4fr]">
           <div>
             <h2 className="display text-[30px] md:text-[40px]">{t('companyTitle')}</h2>
-            <Link href={localePath(locale, '/iletisim')} className="btn-ghost mt-8">{t('contactCta')} <ArrowRight size={18} aria-hidden /></Link>
+            <Link prefetch={false} href={localePath(locale, '/iletisim')} className="btn-ghost mt-8">{t('contactCta')} <ArrowRight size={18} aria-hidden /></Link>
           </div>
           <CompanyFacts />
         </div>
@@ -167,7 +167,7 @@ function ContactBody({ locale }: { locale: SiteLocale }) {
             {field('message', t('message'), 'text', true)}
           </div>
           <p className="mt-4 text-xs text-ink-mute">
-            {t('consent')} <Link href={localePath(locale, '/kvkk-aydinlatma-metni')} className="underline">KVKK</Link>
+            {t('consent')} <Link prefetch={false} href={localePath(locale, '/kvkk-aydinlatma-metni')} className="underline">KVKK</Link>
           </p>
           <button type="submit" disabled={state === 'sending'} className="btn-kx mt-6 w-full sm:w-auto">{state === 'sending' ? t('sending') : t('send')}</button>
           <p role="status" aria-live="polite" className={`mt-4 text-sm ${state === 'error' ? 'text-[#B42318]' : 'text-[#0F7A4A]'}`}>

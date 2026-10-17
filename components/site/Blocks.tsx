@@ -29,8 +29,8 @@ export function TrialCta({ dark = false, secondary }: { dark?: boolean; secondar
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <Link href={SIGNUP_HREF} className="btn-kx text-[16px]">{t('ctaTrial')} <ArrowRight size={18} aria-hidden /></Link>
-        {secondary ? <Link href={secondary.href} className={`btn-ghost ${dark ? 'btn-ghost-dark' : ''}`}>{secondary.label}</Link> : null}
+        <Link prefetch={false} href={SIGNUP_HREF} className="btn-kx text-[16px]">{t('ctaTrial')} <ArrowRight size={18} aria-hidden /></Link>
+        {secondary ? <Link prefetch={false} href={secondary.href} className={`btn-ghost ${dark ? 'btn-ghost-dark' : ''}`}>{secondary.label}</Link> : null}
       </div>
       <p className={`mt-3 text-sm ${dark ? 'text-paper/65' : 'text-ink-mute'}`}>{t('trialLine')}</p>
     </div>
@@ -126,7 +126,7 @@ export function Breadcrumbs({ items }: { items: { href: string; label: string }[
         {items.map((it, i) => (
           <li key={it.href} className="flex items-center gap-1.5">
             {i > 0 ? <span aria-hidden>/</span> : null}
-            {i < items.length - 1 ? <Link href={it.href} className="hover:text-ink hover:underline">{it.label}</Link> : <span aria-current="page" className="text-ink-soft">{it.label}</span>}
+            {i < items.length - 1 ? <Link prefetch={false} href={it.href} className="hover:text-ink hover:underline">{it.label}</Link> : <span aria-current="page" className="text-ink-soft">{it.label}</span>}
           </li>
         ))}
       </ol>

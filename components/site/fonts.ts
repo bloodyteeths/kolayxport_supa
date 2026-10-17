@@ -1,21 +1,26 @@
-// Marketing fonts (docs/brand.md §4), self-hosted by next/font. latin-ext covers ş ğ ı İ ç ö ü.
-import { Fraunces, Instrument_Sans } from 'next/font/google';
+// Marketing fonts (docs/brand.md §4), self-hosted subsets built by scripts/brand/subset-fonts.py:
+// Fraunces with SOFT 100 / opsz 72 baked in (weights 500–600) and Instrument Sans (400–600), Latin +
+// Turkish glyphs only — ~28 KB each instead of ~160 KB of Google subsets (GTM perf budget).
+import localFont from 'next/font/local';
 
-export const fraunces = Fraunces({
-  subsets: ['latin', 'latin-ext'],
-  // SOFT keeps the rounded serifs of the logo wordmark; the optical-size axis (opsz) is dropped to keep
-  // the font files small (it roughly doubles them for no visible gain at heading sizes).
-  axes: ['SOFT'],
+export const fraunces = localFont({
+  src: '../../public/fonts/fraunces-soft-500-600.woff2',
+  weight: '500 600',
+  style: 'normal',
   display: 'swap',
   variable: '--font-fraunces',
+  fallback: ['Georgia', 'Times New Roman', 'serif'],
+  adjustFontFallback: 'Times New Roman',
 });
 
-export const instrument = Instrument_Sans({
-  subsets: ['latin', 'latin-ext'],
+export const instrument = localFont({
+  src: '../../public/fonts/instrument-sans-400-600.woff2',
+  weight: '400 600',
+  style: 'normal',
   display: 'swap',
-  // Body text renders first in the size-adjusted fallback; only the display face (the LCP headline) is preloaded.
-  preload: false,
   variable: '--font-instrument',
+  fallback: ['ui-sans-serif', 'system-ui', 'Arial', 'sans-serif'],
+  adjustFontFallback: 'Arial',
 });
 
 export const siteFontClass = `${fraunces.variable} ${instrument.variable}`;

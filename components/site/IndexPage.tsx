@@ -43,7 +43,7 @@ function IndexBody({ locale, type, path, cards }: IndexPageProps) {
           <ul className={`mt-12 grid gap-5 ${type === 'blog' ? 'md:grid-cols-2' : 'md:grid-cols-2 lg:grid-cols-3'}`}>
             {cards.map(({ slug, meta }) => (
               <li key={slug}>
-                <Link href={href(`${path}/${slug}`)} className="group flex h-full flex-col rounded-2xl border border-line bg-white p-6 transition-colors hover:border-ink">
+                <Link prefetch={false} href={href(`${path}/${slug}`)} className="group flex h-full flex-col rounded-2xl border border-line bg-white p-6 transition-colors hover:border-ink">
                   {meta.eyebrow ? <span className="site-tag self-start">{meta.eyebrow}</span> : null}
                   {type === 'blog' ? <span className="text-sm text-ink-mute">{meta.date}</span> : null}
                   <span className="display mt-4 text-[24px] leading-tight text-ink">{meta.h1 || meta.title}</span>
@@ -71,7 +71,7 @@ function IntegrationGroups({ cards, href }: { cards: { slug: string; meta: Recor
           <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {g.items.map(({ slug, meta }) => (
               <li key={slug}>
-                <Link href={href(`/entegrasyonlar/${slug}`)} className="flex h-full flex-col rounded-2xl border border-line bg-white p-6 hover:border-ink">
+                <Link prefetch={false} href={href(`/entegrasyonlar/${slug}`)} className="flex h-full flex-col rounded-2xl border border-line bg-white p-6 hover:border-ink">
                   <span className="flex items-center justify-between">
                     <span className="display text-[26px]">{meta.name}</span>
                     <span className="rounded-full bg-paper-2 px-2.5 py-1 text-xs font-semibold text-ink-soft">{c(`maturity.${meta.status || 'production'}` as any)}</span>

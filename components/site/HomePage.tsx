@@ -125,7 +125,7 @@ function HomeBody({ locale, shots, photos, integrations, testimonials }: HomePro
             <p className="site-tag !border-paper/20 !bg-paper/10 !text-paper">{t('trendyol.eyebrow')}</p>
             <h2 className="display mt-4 text-[30px] text-paper md:text-[46px]">{t('trendyol.title')}</h2>
             <p className="mt-5 text-lg text-paper/75">{t('trendyol.text')}</p>
-            <Link href={href('/cozumler/trendyoldan-dunyaya')} className="btn-ghost btn-ghost-dark mt-8">{t('trendyol.cta')} <ArrowRight size={18} aria-hidden /></Link>
+            <Link prefetch={false} href={href('/cozumler/trendyoldan-dunyaya')} className="btn-ghost btn-ghost-dark mt-8">{t('trendyol.cta')} <ArrowRight size={18} aria-hidden /></Link>
           </div>
           <div>
             {photos['textile-workshop'] ? <Photo asset={photos['textile-workshop']} alt={t('trendyol.title')} label={c('illustration')} className="aspect-[4/3]" /> : shots['stock-sync'] ? <Shot asset={shots['stock-sync']} alt={c('screenAlt', { name: 'Trendyol' })} /> : null}
@@ -137,12 +137,12 @@ function HomeBody({ locale, shots, photos, integrations, testimonials }: HomePro
       <Section>
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <Heading title={t('integrations.title')} lead={t('integrations.lead')} />
-          <Link href={href('/entegrasyonlar')} className="font-semibold text-kx hover:underline">{t('integrations.all')} →</Link>
+          <Link prefetch={false} href={href('/entegrasyonlar')} className="font-semibold text-kx hover:underline">{t('integrations.all')} →</Link>
         </div>
         <ul className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {integrations.map((it) => (
             <li key={it.slug}>
-              <Link href={href(`/entegrasyonlar/${it.slug}`)} className="group flex h-full flex-col justify-between rounded-2xl border border-line bg-white p-5 transition-colors hover:border-ink">
+              <Link prefetch={false} href={href(`/entegrasyonlar/${it.slug}`)} className="group flex h-full flex-col justify-between rounded-2xl border border-line bg-white p-5 transition-colors hover:border-ink">
                 <span className="text-xs font-semibold uppercase tracking-[.12em] text-ink-mute">{c(`kinds.${it.kind}` as any)}</span>
                 <span className="display mt-6 text-[24px] text-ink">{it.name}</span>
                 <span className="mt-2 text-xs font-medium text-ink-mute">{c(`maturity.${it.status}` as any)}</span>

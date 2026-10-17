@@ -67,7 +67,7 @@ export default function SiteFooter({ locale }: { locale: SiteLocale }) {
                 <h2 className="text-xs font-semibold uppercase tracking-[.14em] text-kraft">{c.title}</h2>
                 <ul className="mt-4 grid gap-2.5 text-[15px]">
                   {c.links.map((l) => (
-                    <li key={l.href}><Link href={l.href} className="text-paper/80 hover:text-paper">{l.label}</Link></li>
+                    <li key={l.href}><Link prefetch={false} href={l.href} className="text-paper/80 hover:text-paper">{l.label}</Link></li>
                   ))}
                   {c.title === t('footer.legal') && (
                     <li><button type="button" onClick={openCookiePreferences} className="text-left text-paper/80 hover:text-paper">{t('footer.cookiePrefs')}</button></li>

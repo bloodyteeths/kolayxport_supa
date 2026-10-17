@@ -42,7 +42,7 @@ export default function SiteHeader({ locale, path, hasTwin, tone }: Props) {
   return (
     <header className={`sticky top-0 z-50 border-b backdrop-blur supports-[backdrop-filter]:backdrop-blur ${bar}`} style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="mx-auto flex h-16 max-w-[1200px] items-center gap-6 px-5 md:h-[72px] md:px-8">
-        <Link href={href('/')} className="flex shrink-0 items-center" aria-label="KolayXport">
+        <Link prefetch={false} href={href('/')} className="flex shrink-0 items-center" aria-label="KolayXport">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={dark ? '/brand/kolayxport-logo-dark.svg' : '/brand/kolayxport-logo.svg'} alt="KolayXport" width={146} height={36} className="h-8 w-auto md:h-9" />
         </Link>
@@ -63,30 +63,30 @@ export default function SiteHeader({ locale, path, hasTwin, tone }: Props) {
                 <ul className="grid grid-cols-2 gap-1">
                   {CASES.map((slug) => (
                     <li key={slug}>
-                      <Link href={href(`/cozumler/${slug}`)} onClick={() => setSolutions(false)} className="block rounded-xl px-3 py-2.5 hover:bg-paper-2">
+                      <Link prefetch={false} href={href(`/cozumler/${slug}`)} onClick={() => setSolutions(false)} className="block rounded-xl px-3 py-2.5 hover:bg-paper-2">
                         <span className="block font-semibold">{t(`cases.${slug}.label`)}</span>
                         <span className="block text-sm text-ink-mute">{t(`cases.${slug}.desc`)}</span>
                       </Link>
                     </li>
                   ))}
                 </ul>
-                <Link href={href('/cozumler')} onClick={() => setSolutions(false)} className="mt-2 block rounded-xl px-3 py-2 text-sm font-semibold text-kx hover:bg-paper-2">
+                <Link prefetch={false} href={href('/cozumler')} onClick={() => setSolutions(false)} className="mt-2 block rounded-xl px-3 py-2 text-sm font-semibold text-kx hover:bg-paper-2">
                   {t('nav.allSolutions')} →
                 </Link>
               </div>
             )}
           </div>
           {links.map((l) => (
-            <Link key={l.href} href={l.href} className="rounded-full px-3 py-2 text-[15px] font-medium hover:bg-current/5">{l.label}</Link>
+            <Link prefetch={false} key={l.href} href={l.href} className="rounded-full px-3 py-2 text-[15px] font-medium hover:bg-current/5">{l.label}</Link>
           ))}
         </nav>
 
         <div className="ml-auto hidden items-center gap-2 lg:flex">
-          <Link href={switchHref} hrefLang={other} className="rounded-full px-3 py-2 text-sm font-semibold opacity-80 hover:opacity-100" aria-label={t('nav.lang')}>
+          <Link prefetch={false} href={switchHref} hrefLang={other} className="rounded-full px-3 py-2 text-sm font-semibold opacity-80 hover:opacity-100" aria-label={t('nav.lang')}>
             {t('nav.langShort')}
           </Link>
-          <Link href="/login" className="rounded-full px-3 py-2 text-[15px] font-medium hover:bg-current/5">{t('nav.login')}</Link>
-          <Link href={SIGNUP_HREF} className="btn-kx !min-h-[42px] text-[15px]">{t('nav.cta')}</Link>
+          <Link prefetch={false} href="/login" className="rounded-full px-3 py-2 text-[15px] font-medium hover:bg-current/5">{t('nav.login')}</Link>
+          <Link prefetch={false} href={SIGNUP_HREF} className="btn-kx !min-h-[42px] text-[15px]">{t('nav.cta')}</Link>
         </div>
 
         <button
@@ -107,7 +107,7 @@ export default function SiteHeader({ locale, path, hasTwin, tone }: Props) {
           <ul className="mt-3 grid gap-1">
             {CASES.map((slug) => (
               <li key={slug}>
-                <Link href={href(`/cozumler/${slug}`)} onClick={() => setOpen(false)} className="block rounded-xl px-2 py-3">
+                <Link prefetch={false} href={href(`/cozumler/${slug}`)} onClick={() => setOpen(false)} className="block rounded-xl px-2 py-3">
                   <span className="block font-semibold">{t(`cases.${slug}.label`)}</span>
                   <span className="block text-sm text-ink-mute">{t(`cases.${slug}.desc`)}</span>
                 </Link>
@@ -116,13 +116,13 @@ export default function SiteHeader({ locale, path, hasTwin, tone }: Props) {
           </ul>
           <ul className="mt-4 grid gap-1 border-t border-line pt-4">
             {links.map((l) => (
-              <li key={l.href}><Link href={l.href} onClick={() => setOpen(false)} className="block rounded-xl px-2 py-3 text-lg font-semibold">{l.label}</Link></li>
+              <li key={l.href}><Link prefetch={false} href={l.href} onClick={() => setOpen(false)} className="block rounded-xl px-2 py-3 text-lg font-semibold">{l.label}</Link></li>
             ))}
-            <li><Link href={switchHref} hrefLang={other} onClick={() => setOpen(false)} className="block rounded-xl px-2 py-3 font-semibold text-ink-soft">{t('nav.lang')}</Link></li>
+            <li><Link prefetch={false} href={switchHref} hrefLang={other} onClick={() => setOpen(false)} className="block rounded-xl px-2 py-3 font-semibold text-ink-soft">{t('nav.lang')}</Link></li>
           </ul>
           <div className="mt-6 grid gap-3">
-            <Link href={SIGNUP_HREF} className="btn-kx w-full">{t('nav.cta')}</Link>
-            <Link href="/login" className="btn-ghost w-full">{t('nav.login')}</Link>
+            <Link prefetch={false} href={SIGNUP_HREF} className="btn-kx w-full">{t('nav.cta')}</Link>
+            <Link prefetch={false} href="/login" className="btn-ghost w-full">{t('nav.login')}</Link>
           </div>
           <p className="mt-4 text-center text-sm text-ink-mute">{t('common.trialLine')}</p>
         </div>

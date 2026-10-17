@@ -300,7 +300,7 @@ function Body({ locale, type, doc, heroPhoto, heroShot, heroShotMobile, related,
           <ul className="mt-6 grid gap-4 md:grid-cols-3">
             {related.map((r) => (
               <li key={r.slug}>
-                <Link href={href(`${type === 'cases' ? '/cozumler' : '/entegrasyonlar'}/${r.slug}`)} className="flex h-full flex-col rounded-2xl border border-line bg-white p-5 hover:border-ink">
+                <Link prefetch={false} href={href(`${type === 'cases' ? '/cozumler' : '/entegrasyonlar'}/${r.slug}`)} className="flex h-full flex-col rounded-2xl border border-line bg-white p-5 hover:border-ink">
                   <span className="font-semibold">{r.meta.name || r.meta.h1}</span>
                   <span className="mt-2 text-sm text-ink-soft">{r.meta.subtitle || r.meta.description}</span>
                   <span className="mt-auto pt-4 text-sm font-semibold text-kx">{c('readMore')} <ArrowRight size={14} className="inline" aria-hidden /></span>

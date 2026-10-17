@@ -23,7 +23,7 @@ export default function PricingTeaser({ locale }: { locale: SiteLocale }) {
     <div>
       <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
         <Heading title={t('title')} lead={t('lead')} />
-        <Link href="/fiyatlandirma" className="btn-ghost shrink-0">{t('cta')}</Link>
+        <Link prefetch={false} href="/fiyatlandirma" className="btn-ghost shrink-0">{t('cta')}</Link>
       </div>
       {spots ? (
         <p className="mt-8 inline-flex rounded-full border border-kx/30 bg-kx-wash px-4 py-2 text-sm font-semibold text-kx-deep" role="status">

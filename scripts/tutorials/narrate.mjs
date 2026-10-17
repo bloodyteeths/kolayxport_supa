@@ -13,7 +13,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { GoogleGenAI } from '@google/genai';
 import { CONFIG, WORK, ensure, ffmpeg, durationSec, hash, loadTutorial } from './lib.mjs';
-import { judgeTake, isPerfect, score, respell, writeReport } from './voiceQa.mjs';
+import { judgeTake, isPerfect, score, respell, writeReport, missingTerms } from './voiceQa.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const ENGINE = process.env.TTS_ENGINE === 'say' ? 'say' : 'gemini';
@@ -101,13 +101,15 @@ async function voiceFinal(ai, text, file, meta = {}) {
     const { pcm, rate } = await tts(ai, spoken);
     const out = file.replace(/\.wav$/, `.take${take}.wav`);
     pcmToWav(pcm, rate, out, POLISH);
-    const q = await judgeTake(ai, out, text);
+    const q = await judgeTake(ai, out, text, spoken);
     const tooLong = durationSec(out) > maxSec(text) + 1;
     if (tooLong) q.issues.push('take much longer than the text needs');
     console.log(`    take ${take}: words ${(q.similarity * 100).toFixed(0)}%, natural ${q.natural}/5${q.mispronounced.length ? `, mispronounced ${q.mispronounced.join(', ')}` : ''}${q.issues.length ? `, issues: ${q.issues.join('; ').slice(0, 120)}` : ''}`);
     if (!best || score(q) > score(best.q)) { if (best) fs.unlinkSync(best.out); best = { out, q, take }; } else fs.unlinkSync(out);
     if (isPerfect(q) && !tooLong) break;
-    respellTerms = [...new Set([...respellTerms, ...q.mispronounced])];
+    // Respell terms the judge heard wrong, and brand terms that didn't make it into the transcript at all
+    // ("Etsy'de" heard as "H'de").
+    respellTerms = [...new Set([...respellTerms, ...q.mispronounced, ...missingTerms(text, q.transcript)])];
   }
   fs.renameSync(best.out, file);
   fs.writeFileSync(file.replace(/\.wav$/, '.qa.json'), JSON.stringify({ text, takes: best.take, q: best.q }, null, 2));

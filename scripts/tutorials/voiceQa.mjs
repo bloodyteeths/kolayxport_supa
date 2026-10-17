@@ -41,14 +41,49 @@ export function respell(text, terms) {
   return out;
 }
 
-const norm = (s) => s.toLocaleLowerCase('tr').replace(/kolay\s*e[kx]s?port/g, 'kolayxport').normalize('NFD').replace(/[̀-ͯ]/g, '')
-  .replace(/ı/g, 'i').replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
+const ONES = ['', 'bir', 'iki', 'üç', 'dört', 'beş', 'altı', 'yedi', 'sekiz', 'dokuz'];
+const TENS = ['', 'on', 'yirmi', 'otuz', 'kırk', 'elli', 'altmış', 'yetmiş', 'seksen', 'doksan'];
+/** 0–9999 as Turkish words, so "13" in a transcript matches "on üç" in the script. */
+function numTr(n) {
+  if (n === 0) return 'sıfır';
+  const th = Math.floor(n / 1000), h = Math.floor((n % 1000) / 100), t = Math.floor((n % 100) / 10), o = n % 10;
+  return [th ? (th === 1 ? 'bin' : `${ONES[th]} bin`) : '', h ? (h === 1 ? 'yüz' : `${ONES[h]} yüz`) : '', TENS[t], ONES[o]].filter(Boolean).join(' ');
+}
+
+/**
+ * Comparable letters only: lowercase, numbers spelled out, %10 = "yüzde on", no accents, no spaces or
+ * punctuation. Comparing letters instead of words means spelling variants of the same sound
+ * ("filtresiyle" / "filtresi ile", "pazaryeri" / "pazar yeri") don't count as errors, while a wrong or
+ * missing word ("H'de" for "Etsy'de") still does.
+ */
+const norm = (s) => s.toLocaleLowerCase('tr')
+  .replace(/%\s*(\d+)/g, (_, d) => `yüzde ${d}`)
+  .replace(/\d{1,4}/g, (d) => ` ${numTr(Number(d))} `)
+  .replace(/kolay\s*e[kx]s?port/g, 'kolayxport')
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ı/g, 'i')
+  .replace(/[^a-z]/g, '');
 
 function lcsRatio(a, b) {
   const m = a.length, n = b.length;
-  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
-  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
-  return dp[m][n] / Math.max(m, n, 1);
+  let prev = new Array(n + 1).fill(0);
+  for (let i = 1; i <= m; i++) {
+    const cur = new Array(n + 1).fill(0);
+    for (let j = 1; j <= n; j++) cur[j] = a[i - 1] === b[j - 1] ? prev[j - 1] + 1 : Math.max(prev[j], cur[j - 1]);
+    prev = cur;
+  }
+  return prev[n] / Math.max(m, n, 1);
+}
+
+/** Brand terms in the script whose letters don't appear in the transcript (garbled or dropped). */
+export function missingTerms(script, transcript) {
+  const t = norm(transcript);
+  return termsIn(script).filter((term) => !t.includes(norm(term)) && !t.includes(norm(PRONUNCIATION[term].say)));
+}
+
+/** Similarity of a transcript to the script, also accepting the respelled text that was actually sent to TTS. */
+export function wordMatch(script, transcript, spoken = script) {
+  const t = norm(transcript);
+  return Math.max(lcsRatio(norm(script), t), spoken === script ? 0 : lcsRatio(norm(spoken), t));
 }
 
 /**
@@ -105,14 +140,14 @@ Judge ONLY what you actually hear. Return JSON only:
  * independent listens — a term counts as mispronounced or an issue counts only when BOTH listens report it
  * (one listen alone was seen re-scoring identical audio differently).
  */
-export async function judgeTake(ai, wavFile, script) {
+export async function judgeTake(ai, wavFile, script, spoken = script) {
   const terms = termsIn(script);
   const audio = fs.readFileSync(wavFile).toString('base64');
   const [transcript, a, b] = await Promise.all([transcribe(ai, audio), listen(ai, audio, script, terms), listen(ai, audio, script, terms)]);
   const list = (x) => (Array.isArray(x) ? x.map(String).filter(Boolean) : []);
   const mis = list(a.mispronounced).filter((t) => terms.includes(t) && list(b.mispronounced).includes(t));
   const both = list(a.issues).length && list(b.issues).length ? [...list(a.issues), ...list(b.issues)] : [];
-  const similarity = lcsRatio(norm(script), norm(transcript));
+  const similarity = wordMatch(script, transcript, spoken);
   if (similarity < 0.97) both.unshift(`words: ${(similarity * 100).toFixed(0)}% match (heard: "${transcript.slice(0, 160)}")`);
   return { transcript, similarity, mispronounced: mis, issues: both, natural: Math.min(Number(a.natural) || 0, Number(b.natural) || 0) };
 }

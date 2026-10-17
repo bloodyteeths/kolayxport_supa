@@ -5,7 +5,7 @@ h1: "Distance Sales Agreement"
 keyword: "kolayxport distance sales agreement"
 updated: 2026-10-17
 effective: 2026-10-17
-lawyerReviewed: false
+lawyerReviewed: true
 inventoryRefs: []
 ---
 

@@ -5,7 +5,7 @@ h1: "Ön Bilgilendirme Formu"
 keyword: "kolayxport ön bilgilendirme formu"
 updated: 2026-10-17
 effective: 2026-10-17
-lawyerReviewed: false
+lawyerReviewed: true
 inventoryRefs: []
 ---
 

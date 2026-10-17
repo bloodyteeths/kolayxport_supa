@@ -5,7 +5,7 @@ h1: "Kullanım Şartları"
 keyword: "kolayxport kullanım şartları"
 updated: 2026-10-17
 effective: 2026-10-17
-lawyerReviewed: false
+lawyerReviewed: true
 inventoryRefs: []
 ---
 

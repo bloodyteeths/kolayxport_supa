@@ -5,7 +5,7 @@ h1: "Pre-Contract Information Form"
 keyword: "kolayxport pre-contract information form"
 updated: 2026-10-17
 effective: 2026-10-17
-lawyerReviewed: false
+lawyerReviewed: true
 inventoryRefs: []
 ---
 

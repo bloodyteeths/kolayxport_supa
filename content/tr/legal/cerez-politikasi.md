@@ -5,7 +5,7 @@ h1: "Çerez Politikası"
 keyword: "kolayxport çerez politikası"
 updated: 2026-10-17
 effective: 2026-10-17
-lawyerReviewed: false
+lawyerReviewed: true
 inventoryRefs: []
 ---
 

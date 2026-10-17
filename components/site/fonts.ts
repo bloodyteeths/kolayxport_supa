@@ -13,6 +13,8 @@ export const fraunces = Fraunces({
 export const instrument = Instrument_Sans({
   subsets: ['latin', 'latin-ext'],
   display: 'swap',
+  // Body text renders first in the size-adjusted fallback; only the display face (the LCP headline) is preloaded.
+  preload: false,
   variable: '--font-instrument',
 });
 

@@ -64,7 +64,8 @@ import { useGoShortcuts } from '@/lib/nav/useGoShortcuts';
 import { isShellRoute } from '@/lib/nav/shellRoutes';
 
 // Inter via next/font (self-hosted). latin-ext covers ğ ş ı İ. Exposed as --font-inter at :root below.
-const inter = Inter({ subsets: ['latin', 'latin-ext'], display: 'swap', variable: '--font-inter' });
+// preload: false — marketing pages never use Inter; app pages fetch it on first use (then cached).
+const inter = Inter({ subsets: ['latin', 'latin-ext'], display: 'swap', variable: '--font-inter', preload: false });
 
 // Module scope (client only) so the 402 interceptor is active before any page
 // effect issues a request. Idempotent.

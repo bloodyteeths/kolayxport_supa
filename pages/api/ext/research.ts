@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import { etsyFetch, etsyPublicHeaders } from '@/lib/etsy/http';
 import { EtsyPriority } from '@/lib/etsy/rateBudget';
-import { getBatchListingStats, getListingStats, getShopStats, EtsyPublicApiError } from '@/lib/etsy/listingStats';
+import { getBatchListingStats, applyPageEstimates, getListingStats, getShopStats, EtsyPublicApiError } from '@/lib/etsy/listingStats';
 import { buildFxTable } from '@/lib/research/stats';
 import { summarizeEtsySearch } from '@/lib/etsy/searchSummary';
 import { convertCurrency } from '@/lib/finance/fx';
@@ -109,6 +109,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             return { status: 200, body, cacheable: !(result as any).pendingIds?.length };
           },
         );
+        // Cached or live, a listing opened since then wins: same number on the card and the listing page.
+        if (outcome.kind === 'ok' && outcome.body && typeof outcome.body === 'object') {
+          outcome.body = { ...outcome.body, listings: applyPageEstimates({ ...(outcome.body.listings || {}) }) };
+        }
         return sendResearchOutcome(res, outcome, { plan });
       }
 

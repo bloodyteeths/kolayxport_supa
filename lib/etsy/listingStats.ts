@@ -725,6 +725,24 @@ function rememberPageEstimate(listingId: string, sales: any) {
 
 /** Test hook. */
 export function __clearPageEstimates() { pageEstimateCache.clear(); }
+
+/**
+ * Override card stats with fresher listing-page estimates. Card results can come from the 6 h shared cache, so
+ * this runs on every response (cached or live) and the search card always matches the listing page.
+ */
+export function applyPageEstimates(listings: Record<string, CardStats> | undefined | null, now = Date.now()) {
+  if (!listings) return listings;
+  for (const id of Object.keys(listings)) {
+    const pe = pageEstimateCache.get(id);
+    const card = listings[id];
+    if (!pe || !card || now - pe.at >= PAGE_ESTIMATE_TTL_MS) continue;
+    listings[id] = { ...card, sales: { ...pe.sales, monthlyRevenue: revenueFor(pe.sales.monthlySales, card.price) } as CardStats['sales'] };
+  }
+  return listings;
+}
+
+/** Test hook: store a listing-page estimate directly. */
+export function __rememberPageEstimateForTest(listingId: string, sales: any) { rememberPageEstimate(listingId, sales); }
 const LISTING_BASIC_TTL_MS = 30 * 60 * 1000;
 /** Max shops fetched fresh from Etsy per batch request (2 calls each); the rest come back as 'pending'. */
 const DEFAULT_MAX_NEW_SHOPS = 12;

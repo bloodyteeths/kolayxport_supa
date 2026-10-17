@@ -6,6 +6,7 @@ import prisma from '../../../lib/prisma';
 import { type PlanKey, type IntervalKey } from '../../../lib/stripePrices';
 import { planFromPriceId as planFromPriceIdShared } from '@/lib/billing/stripeAccountServer';
 import { logger } from '@/lib/logger';
+import { contextFromMetadata, sendServerEvent } from '@/lib/tracking/server';
 import { logBillingEvent, logSecurityEvent } from '@/lib/admin/events';
 
 /**
@@ -206,6 +207,17 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
                 usageResetAt: subscription.status === 'active' ? usageResetAt : null,
               },
             });
+
+            // Funnel: server copy of `purchase` (consent + click ids captured at checkout, lib/tracking/server.ts).
+            await sendServerEvent({
+              name: subscription.status === 'trialing' ? 'start_trial' : 'purchase',
+              eventId: checkoutSession.id,
+              email: checkoutSession.customer_details?.email ?? null,
+              userId: user.id,
+              value: (checkoutSession.amount_total ?? 0) / 100,
+              currency: checkoutSession.currency || undefined,
+              params: { plan: String(plan || ''), interval: String(interval) },
+            }, contextFromMetadata(checkoutSession.metadata as Record<string, string>));
           }
           break;
         }

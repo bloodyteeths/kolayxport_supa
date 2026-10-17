@@ -21,6 +21,14 @@ import enMessages from '@/messages/en.json';
 import CookieConsent from '@/components/CookieConsent';
 import { captureAttribution, track } from '@/lib/tracking/events';
 
+/** URL-driven funnel events: pricing views and marketplace connections (OAuth callbacks land on /ayarlar?success=<mp>_connected). */
+function funnelFromUrl(url: string) {
+  const u = new URL(url, 'https://kolayxport.com');
+  if (u.pathname === '/fiyatlandirma') track('view_pricing');
+  const ok = /^([a-z]+)_connected$/.exec(u.searchParams.get('success') || '');
+  if (u.pathname === '/ayarlar' && ok) track('connect_marketplace', { marketplace: ok[1] });
+}
+
 // First path segment of Turkish marketing routes (SiteLayout sets <html lang> itself there).
 const SITE_TR_ROUTES = new Set(['', 'cozumler', 'entegrasyonlar', 'karsilastirma', 'nasil-kullanirim', 'blog', 'kurumsal', 'iletisim', 'ozellikler', 'kvkk-aydinlatma-metni', 'cerez-politikasi', 'gizlilik-politikasi', 'kullanim-sartlari', 'mesafeli-satis-sozlesmesi', 'on-bilgilendirme-formu']);
 import { ConfirmProvider } from '@/components/ds/overlay/ConfirmDialog';
@@ -155,7 +163,11 @@ function MyApp({ Component, pageProps }: AppProps) {
   // First-touch UTM / click-id capture and SPA page views for GTM (lib/tracking/events.ts).
   useEffect(() => {
     captureAttribution(window.location.search);
-    const onRoute = (url: string) => track('page_view', { page_path: url });
+    const onRoute = (url: string) => {
+      track('page_view', { page_path: url });
+      funnelFromUrl(url);
+    };
+    funnelFromUrl(window.location.pathname + window.location.search);
     router.events.on('routeChangeComplete', onRoute);
     return () => router.events.off('routeChangeComplete', onRoute);
   }, [router.events]);

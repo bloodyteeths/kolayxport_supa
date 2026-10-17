@@ -1,6 +1,7 @@
 import { STRIPE_PRICES, priceIdFor, type PlanKey } from '@/lib/stripePrices';
 import { foundingCouponId, getFoundingSpots } from '@/lib/billing/foundingServer';
 import { newTrialExpiry } from '@/lib/billing/planLimits';
+import { contextFromRequest, contextToMetadata } from '@/lib/tracking/server';
 import { TRIAL_CARRY_MS } from '@/lib/billing/billingState';
 import { FOUNDING_INTERVALS } from '@/lib/billing/price';
 import prisma from '@/lib/prisma';
@@ -236,6 +237,8 @@ export default async function handler(req, res) {
     try {
       const checkoutSession = await stripe.checkout.sessions.create({
         ...(discounts ? { discounts } : {}),
+        // Consent + click ids for the server-side `purchase` event sent by the webhook.
+        metadata: { ...contextToMetadata(contextFromRequest(req)), plan, interval },
         payment_method_types: ['card'],
         billing_address_collection: 'required',
         customer: stripeCustomerId,

@@ -40,6 +40,7 @@ import { useToast } from '@/components/ds/feedback/toast';
 import type { FieldSuggestionProps } from '@/components/ds/inputs/FieldSuggestion';
 import type { FieldAiState, MarketBand } from './sections/sectionTypes';
 import { normalizeCondition } from '@/lib/ebay/payloadRules';
+import { track } from '@/lib/tracking/events';
 import { decodeAspects } from './adapters/ebay';
 import {
   TITLE_MAX as CATALOG_TITLE_MAX,
@@ -50,6 +51,18 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+/** Funnel: the first successful AI listing suggestion in this browser (once). */
+function trackFirstAiListing(marketplace: string) {
+  try {
+    if (window.localStorage.getItem('kx-first-ai')) return;
+    window.localStorage.setItem('kx-first-ai', new Date().toISOString());
+  } catch {
+    return;
+  }
+  track('first_listing_optimized', { marketplace });
+}
 
 export type AiMarketplace = 'etsy' | 'ebay' | 'trendyol' | 'wix' | 'shopify';
 
@@ -865,18 +878,21 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
   const etsyAi = useCallback(async (action: string, body: Record<string, unknown>) => {
     const r = await http('/api/ai/etsy', { method: 'POST', body: { action, ...body } });
     if (!r.ok || !r.data || typeof r.data !== 'object') throw new AiCallError(r.ok ? 502 : r.status, r.data);
+    trackFirstAiListing('etsy');
     return r.data as Record<string, unknown>;
   }, [http]);
 
   const ebayAi = useCallback(async (action: string, body: Record<string, unknown>) => {
     const r = await http(`/api/clawd/ebay-ai?action=${encodeURIComponent(action)}`, { method: 'POST', body });
     if (!r.ok || !r.data || typeof r.data !== 'object') throw new AiCallError(r.ok ? 502 : r.status, r.data);
+    trackFirstAiListing('ebay');
     return r.data as Record<string, unknown>;
   }, [http]);
 
   const trendyolAi = useCallback(async (action: 'optimize_title' | 'optimize_description' | 'suggest_attributes', body: Record<string, unknown>) => {
     const r = await http(`/api/ai/trendyol?action=${action}`, { method: 'POST', body });
     if (!r.ok || !r.data || typeof r.data !== 'object') throw new AiCallError(r.ok ? 502 : r.status, r.data);
+    trackFirstAiListing('trendyol');
     return r.data as Record<string, unknown>;
   }, [http]);
 

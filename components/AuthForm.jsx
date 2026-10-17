@@ -3,6 +3,7 @@ import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { useTranslations } from 'next-intl';
 import { PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH } from '@/lib/auth/passwordPolicy';
+import { newEventId, readAttribution, track } from '@/lib/tracking/events';
 
 // Policy codes returned by /api/auth/signup (lib/auth/passwordPolicy.ts) that
 // have a localised message under auth.errors.<code>.
@@ -48,6 +49,11 @@ export default function AuthForm() {
     if (router.isReady && queryMode === 'signup') setIsSignUp(true);
   }, [router.isReady, queryMode]);
 
+  // Funnel: the signup form was shown (from a CTA or the toggle).
+  useEffect(() => {
+    if (isSignUp) track('start_signup', { method: 'email' });
+  }, [isSignUp]);
+
   // NextAuth redirects OAuth failures to the sign-in page (/login?error=<code>).
   const queryError = Array.isArray(router.query.error) ? router.query.error[0] : router.query.error;
   const oauthErrorMessage = typeof queryError === 'string' && queryError
@@ -79,10 +85,11 @@ export default function AuthForm() {
 
     try {
       if (isSignUp) {
+        const eventId = newEventId();
         const res = await fetch('/api/auth/signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, name }),
+          body: JSON.stringify({ email, password, name, eventId, attribution: readAttribution() }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -90,6 +97,9 @@ export default function AuthForm() {
           setLoading(false);
           return;
         }
+        // Same event_id as the server copy (pages/api/auth/signup.ts) so ad platforms de-duplicate.
+        track('sign_up', { event_id: eventId, method: 'email' });
+        track('start_trial', { event_id: `${eventId}-trial` });
         // After signup, surface the verification flow instead of trying to sign in.
         setUnverified(true);
         setError('');
@@ -139,6 +149,7 @@ export default function AuthForm() {
     setError('');
     setLoading(true);
     try {
+      track('start_signup', { method: 'google', mode: isSignUp ? 'signup' : 'signin' });
       await signIn('google', { callbackUrl });
     } catch {
       setError(t('errors.signInFailed'));

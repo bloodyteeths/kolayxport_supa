@@ -8,6 +8,7 @@ import { sendEmail, verificationEmailBody, maskEmail } from '@/lib/auth/email';
 import { logAuthEvent } from '@/lib/admin/events';
 import { validatePassword } from '@/lib/auth/passwordPolicy';
 import { newTrialExpiry } from '@/lib/billing/planLimits';
+import { contextFromRequest, sendServerEvent } from '@/lib/tracking/server';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -63,6 +64,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     throw e;
   }
+
+  // Funnel: server copies of sign_up / start_trial (same event_id as the browser event, consent-gated).
+  const clientEventId = typeof req.body?.eventId === 'string' ? String(req.body.eventId).slice(0, 64) : `${user.id}-signup`;
+  const trackingCtx = contextFromRequest(req);
+  const attribution = Object.fromEntries(
+    Object.entries((req.body?.attribution && typeof req.body.attribution === 'object') ? req.body.attribution : {})
+      .filter(([k, v]) => /^(utm_(source|medium|campaign|content|term)|landing)$/.test(k) && typeof v === 'string')
+      .map(([k, v]) => [k, String(v).slice(0, 100)]),
+  ) as Record<string, string>;
+  void sendServerEvent({ name: 'sign_up', eventId: clientEventId, email, userId: user.id, params: attribution }, trackingCtx);
+  void sendServerEvent({ name: 'start_trial', eventId: `${clientEventId}-trial`, email, userId: user.id }, trackingCtx);
 
   // Fire-and-forget the verification email. Don't block signup on Postmark.
   try {

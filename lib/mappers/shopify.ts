@@ -91,7 +91,8 @@ export function toOrder(shopifyOrder: any, shopDomain?: string): UIOrder {
     line_items: lineItems,
     marketplaceOrderDate: shopifyOrder.created_at,
     shipByDate: undefined, // Shopify doesn't have a ship-by concept by default
-    rawData: shopifyOrder,
+    // shop_domain lets shop/redact find this shop's orders (lib/integrations/shopify/redact.ts).
+    rawData: shopDomain ? { ...shopifyOrder, shop_domain: shopDomain } : shopifyOrder,
     commodityDesc: lineItems.map((i: NormalizedLineItem) => i.title).join(', ').slice(0, 200),
   };
 }

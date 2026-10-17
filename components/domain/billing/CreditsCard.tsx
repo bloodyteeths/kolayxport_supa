@@ -13,7 +13,8 @@ export function CreditsCard() {
   const t = useTranslations('credits');
   const f = useFormatters();
   const { balance } = useCredits();
-  if (!balance) return null;
+  // Shopify-connected accounts: no credits card in Billing (App Store rule 1.2.1).
+  if (!balance || balance.neutral) return null;
   const m = balance.monthly;
   const label = (kind: string, feature: string | null) =>
     kind === 'purchase' ? t('entry.purchase') : kind === 'refund' ? t('entry.refund') : kind === 'adjust' ? t('entry.adjust') : feature === 'image' ? t('entry.image') : t('entry.video');

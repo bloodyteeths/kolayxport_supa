@@ -561,7 +561,10 @@ export function VideoStudio() {
 
   const L = <K extends string>(group2: string, keys: readonly K[]) => keys.map((k) => ({ value: k, label: t(`${group2}.${k}` as 'title') }));
   const chips = [...(curDir.person ? [t('chip.expression')] : []), t('chip.slower'), t('chip.closer'), t('chip.showProduct'), t('chip.keepProduct'), t('chip.realer'), t('chip.staticCam')];
-  const creditsLabel = (c: number) => tc('cost', { count: f.num(c) });
+  // Shopify-connected accounts never see credit costs, balance or buy links (App Store rule 1.2.1).
+  const neutralBilling = balance?.neutral === true;
+  const creditsLabel = (c: number) => (neutralBilling ? '' : tc('cost', { count: f.num(c) }));
+  const withCost = (label: string, c: number) => (neutralBilling ? label : `${label} · ${creditsLabel(c)}`);
 
   return (
     <Page title={t('title')} width="list">
@@ -765,11 +768,11 @@ export function VideoStudio() {
           ) : null}
           {missing ? <Box sx={{ fontSize: 13, color: tone.warning.fg }}>{missing}</Box> : null}
           <Button variant="primary" onClick={() => (affordable ? void generate() : showCreditsDialog(cost))} disabled={Boolean(missing) || busy === 'generate' || (dir.person && !consent)} loading={busy === 'generate'}>
-            {affordable ? `${t('generate', { count: variants })} · ${creditsLabel(cost)}` : tc('buyFor', { count: f.num(cost) })}
+            {affordable || neutralBilling ? withCost(t('generate', { count: variants }), cost) : tc('buyFor', { count: f.num(cost) })}
           </Button>
           <Box sx={{ display: 'flex', justifyContent: 'center', gap: '6px', flexWrap: 'wrap', fontSize: 12, color: n[500], textAlign: 'center' }}>
             <span>{t('eta', { minutes: (quality === 'best' ? 2 : 1) + (aiStart || aiEnd ? 1 : 0) })}</span>
-            {balance ? (
+            {balance && !neutralBilling ? (
               <span>
                 {tc('balanceShort', { count: balance.total === null ? '∞' : f.num(balance.total) })}{' '}
                 <Box component="button" type="button" onClick={() => showCreditsDialog()} sx={{ border: 0, p: 0, bgcolor: 'transparent', color: accent[700], font: 'inherit', cursor: 'pointer', textDecoration: 'underline' }}>{tc('buyShort')}</Box>
@@ -836,7 +839,7 @@ export function VideoStudio() {
                     {!qa.diffs?.length && !qa.issues?.length ? <Box sx={{ fontSize: 12, color: tone.success.fg }}>{t('qa.clean')}</Box> : null}
                     {fixes.length ? (
                       <Button variant="secondary" size="sm" onClick={() => void followUp(`Fix: ${fixes.join('; ')}`.slice(0, 400))} disabled={Boolean(busy)} loading={busy === 'followUp'}>
-                        {`${t('qa.fix')} · ${creditsLabel(followCost)}`}
+                        {withCost(t('qa.fix'), followCost)}
                       </Button>
                     ) : null}
                   </>
@@ -856,7 +859,7 @@ export function VideoStudio() {
             {cur && cur.status === 'done' ? (
               <>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <Box sx={{ fontSize: 13, fontWeight: 600, color: n[800] }}>{t('refine.title')} <Box component="span" sx={{ fontWeight: 400, color: n[500] }}>· {creditsLabel(followCost)}</Box></Box>
+                  <Box sx={{ fontSize: 13, fontWeight: 600, color: n[800] }}>{t('refine.title')} {neutralBilling ? null : <Box component="span" sx={{ fontWeight: 400, color: n[500] }}>· {creditsLabel(followCost)}</Box>}</Box>
                   <Box sx={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     {chips.map((c) => (
                       <Box key={c} component="button" type="button" disabled={Boolean(busy)} onClick={() => void followUp(c)}
@@ -870,7 +873,7 @@ export function VideoStudio() {
                 </Box>
 
                 <Box sx={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  <Button variant="secondary" size="sm" onClick={() => void extend()} loading={busy === 'extend'} disabled={Boolean(busy)}>{`${t('action.extend')} · ${creditsLabel(extendCredits(cur.quality))}`}</Button>
+                  <Button variant="secondary" size="sm" onClick={() => void extend()} loading={busy === 'extend'} disabled={Boolean(busy)}>{withCost(t('action.extend'), extendCredits(cur.quality))}</Button>
                   {cur.aspectRatio !== '1:1' ? <Button variant="secondary" size="sm" onClick={() => void edit({ square: true })} disabled={Boolean(busy)}>{t('action.square')}</Button> : null}
                   {cur.aspectRatio === '9:16' ? <Button variant="secondary" size="sm" onClick={() => void edit({ portrait45: true })} disabled={Boolean(busy)}>{t('action.portrait45')}</Button> : null}
                   {curDir.audio !== 'none' ? <Button variant="secondary" size="sm" onClick={() => void edit({ mute: true })} disabled={Boolean(busy)}>{t('action.mute')}</Button> : null}

@@ -232,7 +232,7 @@ async function launchTake(userId: string, body: any, locale: 'tr' | 'en', opts: 
   const aiStart = !start;
   if (aiStart && !products.length) return { status: 400, json: { code: direction.mode === 'scene' ? 'productPhotosRequired' : 'imageRequired' } };
   // The end the first frame cannot show (the back after a turn, the next pose) is built from the photos.
-  const aiEnd = !end && !parent && lock && TURNING.has(direction.preset) && products.length > 0;
+  const aiEnd = !end && !parent && lock && (TURNING.has(direction.preset) || (direction.preset === 'custom' && direction.showsBack === true)) && products.length > 0;
 
   const changes = [...(await changesOf(userId, parent)), ...(instruction ? [instruction] : [])];
   // Veo renders 16:9 / 9:16; the client sends the generation aspect (from the format and the photo orientation).

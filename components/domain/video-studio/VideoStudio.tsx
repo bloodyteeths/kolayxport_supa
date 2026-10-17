@@ -19,7 +19,7 @@ import { useConfirm } from '@/components/ds/overlay/ConfirmDialog';
 import { useFormatters } from '@/lib/format';
 import { accent, neutral as n, radius, tone } from '@/lib/ds/tokens';
 import {
-  DEFAULT_DIRECTION, VIDEO_AUDIO, VIDEO_CAMERAS, VIDEO_EXPRESSIONS, VIDEO_LIGHTS, VIDEO_LOOKS, VIDEO_MOTIONS, VIDEO_PRESETS, VIDEO_SCENES,
+  BASIC_SCENES, DEFAULT_DIRECTION, OBJECT_PRESETS, PERSON_PRESETS, VIDEO_AUDIO, VIDEO_CAMERAS, VIDEO_EXPRESSIONS, VIDEO_LIGHTS, VIDEO_LOOKS, VIDEO_MOTIONS,
   directVideo, type VideoDirection,
 } from '@/lib/ai/videoDirector';
 import { VIDEO_TARGETS, VIDEO_TARGET_PROFILES, generationAspect, videoReadiness, type VideoFormat, type VideoTarget } from '@/lib/ai/videoTargets';
@@ -31,6 +31,7 @@ import { LIMIT_UI_HEADER } from '@/lib/http/limitInterceptor';
 type Photo = { key: string; ref: string; src: string; landscape?: boolean; fromVideo?: boolean };
 type Qa = { status: 'running' | 'done' | 'failed'; match?: number; realism?: number; diffs?: { text: string; fix: string }[]; issues?: { text: string; fix: string }[]; autoFix?: string };
 type PhotoInfo = { view: 'front' | 'back' | 'side' | 'detail' | 'flat' | 'other'; fullBody: boolean; person: boolean };
+type Ideas = { kind: 'worn' | 'object'; shots: { label: string; hint: string; action: string; showsBack: boolean }[]; scenes: { label: string; prompt: string }[] };
 type Job = {
   id: string; parentId: string | null; groupId: string | null; variantIndex: number; status: 'preparing' | 'running' | 'done' | 'failed';
   mode: string; instruction: string | null; aspectRatio: string; durationSec: number; resolution: string; quality: string;
@@ -154,6 +155,10 @@ export function VideoStudio() {
   const [auto, setAuto] = useState<{ start: string | null; end: string | null } | null>(null);
   const userPicked = useRef(false);
   const userPerson = useRef(false);
+  const userShot = useRef(false);
+  const userFormat = useRef(false);
+  // Shots and settings the AI suggests for THIS product (any category, any marketplace).
+  const [ideas, setIdeas] = useState<Ideas | null>(null);
 
   // ── Product photos ──
   const [mp, setMp] = useState<Mp>('etsy');
@@ -260,6 +265,8 @@ export function VideoStudio() {
       const probed = await Promise.all(list.map(probe));
       setPhotos((prev) => [...prev.filter((x) => x.ref.startsWith('upload:')), ...probed]);
       userPicked.current = false;
+      userShot.current = false;
+      setIdeas(null);
       setStart(probed[0] ?? null);
       setEnd(null);
       setSlot('end');
@@ -328,20 +335,31 @@ export function VideoStudio() {
     return Array.from(new Set(ordered.map((p) => p.ref))).slice(0, MAX_PRODUCT_PHOTOS);
   }, [start, end, photos]);
 
+  const showsBack = SHOWS_BACK.has(dir.preset) || (dir.preset === 'custom' && dir.showsBack === true);
+  const turning = TURNING.has(dir.preset) || (dir.preset === 'custom' && dir.showsBack === true);
   // Look at the photos once and pick the anchor frames (unless the seller picked them).
   const photoKey = photos.map((p) => p.ref).join('|');
   useEffect(() => {
     if (!photos.length) { setAuto(null); return undefined; }
     const h = window.setTimeout(async () => {
       try {
-        const r = await fetch('/api/ai/video/analyze', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refs: photos.map((p) => p.ref).slice(0, 12) }) });
+        const r = await fetch('/api/ai/video/analyze', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refs: photos.map((p) => p.ref).slice(0, 12), title: listing?.title ?? dir.product ?? '', locale }) });
         const d = await r.json().catch(() => null);
         if (!r.ok || !Array.isArray(d?.photos)) return;
         const map: Record<string, PhotoInfo> = {};
         for (const x of d.photos) map[x.ref] = { view: x.view, fullBody: Boolean(x.fullBody), person: Boolean(x.person) };
         setInfo((prev) => ({ ...prev, ...map }));
         setAuto({ start: d.start ?? null, end: d.end ?? null });
-        if (!userPerson.current) setDir((dd) => ({ ...dd, person: d.photos.some((x: any) => x.person) }));
+        const kind: 'worn' | 'object' = d.product?.kind === 'worn' ? 'worn' : 'object';
+        const shots = Array.isArray(d.shots) ? d.shots : [];
+        setIdeas({ kind, shots, scenes: Array.isArray(d.scenes) ? d.scenes : [] });
+        const person = userPerson.current ? undefined : d.photos.some((x: any) => x.person);
+        setDir((dd) => {
+          const next = { ...dd, productKind: kind, ...(person === undefined ? {} : { person }) };
+          // Unless the seller chose a shot, start with the best suggestion for this product.
+          if (!userShot.current && shots[0]) return { ...next, preset: 'custom', shotText: shots[0].action, showsBack: Boolean(shots[0].showsBack) };
+          return next;
+        });
       } catch { /* the seller picks by hand */ }
     }, 500);
     return () => window.clearTimeout(h);
@@ -352,20 +370,28 @@ export function VideoStudio() {
     const byRef = (ref: string | null) => (ref ? photos.find((p) => p.ref === ref) ?? null : null);
     const s0 = byRef(auto.start);
     if (s0) setStart(s0);
-    setEnd(SHOWS_BACK.has(dir.preset) ? byRef(auto.end) : null);
+    setEnd(showsBack ? byRef(auto.end) : null);
     setSlot('end');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auto, dir.preset]);
+  }, [auto, dir.preset, dir.shotText]);
   const autoChosen = Boolean(auto && !userPicked.current && start && start.ref === auto.start);
 
   const sourceLandscape = ((dir.mode === 'scene' ? photos[0] : start) ?? photos[0])?.landscape ?? false;
+  useEffect(() => {
+    if (userFormat.current || !(start ?? photos[0])) return;
+    const wanted = profile.format;
+    const clash = (sourceLandscape && (wanted === '9:16' || wanted === '4:5')) || (!sourceLandscape && wanted === '16:9');
+    const pick = !clash ? wanted : profile.formats.includes('1:1') ? '1:1' : sourceLandscape ? '16:9' : '9:16';
+    if (pick !== format) setFormat(pick);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceLandscape, target, start?.key]);
   const effective = useMemo(() => (resolution !== '720p' ? { durationSec: 8 as const, resolution } : { durationSec, resolution }), [durationSec, resolution]);
   const direction: VideoDirection = { ...dir, target, format };
   const promptPreview = useMemo(() => directVideo(direction), [direction]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const missing = dir.mode === 'scene' ? (photos.length ? null : t('need.photos')) : !start ? t('need.start') : null;
   const aiStart = dir.mode === 'scene';
-  const aiEnd = !end && lock && TURNING.has(dir.preset) && productRefs.length > 0;
+  const aiEnd = !end && lock && turning && productRefs.length > 0;
   const cost = videoCredits({ quality, resolution: effective.resolution, durationSec: effective.durationSec, variants }) + (aiStart ? imageCredits() : 0) + (aiEnd ? imageCredits() : 0);
   const affordable = canAfford(balance, cost);
   const costFor = (q: 'fast' | 'best') => videoCredits({ quality: q, resolution: effective.resolution, durationSec: effective.durationSec, variants }) + (aiStart ? imageCredits() : 0) + (aiEnd ? imageCredits() : 0);
@@ -521,7 +547,7 @@ export function VideoStudio() {
   }, [autoFixJob?.id, autoFixJob?.status]);
 
   const L = <K extends string>(group2: string, keys: readonly K[]) => keys.map((k) => ({ value: k, label: t(`${group2}.${k}` as 'title') }));
-  const chips = [t('chip.expression'), t('chip.slower'), t('chip.closer'), t('chip.showDress'), t('chip.keepDress'), t('chip.realer'), t('chip.staticCam')];
+  const chips = [...(curDir.person ? [t('chip.expression')] : []), t('chip.slower'), t('chip.closer'), t('chip.showProduct'), t('chip.keepProduct'), t('chip.realer'), t('chip.staticCam')];
   const creditsLabel = (c: number) => tc('cost', { count: f.num(c) });
 
   return (
@@ -603,10 +629,23 @@ export function VideoStudio() {
 
           <Block title={t('step.video')}>
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '6px' }}>
-              {VIDEO_PRESETS.map((x) => {
-                const on = dir.preset === x;
+              {(ideas?.shots ?? []).map((x) => {
+                const on = dir.preset === 'custom' && dir.shotText === x.action;
                 return (
-                  <Box key={x} component="button" type="button" onClick={() => set('preset', x)} aria-pressed={on}
+                  <Box key={x.action} component="button" type="button" aria-pressed={on}
+                    onClick={() => { userShot.current = true; setDir((d) => ({ ...d, preset: 'custom', shotText: x.action, showsBack: x.showsBack })); }}
+                    sx={{ textAlign: 'left', font: 'inherit', p: '8px 10px', borderRadius: '8px', cursor: 'pointer', border: `1px solid ${on ? accent[500] : accent[200]}`, bgcolor: on ? accent[50] : n[0] }}>
+                    <Box sx={{ fontSize: 10, fontWeight: 700, color: accent[600], textTransform: 'uppercase', letterSpacing: '.04em' }}>✦ {t('shot.suggested')}</Box>
+                    <Box sx={{ fontSize: 13, fontWeight: 600, color: on ? accent[700] : n[800] }}>{x.label}</Box>
+                    {x.hint ? <Box sx={{ fontSize: 11, lineHeight: '15px', color: n[500], mt: '2px' }}>{x.hint}</Box> : null}
+                  </Box>
+                );
+              })}
+              {[...(dir.person ? PERSON_PRESETS : OBJECT_PRESETS), ...(!dir.person && ideas?.kind === 'worn' ? (['hanger'] as const) : []), 'custom' as const].map((x) => {
+                const on = dir.preset === x && (x !== 'custom' || !dir.shotText);
+                return (
+                  <Box key={x} component="button" type="button" aria-pressed={on}
+                    onClick={() => { userShot.current = true; setDir((d) => ({ ...d, preset: x, shotText: undefined, showsBack: undefined })); }}
                     sx={{ textAlign: 'left', font: 'inherit', p: '8px 10px', borderRadius: '8px', cursor: 'pointer', border: `1px solid ${on ? accent[500] : n[200]}`, bgcolor: on ? accent[50] : n[0] }}>
                     <Box sx={{ fontSize: 13, fontWeight: 600, color: on ? accent[700] : n[800] }}>{t(`preset.${x}.label`)}</Box>
                     <Box sx={{ fontSize: 11, lineHeight: '15px', color: n[500], mt: '2px' }}>{t(`preset.${x}.hint`)}</Box>
@@ -614,10 +653,23 @@ export function VideoStudio() {
                 );
               })}
             </Box>
-            {TURNING.has(dir.preset) && !end && !lock ? <Box sx={{ fontSize: 12, color: tone.warning.fg }}>{t('shot.backWarning')}</Box> : null}
+            {!ideas && photos.length ? <Box sx={{ fontSize: 12, color: n[500] }}>{t('shot.thinking')}</Box> : null}
+            {turning && !end && !lock ? <Box sx={{ fontSize: 12, color: tone.warning.fg }}>{t('shot.backWarning')}</Box> : null}
             <Labeled label={t('director.scene')}>
-              <Pills label={t('director.scene')} value={dir.scene} onChange={setScene} options={L('scene', VIDEO_SCENES)} />
-              {dir.scene === 'custom' ? <TextField value={dir.sceneText ?? ''} onChange={(v) => set('sceneText', v.slice(0, 300))} placeholder={t('director.scenePlaceholder')} /> : null}
+              <Box role="radiogroup" aria-label={t('director.scene')} sx={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {[
+                  ...BASIC_SCENES.map((x) => ({ key: x, label: t(`scene.${x}`), on: dir.scene === x, pick: () => setScene(x) })),
+                  ...(ideas?.scenes ?? []).map((x) => ({ key: x.prompt, label: `✦ ${x.label}`, on: dir.scene === 'custom' && dir.sceneText === x.prompt, pick: () => setDir((d) => ({ ...d, scene: 'custom', sceneText: x.prompt, mode: 'scene' })) })),
+                  { key: 'custom', label: t('scene.custom'), on: dir.scene === 'custom' && !(ideas?.scenes ?? []).some((x) => x.prompt === dir.sceneText), pick: () => setDir((d) => ({ ...d, scene: 'custom', sceneText: '', mode: 'scene' })) },
+                ].map((o) => (
+                  <Box key={o.key} component="button" type="button" role="radio" aria-checked={o.on} onClick={o.pick}
+                    sx={{ font: 'inherit', fontSize: 13, lineHeight: '18px', px: '10px', py: '5px', borderRadius: '999px', cursor: 'pointer',
+                      border: `1px solid ${o.on ? accent[500] : n[200]}`, bgcolor: o.on ? accent[50] : n[0], color: o.on ? accent[700] : n[700], fontWeight: o.on ? 600 : 400 }}>
+                    {o.label}
+                  </Box>
+                ))}
+              </Box>
+              {dir.scene === 'custom' && !(ideas?.scenes ?? []).some((x) => x.prompt === dir.sceneText) ? <TextField value={dir.sceneText ?? ''} onChange={(v) => set('sceneText', v.slice(0, 300))} placeholder={t('director.scenePlaceholder')} /> : null}
               {dir.scene !== 'keep' ? <Box sx={{ fontSize: 12, color: n[500] }}>{t('scene.aiHint')}</Box> : null}
             </Labeled>
             <Labeled label={t('director.notes')}>
@@ -672,7 +724,7 @@ export function VideoStudio() {
                 <TextField value={dir.avoid ?? ''} onChange={(v) => set('avoid', v.slice(0, 300))} placeholder={t('director.avoidPlaceholder')} />
               </Labeled>
               <Labeled label={t('output.format')}>
-                <Pills<VideoFormat> label={t('output.format')} value={format} onChange={(v) => setFormat(v)} options={profile.formats.map((x) => ({ value: x, label: t(`format.${x.replace(':', 'x')}`) }))} />
+                <Pills<VideoFormat> label={t('output.format')} value={format} onChange={(v) => { userFormat.current = true; setFormat(v); }} options={profile.formats.map((x) => ({ value: x, label: t(`format.${x.replace(':', 'x')}`) }))} />
               </Labeled>
               <Box sx={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                 <Labeled label={t('output.length')}>

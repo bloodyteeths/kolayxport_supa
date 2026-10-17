@@ -2,6 +2,10 @@
 // with (look, subject, action, camera, scene, light, audio; Google's Veo prompt guide) + a negative prompt.
 // ISOMORPHIC and pure (the studio shows the same text as a preview; tests cover it).
 //
+// KolayXport is a SaaS for every kind of seller (founder 2026-10-17: "you acted like this whole SaaS is for us"):
+// every built-in shot and setting is product-neutral, and the studio adds AI-suggested shots and settings made for
+// the seller's own product (lib/ai/videoProduct analyzePhotos → preset 'custom' + shotText).
+//
 // Founder 2026-10-17: "videos have to look natural … people hate AI videos … nobody should be able to tell". So every
 // prompt asks for real footage: real-time speed (AI clips drift into slow motion), real fabric weight, real skin with
 // no beauty filter, spontaneous small movements, and — by default — the look of a phone video filmed by the seller.
@@ -12,14 +16,20 @@
 export const VIDEO_MODES = ['image', 'scene'] as const;
 export type VideoMode = (typeof VIDEO_MODES)[number];
 
-export const VIDEO_PRESETS = ['twirl', 'walk', 'pose', 'detail', 'hanger', 'flatlay', 'turntable', 'lifestyle', 'frontBack', 'custom'] as const;
+export const VIDEO_PRESETS = ['turntable', 'hero', 'detail', 'lifestyle', 'flatlay', 'twirl', 'walk', 'pose', 'frontBack', 'hanger', 'custom'] as const;
+/** Shots for any product (no person). */
+export const OBJECT_PRESETS: readonly VideoPreset[] = ['turntable', 'hero', 'detail', 'lifestyle', 'flatlay'];
+/** Shots when a person wears or holds the product. */
+export const PERSON_PRESETS: readonly VideoPreset[] = ['twirl', 'walk', 'pose', 'frontBack', 'detail', 'hero'];
 export type VideoPreset = (typeof VIDEO_PRESETS)[number];
 
 export const VIDEO_LOOKS = ['phone', 'studio', 'cinematic'] as const;
 export const VIDEO_CAMERAS = ['auto', 'static', 'dollyIn', 'orbit', 'pan', 'craneDown', 'handheld'] as const;
 export const VIDEO_MOTIONS = ['subtle', 'medium', 'lively'] as const;
 export const VIDEO_EXPRESSIONS = ['smiling', 'joyful', 'natural', 'calm'] as const;
-export const VIDEO_SCENES = ['keep', 'studio', 'garden', 'birthday', 'wedding', 'christmas', 'beach', 'home', 'custom'] as const;
+export const VIDEO_SCENES = ['keep', 'studio', 'home', 'outdoor', 'garden', 'birthday', 'wedding', 'christmas', 'beach', 'custom'] as const;
+/** The settings every seller gets (the AI adds ones that suit the product; older values stay valid for old jobs). */
+export const BASIC_SCENES: readonly (typeof VIDEO_SCENES)[number][] = ['keep', 'studio', 'home', 'outdoor'];
 export const VIDEO_LIGHTS = ['daylight', 'golden', 'studio', 'warm'] as const;
 export const VIDEO_AUDIO = ['none', 'ambient', 'music'] as const;
 
@@ -39,6 +49,12 @@ export type VideoDirection = {
   audio: (typeof VIDEO_AUDIO)[number];
   /** Light film grain after generation (real camera sensors have it; clean AI output reads as fake). */
   grain: boolean;
+  /** An AI-suggested shot for this product (preset 'custom'): what happens on camera, in English. */
+  shotText?: string;
+  /** The shot shows the product's back (a turn): the back photo becomes the end frame. */
+  showsBack?: boolean;
+  /** 'worn' (clothing, shoes, jewellery on a person) or 'object' — picks the lock wording. */
+  productKind?: 'worn' | 'object';
   /** Free text from the seller (any language; Veo understands it). */
   notes?: string;
   /** Extra things to avoid, on top of the defaults. */
@@ -51,47 +67,51 @@ export type VideoDirection = {
 };
 
 export const DEFAULT_DIRECTION: VideoDirection = {
-  mode: 'image', preset: 'twirl', look: 'phone', camera: 'auto', motion: 'subtle', person: true, expression: 'natural',
+  mode: 'image', preset: 'turntable', look: 'phone', camera: 'auto', motion: 'subtle', person: true, expression: 'natural',
   scene: 'keep', light: 'daylight', audio: 'none', grain: true,
 };
 
 /** Shot types: small, physically plausible actions at real speed (big spins are where AI invents details). */
 const PRESET_ACTION: Record<VideoPreset, { person: string; product: string }> = {
+  turntable: {
+    person: 'The model slowly turns through a full circle, showing the product from the front, the side and the back.',
+    product: 'The product turns slowly through a full circle, showing every side.',
+  },
+  hero: {
+    person: 'The model stands naturally while the camera slowly moves in to a sharp hero shot of the product.',
+    product: 'The camera slowly moves in from a wide view to a sharp hero shot of the product, soft light gliding across its surface.',
+  },
+  detail: {
+    person: 'Close-up shots glide slowly across the product while it is worn, showing its materials and details sharp and unchanged.',
+    product: 'A slow close-up camera glide across the product shows its materials, finish and details sharp and unchanged.',
+  },
+  lifestyle: {
+    person: 'A real, candid moment: the person uses or wears the product naturally in the setting, filmed as it happens.',
+    product: 'The product in a real everyday moment in the setting, placed or used naturally.',
+  },
+  flatlay: {
+    person: 'Top-down view of the product laid flat; the camera slowly lowers and turns slightly.',
+    product: 'Top-down view of the product laid flat; the camera slowly lowers and turns slightly.',
+  },
   twirl: {
-    person: 'The model turns around once at a natural, real-life speed so the outfit is seen from the side and the back, and the skirt swings and settles with its real weight.',
-    product: 'The garment turns slowly so it is seen from every side, the fabric moving with its real weight.',
+    person: 'The model turns around once at a natural, real-life speed so the product is seen from the side and the back; clothing moves and settles with its real weight.',
+    product: 'The product turns slowly so it is seen from every side.',
   },
   walk: {
-    person: 'The model walks a few natural steps toward the camera, stops and stands relaxed, like a real moment filmed on a phone.',
+    person: 'The model walks a few natural steps toward the camera, stops and stands relaxed, like a real moment.',
     product: 'The camera walks up to the product and ends on a clean, steady shot.',
   },
   pose: {
-    person: 'The model stands naturally, shifts weight, glances at the camera and away, touches the outfit lightly — a real person waiting to be photographed.',
-    product: 'The product in a calm, steady shot with small natural movement of the fabric.',
-  },
-  detail: {
-    person: 'Close-up shots glide slowly across the outfit while it is worn, showing the fabric, stitching and embellishments sharp and unchanged.',
-    product: 'A slow close-up camera glide across the product shows the fabric, stitching and embellishments sharp and unchanged.',
-  },
-  hanger: {
-    person: 'The outfit hangs on a hanger and moves gently in a soft breeze.',
-    product: 'The garment hangs on its hanger and sways gently in a soft breeze; the fabric catches the light.',
-  },
-  flatlay: {
-    person: 'Top-down view of the outfit laid flat; the camera slowly lowers and turns slightly.',
-    product: 'Top-down view of the product laid flat; the camera slowly lowers and turns slightly.',
-  },
-  turntable: {
-    person: 'The model slowly turns through a full circle, showing the outfit from the front, the side and the back.',
-    product: 'The product turns slowly through a full circle on a turntable, showing every side.',
-  },
-  lifestyle: {
-    person: 'A real, candid moment: the model wears the outfit and plays, laughs and moves naturally in the setting, filmed as it happens.',
-    product: 'The product in a real lifestyle moment in the setting, naturally in use.',
+    person: 'The model stands naturally, shifts weight, glances at the camera and away and touches the product lightly — a real person waiting to be photographed.',
+    product: 'The product in a calm, steady shot with small natural movement.',
   },
   frontBack: {
-    person: 'A smooth natural turn from the front of the outfit to its back, the model moving like a real person.',
+    person: 'A smooth natural turn from the front of the product to its back, the model moving like a real person.',
     product: 'A smooth turn from the front of the product to its back.',
+  },
+  hanger: {
+    person: 'The garment hangs on a hanger and moves gently in a soft breeze.',
+    product: 'The garment hangs on its hanger and sways gently in a soft breeze; the fabric catches the light.',
   },
   custom: { person: '', product: '' },
 };
@@ -108,7 +128,7 @@ const LOOK: Record<VideoDirection['look'], { intro: string; finish: string }> = 
     finish: 'Real camera exposure, accurate colours, crisp natural detail.',
   },
   cinematic: {
-    intro: 'A real fashion film shot on a cinema camera — real footage, not CGI or AI. The image fills the whole frame.',
+    intro: 'A real cinematic film shot on a cinema camera — real footage, not CGI or AI. The image fills the whole frame.',
     finish: 'Natural film look with shallow depth of field and gentle, real camera movement.',
   },
 };
@@ -138,13 +158,14 @@ const EXPRESSION: Record<VideoDirection['expression'], string> = {
 
 const SCENE: Record<Exclude<VideoDirection['scene'], 'custom'>, string> = {
   keep: 'The same place as in the photos.',
+  outdoor: 'A real outdoor setting in soft natural light.',
   studio: 'A clean, bright photo studio with a plain light background.',
   garden: 'A real flower garden.',
   birthday: 'A real children\'s birthday party at home with balloons and a cake.',
   wedding: 'A real wedding venue with flowers.',
   christmas: 'A cozy living room at Christmas with a decorated tree.',
   beach: 'A sunny beach with soft sand and gentle waves.',
-  home: 'A bright, cozy, lived-in home.',
+  home: 'A bright, real, lived-in home.',
 };
 
 const LIGHT: Record<VideoDirection['light'], string> = {
@@ -163,8 +184,11 @@ const AUDIO: Record<VideoDirection['audio'], string> = {
 const clean = (s: unknown, max: number) => (typeof s === 'string' ? s.replace(/[`{}<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max) : '');
 
 /** "The product is exactly the one in the photos" — an instruction, never a description. Pure. */
-export function lockSentence(person: boolean): string {
-  return 'The product must be exactly the one in the photos in every frame: the same cut, colours, fabric, pattern, lace and embroidery, flowers and appliqués (same number, size and position), sleeves, neckline, buttons, bows and length. Never add, remove, move or redesign any detail.'
+export function lockSentence(person: boolean, kind?: VideoDirection['productKind']): string {
+  const detail = kind === 'worn'
+    ? 'the same cut, colours, fabric, pattern, prints, lace, embroidery and embellishments (same number, size and position), sleeves, neckline, fastenings and length'
+    : 'the same shape, proportions, colours, materials, textures, parts, buttons and any printed text or logos';
+  return `The product must be exactly the one in the photos in every frame: ${detail}. Never add, remove, move or redesign any detail.`
     + (person ? ' Keep the same person: the same face, hair, skin tone, age and body.' : '');
 }
 
@@ -186,19 +210,19 @@ export function directVideo(d: VideoDirection, changes: string[] = []): string {
   const parts: string[] = [
     look.intro,
     product ? `The product: ${product}.` : '',
-    lockSentence(d.person),
-    PRESET_ACTION[d.preset][who],
+    lockSentence(d.person, d.productKind),
+    d.preset === 'custom' && clean(d.shotText, 300) ? clean(d.shotText, 300) : PRESET_ACTION[d.preset][who],
     CAMERA[d.camera],
     MOTION[d.motion],
     d.person ? personSentence(d) : '',
-    'Everything moves at real-time speed, never slow motion. Fabric moves with its real weight, folds and physics; light and shadows stay consistent; nothing morphs, melts or flickers.',
+    'Everything moves at real-time speed, never slow motion, with real weight and physics; light and shadows stay consistent; nothing morphs, melts or flickers.',
     sceneSentence(d),
     look.finish,
   ];
   const notes = clean(d.notes, 800);
   if (notes) parts.push(notes);
   changes.map((c) => clean(c, 400)).filter(Boolean).forEach((c, i) => parts.push(`Change ${i + 1}: ${c}.`));
-  parts.push('No text, captions, logos or watermarks.');
+  parts.push('No added captions, subtitles, logos or watermarks (keep the product\'s own text and logos as in the photos).');
   if (AUDIO[d.audio]) parts.push(AUDIO[d.audio]);
   return parts.filter(Boolean).join(' ');
 }
@@ -209,7 +233,7 @@ export function negativePrompt(d: Pick<VideoDirection, 'avoid' | 'person'>): str
     'CGI', '3D render', 'animation', 'cartoon', 'illustration', 'painting', 'AI-generated look', 'video game',
     'slow motion', 'floaty or dreamlike motion', 'morphing', 'warping', 'melting', 'flickering details',
     'changing the product', 'changing the pattern or colours', 'added or missing details', 'extra accessories',
-    'oversaturated colours', 'glow', 'haze', 'blurry', 'low quality', 'text', 'watermark', 'logo',
+    'oversaturated colours', 'glow', 'haze', 'blurry', 'low quality', 'added captions', 'subtitles', 'watermark', 'added logos',
     'phone screen', 'camera app interface', 'on-screen buttons or icons', 'screen recording', 'black bars', 'letterbox', 'border', 'picture frame',
   ];
   if (d.person) base.push('plastic or waxy skin', 'airbrushed skin', 'beauty filter', 'uncanny face', 'dead eyes', 'frozen expression', 'distorted face', 'deformed hands', 'extra fingers', 'extra limbs');
@@ -236,6 +260,9 @@ export function normalizeDirection(v: unknown): VideoDirection {
     light: pick(VIDEO_LIGHTS, o.light, DEFAULT_DIRECTION.light),
     audio: pick(VIDEO_AUDIO, o.audio, DEFAULT_DIRECTION.audio),
     grain: o.grain === undefined ? DEFAULT_DIRECTION.grain : Boolean(o.grain),
+    shotText: clean(o.shotText, 300) || undefined,
+    showsBack: o.showsBack === true || undefined,
+    productKind: o.productKind === 'worn' || o.productKind === 'object' ? o.productKind : undefined,
     notes: clean(o.notes, 800) || undefined,
     avoid: clean(o.avoid, 300) || undefined,
     product: clean(o.product, 160) || undefined,

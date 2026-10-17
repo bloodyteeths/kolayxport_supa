@@ -16452,66 +16452,72 @@
     },
     "shot": {
       "title": "Shot type",
-      "backWarning": "This shot shows the back. Set a back photo as the end frame or turn on \"Lock the product\"; otherwise the AI guesses the back."
+      "backWarning": "This shot shows the back. Set a back photo as the end frame or turn on \"Lock the product\"; otherwise the AI guesses the back.",
+      "suggested": "For your product",
+      "thinking": "Preparing shots that suit your product…"
     },
     "preset": {
+      "turntable": {
+        "label": "360° turn",
+        "hint": "The product turns slowly, every side shown"
+      },
+      "hero": {
+        "label": "Hero shot",
+        "hint": "The camera slowly moves in"
+      },
+      "detail": {
+        "label": "Detail close-up",
+        "hint": "Materials and craft up close"
+      },
+      "lifestyle": {
+        "label": "In use",
+        "hint": "A real, natural moment"
+      },
+      "flatlay": {
+        "label": "Top-down",
+        "hint": "From above, slow approach"
+      },
       "twirl": {
-        "label": "Twirl",
-        "hint": "The model turns, the skirt flares"
+        "label": "Turn around",
+        "hint": "The person turns, every side shown"
       },
       "walk": {
-        "label": "Runway walk",
-        "hint": "Walks toward the camera, poses"
+        "label": "Walk",
+        "hint": "Natural steps toward the camera"
       },
       "pose": {
         "label": "Natural pose",
         "hint": "Changes pose like a real shoot"
       },
-      "detail": {
-        "label": "Detail close-up",
-        "hint": "Fabric and craft up close"
-      },
-      "hanger": {
-        "label": "Hanger breeze",
-        "hint": "Gently sways on the hanger"
-      },
-      "flatlay": {
-        "label": "Flat lay",
-        "hint": "From above, slow push-in"
-      },
-      "turntable": {
-        "label": "360° turn",
-        "hint": "Shows every side"
-      },
-      "lifestyle": {
-        "label": "Lifestyle",
-        "hint": "A real, natural moment"
-      },
       "frontBack": {
         "label": "Front to back",
         "hint": "From the front view to the back"
       },
+      "hanger": {
+        "label": "On a hanger",
+        "hint": "A gentle sway on the hanger"
+      },
       "custom": {
         "label": "Free",
-        "hint": "Follows your notes"
+        "hint": "Following your notes"
       }
     },
     "director": {
       "title": "Director controls",
-      "person": "A model is in the photo",
-      "personHint": "Turns on expression and movement so the model looks alive and natural.",
+      "person": "A person is in the photos",
+      "personHint": "Someone wears or holds the product in the photos: expression and movement settings appear.",
       "expression": "Expression",
       "camera": "Camera",
       "motion": "Motion",
       "scene": "Setting",
-      "scenePlaceholder": "e.g. a spring picnic in a garden",
+      "scenePlaceholder": "e.g. a modern office desk in morning light",
       "light": "Light",
       "audio": "Sound",
       "audioRemoved": "{marketplace} removes the sound of videos: no sound is added.",
       "notes": "Extra direction (optional)",
-      "notesPlaceholder": "e.g. she walks holding her mother's hand and smiles at the camera at the end",
+      "notesPlaceholder": "e.g. the product turns slowly and ends with its front facing the camera",
       "avoid": "Avoid (optional)",
-      "avoidPlaceholder": "e.g. other children, toys",
+      "avoidPlaceholder": "e.g. other products, hands",
       "look": "Look",
       "motionHint": "Fast movement can change product details; \"Subtle\" is the most exact.",
       "sceneNeedsScene": "To change the setting choose \"New scene\"; \"From my photo\" keeps the photo's setting."
@@ -16545,8 +16551,9 @@
       "christmas": "Christmas",
       "beach": "Beach",
       "home": "Home",
-      "custom": "Custom",
-      "aiHint": "In a new setting the first and last frames are built from your photos by AI (+15 credits per frame)."
+      "custom": "Custom…",
+      "aiHint": "In a new setting the first and last frames are built from your photos by AI (+15 credits per frame).",
+      "outdoor": "Outdoors"
     },
     "light": {
       "daylight": "Daylight",
@@ -16585,7 +16592,7 @@
       "best": "Most realistic"
     },
     "seconds": "{count} s",
-    "consent": "I own the rights to these photos and have the consent of the models in them (a parent's, for children).",
+    "consent": "I own these photos and have the consent of the people in them (a parent's, for children).",
     "need": {
       "start": "Choose a photo for the start frame.",
       "photos": "Add at least one product photo or video."
@@ -16629,13 +16636,13 @@
       "send": "New version"
     },
     "chip": {
-      "expression": "More natural expression, smiling",
-      "slower": "Slower motion",
+      "expression": "More natural expression, a smile",
+      "slower": "Slower movement",
       "closer": "Closer shot",
-      "showDress": "Show the dress more",
-      "staticCam": "Keep the camera still",
-      "keepDress": "Keep the dress exactly as in the photos",
-      "realer": "More real, like a phone video"
+      "showProduct": "Show the product more",
+      "keepProduct": "Keep the product exactly as in the photos",
+      "realer": "Make it look more real",
+      "staticCam": "Keep the camera still"
     },
     "action": {
       "extend": "+7 s extend",
@@ -16701,7 +16708,7 @@
     "lookHint": {
       "phone": "Like a real video the seller filmed on a phone: the look that feels least like AI.",
       "studio": "Like a professional photographer's shoot, clean and sharp.",
-      "cinematic": "Like a fashion film, shallow depth of field."
+      "cinematic": "Like a film, shallow depth of field."
     },
     "qualityHint": {
       "fast": "Quick and affordable.",

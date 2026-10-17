@@ -21,16 +21,18 @@ export const MAX_PRODUCT_REFS = 10;
 
 /** What the end frame shows, per shot type (the same shot a few seconds later). */
 const END_POSE: Partial<Record<VideoDirection['preset'], string>> = {
-  twirl: 'The person has turned around and now faces away from the camera, so the back of the outfit is fully visible.',
+  twirl: 'The person has turned around and now faces away from the camera, so the back of the product is fully visible.',
   turntable: 'The product has turned so its back is fully visible.',
-  frontBack: 'The back of the outfit now faces the camera.',
+  frontBack: 'The back of the product now faces the camera.',
   walk: 'The person has walked a few steps closer to the camera and stopped, smiling.',
   pose: 'The person stands in a different, relaxed natural pose a few seconds later.',
   lifestyle: 'A few seconds later in the same moment: a different natural pose.',
+  hero: 'The camera has moved in closer: a sharp hero view of the product.',
 };
 
-export function endPoseFor(preset: VideoDirection['preset']): string {
-  return END_POSE[preset] ?? 'A few seconds later in the same shot: a slightly different natural pose.';
+export function endPoseFor(d: Pick<VideoDirection, 'preset' | 'showsBack'>): string {
+  if (d.preset === 'custom' && d.showsBack) return 'The back of the product is now fully visible.';
+  return END_POSE[d.preset] ?? 'A few seconds later in the same shot: a slightly different natural view.';
 }
 
 /** Keyframe prompt (exported for tests). `refCount` product photos follow the optional first frame. */
@@ -38,13 +40,13 @@ export function keyframePrompt(d: VideoDirection, opts: { which: 'start' | 'end'
   const productImgs = opts.hasStart ? `Images 2–${opts.refCount + 1}` : `Images 1–${opts.refCount}`;
   const parts = [
     opts.which === 'end' && opts.hasStart
-      ? `Image 1 is the first frame of a video. Create the LAST frame of the same continuous shot a few seconds later: the same ${d.person ? 'person, ' : ''}place, light and camera. ${endPoseFor(d.preset)}`
-      : `Create the first frame of a real product video: ${d.person ? 'the same person from the photos wearing exactly this outfit, standing naturally, the whole outfit in frame' : 'the product fully in frame'}.`,
+      ? `Image 1 is the first frame of a video. Create the LAST frame of the same continuous shot a few seconds later: the same ${d.person ? 'person, ' : ''}place, light and camera distance. ${endPoseFor(d)}`
+      : `Create the first frame of a real product video: ${d.person ? 'the same person from the photos wearing or holding exactly this product, natural and relaxed, the whole product in frame' : 'the product fully in frame'}.`,
     `${productImgs} are real photos of the product${d.product ? ` (${d.product})` : ''} from different angles.`,
-    lockSentence(d.person),
+    lockSentence(d.person, d.productKind),
     d.person ? personSentence(d) : '',
     opts.which === 'start' || !opts.hasStart ? sceneSentence(d) : '',
-    'A real photograph, a frame from an unedited video: true-to-life colours, natural light and shadows, real skin and fabric texture. No text, logos or watermarks.',
+    'A real photograph, a frame from an unedited video: true-to-life colours, natural light and shadows, real textures. No added text, logos or watermarks.',
   ];
   return parts.filter(Boolean).join(' ');
 }
@@ -204,9 +206,21 @@ export async function matchSubjectScale(userId: string, start: VideoMedia, end: 
 }
 
 export type PhotoView = 'front' | 'back' | 'side' | 'detail' | 'flat' | 'other';
-export type PhotoAnalysis = { photos: { view: PhotoView; fullBody: boolean; person: boolean; quality: number }[]; start: number | null; end: number | null };
+export type ShotIdea = { label: string; hint: string; action: string; showsBack: boolean };
+export type SceneIdea = { label: string; prompt: string };
+export type PhotoAnalysis = {
+  photos: { view: PhotoView; fullBody: boolean; person: boolean; quality: number }[];
+  start: number | null;
+  end: number | null;
+  /** What the product is, for the shot list and the lock wording. */
+  product: { kind: 'worn' | 'object'; category: string };
+  /** Shots and settings that suit THIS product (any marketplace, any category). */
+  shots: ShotIdea[];
+  scenes: SceneIdea[];
+};
 
 const VIEWS: readonly PhotoView[] = ['front', 'back', 'side', 'detail', 'flat', 'other'];
+const txt = (v: unknown, max: number) => (typeof v === 'string' ? v.replace(/[`{}<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max) : '');
 
 /** Cleans the model's photo analysis (indices 1-based in the prompt → 0-based). Pure, exported for tests. */
 export function normalizePhotoAnalysis(raw: unknown, count: number): PhotoAnalysis {
@@ -231,20 +245,36 @@ export function normalizePhotoAnalysis(raw: unknown, count: number): PhotoAnalys
   if (start === null || photos[start].view === 'detail') start = best(['front'], null) ?? best(['side', 'other', 'flat'], null);
   if (end !== null && (end === start || photos[end].view === 'detail')) end = null;
   if (end === null) end = best(['back'], start);
-  return { photos, start, end };
+  const kind = o?.product?.kind === 'worn' ? 'worn' : 'object';
+  const shots: ShotIdea[] = (Array.isArray(o?.shots) ? o!.shots : [])
+    .map((x: any) => ({ label: txt(x?.label, 40), hint: txt(x?.hint, 80), action: txt(x?.action, 300), showsBack: x?.showsBack === true }))
+    .filter((x: ShotIdea) => x.label && x.action)
+    .slice(0, 5);
+  const scenes: SceneIdea[] = (Array.isArray(o?.scenes) ? o!.scenes : [])
+    .map((x: any) => ({ label: txt(x?.label, 30), prompt: txt(x?.prompt, 300) }))
+    .filter((x: SceneIdea) => x.label && x.prompt)
+    .slice(0, 4);
+  return { photos, start, end, product: { kind, category: txt(o?.product?.category, 60) }, shots, scenes };
 }
 
-/** Looks at every product photo once: its view, whether the whole product is in it, and the best start / end frame. */
-export async function analyzePhotos(userId: string, refs: VideoMedia[]): Promise<PhotoAnalysis> {
+/**
+ * Looks at every product photo once: its view, whether the whole product is in it, the best start / end frame, what
+ * the product is, and the shots and settings a good e-commerce videographer would film for it. Any category.
+ */
+export async function analyzePhotos(userId: string, refs: VideoMedia[], ctx: { title?: string; locale?: 'tr' | 'en' } = {}): Promise<PhotoAnalysis> {
   const small = await Promise.all(refs.slice(0, 12).map((m) => shrink(m, 512)));
-  const raw = await aiJson<any>({ tier: 'fast', feature: 'video.photos', userId, temperature: 0 }, [
+  const lang = ctx.locale === 'en' ? 'English' : 'Turkish';
+  const raw = await aiJson<any>({ tier: 'fast', feature: 'video.photos', userId, temperature: 0.2 }, [
     ...small.map((m) => ({ inlineData: { mimeType: m.mimeType, data: m.data } })),
     {
       text: [
-        `Images 1–${small.length} are photos of one product for a product video.`,
-        'For each image (in order) return: view = "front" | "back" | "side" | "detail" (a close-up where the whole product is not visible) | "flat" (laid flat or on a hanger) | "other"; fullBody = true when the whole product — and the whole person wearing it, head to feet or hem — is in the photo; person = true when a person wears or holds it; quality 0–10 (sharp, well lit, usable as a video frame).',
-        'Then pick start = the number of the best full-body front photo (natural pose, sharp) and end = the number of the best full-body back photo of the same person and setting (if there is none, a full-body side photo; null if none).',
-        'Return JSON: {"photos": [{"view","fullBody","person","quality"}], "start": number, "end": number | null}',
+        `Images 1–${small.length} are photos of one product sold online${ctx.title ? ` ("${txt(ctx.title, 160)}")` : ''}. We will make a short product video from them.`,
+        'For each image (in order) return: view = "front" | "back" | "side" | "detail" (a close-up where the whole product is not visible) | "flat" (laid flat or on a hanger) | "other"; fullBody = true when the whole product — and the whole person wearing or holding it, if any — is in the photo; person = true when a person wears or holds it; quality 0–10 (sharp, well lit, usable as a video frame).',
+        'Pick start = the number of the best photo to open the video (the whole product, front, sharp) and end = the number of the best back view of the same product, person and setting (null if there is none).',
+        'product: kind = "worn" for clothing, shoes, jewellery or accessories worn by a person, otherwise "object"; category = 2–4 English words.',
+        `shots: 5 video shots that suit THIS product and these photos — what a good e-commerce videographer would film for it (for an object e.g. a slow turntable, a macro glide over a key detail, the product in use, in its natural place; for a worn product the person moving naturally). Physically simple, real-time, the product always recognisable. Each: label (≤ 4 words, ${lang}), hint (≤ 8 words, ${lang}), action (one English sentence of what happens on camera), showsBack (true if the shot ends showing the back).`,
+        `scenes: 4 real settings where this product would naturally be filmed. Each: label (≤ 3 words, ${lang}), prompt (one English sentence describing the place and light).`,
+        'Return JSON: {"photos": [{"view","fullBody","person","quality"}], "start": number, "end": number | null, "product": {"kind","category"}, "shots": [{"label","hint","action","showsBack"}], "scenes": [{"label","prompt"}]}',
       ].join('\n'),
     },
   ]);

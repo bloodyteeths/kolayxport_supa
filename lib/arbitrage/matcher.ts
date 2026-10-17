@@ -13,6 +13,7 @@ import { getTrendyolIndexForCategory } from './trendyolIndexer';
 import { calculateArbitrage } from './calculator';
 import { getCachedExchangeRate } from './scanner';
 import type { TrendyolProduct, EbayComparable, ArbitrageResult } from './types';
+import { GEMINI_TEXT_MODEL } from '@/lib/ai/models';
 
 const MATCH_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -183,7 +184,7 @@ async function aiMatchCategory(
   try {
     const genAI = new GoogleGenerativeAI(geminiKey);
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: GEMINI_TEXT_MODEL,
       generationConfig: { responseMimeType: 'application/json' } as any,
     });
 

@@ -17,6 +17,7 @@ import { logger } from '@/lib/logger';
 import { coerceAiString, looksGarbled } from '@/lib/etsy/seoRules';
 import { readShared, requestLocale, sha1, userRateLimit, writeShared } from '@/lib/research/etsySearch';
 import { EXPLAIN_TOOLS, type ExplainData, type ExplainRequest, type ExplainTool, type ResearchErrorBody, type ResearchResponse } from '@/lib/research/types';
+import { GEMINI_TEXT_MODEL } from '@/lib/ai/models';
 
 export const EXPLAIN_MAX_CHARS = 600;
 const MAX_METRICS_JSON = 4_000;
@@ -30,7 +31,7 @@ export async function geminiJson(prompt: string, timeoutMs = 25_000): Promise<Re
   if (!apiKey) return null;
   try {
     const model = new GoogleGenerativeAI(apiKey).getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: GEMINI_TEXT_MODEL,
       generationConfig: { responseMimeType: 'application/json', temperature: 0.3 } as never,
     });
     const result = await Promise.race([

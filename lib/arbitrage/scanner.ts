@@ -8,6 +8,7 @@ import { matchAndCalculateCategory } from './matcher';
 import { getTrendyolIndexForCategory, isCategoryFresh as isTrendyolFresh } from './trendyolIndexer';
 import { getEbayIndexForCategory } from './ebayIndexer';
 import type { ArbitrageResult, EbayComparable, TrendyolProduct } from './types';
+import { GEMINI_TEXT_MODEL } from '@/lib/ai/models';
 
 const EBAY_API_BASE = 'https://api.ebay.com';
 
@@ -60,7 +61,7 @@ export async function batchTranslateTitles(
   try {
     const genAI = new GoogleGenerativeAI(geminiKey);
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: GEMINI_TEXT_MODEL,
       generationConfig: { responseMimeType: 'application/json' } as any,
     });
 

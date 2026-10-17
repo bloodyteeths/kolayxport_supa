@@ -26,6 +26,7 @@ import {
   type DraftDb,
   type DraftReplyErrorCode,
 } from '@/lib/messages/draftReply';
+import { GEMINI_TEXT_MODEL } from '@/lib/ai/models';
 
 const SOURCE_STATUS: Record<DraftSourceError['code'], number> = { notFound: 404, alreadyAnswered: 409, notAnswerable: 409, unavailable: 502 };
 
@@ -37,7 +38,7 @@ async function geminiGenerate(prompt: string): Promise<string> {
   const { GoogleGenerativeAI } = await import('@google/generative-ai');
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string);
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
+    model: GEMINI_TEXT_MODEL,
     generationConfig: { responseMimeType: 'application/json', temperature: 0.4 } as any,
   });
   const response = await model.generateContent(prompt);

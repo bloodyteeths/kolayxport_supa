@@ -35,6 +35,7 @@ import {
     untrackKeywords,
     type RankPageGetter,
 } from '@/lib/research/rank';
+import { GEMINI_TEXT_MODEL } from '@/lib/ai/models';
 
 /**
  * Legacy research price summary in USD (RESEARCH_REDESIGN §6.3), through
@@ -3313,7 +3314,7 @@ export default async function handler(
             const { GoogleGenerativeAI } = await import('@google/generative-ai');
             const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
             const model = genAI.getGenerativeModel({
-                model: 'gemini-2.5-flash',
+                model: GEMINI_TEXT_MODEL,
                 generationConfig: { responseMimeType: 'application/json' } as any,
             });
 

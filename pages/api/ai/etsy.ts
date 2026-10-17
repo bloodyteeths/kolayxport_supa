@@ -5,6 +5,7 @@ import {
   normalizeTitle, checkTitle, normalizeTags, tagKey, coerceAiString, coerceAiStringArray, looksGarbled,
   TITLE_MIN, TITLE_MAX, TAG_MAX_LEN, TAG_MAX_COUNT, type TitleCheck, type AiErrorCode,
 } from '../../../lib/etsy/seoRules';
+import { GEMINI_TEXT_MODEL } from '@/lib/ai/models';
 
 // Allow up to 60s for AI responses (Vercel default is 10s)
 export const config = { maxDuration: 60 };
@@ -43,7 +44,7 @@ function getGeminiModel() {
   }
   const genAI = new GoogleGenerativeAI(apiKey);
   return genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
+    model: GEMINI_TEXT_MODEL,
     generationConfig: {
       responseMimeType: 'application/json',
     } as any,

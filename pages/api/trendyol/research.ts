@@ -8,6 +8,7 @@ import {
 } from '../../../lib/integrations/trendyolSearch';
 import type { TrendyolProduct } from '../../../lib/arbitrage/types';
 import { summarizeAmounts, groupMedian, type PriceSummary } from '../../../lib/research/stats';
+import { GEMINI_TEXT_MODEL } from '@/lib/ai/models';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const action = req.query.action as string;
@@ -143,7 +144,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const { GoogleGenerativeAI } = await import('@google/generative-ai');
       const genAI = new GoogleGenerativeAI(geminiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const model = genAI.getGenerativeModel({ model: GEMINI_TEXT_MODEL });
 
       const analysis = analyzeProducts(products);
       const topProducts = products.slice(0, 20).map(p => ({

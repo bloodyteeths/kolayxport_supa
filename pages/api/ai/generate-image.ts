@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import { GoogleGenAI } from '@google/genai';
 import sharp from 'sharp';
+import { GEMINI_IMAGE_MODEL } from '@/lib/ai/models';
 
 export const config = {
   api: {
@@ -13,7 +14,7 @@ export const config = {
 
 // Gemini image generation model — Nano Banana 2 (best quality-to-speed, up to 4K).
 // Use the GA model id; the "-preview" alias is being retired. Override via env.
-const MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image';
+const MODEL = GEMINI_IMAGE_MODEL;
 
 // NOTE: Gemini API image output carries only an invisible SynthID watermark —
 // there is no visible logo/strip (that sparkle mark is added by the consumer

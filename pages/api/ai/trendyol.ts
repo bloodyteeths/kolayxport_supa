@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '../../../lib/auth';
 import { logger } from '../../../lib/logger';
+import { GEMINI_TEXT_MODEL } from '@/lib/ai/models';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -21,7 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { GoogleGenerativeAI } = await import('@google/generative-ai');
     const genAI = new GoogleGenerativeAI(geminiKey);
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: GEMINI_TEXT_MODEL,
       generationConfig: { responseMimeType: 'application/json' } as any,
     });
 
@@ -142,7 +143,7 @@ JSON döndür: [{"attributeId": number, "attributeValueId": number, "reason": "n
         return res.status(400).json({ error: 'product is required' });
       }
 
-      const modelText = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const modelText = genAI.getGenerativeModel({ model: GEMINI_TEXT_MODEL });
       const prompt = `Sen bir Trendyol listing optimizasyon uzmanısın. Bu ürün listesini analiz et ve iyileştirme önerileri ver.
 
 Ürün: ${JSON.stringify({

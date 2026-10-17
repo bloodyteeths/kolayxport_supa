@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '../../../lib/auth';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GEMINI_TEXT_MODEL } from '@/lib/ai/models';
 
 export const config = { maxDuration: 60 };
 
@@ -29,7 +30,7 @@ function getGeminiModel() {
   if (!apiKey) throw new Error('GEMINI_API_KEY is required');
   const genAI = new GoogleGenerativeAI(apiKey);
   return genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
+    model: GEMINI_TEXT_MODEL,
     generationConfig: { responseMimeType: 'application/json' } as any,
   });
 }

@@ -16,6 +16,10 @@ Work through this list in order. Steps marked 👤 need your logins. Everything 
    - `NEXT_PUBLIC_WHATSAPP_NUMBER` (e.g. `905XXXXXXXXX`); without it the WhatsApp button is hidden
    - `NEXT_PUBLIC_SOCIAL_*`, only for accounts that exist
    - The tracking IDs can wait until step C.
+   - **Gemini for the SaaS:** use a key from a Google project **with billing enabled** (the free tier allows ~10–20 requests per model per day, so a few customers would exhaust it).
+     - New projects can't use `gemini-2.5-flash`, so set `GEMINI_TEXT_MODEL=gemini-3.8-flash` (or `gemini-3.5-flash`) together with the new `GEMINI_API_KEY`.
+     - Optionally set `GEMINI_IMAGE_MODEL`.
+     - All AI routes read these from `lib/ai/models.ts`.
 4. 👤 **Company details:** add the MERSİS number, vergi dairesi and KEP to `lib/site/company.ts`. Until then they're simply not shown.
 5. 👤 **Legal review:** send `content/tr/legal/*.md` to a lawyer. The pages show a "taslak" note until `lawyerReviewed: true`.
 6. **Merge** `gtm/overhaul` → `main`, or merge the PR. The VPS deploy builds it; check `.next/BUILD_ID`, then `curl https://kolayxport.com/api/health`.

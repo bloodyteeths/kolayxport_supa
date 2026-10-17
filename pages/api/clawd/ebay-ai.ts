@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { logger } from '../../../lib/logger';
 import { getAuthUser } from '../../../lib/auth';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GEMINI_TEXT_MODEL } from '@/lib/ai/models';
 
 export const config = { maxDuration: 30 };
 
@@ -28,7 +29,7 @@ async function askClaude<T>(
 ): Promise<T> {
   const genAI = getGeminiClient();
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
+    model: GEMINI_TEXT_MODEL,
     systemInstruction: systemPrompt,
     generationConfig: {
       responseMimeType: 'application/json',
@@ -590,7 +591,7 @@ async function askGeminiVision<T>(
 ): Promise<T> {
   const genAI = getGeminiClient();
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
+    model: GEMINI_TEXT_MODEL,
     systemInstruction: systemPrompt,
     generationConfig: { responseMimeType: 'application/json' },
   });

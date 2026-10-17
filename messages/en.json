@@ -15868,7 +15868,7 @@
       "subtitle": "8 steps to set up KolayXport and use it every day",
       "connect": {
         "title": "Connect your stores",
-        "body": "In Settings → Connections, connect Etsy, eBay, Amazon and Shopify with \"Connect\", and Trendyol and Wix with an API key. Add your carriers (DHL eCommerce, FedEx, UPS) under \"Carriers and API keys\".",
+        "body": "In Settings → Connections, connect Etsy, eBay, Amazon and Shopify with \"Connect\" and Trendyol with an API key; for Wix, install the KolayXport app from the Wix App Market. Add your carriers (DHL eCommerce, FedEx, UPS) under \"Carriers and API keys\".",
         "action": "Go to Connections"
       },
       "sender": {
@@ -15878,12 +15878,12 @@
       },
       "orders": {
         "title": "Prepare orders and print labels",
-        "body": "Orders from every marketplace land in Orders. Tap an order and choose \"Create label\", or select several for bulk labels. Tracking numbers go back to the marketplace automatically.",
+        "body": "Orders from every marketplace land in Orders. Tap an order and choose \"Create label\", or select several for bulk labels. Tracking numbers go back to eBay, Amazon and Wix automatically, and to Etsy while the Chrome extension is open. For Trendyol and Shopify, enter the number in the marketplace's own panel.",
         "action": "Go to Orders"
       },
       "extension": {
         "title": "Install the extension for Etsy addresses",
-        "body": "Etsy does not share buyer addresses through its API. Install the KolayXport Chrome extension and open your Orders page on Etsy: addresses import in one go. Use \"Import all addresses\" in the extension any time.",
+        "body": "Etsy does not share buyer addresses through its API. The KolayXport Chrome extension is not on the Chrome Web Store yet; ask destek@kolayxport.com for the install file. With the extension on, open your Orders page on Etsy and the addresses import in one go.",
         "action": "See the extension in Connections"
       },
       "listings": {

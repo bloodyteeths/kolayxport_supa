@@ -1,0 +1,12 @@
+{
+  "count": 1,
+  "results": [
+    {
+      "readiness_state_id": 81001,
+      "readiness_state": "made_to_order",
+      "min_processing_time": 1,
+      "max_processing_time": 3,
+      "processing_time_unit": "days"
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+slug: mesaj-kutusu-ai-yanit
+order: 11
+title: "Mesajları yapay zekâ taslağıyla yanıtlayın"
+description: "Wix mesajlarınızı ve Trendyol müşteri sorularınızı tek kutuda görün; sipariş bilgisiyle birlikte yapay zekâdan yanıt taslağı alın."
+keyword: "trendyol müşteri sorularını yanıtlama"
+inventoryRefs: [inbox-unified, ai-message-draft]
+tags: [mesaj kutusu, trendyol soru cevap, wix, müşteri hizmetleri, yapay zeka]
+startUrl: /app/mesajlar?view=needs_reply&store=all
+ready: { testid: conversation-row-wix-demo-conv-1 }
+mocks:
+  - use: inbox
+steps:
+  - say: "Merhaba! Bu videoda Wix mesajlarınızı ve Trendyol müşteri sorularınızı tek kutuda yanıtlayacağız ve yapay zekâdan taslak alacağız."
+  - title: "Mesajlar sayfasını açın"
+    say: "Mesajlar sayfasında yanıt bekleyen konuşmalar listelenir. Burada yalnızca Wix ve Trendyol var; Etsy, eBay ve Amazon mesajları bu kutuya gelmez."
+    do:
+      - hover: { testid: conversation-row-trendyol-650000101 }
+    zoom: { testid: conversation-row-trendyol-650000101, scale: 1.4 }
+  - title: "Konuşmayı açın"
+    say: "Bir konuşmaya tıklayın. Mesaj geçmişi ortada açılır."
+    do:
+      - click: { testid: conversation-row-wix-demo-conv-1 }
+      - waitFor: { text: "So happy to hear that" }
+      - wait: 600
+  - title: "Sipariş bilgisine bakın"
+    say: "Sağda müşterinin siparişleri ve takip numarası görünür. Müşteriye sormadan siparişin durumunu bilirsiniz."
+    do:
+      - hover: { text: "Müşteri ve siparişler" }
+    zoom: { text: "Takip numarası", scale: 1.5 }
+  - title: "Yapay zekâdan taslak alın"
+    say: "AI ile taslak yaz'a tıklayın. Yapay zekâ konuşmayı ve sipariş bilgisini okuyup bir yanıt taslağı hazırlar."
+    do:
+      - click: { testid: composer-ai }
+      - waitFor: { testid: composer-send }
+      - wait: 1500
+    zoom: { label: "Yanıt", scale: 1.3 }
+  - title: "Taslağı kontrol edin"
+    say: "Taslak kendiliğinden gönderilmez. Okuyun, gerekirse düzeltin. Sık yazdığınız cevapları da Hazır yanıtlar'a kaydedebilirsiniz."
+    do:
+      - hover: { testid: saved-replies-button }
+    zoom: { testid: saved-replies-button, scale: 1.6 }
+  - title: "Yanıtı gönderin"
+    say: "Hazır olunca Yanıtı gönder'e basın. Yanıtınız Wix'e ya da Trendyol'a gider."
+    do:
+      - hover: { testid: composer-send }
+    zoom: { testid: composer-send, scale: 1.6 }
+  - title: "Trendyol sorularını yanıtlayın"
+    say: "Trendyol müşteri soruları da aynı listede, hangi ürün için sorulduğuyla birlikte görünür."
+    do:
+      - click: { testid: conversation-row-trendyol-650000101 }
+      - wait: 1500
+    zoom: { testid: conversation-row-trendyol-650000101, scale: 1.4 }
+  - say: "Takıldığınız yerde Yardım sayfasından bize yazabilirsiniz. KolayXport'u 14 gün ücretsiz deneyebilirsiniz."

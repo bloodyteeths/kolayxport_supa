@@ -1,0 +1,35 @@
+{
+  "count": 5,
+  "results": [
+    {
+      "shop_section_id": 51001,
+      "title": "Iznik Ceramics",
+      "rank": 1,
+      "active_listing_count": 9
+    },
+    {
+      "shop_section_id": 51002,
+      "title": "Telkari Silver",
+      "rank": 2,
+      "active_listing_count": 6
+    },
+    {
+      "shop_section_id": 51003,
+      "title": "Turkish Towels",
+      "rank": 3,
+      "active_listing_count": 5
+    },
+    {
+      "shop_section_id": 51004,
+      "title": "Leather Goods",
+      "rank": 4,
+      "active_listing_count": 3
+    },
+    {
+      "shop_section_id": 51005,
+      "title": "Home Decor",
+      "rank": 5,
+      "active_listing_count": 3
+    }
+  ]
+}

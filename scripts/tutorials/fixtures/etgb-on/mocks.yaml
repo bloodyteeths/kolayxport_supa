@@ -1,0 +1,8 @@
+# ETGB is off in the seeded demo account. Show it switched on, with a made-up customs broker address,
+# without writing anything to the database: the real settings response gets these fields merged in.
+- url: "**/api/user/settings**"
+  method: GET
+  merge:
+    shippingSettings:
+      etgbEnabled: true
+      etgbRecipientEmail: "gumruk@ornek-musavir.test"

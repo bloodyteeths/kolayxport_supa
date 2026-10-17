@@ -1,0 +1,188 @@
+{
+  "items": [
+    {
+      "listing_id": 900000,
+      "title": "Iznik ceramic bowl 0",
+      "price": {
+        "amount": 3400,
+        "divisor": 100,
+        "currency_code": "USD"
+      },
+      "num_favorers": 40
+    },
+    {
+      "listing_id": 900001,
+      "title": "Iznik ceramic bowl 1",
+      "price": {
+        "amount": 3800,
+        "divisor": 100,
+        "currency_code": "USD"
+      },
+      "num_favorers": 49
+    },
+    {
+      "listing_id": 900002,
+      "title": "Iznik ceramic bowl 2",
+      "price": {
+        "amount": 3900,
+        "divisor": 100,
+        "currency_code": "USD"
+      },
+      "num_favorers": 58
+    },
+    {
+      "listing_id": 900003,
+      "title": "Iznik ceramic bowl 3",
+      "price": {
+        "amount": 4200,
+        "divisor": 100,
+        "currency_code": "USD"
+      },
+      "num_favorers": 67
+    },
+    {
+      "listing_id": 900004,
+      "title": "Iznik ceramic bowl 4",
+      "price": {
+        "amount": 4400,
+        "divisor": 100,
+        "currency_code": "USD"
+      },
+      "num_favorers": 76
+    },
+    {
+      "listing_id": 900005,
+      "title": "Iznik ceramic bowl 5",
+      "price": {
+        "amount": 4500,
+        "divisor": 100,
+        "currency_code": "USD"
+      },
+      "num_favorers": 85
+    },
+    {
+      "listing_id": 900006,
+      "title": "Iznik ceramic bowl 6",
+      "price": {
+        "amount": 4600,
+        "divisor": 100,
+        "currency_code": "USD"
+      },
+      "num_favorers": 94
+    },
+    {
+      "listing_id": 900007,
+      "title": "Iznik ceramic bowl 7",
+      "price": {
+        "amount": 4800,
+        "divisor": 100,
+        "currency_code": "USD"
+      },
+      "num_favorers": 103
+    },
+    {
+      "listing_id": 900008,
+      "title": "Iznik ceramic bowl 8",
+      "price": {
+        "amount": 4900,
+        "divisor": 100,
+        "currency_code": "USD"
+      },
+      "num_favorers": 112
+    },
+    {
+      "listing_id": 900009,
+      "title": "Iznik ceramic bowl 9",
+      "price": {
+        "amount": 5200,
+        "divisor": 100,
+        "currency_code": "USD"
+      },
+      "num_favorers": 121
+    },
+    {
+      "listing_id": 900010,
+      "title": "Iznik ceramic bowl 10",
+      "price": {
+        "amount": 5400,
+        "divisor": 100,
+        "currency_code": "USD"
+      },
+      "num_favorers": 130
+    },
+    {
+      "listing_id": 900011,
+      "title": "Iznik ceramic bowl 11",
+      "price": {
+        "amount": 5500,
+        "divisor": 100,
+        "currency_code": "USD"
+      },
+      "num_favorers": 139
+    },
+    {
+      "listing_id": 900012,
+      "title": "Iznik ceramic bowl 12",
+      "price": {
+        "amount": 5800,
+        "divisor": 100,
+        "currency_code": "USD"
+      },
+      "num_favorers": 148
+    },
+    {
+      "listing_id": 900013,
+      "title": "Iznik ceramic bowl 13",
+      "price": {
+        "amount": 6200,
+        "divisor": 100,
+        "currency_code": "USD"
+      },
+      "num_favorers": 157
+    },
+    {
+      "listing_id": 900014,
+      "title": "Iznik ceramic bowl 14",
+      "price": {
+        "amount": 6800,
+        "divisor": 100,
+        "currency_code": "USD"
+      },
+      "num_favorers": 166
+    }
+  ],
+  "priceStats": {
+    "p25": 42,
+    "median": 48,
+    "p75": 55,
+    "min": 34,
+    "max": 68,
+    "n": 15,
+    "currency": "USD"
+  },
+  "tagFrequency": [
+    {
+      "tag": "turkish ceramic",
+      "count": 31
+    },
+    {
+      "tag": "iznik pottery",
+      "count": 24
+    },
+    {
+      "tag": "housewarming gift",
+      "count": 19
+    }
+  ],
+  "titleKeywords": [
+    {
+      "keyword": "iznik",
+      "count": 28
+    },
+    {
+      "keyword": "ceramic bowl",
+      "count": 22
+    }
+  ],
+  "fetchedAt": "{{ago:20m}}"
+}

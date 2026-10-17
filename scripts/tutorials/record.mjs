@@ -3,9 +3,11 @@
 // Demo login: DEMO_EMAIL / DEMO_PASSWORD (defaults in scripts/demo/README.md). Never a real customer account.
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 import sharp from 'sharp';
 import { CONFIG, WORK, STEPS_IMG, ensure, loadTutorial, chromePath } from './lib.mjs';
+import { installMocks } from './mocks.mjs';
 
 const CURSOR_SCRIPT = `
 (() => {
@@ -14,12 +16,25 @@ const CURSOR_SCRIPT = `
   style.textContent = '#kx-cursor{position:fixed;left:0;top:0;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:rgba(43,69,224,.25);border:2px solid #2B45E0;z-index:2147483647;pointer-events:none;transition:transform .12s ease;box-shadow:0 0 0 6px rgba(43,69,224,.10)}' +
     '#kx-cursor.down{transform:scale(.7)}.kx-ripple{position:fixed;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;border:3px solid #2B45E0;z-index:2147483646;pointer-events:none;animation:kxr .6s ease-out forwards}@keyframes kxr{to{transform:scale(4);opacity:0}}' +
     'html.kx-zoom{transition:transform .7s cubic-bezier(.2,.7,.2,1)}' +
-    '[data-nextjs-toast],nextjs-portal,#__next-build-watcher,[data-sonner-toaster]{display:none!important}';
-  document.documentElement.appendChild(style);
+    '[data-nextjs-toast],nextjs-portal,#__next-build-watcher,[data-sonner-toaster]{display:none!important}' +
+    '*,*::before,*::after{caret-color:transparent!important}';
+  style.id = 'kx-rec-style';
   const c = document.createElement('div'); c.id = 'kx-cursor';
-  const add = () => document.body && !document.getElementById('kx-cursor') && document.body.appendChild(c);
-  document.addEventListener('DOMContentLoaded', add); add();
-  document.addEventListener('mousemove', (e) => { c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px'; }, true);
+  // Init scripts run before <html> exists, and a hydration re-render can drop what we add. Re-attach the
+  // style and the cursor whenever they go missing; this also keeps the Next dev overlay hidden.
+  try { const p = JSON.parse(sessionStorage.getItem('kx-cursor') || 'null'); if (p) { c.style.left = p.x + 'px'; c.style.top = p.y + 'px'; } } catch (e) {}
+  const ensure = () => {
+    const root = document.head || document.documentElement;
+    if (root && !document.getElementById('kx-rec-style')) root.appendChild(style);
+    if (document.body && !document.getElementById('kx-cursor')) document.body.appendChild(c);
+  };
+  ensure();
+  document.addEventListener('DOMContentLoaded', ensure);
+  setInterval(ensure, 200);
+  document.addEventListener('mousemove', (e) => {
+    c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px';
+    try { sessionStorage.setItem('kx-cursor', JSON.stringify({ x: e.clientX, y: e.clientY })); } catch (err) {}
+  }, true);
   document.addEventListener('mousedown', (e) => {
     c.classList.add('down');
     const r = document.createElement('div'); r.className = 'kx-ripple'; r.style.left = e.clientX + 'px'; r.style.top = e.clientY + 'px';
@@ -55,25 +70,50 @@ async function moveTo(page, loc) {
 
 async function zoom(page, target) {
   if (!target) {
+    if (!state.zoomed) return;
     await page.evaluate(() => { const h = document.documentElement; h.style.transform = ''; });
+    state.zoomed = false;
+    await page.waitForTimeout(750); // let the zoom-out finish before measuring anything again
     return;
   }
   const loc = await locate(page, target);
   const box = await loc.boundingBox();
   if (!box) return;
   const scale = target.scale || 1.5;
-  await page.evaluate(({ cx, cy, scale }) => {
+  // Scale around an origin chosen so the zoomed element ends up fully on screen: an element near an edge
+  // (a drawer button, a panel) is pulled inwards instead of being pushed off the frame. The origin stays
+  // inside the viewport, so the scaled page always covers the whole frame.
+  const axis = (start, size, view) => {
+    const c = start + size / 2;
+    const half = Math.min((size * scale) / 2 + 24, view / 2);
+    const target = Math.min(Math.max(c, half), view - half);
+    const o = (target - scale * c) / (1 - scale);
+    return Math.min(Math.max(o, 0), view);
+  };
+  const ox = axis(box.x, box.width, CONFIG.width), oy = axis(box.y, box.height, CONFIG.height);
+  await page.evaluate(({ ox, oy, scale }) => {
     const h = document.documentElement; h.classList.add('kx-zoom');
-    h.style.transformOrigin = `${cx}px ${cy + window.scrollY}px`; h.style.transform = `scale(${scale})`;
-  }, { cx: box.x + box.width / 2, cy: box.y + box.height / 2, scale });
+    h.style.transformOrigin = `${ox}px ${oy + window.scrollY}px`; h.style.transform = `scale(${scale})`;
+  }, { ox, oy, scale });
+  state.zoomed = true;
   await page.waitForTimeout(750);
 }
 
 async function act(page, a) {
   const [kind, arg] = Object.entries(a)[0];
   switch (kind) {
-    case 'goto': await page.goto(CONFIG.baseUrl + arg, { waitUntil: 'networkidle', timeout: 120000 }); break;
-    case 'click': { const l = await locate(page, arg); await moveTo(page, l); await l.click({ timeout: 15000 }); break; }
+    case 'goto': await gotoSettled(page, arg); break;
+    case 'click': { const l = await locate(page, arg); await moveTo(page, l); await l.click({ timeout: 15000, force: !!arg.force }); break; }
+    // Checkboxes that only appear on row hover (opacity 0): move there, then click without the actionability wait.
+    case 'check': { const l = await locate(page, arg); await moveTo(page, l); await l.click({ timeout: 15000, force: true }); break; }
+    // Bring an element into view (smoothly, inside whatever scrolls) without clicking it.
+    case 'scrollTo': {
+      const l = await locate(page, arg);
+      await l.evaluate((el, block) => el.scrollIntoView({ behavior: 'smooth', block }), arg.block || 'center');
+      await page.waitForTimeout(900);
+      break;
+    }
+    case 'blur': await page.evaluate(() => document.activeElement?.blur?.()); break;
     case 'hover': { const l = await locate(page, arg); await moveTo(page, l); break; }
     case 'fill': {
       const l = await locate(page, arg); await moveTo(page, l); await l.click();
@@ -87,6 +127,12 @@ async function act(page, a) {
   }
 }
 
+async function gotoSettled(page, url) {
+  await page.goto(CONFIG.baseUrl + url, { waitUntil: 'domcontentloaded', timeout: 180000 });
+  // Pages keep polling (nav counts, notifications), so "networkidle" is best effort only.
+  await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => undefined);
+}
+
 async function login(browser) {
   const email = process.env.DEMO_EMAIL || 'demo@kolayxport.test';
   const password = process.env.DEMO_PASSWORD;
@@ -96,8 +142,9 @@ async function login(browser) {
     localStorage.setItem('kolayxport_locale', 'tr');
     localStorage.setItem('kx-consent', JSON.stringify({ analytics: false, marketing: false, at: new Date().toISOString(), v: 1 }));
   });
+  await installMocks(ctx, {});
   const page = await ctx.newPage();
-  await page.goto(`${CONFIG.baseUrl}/login`, { waitUntil: 'networkidle', timeout: 180000 });
+  await gotoSettled(page, '/login');
   await page.locator('input[type=email]').fill(email);
   await page.locator('input[type=password]').fill(password);
   await page.locator('form button[type=submit]').click();
@@ -109,23 +156,30 @@ async function login(browser) {
 
 export async function record(slug) {
   const t = loadTutorial(slug);
+  Object.assign(state, { x: CONFIG.width / 2, y: CONFIG.height / 2, zoomed: false });
   const work = ensure(path.join(WORK, slug));
-  const narration = JSON.parse(fs.readFileSync(path.join(work, 'narration.json'), 'utf8'));
+  // TUTORIAL_DRY=1: check the steps and selectors fast, with a 1 s hold per step and no narration needed.
+  // Nothing is written except .cache/tutorials/<slug>/dry-run.webm (no guide screenshots, no timeline).
+  const dry = !!process.env.TUTORIAL_DRY;
+  const narration = dry ? t.steps.map(() => ({ duration: 1 })) : JSON.parse(fs.readFileSync(path.join(work, 'narration.json'), 'utf8'));
   const browser = await chromium.launch({ executablePath: chromePath() });
   const storageState = await login(browser);
-  const videoDir = ensure(path.join(work, 'raw'));
+  const videoDir = ensure(path.join(work, dry ? 'raw-dry' : 'raw'));
   for (const f of fs.readdirSync(videoDir)) fs.unlinkSync(path.join(videoDir, f));
-  const ctx = await browser.newContext({ viewport: { width: CONFIG.width, height: CONFIG.height }, storageState, recordVideo: { dir: videoDir, size: { width: CONFIG.width, height: CONFIG.height } } });
+  const ctx = await browser.newContext({ viewport: { width: CONFIG.width, height: CONFIG.height }, storageState, locale: 'tr-TR', timezoneId: 'Europe/Istanbul', recordVideo: { dir: videoDir, size: { width: CONFIG.width, height: CONFIG.height } } });
   await ctx.addInitScript(CURSOR_SCRIPT);
+  const mockReport = await installMocks(ctx, t);
   const opened = Date.now();
   const page = await ctx.newPage();
   // Warm-up (not part of the video): load the start page, let data settle.
-  await page.goto(CONFIG.baseUrl + (t.startUrl || '/app'), { waitUntil: 'networkidle', timeout: 180000 });
+  await gotoSettled(page, t.startUrl || '/app');
+  if (t.ready) await (await locate(page, t.ready)).waitFor({ state: 'visible', timeout: 60000 });
   await page.waitForTimeout(t.settleMs || 2500);
   await page.mouse.move(state.x, state.y);
   const t0 = Date.now();
   const timeline = [];
-  const imgDir = ensure(path.join(STEPS_IMG, slug));
+  const imgDir = dry ? null : ensure(path.join(STEPS_IMG, slug));
+  if (imgDir) for (const f of fs.readdirSync(imgDir).filter((x) => x.endsWith('.webp'))) fs.unlinkSync(path.join(imgDir, f));
   let shotNo = 0;
 
   for (const [i, step] of t.steps.entries()) {
@@ -135,10 +189,14 @@ export async function record(slug) {
       for (const a of step.do || []) await act(page, a);
       if (step.zoom) await zoom(page, step.zoom);
     } catch (e) {
-      console.error(`✗ ${slug} step ${i + 1} failed: ${e.message}`);
+      const shot = path.join(work, 'failed-step.png');
+      await page.screenshot({ path: shot }).catch(() => undefined);
+      console.error(`✗ ${slug} step ${i + 1} failed (screenshot: ${path.relative(process.cwd(), shot)}): ${e.message.split('\n')[0]}`);
+      await ctx.close().catch(() => undefined);
+      await browser.close().catch(() => undefined);
       throw e;
     }
-    if (step.title) {
+    if (step.title && imgDir) {
       shotNo += 1;
       const png = await page.screenshot({ type: 'png' });
       await sharp(png).resize(1440).webp({ quality: 80 }).toFile(path.join(imgDir, `${String(shotNo).padStart(2, '0')}.webp`));
@@ -155,10 +213,17 @@ export async function record(slug) {
   await ctx.close();
   await browser.close();
   const raw = await video.path();
+  if (dry) {
+    fs.renameSync(raw, path.join(work, 'dry-run.webm'));
+    console.log(`✓ dry run ${slug}: all ${t.steps.length} steps passed (.cache/tutorials/${slug}/dry-run.webm)`);
+    return;
+  }
   fs.writeFileSync(path.join(work, 'timeline.json'), JSON.stringify({ trimStart: (t0 - opened) / 1000, end: (Date.now() - opened) / 1000, raw, steps: timeline }, null, 2));
+  if (mockReport.mocked.size) console.log(`  mocked: ${[...mockReport.mocked].map(([g, n]) => `${g} ×${n}`).join(', ')}`);
+  if (mockReport.blocked.size) console.log(`  blocked external hosts: ${[...mockReport.blocked].join(', ')}`);
   console.log(`✓ recorded ${slug}: ${timeline.at(-1)?.end.toFixed(1)}s`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (fileURLToPath(import.meta.url) === path.resolve(process.argv[1] || '')) {
   record(process.argv[2]).catch((e) => { console.error(e); process.exit(1); });
 }

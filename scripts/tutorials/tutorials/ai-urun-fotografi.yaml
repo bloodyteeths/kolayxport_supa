@@ -1,0 +1,51 @@
+slug: ai-urun-fotografi
+order: 4
+title: "Yapay zekâyla ürün fotoğrafı oluşturun"
+description: "Etsy ilan düzenleyicide mevcut fotoğrafınızı referans alarak yapay zekâyla yeni ürün fotoğrafı oluşturun ve taslağa ekleyin."
+keyword: "yapay zeka ile ürün fotoğrafı"
+inventoryRefs: [ai-image-gen, etsy-listing-editor, staged-drafts-send]
+tags: [etsy, ürün fotoğrafı, yapay zeka görsel, ai fotoğraf]
+startUrl: /app/etsy-listings/1790001234?shop=48291736
+ready: { role: button, name: "Fotoğraf oluştur" }
+mocks:
+  - use: ai-image
+  - use: etsy-editor
+steps:
+  - say: "Merhaba! Bu videoda bir Etsy ilanı için yapay zekâyla yeni ürün fotoğrafı oluşturacağız."
+  - title: "Fotoğraflar bölümüne bakın"
+    say: "İlan düzenleyicinin en üstünde fotoğraflarınız var. Sürükleyerek sıralayabilir, bilgisayarınızdan yenisini seçebilirsiniz."
+    do:
+      - hover: { text: "Fotoğraflar ve video", exact: true }
+    zoom: { text: "Sıralamak için sürükleyin", scale: 1.3 }
+  - title: "Fotoğraf oluştur'a tıklayın"
+    say: "Yapay zekâ için Fotoğraf oluştur'a tıklayın."
+    do:
+      - click: { role: button, name: "Fotoğraf oluştur" }
+      - waitFor: { role: dialog }
+  - title: "Ne istediğinizi yazın"
+    say: "Görmek istediğiniz sahneyi kısaca yazın. İngilizce yazarsanız sonuç genelde daha iyi olur."
+    do:
+      - fill: { placeholder: "örnek: Professional", value: "Iznik bowl on a wooden dining table, soft daylight" }
+    zoom: { placeholder: "örnek: Professional", scale: 1.4 }
+  - title: "Referans fotoğraf seçin"
+    say: "Mevcut fotoğraflarınızdan birini referans seçin. Yapay zekâ ürününüzü bu fotoğraftan örnek alır."
+    do:
+      - click: { selector: "[role=dialog] img" }
+      - wait: 500
+  - title: "Görseli oluşturun"
+    say: "Görsel Oluştur'a tıklayın. Sonuç hazır olunca burada görünür."
+    do:
+      - click: { role: button, name: "Görsel Oluştur" }
+      - waitFor: { role: button, name: "Kabul Et ve Yükle" }
+      - scrollTo: { role: button, name: "Kabul Et ve Yükle" }
+    zoom: { selector: "[role=dialog] img >> nth=-1", scale: 1.3 }
+  - title: "Değişiklik isteyin"
+    say: "Beğenmezseniz alttaki kutuya neyin değişmesini istediğinizi yazın, örneğin arka planı koyulaştır, ve yeniden oluşturun."
+    do:
+      - hover: { placeholder: "Değişiklik isteği" }
+  - title: "Kabul edin"
+    say: "Beğendiğinizde Kabul Et ve Yükle deyin. Fotoğraf taslağa eklenir; siz Etsy'ye gönder demeden Etsy'ye gitmez."
+    do:
+      - hover: { role: button, name: "Kabul Et ve Yükle" }
+    zoom: { role: button, name: "Kabul Et ve Yükle", scale: 1.6 }
+  - say: "Takıldığınız yerde Yardım sayfasından bize yazabilirsiniz. KolayXport'u 14 gün ücretsiz deneyebilirsiniz."

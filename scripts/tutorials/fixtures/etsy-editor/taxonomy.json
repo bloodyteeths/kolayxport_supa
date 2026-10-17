@@ -1,0 +1,92 @@
+{
+  "count": 2,
+  "results": [
+    {
+      "id": 891,
+      "name": "Home & Living",
+      "level": 0,
+      "full_path_taxonomy_ids": [
+        891
+      ],
+      "children": [
+        {
+          "id": 1002,
+          "name": "Kitchen & Dining",
+          "level": 1,
+          "full_path_taxonomy_ids": [
+            891,
+            1002
+          ],
+          "children": [
+            {
+              "id": 1046,
+              "name": "Dining & Serving",
+              "level": 2,
+              "full_path_taxonomy_ids": [
+                891,
+                1002,
+                1046
+              ],
+              "children": [
+                {
+                  "id": 1052,
+                  "name": "Bowls",
+                  "level": 3,
+                  "full_path_taxonomy_ids": [
+                    891,
+                    1002,
+                    1046,
+                    1052
+                  ],
+                  "children": []
+                },
+                {
+                  "id": 1053,
+                  "name": "Plates",
+                  "level": 3,
+                  "full_path_taxonomy_ids": [
+                    891,
+                    1002,
+                    1046,
+                    1053
+                  ],
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 1031,
+          "name": "Bathroom",
+          "level": 1,
+          "full_path_taxonomy_ids": [
+            891,
+            1031
+          ],
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": 68887482,
+      "name": "Jewelry",
+      "level": 0,
+      "full_path_taxonomy_ids": [
+        68887482
+      ],
+      "children": [
+        {
+          "id": 1222,
+          "name": "Necklaces",
+          "level": 1,
+          "full_path_taxonomy_ids": [
+            68887482,
+            1222
+          ],
+          "children": []
+        }
+      ]
+    }
+  ]
+}

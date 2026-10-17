@@ -1,0 +1,24 @@
+{
+  "products": [
+    {
+      "product_id": 1,
+      "sku": "KX-IZB-01",
+      "property_values": [],
+      "offerings": [
+        {
+          "offering_id": 1,
+          "quantity": 14,
+          "is_enabled": true,
+          "price": {
+            "amount": 4800,
+            "divisor": 100,
+            "currency_code": "USD"
+          }
+        }
+      ]
+    }
+  ],
+  "price_on_property": [],
+  "quantity_on_property": [],
+  "sku_on_property": []
+}

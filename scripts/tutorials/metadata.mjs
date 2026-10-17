@@ -3,6 +3,7 @@
 // Writes public/media/tutorials/<slug>.youtube.txt and content/tr/guides/<slug>.md (keeps a youtubeId already set).
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import yaml from 'js-yaml';
 import { OUT, WORK, ROOT, STEPS_IMG, ensure, loadTutorial } from './lib.mjs';
 
@@ -73,4 +74,4 @@ export function metadata(slug) {
   console.log(`✓ metadata ${slug}`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) metadata(process.argv[2]);
+if (fileURLToPath(import.meta.url) === path.resolve(process.argv[1] || '')) metadata(process.argv[2]);

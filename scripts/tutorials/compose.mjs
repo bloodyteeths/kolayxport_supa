@@ -4,11 +4,16 @@
 // captions burned in), <slug>.tr.vtt (subtitles), <slug>.jpg (poster).
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 import { CONFIG, OUT, WORK, ROOT, ensure, ffmpeg, loadTutorial, chromePath, fontFaceCss, fmtVttTime } from './lib.mjs';
 
 const INTRO = 2.6;
 const OUTRO = 3.2;
+// Vertical (9:16) layout: crop width of the recording, where the video sits, where captions start.
+const V_CROP_W = 1280;
+const V_VIDEO_Y = 520;                                  // 1280×1080 → 1080×911, so the video ends at y≈1431
+const V_CAPTION_Y = 1460;
 const C = { ink: '#0E1A2B', paper: '#FAF7F0', accent: '#2B45E0', soft: '#8EA0FF' };
 
 const logo = (dark) => fs.readFileSync(path.join(ROOT, 'public/brand', dark ? 'kolayxport-logo-dark.svg' : 'kolayxport-logo.svg'), 'utf8');
@@ -29,12 +34,13 @@ ${eyebrow ? `<div class="eyebrow">${eyebrow}</div>` : ''}<h1>${title}</h1>${sub 
 function captionHtml(text, w) {
   return `<!doctype html><html><head><meta charset="utf-8"><style>${fontFaceCss()}
 *{margin:0}body{width:${w}px;background:transparent;font-family:Instrument,sans-serif;display:flex;justify-content:center}
-p{max-width:${w - 120}px;background:rgba(14,26,43,.92);color:#FAF7F0;font-size:44px;line-height:1.3;font-weight:600;padding:22px 30px;border-radius:24px;text-align:center}
+p{max-width:${w - 120}px;background:rgba(14,26,43,.92);color:#FAF7F0;font-size:40px;line-height:1.28;font-weight:600;padding:20px 28px;border-radius:24px;text-align:center}
 </style></head><body><p>${text}</p></body></html>`;
 }
 
 async function renderPng(browser, html, w, h, out, transparent = false) {
-  const page = await browser.newPage({ viewport: { width: w, height: h || 10 } });
+  // Captions (h = 0) are cropped to the <p>; give them a tall viewport so the element is fully on screen.
+  const page = await browser.newPage({ viewport: { width: w, height: h || 800 } });
   const tmp = path.join(WORK, `tmp-${Math.random().toString(36).slice(2)}.html`);
   fs.writeFileSync(tmp, html);
   await page.goto('file://' + encodeURI(tmp));
@@ -101,9 +107,16 @@ export async function compose(slug) {
   const vertical = path.join(OUT, `${slug}-vertical.mp4`);
   const capInputs = caps.flatMap((c) => ['-i', c.file]);
   const capBase = 4;
-  let chain = `[1:v]scale=1080:608,fps=30,setpts=PTS-STARTPTS+${INTRO}/TB[vid];[0:v]fps=30[bg];[bg][vid]overlay=0:620:eof_action=pass[b0]`;
+  // The whole 1920×1080 frame scaled to phone width is unreadable, so the vertical cut follows the action:
+  // per step, a 1280×1080 window centred on where the cursor ends up in that step (timeline focus.x), scaled
+  // to 1080 wide (1080×911). `t` in the crop expression is the recording's own time after the -ss trim.
+  const cropX = (fx) => Math.round(Math.min(Math.max(fx - V_CROP_W / 2, 0), 1920 - V_CROP_W));
+  const xs = tl.steps.map((st) => ({ at: st.start, x: cropX(st.focus?.x ?? 960) }));
+  let xExpr = String(xs.at(-1).x);
+  for (let k = xs.length - 2; k >= 0; k--) xExpr = `if(lt(t\\,${xs[k + 1].at.toFixed(2)})\\,${xs[k].x}\\,${xExpr})`;
+  let chain = `[1:v]fps=30,crop=${V_CROP_W}:1080:x='${xExpr}':y=0,scale=1080:-2,setpts=PTS-STARTPTS+${INTRO}/TB[vid];[0:v]fps=30[bg];[bg][vid]overlay=0:${V_VIDEO_Y}:eof_action=pass[b0]`;
   caps.forEach((c, k) => {
-    chain += `;[b${k}][${capBase + k}:v]overlay=(W-w)/2:1290:enable='between(t,${c.start.toFixed(2)},${c.end.toFixed(2)})'[b${k + 1}]`;
+    chain += `;[b${k}][${capBase + k}:v]overlay=(W-w)/2:${V_CAPTION_Y}:enable='between(t,${c.start.toFixed(2)},${c.end.toFixed(2)})'[b${k + 1}]`;
   });
   chain += `;[b${caps.length}][2:v]overlay=0:0:enable='lt(t,${INTRO})'[x1];[x1][3:v]overlay=0:0:enable='gte(t,${(INTRO + mainDur).toFixed(2)})',format=yuv420p[v]`;
   ffmpeg([
@@ -130,6 +143,6 @@ export async function compose(slug) {
   console.log(`✓ composed ${slug}: ${total.toFixed(1)}s → ${path.relative(ROOT, main169)}, ${path.relative(ROOT, vertical)}`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (fileURLToPath(import.meta.url) === path.resolve(process.argv[1] || '')) {
   compose(process.argv[2]).catch((e) => { console.error(e); process.exit(1); });
 }

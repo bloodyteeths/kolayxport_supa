@@ -32,6 +32,27 @@ npm run tutorials -- etsy-baglama --only=narrate,metadata   # text-only change
 
 - **Voice:** Gemini TTS model `gemini-2.5-flash-preview-tts`, voice **Kore**. Keep one voice for every video, and change it only with a full re-render (`TTS_VOICE`).
 - **Cache:** narration is cached per line, so editing one sentence re-voices only that sentence.
+- **Quota:** the free Gemini tier allows about **10 TTS requests per day**. Missing lines are therefore voiced in
+  batches (several lines in one request, split back at the pauses; `TTS_BATCH_SEC`, default 180 s of speech per
+  request; `TTS_BATCH=0` = one request per line). `npm run tutorials -- all` batches across all tutorials. When the
+  daily quota is used up the run stops with the reset time; cached lines are kept, just re-run later.
+- **Listen-check:** `node scripts/tutorials/verify-voice.mjs all` transcribes every line (gemini-2.5-flash) and
+  flags lines whose words differ from the script, e.g. when the TTS read its instruction aloud. Lines that are much
+  longer than their text are also retried automatically while voicing.
+- **Preview voice:** `TTS_ENGINE=say` voices with the macOS Turkish voice (Yelda), no quota, cached separately.
+  Use it to check timing and visuals; never publish a preview-voice video. Switch back by running without it.
+
+### Other flags
+
+| Flag | Effect |
+|---|---|
+| `--seed` | Re-seed the local demo account before each recording (see `reseed:` below). |
+| `TUTORIAL_DRY=1` with `--only=record` | Run every step with a 1 s hold to check selectors fast. Writes only `.cache/tutorials/<slug>/dry-run.webm`. |
+
+When a step fails, the recorder saves `.cache/tutorials/<slug>/failed-step.png`.
+
+The vertical cut follows the action: for each step it shows a 1280×1080 window of the recording centred on where
+the cursor ended up, so text stays readable on a phone. Captions sit under it.
 
 ## Writing a tutorial (`tutorials/<slug>.yaml`)
 
@@ -53,15 +74,70 @@ steps:
     zoom: { text: "Etsy", scale: 1.6 }
 ```
 
+**Top-level keys besides the ones above:**
+- `ready: <selector>`: wait for this before the video starts. App pages render client-side under `next dev`, so
+  always set it to something that only exists once the data is on screen.
+- `settleMs: 2500`: extra wait after `ready`.
+- `reseed: true`: the tutorial saves drafts (AI title, bulk edits…), so the demo account is re-seeded before
+  recording; otherwise a second recording would start from a different screen.
+- `mocks:` browser-side fixtures, see below.
+- `allowHosts: [host]`: external hosts the page may load (everything else is blocked, see below).
+- `guide:` on a step: text for the written guide instead of the narration.
+
 **Actions (`do`):**
 - `goto: /path`
-- `click`, `hover`, `waitFor`: take a selector.
-- `fill`: a selector plus `value`.
-- `press: Enter`
+- `click`, `hover`, `waitFor`: take a selector. `click` also takes `force: true`.
+- `check`: a selector; for row checkboxes that only show on hover (moves there, clicks without waiting).
+- `scrollTo`: a selector (plus optional `block: start|center`); scrolls it into view without clicking.
+- `fill`: a selector plus `value` (typed visibly).
+- `press: Enter` / `press: Escape`
 - `scroll: 600`
+- `blur: true` (drop the focus ring)
 - `wait: 1500`
 
-**Selectors:** `{ role, name }`, `{ text }`, `{ label }`, `{ placeholder }`, `{ testid }` or `{ selector: "css" }`. Prefer role and text: they survive redesigns.
+**Zoom (`zoom:`):** a selector plus `scale`. The page is scaled so that the element stays fully on screen (an
+element near an edge is pulled inwards). The next step zooms back out first.
+
+**Selectors:** `{ role, name }` (add `exact: true` for an exact name), `{ text }`, `{ label }`, `{ placeholder }`,
+`{ testid }` or `{ selector: "css" }` (Playwright selectors such as `tr:has-text('…')` and `>> nth=-1` work).
+Prefer role, testid and text: they survive redesigns. Check new steps with a dry run before voicing.
+
+## Mocks (browser-side fixtures)
+
+Some screens call our own API routes that in turn call a marketplace or Gemini live: the Etsy listing editor,
+the inbox, the AI buttons. The demo account only has fake tokens, so during the recording the **browser's** request
+is answered with a synthetic JSON fixture (Playwright `page.route`). Nothing on the server changes.
+
+```yaml
+mocks:
+  - use: etsy-editor          # a set: scripts/tutorials/fixtures/etsy-editor/mocks.yaml
+  - url: "**/api/ai/etsy**"   # or a single rule
+    body: { action: suggest_tags }
+    fixture: etsy-editor/ai-suggest-tags.json
+```
+
+A rule has a `url` (Playwright glob, or a regex in code) and optional `method`, `query` (every listed query param
+must match) and `body` (top-level JSON fields of the request body must match). It answers with one of:
+`fixture` (JSON file under `fixtures/`, or relative to the set's folder), `json` (inline), `file`
+(serve a local file, `{path}` = request path), `empty: true` (e.g. 204), `merge` (let the request reach our
+server and deep-merge this object into its JSON answer; e.g. `etgb-on` switches ETGB on in the settings answer
+without writing to the database) or `passthrough: true`. Rules are tried in order; first match wins; no match
+lets the request through. Fixture strings may use `{{base}}` (app URL), `{{now}}`, `{{ago:35m}}` (ISO time),
+`"{{unix-ago:3d}}"` (epoch seconds) and `"{{base64:path/to/file}}"` (file contents, e.g. a fake AI image).
+
+| Set | For |
+|---|---|
+| `etsy-editor` | Listing editor reads (listing, sections, shipping, taxonomy, inventory, market search) and the AI title/tag answers. Also stops the 500 on shop sections in the Etsy grid. |
+| `etsy-bulk-ai` | Bulk editor "AI ile iyileştir" answer for the three towel listings. |
+| `ai-image` | "Fotoğraf oluştur" → a synthetic scene made from the demo renders. |
+| `inbox` | Conversation list, threads, order context and the AI reply draft. |
+| `etgb-on` | ETGB switched on with a made-up broker address. |
+| `demo-cdn` | Price-gap product images on the fake `demo-cdn.kolayxport.test` host. |
+
+**Safety net (always on):** every request to a host other than the app, `localhost` and Google Fonts is aborted
+(marketplaces, carriers, analytics); the recorder prints the blocked hosts. Live pulls and sends are stubbed too:
+order sync, finance refresh, price-gap refresh, draft sends to any marketplace, ETGB sends, label purchases and
+message replies. Fixture data must stay synthetic.
 
 **Narration rules:**
 - Short spoken Turkish sentences, addressing the viewer as "siz".

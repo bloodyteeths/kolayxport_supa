@@ -1,0 +1,54 @@
+slug: ai-ilan-optimizasyonu
+order: 2
+title: "Etsy ilanınızı yapay zekâyla iyileştirin"
+description: "Etsy ilanınız için yapay zekâdan İngilizce başlık ve etiket önerisi alın, taslağa ekleyin, hazır olunca tek düğmeyle Etsy'ye gönderin."
+keyword: "etsy başlık ve etiket optimizasyonu"
+inventoryRefs: [ai-listing-copy, etsy-listing-editor, staged-drafts-send]
+tags: [etsy seo, etsy başlık, etsy etiket, yapay zeka, ilan optimizasyonu]
+startUrl: /app/etsy-listings
+ready: { text: "Cobalt Blue" }
+reseed: true            # the AI title and tag edits are saved as drafts in the demo account
+mocks:
+  - use: etsy-editor
+steps:
+  - say: "Merhaba! Bu videoda bir Etsy ilanının başlığını ve etiketlerini yapay zekâyla iyileştireceğiz. Hiçbir değişiklik siz göndermeden Etsy'ye gitmez."
+  - title: "İlanı açın"
+    say: "Etsy ilanları sayfasında düzenlemek istediğiniz ilanın satırında Düzenle'ye tıklayın."
+    do:
+      - click: { selector: "#kx-main tr:has-text('Cobalt Blue') button:has-text('Düzenle')" }
+      - waitFor: { role: button, name: "Başlık öner" }
+      - wait: 800
+  - title: "Başlık önerisi alın"
+    say: "Başlık ve açıklama bölümünde Başlık öner'e tıklayın. Yapay zekâ, Etsy'deki benzer ilanlara bakarak İngilizce bir başlık önerir ve nedenini Türkçe açıklar."
+    do:
+      - click: { role: button, name: "Başlık öner" }
+      - waitFor: { testid: le-title-suggestion }
+    zoom: { testid: le-title-suggestion, scale: 1.4 }
+  - title: "Öneriyi kullanın"
+    say: "Öneri uygunsa Kullan deyin. Başlık değişir ama Etsy'de henüz hiçbir şey değişmez. Değişiklik taslak olarak kaydedilir."
+    do:
+      - click: { role: button, name: "Kullan", exact: true }
+      - wait: 600
+    zoom: { text: "Başlık", exact: true, scale: 1.4 }
+  - title: "Etiket fikri alın"
+    say: "Şimdi Etiketler bölümüne geçin ve Etiket fikri al'a tıklayın. Öneriler başlığınızda zaten geçen kelimeleri tekrar etmez."
+    do:
+      - click: { role: button, name: "Etiketler", exact: true }
+      - wait: 900
+      - click: { role: button, name: "Etiket fikri al" }
+      - waitFor: { role: button, name: "fruit dish etiketini ekle" }
+    zoom: { role: button, name: "fruit dish etiketini ekle", scale: 1.4 }
+  - title: "Zayıf etiketi değiştirin"
+    say: "Etsy'de en fazla on üç etiket olur. Kota doluysa turuncu işaretli zayıf bir etiketi kaldırın, sonra öneriye tıklayıp ekleyin."
+    do:
+      - click: { role: button, name: "gift for mom etiketini kaldır" }
+      - wait: 500
+      - click: { role: button, name: "fruit dish etiketini ekle" }
+      - wait: 600
+    zoom: { text: "fruit dish", scale: 1.4 }
+  - title: "Değişiklikleri Etsy'ye gönderin"
+    say: "Hazır olduğunuzda alttaki Değişiklikleri Etsy'ye gönder düğmesine basın. İlan bu arada Etsy'de değiştiyse KolayXport göndermeden önce sizi uyarır."
+    do:
+      - hover: { testid: action-send }
+    zoom: { testid: action-send, scale: 1.5 }
+  - say: "Takıldığınız yerde Yardım sayfasından bize yazabilirsiniz. KolayXport'u 14 gün ücretsiz deneyebilirsiniz."

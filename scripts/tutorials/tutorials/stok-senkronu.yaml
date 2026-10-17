@@ -1,0 +1,50 @@
+slug: stok-senkronu
+order: 9
+title: "Stoğunuzu mağazalar arasında senkron tutun"
+description: "Bir mağazada satılan ürünün stoğu Etsy, eBay, Trendyol ve Wix'teki diğer ilanlarınızda da düşsün; önce deneme modunda görün, sonra canlıya alın."
+keyword: "etsy trendyol stok senkronizasyonu"
+inventoryRefs: [stock-sync, stock-sku-matching]
+tags: [stok senkronu, stok takibi, etsy, trendyol, ebay]
+startUrl: /app/stok-senkron
+ready: { text: "KX-IZB-01" }
+steps:
+  - say: "Merhaba! Bu videoda bir mağazada satılan ürünün stoğunun diğer mağazalarınızda da otomatik düşmesini sağlayacağız. Böylece olmayan ürünü satmazsınız."
+  - title: "Durumu ve sayıları görün"
+    say: "Stok senkronu sayfasının üstünde durum ve sayılar var: kaç ürün olduğu, kaç ilanın bağlı olduğu ve bekleyen işler."
+    do:
+      - hover: { text: "Durum ve ayarlar" }
+    zoom: { text: "Bağlı ilan", scale: 1.4 }
+  - title: "Kurulum sihirbazıyla eşleştirin"
+    say: "İlk kurulumda sihirbaz ilanlarınızı SKU'ya göre eşleştirir. SKU'su birebir aynı olanlar otomatik bağlanır; benzer olanlar size öneri olarak gelir."
+    do:
+      - hover: { role: button, name: "Kurulum sihirbazı" }
+    zoom: { role: button, name: "Kurulum sihirbazı", scale: 1.6 }
+  - title: "Önce deneme modunda bakın"
+    say: "Canlıya almadan önce deneme modunda hangi stokların değişeceğini görürsünüz. Emin olunca canlıya geçersiniz."
+    do:
+      - hover: { role: button, name: "Deneme moduna dön" }
+    zoom: { text: "Canlı", exact: true, scale: 1.6 }
+  - title: "Kuralları seçin"
+    say: "İptal edilen siparişte stoğu geri eklemeyi ve fazla görünen stoğu otomatik azaltmayı buradan açın. Stok hiçbir zaman otomatik artırılmaz."
+    do:
+      - hover: { text: "Uyumsuzlukları otomatik düzelt" }
+    zoom: { text: "Uyumsuzlukları otomatik düzelt", scale: 1.4 }
+  - title: "Kanalları kontrol edin"
+    say: "Senkronlanan kanallar burada. Etsy değişiklikleri yaklaşık bir dakikada, Trendyol yaklaşık üç dakikada, diğerleri yaklaşık on beş dakikada işlenir. Amazon ve Hepsiburada henüz yok."
+    do:
+      - hover: { text: "Senkronlanan kanallar" }
+    zoom: { text: "Senkronlanan kanallar", scale: 1.6 }
+  - title: "Ürün listesine bakın"
+    say: "Altta her ürünün hangi kanallarda satıldığını ve ortak stok sayısını görürsünüz."
+    do:
+      - scrollTo: { text: "KX-IZB-01", exact: true }
+      - hover: { text: "KX-IZB-01", exact: true }
+    zoom: { selector: "#kx-main tr:has-text('KX-IZB-01')", scale: 1.3 }
+  - title: "Sayının nedenini görün"
+    say: "Bir sayıdan emin değilseniz Bu sayı neden'e tıklayın. Stoğun hangi satış ve düzeltmelerle bu sayıya geldiği görünür."
+    do:
+      - click: { selector: "#kx-main tr:has-text('KX-IZB-01') button:has-text('Bu sayı neden')" }
+      - wait: 1500
+  - say: "Takıldığınız yerde Yardım sayfasından bize yazabilirsiniz. KolayXport'u 14 gün ücretsiz deneyebilirsiniz."
+    do:
+      - press: Escape

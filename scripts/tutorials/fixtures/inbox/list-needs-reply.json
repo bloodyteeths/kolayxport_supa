@@ -1,0 +1,109 @@
+{
+  "conversations": [
+    {
+      "id": "demo-conv-1",
+      "platform": "wix",
+      "status": "unanswered",
+      "needsReply": true,
+      "unread": true,
+      "platformStatus": "open",
+      "customerName": "Rachel Simmons",
+      "customerEmail": "rachel@example.com",
+      "subject": "Gift wrapping for the Iznik bowl",
+      "lastMessageText": "Hi! Does the cobalt Iznik bowl come gift wrapped? It's for my sister's housewarming next Saturday.",
+      "lastMessageAt": "{{ago:35m}}",
+      "lastMessageDate": "{{ago:35m}}",
+      "lastFromCustomer": true,
+      "contactId": "demo-contact-1",
+      "unreadCount": 1,
+      "messages": []
+    },
+    {
+      "id": "650000101",
+      "platform": "trendyol",
+      "status": "unanswered",
+      "needsReply": true,
+      "unread": true,
+      "platformStatus": "WAITING_FOR_ANSWER",
+      "customerName": "Gizem T.",
+      "subject": "Peştamal boyutu",
+      "lastMessageText": "Merhaba, peştamalın boyutu tam olarak kaç cm? Yıkayınca çeker mi?",
+      "lastMessageAt": "{{ago:80m}}",
+      "lastMessageDate": "{{ago:80m}}",
+      "lastFromCustomer": true,
+      "unreadCount": 1,
+      "productInfo": {
+        "id": "KX-PST-01-TY",
+        "title": "İndigo Çizgili Peştamal, %100 Pamuk Hamam Havlusu",
+        "imageUrl": "{{base}}/demo/peshtemal-indigo.jpg"
+      },
+      "messages": [
+        {
+          "id": "q-650000101",
+          "sender": "customer",
+          "text": "Merhaba, peştamalın boyutu tam olarak kaç cm? Yıkayınca çeker mi?",
+          "date": "{{ago:80m}}"
+        }
+      ]
+    },
+    {
+      "id": "demo-conv-2",
+      "platform": "wix",
+      "status": "unanswered",
+      "needsReply": true,
+      "unread": false,
+      "platformStatus": "open",
+      "customerName": "Thomas Keller",
+      "customerEmail": "thomas@example.com",
+      "subject": "Engraving",
+      "lastMessageText": "Can you engrave three initials on the cognac wallet? Something like T.J.K.",
+      "lastMessageAt": "{{ago:190m}}",
+      "lastMessageDate": "{{ago:190m}}",
+      "lastFromCustomer": true,
+      "contactId": "demo-contact-2",
+      "unreadCount": 0,
+      "messages": []
+    },
+    {
+      "id": "650000102",
+      "platform": "trendyol",
+      "status": "unanswered",
+      "needsReply": true,
+      "unread": false,
+      "platformStatus": "WAITING_FOR_ANSWER",
+      "customerName": "Hakan Y.",
+      "subject": "Zincir",
+      "lastMessageText": "Telkari kolyenin zinciri de gümüş mü, kaç cm?",
+      "lastMessageAt": "{{ago:260m}}",
+      "lastMessageDate": "{{ago:260m}}",
+      "lastFromCustomer": true,
+      "unreadCount": 0,
+      "productInfo": {
+        "id": "KX-TLK-N01-TY",
+        "title": "Telkari Gümüş Kolye, 925 Ayar Turkuaz Taşlı Lotus Kolye",
+        "imageUrl": "{{base}}/demo/telkari-necklace-turquoise.jpg"
+      },
+      "messages": [
+        {
+          "id": "q-650000102",
+          "sender": "customer",
+          "text": "Telkari kolyenin zinciri de gümüş mü, kaç cm?",
+          "date": "{{ago:260m}}"
+        }
+      ]
+    }
+  ],
+  "totalCount": 4,
+  "unansweredCount": 4,
+  "page": 0,
+  "pageSize": 30,
+  "nextCursor": null,
+  "enabledPlatforms": [
+    "wix",
+    "trendyol"
+  ],
+  "errors": [],
+  "platformErrors": [],
+  "fetchedAt": "{{now}}",
+  "readStateStore": "db"
+}

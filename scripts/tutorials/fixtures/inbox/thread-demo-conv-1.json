@@ -1,0 +1,24 @@
+{
+  "id": "demo-conv-1",
+  "platform": "wix",
+  "messages": [
+    {
+      "id": "m1",
+      "sender": "customer",
+      "text": "Hello! I ordered the cobalt Iznik bowl last month and loved it.",
+      "date": "{{ago:26h}}"
+    },
+    {
+      "id": "m2",
+      "sender": "seller",
+      "text": "So happy to hear that, thank you for the kind words!",
+      "date": "{{ago:25h}}"
+    },
+    {
+      "id": "m3",
+      "sender": "customer",
+      "text": "Hi! Does the cobalt Iznik bowl come gift wrapped? It's for my sister's housewarming next Saturday.",
+      "date": "{{ago:35m}}"
+    }
+  ]
+}

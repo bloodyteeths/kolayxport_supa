@@ -1,0 +1,3 @@
+# Listing editor "Fotoğraf oluştur" (AI image). The real route calls Gemini's image model; here it returns a
+# synthetic scene built from the demo renders in public/demo (generated-iznik-bowl.jpg).
+- { url: "**/api/ai/generate-image**", method: POST, fixture: generate-image.json }

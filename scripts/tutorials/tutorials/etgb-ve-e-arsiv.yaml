@@ -1,0 +1,51 @@
+slug: etgb-ve-e-arsiv
+order: 8
+title: "ETGB dosyasını gümrük müşavirinize gönderin"
+description: "Yurt dışı siparişleriniz için ETGB Excel dosyasını hazırlayıp gümrük müşavirinize e-postayla gönderin. Paraşüt bağlıysa e-Arşiv için ne olduğunu öğrenin."
+keyword: "etgb nasıl hazırlanır"
+inventoryRefs: [etgb-excel-email, sender-profile, orders-bulk-actions, parasut-einvoice]
+tags: [etgb, mikro ihracat, gümrük, e-arşiv, paraşüt]
+startUrl: /ayarlar?tab=senderProfile
+ready: { text: "Şirket adı" }
+mocks:
+  - use: etgb-on
+steps:
+  - say: "Merhaba! Bu videoda yurt dışı siparişleriniz için ETGB Excel dosyasını hazırlayıp gümrük müşavirinize e-postayla göndermeyi göstereceğiz."
+  - title: "Gönderici profilinizi kontrol edin"
+    say: "ETGB dosyasındaki ihracatçı adı ve vergi numarası, Ayarlar'daki gönderici profilinizden gelir. Önce bunların doğru olduğundan emin olun."
+    do:
+      - hover: { text: "Vergi numarası", exact: true }
+    zoom: { text: "Vergi numarası", exact: true, scale: 1.4 }
+  - title: "ETGB'yi açın ve müşavir e-postasını yazın"
+    say: "Aynı sayfanın altındaki ETGB bölümünde özelliği açın ve gümrük müşavirinizin e-posta adresini yazın."
+    do:
+      - scrollTo: { testid: sender-row-etgbEnabled }
+      - hover: { testid: sender-row-etgbEnabled }
+    zoom: { testid: sender-row-etgbEnabled, scale: 1.4 }
+  - title: "Yurt dışı siparişleri seçin"
+    say: "Şimdi Siparişler sayfasına geçin ve ETGB'ye girecek yurt dışı siparişlerini soldaki kutucuklardan seçin."
+    do:
+      - click: { testid: nav-item-orders }
+      - waitFor: { text: "Emily Carter" }
+      - check: { selector: "#kx-main tr:has-text('Emily Carter') input[type=checkbox]" }
+      - check: { selector: "#kx-main tr:has-text('Jonas Becker') input[type=checkbox]" }
+  - title: "ETGB belgelerini gönderin"
+    say: "Toplu işlem çubuğundaki üç noktaya tıklayın ve ETGB belgelerini gönder'i seçin. Tek seferde en fazla yüz sipariş gönderebilirsiniz."
+    do:
+      - click: { selector: "#kx-main [data-testid=action-menu] >> nth=-1" }
+      - hover: { text: "ETGB belgelerini gönder" }
+    zoom: { text: "ETGB belgelerini gönder", scale: 1.6 }
+  - title: "Ne gönderildiğini bilin"
+    say: "KolayXport seçili siparişlerden bir Excel dosyası hazırlar ve müşavirinize e-postayla yollar. Bu bir gümrük beyannamesi değildir; beyannameyi müşaviriniz verir."
+    do:
+      - hover: { text: "ETGB belgelerini gönder" }
+  - title: "e-Arşiv için Paraşüt'ü bağlayın"
+    say: "Paraşüt kullanıyorsanız hesabınızı Ayarlar'daki Kargo ve API anahtarları bölümünden bağlayın. ETGB gönderirken e-Arşiv faturası Paraşüt'te de oluşturulmaya çalışılır; faturayı Paraşüt'ten kontrol edin."
+    do:
+      - press: Escape
+      - click: { testid: nav-item-settings }
+      - click: { testid: settings-nav-apiKeys }
+      - waitFor: { testid: credentials-row-parasut-action }
+      - hover: { testid: credentials-row-parasut-action }
+    zoom: { testid: credentials-row-parasut-action, scale: 1.5 }
+  - say: "Takıldığınız yerde Yardım sayfasından bize yazabilirsiniz. KolayXport'u 14 gün ücretsiz deneyebilirsiniz."

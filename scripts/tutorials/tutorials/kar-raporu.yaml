@@ -1,0 +1,51 @@
+slug: kar-raporu
+order: 10
+title: "Gerçek kârınızı kâr raporunda görün"
+description: "Komisyon, kargo, reklam ve ürün maliyeti düşülmüş net kârınızı Etsy, eBay, Amazon ve Trendyol için görün; ürün bazında kârı izleyin. Pro planda."
+keyword: "etsy kar hesaplama"
+inventoryRefs: [reports-profit, finance-auto-sync, reports-sales]
+tags: [kâr raporu, etsy kar hesaplama, finans, e-ticaret muhasebe]
+startUrl: /app/analytics
+ready: { role: tab, name: "Kâr" }
+steps:
+  - say: "Merhaba! Bu videoda komisyon, kargo, reklam ve ürün maliyeti düşüldükten sonra gerçekte ne kazandığınızı göreceğiz. Kâr raporu Pro planda."
+  - title: "Kâr sekmesini açın"
+    say: "Ana sayfada Kâr sekmesine geçin."
+    do:
+      - click: { role: tab, name: "Kâr" }
+      - waitFor: { text: "Kâr ve zarar" }
+  - title: "Mağazayı ve tarihi seçin"
+    say: "Üstten tarih aralığını ve mağazayı seçin. Etsy, eBay, Amazon ve Trendyol desteklenir; Shopify ve Wix için kâr raporu yok. Veriler pazaryerlerinden kendiliğinden yenilenir."
+    do:
+      - hover: { testid: reports-date-range }
+      - wait: 500
+      - hover: { testid: filter-mp }
+    zoom: { testid: filter-mp, scale: 1.6 }
+  - title: "Özet kartlarını okuyun"
+    say: "Üstte net satış, kesintiler, net kâr ve kâr marjı var. Her biri önceki dönemle karşılaştırılır."
+    do:
+      - hover: { text: "Net kâr", exact: true }
+    zoom: { text: "Kesinti ve maliyetler", scale: 1.3 }
+  - title: "Kâr ve zararı inceleyin"
+    say: "Kâr ve zarar tablosu brüt satıştan iadeleri, pazaryeri kesintilerini, reklamı, kargoyu ve ürün maliyetini tek tek düşer."
+    do:
+      - hover: { text: "Pazaryeri kesintileri" }
+    zoom: { text: "Pazaryeri kesintileri", scale: 1.4 }
+  - title: "Günlük grafiği izleyin"
+    say: "Grafikte net satışı ve net kârı gün gün ya da hafta hafta izleyin."
+    do:
+      - click: { role: radio, name: "Haftalık" }
+      - wait: 800
+    zoom: { text: "Net satış ve net kâr", scale: 1.3 }
+  - title: "Ürün maliyetini girin"
+    say: "Ürün maliyetinizi KolayXport bilemez. Birim maliyet düzenle ile her ürün için bir kez girin; böylece ürün bazında kârı da görürsünüz."
+    do:
+      - scrollTo: { text: "Ürüne göre kâr" }
+      - hover: { role: button, name: "Birim maliyet düzenle" }
+    zoom: { role: button, name: "Birim maliyet düzenle", scale: 1.5 }
+  - title: "CSV olarak indirin"
+    say: "Raporu muhasebeciniz için CSV olarak indirebilirsiniz."
+    do:
+      - hover: { testid: action-export-csv }
+    zoom: { testid: action-export-csv, scale: 1.6 }
+  - say: "Takıldığınız yerde Yardım sayfasından bize yazabilirsiniz. KolayXport'u 14 gün ücretsiz deneyebilirsiniz."

@@ -1,0 +1,23 @@
+{
+  "orders": [
+    {
+      "orderNumber": "10482",
+      "status": "FULFILLED",
+      "createdDate": "{{ago:31d}}",
+      "totalAmount": 48,
+      "currency": "USD",
+      "total": "$48.00",
+      "items": [
+        {
+          "name": "Handmade Iznik Ceramic Bowl, Cobalt Blue",
+          "imageUrl": "{{base}}/demo/iznik-bowl-blue.jpg",
+          "quantity": 1,
+          "amount": 48,
+          "price": "$48.00"
+        }
+      ],
+      "trackingNumber": "794612345678",
+      "shipByDate": null
+    }
+  ]
+}

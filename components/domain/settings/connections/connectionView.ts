@@ -93,10 +93,18 @@ export function isStale(lastSyncAt: string | null | undefined, now: Date): boole
   return t !== null && now.getTime() - t > STALE_SYNC_MS;
 }
 
-/** Server account names that only repeat the provider ("Veeqo", "eBay") carry no information. */
-function meaningfulName(spec: IntegrationSpec, name: string | undefined): string | undefined {
+/**
+ * Server account names that only repeat the provider ("Veeqo", "eBay") or the provider plus a raw account id
+ * ("Amazon A1Q4UP10N4XSPS") carry no information for the seller.
+ */
+export function meaningfulName(spec: IntegrationSpec, name: string | undefined): string | undefined {
   if (!name) return undefined;
-  return name.trim().toLowerCase() === spec.name.toLowerCase() ? undefined : name;
+  const v = name.trim();
+  const provider = spec.name.toLowerCase();
+  if (v.toLowerCase() === provider) return undefined;
+  const rest = v.toLowerCase().startsWith(`${provider} `) ? v.slice(provider.length).trim() : null;
+  if (rest && (/^[A-Z0-9]{8,}$/.test(rest) || /^\d{4,}$/.test(rest))) return undefined;
+  return v;
 }
 
 function reauthReason(entry: ConnectionEntry | undefined): 'authExpired' | 'incomplete' {

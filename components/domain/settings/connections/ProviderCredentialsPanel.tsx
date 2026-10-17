@@ -205,7 +205,8 @@ export function ProviderCredentialsPanel({
         label: t('credentials.save'),
         loadingLabel: t('credentials.saving'),
         loading: saving,
-        disabled: !store.loaded,
+        // A connected store with nothing changed has nothing to save.
+        disabled: !store.loaded || (status === 'connected' && !dirty),
         disabledReason: loadFailed ? t('credentials.loadFailedReason') : !store.loaded ? t('credentials.loading') : undefined,
         onClick: () => void save(),
       }}
@@ -242,7 +243,8 @@ export function ProviderCredentialsPanel({
                   secret={x.secret}
                   numeric={x.pattern === 'digits'}
                   width={row.length === 2 ? 'full' : x.width ?? 'full'}
-                  autoFocus={ri === 0 && ci === 0}
+                  // Only a new connection starts typing: on a connected store the phone keyboard popped up for nothing.
+                  autoFocus={ri === 0 && ci === 0 && status !== 'connected' && !isPhone}
                   error={errorText(x)}
                   onChange={(nm, v) => { setDraft((d) => ({ ...d, [nm]: v })); if (failure === 'failed') setFailure(null); }}
                   onBlur={(nm) => setTouched((tt) => ({ ...tt, [nm]: true }))}

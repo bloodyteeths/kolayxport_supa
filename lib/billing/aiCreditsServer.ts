@@ -92,6 +92,7 @@ export async function getCreditBalance(userId: string, currency: Currency = 'TRY
     packs,
     total: remaining === null ? null : remaining + packs,
     channel: info.channel,
+    neutral: info.neutral,
     currency,
     recent: recent.map((e) => ({ id: e.id, delta: e.delta, kind: e.kind, feature: e.feature, createdAt: e.createdAt.toISOString() })),
   };

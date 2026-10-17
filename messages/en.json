@@ -16825,6 +16825,8 @@
       "purchase": "Credit pack",
       "refund": "Refund",
       "adjust": "Adjustment"
-    }
+    },
+    "neutralTitle": "This month's AI generation is used up",
+    "neutralBody": "You have used this month's AI image and video generation. It renews on {date}."
   }
 }

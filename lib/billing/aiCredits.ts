@@ -86,6 +86,8 @@ export type CreditBalance = {
   total: number | null;
   /** How credits can be bought: Stripe checkout, Shopify billing (Shopify-billed accounts), or not at all. */
   channel: 'stripe' | 'shopify' | null;
+  /** Shopify-connected / neutral account: no prices, packs or buy buttons anywhere (App Store rule 1.2.1). */
+  neutral: boolean;
   currency: Currency;
   recent: { id: string; delta: number; kind: string; feature: string | null; createdAt: string }[];
 };

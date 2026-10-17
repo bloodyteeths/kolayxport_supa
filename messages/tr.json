@@ -16825,6 +16825,8 @@
       "purchase": "Kredi paketi",
       "refund": "İade",
       "adjust": "Düzeltme"
-    }
+    },
+    "neutralTitle": "Bu ayın AI üretim hakkı doldu",
+    "neutralBody": "Bu ayki AI görsel ve video üretim hakkınızı kullandınız. Hakkınız {date} tarihinde yenilenir."
   }
 }

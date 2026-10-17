@@ -111,7 +111,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   const linkProps = href && !disabled
     ? external
       ? { component: 'a' as const, href, target: '_blank', rel: 'noopener noreferrer' }
-      : { component: NextLink, href }
+      // API routes (OAuth starts etc.) must not be prefetched: a prefetch ran the route on page view.
+      : { component: NextLink, href, ...(href.startsWith('/api/') ? { prefetch: false } : {}) }
     : {};
 
   const button = (

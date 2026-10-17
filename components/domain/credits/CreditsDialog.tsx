@@ -75,6 +75,17 @@ export function CreditsDialog() {
   };
 
   const total = balance?.total;
+  if (!balance && open) return null; // never flash pack prices before we know the account may see them
+  if (balance?.neutral) {
+    // Shopify-connected account (App Store rule 1.2.1): its usage only — no prices, packs or buying.
+    return (
+      <Modal open={open} onClose={close} size="sm" title={t('neutralTitle')} primary={{ id: 'close', label: t('close'), onClick: close }} secondary={null} data-testid="credits-dialog">
+        <Box sx={{ fontSize: 14, color: n[700], lineHeight: '20px' }}>
+          {t('neutralBody', { date: f.date(balance.monthly.renewsAt, 'date') })}
+        </Box>
+      </Modal>
+    );
+  }
   return (
     <Modal
       open={open}
@@ -105,7 +116,7 @@ export function CreditsDialog() {
           </Box>
         ) : null}
 
-        {canBuy || !balance ? (
+        {canBuy ? (
           <Box role="radiogroup" aria-label={t('title')} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' }, gap: '8px' }}>
             {CREDIT_PACKS.map((p) => {
               const on = p.id === pick;

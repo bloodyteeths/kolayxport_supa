@@ -14042,6 +14042,13 @@
         "personalization": "Kişiselleştirmeyi düzelt",
         "shipping": "Kargoyu düzelt",
         "seo": "İlanı aç"
+      },
+      "field": {
+        "shopSection": "Mağaza bölümü seç",
+        "shippingProfile": "Kargo profili seç",
+        "returnPolicy": "İade politikası seç",
+        "processing": "Hazırlama süresi seç",
+        "whoMade": "\"Kim yaptı\"yı doldur"
       }
     }
   },

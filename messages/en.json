@@ -14042,6 +14042,13 @@
         "personalization": "Fix personalization",
         "shipping": "Fix shipping",
         "seo": "Open listing"
+      },
+      "field": {
+        "shopSection": "Pick a shop section",
+        "shippingProfile": "Pick a shipping profile",
+        "returnPolicy": "Pick a return policy",
+        "processing": "Pick a processing time",
+        "whoMade": "Fill in \"Who made it\""
       }
     }
   },

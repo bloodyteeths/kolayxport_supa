@@ -148,6 +148,15 @@ export function failureFixFor(errorKey: string | null | undefined, status?: stri
   return open(null, null);
 }
 
+/** Fields whose fix button names the exact field (more precise than the section). */
+const FIELD_LABELS: Record<string, string> = {
+  shop_section_id: 'listings.fix.field.shopSection',
+  shipping_profile_id: 'listings.fix.field.shippingProfile',
+  return_policy_id: 'listings.fix.field.returnPolicy',
+  readiness_state_id: 'listings.fix.field.processing',
+  who_made: 'listings.fix.field.whoMade',
+};
+
 /** The i18n key of the fix button (`listings.fix.*`). Pure. */
 export function failureFixLabelKey(fix: FailureFix): string {
   switch (fix.kind) {
@@ -156,7 +165,9 @@ export function failureFixLabelKey(fix: FailureFix): string {
     case 'reconnect': return 'listings.fix.reconnect';
     case 'discard': return 'listings.fix.discard';
     case 'onMarketplace': return 'listings.fix.onMarketplace';
-    case 'open': return fix.section ? `listings.fix.open.${fix.section}` : 'listings.fix.open.listing';
+    case 'open':
+      if (fix.target && FIELD_LABELS[fix.target]) return FIELD_LABELS[fix.target];
+      return fix.section ? `listings.fix.open.${fix.section}` : 'listings.fix.open.listing';
   }
 }
 

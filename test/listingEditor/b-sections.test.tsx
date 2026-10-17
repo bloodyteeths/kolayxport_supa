@@ -215,7 +215,7 @@ describe('PriceSection', () => {
     const { value } = makeCtx({ facts: { variations: { count: 2, combinations: 14, priceRange: { min: 54, max: 79 } } } });
     renderIn(<PriceSection />, value);
     expect(screen.queryByTestId('le-price-input')).toBeNull();
-    expect(screen.getByText(/set in Variations/)).toBeTruthy();
+    expect(screen.getByRole('link', { name: /Edit in variations/ }).getAttribute('href')).toMatch(/variations/);
   });
 
   it('shows the field error from the engine issues', () => {

@@ -451,8 +451,9 @@ const rowSx = {
   display: 'flex',
   alignItems: 'center',
   gap: 1,
-  py: 1.2,
+  py: { xs: 1, sm: 1.2 },
   px: 1.5,
+  rowGap: { xs: 0.5, sm: 1 },
   flexWrap: 'wrap',
   borderBottom: '1px solid rgba(0,0,0,0.06)',
   '&:hover': { bgcolor: 'rgba(102,126,234,0.03)' },
@@ -2250,14 +2251,18 @@ function VariationEditorInner({
                 displayEmpty
                 sx={{ minWidth: 160, height: 32, fontSize: '0.82rem' }}
               >
-                <MenuItem value=""><em>{t('noSecondVariation')}</em></MenuItem>
+                <MenuItem value=""><Box component="span" sx={{ color: 'text.secondary' }}>{t('noSecondVariation')}</Box></MenuItem>
                 {ETSY_PROPERTIES.filter(p => p.id !== primaryPropertyId).map(prop => (
                   <MenuItem key={prop.id} value={prop.id}>{t(prop.tKey)}</MenuItem>
                 ))}
+                {/* A custom second variation (e.g. "Style") is not a preset: list it so the select shows its name. */}
+                {secondPropertyId && !ETSY_PROPERTIES.some(p => p.id === secondPropertyId) && (
+                  <MenuItem value={secondPropertyId}>{getPropertyName(secondPropertyId, t('secondVariation'))}</MenuItem>
+                )}
               </Select>
               {secondPropertyId && (
                 <Chip
-                  label={`${getPropertyName(secondPropertyId, t('secondVariation'))} (${getExistingSecondValues(secondPropertyId).length})`}
+                  label={t('editValuesCount', { count: getExistingSecondValues(secondPropertyId).length })}
                   size="small"
                   color="primary"
                   variant="outlined"
@@ -2281,7 +2286,7 @@ function VariationEditorInner({
                     disabled={!secondPropertyId || thirdVariationCandidates.length === 0}
                     sx={{ minWidth: 180, height: 32, fontSize: '0.82rem' }}
                   >
-                    <MenuItem value=""><em>{t('noThirdVariation')}</em></MenuItem>
+                    <MenuItem value=""><Box component="span" sx={{ color: 'text.secondary' }}>{t('noThirdVariation')}</Box></MenuItem>
                     {thirdVariationCandidates.map(prop => (
                       <MenuItem key={prop.property_id} value={prop.property_id}>
                         {prop.display_name || prop.name}
@@ -2292,7 +2297,7 @@ function VariationEditorInner({
               </Tooltip>
               {thirdPropertyId && (
                 <Chip
-                  label={`${getPropertyName(thirdPropertyId, t('thirdVariation'))} (${getExistingThirdValues(thirdPropertyId).length})`}
+                  label={t('editValuesCount', { count: getExistingThirdValues(thirdPropertyId).length })}
                   size="small"
                   color="primary"
                   variant="outlined"
@@ -2351,7 +2356,8 @@ function VariationEditorInner({
                         opacity: o.is_enabled ? 1 : 0.45,
                       }}>
                         {/* Reorder arrows */}
-                        <Box sx={{ display: 'flex', flexDirection: 'column', mr: 0.5 }}>
+                        {/* Phones: the arrows sit on the price/stock line (row), not stacked in their own column. */}
+                        <Box sx={{ display: 'flex', flexDirection: { xs: 'row', sm: 'column' }, mr: { xs: 0, sm: 0.5 }, ml: { xs: 'auto', sm: 0 }, order: { xs: 3, sm: 0 } }}>
                           <IconButton size="small" disabled={globalIdx === 0} onClick={() => moveProduct(globalIdx, 'up')} sx={{ p: 0.15 }}>
                             <icons.sortAsc size={16} strokeWidth={ICON_STROKE} />
                           </IconButton>
@@ -2362,7 +2368,7 @@ function VariationEditorInner({
 
                         {/* Variation values — editable */}
                         <Box sx={{ flex: 1, minWidth: { xs: '100%', sm: 260 } }}>
-                          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(auto-fit, minmax(120px, 1fr))' }, gap: 0.75, alignItems: 'stretch' }}>
+                          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: `repeat(${Math.max(1, product.property_values?.length ?? 1)}, minmax(0, 1fr))`, sm: 'repeat(auto-fit, minmax(120px, 1fr))' }, gap: 0.75, alignItems: 'stretch' }}>
                             {product.property_values?.map((pv, pvIdx) => (
                               <Box
                                 key={`${pv.property_id}-${pvIdx}`}
@@ -2396,7 +2402,7 @@ function VariationEditorInner({
                         </Box>
 
                         {/* Quick info */}
-                        <Typography variant="body2" color="text.secondary" sx={{ minWidth: 55, textAlign: 'right' }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ minWidth: { xs: 0, sm: 55 }, textAlign: { xs: 'left', sm: 'right' } }}>
                           {sym}{getPrice(o)}
                         </Typography>
                         {(() => {
@@ -2420,7 +2426,7 @@ function VariationEditorInner({
                         )}
 
                         {/* Actions */}
-                        <Box sx={{ display: 'flex', gap: 0 }}>
+                        <Box sx={{ display: 'flex', gap: 0, order: { xs: 4, sm: 0 } }}>
                           <Tooltip title={t('copy')}>
                             <IconButton size="small" onClick={() => duplicateProduct(globalIdx)}><icons.copy size={16} strokeWidth={ICON_STROKE} /></IconButton>
                           </Tooltip>

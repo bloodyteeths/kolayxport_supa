@@ -13,7 +13,7 @@ import { PriceBand, priceBandMode } from '@/components/ds/research/PriceBand';
 import { SourceNote } from '@/components/ds/research/SourceNote';
 import { useDsFormat } from '@/components/ds/data/fmt';
 import { icons } from '@/lib/ds/icons';
-import { neutral, tone, type as typeScale } from '@/lib/ds/tokens';
+import { accent, neutral, tone, type as typeScale } from '@/lib/ds/tokens';
 import { sectionAnchorId } from '@/lib/listingEditor/sections';
 import type { ListingSectionProps } from '@/lib/listingEditor/types';
 import { useStockManaged } from '@/components/stock/useStockManaged';
@@ -116,10 +116,17 @@ export function PriceSection({ id = 'price', market: marketProp, marketLoading, 
           <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', fontSize: typeScale.body[0], color: neutral[700] }}>
             <span>
               {range
-                ? t('field.priceFromVariations', { min: fmt.money(range.min, currency), max: fmt.money(range.max, currency) })
+                ? t('field.priceRange', { min: fmt.money(range.min, currency), max: fmt.money(range.max, currency) })
                 : t('field.priceInVariations')}
             </span>
-            <Button variant="ghost" size="sm" href={`#${sectionAnchorId('variations')}`}>{t('section.variations')}</Button>
+            {/* An inline link, not a ghost button: on phones the button wrapped onto its own padded row. */}
+            <Box
+              component="a"
+              href={`#${sectionAnchorId('variations')}`}
+              sx={{ color: accent[700], fontWeight: 500, textDecoration: 'none', whiteSpace: 'nowrap', '&:hover': { textDecoration: 'underline' } }}
+            >
+              {t('field.editInVariations')}
+            </Box>
           </Box>
         ) : (
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: '200px 160px' }, gap: '16px', alignItems: 'start' }}>

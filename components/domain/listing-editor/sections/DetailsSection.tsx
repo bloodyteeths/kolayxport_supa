@@ -36,6 +36,18 @@ export interface DetailsSectionProps extends Partial<ListingSectionProps> {
 
 type PropsLoad = { status: LoadStatus | 'none'; props: TaxonomyProperty[] };
 
+/** "Primary color" → "primaryColor". Pure. */
+export function taxPropKey(name: string): string {
+  const words = name.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').trim().split(/\s+/).filter(Boolean);
+  return words.map((w, i) => (i ? w[0].toUpperCase() + w.slice(1) : w)).join('');
+}
+
+/** Etsy sends category detail names in English; show the translation when we have one (values stay as Etsy sends them). */
+function taxPropLabel(t: ReturnType<typeof useTranslations<'listingEditor'>>, name: string): string {
+  const key = `taxProp.${taxPropKey(name)}`;
+  return name && t.has(key as never) ? t(key as never) : name;
+}
+
 function PropertyField({ prop, value, onChange, disabled }: {
   prop: TaxonomyProperty;
   value: ListingPropertyValue | undefined;
@@ -52,7 +64,7 @@ function PropertyField({ prop, value, onChange, disabled }: {
   return (
     <Box sx={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <FormField label={prop.display_name} required={prop.is_required}>
+        <FormField label={taxPropLabel(t, prop.display_name)} required={prop.is_required}>
           <Combobox
             multiple
             value={selected}

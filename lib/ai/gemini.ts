@@ -9,7 +9,7 @@
 import { GoogleGenerativeAI, type Content, type Part } from '@google/generative-ai';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { modelChain, timeoutFor, type AiTier } from './models';
+import { modelChain, thinkingConfigFor, timeoutFor, type AiTier } from './models';
 import { cleanPrefText, mergePreferences, normalizePreference, preferencesBlock, type AiMarketplaceKey, type AiPreferenceValue } from './preferences';
 
 export type AiRefine = { previous: unknown; instruction: string };
@@ -160,6 +160,7 @@ export function getAiModel(opts: AiModelOptions) {
               generationConfig: {
                 ...(json ? { responseMimeType: 'application/json' } : {}),
                 ...(typeof opts.temperature === 'number' ? { temperature: opts.temperature } : {}),
+                ...(thinkingConfigFor(tier, modelName) ? { thinkingConfig: thinkingConfigFor(tier, modelName) } : {}),
               } as any,
             },
             { timeout: timeoutFor(tier) },

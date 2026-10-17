@@ -25,3 +25,15 @@ export function modelChain(tier: AiTier): string[] {
 export function timeoutFor(tier: AiTier): number {
   return tier === 'fast' ? 45_000 : tier === 'deep' ? 120_000 : 150_000;
 }
+
+/**
+ * Thinking for a model on a tier. Buttons ('fast'): thinking 'low' — benchmarked 2026-10-17 on the editor's title
+ * prompt (48 competitors): gemini-3.8-flash 18.1 s → 2.5 s with the same quality. Gemini 2.5 models take a token
+ * budget instead of a level. 'deep' keeps the model default (full thinking). Pure, exported for tests.
+ */
+export function thinkingConfigFor(tier: AiTier, model: string): Record<string, unknown> | undefined {
+  if (tier !== 'fast') return undefined;
+  if (/^gemini-2\.5/.test(model)) return { thinkingBudget: 512 };
+  if (/^gemini-(3|4|flash-latest|pro-latest|flash-lite-latest)/.test(model)) return { thinkingLevel: 'low' };
+  return undefined;
+}

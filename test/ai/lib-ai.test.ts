@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { isRetryableAiError, parseAiJson, refineContents, refineFromBody } from '@/lib/ai/gemini';
 import { mergePreferences, normalizePreference, preferencesBlock } from '@/lib/ai/preferences';
-import { modelChain } from '@/lib/ai/models';
+import { modelChain, thinkingConfigFor } from '@/lib/ai/models';
 
 describe('lib/ai', () => {
   it('model chains start with the benchmarked models and always end on an older fallback', () => {
@@ -9,6 +9,13 @@ describe('lib/ai', () => {
     expect(modelChain('deep')[0]).toBe('gemini-3.1-pro-preview');
     expect(modelChain('image')[0]).toBe('gemini-3-pro-image');
     for (const t of ['fast', 'deep', 'image'] as const) expect(modelChain(t).length).toBeGreaterThan(1);
+  });
+
+  it('buttons think low (3.x) / with a small budget (2.5); deep analysis keeps full thinking', () => {
+    expect(thinkingConfigFor('fast', 'gemini-3.8-flash')).toEqual({ thinkingLevel: 'low' });
+    expect(thinkingConfigFor('fast', 'gemini-flash-latest')).toEqual({ thinkingLevel: 'low' });
+    expect(thinkingConfigFor('fast', 'gemini-2.5-flash')).toEqual({ thinkingBudget: 512 });
+    expect(thinkingConfigFor('deep', 'gemini-3.1-pro-preview')).toBeUndefined();
   });
 
   it('falls back on retired / busy / timed-out models, not on bad requests', () => {

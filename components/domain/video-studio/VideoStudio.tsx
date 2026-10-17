@@ -785,7 +785,7 @@ export function VideoStudio() {
                 {cur.status === 'preparing' ? t('result.preparingHint') : t('result.runningHint')}
               </Box>
             ) : cur.status === 'failed' ? (
-              <Banner tone={cur.errorKey === 'videoChildPhoto' ? 'warning' : 'danger'} title={t(`result.error.${cur.errorKey === 'videoChildPhoto' ? 'childPhoto' : cur.errorKey === 'videoFiltered' ? 'filtered' : cur.errorKey === 'keyframeFailed' ? 'keyframe' : 'failed'}`)}>
+              <Banner tone={cur.errorKey === 'videoChildPhoto' ? 'warning' : 'danger'} title={t(`result.error.${cur.errorKey === 'videoChildPhoto' ? 'childPhoto' : cur.errorKey === 'videoFiltered' ? 'filtered' : cur.errorKey === 'keyframeFailed' ? 'keyframe' : cur.errorKey === 'videoWording' ? 'wording' : 'failed'}`)}>
                 {(cur.credits ?? 0) > 0 ? t('result.refunded', { count: f.num(cur.credits ?? 0) }) : undefined}
               </Banner>
             ) : (

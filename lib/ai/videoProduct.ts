@@ -15,7 +15,7 @@ import { modelChain } from './models';
 import { frameAt, shrink, videoDuration } from './videoSources';
 import type { VideoMedia } from './video';
 import type { VideoDirection } from './videoDirector';
-import { lockSentence, personSentence, sceneSentence } from './videoDirector';
+import { lockSentence, neutralPeople, personSentence, sceneSentence } from './videoDirector';
 
 export const MAX_PRODUCT_REFS = 10;
 
@@ -42,7 +42,7 @@ export function keyframePrompt(d: VideoDirection, opts: { which: 'start' | 'end'
     opts.which === 'end' && opts.hasStart
       ? `Image 1 is the first frame of a video. Create the LAST frame of the same continuous shot a few seconds later: the same ${d.person ? 'person, ' : ''}place, light and camera distance. ${endPoseFor(d)}`
       : `Create the first frame of a real product video: ${d.person ? 'the same person from the photos wearing or holding exactly this product, natural and relaxed, the whole product in frame' : 'the product fully in frame'}.`,
-    `${productImgs} are real photos of the product${d.product ? ` (${d.product})` : ''} from different angles.`,
+    `${productImgs} are real photos of the product${d.product ? ` (${d.person ? neutralPeople(d.product) : d.product})` : ''} from different angles.`,
     lockSentence(d.person, d.productKind),
     d.person ? personSentence(d) : '',
     opts.which === 'start' || !opts.hasStart ? sceneSentence(d) : '',

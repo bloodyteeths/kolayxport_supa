@@ -16624,7 +16624,8 @@
         "childPhoto": "Google didn't make a video from this photo (it shows a child).",
         "filtered": "Google refused this request for safety reasons. Try another photo or description.",
         "failed": "Couldn't make the video. Try again.",
-        "keyframe": "Could not build the frames from the photos. Try \"From my photo\"."
+        "keyframe": "Could not build the frames from the photos. Try \"From my photo\".",
+        "wording": "Google did not accept this shot's description. Pick another shot type and try again; your credits were refunded."
       },
       "preparing": "Building the frames from your photos…",
       "preparingHint": "AI rebuilds the product exactly from your photos, then the video starts (2–3 min).",

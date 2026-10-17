@@ -24,7 +24,7 @@ Status: the code is done on `gtm/overhaul`. The founder needs to provide the IDs
 | `connect_marketplace` | browser | `/ayarlar?success=<mp>_connected` after OAuth | `marketplace` |
 | `first_listing_optimized` | browser | first successful AI listing suggestion (`useListingAI`) | `marketplace` |
 | `begin_checkout` | browser | "Choose plan" on pricing (`useCheckout`) | `plan`, `interval`, `currency` |
-| `purchase` | server | Stripe `checkout.session.completed` (`pages/api/stripe/webhook.ts`) | `value`, `currency`, `plan`, `interval`, `event_id` = checkout session id |
+| `purchase` | server | Stripe `checkout.session.completed` (`pages/api/stripe/webhook.ts`): a subscription with a card on file, also when the remaining trial carries over (value = plan price) | `value`, `currency`, `plan`, `interval`, `event_id` = checkout session id |
 | `contact_submit` | browser | contact form | `location` |
 
 Meta mapping (server): `sign_up` → CompleteRegistration, `start_trial` → StartTrial, `begin_checkout` → InitiateCheckout, `purchase` → Purchase, `contact_submit` → Contact.

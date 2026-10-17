@@ -209,13 +209,17 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
             });
 
             // Funnel: server copy of `purchase` (consent + click ids captured at checkout, lib/tracking/server.ts).
+            // A subscription with a card on file is the conversion we optimise ads for, even when the remaining
+            // in-app trial carries over (amount_total 0): report the plan's price as the value.
+            const item = subscription.items.data[0]?.price;
+            const listValue = (item?.unit_amount ?? 0) / 100;
             await sendServerEvent({
-              name: subscription.status === 'trialing' ? 'start_trial' : 'purchase',
+              name: 'purchase',
               eventId: checkoutSession.id,
               email: checkoutSession.customer_details?.email ?? null,
               userId: user.id,
-              value: (checkoutSession.amount_total ?? 0) / 100,
-              currency: checkoutSession.currency || undefined,
+              value: (checkoutSession.amount_total ?? 0) > 0 ? (checkoutSession.amount_total ?? 0) / 100 : listValue,
+              currency: checkoutSession.currency || item?.currency || undefined,
               params: { plan: String(plan || ''), interval: String(interval) },
             }, contextFromMetadata(checkoutSession.metadata as Record<string, string>));
           }

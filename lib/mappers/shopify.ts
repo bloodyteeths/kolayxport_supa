@@ -68,7 +68,8 @@ export function toOrder(shopifyOrder: any, shopDomain?: string): UIOrder {
     channel: 'shopify' as OrderChannel,
     marketplace: 'shopify',
     marketplaceKey: String(shopifyOrder.id),
-    orderNumber: shopifyOrder.name || `#${shopifyOrder.order_number}`,
+    // Bare number: the orders UI adds its own '#' (was rendering '##1048').
+    orderNumber: String(shopifyOrder.name || shopifyOrder.order_number || '').replace(/^#/, ''),
     customerName,
     status: mapStatus(shopifyOrder),
     externalStatus: `${shopifyOrder.financial_status || ''}/${shopifyOrder.fulfillment_status || 'unfulfilled'}`,

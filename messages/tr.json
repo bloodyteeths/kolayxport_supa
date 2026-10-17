@@ -16731,7 +16731,8 @@
       "autoFixFailed": "Otomatik düzeltme yapılamadı; \"Bunları düzelt\" ile deneyin.",
       "autoFixShow": "Göster",
       "isAutoFix": "Bu sürüm kalite kontrolünün bulduğu farklara göre otomatik düzeltildi (ücretsiz).",
-      "autoFixSafer": "Ürün bu çekimde fazla değişti: daha güvenli bir çekimle (ürün sabit, kamera yaklaşıyor) otomatik yeniden hazırlanıyor (ücretsiz)."
+      "autoFixSafer": "Ürün bu çekimde fazla değişti: daha güvenli bir çekimle (ürün sabit, kamera yaklaşıyor) otomatik yeniden hazırlanıyor (ücretsiz).",
+      "autoFixNotBetter": "Otomatik düzeltme daha iyi olmadı: en iyi sürüm gösteriliyor. Farklı bir çekim türü deneyebilirsiniz."
     },
     "publish": {
       "button": "{marketplace} ilanına ekle",

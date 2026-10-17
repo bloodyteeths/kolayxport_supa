@@ -16731,7 +16731,8 @@
       "autoFixFailed": "The automatic fix could not run; try \"Fix these\".",
       "autoFixShow": "Show",
       "isAutoFix": "This version was corrected automatically from what the quality check found (free).",
-      "autoFixSafer": "The product changed too much in this shot: it is being remade automatically with a safer shot (product still, camera moving in), free."
+      "autoFixSafer": "The product changed too much in this shot: it is being remade automatically with a safer shot (product still, camera moving in), free.",
+      "autoFixNotBetter": "The automatic fix was not better: the best version is shown. You can try another shot type."
     },
     "publish": {
       "button": "Add to {marketplace} listing",

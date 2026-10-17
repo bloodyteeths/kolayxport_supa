@@ -78,8 +78,8 @@ const PRESET_ACTION: Record<VideoPreset, { person: string; product: string }> = 
     product: 'The product turns slowly through a full circle on a turntable as one rigid piece, showing every side.',
   },
   hero: {
-    person: 'The model stands naturally while the camera slowly moves in to a sharp hero shot of the product.',
-    product: 'The camera slowly moves in from a wide view to a sharp hero shot of the product, soft light gliding across its surface.',
+    person: 'The model stands naturally while the camera moves gently in to a sharp hero shot, the whole product still in frame.',
+    product: 'The camera moves gently in from a wide view to a sharp hero shot of the whole product, soft light gliding across its surface.',
   },
   detail: {
     person: 'Close-up shots glide slowly across the product while it is worn, showing its materials and details sharp and unchanged.',
@@ -238,6 +238,8 @@ export function directVideo(d: VideoDirection, changes: string[] = [], opts: { s
     product ? `The product: ${product}.` : '',
     lockSentence(d.person, d.productKind),
     d.preset === 'custom' && clean(d.shotText, 300) ? ppl(clean(d.shotText, 300)) : PRESET_ACTION[d.preset][who],
+    // A tight zoom past what the photos show makes Veo invent details (seen on a Wix dress: bodice made up, head cut).
+    d.preset === 'detail' ? '' : `The whole product${d.person ? ' and the model\'s head' : ''} stay in frame for the whole shot: no extreme close-ups, the camera never moves closer than the photos show.`,
     CAMERA[d.camera],
     MOTION[d.motion],
     d.person ? personSentence(d) : '',

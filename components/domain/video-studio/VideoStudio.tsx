@@ -548,12 +548,16 @@ export function VideoStudio() {
     setCurrent(bestInGroup.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bestInGroup?.id]);
+  // The fixed version is shown only when its check says it is better than the take's best variant.
+  const takeBest = groupMain ? jobs.filter((j) => j.groupId === groupMain.groupId).reduce((b, j) => Math.max(b, qaScore(j)), -1) : -1;
+  const fixBetter = Boolean(autoFixJob && autoFixJob.qa?.status === 'done' && qaScore(autoFixJob) > takeBest);
+  const fixWorse = Boolean(autoFixJob && (autoFixJob.qa?.status === 'done' || autoFixJob.qa?.status === 'failed') && !fixBetter);
   useEffect(() => {
-    if (!autoFixJob || autoFixJob.status !== 'done' || autoFixDone.current.has(autoFixJob.id)) return;
+    if (!autoFixJob || !fixBetter || autoFixDone.current.has(autoFixJob.id)) return;
     autoFixDone.current.add(autoFixJob.id);
     if (cur && cur.groupId === groupMain?.groupId) setCurrent(autoFixJob.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoFixJob?.id, autoFixJob?.status]);
+  }, [autoFixJob?.id, fixBetter]);
 
   const L = <K extends string>(group2: string, keys: readonly K[]) => keys.map((k) => ({ value: k, label: t(`${group2}.${k}` as 'title') }));
   const chips = [...(curDir.person ? [t('chip.expression')] : []), t('chip.slower'), t('chip.closer'), t('chip.showProduct'), t('chip.keepProduct'), t('chip.realer'), t('chip.staticCam')];
@@ -809,8 +813,8 @@ export function VideoStudio() {
             ) : null}
 
             {autoFixJob && autoFixJob.id !== cur?.id ? (
-              <Box sx={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', p: '10px', borderRadius: '8px', bgcolor: autoFixJob.status === 'done' ? tone.success.bg : accent[50], border: `1px solid ${autoFixJob.status === 'done' ? tone.success.border : accent[200]}` }} data-testid="video-autofix">
-                <Box sx={{ flex: 1, minWidth: 0, fontSize: 13, color: n[800] }}>{autoFixJob.status === 'done' ? t('qa.autoFixReady') : autoFixJob.status === 'failed' ? t('qa.autoFixFailed') : groupMain?.qa?.autoFixMode === 'safer' ? t('qa.autoFixSafer') : t('qa.autoFixRunning')}</Box>
+              <Box sx={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', p: '10px', borderRadius: '8px', bgcolor: fixBetter ? tone.success.bg : accent[50], border: `1px solid ${fixBetter ? tone.success.border : accent[200]}` }} data-testid="video-autofix">
+                <Box sx={{ flex: 1, minWidth: 0, fontSize: 13, color: n[800] }}>{fixBetter ? t('qa.autoFixReady') : fixWorse ? t('qa.autoFixNotBetter') : autoFixJob.status === 'failed' ? t('qa.autoFixFailed') : autoFixJob.status === 'done' ? t('qa.running') : groupMain?.qa?.autoFixMode === 'safer' ? t('qa.autoFixSafer') : t('qa.autoFixRunning')}</Box>
                 {autoFixJob.status === 'done' ? <Button variant="secondary" size="sm" onClick={() => setCurrent(autoFixJob.id)}>{t('qa.autoFixShow')}</Button> : null}
               </Box>
             ) : null}

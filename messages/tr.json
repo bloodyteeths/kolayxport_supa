@@ -16452,66 +16452,72 @@
     },
     "shot": {
       "title": "Çekim türü",
-      "backWarning": "Bu çekimde ürünün arkası görünür. Arka fotoğrafını bitiş karesi yapın veya \"Ürünü kilitle\"yi açın; yoksa yapay zekâ arkayı tahmin eder."
+      "backWarning": "Bu çekimde ürünün arkası görünür. Arka fotoğrafını bitiş karesi yapın veya \"Ürünü kilitle\"yi açın; yoksa yapay zekâ arkayı tahmin eder.",
+      "suggested": "Ürününüz için",
+      "thinking": "Ürününüze uygun çekimler hazırlanıyor…"
     },
     "preset": {
+      "turntable": {
+        "label": "360° tur",
+        "hint": "Her yanının fotoğrafı varsa en iyisi"
+      },
+      "hero": {
+        "label": "Vitrin çekimi",
+        "hint": "Kamera ürüne yavaşça yaklaşır"
+      },
+      "detail": {
+        "label": "Detay yakın çekim",
+        "hint": "Malzeme ve işçilik yakından"
+      },
+      "lifestyle": {
+        "label": "Kullanımda",
+        "hint": "Gerçek bir anda, doğal"
+      },
+      "flatlay": {
+        "label": "Üstten çekim",
+        "hint": "Yukarıdan, yavaş yaklaşma"
+      },
       "twirl": {
         "label": "Kendi etrafında dönüş",
-        "hint": "Model döner, etek açılır"
+        "hint": "Kişi döner, ürün her yönden görünür"
       },
       "walk": {
-        "label": "Podyum yürüyüşü",
-        "hint": "Kameraya doğru yürür, poz verir"
+        "label": "Yürüyüş",
+        "hint": "Kameraya doğru doğal adımlar"
       },
       "pose": {
         "label": "Doğal poz",
         "hint": "Gerçek çekim gibi poz değiştirir"
       },
-      "detail": {
-        "label": "Detay yakın çekim",
-        "hint": "Kumaş ve işçilik yakından"
+      "frontBack": {
+        "label": "Önden arkaya",
+        "hint": "Ön görünümden arkaya geçiş"
       },
       "hanger": {
-        "label": "Askıda esinti",
+        "label": "Askıda",
         "hint": "Askıda hafif dalgalanma"
-      },
-      "flatlay": {
-        "label": "Serili ürün",
-        "hint": "Yukarıdan, yavaş yaklaşma"
-      },
-      "turntable": {
-        "label": "360° tur",
-        "hint": "Her açıdan gösterir"
-      },
-      "lifestyle": {
-        "label": "Yaşam tarzı",
-        "hint": "Gerçek bir anda, doğal"
-      },
-      "frontBack": {
-        "label": "Önden arkaya geçiş",
-        "hint": "Ön görünümden arkaya"
       },
       "custom": {
         "label": "Serbest",
-        "hint": "Notlarınıza göre"
+        "hint": "Ek yönlendirmenize göre"
       }
     },
     "director": {
       "title": "Yönetmen ayarları",
-      "person": "Fotoğrafta model var",
-      "personHint": "Modelin canlı ve doğal görünmesi için ifade ve hareket ayarları açılır.",
+      "person": "Fotoğrafta kişi var",
+      "personHint": "Fotoğrafta ürünü giyen veya tutan biri var: ifade ve hareket ayarları açılır.",
       "expression": "İfade",
       "camera": "Kamera",
       "motion": "Hareket",
       "scene": "Ortam",
-      "scenePlaceholder": "ör. bahar bahçesinde piknik",
+      "scenePlaceholder": "ör. modern bir ofis masası, sabah ışığı",
       "light": "Işık",
       "audio": "Ses",
       "audioRemoved": "{marketplace} videoların sesini kaldırır: ses eklenmez.",
       "notes": "Ek yönlendirme (isteğe bağlı)",
-      "notesPlaceholder": "ör. kız annesinin elinden tutup yürüsün, sonunda kameraya gülümsesin",
+      "notesPlaceholder": "ör. ürün yavaşça dönsün, sonunda ön yüzü kameraya baksın",
       "avoid": "Kaçınılacaklar (isteğe bağlı)",
-      "avoidPlaceholder": "ör. başka çocuk, oyuncak",
+      "avoidPlaceholder": "ör. başka ürünler, eller",
       "look": "Görünüm",
       "motionHint": "Hızlı hareket ürün detaylarını değiştirebilir; en doğru sonuç için \"Hafif\".",
       "sceneNeedsScene": "Ortamı değiştirmek için \"Yeni sahne\"yi seçin; \"Fotoğrafımdan\" fotoğraftaki ortamı korur."
@@ -16545,8 +16551,9 @@
       "christmas": "Yılbaşı",
       "beach": "Plaj",
       "home": "Ev",
-      "custom": "Özel",
-      "aiHint": "Yeni ortamda ilk ve son kare, fotoğraflarınızdan yapay zekâ ile kurulur (+15 kredi kare başına)."
+      "custom": "Özel…",
+      "aiHint": "Yeni ortamda ilk ve son kare, fotoğraflarınızdan yapay zekâ ile kurulur (+15 kredi kare başına).",
+      "outdoor": "Dış mekân"
     },
     "light": {
       "daylight": "Gün ışığı",
@@ -16585,7 +16592,7 @@
       "best": "En gerçekçi"
     },
     "seconds": "{count} sn",
-    "consent": "Fotoğrafların hakları ve fotoğraftaki modellerin (çocuklarda velisinin) izni bende.",
+    "consent": "Fotoğrafların hakları ve fotoğraftaki kişilerin izni bende (çocuklar için velisinin).",
     "need": {
       "start": "Başlangıç karesi için bir fotoğraf seçin.",
       "photos": "En az bir ürün fotoğrafı veya videosu ekleyin."
@@ -16625,17 +16632,17 @@
     },
     "refine": {
       "title": "Değiştirmek istediğiniz bir şey var mı?",
-      "placeholder": "ör. kız daha çok gülümsesin, kamera biraz daha uzaktan çeksin",
+      "placeholder": "ör. kamera biraz daha uzaktan çeksin, ışık daha sıcak olsun",
       "send": "Yeni sürüm"
     },
     "chip": {
       "expression": "Daha doğal ifade, gülümsesin",
       "slower": "Daha yavaş hareket",
       "closer": "Daha yakın çekim",
-      "showDress": "Elbise daha çok görünsün",
-      "staticCam": "Kamera sabit kalsın",
-      "keepDress": "Elbise fotoğraftakiyle birebir aynı kalsın",
-      "realer": "Daha gerçek, telefon çekimi gibi"
+      "showProduct": "Ürün daha çok görünsün",
+      "keepProduct": "Ürün fotoğraftakiyle birebir aynı kalsın",
+      "realer": "Daha gerçek görünsün",
+      "staticCam": "Kamera sabit kalsın"
     },
     "action": {
       "extend": "+7 sn uzat",
@@ -16691,7 +16698,7 @@
     },
     "lock": {
       "label": "Ürünü kilitle",
-      "hint": "Model dönerken veya yürürken görünen taraf (ör. elbisenin arkası) yapay zekâ tarafından uydurulmaz: fotoğraflarınızdan son kare oluşturulur ve video ona varır. +15 kredi."
+      "hint": "Ürünün fotoğrafta görünmeyen tarafı (ör. arkası) yapay zekâ tarafından uydurulmaz: fotoğraflarınızdan son kare oluşturulur ve video ona varır. +15 kredi."
     },
     "look": {
       "phone": "Telefon çekimi",
@@ -16701,11 +16708,11 @@
     "lookHint": {
       "phone": "Satıcının telefonla çektiği gerçek bir video gibi: en az \"yapay zekâ\" hissi veren görünüm.",
       "studio": "Profesyonel fotoğrafçı çekimi gibi, temiz ve net.",
-      "cinematic": "Moda filmi gibi, sığ alan derinliği."
+      "cinematic": "Sinema filmi gibi, sığ alan derinliği."
     },
     "qualityHint": {
       "fast": "Hızlı ve uygun fiyatlı.",
-      "best": "Yüz, el ve kumaş en doğal hâliyle."
+      "best": "En doğal ışık, doku ve hareket."
     },
     "qa": {
       "title": "Kalite kontrolü",
@@ -16722,7 +16729,8 @@
       "autoFixReady": "Düzeltilmiş sürüm hazır.",
       "autoFixFailed": "Otomatik düzeltme yapılamadı; \"Bunları düzelt\" ile deneyin.",
       "autoFixShow": "Göster",
-      "isAutoFix": "Bu sürüm kalite kontrolünün bulduğu farklara göre otomatik düzeltildi (ücretsiz)."
+      "isAutoFix": "Bu sürüm kalite kontrolünün bulduğu farklara göre otomatik düzeltildi (ücretsiz).",
+      "autoFixSafer": "Ürün bu çekimde fazla değişti: daha güvenli bir çekimle (ürün sabit, kamera yaklaşıyor) otomatik yeniden hazırlanıyor (ücretsiz)."
     },
     "publish": {
       "button": "{marketplace} ilanına ekle",

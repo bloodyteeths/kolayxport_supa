@@ -29,12 +29,19 @@ describe('video director', () => {
     expect(p).toMatch(/hanger/);
     expect(p).toMatch(/Change 1: slower\. Change 2: closer\./);
   });
+  it('any product: an AI-suggested shot is used as the action; objects lock shape and printed logos, not fabric', () => {
+    const p = directVideo({ ...DEFAULT_DIRECTION, person: false, preset: 'custom', shotText: 'A slow macro glide over the chest piece of the stethoscope.', productKind: 'object' });
+    expect(p).toMatch(/macro glide over the chest piece/);
+    expect(p).toMatch(/printed text or logos/);
+    expect(p).not.toMatch(/\b(lace|embroidery|sleeves)\b/);
+    expect(negativePrompt({ person: false })).not.toMatch(/(^|, )logo(,|$)/);
+  });
   it('studio and cinematic looks change the intro', () => {
     expect(directVideo({ ...DEFAULT_DIRECTION, look: 'studio' })).toMatch(/professional photographer/);
     expect(directVideo({ ...DEFAULT_DIRECTION, look: 'cinematic' })).toMatch(/cinema camera/);
   });
   it('unknown client values fall back to defaults; old modes map to today\'s', () => {
-    expect(normalizeDirection({ preset: 'x', camera: 'drone', target: 'etsy', format: '1:1' })).toMatchObject({ preset: 'twirl', camera: 'auto', target: 'etsy', format: '1:1', look: 'phone', grain: true });
+    expect(normalizeDirection({ preset: 'x', camera: 'drone', target: 'etsy', format: '1:1' })).toMatchObject({ preset: 'turntable', camera: 'auto', target: 'etsy', format: '1:1', look: 'phone', grain: true });
     expect(normalizeDirection({ mode: 'reference' }).mode).toBe('scene');
     expect(normalizeDirection({ mode: 'interpolate' }).mode).toBe('image');
   });
@@ -45,7 +52,7 @@ describe('product lock keyframes', () => {
     const p = keyframePrompt({ ...DEFAULT_DIRECTION, preset: 'twirl' }, { which: 'end', refCount: 4, hasStart: true });
     expect(p).toMatch(/Image 1 is the first frame/);
     expect(p).toMatch(/Images 2–5 are real photos/);
-    expect(p).toMatch(/back of the outfit/);
+    expect(p).toMatch(/back of the product/);
     expect(p).toMatch(/Never add, remove, move or redesign/);
   });
   it('the start keyframe puts the product in the chosen scene', () => {

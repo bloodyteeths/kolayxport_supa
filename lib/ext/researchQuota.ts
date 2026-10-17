@@ -43,7 +43,8 @@ const HOUR_MS = 60 * 60 * 1000;
 export const RESEARCH_TTL = { search: 6 * HOUR_MS, detail: 24 * HOUR_MS } as const;
 
 export const UPGRADE_URL = 'https://kolayxport.com/plan';
-export const SIGNUP_URL = 'https://kolayxport.com/login?mode=signup&utm_source=extension&utm_medium=limit';
+// Sign-in (the login page also offers sign-up). No trial wording: Shopify-connected accounts must never see trials.
+export const SIGNUP_URL = 'https://kolayxport.com/login?utm_source=extension&utm_medium=limit';
 
 /** Share of the daily marketplace budget after which only cached data is served. */
 export const BRAKE_RATIO = 0.8;
@@ -211,19 +212,31 @@ export interface ResearchLimitBody {
   limit: number;
   used: number;
   resetAt: string;
-  upgradeUrl: string;
+  /** null = no upgrade offer (Shopify-connected accounts: Shopify bills them, never Stripe). */
+  upgradeUrl: string | null;
 }
 
-async function userDailyLimit(userId: string, now: Date): Promise<number> {
+/**
+ * Shopify-connected accounts (shopify_free) are billed by Shopify, so they must never see Stripe, plans or
+ * upgrade prompts (App Store review 1.2.1). They get a generous cap and a neutral "resets tomorrow" card.
+ */
+export const SHOPIFY_FREE_RESEARCH_DAILY = 500;
+
+async function userDailyInfo(userId: string, now: Date): Promise<{ limit: number; shopify: boolean }> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { subscriptionPlan: true, subscriptionStatus: true, trialExpiresAt: true },
   });
-  if (!user) return 0;
-  return getExtResearchDailyLimit(user.subscriptionPlan, user.subscriptionStatus, user.trialExpiresAt, now).limit;
+  if (!user) return { limit: 0, shopify: false };
+  const r = getExtResearchDailyLimit(user.subscriptionPlan, user.subscriptionStatus, user.trialExpiresAt, now);
+  if (r.plan === 'shopify_free') return { limit: SHOPIFY_FREE_RESEARCH_DAILY, shopify: true };
+  return { limit: r.limit, shopify: false };
 }
 
-/** Today's lookups for a user (for responses that did not charge). */
+async function userDailyLimit(userId: string, now: Date): Promise<number> {
+  return (await userDailyInfo(userId, now)).limit;
+}
+
 export async function getResearchQuota(userId: string, now: Date = new Date()): Promise<QuotaInfo | null> {
   try {
     const { day, resetAt } = istanbulDay(now);
@@ -235,14 +248,14 @@ export async function getResearchQuota(userId: string, now: Date = new Date()): 
   }
 }
 
-export function limitBody(reason: ResearchLimitReason, used: number, limit: number, resetAt: Date): ResearchLimitBody {
+export function limitBody(reason: ResearchLimitReason, used: number, limit: number, resetAt: Date, opts: { noUpgrade?: boolean } = {}): ResearchLimitBody {
   return {
     error: 'research_limit',
     reason,
     limit,
     used,
     resetAt: resetAt.toISOString(),
-    upgradeUrl: reason === 'signed_out' ? SIGNUP_URL : UPGRADE_URL,
+    upgradeUrl: opts.noUpgrade ? null : reason === 'signed_out' ? SIGNUP_URL : UPGRADE_URL,
   };
 }
 
@@ -346,7 +359,7 @@ export async function withResearchQuota(
     }
   } else {
     try {
-      const limit = await userDailyLimit(userId, now);
+      const { limit, shopify } = await userDailyInfo(userId, now);
       const pv = pageViewId(opts.req);
       let chargeThis = true;
       if (pv) {
@@ -360,7 +373,7 @@ export async function withResearchQuota(
         if (used > limit) {
           await bumpCounter(userId, quotaKey(day), -1, counterExpiry, now);
           if (pvKey) await bumpCounter(userId, pvKey, -1, new Date(now.getTime() + PAGE_VIEW_TTL_MS), now);
-          return { kind: 'limited', status: 429, body: limitBody('user_daily', Math.min(used - 1, limit), limit, resetAt) };
+          return { kind: 'limited', status: 429, body: limitBody('user_daily', Math.min(used - 1, limit), limit, resetAt, { noUpgrade: shopify }) };
         }
         charged = true;
         quota = { used, limit, resetAt: resetAt.toISOString() };

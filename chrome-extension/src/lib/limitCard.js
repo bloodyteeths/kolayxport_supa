@@ -15,7 +15,7 @@
   'use strict';
 
   var UPGRADE_URL = 'https://kolayxport.com/plan';
-  var SIGNUP_URL = 'https://kolayxport.com/login?mode=signup&utm_source=extension&utm_medium=limit';
+  var SIGNUP_URL = 'https://kolayxport.com/login?utm_source=extension&utm_medium=limit';
   var REASONS = { user_daily: 1, global_brake: 1, signed_out: 1 };
 
   // Language: lib/lang.js (stored choice → account language → 'tr'), read at render time.
@@ -33,9 +33,9 @@
       userTitle: 'Günlük araştırma hakkınız doldu',
       userSub: "Yarın 00:00'da yenilenir.",
       upgrade: 'Planınızı yükseltin',
-      signedOutTitle: 'Araştırma için ücretsiz deneyin',
-      signedOutSub: 'KolayXport hesabınızla tüm araştırma verilerini görün.',
-      trial: '14 gün ücretsiz deneyin',
+      signedOutTitle: 'KolayXport hesabınıza giriş yapın',
+      signedOutSub: 'Araştırma verileri KolayXport hesabınızla görünür. Giriş yaptıktan sonra bu sayfayı yenileyin.',
+      trial: 'Giriş yap',
       brakeTitle: 'Yoğunluk nedeniyle şu an yalnızca önbellekteki veriler gösteriliyor, birazdan tekrar deneyin',
       usage: 'Bugün: {used} / {limit} araştırma',
     },
@@ -43,9 +43,9 @@
       userTitle: 'Daily research limit reached',
       userSub: 'Resets at 00:00 tomorrow.',
       upgrade: 'Upgrade plan',
-      signedOutTitle: 'Try research for free',
-      signedOutSub: 'See all research data with a KolayXport account.',
-      trial: 'Try free for 14 days',
+      signedOutTitle: 'Sign in to your KolayXport account',
+      signedOutSub: 'Research data is shown with your KolayXport account. Refresh this page after signing in.',
+      trial: 'Sign in',
       brakeTitle: 'High demand: only cached data is shown right now, please try again shortly',
       usage: 'Today: {used} / {limit} lookups',
     },
@@ -138,7 +138,8 @@
       title = t('userTitle');
       sub = t('userSub');
       if (info && Number(info.limit) > 0) sub += ' ' + t('usage', { used: Math.min(Number(info.used) || 0, Number(info.limit)), limit: info.limit });
-      button = t('upgrade');
+      // upgradeUrl: null = no upgrade offer (Shopify-connected accounts): neutral "resets tomorrow" only.
+      button = info && info.upgradeUrl === null ? null : t('upgrade');
     }
     var titleEl = node(doc, 'span', title, 'font-weight:700;color:#222;');
     titleEl.className = 'kx-limit-title';

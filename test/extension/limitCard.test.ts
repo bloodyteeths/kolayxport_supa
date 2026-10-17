@@ -19,7 +19,7 @@ const limitBody = (reason: string, extra: Record<string, unknown> = {}) => ({
   limit: 150,
   used: 150,
   resetAt: RESET,
-  upgradeUrl: reason === 'signed_out' ? 'https://kolayxport.com/login?mode=signup&utm_source=extension&utm_medium=limit' : 'https://kolayxport.com/plan',
+  upgradeUrl: reason === 'signed_out' ? 'https://kolayxport.com/login?utm_source=extension&utm_medium=limit' : 'https://kolayxport.com/plan',
   ...extra,
 });
 /** What background-simple.js hands the content script for a 429 research-limit answer. */
@@ -116,11 +116,11 @@ describe('Etsy overlays', () => {
       (m) => (m.type === 'kx_listing_stats' ? { error: 'NOT_AUTHENTICATED', status: 401 } : null), null);
     const so = await waitFor(() => cardIn(b.doc.getElementById('kx-listing-stats')));
     expect(so.getAttribute('data-kx-limit')).toBe('signed_out');
-    expect(norm(so.textContent)).toContain('Araştırma için ücretsiz deneyin');
+    expect(norm(so.textContent)).toContain('KolayXport hesabınıza giriş yapın');
     const btn = so.querySelector('.kx-limit-upgrade') as HTMLButtonElement;
-    expect(btn.textContent).toBe('14 gün ücretsiz deneyin');
+    expect(btn.textContent).toBe('Giriş yap');
     btn.click();
-    expect(b.opened).toEqual(['https://kolayxport.com/login?mode=signup&utm_source=extension&utm_medium=limit']);
+    expect(b.opened).toEqual(['https://kolayxport.com/login?utm_source=extension&utm_medium=limit']);
   });
 
   it('shop bar: global brake → busy card without an upgrade button', async () => {
@@ -129,6 +129,14 @@ describe('Etsy overlays', () => {
     const card = await waitFor(() => cardIn(shadowOf(doc, 'kx-shop-overlay')));
     expect(card.getAttribute('data-kx-limit')).toBe('global_brake');
     expect(norm(card.textContent)).toContain('Yoğunluk nedeniyle şu an yalnızca önbellekteki veriler gösteriliyor, birazdan tekrar deneyin');
+    expect(card.querySelector('.kx-limit-upgrade')).toBeNull();
+  });
+
+  it('upgradeUrl: null (Shopify-connected) → neutral card without an upgrade button', async () => {
+    const { doc } = boot('https://www.etsy.com/shop/MyShop', '', [...ETSY, 'content-shop.js'],
+      (m) => (m.type === 'kx_research' ? { error: 'research_limit', status: 429, limit: { error: 'research_limit', reason: 'user_daily', limit: 500, used: 500, resetAt: '2026-10-18T21:00:00.000Z', upgradeUrl: null } } : null), 'tr');
+    const card = await waitFor(() => cardIn(shadowOf(doc, 'kx-shop-overlay')));
+    expect(norm(card.textContent)).toContain("Yarın 00:00'da yenilenir.");
     expect(card.querySelector('.kx-limit-upgrade')).toBeNull();
   });
 

@@ -6,6 +6,7 @@ import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { logSecurityEvent, logIntegrationEvent } from '@/lib/admin/events';
 import { verifyShopifyHmac, readRawBody } from '@/lib/integrations/shopify/verifyWebhook';
+import { deleteShopOrders, redactCustomerOrders } from '@/lib/integrations/shopify/redact';
 
 export const config = { api: { bodyParser: false } };
 
@@ -79,23 +80,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
       break;
 
-    case 'customers/redact':
+    case 'customers/redact': {
+      // Strip the customer's personal data from the orders Shopify lists.
+      let redacted = 0;
+      if (shopDomain) {
+        try {
+          redacted = await redactCustomerOrders(shopDomain, Array.isArray(payload.orders_to_redact) ? payload.orders_to_redact : []);
+        } catch (err: any) {
+          logger.error('Shopify customers/redact failed', err, { shopDomain });
+        }
+      }
       logIntegrationEvent('info', {
-        message: 'Shopify customers/redact received',
+        message: 'Shopify customers/redact processed',
         operation: 'shopify.compliance.customer_redact',
         details: {
           shopDomain,
           customerIdSuffix: String(payload.customer?.id ?? '').slice(-4),
+          redacted,
         },
       });
       break;
+    }
 
     case 'shop/redact': {
-      // Sent 48h after uninstall: drop the shop, its synced products (cascade)
-      // and the legacy token copy on Credential.
+      // Sent 48h after uninstall: drop the shop's synced orders, the shop, its synced products (cascade)
+      // and the legacy token copy on Credential. Orders first: they are found through the shop's user.
       let shopsDeleted = 0;
+      let ordersDeleted = 0;
       if (shopDomain) {
         try {
+          ordersDeleted = await deleteShopOrders(shopDomain);
           shopsDeleted = (await prisma.shopifyShop.deleteMany({ where: { shopDomain } })).count;
           await prisma.credential.updateMany({
             where: { shopifyShopDomain: shopDomain },
@@ -108,7 +122,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       logIntegrationEvent('info', {
         message: 'Shopify shop/redact processed',
         operation: 'shopify.compliance.shop_redact',
-        details: { shopDomain, shopId: payload.shop_id, shopsDeleted },
+        details: { shopDomain, shopId: payload.shop_id, shopsDeleted, ordersDeleted },
       });
       break;
     }

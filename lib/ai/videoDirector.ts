@@ -78,8 +78,8 @@ const PRESET_ACTION: Record<VideoPreset, { person: string; product: string }> = 
     product: 'The product turns slowly through a full circle on a turntable as one rigid piece, showing every side.',
   },
   hero: {
-    person: 'The model stands naturally while the camera slowly moves in to a sharp hero shot of the product.',
-    product: 'The camera slowly moves in from a wide view to a sharp hero shot of the product, soft light gliding across its surface.',
+    person: 'The model stands naturally while the camera moves gently in to a sharp hero shot, the whole product still in frame.',
+    product: 'The camera moves gently in from a wide view to a sharp hero shot of the whole product, soft light gliding across its surface.',
   },
   detail: {
     person: 'Close-up shots glide slowly across the product while it is worn, showing its materials and details sharp and unchanged.',
@@ -183,18 +183,36 @@ const AUDIO: Record<VideoDirection['audio'], string> = {
 
 const clean = (s: unknown, max: number) => (typeof s === 'string' ? s.replace(/[`{}<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max) : '');
 
+/**
+ * Words about who the model is ("girl", "child", "kız çocuk", "bebek") → "the model". Google's prompt filter rejects
+ * prompts that mix them with body / skin words ("This prompt contains sensitive words", seen 2026-10-17 on a Turkish
+ * "Kız Çocuk Elbisesi" title); the photos already show who it is. Pure, exported for tests.
+ */
+export function neutralPeople(text: string): string {
+  return text
+    .replace(/\bflower[\s-]+girls?\b/gi, 'formal')
+    .replace(/\b(little|young|small)\s+(girl|boy|child|kid)s?\b/gi, 'the model')
+    .replace(/\b(girls?|boys?|child(ren)?|kids?|toddlers?|bab(y|ies)|infants?|teen(ager)?s?|daughter|son)\b/gi, 'model')
+    .replace(/(kız|erkek)\s+çocu[kğ]\w*/gi, '')
+    .replace(/\b(kız|çocu[kğ]\w*|bebe[kğ]\w*|oğlan)\b/gi, '')
+    .replace(/\bmodel\s+model\b/gi, 'model')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /** "The product is exactly the one in the photos" — an instruction, never a description. Pure. */
 export function lockSentence(person: boolean, kind?: VideoDirection['productKind']): string {
+  // (No "body" / "skin" / "age" words for people: see neutralPeople.)
   const detail = kind === 'worn'
     ? 'the same cut, colours, fabric, pattern, prints, lace, embroidery and embellishments (same number, size and position), sleeves, neckline, fastenings and length'
     : 'the same shape, proportions, colours, materials, textures, parts, buttons and any printed text or logos';
   return `The product must be exactly the one in the photos in every frame: ${detail}. Never add, remove, move or redesign any detail.`
-    + (person ? ' Keep the same person: the same face, hair, skin tone, age and body.' : '');
+    + (person ? ' Keep the same model exactly as in the photos: the same face, hair and look.' : '');
 }
 
 /** How a real person behaves on camera. Pure. */
 export function personSentence(d: Pick<VideoDirection, 'expression'>): string {
-  return `The person behaves like a real person being filmed: ${EXPRESSION[d.expression]}, natural blinking, real breathing, small spontaneous head and hand movements, relaxed posture. Real skin texture with no retouching or beauty filter, natural hair, correct hands and fingers. Never a frozen, blank or doll-like face.`;
+  return `The model behaves naturally, like a real person being filmed: ${EXPRESSION[d.expression]}, natural blinking, small spontaneous head and hand movements, relaxed posture. A natural, unretouched look with no beauty filter, natural hair, correct hands and fingers. Never a frozen, blank or doll-like face.`;
 }
 
 export function sceneSentence(d: Pick<VideoDirection, 'scene' | 'sceneText' | 'light'>): string {
@@ -203,15 +221,25 @@ export function sceneSentence(d: Pick<VideoDirection, 'scene' | 'sceneText' | 'l
 }
 
 /** The full English prompt for Veo. `changes` are the follow-ups asked so far (oldest first). Pure. */
-export function directVideo(d: VideoDirection, changes: string[] = []): string {
+export function directVideo(d: VideoDirection, changes: string[] = [], opts: { safe?: boolean } = {}): string {
   const who = d.person ? 'person' : 'product';
-  const product = clean(d.product, 160);
+  const ppl = (t: string) => (d.person ? neutralPeople(t) : t);
+  const product = ppl(clean(d.product, 160));
+  if (opts.safe) {
+    // Google refused the wording once: the plainest prompt (no seller text, no AI shot, no person details).
+    const preset = d.preset === 'custom' ? (d.person ? 'pose' : 'hero') : d.preset;
+    return [LOOK[d.look]?.intro ?? LOOK.phone.intro, lockSentence(d.person, d.productKind), PRESET_ACTION[preset][who], MOTION[d.motion],
+      'Everything moves at real-time speed with real weight and physics; nothing morphs, melts or flickers.', sceneSentence(d),
+      'No added captions, subtitles, logos or watermarks.'].filter(Boolean).join(' ');
+  }
   const look = LOOK[d.look] ?? LOOK.phone;
   const parts: string[] = [
     look.intro,
     product ? `The product: ${product}.` : '',
     lockSentence(d.person, d.productKind),
-    d.preset === 'custom' && clean(d.shotText, 300) ? clean(d.shotText, 300) : PRESET_ACTION[d.preset][who],
+    d.preset === 'custom' && clean(d.shotText, 300) ? ppl(clean(d.shotText, 300)) : PRESET_ACTION[d.preset][who],
+    // A tight zoom past what the photos show makes Veo invent details (seen on a Wix dress: bodice made up, head cut).
+    d.preset === 'detail' ? '' : `The whole product${d.person ? ' and the model\'s head' : ''} stay in frame for the whole shot: no extreme close-ups, the camera never moves closer than the photos show.`,
     CAMERA[d.camera],
     MOTION[d.motion],
     d.person ? personSentence(d) : '',
@@ -220,9 +248,9 @@ export function directVideo(d: VideoDirection, changes: string[] = []): string {
     sceneSentence(d),
     look.finish,
   ];
-  const notes = clean(d.notes, 800);
+  const notes = ppl(clean(d.notes, 800));
   if (notes) parts.push(notes);
-  changes.map((c) => clean(c, 400)).filter(Boolean).forEach((c, i) => parts.push(`Change ${i + 1}: ${c}.`));
+  changes.map((c) => ppl(clean(c, 400))).filter(Boolean).forEach((c, i) => parts.push(`Change ${i + 1}: ${c}.`));
   parts.push('No added captions, subtitles, logos or watermarks (keep the product\'s own text and logos as in the photos).');
   if (AUDIO[d.audio]) parts.push(AUDIO[d.audio]);
   return parts.filter(Boolean).join(' ');
@@ -239,7 +267,7 @@ export function negativePrompt(d: Pick<VideoDirection, 'avoid' | 'person'>): str
   ];
   // No person in the photos: no hands reaching in to hold the product (seen on an eBay statue video).
   if (!d.person) base.push('hands', 'fingers', 'people');
-  if (d.person) base.push('plastic or waxy skin', 'airbrushed skin', 'beauty filter', 'uncanny face', 'dead eyes', 'frozen expression', 'distorted face', 'deformed hands', 'extra fingers', 'extra limbs');
+  if (d.person) base.push('plastic look', 'airbrushed look', 'beauty filter', 'uncanny face', 'dead eyes', 'frozen expression', 'distorted face', 'deformed hands', 'extra fingers', 'extra limbs');
   const extra = clean(d.avoid, 300);
   return [...base, ...(extra ? [extra] : [])].join(', ');
 }

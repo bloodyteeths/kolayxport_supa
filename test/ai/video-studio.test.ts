@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { directVideo, negativePrompt, normalizeDirection, DEFAULT_DIRECTION } from '@/lib/ai/videoDirector';
+import { directVideo, negativePrompt, neutralPeople, normalizeDirection, DEFAULT_DIRECTION } from '@/lib/ai/videoDirector';
 import { VIDEO_TARGET_PROFILES, generationAspect, videoReadiness } from '@/lib/ai/videoTargets';
 import { ffmpegArgs, finishArgs, veoConstraints, veoRequest } from '@/lib/ai/video';
 import { keyframePrompt, matchWindow, normalizePhotoAnalysis, normalizeQa } from '@/lib/ai/videoProduct';
@@ -9,7 +9,7 @@ const img = { data: 'AAA', mimeType: 'image/jpeg' };
 describe('video director', () => {
   it('reads as real footage: real-time speed, real skin, phone look; the product is locked to the photos, never described', () => {
     const p = directVideo({ ...DEFAULT_DIRECTION, person: true, expression: 'joyful', product: 'pink flower girl dress' });
-    expect(p).toMatch(/pink flower girl dress/);
+    expect(p).toMatch(/pink formal dress/);
     expect(p).toMatch(/joyful/);
     expect(p).toMatch(/Never a frozen, blank or doll-like face/);
     expect(p).toMatch(/exactly the one in the photos in every frame/);
@@ -17,11 +17,11 @@ describe('video director', () => {
     expect(p).toMatch(/handheld footage/);
     expect(p).not.toMatch(/phone/i);
     expect(negativePrompt({ person: false })).toMatch(/camera app interface/);
-    expect(p).toMatch(/no retouching or beauty filter/);
+    expect(p).toMatch(/unretouched look with no beauty filter/);
     const neg = negativePrompt({ person: true });
     expect(neg).toMatch(/frozen expression/);
     expect(neg).toMatch(/slow motion/);
-    expect(neg).toMatch(/plastic or waxy skin/);
+    expect(neg).toMatch(/plastic look/);
   });
   it('product-only shots drop the person lines; follow-ups are numbered', () => {
     const p = directVideo({ ...DEFAULT_DIRECTION, person: false, preset: 'hanger' }, ['slower', 'closer']);
@@ -35,6 +35,15 @@ describe('video director', () => {
     expect(p).toMatch(/printed text or logos/);
     expect(p).not.toMatch(/\b(lace|embroidery|sleeves)\b/);
     expect(negativePrompt({ person: false })).not.toMatch(/(^|, )logo(,|$)/);
+  });
+  it('who the model is never goes into the prompt (Google refuses child + body wording)', () => {
+    expect(neutralPeople('Pembe Rebecca Kız Çocuk Elbisesi')).toBe('Pembe Rebecca Elbisesi');
+    expect(neutralPeople('Camera pushes slowly in toward the girl in the pink gown')).toBe('Camera pushes slowly in toward the model in the pink gown');
+    expect(neutralPeople('Quince Girl Gown, Dusty Pink Flower Girl Dress')).toBe('Quince model Gown, Dusty Pink formal Dress');
+    const p = directVideo({ ...DEFAULT_DIRECTION, person: true, product: 'Kız Çocuk Abiye', preset: 'custom', shotText: 'The little girl twirls' });
+    expect(p).not.toMatch(/\b(girl|child|body|skin|breathing)\b|kız|çocuk/i);
+    const safe = directVideo({ ...DEFAULT_DIRECTION, person: true, notes: 'kız gülsün' }, ['the girl smiles'], { safe: true });
+    expect(safe).not.toMatch(/girl|kız|Change 1/);
   });
   it('studio and cinematic looks change the intro', () => {
     expect(directVideo({ ...DEFAULT_DIRECTION, look: 'studio' })).toMatch(/professional photographer/);

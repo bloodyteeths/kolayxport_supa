@@ -22,6 +22,7 @@
  * Image adds are not idempotent: after a failure the stored draft keeps only the adds that did not succeed
  * (`remainingPatch`), so a Retry never uploads a photo twice.
  */
+import { logger } from '@/lib/logger';
 import prisma from '@/lib/prisma';
 import { ShopifyClient, getValidAccessToken } from '@/lib/integrations/shopifyClient';
 import { resolveImageId } from '@/lib/integrations/shopifyImageIds';
@@ -199,6 +200,7 @@ export function createShopifySession(
         wrote = true;
         if (o.op === 'add') added.add(o.src);
       } catch (err) {
+        logger.warn('Shopify image op failed', { productId, op: o.op, error: String((err as any)?.message || err).slice(0, 400) });
         failed.push({ index: indexOf(o), op: o.op, key: toExecutorError(err).errorKey });
       }
     };

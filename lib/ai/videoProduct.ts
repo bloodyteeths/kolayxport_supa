@@ -15,7 +15,7 @@ import { modelChain } from './models';
 import { frameAt, shrink, videoDuration } from './videoSources';
 import type { VideoMedia } from './video';
 import type { VideoDirection } from './videoDirector';
-import { lockSentence, personSentence, sceneSentence } from './videoDirector';
+import { lockSentence, neutralPeople, personSentence, sceneSentence } from './videoDirector';
 
 export const MAX_PRODUCT_REFS = 10;
 
@@ -42,7 +42,7 @@ export function keyframePrompt(d: VideoDirection, opts: { which: 'start' | 'end'
     opts.which === 'end' && opts.hasStart
       ? `Image 1 is the first frame of a video. Create the LAST frame of the same continuous shot a few seconds later: the same ${d.person ? 'person, ' : ''}place, light and camera distance. ${endPoseFor(d)}`
       : `Create the first frame of a real product video: ${d.person ? 'the same person from the photos wearing or holding exactly this product, natural and relaxed, the whole product in frame' : 'the product fully in frame'}.`,
-    `${productImgs} are real photos of the product${d.product ? ` (${d.product})` : ''} from different angles.`,
+    `${productImgs} are real photos of the product${d.product ? ` (${d.person ? neutralPeople(d.product) : d.product})` : ''} from different angles.`,
     lockSentence(d.person, d.productKind),
     d.person ? personSentence(d) : '',
     opts.which === 'start' || !opts.hasStart ? sceneSentence(d) : '',
@@ -275,7 +275,7 @@ export async function analyzePhotos(userId: string, refs: VideoMedia[], ctx: { t
         'For each image (in order) return: view = "front" | "back" | "side" | "detail" (a close-up where the whole product is not visible) | "flat" (laid flat or on a hanger) | "other"; fullBody = true when the whole product — and the whole person wearing or holding it, if any — is in the photo; person = true when a person wears or holds it; quality 0–10 (sharp, well lit, usable as a video frame).',
         'Pick start = the number of the best photo to open the video (the whole product, front, sharp) and end = the number of the best back view of the same product, person and setting (null if there is none).',
         'product: kind = "worn" for clothing, shoes, jewellery or accessories worn by a person, otherwise "object"; category = 2–4 English words.',
-        `shots: 5 video shots that suit THIS product and these photos — what a good e-commerce videographer would film for it. AI video invents every side the photos do not show, so: never turn or rotate an object unless the photos show its back and sides; prefer the CAMERA moving around a still product (a slow push-in, a gentle arc of at most 30 degrees, a rising or lowering move), light gliding across it, a macro glide over a key detail, the product in use or in its natural place; for a worn product, the person moving naturally. Physically simple, real-time, the product always recognisable and rigid. Order them safest first. Each: label (≤ 4 words, ${lang}), hint (≤ 8 words, ${lang}), action (one English sentence of what happens on camera), showsBack (true only if the shot ends showing the back, which must be in the photos).`,
+        `shots: 5 video shots that suit THIS product and these photos — what a good e-commerce videographer would film for it. AI video invents every side the photos do not show, so: never turn or rotate an object unless the photos show its back and sides; prefer the CAMERA moving around a still product (a slow push-in, a gentle arc of at most 30 degrees, a rising or lowering move), light gliding across it, a macro glide over a key detail, the product in use or in its natural place; for a worn product, the person moving naturally. Physically simple, real-time, the product always recognisable and rigid; keep the whole product in frame (a close-up only of a part a detail photo shows). Order them safest first. Each: label (≤ 4 words, ${lang}), hint (≤ 8 words, ${lang}), action (one English sentence of what happens on camera), showsBack (true only if the shot ends showing the back, which must be in the photos).`,
         `scenes: 4 real settings where this product would naturally be filmed. Each: label (≤ 3 words, ${lang}), prompt (one English sentence describing the place and light).`,
         'Return JSON: {"photos": [{"view","fullBody","person","quality"}], "start": number, "end": number | null, "product": {"kind","category"}, "shots": [{"label","hint","action","showsBack"}], "scenes": [{"label","prompt"}]}',
       ].join('\n'),

@@ -16624,7 +16624,8 @@
         "childPhoto": "Google bu fotoğraftan video oluşturmadı (fotoğrafta çocuk var).",
         "filtered": "Google bu isteği güvenlik nedeniyle reddetti. Başka bir fotoğraf veya açıklama deneyin.",
         "failed": "Video oluşturulamadı. Tekrar deneyin.",
-        "keyframe": "Fotoğraflardan kare oluşturulamadı. \"Fotoğrafımdan\" ile deneyin."
+        "keyframe": "Fotoğraflardan kare oluşturulamadı. \"Fotoğrafımdan\" ile deneyin.",
+        "wording": "Google bu çekimin açıklamasını kabul etmedi. Başka bir çekim türü seçip tekrar deneyin; krediniz iade edildi."
       },
       "preparing": "Kareler fotoğraflarınızdan hazırlanıyor…",
       "preparingHint": "Yapay zekâ ürünü fotoğraflarınızdan birebir kuruyor, ardından video başlar (2–3 dakika).",
@@ -16730,7 +16731,8 @@
       "autoFixFailed": "Otomatik düzeltme yapılamadı; \"Bunları düzelt\" ile deneyin.",
       "autoFixShow": "Göster",
       "isAutoFix": "Bu sürüm kalite kontrolünün bulduğu farklara göre otomatik düzeltildi (ücretsiz).",
-      "autoFixSafer": "Ürün bu çekimde fazla değişti: daha güvenli bir çekimle (ürün sabit, kamera yaklaşıyor) otomatik yeniden hazırlanıyor (ücretsiz)."
+      "autoFixSafer": "Ürün bu çekimde fazla değişti: daha güvenli bir çekimle (ürün sabit, kamera yaklaşıyor) otomatik yeniden hazırlanıyor (ücretsiz).",
+      "autoFixNotBetter": "Otomatik düzeltme daha iyi olmadı: en iyi sürüm gösteriliyor. Farklı bir çekim türü deneyebilirsiniz."
     },
     "publish": {
       "button": "{marketplace} ilanına ekle",

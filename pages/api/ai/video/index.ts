@@ -35,7 +35,9 @@ const STALE_MS = 20 * 60 * 1000;
 const TURNING = new Set(['twirl', 'turntable', 'frontBack', 'walk', 'pose', 'lifestyle']);
 
 type Job = NonNullable<Awaited<ReturnType<typeof prisma.aiVideoJob.findFirst>>>;
-type Dir = VideoDirection & { genAspect?: '9:16' | '16:9'; variants?: number; locale?: 'tr' | 'en'; autoFixOf?: string };
+type Dir = VideoDirection & { genAspect?: '9:16' | '16:9'; variants?: number; locale?: 'tr' | 'en'; autoFixOf?: string; safeRetry?: boolean };
+
+const WORDING_REFUSED = /sensitive words|responsible ai|prompt could not be submitted/i;
 
 export function viewJob(j: Job) {
   return {
@@ -123,7 +125,9 @@ async function refresh(job: Job): Promise<Job> {
     const ms = Date.now() - new Date(job.createdAt).getTime();
     if (!r.ok) {
       void logUsage({ userId: job.userId, feature: 'video.generate', model: job.model, ok: false, ms, refine: Boolean(job.parentId), error: r.detail });
-      return failJob(job, r.errorKey, r.detail);
+      // Google refused the wording (not the photos): retry once by itself with the plainest prompt, same frames.
+      if (WORDING_REFUSED.test(r.detail) && !(job.direction as Dir | null)?.safeRetry && job.mode !== 'extend') return retrySafe(job);
+      return failJob(job, WORDING_REFUSED.test(r.detail) ? 'videoWording' : r.errorKey, r.detail);
     }
     // Claim the job first so two pollers never save it twice.
     const claimed = await prisma.aiVideoJob.updateMany({ where: { id: job.id, status: 'running', operation: job.operation }, data: { operation: null } });
@@ -156,6 +160,25 @@ async function refresh(job: Job): Promise<Job> {
     logger.warn('AI video poll failed', { jobId: job.id, error: err?.message });
     return job;
   }
+}
+
+/** Restarts a job whose prompt Google refused, with the safe prompt (the same frames; no extra charge). */
+async function retrySafe(job: Job): Promise<Job> {
+  const raw = (job.direction ?? {}) as Dir;
+  const d: Dir = { ...normalizeDirection(raw), genAspect: raw.genAspect, variants: raw.variants, locale: raw.locale, autoFixOf: raw.autoFixOf, safeRetry: true };
+  const prompt = directVideo(d, [], { safe: true });
+  const claimed = await prisma.aiVideoJob.updateMany({ where: { id: job.id, status: 'running', operation: job.operation }, data: { status: 'preparing', operation: null, prompt, direction: d as any } });
+  if (!claimed.count) return (await prisma.aiVideoJob.findFirst({ where: { id: job.id } })) ?? job;
+  const fresh = (await prisma.aiVideoJob.findFirst({ where: { id: job.id } })) ?? job;
+  const start = await loadSource(job.userId, job.sourceUrl);
+  const end = job.endUrl ? await loadSource(job.userId, job.endUrl) : null;
+  const aspectRatio: '9:16' | '16:9' = raw.genAspect === '16:9' ? '16:9' : '9:16';
+  void prepareAndStart({
+    job: fresh, direction: d, prompt, aspectRatio, durationSec: job.durationSec, resolution: job.resolution, quality: job.quality === 'best' ? 'best' : 'fast',
+    variants: Math.max(1, Number(raw.variants ?? 1)), seed: job.seed, start, end, products: [], aiStart: false, aiEnd: false,
+  });
+  logger.info('AI video: wording refused by Google, retrying with the safe prompt', { jobId: job.id });
+  return fresh;
 }
 
 async function changesOf(userId: string, start: Job | null): Promise<string[]> {

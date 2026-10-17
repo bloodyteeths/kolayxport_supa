@@ -194,6 +194,11 @@ const Q_LOCATIONS = `query KxLocations($after: String) {
   }
 }`;
 
+// Without read_locations only the id is readable (name/address/isActive are denied); inactive ones are left out.
+const Q_LOCATION_IDS = `query KxLocationIds($after: String) {
+  locations(first: 250, after: $after) { pageInfo { hasNextPage endCursor } nodes { id } }
+}`;
+
 const Q_PRIMARY_LOCATION = `query KxPrimaryLocation { location { id } }`;
 
 const Q_ITEM_LEVELS = `query KxItemLevels($ids: [ID!]!) {
@@ -885,16 +890,28 @@ export class ShopifyClient {
   ): Promise<any> {
     const source = image.attachment ? await this.stageAttachment(image.attachment, image.filename) : image.src;
     if (!source) throw new ShopifyApiError('Shopify API productCreateMedia failed: 400 - src or attachment required', 400);
+    const before = new Set((await this.getAllMedia(productId).catch(() => [] as any[])).map((m: any) => gidStr(m.id)));
     const data = await this.graphql(M_PRODUCT_ADD_MEDIA, {
       product: { id: toGid('Product', productId) },
       media: [{ originalSource: source, mediaContentType: 'IMAGE', ...(image.alt !== undefined ? { alt: image.alt } : {}) }],
     });
     assertNoUserErrors(data?.productUpdate, 'productUpdate(media)');
-    const created = nodesOf(data?.productUpdate?.product?.media)[0];
-    if (!created?.id) throw new ShopifyApiError('Shopify API productUpdate(media) failed: 502 - no media returned', 502);
+    // URL media is fetched by Shopify asynchronously: the new media may not be in the mutation's response yet.
+    // Once the mutation succeeded the image IS added, so never report it as failed (a retry would duplicate it).
+    let created: any = nodesOf(data?.productUpdate?.product?.media).find((m: any) => m?.id && !before.has(gidStr(m.id)));
+    for (let i = 0; !created && i < 8; i++) {
+      await new Promise((r) => setTimeout(r, 750));
+      created = (await this.getAllMedia(productId).catch(() => [] as any[])).find((m: any) => m?.id && !before.has(gidStr(m.id)));
+    }
+    if (!created) {
+      logger.warn('Shopify createProductImage: media added but not visible yet', { productId: gidStr(productId) });
+      return { id: null, product_id: Number(gidStr(productId)) || null, src: typeof source === 'string' ? source : null, alt: image.alt ?? null };
+    }
     const mediaId = gidStr(created.id);
     if (image.position !== undefined && image.position !== null) {
-      await this.moveImage(productId, mediaId, Number(image.position));
+      // Ordering is cosmetic: a media still processing can refuse a move; don't fail an add that happened.
+      await this.moveImage(productId, mediaId, Number(image.position)).catch((err: any) =>
+        logger.warn('Shopify createProductImage: position move failed', { productId: gidStr(productId), error: String(err?.message || err).slice(0, 300) }));
     }
     const images = await this.getProductImages(productId).catch(() => null);
     return images?.find((im) => String(im.id) === mediaId) ?? restImages([created], Number(gidStr(productId)) || null)[0];
@@ -1004,11 +1021,22 @@ export class ShopifyClient {
 
   /** All locations (active and inactive), REST-shaped (`active` flag). */
   async getLocations(): Promise<any[]> {
-    const nodes = await this.paginate<any>(async (after) => {
-      const data = await this.graphql(Q_LOCATIONS, { after });
-      return data?.locations;
-    });
-    return nodes.map(restLocation);
+    try {
+      const nodes = await this.paginate<any>(async (after) => {
+        const data = await this.graphql(Q_LOCATIONS, { after });
+        return data?.locations;
+      });
+      return nodes.map(restLocation);
+    } catch (err: any) {
+      // The app doesn't request read_locations: fall back to ids (active locations only) — enough for the
+      // editor's location count; names stay null.
+      if (err?.status !== 403) throw err;
+      const nodes = await this.paginate<any>(async (after) => {
+        const data = await this.graphql(Q_LOCATION_IDS, { after });
+        return data?.locations;
+      });
+      return nodes.map((n) => ({ ...restLocation(n), active: true }));
+    }
   }
 
   /** Inventory levels of the given inventory items, grouped by numeric inventory_item_id. */

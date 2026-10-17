@@ -157,6 +157,8 @@ export function EbayTitleSection({ id = 'title', aiTitle: aiTitleProp, aiDescrip
         onUse={() => state.value && use(key, state.value, state.dismiss)}
         onDismiss={state.dismiss}
         onRetry={state.run}
+        onRefine={state.refine}
+        refineChips={state.refineChips}
         data-testid={`le-ebay-${key}-suggestion`}
       />
     ) : null;

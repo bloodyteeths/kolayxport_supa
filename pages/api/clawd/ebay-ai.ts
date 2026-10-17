@@ -1,57 +1,36 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { logger } from '../../../lib/logger';
 import { getAuthUser } from '../../../lib/auth';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getAiModel, parseAiJson, refineFromBody } from '../../../lib/ai/gemini';
+import { aiContext, withAiContext } from '../../../lib/ai/context';
+import { hasValidInternalApiKeyHeader } from '../../../lib/security/internalApiKey';
 
-export const config = { maxDuration: 30 };
+export const config = { maxDuration: 120 };
+
+const UNKNOWN_ACTION = Symbol('unknown-action');
 
 // ---------------------------------------------------------------------------
 // Gemini client
 // ---------------------------------------------------------------------------
 
-function getGeminiClient(): GoogleGenerativeAI {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('GEMINI_API_KEY environment variable is not configured');
-  }
-  return new GoogleGenerativeAI(apiKey);
-}
 
 // ---------------------------------------------------------------------------
 // AI helper – returns parsed JSON from Gemini
 // ---------------------------------------------------------------------------
 
+/** JSON from the shared AI client (lib/ai): model chain + fallback, seller preferences, follow-up, usage log. */
 async function askClaude<T>(
   systemPrompt: string,
   userMessage: string,
   _maxTokens: number = 1024
 ): Promise<T> {
-  const genAI = getGeminiClient();
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
-    systemInstruction: systemPrompt,
-    generationConfig: {
-      responseMimeType: 'application/json',
-    },
-  });
-
-  const result = await model.generateContent(userMessage);
-  const response = result.response;
-  let raw = response.text().trim();
-
-  // Strip markdown code fences if present
-  if (raw.startsWith('```')) {
-    raw = raw.replace(/^```(?:json)?\s*/, '').replace(/```\s*$/, '').trim();
-  }
-
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    logger.error('Failed to parse Gemini JSON response', new Error('JSON parse error'), {
-      raw: raw.substring(0, 500),
-    });
+  const result = await getAiModel({ ...aiContext('ebay.unknown'), system: systemPrompt }).generateContent(userMessage);
+  const parsed = parseAiJson<T>(result.response.text());
+  if (parsed === null) {
+    logger.error('Failed to parse Gemini JSON response', new Error('JSON parse error'), { raw: result.response.text().substring(0, 500) });
     throw new Error('Failed to parse AI response as JSON');
   }
+  return parsed;
 }
 
 // ---------------------------------------------------------------------------
@@ -588,28 +567,14 @@ async function askGeminiVision<T>(
   userMessage: string,
   imageUrls: string[]
 ): Promise<T> {
-  const genAI = getGeminiClient();
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
-    systemInstruction: systemPrompt,
-    generationConfig: { responseMimeType: 'application/json' },
-  });
-
   const parts: any[] = [{ text: userMessage }];
   for (const url of imageUrls.slice(0, 4)) {
     parts.push(await fetchImageAsInlineData(url));
   }
-
-  const result = await model.generateContent(parts);
-  let raw = result.response.text().trim();
-  if (raw.startsWith('```')) {
-    raw = raw.replace(/^```(?:json)?\s*/, '').replace(/```\s*$/, '').trim();
-  }
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    throw new Error('Failed to parse AI response as JSON');
-  }
+  const result = await getAiModel({ ...aiContext('ebay.vision'), system: systemPrompt }).generateContent(parts);
+  const parsed = parseAiJson<T>(result.response.text());
+  if (parsed === null) throw new Error('Failed to parse AI response as JSON');
+  return parsed;
 }
 
 // ---------------------------------------------------------------------------
@@ -684,20 +649,14 @@ export default async function handler(
 
   // 1. Authenticate --- accept API key OR session auth
   // Header-only since Sprint 5 (query-string keys leak via CDN/proxy logs).
-  const apiKey = req.headers['x-api-key'];
-  const envApiKey = process.env.CLAWD_API_KEY;
-  let authenticated = false;
-
-  // Try API key auth first
-  if (envApiKey && apiKey === envApiKey) {
-    authenticated = true;
-  }
-
-  // Fall back to session auth
+  // Constant-time internal key check (was a plain ===), else the session.
+  let authenticated = hasValidInternalApiKeyHeader(req);
+  let userId: string | null = null;
   if (!authenticated) {
     const user = await getAuthUser(req, res);
     if (user) {
       authenticated = true;
+      userId = user.id;
     }
   }
 
@@ -725,7 +684,9 @@ export default async function handler(
 
   try {
     let result: unknown;
-
+    const ctx = { feature: `ebay.${action}`, userId, marketplace: 'ebay' as const, refine: refineFromBody(req.body), tier: (action === 'analyze_listing' ? 'deep' : 'fast') as 'deep' | 'fast' };
+    result = await withAiContext(ctx, async () => {
+    let result: unknown;
     switch (action) {
       case 'optimize_title':
         result = await handleOptimizeTitle(req.body);
@@ -760,21 +721,26 @@ export default async function handler(
         break;
 
       default:
-        return res.status(400).json({
-          error: `Unknown action: ${action}`,
-          availableActions: [
-            'optimize_title',
-            'generate_description',
-            'analyze_listing',
-            'suggest_price',
-            'bulk_optimize_titles',
-            'suggest_aspects',
-            'identify_product',
-            'suggest_variation_values',
-          ],
-        });
+        return UNKNOWN_ACTION;
     }
+    return result;
+    });
 
+    if (result === UNKNOWN_ACTION) {
+      return res.status(400).json({
+        error: `Unknown action: ${action}`,
+        availableActions: [
+          'optimize_title',
+          'generate_description',
+          'analyze_listing',
+          'suggest_price',
+          'bulk_optimize_titles',
+          'suggest_aspects',
+          'identify_product',
+          'suggest_variation_values',
+        ],
+      });
+    }
     return res.status(200).json(result);
   } catch (error) {
     if (error instanceof InputError) {

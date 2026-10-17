@@ -1458,7 +1458,8 @@
         "unsaved": "Unsaved changes",
         "billing": "Your plan needs attention",
         "runFailed": "The last refresh failed"
-      }
+      },
+      "ai": "AI"
     },
     "unsaved": {
       "title": "Discard unsaved changes?",
@@ -1735,6 +1736,42 @@
         "store": "{store} refresh",
         "other": "Refresh"
       }
+    },
+    "ai": {
+      "title": "AI preferences",
+      "description": "Titles, tags, descriptions, alt text, message replies and item specifics follow these preferences. Marketplace rules always come first.",
+      "appliesTo": "Applies to",
+      "appliesToHelp": "\"All\" is the default for every marketplace; pick a marketplace to add preferences just for it.",
+      "mp": {
+        "all": "All",
+        "etsy": "Etsy",
+        "ebay": "eBay",
+        "trendyol": "Trendyol",
+        "wix": "Wix",
+        "shopify": "Shopify",
+        "amazon": "Amazon"
+      },
+      "tone": "Tone",
+      "toneHelp": "How the copy should sound",
+      "tonePlaceholder": "e.g. warm and friendly, luxury, short and factual",
+      "include": "Always use",
+      "includeHelp": "Worked in wherever it fits (e.g. handmade, organic cotton). Press Enter or comma to add.",
+      "avoid": "Never use",
+      "avoidHelp": "These words and claims are never used (e.g. cheap, competitor brand names).",
+      "brand": "Brand / shop name",
+      "brandHelp": "Used where it fits",
+      "notes": "Extra notes",
+      "notesHelp": "Anything the AI should know",
+      "notesPlaceholder": "e.g. All our products are handmade in Turkey. Ships in 1-3 days. Free gift wrap.",
+      "previewTitle": "What the AI is told",
+      "saved": "AI preferences saved",
+      "saveFailed": "Couldn't save. Try again.",
+      "loadFailed": "Couldn't load preferences",
+      "unsaved": "Unsaved changes",
+      "discard": "Discard",
+      "save": "Save",
+      "saving": "Saving…",
+      "discardConfirm": "Discard unsaved changes?"
     }
   },
   "fedex": {
@@ -11970,7 +12007,19 @@
         "dismiss": "Dismiss",
         "retry": "Try again",
         "retryCost": "Try again · {count, plural, one {# credit} other {# credits}}",
-        "use": "Use"
+        "use": "Use",
+        "refinePlaceholder": "Ask for a change: e.g. \"add the word handmade\"",
+        "refineSend": "Revise",
+        "chip": {
+          "shorter": "Shorter",
+          "longer": "Longer",
+          "friendlier": "Friendlier",
+          "moreFormal": "More formal",
+          "keywordFirst": "Main keyword first",
+          "bullets": "Use bullet points",
+          "moreSpecific": "More specific",
+          "broader": "Broader"
+        }
       },
       "combobox": {
         "create": "Create “{value}”",

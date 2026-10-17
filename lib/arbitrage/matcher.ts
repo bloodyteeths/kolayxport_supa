@@ -1,3 +1,4 @@
+import { getAiModel } from '@/lib/ai/gemini';
 /**
  * AI Product Matcher — matches Trendyol products against eBay index using Gemini.
  *
@@ -5,7 +6,6 @@
  * (1-3 API calls per product), we load pre-indexed eBay products and let Gemini
  * find matches offline (1 Gemini call per category, 0 eBay calls).
  */
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import prisma from '../prisma';
 import { logger } from '../logger';
 import { getEbayIndexForCategory } from './ebayIndexer';
@@ -181,11 +181,7 @@ async function aiMatchCategory(
   }));
 
   try {
-    const genAI = new GoogleGenerativeAI(geminiKey);
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
-      generationConfig: { responseMimeType: 'application/json' } as any,
-    });
+    const model = getAiModel({ feature: 'arbitrage.match' });
 
     const prompt = `You are a cross-border e-commerce product matching expert specializing in Turkish→US/UK arbitrage.
 

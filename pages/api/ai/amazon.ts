@@ -1,6 +1,6 @@
+import { getAiModel } from '@/lib/ai/gemini';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '../../../lib/auth';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export const config = { maxDuration: 60 };
 
@@ -27,11 +27,7 @@ function checkRateLimit(userId: string): boolean {
 function getGeminiModel() {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY is required');
-  const genAI = new GoogleGenerativeAI(apiKey);
-  return genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
-    generationConfig: { responseMimeType: 'application/json' } as any,
-  });
+  return getAiModel({ feature: 'amazon.ai', tier: 'deep', marketplace: 'amazon' });
 }
 
 // ---------------------------------------------------------------------------

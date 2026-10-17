@@ -141,9 +141,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(500).json({ error: 'Gemini API key not configured' });
       }
 
-      const { GoogleGenerativeAI } = await import('@google/generative-ai');
-      const genAI = new GoogleGenerativeAI(geminiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const { getAiModel } = await import('@/lib/ai/gemini');
+      const model = getAiModel({ feature: 'trendyol.market_report', tier: 'deep', json: false });
 
       const analysis = analyzeProducts(products);
       const topProducts = products.slice(0, 20).map(p => ({

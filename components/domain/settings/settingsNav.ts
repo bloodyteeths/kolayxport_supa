@@ -13,7 +13,7 @@ import { SECTION_SLICES } from '@/lib/hooks/useSettings';
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────────────────────────
 /** `?tab=` keys. The five existing keys are unchanged (links in notifications, AppLayout, portal return). */
-export const SETTINGS_TAB_KEYS = ['connections', 'apiKeys', 'senderProfile', 'billing', 'preferences', 'syncAdvanced'] as const;
+export const SETTINGS_TAB_KEYS = ['connections', 'apiKeys', 'ai', 'senderProfile', 'billing', 'preferences', 'syncAdvanced'] as const;
 export type SettingsTabKey = (typeof SETTINGS_TAB_KEYS)[number];
 export const DEFAULT_SETTINGS_TAB: SettingsTabKey = 'connections';
 export const SETTINGS_PATH = '/ayarlar';
@@ -67,7 +67,7 @@ export function leavesSettingsTab(currentAsPath: string, url: string, mobile: bo
 // ── Nav groups (§1.2) ─────────────────────────────────────────────────────────────────────────────
 export type SettingsNavGroupKey = 'workspace' | 'shipping' | 'account' | 'system';
 export const SETTINGS_NAV_GROUPS: readonly { key: SettingsNavGroupKey; items: readonly SettingsTabKey[] }[] = [
-  { key: 'workspace', items: ['connections', 'apiKeys'] },
+  { key: 'workspace', items: ['connections', 'apiKeys', 'ai'] },
   { key: 'shipping', items: ['senderProfile'] },
   { key: 'account', items: ['billing', 'preferences'] },
   { key: 'system', items: ['syncAdvanced'] },
@@ -76,6 +76,7 @@ export const SETTINGS_NAV_GROUPS: readonly { key: SettingsNavGroupKey; items: re
 export const SETTINGS_TAB_ICONS: Record<SettingsTabKey, LucideIcon> = {
   connections: icons.connections,
   apiKeys: icons.credentials,
+  ai: icons.ai,
   senderProfile: icons.senderProfile,
   billing: icons.billing,
   preferences: icons.languageRegion,

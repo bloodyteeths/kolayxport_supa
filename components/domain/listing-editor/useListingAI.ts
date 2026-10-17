@@ -862,20 +862,28 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
     return { ok: res.ok, status: res.status, data };
   }, []);
 
+  /** Follow-up for the next AI call only: the previous answer + the seller's instruction (lib/ai refine). */
+  const refineNext = useRef<{ previous: unknown; instruction: string } | null>(null);
+  const withRefine = (body: Record<string, unknown>) => {
+    const refine = refineNext.current;
+    refineNext.current = null;
+    return refine ? { ...body, refine } : body;
+  };
+
   const etsyAi = useCallback(async (action: string, body: Record<string, unknown>) => {
-    const r = await http('/api/ai/etsy', { method: 'POST', body: { action, ...body } });
+    const r = await http('/api/ai/etsy', { method: 'POST', body: withRefine({ action, ...body }) });
     if (!r.ok || !r.data || typeof r.data !== 'object') throw new AiCallError(r.ok ? 502 : r.status, r.data);
     return r.data as Record<string, unknown>;
   }, [http]);
 
   const ebayAi = useCallback(async (action: string, body: Record<string, unknown>) => {
-    const r = await http(`/api/clawd/ebay-ai?action=${encodeURIComponent(action)}`, { method: 'POST', body });
+    const r = await http(`/api/clawd/ebay-ai?action=${encodeURIComponent(action)}`, { method: 'POST', body: withRefine(body) });
     if (!r.ok || !r.data || typeof r.data !== 'object') throw new AiCallError(r.ok ? 502 : r.status, r.data);
     return r.data as Record<string, unknown>;
   }, [http]);
 
   const trendyolAi = useCallback(async (action: 'optimize_title' | 'optimize_description' | 'suggest_attributes', body: Record<string, unknown>) => {
-    const r = await http(`/api/ai/trendyol?action=${action}`, { method: 'POST', body });
+    const r = await http(`/api/ai/trendyol?action=${action}`, { method: 'POST', body: withRefine(body) });
     if (!r.ok || !r.data || typeof r.data !== 'object') throw new AiCallError(r.ok ? 502 : r.status, r.data);
     return r.data as Record<string, unknown>;
   }, [http]);
@@ -1678,6 +1686,25 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
     return () => undefined;
   }, [suggestTitle, writeDescription, getTagIdeas, checkPrice, fillSpecifics, suggestAttributes, writeAltText]);
 
+  /** Follow-up: revise the current suggestion for `key` with the seller's instruction (same action, + refine). */
+  const refine = useCallback((key: AiKey, instruction: string) => {
+    const p = proposalsRef.current[key];
+    const text = instruction.trim();
+    if (!text || !p || p.status !== 'ready' || p.value === undefined) return;
+    refineNext.current = { previous: p.value, instruction: text };
+    retryFor(key)();
+  }, [retryFor]);
+
+  /** Quick follow-up chips per suggestion kind (translated). */
+  const refineChipsFor = useCallback((key: AiKey): string[] => {
+    const c = (k: string) => t(`ds.inputs.suggestion.chip.${k}`);
+    if (key === 'title') return [c('shorter'), c('longer'), c('keywordFirst'), c('moreSpecific')];
+    if (key === 'description') return [c('shorter'), c('longer'), c('friendlier'), c('bullets')];
+    if (key === 'tags') return [c('moreSpecific'), c('broader')];
+    if (key.startsWith('alt:')) return [c('shorter'), c('moreSpecific')];
+    return [c('moreSpecific'), c('broader')];
+  }, [t]);
+
   const suggestionProps = useCallback((key: AiKey, o?: { onUse?: (value: unknown) => void; useLabel?: string }): FieldSuggestionProps | null => {
     const p = proposals[key];
     if (!p || p.status === 'idle') return null;
@@ -1720,9 +1747,10 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
       },
       onDismiss: () => dismiss(key),
       onRetry: p.limited ? () => undefined : retryFor(key),
+      ...(p.limited || key === 'price' || key === 'category' || key === 'condition' ? {} : { onRefine: (i: string) => refine(key, i), refineChips: refineChipsFor(key) }),
       'data-testid': `ai-suggestion-${key.replace(':', '-')}`,
     };
-  }, [proposals, marketplace, dismiss, apply, acceptAllAttributes, retryFor]);
+  }, [proposals, marketplace, dismiss, apply, acceptAllAttributes, retryFor, refine, refineChipsFor]);
 
   const tagSuggestionProps = useCallback(() => {
     const p = proposals.tags;
@@ -1757,6 +1785,7 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
       rationale: p?.rationale,
       dismiss: () => dismiss(key),
       credits: creditsFor(key),
+      ...(limited ? {} : { refine: (i: string) => refine(key, i), refineChips: refineChipsFor(key) }),
     };
   }, [proposals, suggestTitle, writeDescription, getTagIdeas, dismiss, limitReached]);
 

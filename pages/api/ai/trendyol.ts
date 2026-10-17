@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '../../../lib/auth';
+import { getAiModel, refineFromBody } from '../../../lib/ai/gemini';
 import { logger } from '../../../lib/logger';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -18,12 +19,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: 'Gemini API key not configured' });
     }
 
-    const { GoogleGenerativeAI } = await import('@google/generative-ai');
-    const genAI = new GoogleGenerativeAI(geminiKey);
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
-      generationConfig: { responseMimeType: 'application/json' } as any,
-    });
+    // Shared AI client (lib/ai): model chain + fallback, the seller's Trendyol preferences, follow-up, usage log.
+    const aiOpts = { feature: `trendyol.${action}`, userId: user.id, marketplace: 'trendyol' as const, refine: refineFromBody(req.body) };
+    const model = getAiModel(aiOpts);
 
     // ================================================================
     // OPTIMIZE TITLE
@@ -142,7 +140,7 @@ JSON döndür: [{"attributeId": number, "attributeValueId": number, "reason": "n
         return res.status(400).json({ error: 'product is required' });
       }
 
-      const modelText = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const modelText = getAiModel({ ...aiOpts, tier: 'deep', json: false });
       const prompt = `Sen bir Trendyol listing optimizasyon uzmanısın. Bu ürün listesini analiz et ve iyileştirme önerileri ver.
 
 Ürün: ${JSON.stringify({

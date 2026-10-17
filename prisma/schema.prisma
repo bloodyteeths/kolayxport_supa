@@ -79,6 +79,8 @@ model User {
   savedReplies            SavedReply[]
   researchWatches         ResearchWatch[]
   notificationPreferences NotificationPreference[]
+  aiPreferences           AiPreference[]
+  aiUsage                 AiUsage[]
   notificationSettings    NotificationSettings?
   stockSettings           StockSettings?
   stockItems              StockItem[]
@@ -2307,4 +2309,47 @@ model SavedReply {
 
   @@unique([userId, title])
   @@index([userId, usageCount])
+}
+
+/// Seller's standing instructions for every AI feature (founder 2026-10-17: "users enter their own preferences so
+/// AI generates results according to those criteria"). marketplace = 'all' (defaults) or etsy/ebay/trendyol/wix/
+/// shopify/amazon (overrides). Injected by lib/ai into every prompt; marketplace rules still win.
+model AiPreference {
+  id          String   @id @default(cuid())
+  userId      String
+  marketplace String   @default("all")
+  /// e.g. "warm and friendly", "luxury", "short and factual"
+  tone        String?
+  /// words / facts to always use ("handmade", "made in Turkey")
+  include     String[] @default([])
+  /// words never to use ("cheap", competitor brands)
+  avoid       String[] @default([])
+  brand       String?
+  /// free text, ≤ 1000 chars
+  notes       String?
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, marketplace])
+}
+
+/// One row per AI call (lib/ai): cost tracking and the base for AI credit enforcement.
+model AiUsage {
+  id             String   @id @default(cuid())
+  userId         String?
+  feature        String
+  model          String
+  ok             Boolean  @default(true)
+  inputTokens    Int      @default(0)
+  outputTokens   Int      @default(0)
+  thinkingTokens Int      @default(0)
+  images         Int      @default(0)
+  ms             Int      @default(0)
+  refine         Boolean  @default(false)
+  error          String?
+  createdAt      DateTime @default(now())
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([feature, createdAt])
 }

@@ -68,6 +68,8 @@ function run(body: unknown, method = 'POST') {
   return handler({ method, headers: {}, query: {}, body } as any, res).then(() => res);
 }
 
+/** The prompt text whatever the call shape (string, or lib/ai's { contents }). */
+const promptOf = (arg: any): string => (typeof arg === 'string' ? arg : (arg?.contents ?? []).flatMap((c: any) => c.parts ?? []).map((p: any) => p.text ?? '').join('\n'));
 const modelSays = (obj: unknown) => generateContent.mockResolvedValue({ response: { text: () => (typeof obj === 'string' ? obj : JSON.stringify(obj)) } });
 
 const TRENDYOL_Q = {
@@ -235,7 +237,7 @@ describe('POST /api/messages/draft-reply', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body).toEqual({ reply: 'Merhaba Ayşe, kutumuz 20 x 15 cm ölçülerindedir.', missing: [] });
     expect(productFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: 'u1', productMainId: 'PM-1' } }));
-    const prompt = generateContent.mock.calls[0][0] as string;
+    const prompt = promptOf(generateContent.mock.calls[0][0]);
     expect(prompt).toContain('Bu kutunun ölçüleri nedir?');
     expect(prompt).not.toContain('IGNORE RULES');
   });
@@ -271,7 +273,7 @@ describe('POST /api/messages/draft-reply', () => {
     expect(res.statusCode).toBe(200);
     expect(searchOrders).toHaveBeenCalledWith({ contactId: 'ct1', limit: 3 });
     expect(orderFindMany.mock.calls[0][0].where).toMatchObject({ userId: 'u1', orderNumber: { in: ['10023'] } });
-    const prompt = generateContent.mock.calls[0][0] as string;
+    const prompt = promptOf(generateContent.mock.calls[0][0]);
     expect(prompt).toContain('Belle Couture');
     expect(prompt).toContain('1Z999AA10123456784');
   });
@@ -283,7 +285,7 @@ describe('POST /api/messages/draft-reply', () => {
     modelSays({ reply: 'Hi! Let me check and get back to you.', missing: ['order'] });
     const res = await run({ platform: 'wix', id: 'c1' });
     expect(res.body).toEqual({ reply: 'Hi! Let me check and get back to you.', missing: ['order'] });
-    expect(generateContent.mock.calls[0][0]).toContain('ORDER LOOKUP FAILED');
+    expect(promptOf(generateContent.mock.calls[0][0])).toContain('ORDER LOOKUP FAILED');
   });
 
   it('Wix: unknown contact → model is told it cannot see orders (not "no orders")', async () => {
@@ -293,7 +295,7 @@ describe('POST /api/messages/draft-reply', () => {
     const res = await run({ platform: 'wix', id: 'c1' });
     expect(res.statusCode).toBe(200);
     expect(searchOrders).not.toHaveBeenCalled();
-    expect(generateContent.mock.calls[0][0]).toContain('ORDER LOOKUP FAILED');
+    expect(promptOf(generateContent.mock.calls[0][0])).toContain('ORDER LOOKUP FAILED');
   });
 
   it('Wix: lookup succeeded with zero orders → empty list, not a lookup failure', async () => {
@@ -302,7 +304,7 @@ describe('POST /api/messages/draft-reply', () => {
     searchOrders.mockResolvedValue({ orders: [] });
     modelSays({ reply: 'Hi! How can I help?', missing: [] });
     await run({ platform: 'wix', id: 'c1' });
-    const prompt = generateContent.mock.calls[0][0] as string;
+    const prompt = promptOf(generateContent.mock.calls[0][0]);
     expect(prompt).not.toContain('ORDER LOOKUP FAILED');
     expect(prompt).toContain('"orders": []');
   });

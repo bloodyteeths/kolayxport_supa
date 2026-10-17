@@ -206,6 +206,8 @@ export function CatalogTitleSection({ id = 'title', aiTitle, aiDescription }: Ca
         onUse={() => state.value && use(key, state.value, state.dismiss)}
         onDismiss={state.dismiss}
         onRetry={state.run}
+        onRefine={state.refine}
+        refineChips={state.refineChips}
         data-testid={`le-catalog-${key}-suggestion`}
       />
     ) : null;

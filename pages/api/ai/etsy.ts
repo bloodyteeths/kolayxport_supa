@@ -1,6 +1,6 @@
+import { AiNotConfiguredError, getAiModel, refineFromBody } from '@/lib/ai/gemini';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '../../../lib/auth';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import {
   normalizeTitle, checkTitle, normalizeTags, tagKey, coerceAiString, coerceAiStringArray, looksGarbled,
   TITLE_MIN, TITLE_MAX, TAG_MAX_LEN, TAG_MAX_COUNT, type TitleCheck, type AiErrorCode,
@@ -36,17 +36,21 @@ function checkRateLimit(userId: string): boolean {
 // ---------------------------------------------------------------------------
 // Gemini client
 // ---------------------------------------------------------------------------
-function getGeminiModel() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is not configured');
-  }
-  const genAI = new GoogleGenerativeAI(apiKey);
-  return genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
-    generationConfig: {
-      responseMimeType: 'application/json',
-    } as any,
+/** Analysis actions get the strongest model; the editor's buttons the fast one (lib/ai/models). */
+const DEEP_ACTIONS = new Set(['market_analysis', 'niche_report', 'shop_spy_report', 'listing_audit', 'review_sentiment', 'price_recommendation']);
+
+/**
+ * The shared AI client (lib/ai): model chain with fallback, the seller's saved preferences, follow-up (`refine`),
+ * usage logging. `body.__ctx` is set by the handler below (user + action); it never comes from the client.
+ */
+function getGeminiModel(body: any) {
+  const ctx = body?.__ctx as { userId: string; action: string } | undefined;
+  return getAiModel({
+    tier: ctx && DEEP_ACTIONS.has(ctx.action) ? 'deep' : 'fast',
+    feature: `etsy.${ctx?.action ?? 'unknown'}`,
+    userId: ctx?.userId,
+    marketplace: 'etsy',
+    refine: refineFromBody(body),
   });
 }
 
@@ -142,7 +146,7 @@ async function handleSuggestTags(body: any) {
     ? `The result will REPLACE all current tags. Keep any current tag that already follows every rule above and is strongly relevant; replace the weak, too-long, duplicate, or title-overlapping ones. Return the full final set of ${TAG_MAX_COUNT} tags.`
     : `The result will be ADDED to the current tags. Do NOT repeat or paraphrase any current tag.`;
 
-  const model = getGeminiModel();
+  const model = getGeminiModel(body);
   const prompt = `You are a top Etsy SEO specialist. Your job is to suggest research-backed, high-converting Etsy tags.
 ${ENGLISH_RULE}
 
@@ -272,7 +276,7 @@ async function handleOptimizeTitle(body: any) {
     return fail(400, 'missing_title', 'title alanı zorunludur.');
   }
 
-  const model = getGeminiModel();
+  const model = getGeminiModel(body);
   let best = await generateTitleCandidate(model, body, title);
 
   // Retry once with concrete feedback when the result breaks a hard rule.
@@ -305,7 +309,7 @@ async function handleGenerateDescription(body: any) {
     return fail(400, 'missing_title', 'title alanı zorunludur.');
   }
 
-  const model = getGeminiModel();
+  const model = getGeminiModel(body);
   const improvePart = existing_description
     ? `\nAn existing description is provided – improve it while keeping the seller's voice and every concrete product detail (sizes, materials, care, shipping, personalization):\n${existing_description.slice(0, 5000)}`
     : '';
@@ -387,7 +391,7 @@ async function handleGenerateAltText(body: any) {
     return fail(400, 'missing_title', 'title alanı zorunludur.');
   }
 
-  const model = getGeminiModel();
+  const model = getGeminiModel(body);
   const imagePart = image_url ? await fetchImagePart(image_url) : null;
 
   const prompt = `You are a top Etsy SEO specialist with deep knowledge of Etsy's search algorithm as of March 2026.
@@ -433,7 +437,7 @@ async function handleMarketAnalysis(body: any) {
     return fail(400, 'missing_query', 'query alanı zorunludur.');
   }
 
-  const model = getGeminiModel();
+  const model = getGeminiModel(body);
   const prompt = `Sen Etsy pazar araştırma ve strateji uzmanısın. Mart 2026 itibarıyla Etsy'nin arama algoritması, trendleri ve satıcı stratejileri hakkında derin bilgiye sahipsin.
 
 ÖNEMLİ DİL KURALI: Etsy alıcıları İngilizce arama yaptığı için tüm Etsy anahtar kelimeleri, tagleri, arama terimleri, niş terimleri ve başlık önerileri MUTLAKA İNGİLİZCE olmalıdır. Sadece analiz metni, açıklamalar ve yorumlar Türkçe olmalıdır. tag_recommendations dizisi tamamen İngilizce Etsy tagleri içermelidir. niche_positioning ve title_recommendations içindeki anahtar kelimeler/örnekler İngilizce olmalıdır.
@@ -522,7 +526,7 @@ async function handleBulkOptimize(body: any) {
   }
   if (inputById.size === 0) return fail(400, 'no_listings', 'listings alanı boş olamaz.');
 
-  const model = getGeminiModel();
+  const model = getGeminiModel(body);
   const listingSummaries = Array.from(inputById.values()).map((l: any, i: number) => {
     return `Listing ${i + 1} (ID: ${l.listing_id}):
   Title: ${coerceAiString(l.title) || 'N/A'}
@@ -610,7 +614,7 @@ async function handleNicheReport(body: any) {
     return fail(400, 'missing_query', 'query alanı zorunludur.');
   }
 
-  const model = getGeminiModel();
+  const model = getGeminiModel(body);
   const prompt = `Sen derin niş analizi yapan bir Etsy pazar uzmanısın. Aşağıdaki verilere dayanarak detaylı ve eyleme dönüştürülebilir niş raporu hazırla.
 
 ÖNEMLİ DİL KURALI: Tüm anahtar kelimeler, tagler ve keyword örnekleri MUTLAKA İNGİLİZCE olmalıdır. Sadece analiz metni, açıklamalar ve yorumlar Türkçe olmalıdır.
@@ -668,7 +672,7 @@ async function handleShopSpyReport(body: any) {
     return { status: 400, data: { error: 'shopName alanı zorunludur.' } };
   }
 
-  const model = getGeminiModel();
+  const model = getGeminiModel(body);
   const listingsText = Array.isArray(topListings)
     ? topListings.slice(0, 10).map((l: any, i: number) => `  ${i + 1}. "${l.title}" — $${l.price}, ${l.favorites} favori`).join('\n')
     : 'N/A';
@@ -732,7 +736,7 @@ async function handleListingAudit(body: any) {
     return fail(400, 'missing_title', 'title alanı zorunludur.');
   }
 
-  const model = getGeminiModel();
+  const model = getGeminiModel(body);
   const prompt = `Sen Etsy ilan denetimi yapan bir SEO ve satış uzmanısın. Aşağıdaki ilanı kapsamlı şekilde denetle.
 
 ÖNEMLİ DİL KURALI: Optimize edilmiş başlık ve tag önerileri MUTLAKA İNGİLİZCE olmalıdır. Geri bildirim metinleri Türkçe olmalıdır.
@@ -805,7 +809,7 @@ async function handleReviewSentiment(body: any) {
     return { status: 400, data: { error: 'shopName ve reviews alanları zorunludur.' } };
   }
 
-  const model = getGeminiModel();
+  const model = getGeminiModel(body);
   const reviewsText = reviews.slice(0, 50).map((r: any, i: number) =>
     `  ${i + 1}. [${r.rating}★] "${(r.review || '').slice(0, 200)}" (${r.created_timestamp || 'N/A'})`
   ).join('\n');
@@ -858,7 +862,7 @@ async function handlePriceRecommendation(body: any) {
     return fail(400, 'missing_query', 'query alanı zorunludur.');
   }
 
-  const model = getGeminiModel();
+  const model = getGeminiModel(body);
   const breakdownText = Array.isArray(priceRangeBreakdown)
     ? priceRangeBreakdown.map((r: any) => `  $${r.min}-$${r.max}: ${r.count} ilan (${r.pct}%)`).join('\n')
     : 'N/A';
@@ -938,7 +942,9 @@ export default async function handler(
   }
 
   // --- Route by action ---
-  const { action, ...body } = req.body || {};
+  const { action, ...rawBody } = req.body || {};
+  // Server-set context for lib/ai (never trusted from the client: any incoming __ctx is overwritten).
+  const body = { ...rawBody, __ctx: { userId, action: String(action || '') } };
 
   if (!action) {
     return res.status(400).json({ error: 'action alanı zorunludur.', code: 'invalid_action' });
@@ -992,7 +998,7 @@ export default async function handler(
   } catch (err: any) {
     console.error('[AI Etsy] Gemini hatası:', err);
 
-    if (err?.message?.includes('GEMINI_API_KEY')) {
+    if (err instanceof AiNotConfiguredError || err?.message?.includes('GEMINI_API_KEY')) {
       return res.status(500).json({ error: 'AI servisi yapılandırılmamış.', code: 'ai_not_configured' });
     }
     if (err instanceof SyntaxError) {

@@ -1376,7 +1376,8 @@
         "unsaved": "Kaydedilmemiş değişiklikler",
         "billing": "Planınız dikkat gerektiriyor",
         "runFailed": "Son yenileme başarısız oldu"
-      }
+      },
+      "ai": "Yapay zekâ"
     },
     "unsaved": {
       "title": "Kaydedilmemiş değişiklikler silinsin mi?",
@@ -1653,6 +1654,42 @@
         "store": "{store} yenilemesi",
         "other": "Yenileme"
       }
+    },
+    "ai": {
+      "title": "Yapay zekâ tercihleri",
+      "description": "Başlık, etiket, açıklama, alt metin, mesaj yanıtı ve ürün özelliklerinde yapay zekâ bu tercihlere uyar. Pazaryeri kuralları her zaman önce gelir.",
+      "appliesTo": "Uygulandığı yer",
+      "appliesToHelp": "\"Tümü\" her pazaryeri için varsayılandır; bir pazaryeri seçerek ona özel tercih ekleyin.",
+      "mp": {
+        "all": "Tümü",
+        "etsy": "Etsy",
+        "ebay": "eBay",
+        "trendyol": "Trendyol",
+        "wix": "Wix",
+        "shopify": "Shopify",
+        "amazon": "Amazon"
+      },
+      "tone": "Ton",
+      "toneHelp": "Metinlerin nasıl konuşacağı",
+      "tonePlaceholder": "ör. samimi ve sıcak, lüks, kısa ve net",
+      "include": "Her zaman kullan",
+      "includeHelp": "Uygun yerde mutlaka geçsin (ör. handmade, organic cotton). Enter veya virgülle ekleyin.",
+      "avoid": "Asla kullanma",
+      "avoidHelp": "Bu kelimeler ve iddialar hiç kullanılmaz (ör. cheap, rakip marka adları).",
+      "brand": "Marka / mağaza adı",
+      "brandHelp": "Uygun olduğunda kullanılır",
+      "notes": "Ek notlar",
+      "notesHelp": "Yapay zekânın bilmesini istediğiniz her şey",
+      "notesPlaceholder": "ör. Tüm ürünlerimiz Türkiye'de el yapımı. Kargo 1-3 gün. Hediye paketi ücretsiz.",
+      "previewTitle": "Yapay zekâya şöyle iletilir",
+      "saved": "Yapay zekâ tercihleri kaydedildi",
+      "saveFailed": "Kaydedilemedi. Tekrar deneyin.",
+      "loadFailed": "Tercihler yüklenemedi",
+      "unsaved": "Kaydedilmemiş değişiklikler",
+      "discard": "Vazgeç",
+      "save": "Kaydet",
+      "saving": "Kaydediliyor…",
+      "discardConfirm": "Kaydedilmemiş değişiklikler silinsin mi?"
     }
   },
   "importer": {
@@ -11970,7 +12007,19 @@
         "dismiss": "Kapat",
         "retry": "Tekrar dene",
         "retryCost": "Tekrar dene · {count} kredi",
-        "use": "Kullan"
+        "use": "Kullan",
+        "refinePlaceholder": "Değişiklik isteyin: ör. \"handmade kelimesini ekle\"",
+        "refineSend": "Düzelt",
+        "chip": {
+          "shorter": "Daha kısa",
+          "longer": "Daha uzun",
+          "friendlier": "Daha samimi",
+          "moreFormal": "Daha resmi",
+          "keywordFirst": "Ana kelimeyi başa al",
+          "bullets": "Madde madde yaz",
+          "moreSpecific": "Daha spesifik",
+          "broader": "Daha geniş"
+        }
       },
       "combobox": {
         "create": "“{value}” oluştur",

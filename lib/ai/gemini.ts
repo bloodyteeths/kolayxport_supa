@@ -99,7 +99,7 @@ export function refineContents(base: Content[], refine: AiRefine | null | undefi
     {
       role: 'user',
       parts: [{
-        text: `Revise your previous answer following this request from the seller: "${instruction}". Keep every rule and requirement given above${json ? ' and return exactly the same JSON shape' : ''}. Change only what the request asks for.`,
+        text: `Revise your previous answer following this request from the seller: "${instruction}". Change only what the request asks for. Every rule and limit given above still applies and wins over the request: e.g. "shorter" means as short as the rules allow, never below a minimum length. ${json ? 'Return exactly the same JSON shape; any explanation / rationale field is ONE short sentence saying what you changed, in the language used before.' : ''}`.trim(),
       }],
     },
   ];

@@ -9,6 +9,10 @@
 // - ICU params live on the failed / conflict attempt that recorded the key: `syncAttempts[].result.{errorKey,errorParams}`.
 // - Rows written before the change still hold English text: those are bucketed into `listings.sendError.*`.
 
+import { ebaySpecificKey, etsySpecificKey } from '@/lib/drafts/syncErrors';
+import { isGenericFailureKey, marketplaceDetail } from './failureFix';
+
+/** `errorParams.detail` (when present) is the marketplace's own message, shown under a general key. */
 export type SendError = { errorKey: string; errorParams?: Record<string, string | number> };
 
 /** Generic fallback (also used when a key needs ICU params the attempt did not record). */
@@ -26,13 +30,18 @@ function isFailedStatus(status: unknown): boolean {
 }
 
 /** Old rows: English `lastSyncError` → coarse `listings.sendError.*` family. Never returns the text. */
-export function legacySendErrorKey(status: string, text: unknown): string {
+export function legacySendErrorKey(status: string, text: unknown, marketplace?: string): string {
   if (status === 'conflict') return 'listings.sendError.conflict';
   const msg = typeof text === 'string' ? text.toLowerCase() : '';
   if (!msg) return SEND_ERROR_GENERIC;
   if (/server restart|interrupted/.test(msg)) return 'listings.sendError.interrupted';
   if (/token|unauthori[sz]ed|reconnect|invalid_grant|\b401\b|\b403\b|forbidden/.test(msg)) return 'listings.sendError.reconnect';
   if (/rate limit|too many requests|\b429\b/.test(msg)) return 'listings.sendError.rateLimited';
+  // The marketplace's wording names the exact field ("Shop section not found" is not a missing listing).
+  // Only the draft's own marketplace's wording (an Etsy draft never reads as an eBay rule).
+  const mp = marketplace ?? (/\betsy\b/.test(msg) ? 'etsy' : /\bebay\b/.test(msg) ? 'ebay' : '');
+  const specific = mp === 'etsy' ? etsySpecificKey(msg) : mp === 'ebay' ? ebaySpecificKey(msg) : null;
+  if (specific) return specific;
   if (/not found|\b404\b|no longer exists|deleted/.test(msg)) return 'listings.sendError.notFound';
   if (/price|quantity|title|tag|invalid|validation|must|required|\b400\b/.test(msg)) return 'listings.sendError.rejected';
   return SEND_ERROR_GENERIC;
@@ -78,6 +87,8 @@ export type DraftErrorSource = {
   lastSyncError?: unknown;
   /** Newest first; params come from `result.errorParams` of the attempt whose `result.errorKey` is the stored key. */
   syncAttempts?: unknown;
+  /** CatalogDraft: the stored key's params + `detail` (Trendyol / Wix / Shopify keep no attempt rows). */
+  lastSyncErrorParams?: unknown;
 };
 
 /**
@@ -86,16 +97,39 @@ export type DraftErrorSource = {
  * (DB rows, CatalogDraft, the pre-existing `etsy.draftSync.remoteChanged` / `deletedOnEtsy`) → legacy text bucket.
  * `prefix` (e.g. `etsy.`) is added to a stored key that lacks a top-level namespace (`draftSync.x`, very old rows).
  */
-export function draftSendError(d: DraftErrorSource, opts: { prefix?: string; extraParams?: Record<string, string | number> } = {}): SendError | null {
+export function draftSendError(d: DraftErrorSource, opts: { prefix?: string; extraParams?: Record<string, string | number>; marketplace?: string } = {}): SendError | null {
   const status = typeof d.status === 'string' ? d.status : '';
   if (!isFailedStatus(status)) return null;
   const stored = isI18nKey(d.lastSyncErrorKey) ? d.lastSyncErrorKey.trim() : isI18nKey(d.lastSyncError) ? d.lastSyncError.trim() : null;
   if (stored) {
     const key = withPrefix(stored, opts.prefix);
-    const params = { ...(attemptErrorParams(d.syncAttempts, [stored, key]) ?? {}), ...(opts.extraParams ?? {}) };
+    const params: Record<string, string | number> = {
+      ...(cleanParams(d.lastSyncErrorParams) ?? {}),
+      ...(attemptErrorParams(d.syncAttempts, [stored, key]) ?? {}),
+      ...(opts.extraParams ?? {}),
+    };
+    // A general key ("rejected", "remoteFailed") gets the marketplace's own words, so the reason is never hidden.
+    if (isGenericFailureKey(key) && params.detail === undefined) {
+      const detail = attemptDetail(d.syncAttempts);
+      if (detail) params.detail = detail;
+    }
     return Object.keys(params).length ? { errorKey: key, errorParams: params } : { errorKey: key };
   }
-  return { errorKey: legacySendErrorKey(status, d.lastSyncError) };
+  const errorKey = legacySendErrorKey(status, d.lastSyncError, opts.marketplace);
+  const detail = isGenericFailureKey(errorKey) ? marketplaceDetail(d.lastSyncError) : null;
+  return detail ? { errorKey, errorParams: { detail } } : { errorKey };
+}
+
+/** The raw marketplace message of the newest failed attempt (Etsy / eBay attempt rows keep it in `error`). */
+function attemptDetail(attempts: unknown): string | null {
+  if (!Array.isArray(attempts)) return null;
+  for (const a of attempts as Array<{ status?: unknown; error?: unknown }>) {
+    if (a && (a.status === 'failed' || a.status === 'conflict')) {
+      const d = marketplaceDetail(a.error);
+      if (d) return d;
+    }
+  }
+  return null;
 }
 
 const ROOT_NAMESPACES = ['etsy.', 'ebay.', 'listings.', 'trendyol.', 'wix.', 'shopify.', 'catalog.'];

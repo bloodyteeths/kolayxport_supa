@@ -1,3 +1,4 @@
+import { legacySendErrorKey } from '@/lib/listings/sendError';
 import { describe, it, expect, afterEach } from 'vitest';
 import {
   collectExportRows,
@@ -338,20 +339,24 @@ describe('draft helpers', () => {
     ]);
     expect(m.get('1')!.status).toBe('draft');
   });
-  it('sendErrorKey never returns raw text', () => {
+  it('sendErrorKey names the exact field, and keeps the marketplace message only as `detail` under a general key', () => {
     expect(sendErrorKey('draft', 'x')).toBeNull();
     expect(sendErrorKey('failed', 'Sync interrupted by a server restart — retry Sync to Etsy')).toEqual({ errorKey: 'listings.sendError.interrupted' });
     expect(sendErrorKey('failed', 'Etsy 429 Too Many Requests')).toEqual({ errorKey: 'listings.sendError.rateLimited' });
     expect(sendErrorKey('failed', 'Listing not found')).toEqual({ errorKey: 'listings.sendError.notFound' });
-    expect(sendErrorKey('failed', 'Price must be at least 0.20')).toEqual({ errorKey: 'listings.sendError.rejected' });
-    expect(sendErrorKey('failed', 'boom')).toEqual({ errorKey: 'listings.sendError.generic' });
+    expect(sendErrorKey('failed', 'Price must be at least 0.20')).toEqual({ errorKey: 'listings.sendError.rejected', errorParams: { detail: 'Price must be at least 0.20' } });
+    // With the draft's marketplace known (the grid passes it), Etsy's wording names the exact field.
+    expect(legacySendErrorKey('failed', 'Price must be at least 0.20', 'etsy')).toBe('etsy.validation.pricePositive');
+    expect(legacySendErrorKey('failed', 'Listing not found', 'etsy')).toBe('etsy.draftSync.listingDeleted');
+    expect(sendErrorKey('failed', 'boom')).toEqual({ errorKey: 'listings.sendError.generic', errorParams: { detail: 'boom' } });
     expect(sendErrorKey('failed', null)).toEqual({ errorKey: 'listings.sendError.generic' });
   });
   it('sendErrorKey passes CatalogDraft i18n keys through unchanged', () => {
     expect(sendErrorKey('failed', 'listings.cell.variationsReadOnly')).toEqual({ errorKey: 'listings.cell.variationsReadOnly' });
     expect(sendErrorKey('failed', 'listings.validate.priceInvalid')).toEqual({ errorKey: 'listings.validate.priceInvalid' });
     expect(sendErrorKey('conflict', 'listings.draftError.remoteChanged')).toEqual({ errorKey: 'listings.draftError.remoteChanged' });
-    expect(sendErrorKey('failed', 'Invalid price.')).toEqual({ errorKey: 'listings.sendError.rejected' });
+    expect(sendErrorKey('failed', 'Invalid price.')).toEqual({ errorKey: 'listings.sendError.rejected', errorParams: { detail: 'Invalid price.' } });
+    expect(legacySendErrorKey('failed', 'Invalid price.', 'ebay')).toBe('ebay.draftSync.priceInvalid');
   });
 });
 

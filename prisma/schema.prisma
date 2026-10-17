@@ -932,23 +932,25 @@ model EbayListingDraft {
 /// DB staging for Trendyol, Wix and Shopify edits (listings-grid §9.3). At most one open
 /// draft (draft|failed|conflict|syncing) per product, enforced by lib/catalogDrafts/service.
 model CatalogDraft {
-  id              String    @id @default(cuid())
-  userId          String
-  marketplace     String // 'trendyol' | 'wix' | 'shopify'
-  storeId         String // supplierId | WixSite.id | ShopifyShop.id
-  externalId      String // barcode | wixProductId | shopifyProductId
-  status          String    @default("draft") // draft | syncing | failed | conflict | synced | cancelled
-  baseUpdatedAt   DateTime?
-  baseSnapshot    Json      @default("{}")
-  fieldPatch      Json      @default("{}")
-  queuedActions   Json      @default("[]")
-  batchRequestId  String?
-  lastSyncError   String?
-  scheduledSendAt DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  syncedAt        DateTime?
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                  String    @id @default(cuid())
+  userId              String
+  marketplace         String // 'trendyol' | 'wix' | 'shopify'
+  storeId             String // supplierId | WixSite.id | ShopifyShop.id
+  externalId          String // barcode | wixProductId | shopifyProductId
+  status              String    @default("draft") // draft | syncing | failed | conflict | synced | cancelled
+  baseUpdatedAt       DateTime?
+  baseSnapshot        Json      @default("{}")
+  fieldPatch          Json      @default("{}")
+  queuedActions       Json      @default("[]")
+  batchRequestId      String?
+  lastSyncError       String?
+  /// ICU params of lastSyncError + `detail` (the marketplace's own message, ≤300 chars).
+  lastSyncErrorParams Json?
+  scheduledSendAt     DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  syncedAt            DateTime?
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, marketplace, storeId])
   @@index([status])

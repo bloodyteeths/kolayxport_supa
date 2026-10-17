@@ -85,6 +85,7 @@ import { AiFillCard } from './AiFillCard';
 import { storedDraftSendError, storedDraftSendErrorParams } from './draftSendError';
 import { useStagedMediaUndo } from './useStagedMediaUndo';
 import { isRefusalKey } from './stagedMedia';
+import { failureFixFor, failureFixLabelKey, isGenericFailureKey, marketplaceDetail } from '@/lib/listings/failureFix';
 import { renderSendError, type SendErrorTranslator } from '@/lib/listings/sendError';
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -453,6 +454,11 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
   React.useEffect(() => {
     if (engine.loadState !== 'ready' || deepLinked.current || typeof window === 'undefined') return undefined;
     deepLinked.current = true;
+    // `#review` (the list's "Choose what to keep" on a conflicted listing) opens Review differences.
+    if (window.location.hash === '#review') {
+      setPanel('review');
+      return undefined;
+    }
     const target = resolveEditorHash(window.location.hash, marketplace, mode);
     if (!target) return undefined;
     const id = window.setTimeout(() => scrollTo(target.section, target.field), 0);
@@ -963,18 +969,46 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
   if (draftStatus === 'failed' && draft) {
     const causeKey = adapter.failureCauseKey(draft);
     // ICU params of the stored key come from the attempt that recorded it (also when the adapter added the
-    // `etsy.` / `ebay.` namespace to a bare key); missing params render the generic cause.
+    // `etsy.` / `ebay.` namespace to a bare key); catalog drafts (Trendyol / Wix / Shopify) keep them on the row.
+    const rawDraft = (draft.raw && typeof draft.raw === 'object' ? draft.raw : {}) as { lastSyncErrorParams?: Record<string, string | number> | null };
+    const params = storedDraftSendErrorParams(draft, causeKey) ?? rawDraft.lastSyncErrorParams ?? undefined;
     const cause = tRoot.has(causeKey)
-      ? renderSendError(tRoot as unknown as SendErrorTranslator, { errorKey: causeKey, errorParams: storedDraftSendErrorParams(draft, causeKey) })
+      ? renderSendError(tRoot as unknown as SendErrorTranslator, { errorKey: causeKey, errorParams: params })
       : t('banner.rejected', mp);
+    // The exact reason: under a general cause, the marketplace's own words (founder 2026-10-17, all marketplaces).
+    const rawDetail = typeof params?.detail === 'string' ? params.detail : isGenericFailureKey(causeKey) ? marketplaceDetail(draft.lastSyncError) : null;
+    const fix = failureFixFor(causeKey, 'failed');
+    const fixLabel = tRoot(failureFixLabelKey(fix) as 'listings.fix.resend');
+    const sendAgain: ActionSpec = { id: 'retrySend', label: t('action.sendAgain'), onClick: () => void doSend(), disabled: Boolean(sendDisabledReason) };
+    let action: ActionSpec = sendAgain;
+    if (fix.kind === 'open' && fix.target) {
+      const target = resolveEditorHash(`#${fix.target}`, marketplace, mode);
+      if (target) action = { id: 'fix', label: fixLabel, onClick: () => scrollTo(target.section, target.field) };
+    } else if (fix.kind === 'reconnect') {
+      action = { id: 'fix', label: fixLabel, href: '/ayarlar?tab=connections' };
+    } else if (fix.kind === 'discard') {
+      action = { id: 'fix', label: fixLabel, onClick: () => void doDiscard() };
+    } else if (fix.kind === 'review') {
+      action = { id: 'fix', label: fixLabel, onClick: () => setPanel('review') };
+    }
     banners.push(
       <Banner
         key="failed"
         tone="danger"
         title={t('banner.failed', { ...mp, cause })}
-        action={{ id: 'retrySend', label: t('action.sendAgain'), onClick: () => void doSend(), disabled: Boolean(sendDisabledReason) }}
+        action={action}
         data-testid="le-banner-failed"
-      />,
+      >
+        {rawDetail || fix.kind !== 'discard' ? (
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
+            {rawDetail ? <span data-testid="le-banner-failed-detail">{tRoot('listings.fix.detail', { marketplace: mpName, detail: rawDetail })}</span> : null}
+            <Box sx={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              {action !== sendAgain ? <Button variant="ghost" size="sm" onClick={() => void doSend()} disabled={Boolean(sendDisabledReason)}>{t('action.sendAgain')}</Button> : null}
+              {fix.kind !== 'discard' ? <Button variant="ghost" size="sm" onClick={() => void doDiscard()} data-testid="le-banner-failed-discard">{tRoot('listings.fix.discardAlso')}</Button> : null}
+            </Box>
+          </Box>
+        ) : undefined}
+      </Banner>,
     );
   }
   if (draftStatus === 'conflict') {
@@ -996,10 +1030,13 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
         key="conflict"
         tone="warning"
         title={t('banner.conflict', mp)}
-        action={{ id: 'review', label: t('action.review'), onClick: () => setPanel('review') }}
+        action={{ id: 'review', label: tRoot('listings.fix.review'), onClick: () => setPanel('review') }}
         data-testid="le-banner-conflict"
       >
-        {conflictCause || undefined}
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
+          <span>{conflictCause || tRoot('listings.sendError.conflict')}</span>
+          <Button variant="ghost" size="sm" onClick={() => void doDiscard()} data-testid="le-banner-conflict-discard">{tRoot('listings.fix.discardAlso')}</Button>
+        </Box>
       </Banner>,
     );
   }

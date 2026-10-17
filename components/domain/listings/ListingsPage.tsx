@@ -23,6 +23,7 @@ import { ConnectState } from '@/components/ds/state/ConnectState';
 import { ErrorState } from '@/components/ds/state/ErrorState';
 import { useConfirm } from '@/components/ds/overlay/ConfirmDialog';
 import { useUrlState } from '@/lib/ds/useUrlState';
+import { failureFixFor, failureFixLabelKey } from '@/lib/listings/failureFix';
 import { renderSendError, type SendErrorTranslator } from '@/lib/listings/sendError';
 import { listQueryForEditor, writeEditorNav } from '@/lib/listingEditor/editorNav';
 import { crosslistCreateHref } from '@/lib/listings/legacyHandoff';
@@ -349,6 +350,16 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
     [t],
   );
 
+  // Filled further down (needs openEditor / sendRows / discardRow); read through a ref so the columns stay memoized.
+  const fixActionRef = React.useRef<((r: ListingRow) => { label: string; run: () => void } | null) | null>(null);
+  const errorDetail = React.useCallback(
+    (row: ListingRow) => {
+      const detail = row.sync?.errorParams?.detail;
+      return typeof detail === 'string' && detail ? t('listings.fix.detail', { marketplace: mpName, detail }) : null;
+    },
+    [t, mpName],
+  );
+
   // Section / collection names for the id-valued column (same request as the filter menu, §9.2).
   const fetchedOptions = useFetchedFilterOptions(config, storeId);
   const optionLabels = React.useMemo<ListingCellContext['optionLabels']>(
@@ -367,13 +378,15 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
       sendingIds: staged.sendingIds,
       formatMoney,
       errorText,
+      errorDetail,
+      fixAction: (r: ListingRow) => fixActionRef.current?.(r) ?? null,
       storeCurrency,
       removalKind,
       optionLabels,
       stockManagedIds,
       externalUrl: config.externalUrl,
     }),
-    [config, mpName, staged.overlays, staged.sendingIds, formatMoney, errorText, storeCurrency, removalKind, optionLabels, stockManagedIds],
+    [config, mpName, staged.overlays, staged.sendingIds, formatMoney, errorText, errorDetail, storeCurrency, removalKind, optionLabels, stockManagedIds],
   );
   const columns = React.useMemo(() => listingColumns(t, cellCtx), [t, cellCtx]);
   const dirtyCells = React.useMemo(() => dirtyCellKeys(rows, staged.overlays), [rows, staged.overlays]);
@@ -449,8 +462,9 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
     [config, storeId],
   );
   const openEditor = React.useCallback(
-    (r: ListingRow) => {
-      const href = editorHref(r.id);
+    (r: ListingRow, hash?: string | null) => {
+      const base = editorHref(r.id);
+      const href = base && hash ? `${base}#${encodeURIComponent(hash)}` : base;
       if (!href) {
         openQuick(r);
         return;
@@ -552,6 +566,24 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
     },
     [confirm, staged, toast, t],
   );
+
+  fixActionRef.current = (r: ListingRow) => {
+    const sync = r.sync;
+    if (!sync || (sync.status !== 'sync_failed' && sync.status !== 'conflict')) return null;
+    const fix = failureFixFor(sync.errorKey, sync.status === 'conflict' ? 'conflict' : 'failed');
+    const label = t(failureFixLabelKey(fix) as 'listings.fix.review');
+    switch (fix.kind) {
+      case 'review': return { label, run: () => openEditor(r, 'review') };
+      case 'open': return { label, run: () => openEditor(r, fix.target) };
+      case 'resend': return sendDisabledReason ? null : { label, run: () => sendRows([r]) };
+      case 'reconnect': return { label, run: () => void router.push('/ayarlar?tab=connections') };
+      case 'discard': return { label, run: () => discardRow(r) };
+      case 'onMarketplace': {
+        const url = config.externalUrl?.(r);
+        return url ? { label, run: () => window.open(url, '_blank', 'noopener') } : { label: t('listings.fix.open.listing'), run: () => openEditor(r) };
+      }
+    }
+  };
 
   const sendDeletion = React.useCallback(
     (row: ListingRow) => {
@@ -1358,7 +1390,7 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
           },
         }}
         onRowOpen={openFromRow}
-        onRowEdit={openEditor}
+        onRowEdit={(r) => openEditor(r)}
         // Cards: the whole card opens the editor, so no full-width "Edit" button per card (⋯ stays).
         inlineAction={mobile ? () => null : inlineAction}
         rowActions={rowActions}

@@ -328,7 +328,7 @@ export async function loadRowSync(
       ? {
         include: {
           ...(spec.attemptsRelation
-            ? { [spec.attemptsRelation]: { where: { status: { in: ['failed', 'conflict'] } }, orderBy: { startedAt: 'desc' }, take: ATTEMPTS_FOR_PARAMS, select: { status: true, result: true } } }
+            ? { [spec.attemptsRelation]: { where: { status: { in: ['failed', 'conflict'] } }, orderBy: { startedAt: 'desc' }, take: ATTEMPTS_FOR_PARAMS, select: { status: true, result: true, error: true } } }
             : {}),
           ...(spec.model !== 'CatalogDraft' ? { _count: { select: { media: true } } } : {}),
         },
@@ -343,7 +343,10 @@ export async function loadRowSync(
     if (!key) continue;
     const r = e.row;
     const { changedFields, draft } = spec.overlay(r);
-    const err = sendErrorKey(e.status, r.lastSyncError, spec.attemptsRelation ? r[spec.attemptsRelation] : undefined);
+    const err = draftSendError(
+      { status: e.status, lastSyncError: r.lastSyncError, lastSyncErrorParams: r.lastSyncErrorParams, syncAttempts: spec.attemptsRelation ? r[spec.attemptsRelation] : undefined },
+      { marketplace: spec.model === 'EtsyListingDraft' ? 'etsy' : spec.model === 'EbayListingDraft' ? 'ebay' : undefined },
+    );
     out.set(extId, {
       draftId: String(r.id),
       status: key,

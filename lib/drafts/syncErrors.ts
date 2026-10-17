@@ -65,6 +65,66 @@ function classifyGeneric(err: unknown, f: Family): string {
   return f.failed;
 }
 
+/**
+ * Etsy's own error wording → the specific key that names the problem (and has a fix in lib/listings/failureFix).
+ * Order matters: "Shop section not found" must never read as a missing listing. null = no specific match.
+ * Used for new failures (classifyEtsyDraftSyncError) and for old rows that stored the English text. Pure.
+ */
+export function etsySpecificKey(text: string): string | null {
+  const m = text.toLowerCase();
+  const rules: Array<[RegExp, string]> = [
+    [/shop section not found|shop_section/, 'etsy.validation.shopSectionNotFound'],
+    [/could not find a listing|listing.*(does not exist|not found)|listing_id.*not found/, 'etsy.draftSync.listingDeleted'],
+    [/price must be consistent|price.*linked products|price_on_property/, 'etsy.validation.inventoryPriceInconsistent'],
+    [/quantity must be consistent|quantity.*linked products|quantity_on_property/, 'etsy.draftSync.linkedQuantity'],
+    [/sku must be consistent|sku.*linked products|sku_on_property/, 'etsy.draftSync.linkedSku'],
+    [/property_values|property_id|scale_id|invalid property|variation/, 'etsy.validation.inventoryInconsistentProperties'],
+    [/who_made|when_made|is_supply/, 'etsy.draftSync.whoMadeRequired'],
+    [/shipping_profile|shipping profile/, 'etsy.draftSync.shippingProfileInvalid'],
+    [/return_policy|return policy/, 'etsy.draftSync.returnPolicyInvalid'],
+    [/readiness_state|processing_min|processing_max|processing time/, 'etsy.draftSync.readinessStateRequired'],
+    [/taxonomy/, 'etsy.validation.taxonomyRequired'],
+    [/title.*(too long|140|characters)|(too long|140).*title/, 'etsy.draftSync.titleRejected'],
+    [/title/, 'etsy.draftSync.titleRejected'],
+    [/too many tags|tags.*13|13.*tags/, 'etsy.draftSync.tagsRejected'],
+    [/tag.*(too long|20 characters)/, 'etsy.draftSync.tagsRejected'],
+    [/\btags?\b/, 'etsy.draftSync.tagsRejected'],
+    [/material/, 'etsy.draftSync.materialsRejected'],
+    [/personaliz/, 'etsy.draftSync.personalizationRejected'],
+    [/(at least one|must have an?|requires an?) (image|photo)|no images/, 'etsy.draftSync.imageRequired'],
+    [/item_weight|item_length|item_width|item_height|dimension/, 'etsy.draftSync.dimensionsRejected'],
+    [/billing|payment account|credit card|unpaid|fees? (are )?due/, 'etsy.draftSync.billingRequired'],
+    [/cannot be (renewed|activated|published)|listing (is )?(not active|expired|sold.?out)|invalid state|state transition/, 'etsy.draftSync.stateNotAllowed'],
+    [/description/, 'etsy.draftSync.descriptionRejected'],
+    [/\bprice\b.*(must|invalid|greater|positive)|minimum price|0\.20/, 'etsy.validation.pricePositive'],
+    [/\bquantity\b.*(must|invalid|999|greater)/, 'etsy.draftSync.quantityRejected'],
+  ];
+  for (const [re, key] of rules) if (re.test(m)) return key;
+  return null;
+}
+
+/** eBay's own error wording (Inventory + Trading API) → the specific key. null = no specific match. Pure. */
+export function ebaySpecificKey(text: string): string | null {
+  const m = text.toLowerCase();
+  const rules: Array<[RegExp, string]> = [
+    [/ended listing|listing (has )?ended|not allowed to revise ended/, 'ebay.draftSync.listingEnded'],
+    [/selling limit|exceeded.*limit|limit.*exceeded/, 'ebay.draftSync.sellingLimit'],
+    [/duplicate listing|identical items|same item/, 'ebay.draftSync.duplicateListing'],
+    [/item specific|aspect|25002/, 'ebay.draftSync.missingAspects'],
+    [/location|25604|merchantlocation/, 'ebay.draftSync.locationRequired'],
+    [/fulfillment policy|payment policy|return policy|business polic|shipping service|25007|25008|25009/, 'ebay.draftSync.policyInvalid'],
+    [/category|25019|leaf/, 'ebay.draftSync.categoryInvalid'],
+    [/condition|25021/, 'ebay.draftSync.conditionInvalid'],
+    [/picture|image|photo|25005/, 'ebay.draftSync.imageInvalid'],
+    [/title/, 'ebay.draftSync.titleInvalid'],
+    [/sku/, 'ebay.draftSync.skuExists'],
+    [/price|25003/, 'ebay.draftSync.priceInvalid'],
+    [/quantity|25004/, 'ebay.draftSync.quantityInvalid'],
+  ];
+  for (const [re, key] of rules) if (re.test(m)) return key;
+  return null;
+}
+
 /** Etsy draft sync failure → stored key (+ params for the attempt row). */
 export function classifyEtsyDraftSyncError(err: unknown): StoredDraftError {
   const e = err as any;
@@ -72,9 +132,14 @@ export function classifyEtsyDraftSyncError(err: unknown): StoredDraftError {
     return { key: `etsy.${e.key}`, ...(e.params ? { params: e.params } : {}) };
   }
   const msg = messageOf(err);
-  if (/who_made|when_made|is_supply/i.test(msg)) return { key: ETSY_DRAFT_ERROR.whoMadeRequired };
-  if (/shop section not found|shop_section/i.test(msg)) return { key: ETSY_DRAFT_ERROR.shopSectionNotFound };
-  if (/shipping_profile/i.test(msg)) return { key: ETSY_DRAFT_ERROR.shippingProfileInvalid };
+  // 401/403/429/5xx first (their bodies can mention any field), then Etsy's wording for the exact field.
+  const generic = classifyGeneric(err, {
+    reauthRequired: ETSY_DRAFT_ERROR.reauthRequired, rateLimited: ETSY_DRAFT_ERROR.rateLimited, notFound: ETSY_DRAFT_ERROR.notFoundOnEtsy,
+    rejected: ETSY_DRAFT_ERROR.rejected, unavailable: ETSY_DRAFT_ERROR.unavailable, failed: ETSY_DRAFT_ERROR.failed,
+  });
+  if (generic === ETSY_DRAFT_ERROR.reauthRequired || generic === ETSY_DRAFT_ERROR.rateLimited || generic === ETSY_DRAFT_ERROR.unavailable) return { key: generic };
+  const specific = etsySpecificKey(msg);
+  if (specific) return { key: specific };
   return {
     key: classifyGeneric(err, {
       reauthRequired: ETSY_DRAFT_ERROR.reauthRequired,
@@ -89,6 +154,13 @@ export function classifyEtsyDraftSyncError(err: unknown): StoredDraftError {
 
 /** eBay draft sync failure → stored key. */
 export function classifyEbayDraftSyncError(err: unknown): StoredDraftError {
+  const generic = classifyGeneric(err, {
+    reauthRequired: EBAY_DRAFT_ERROR.reauthRequired, rateLimited: EBAY_DRAFT_ERROR.rateLimited, notFound: EBAY_DRAFT_ERROR.notFound,
+    rejected: EBAY_DRAFT_ERROR.rejected, unavailable: EBAY_DRAFT_ERROR.unavailable, failed: EBAY_DRAFT_ERROR.failed,
+  });
+  if (generic === EBAY_DRAFT_ERROR.reauthRequired || generic === EBAY_DRAFT_ERROR.rateLimited || generic === EBAY_DRAFT_ERROR.unavailable) return { key: generic };
+  const specific = ebaySpecificKey(messageOf(err));
+  if (specific) return { key: specific };
   return {
     key: classifyGeneric(err, {
       reauthRequired: EBAY_DRAFT_ERROR.reauthRequired,

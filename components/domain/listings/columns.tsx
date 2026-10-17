@@ -35,6 +35,10 @@ export type ListingCellContext = {
   formatMoney: (amount: number, currency: string) => string;
   /** Translates a draft error key (draftErrorI18n contract), or null. */
   errorText: (row: ListingRow) => string | null;
+  /** The marketplace's own message for a general failure key ("Etsy said: …"), or null. */
+  errorDetail?: (row: ListingRow) => string | null;
+  /** The failure's fix button (lib/listings/failureFix): label + action, or null. */
+  fixAction?: (row: ListingRow) => { label: string; run: () => void } | null;
   /** Store currency (validation messages, e.g. Etsy's $0.20 minimum). */
   storeCurrency: string;
   /**
@@ -197,16 +201,36 @@ function WillDelete({ row, t, kind }: { row: ListingRow; t: ListingsT; kind: Rem
 function SyncCell({ row, t, ctx }: { row: ListingRow; t: ListingsT; ctx: ListingCellContext }) {
   const key = rowSyncKey(row, ctx.sendingIds, ctx.overlays);
   if (!key) return null;
-  const err = key === 'sync_failed' ? ctx.errorText(row) : null;
+  const failed = key === 'sync_failed' || key === 'conflict';
+  const err = failed ? ctx.errorText(row) : null;
   const pill = <StatusPill domain="sync" status={key} />;
   if (!err) return pill;
-  // The reason is shown, not only in a tooltip: sellers could not tell what to fix without opening each listing.
+  const detail = ctx.errorDetail?.(row) ?? null;
+  const fix = ctx.fixAction?.(row) ?? null;
+  // Reason, the marketplace's own words when our reason is a general one, and the one-tap fix (founder 2026-10-17:
+  // every failure must say exactly why and offer the way out, on every marketplace).
   return (
-    <Box component="span" sx={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', maxWidth: 220 }} data-testid="listing-sync-error">
+    <Box component="span" sx={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', maxWidth: 260 }} data-testid="listing-sync-error">
       {pill}
-      <Box component="span" title={err} sx={{ fontSize: 12, lineHeight: '16px', color: 'error.main', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+      <Box component="span" title={err} sx={{ fontSize: 12, lineHeight: '16px', color: key === 'conflict' ? 'warning.dark' : 'error.main', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
         {err}
       </Box>
+      {detail && (
+        <Box component="span" title={detail} sx={{ fontSize: 12, lineHeight: '16px', color: 'text.secondary', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} data-testid="listing-sync-error-detail">
+          {detail}
+        </Box>
+      )}
+      {fix && (
+        <Box
+          component="button"
+          type="button"
+          onClick={(e: React.MouseEvent) => { e.stopPropagation(); fix.run(); }}
+          sx={{ mt: '2px', p: 0, border: 0, bgcolor: 'transparent', cursor: 'pointer', font: 'inherit', fontSize: 12, lineHeight: '18px', fontWeight: 600, color: 'primary.main', textAlign: 'left', '&:hover': { textDecoration: 'underline' } }}
+          data-testid="listing-sync-fix"
+        >
+          {fix.label} →
+        </Box>
+      )}
     </Box>
   );
 }

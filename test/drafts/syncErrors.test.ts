@@ -27,7 +27,8 @@ describe('draft sync error codes', () => {
     expect(classifyEtsyDraftSyncError(new Error('Etsy API error: 401 - Invalid access token'))).toEqual({ key: ETSY_DRAFT_ERROR.reauthRequired });
     expect(classifyEtsyDraftSyncError(new Error('Etsy API error: 400 - who_made is required'))).toEqual({ key: ETSY_DRAFT_ERROR.whoMadeRequired });
     expect(classifyEtsyDraftSyncError(new Error('Etsy API error: 429 - slow down'))).toEqual({ key: ETSY_DRAFT_ERROR.rateLimited });
-    expect(classifyEtsyDraftSyncError(new Error('Etsy API error: 400 - price must be > 0'))).toEqual({ key: ETSY_DRAFT_ERROR.rejected });
+    expect(classifyEtsyDraftSyncError(new Error('Etsy API error: 400 - price must be > 0'))).toEqual({ key: 'etsy.validation.pricePositive' });
+    expect(classifyEtsyDraftSyncError(new Error('Etsy API error: 400 - bad'))).toEqual({ key: ETSY_DRAFT_ERROR.rejected });
     expect(classifyEtsyDraftSyncError(new Error('weird'))).toEqual({ key: ETSY_DRAFT_ERROR.failed });
     expect(classifyEbayDraftSyncError(new Error('eBay 503 Service Unavailable'))).toEqual({ key: EBAY_DRAFT_ERROR.unavailable });
   });

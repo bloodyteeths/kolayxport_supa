@@ -32,6 +32,7 @@ import type {
 } from '@/lib/listingEditor/types';
 import { diffKeys, fieldEquals } from '../changeSummary';
 import { storedDraftSendError } from '../draftSendError';
+import { legacySendErrorKey } from '@/lib/listings/sendError';
 import type { AdapterContext, AdapterErrorInfo, ListingEditorAdapter, LoadedListing, StageFieldsInput } from './types';
 
 /** Etsy's photo limit per listing. */
@@ -477,14 +478,8 @@ export function etsyFailureCauseKey(draft: Pick<DraftRow, 'status' | 'lastSyncEr
   const raw = typeof draft.lastSyncError === 'string' ? draft.lastSyncError.trim() : '';
   if (raw && I18N_KEY_RE.test(raw)) return raw.startsWith('etsy.') || raw.startsWith('listings.') ? raw : `etsy.${raw}`;
   if (draft.status === 'conflict') return 'listings.sendError.conflict';
-  const msg = raw.toLowerCase();
-  if (!msg) return 'listings.sendError.generic';
-  if (/server restart|interrupted/.test(msg)) return 'listings.sendError.interrupted';
-  if (/token|unauthori[sz]ed|reconnect|invalid_grant|\b401\b|\b403\b|forbidden/.test(msg)) return 'listings.sendError.reconnect';
-  if (/rate limit|too many requests|\b429\b/.test(msg)) return 'listings.sendError.rateLimited';
-  if (/not found|\b404\b|no longer exists|deleted/.test(msg)) return 'listings.sendError.notFound';
-  if (/price|quantity|title|tag|invalid|validation|must|required|\b400\b/.test(msg)) return 'listings.sendError.rejected';
-  return 'listings.sendError.generic';
+  // One classifier for the grid and the editor: Etsy's wording → the exact field (lib/drafts/syncErrors).
+  return legacySendErrorKey(String(draft.status), raw, 'etsy');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────

@@ -37,6 +37,7 @@ import type {
 } from '@/lib/listingEditor/types';
 import { diffKeys, fieldEquals } from '../changeSummary';
 import { storedDraftSendError } from '../draftSendError';
+import { ebaySpecificKey } from '@/lib/drafts/syncErrors';
 import type { AdapterContext, AdapterErrorInfo, ListingEditorAdapter, LoadedListing, StageFieldsInput } from './types';
 
 /** eBay's photo limit per listing. */
@@ -936,6 +937,8 @@ export function ebayFailureCauseKey(draft: Pick<DraftRow, 'status' | 'lastSyncEr
   if (/missing before listing/.test(msg)) return 'ebay.draftSync.createIncompleteShort';
   if (/server restart|interrupted/.test(msg)) return 'listings.sendError.interrupted';
   if (/rate limit|too many requests|\b429\b/.test(msg)) return 'listings.sendError.rateLimited';
+  const specific = ebaySpecificKey(msg);
+  if (specific) return specific;
   if (/not found|\b404\b|no longer exists/.test(msg)) return 'listings.sendError.notFound';
   if (/invalid|validation|must|required|\b400\b|ebay api 4\d\d/.test(msg)) return 'listings.sendError.rejected';
   return 'listings.sendError.generic';

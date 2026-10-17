@@ -21,6 +21,8 @@
  */
 import { randomBytes } from 'crypto';
 import prisma from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
+import { marketplaceDetail } from '@/lib/listings/failureFix';
 import { logger } from '@/lib/logger';
 import { isCatalogDraftEmpty, type EmptyDraftOptions } from '@/lib/drafts/emptyDraft';
 import { channelEnabled, getStockSettings, isStockSyncActive } from '@/lib/stock/settings';
@@ -129,6 +131,8 @@ export type CatalogDraftRecord = {
   queuedActions: CatalogQueuedAction[];
   batchRequestId: string | null;
   lastSyncError: string | null;
+  /** The failure key's params + `detail` (marketplace message). */
+  lastSyncErrorParams: Record<string, string | number> | null;
   scheduledSendAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -383,6 +387,7 @@ export function toRecord(row: any): CatalogDraftRecord {
     queuedActions: asActions(row.queuedActions),
     batchRequestId: row.batchRequestId ?? null,
     lastSyncError: row.lastSyncError ?? null,
+    lastSyncErrorParams: row.lastSyncErrorParams && typeof row.lastSyncErrorParams === 'object' && !Array.isArray(row.lastSyncErrorParams) ? row.lastSyncErrorParams as Record<string, string | number> : null,
     scheduledSendAt: toDate(row.scheduledSendAt),
     createdAt: toDate(row.createdAt) || new Date(0),
     updatedAt: toDate(row.updatedAt) || new Date(0),
@@ -932,7 +937,7 @@ export async function resolveCatalogDraft(
   const res = await d.updateMany({
     // Only if nothing changed the draft since it was read (no stage, send or discard in between).
     where: { id, userId, status: current.status, updatedAt: current.updatedAt },
-    data: { status: 'draft', lastSyncError: null, baseSnapshot, baseUpdatedAt: remote.updatedAt ?? null, fieldPatch },
+    data: { status: 'draft', lastSyncError: null, lastSyncErrorParams: Prisma.DbNull, baseSnapshot, baseUpdatedAt: remote.updatedAt ?? null, fieldPatch },
   });
   if (res.count === 0) throw new CatalogDraftError('DRAFT_NOT_EDITABLE', 'Draft changed while rebasing');
   logger.info('catalogDrafts.resolve', { userId, draftId: id, marketplace: current.marketplace, from: current.status, dropped });
@@ -1120,8 +1125,23 @@ function pushResult(summary: SendSummary, r: SendResult) {
   else if (r.status === 'skipped' && r.reason) summary.skipped.push({ id: r.draftId, reason: r.reason });
 }
 
-async function markFailed(draftId: string, errorKey: string, fieldPatch?: CatalogFieldPatch) {
-  await db().update({ where: { id: draftId }, data: { status: 'failed', lastSyncError: errorKey, batchRequestId: null, ...(fieldPatch ? { fieldPatch } : {}) } });
+/**
+ * Stored with the key so the exact reason survives a reload: the key's ICU params plus `detail`, the
+ * marketplace's own message (shown under general keys such as `remoteFailed`). Pure, exported for tests.
+ */
+export function failureParamsOf(e?: { errorParams?: Record<string, string | number>; message?: string; errorKey?: string } | null): Record<string, string | number> | null {
+  if (!e) return null;
+  const out: Record<string, string | number> = { ...(e.errorParams || {}) };
+  const detail = marketplaceDetail(e.message && e.message !== e.errorKey ? e.message : null);
+  if (detail) out.detail = detail.slice(0, 300);
+  return Object.keys(out).length ? out : null;
+}
+
+async function markFailed(draftId: string, errorKey: string, fieldPatch?: CatalogFieldPatch, e?: Parameters<typeof failureParamsOf>[0]) {
+  await db().update({
+    where: { id: draftId },
+    data: { status: 'failed', lastSyncError: errorKey, lastSyncErrorParams: failureParamsOf(e) ?? Prisma.DbNull, batchRequestId: null, ...(fieldPatch ? { fieldPatch } : {}) },
+  });
 }
 
 /**
@@ -1129,12 +1149,12 @@ async function markFailed(draftId: string, errorKey: string, fieldPatch?: Catalo
  * (externalId rewritten, `create` completed, empty base so nothing conflicts) and is marked failed, so a retry
  * re-runs the remaining steps on that product and never creates a second one.
  */
-async function markCreatedButFailed(draft: CatalogDraftRecord, externalId: string, errorKey: string, now: Date, remaining?: Record<string, unknown>) {
+async function markCreatedButFailed(draft: CatalogDraftRecord, externalId: string, errorKey: string, now: Date, remaining?: Record<string, unknown>, e?: Parameters<typeof failureParamsOf>[0]) {
   const queuedActions = draft.queuedActions.map((a) => (a.type === 'create' && !a.completedAt ? { ...a, completedAt: now.toISOString() } : a));
   await db().update({
     where: { id: draft.id },
     data: {
-      status: 'failed', lastSyncError: errorKey, batchRequestId: null, externalId, queuedActions, baseSnapshot: {}, baseUpdatedAt: null,
+      status: 'failed', lastSyncError: errorKey, lastSyncErrorParams: failureParamsOf(e) ?? Prisma.DbNull, batchRequestId: null, externalId, queuedActions, baseSnapshot: {}, baseUpdatedAt: null,
       ...(remaining ? { fieldPatch: applyRemainingPatch(draft.fieldPatch, remaining) } : {}),
     },
   });
@@ -1153,7 +1173,7 @@ async function markSynced(
   await db().update({
     where: { id: draft.id },
     data: {
-      status: 'synced', syncedAt: now, lastSyncError: null, batchRequestId: null, scheduledSendAt: null, queuedActions: completedActions,
+      status: 'synced', syncedAt: now, lastSyncError: null, lastSyncErrorParams: Prisma.DbNull, batchRequestId: null, scheduledSendAt: null, queuedActions: completedActions,
       ...(externalId ? { externalId } : {}),
     },
   });
@@ -1277,7 +1297,7 @@ export async function sendCatalogDrafts(userId: string, draftIds: string[], opts
     } catch (err) {
       const e = toExecutorError(err);
       for (const draft of drafts) {
-        await markFailed(draft.id, e.errorKey);
+        await markFailed(draft.id, e.errorKey, undefined, e);
         pushResult(summary, { draftId: draft.id, status: 'failed', errorKey: e.errorKey, errorParams: e.errorParams });
       }
       continue;
@@ -1292,7 +1312,7 @@ export async function sendCatalogDrafts(userId: string, draftIds: string[], opts
     } catch (err) {
       const e = toExecutorError(err);
       for (const draft of drafts) {
-        await markFailed(draft.id, e.errorKey);
+        await markFailed(draft.id, e.errorKey, undefined, e);
         pushResult(summary, { draftId: draft.id, status: 'failed', errorKey: e.errorKey, errorParams: e.errorParams });
       }
       continue;
@@ -1350,8 +1370,8 @@ export async function sendCatalogDrafts(userId: string, draftIds: string[], opts
       const out = outcomes.get(draft.id) || new CatalogExecutorError(`${ERR}.remoteFailed`, 'No result from executor');
       if (out instanceof CatalogExecutorError) {
         const created = isCreateDraft(draft) && out.createdExternalId ? out.createdExternalId : undefined;
-        if (created) await markCreatedButFailed(draft, created, out.errorKey, now(), out.remainingPatch);
-        else await markFailed(draft.id, out.errorKey, out.remainingPatch ? applyRemainingPatch(draft.fieldPatch, out.remainingPatch) : undefined);
+        if (created) await markCreatedButFailed(draft, created, out.errorKey, now(), out.remainingPatch, out);
+        else await markFailed(draft.id, out.errorKey, out.remainingPatch ? applyRemainingPatch(draft.fieldPatch, out.remainingPatch) : undefined, out);
         pushResult(summary, {
           draftId: draft.id, status: 'failed', errorKey: out.errorKey, errorParams: out.errorParams,
           ...(created ? { externalId: created } : {}),
@@ -1461,7 +1481,7 @@ export async function resolvePendingCatalogBatches(opts: { userId?: string; exec
         out.synced++;
         healthIds.push(newId || draft.externalId);
       } else if (r.kind === 'failed') {
-        await markFailed(draft.id, r.errorKey);
+        await markFailed(draft.id, r.errorKey, undefined, r);
         out.failed++;
       } else {
         undecided.push(draft);

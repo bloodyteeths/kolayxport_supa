@@ -2580,3 +2580,129 @@ export async function discardDraft(draftId: string, userId: string) {
   void resolveNotification(userId, notificationKeys.draft(String(draft.id)));
   return { success: true };
 }
+
+// ─── Review differences (listing-editor §6.4, BR-3) ─────────────────────────────────────────────────────────────
+// A conflicted draft was a dead end: /api/etsy-drafts/:id/diff and /resolve answered 501 until these existed
+// (founder 2026-10-17: "user will get angry if we don't show why and a solution"). Read-only diff against the live
+// listing; resolve keeps the seller's picks, drops the rest, re-bases on the live listing and returns the draft to
+// `draft`. Neither ever sends to Etsy or touches queued actions.
+
+/** EtsyListing cache column → Etsy listing key, for drafts whose base snapshot came from the cache (older drafts). */
+const CACHE_TO_ETSY_KEY: Record<string, string> = {
+  title: 'title', description: 'description', tags: 'tags', materials: 'materials', quantity: 'quantity', state: 'state',
+  whoMade: 'who_made', whenMade: 'when_made', isSupply: 'is_supply', taxonomyId: 'taxonomy_id', shopSectionId: 'shop_section_id',
+  shippingProfileId: 'shipping_profile_id', returnPolicyId: 'return_policy_id', itemWeight: 'item_weight', itemWeightUnit: 'item_weight_unit',
+  itemLength: 'item_length', itemWidth: 'item_width', itemHeight: 'item_height', itemDimensionsUnit: 'item_dimensions_unit',
+  processingMin: 'processing_min', processingMax: 'processing_max', isPersonalizable: 'is_personalizable',
+  personalizationIsRequired: 'personalization_is_required', personalizationCharCountMax: 'personalization_char_count_max',
+  personalizationInstructions: 'personalization_instructions',
+};
+
+/** The draft's base as Etsy listing keys (raw Etsy snapshot as is; cache snapshot mapped). Exported for tests. */
+export function baseAsEtsyListing(base: any): Record<string, unknown> {
+  if (!base || typeof base !== 'object') return {};
+  if ('listing_id' in base) return base;
+  const out: Record<string, unknown> = {};
+  for (const [from, to] of Object.entries(CACHE_TO_ETSY_KEY)) if (from in base) out[to] = base[from];
+  if (base.priceAmount != null) out.price = { amount: Number(base.priceAmount), divisor: Number(base.priceDivisor) || 100, currency_code: base.priceCurrencyCode || 'USD' };
+  return out;
+}
+
+/** Short, language-neutral summary of an inventory ("$91.00–$118.00 · 91"), for the review row. Exported for tests. */
+export function inventorySummary(inv: any): string | null {
+  const products = Array.isArray(inv?.products) ? inv.products : null;
+  if (!products) return null;
+  const prices: number[] = [];
+  let currency = 'USD';
+  for (const p of products) for (const o of Array.isArray(p?.offerings) ? p.offerings : []) {
+    const pr = o?.price;
+    const v = typeof pr === 'object' && pr ? Number(pr.amount) / (Number(pr.divisor) || 100) : Number(pr);
+    if (Number.isFinite(v)) prices.push(v);
+    if (pr?.currency_code) currency = pr.currency_code;
+  }
+  if (!prices.length) return `${products.length}`;
+  const fmt = (n: number) => `${currency === 'USD' ? '$' : ''}${n.toFixed(2)}${currency === 'USD' ? '' : ` ${currency}`}`;
+  const min = Math.min(...prices); const max = Math.max(...prices);
+  return `${min === max ? fmt(min) : `${fmt(min)}–${fmt(max)}`} · ${products.length}`;
+}
+
+const PATCH_KEYS = { taxonomyPatch: 'taxonomy', inventoryPatch: 'inventory', personalizationPatch: 'personalization', variationImagesPatch: 'variationImages' } as const;
+
+function diffSameValue(key: string, a: unknown, b: unknown): boolean {
+  return comparableListingValue(key, a) === comparableListingValue(key, b);
+}
+
+/** Pure diff of a draft vs the live listing (exported for tests). */
+export function buildDraftDiff(draft: any, remote: any) {
+  const base = baseAsEtsyListing(draft.baseSnapshot);
+  const rawBase = !!draft.baseSnapshot && typeof draft.baseSnapshot === 'object' && 'listing_id' in draft.baseSnapshot;
+  const fieldPatch = (draft.fieldPatch && typeof draft.fieldPatch === 'object') ? draft.fieldPatch as Record<string, unknown> : {};
+  const fields: Array<{ key: string; base: unknown; remote: unknown; draft: unknown; changedRemotely: boolean; inDraft: boolean }> = [];
+  for (const [key, mine] of Object.entries(fieldPatch)) {
+    const known = key in base;
+    fields.push({
+      key, base: base[key], remote: remote?.[key], draft: mine, inDraft: true,
+      // A base without this field cannot prove Etsy left it alone: show it as changed so the seller decides.
+      changedRemotely: known ? !diffSameValue(key, base[key], remote?.[key]) : remote?.[key] !== undefined && !diffSameValue(key, mine, remote?.[key]),
+    });
+  }
+  // Etsy-only edits (no choice, shown so nothing changes silently) — only provable with a raw Etsy base.
+  if (rawBase) {
+    for (const key of Object.values(CACHE_TO_ETSY_KEY).concat('price')) {
+      if (key in fieldPatch || !(key in base) || !(key in (remote ?? {}))) continue;
+      if (!diffSameValue(key, base[key], remote[key])) fields.push({ key, base: base[key], remote: remote[key], draft: undefined, inDraft: false, changedRemotely: true });
+    }
+  }
+  for (const [col, key] of Object.entries(PATCH_KEYS)) {
+    const patch = draft[col];
+    if (isEmptyPatch(patch)) continue;
+    if (key === 'inventory') {
+      const baseInv = rawBase ? draft.baseSnapshot.inventory : undefined;
+      fields.push({
+        key, base: inventorySummary(baseInv), remote: inventorySummary(remote?.inventory), draft: inventorySummary(patch), inDraft: true,
+        changedRemotely: baseInv ? JSON.stringify(baseInv?.products ?? null) !== JSON.stringify(remote?.inventory?.products ?? null) : true,
+      });
+    } else {
+      fields.push({ key, base: undefined, remote: undefined, draft: undefined, inDraft: true, changedRemotely: false });
+    }
+  }
+  return fields;
+}
+
+async function loadOwnedDraft(draftId: string, userId: string) {
+  const draft = await prisma.etsyListingDraft.findFirst({ where: { id: draftId, userId } });
+  if (!draft) throw new EtsyDraftError('DRAFT_NOT_FOUND', 'Draft not found', { status: 404, key: 'draftSync.draftNotFound' });
+  return draft;
+}
+
+export async function getDraftDiff(draftId: string, userId: string) {
+  const draft: any = await loadOwnedDraft(draftId, userId);
+  const token = await getEtsyAccessToken(String(draft.etsyShopId), userId);
+  const remote = await getListingWithInventory(draft.etsyListingId, token);
+  return { remoteUpdatedAt: remote?.updated_timestamp ?? null, fields: buildDraftDiff(draft, remote), queuedActions: draft.queuedActions };
+}
+
+export async function resolveDraft(draftId: string, userId: string, keep: string[]) {
+  const draft: any = await loadOwnedDraft(draftId, userId);
+  if (draft.status === 'syncing') {
+    throw new EtsyDraftError('DRAFT_SYNCING', 'Draft is syncing right now — wait for it to finish', { status: 409, key: 'draftSync.draftSyncing' });
+  }
+  const token = await getEtsyAccessToken(String(draft.etsyShopId), userId);
+  const remote = await getListingWithInventory(draft.etsyListingId, token);
+  const keepSet = new Set(keep);
+  const conflicted = new Set(buildDraftDiff(draft, remote).filter((f) => f.inDraft && f.changedRemotely).map((f) => f.key));
+  const fieldPatch: Record<string, unknown> = { ...((draft.fieldPatch as Record<string, unknown>) || {}) };
+  for (const key of Object.keys(fieldPatch)) if (conflicted.has(key) && !keepSet.has(key)) delete fieldPatch[key];
+  const data: Record<string, unknown> = {
+    fieldPatch,
+    baseSnapshot: remote,
+    baseEtsyUpdatedTimestamp: remote?.updated_timestamp || 0,
+    status: 'draft',
+    lastSyncError: null,
+  };
+  for (const [col, key] of Object.entries(PATCH_KEYS)) if (conflicted.has(key) && !keepSet.has(key)) data[col] = null;
+  await prisma.etsyListingDraft.update({ where: { id: draft.id }, data: data as any });
+  void resolveNotification(userId, notificationKeys.draft(String(draft.id)));
+  const cancelled = await cancelDraftIfEmpty(draft.id, userId);
+  return { success: true, cancelled };
+}

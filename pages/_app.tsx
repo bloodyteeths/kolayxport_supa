@@ -43,7 +43,7 @@ function intlOnError(error: { code?: string }) {
 }
 
 // First path segment of Turkish marketing routes (SiteLayout sets <html lang> itself there).
-const SITE_TR_ROUTES = new Set(['', 'cozumler', 'entegrasyonlar', 'karsilastirma', 'nasil-kullanirim', 'blog', 'kurumsal', 'iletisim', 'ozellikler', 'kvkk-aydinlatma-metni', 'cerez-politikasi', 'gizlilik-politikasi', 'kullanim-sartlari', 'mesafeli-satis-sozlesmesi', 'on-bilgilendirme-formu']);
+const SITE_TR_ROUTES = new Set(['', 'fiyatlandirma', 'cozumler', 'entegrasyonlar', 'karsilastirma', 'nasil-kullanirim', 'blog', 'kurumsal', 'iletisim', 'ozellikler', 'kvkk-aydinlatma-metni', 'cerez-politikasi', 'gizlilik-politikasi', 'kullanim-sartlari', 'mesafeli-satis-sozlesmesi', 'on-bilgilendirme-formu']);
 
 // App routes need the full dictionary: start fetching it while React hydrates, not after.
 if (typeof window !== 'undefined') {

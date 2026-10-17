@@ -32,7 +32,7 @@ export default function SiteHeader({ locale, path, hasTwin, tone }: Props) {
 
   const links = [
     { href: href('/entegrasyonlar'), label: t('nav.integrations') },
-    { href: '/fiyatlandirma', label: t('nav.pricing') },
+    { href: href('/fiyatlandirma'), label: t('nav.pricing') },
     { href: href('/nasil-kullanirim'), label: t('nav.help') },
     { href: href('/blog'), label: t('nav.blog') },
   ];

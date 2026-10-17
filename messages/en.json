@@ -9902,11 +9902,11 @@
         "title": "Questions",
         "trial": {
           "q": "How does the free trial work?",
-          "a": "You get 14 days with Pro features and no card. When it ends you have 3 more days to choose a plan. After that, importing orders, labels and AI pause, and your data stays."
+          "a": "You get 14 days with Pro features and no card. When it ends you have 3 more days to choose a plan. After that, importing orders and creating new labels pause, and your data stays."
         },
         "limits": {
           "q": "What happens if I go over a limit?",
-          "a": "We tell you at 80%. Orders your buyers place still arrive. Scheduled imports pause at 110% of your order limit, and new labels and AI pause at 100% until the next month or until you change plan."
+          "a": "We tell you at 80%. When you reach a limit, manual order imports and new labels pause until the next period or until you change plan. The order limit counts new orders imported into KolayXport; updates to orders you already have don't count."
         },
         "founding": {
           "q": "What is the founding member offer?",
@@ -13311,7 +13311,7 @@
       "near": "{percent}% of your {meter} are used.",
       "nearUpsell": "{plan} includes {limit} a month.",
       "nearUpsellStores": "{plan} includes {limit} stores.",
-      "ordersOver": "Limit reached. Scheduled imports pause at {cap}.",
+      "ordersOver": "Limit reached. Manual imports and new labels pause until the next period.",
       "paused": "Limit reached. Paused until {date}.",
       "limitReached": "Limit reached.",
       "aiHelp": "A text action uses 1 credit, an image uses 10.",

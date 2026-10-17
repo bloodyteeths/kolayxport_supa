@@ -16,7 +16,7 @@ export default function SiteFooter({ locale }: { locale: SiteLocale }) {
       links: [
         { href: href('/ozellikler'), label: t('footer.features') },
         { href: href('/entegrasyonlar'), label: t('footer.integrations') },
-        { href: '/fiyatlandirma', label: t('footer.pricing') },
+        { href: href('/fiyatlandirma'), label: t('footer.pricing') },
         { href: href('/nasil-kullanirim'), label: t('footer.help') },
         { href: href('/blog'), label: t('footer.blog') },
         { href: href('/karsilastirma'), label: t('footer.compare') },

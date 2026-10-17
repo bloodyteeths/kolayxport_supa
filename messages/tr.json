@@ -9902,11 +9902,11 @@
         "title": "Sık sorulan sorular",
         "trial": {
           "q": "Ücretsiz deneme nasıl işler?",
-          "a": "Kart girmeden 14 gün boyunca Pro özelliklerini kullanırsınız. Deneme bitince plan seçmek için 3 gününüz daha olur. Sonrasında sipariş aktarımı, etiketler ve AI duraklar; verileriniz silinmez."
+          "a": "Kart girmeden 14 gün boyunca Pro özelliklerini kullanırsınız. Deneme bitince plan seçmek için 3 gününüz daha olur. Sonrasında sipariş aktarımı ve yeni etiketler durur; verileriniz silinmez."
         },
         "limits": {
           "q": "Bir sınırı aşarsam ne olur?",
-          "a": "%80'e geldiğinizde size haber veririz. Alıcılarınızın verdiği siparişler gelmeye devam eder. Zamanlanmış aktarımlar sipariş sınırınızın %110'unda, yeni etiketler ve AI ise %100'de bir sonraki aya veya plan değiştirene kadar durur."
+          "a": "%80'e geldiğinizde size haber veririz. Sınıra ulaştığınızda elle başlattığınız sipariş aktarımları ve yeni etiketler, bir sonraki döneme ya da plan değiştirene kadar durur. Sipariş sınırı, panele aktarılan yeni siparişleri sayar; zaten aktarılmış siparişlerin güncellenmesi saymaz."
         },
         "founding": {
           "q": "Kurucu üye fırsatı nedir?",
@@ -13311,7 +13311,7 @@
       "near": "{meter} hakkınızın %{percent} kadarı kullanıldı.",
       "nearUpsell": "{plan} planı ayda {limit} içerir.",
       "nearUpsellStores": "{plan} planı {limit} mağaza içerir.",
-      "ordersOver": "Sınıra ulaşıldı. Zamanlanmış aktarımlar {cap} siparişte durur.",
+      "ordersOver": "Sınıra ulaşıldı. Elle başlatılan aktarımlar ve yeni etiketler bir sonraki döneme kadar durur.",
       "paused": "Sınıra ulaşıldı. {date} tarihine kadar duraklatıldı.",
       "limitReached": "Sınıra ulaşıldı.",
       "aiHelp": "Bir metin işlemi 1, bir görsel 10 kredi kullanır.",

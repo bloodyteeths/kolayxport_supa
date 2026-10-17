@@ -4,7 +4,7 @@ import SiteLayout from './site/SiteLayout';
 
 // Public pages rendered through this wrapper that should be indexed (everything else here is
 // a system page: login, logout, auth, 404, errors).
-const INDEXABLE = new Set(['/fiyatlandirma']);
+const INDEXABLE = new Set([]);
 
 /**
  * Wrapper for public pages outside the marketing content system (pricing, login, auth, errors).

@@ -5,13 +5,13 @@ const PRIVATE = [
   '/admin', '/admin/*',
   '/auth/*',
   '/ayarlar', '/dashboard', '/envanter', '/faturalar', '/urunler',
-  '/login', '/logout', '/offline', '/subscribe',
+  '/login', '/logout', '/offline', '/subscribe', '/plan',
   '/404', '/500', '/_error',
 ];
 
 const SITE = 'https://kolayxport.com';
 // Pages without an English twin (no hreflang pair).
-const TR_ONLY = new Set(['/fiyatlandirma']);
+const TR_ONLY = new Set([]);
 
 module.exports = {
   siteUrl: SITE,
@@ -39,7 +39,7 @@ module.exports = {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/app', '/admin', '/auth/', '/api/', '/ayarlar', '/dashboard', '/envanter', '/faturalar', '/urunler', '/login', '/logout', '/offline', '/subscribe'],
+        disallow: ['/app', '/plan', '/admin', '/auth/', '/api/', '/ayarlar', '/dashboard', '/envanter', '/faturalar', '/urunler', '/login', '/logout', '/offline', '/subscribe'],
       },
     ],
   },

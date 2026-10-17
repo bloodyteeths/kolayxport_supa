@@ -2,7 +2,7 @@
 const defaultSEOConfig = {
   defaultTitle: 'KolayXport | AI Destekli E-Ticaret Komuta Merkezi - Etsy, eBay & Amazon Araçları',
   description:
-    'Etsy, eBay, Amazon, Trendyol, Wix ve Shopify entegrasyonu. AI listeleme optimizasyonu, pazar araştırması, otomatik kargo etiketi (UPS, FedEx, MNG) ve sipariş yönetimi. 30 gün ücretsiz deneme!',
+    'Etsy, eBay, Amazon, Trendyol, Wix ve Shopify entegrasyonu. AI listeleme optimizasyonu, pazar araştırması, otomatik kargo etiketi (UPS, FedEx, MNG) ve sipariş yönetimi. 14 gün ücretsiz deneme, kredi kartı gerekmez.',
   additionalMetaTags: [
     {
       name: 'keywords',
@@ -29,20 +29,7 @@ const defaultSEOConfig = {
       content: 'Turkey'
     }
   ],
-  languageAlternates: [
-    {
-      hrefLang: 'tr',
-      href: 'https://kolayxport.com',
-    },
-    {
-      hrefLang: 'tr-TR',
-      href: 'https://kolayxport.com',
-    },
-    {
-      hrefLang: 'x-default',
-      href: 'https://kolayxport.com',
-    }
-  ],
+  // hreflang is set per page (PublicLayout `seo.languageAlternates`); a site-wide default would point every page at the home page.
   openGraph: {
     type: 'website',
     locale: 'tr_TR',

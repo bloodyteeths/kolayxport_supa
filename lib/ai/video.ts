@@ -5,9 +5,10 @@
 //  - 'gemini' (GEMINI_API_KEY): works for product-only photos. Verified 2026-10-17: the Gemini API REFUSES input
 //    photos showing a child ("can't create videos from input images containing photorealistic children"), even with
 //    personGeneration 'allow_adult'; 'allow_all' is "currently not supported" there.
-//  - 'vertex' (Google Cloud project, VERTEX_PROJECT + VERTEX_LOCATION + GOOGLE_APPLICATION_CREDENTIALS): Veo on
-//    Vertex AI accepts personGeneration 'allow_all' for image-to-video once Google allowlists the project — the route
-//    for kids' clothing shown on child models. Used automatically when configured.
+//  - 'vertex' (Google Cloud project kolayxport-video; VERTEX_PROJECT + VERTEX_LOCATION + VERTEX_CREDENTIALS_FILE, a
+//    service account with only the Agent Platform User role): Veo on Vertex AI with personGeneration 'allow_all'.
+//    Verified 2026-10-17: it makes the video from the founder's photo of a child model wearing the dress (88 s, the
+//    girl turns to show the gown) — the route for kids' clothing. Used automatically when configured.
 import fs from 'fs';
 import path from 'path';
 
@@ -22,13 +23,14 @@ export const VIDEO_UPLOAD_ROOT = process.env.AI_VIDEO_UPLOAD_DIR || path.join(pr
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
-export function videoModel(quality: 'fast' | 'best'): string {
-  if (quality === 'best') return process.env.VEO_MODEL || 'veo-3.1-generate-preview';
-  return process.env.VEO_FAST_MODEL || 'veo-3.1-fast-generate-preview';
+export function vertexConfigured(): boolean {
+  return Boolean(process.env.VERTEX_PROJECT && process.env.VERTEX_CREDENTIALS_FILE);
 }
 
-export function vertexConfigured(): boolean {
-  return Boolean(process.env.VERTEX_PROJECT && process.env.GOOGLE_APPLICATION_CREDENTIALS);
+/** Vertex uses the GA model ids, the Gemini API the -preview ones. */
+export function videoModel(quality: 'fast' | 'best', provider: VideoProvider = activeVideoProvider()): string {
+  if (provider === 'vertex') return quality === 'best' ? (process.env.VEO_MODEL || 'veo-3.1-generate-001') : (process.env.VEO_FAST_MODEL || 'veo-3.1-fast-generate-001');
+  return quality === 'best' ? 'veo-3.1-generate-preview' : 'veo-3.1-fast-generate-preview';
 }
 
 export function activeVideoProvider(): VideoProvider {
@@ -56,7 +58,8 @@ export function classifyVideoFilter(reasons: unknown): 'videoChildPhoto' | 'vide
 
 async function vertexToken(): Promise<string> {
   const { GoogleAuth } = await import('google-auth-library');
-  const auth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
+  // Its own key file (not GOOGLE_APPLICATION_CREDENTIALS, which would change every other Google client in the app).
+  const auth = new GoogleAuth({ keyFile: process.env.VERTEX_CREDENTIALS_FILE, scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
   const client = await auth.getClient();
   const t = await client.getAccessToken();
   if (!t?.token) throw new Error('Vertex AI token unavailable');
@@ -76,7 +79,7 @@ export async function startVideo(input: {
   quality: 'fast' | 'best';
 }): Promise<VideoStart> {
   const provider = activeVideoProvider();
-  const model = videoModel(input.quality);
+  const model = videoModel(input.quality, provider);
   const body = {
     instances: [{ prompt: input.prompt, image: { bytesBase64Encoded: input.image.data, mimeType: input.image.mimeType } }],
     parameters: {

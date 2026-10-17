@@ -15135,7 +15135,7 @@
         "image": "Bu fotoğraf okunamadı. Başka bir fotoğraf seçin.",
         "use": "Video ilana eklenemedi. Tekrar deneyin.",
         "childPhoto": "Google bu fotoğraftan video oluşturmuyor: fotoğrafta bir çocuk var.",
-        "childPhotoHint": "Ürünü askıda, cansız mankende veya serili gösteren bir fotoğraf seçin. Çocuk modelli videolar için Google onayı bekleniyor; onay gelince burada da çalışacak.",
+        "childPhotoHint": "Ürünü askıda, cansız mankende veya serili gösteren bir fotoğraf seçin.",
         "filtered": "Google bu isteği güvenlik nedeniyle reddetti. Başka bir fotoğraf veya açıklama deneyin.",
         "failed": "Video oluşturulamadı. Tekrar deneyin."
       }

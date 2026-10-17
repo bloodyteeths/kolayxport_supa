@@ -53,6 +53,14 @@ export function AiVideoPanel({ open, onClose, images, onUse, defaultPrompt }: Ai
   const startedAt = useRef<number>(0);
 
   useEffect(() => { if (!source && images[0]) setSource(images[0].id); }, [images, source]);
+  // Format follows the photo (a landscape photo in a vertical video gets black bars); the seller can still change it.
+  useEffect(() => {
+    const img = images.find((i) => i.id === source);
+    if (!img || typeof window === 'undefined') return;
+    const probe = new window.Image();
+    probe.onload = () => setAspect(probe.naturalWidth > probe.naturalHeight * 1.1 ? '16:9' : '9:16');
+    probe.src = img.src;
+  }, [source, images]);
   useEffect(() => { if (open && !prompt && defaultPrompt) setPrompt(defaultPrompt); }, [open, defaultPrompt, prompt]);
 
   const cur = jobs.find((j) => j.id === current) ?? null;

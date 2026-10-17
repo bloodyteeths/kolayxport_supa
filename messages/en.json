@@ -15135,7 +15135,7 @@
         "image": "Couldn't read this photo. Pick another one.",
         "use": "Couldn't add the video to the listing. Try again.",
         "childPhoto": "Google won't make a video from this photo: it shows a child.",
-        "childPhotoHint": "Pick a photo of the product on a hanger, mannequin or flat lay. Videos with child models need Google approval; once approved they work here too.",
+        "childPhotoHint": "Pick a photo of the product on a hanger, mannequin or flat lay.",
         "filtered": "Google refused this request for safety reasons. Try another photo or description.",
         "failed": "Couldn't make the video. Try again."
       }

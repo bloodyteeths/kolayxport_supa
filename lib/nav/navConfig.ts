@@ -60,6 +60,7 @@ export type NavItemId =
   | 'stock-sync'
   | 'connect-store'
   | 'research'
+  | 'video-studio'
   | 'reports'
   | 'notifications'
   | 'settings'
@@ -225,6 +226,13 @@ export const NAV_CONFIG: readonly NavGroupConfig[] = [
         icon: 'research',
         gKey: 'r',
         match: ['/app/research', '/app/research/*'],
+      },
+      {
+        id: 'video-studio',
+        labelKey: 'nav.items.videoStudio',
+        href: '/app/video-studio',
+        icon: 'video',
+        match: ['/app/video-studio', '/app/video-studio/*'],
       },
       ...(REPORTS_HOME
         ? [

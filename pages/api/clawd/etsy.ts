@@ -35,7 +35,6 @@ import {
     untrackKeywords,
     type RankPageGetter,
 } from '@/lib/research/rank';
-import { GEMINI_TEXT_MODEL } from '@/lib/ai/models';
 
 /**
  * Legacy research price summary in USD (RESEARCH_REDESIGN §6.3), through
@@ -3311,12 +3310,8 @@ export default async function handler(
             const missingTags = topTags.filter(t => !userTags.has(t.tag.toLowerCase()) && !userTitleWords.has(t.tag.toLowerCase()));
 
             // 7. Call Gemini AI for analysis
-            const { GoogleGenerativeAI } = await import('@google/generative-ai');
-            const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-            const model = genAI.getGenerativeModel({
-                model: GEMINI_TEXT_MODEL,
-                generationConfig: { responseMimeType: 'application/json' } as any,
-            });
+            const { getAiModel } = await import('@/lib/ai/gemini');
+            const model = getAiModel({ feature: 'etsy.keyword_ranking', tier: 'deep', marketplace: 'etsy' });
 
             const aiPrompt = `You are an Etsy search ranking expert. Analyze why this listing ranks #${userRank ?? '500+'} for "${keyword}" and give SPECIFIC, ACTIONABLE steps to reach page 1 (top 48).
 

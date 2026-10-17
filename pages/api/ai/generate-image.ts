@@ -1,8 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import { GoogleGenAI } from '@google/genai';
+import { isRetryableAiError, logUsage } from '@/lib/ai/gemini';
+import { modelChain } from '@/lib/ai/models';
 import sharp from 'sharp';
-import { GEMINI_IMAGE_MODEL } from '@/lib/ai/models';
 
 export const config = {
   api: {
@@ -12,9 +13,8 @@ export const config = {
   },
 };
 
-// Gemini image generation model — Nano Banana 2 (best quality-to-speed, up to 4K).
-// Use the GA model id; the "-preview" alias is being retired. Override via env.
-const MODEL = GEMINI_IMAGE_MODEL;
+// Gemini image models (lib/ai/models): Nano Banana Pro first (benchmarked 2026-10-17: whole product in frame, most
+// faithful colours), then older image models if it is unavailable. GEMINI_IMAGE_MODEL overrides the first.
 
 // NOTE: Gemini API image output carries only an invisible SynthID watermark —
 // there is no visible logo/strip (that sparkle mark is added by the consumer
@@ -165,14 +165,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     parts.push({ text: enhancedPrompt });
 
-    const response = await ai.models.generateContent({
-      model: MODEL,
-      contents: [{ role: 'user', parts }],
-      config: {
-        responseModalities: ['IMAGE', 'TEXT'],
-        imageConfig: { aspectRatio, imageSize: IMAGE_SIZE },
-      },
-    });
+    let response: Awaited<ReturnType<typeof ai.models.generateContent>> | null = null;
+    let lastErr: unknown = null;
+    for (const model of modelChain('image')) {
+      const started = Date.now();
+      try {
+        response = await ai.models.generateContent({
+          model,
+          contents: [{ role: 'user', parts }],
+          config: {
+            responseModalities: ['IMAGE', 'TEXT'],
+            imageConfig: { aspectRatio, imageSize: IMAGE_SIZE },
+          },
+        });
+        void logUsage({ userId: user.id, feature: 'image.generate', model, ok: true, usage: response.usageMetadata, ms: Date.now() - started, refine: refCount > 0, images: 1 });
+        break;
+      } catch (err) {
+        lastErr = err;
+        void logUsage({ userId: user.id, feature: 'image.generate', model, ok: false, ms: Date.now() - started, refine: refCount > 0, error: (err as Error)?.message });
+        if (!isRetryableAiError(err)) throw err;
+      }
+    }
+    if (!response) throw lastErr ?? new Error('No image model available');
 
     // Extract image from response
     const candidates = response.candidates;

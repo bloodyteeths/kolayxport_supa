@@ -98,6 +98,8 @@ export function TitleSection({ id = 'title', aiTitle, aiDescription }: TitleSect
               onUse={() => aiTitle.value && use('title', aiTitle.value, aiTitle.dismiss)}
               onDismiss={aiTitle.dismiss}
               onRetry={aiTitle.run}
+              onRefine={aiTitle.refine}
+              refineChips={aiTitle.refineChips}
               data-testid="le-title-suggestion"
             />
           ) : null}
@@ -137,6 +139,8 @@ export function TitleSection({ id = 'title', aiTitle, aiDescription }: TitleSect
               onUse={() => aiDescription.value && use('description', aiDescription.value, aiDescription.dismiss)}
               onDismiss={aiDescription.dismiss}
               onRetry={aiDescription.run}
+              onRefine={aiDescription.refine}
+              refineChips={aiDescription.refineChips}
               data-testid="le-description-suggestion"
             />
           ) : null}

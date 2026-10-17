@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getAiModel } from '@/lib/ai/gemini';
 import { logger } from '../logger';
 import { callEbayRateLimited } from '../integrations/ebayRateLimiter';
 import { fetchTrendyolCategoryProducts, getExchangeRate } from '../integrations/trendyolSearch';
@@ -8,7 +8,6 @@ import { matchAndCalculateCategory } from './matcher';
 import { getTrendyolIndexForCategory, isCategoryFresh as isTrendyolFresh } from './trendyolIndexer';
 import { getEbayIndexForCategory } from './ebayIndexer';
 import type { ArbitrageResult, EbayComparable, TrendyolProduct } from './types';
-import { GEMINI_TEXT_MODEL } from '@/lib/ai/models';
 
 const EBAY_API_BASE = 'https://api.ebay.com';
 
@@ -59,11 +58,7 @@ export async function batchTranslateTitles(
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(geminiKey);
-    const model = genAI.getGenerativeModel({
-      model: GEMINI_TEXT_MODEL,
-      generationConfig: { responseMimeType: 'application/json' } as any,
-    });
+    const model = getAiModel({ feature: 'arbitrage.translate' });
 
     const batch = products.slice(0, 25).map(p => ({
       id: p.id,

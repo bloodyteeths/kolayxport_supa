@@ -11,13 +11,12 @@
  * (outOfScope); until then a per-user limiter (10/min) protects the Gemini key.
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getAiModel, parseAiJson } from '@/lib/ai/gemini';
 import { getAuthUser } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 import { coerceAiString, looksGarbled } from '@/lib/etsy/seoRules';
 import { readShared, requestLocale, sha1, userRateLimit, writeShared } from '@/lib/research/etsySearch';
 import { EXPLAIN_TOOLS, type ExplainData, type ExplainRequest, type ExplainTool, type ResearchErrorBody, type ResearchResponse } from '@/lib/research/types';
-import { GEMINI_TEXT_MODEL } from '@/lib/ai/models';
 
 export const EXPLAIN_MAX_CHARS = 600;
 const MAX_METRICS_JSON = 4_000;
@@ -26,21 +25,16 @@ const CACHE_TTL_MS = 24 * 3_600_000;
 // ─── Gemini (JSON mode) ─────────────────────────────────────────────────────
 
 /** One JSON-mode Gemini call; returns the parsed object or null (missing key, error, unparsable output). */
-export async function geminiJson(prompt: string, timeoutMs = 25_000): Promise<Record<string, unknown> | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
+export async function geminiJson(prompt: string, timeoutMs = 25_000, feature = 'research.explain', userId?: string | null): Promise<Record<string, unknown> | null> {
+  if (!process.env.GEMINI_API_KEY) return null;
   try {
-    const model = new GoogleGenerativeAI(apiKey).getGenerativeModel({
-      model: GEMINI_TEXT_MODEL,
-      generationConfig: { responseMimeType: 'application/json', temperature: 0.3 } as never,
-    });
+    // Shared AI client (lib/ai): model chain + fallback and usage log. No seller preferences: these explain numbers.
     const result = await Promise.race([
-      model.generateContent(prompt),
+      getAiModel({ feature, userId, temperature: 0.3 }).generateContent(prompt),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
     ]);
     if (!result) return null;
-    const raw = result.response.text().trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
-    const parsed = JSON.parse(raw);
+    const parsed = parseAiJson(result.response.text());
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
   } catch (err) {
     logger.warn('[research] Gemini call failed', { error: (err as Error)?.message });

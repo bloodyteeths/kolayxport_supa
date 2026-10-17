@@ -46,7 +46,7 @@ describe('tabs', () => {
     expect(tabSlices(null)).toEqual([]);
   });
   it('groups follow §1.2 order', () => {
-    expect(SETTINGS_NAV_GROUPS.flatMap((g) => g.items)).toEqual(['connections', 'apiKeys', 'senderProfile', 'billing', 'preferences', 'syncAdvanced']);
+    expect(SETTINGS_NAV_GROUPS.flatMap((g) => g.items)).toEqual(['connections', 'apiKeys', 'ai', 'senderProfile', 'billing', 'preferences', 'syncAdvanced']);
     expect(CREDENTIAL_PROVIDERS).toHaveLength(7);
   });
 });

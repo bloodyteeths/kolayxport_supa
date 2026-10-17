@@ -79,6 +79,9 @@ model User {
   savedReplies            SavedReply[]
   researchWatches         ResearchWatch[]
   notificationPreferences NotificationPreference[]
+  aiPreferences           AiPreference[]
+  aiUsage                 AiUsage[]
+  aiVideoJobs             AiVideoJob[]
   notificationSettings    NotificationSettings?
   stockSettings           StockSettings?
   stockItems              StockItem[]
@@ -2307,4 +2310,91 @@ model SavedReply {
 
   @@unique([userId, title])
   @@index([userId, usageCount])
+}
+
+/// Seller's standing instructions for every AI feature (founder 2026-10-17: "users enter their own preferences so
+/// AI generates results according to those criteria"). marketplace = 'all' (defaults) or etsy/ebay/trendyol/wix/
+/// shopify/amazon (overrides). Injected by lib/ai into every prompt; marketplace rules still win.
+model AiPreference {
+  id          String   @id @default(cuid())
+  userId      String
+  marketplace String   @default("all")
+  /// e.g. "warm and friendly", "luxury", "short and factual"
+  tone        String?
+  /// words / facts to always use ("handmade", "made in Turkey")
+  include     String[] @default([])
+  /// words never to use ("cheap", competitor brands)
+  avoid       String[] @default([])
+  brand       String?
+  /// free text, ≤ 1000 chars
+  notes       String?
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, marketplace])
+}
+
+/// One row per AI call (lib/ai): cost tracking and the base for AI credit enforcement.
+model AiUsage {
+  id             String   @id @default(cuid())
+  userId         String?
+  feature        String
+  model          String
+  ok             Boolean  @default(true)
+  inputTokens    Int      @default(0)
+  outputTokens   Int      @default(0)
+  thinkingTokens Int      @default(0)
+  images         Int      @default(0)
+  ms             Int      @default(0)
+  refine         Boolean  @default(false)
+  error          String?
+  createdAt      DateTime @default(now())
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([feature, createdAt])
+}
+
+/// One AI product video (Veo). Long-running: started, then polled until done; the mp4 is stored on the VPS
+/// (uploads/ai-videos/<userId>/<id>.mp4). A follow-up ("slower camera") is a new job with parentId. provider =
+/// 'gemini' (API key) or 'vertex' (Google Cloud project, needed for photos with child models — allowlisted).
+model AiVideoJob {
+  id            String   @id @default(cuid())
+  userId        String
+  parentId      String?
+  provider      String   @default("gemini")
+  model         String
+  status        String   @default("running") // running | done | failed
+  prompt        String
+  instruction   String?
+  sourceUrl     String?
+  aspectRatio   String   @default("9:16")
+  durationSec   Int      @default(8)
+  operation     String?
+  filePath      String?
+  errorKey      String?
+  errorDetail   String?
+  /// Video Studio: image | interpolate | reference | extend | edit
+  mode          String   @default("image")
+  /// lib/ai/videoDirector VideoDirection (preset, camera, expression, scene, …)
+  direction     Json?
+  /// last frame + reference images (https urls or studio-upload:<id>)
+  endUrl        String?
+  referenceUrls String[] @default([])
+  resolution    String   @default("720p")
+  quality       String   @default("fast")
+  seed          Int?
+  /// one generation with N variants shares a groupId; variantIndex 0..N-1
+  groupId       String?
+  variantIndex  Int      @default(0)
+  favorite      Boolean  @default(false)
+  /// listing it was made for: "<marketplace>:<listingId>[:<storeId>]" + its title
+  listingRef    String?
+  title         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([groupId])
 }

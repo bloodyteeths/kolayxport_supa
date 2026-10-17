@@ -9,6 +9,7 @@
 // The server builds the context itself (never trusts client text), validates Gemini's output, and never
 // writes to a marketplace. Logs carry ids, codes and lengths only — never message text (PII).
 
+import { getAiModel, refineFromBody, type AiRefine } from '@/lib/ai/gemini';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import prisma from '@/lib/prisma';
@@ -26,7 +27,6 @@ import {
   type DraftDb,
   type DraftReplyErrorCode,
 } from '@/lib/messages/draftReply';
-import { GEMINI_TEXT_MODEL } from '@/lib/ai/models';
 
 const SOURCE_STATUS: Record<DraftSourceError['code'], number> = { notFound: 404, alreadyAnswered: 409, notAnswerable: 409, unavailable: 502 };
 
@@ -34,14 +34,9 @@ function fail(res: NextApiResponse, status: number, code: DraftReplyErrorCode) {
   return res.status(status).json({ code });
 }
 
-async function geminiGenerate(prompt: string): Promise<string> {
-  const { GoogleGenerativeAI } = await import('@google/generative-ai');
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string);
-  const model = genAI.getGenerativeModel({
-    model: GEMINI_TEXT_MODEL,
-    generationConfig: { responseMimeType: 'application/json', temperature: 0.4 } as any,
-  });
-  const response = await model.generateContent(prompt);
+/** Shared AI client (lib/ai): the seller's preferences for this marketplace, follow-up ("make it shorter"), usage log. */
+async function geminiGenerate(prompt: string, ctx: { userId: string; platform: 'wix' | 'trendyol'; refine: AiRefine | null }): Promise<string> {
+  const response = await getAiModel({ feature: `messages.draft_reply.${ctx.platform}`, userId: ctx.userId, marketplace: ctx.platform, refine: ctx.refine, temperature: 0.4 }).generateContent(prompt);
   return response.response.text();
 }
 
@@ -103,7 +98,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // TODO(billing track, tiers.md D10 / §2b): AI-credit metering. Reserve 1 credit before this call and
     // refund it in `finally` on a non-200 outcome, once lib/billing exposes the meter. Until then only the
     // in-memory 20/min limit applies.
-    const outcome = await draftFromContext(ctx, geminiGenerate);
+    const outcome = await draftFromContext(ctx, (prompt) => geminiGenerate(prompt, { userId: user.id, platform, refine: refineFromBody(req.body) }));
     if (outcome.status !== 200) {
       logger.warn('[DRAFT_REPLY] draft rejected', { platform, code: outcome.body.code, reason: outcome.reason });
       return res.status(outcome.status).json(outcome.body);

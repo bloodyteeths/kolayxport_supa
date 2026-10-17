@@ -8,6 +8,7 @@
 // Sections (Groups B/C/D) render their own heading, skeleton and errors; this file only gates nothing,
 // routes, guards unsaved edits and handles the OAuth return (`ayarlar.tsx` block kept verbatim, toasts on
 // the DS `useToast`).
+import { AiSettingsPanel } from './AiSettingsPanel';
 import * as React from 'react';
 import NextLink from 'next/link';
 import { useRouter } from 'next/router';
@@ -407,6 +408,8 @@ export default function SettingsPage() {
         return <ConnectionsSection refreshKey={connectionsRefreshKey} />;
       case 'apiKeys':
         return <CredentialsSection />;
+      case 'ai':
+        return <AiSettingsPanel />;
       case 'senderProfile':
         return (
           <SenderForm

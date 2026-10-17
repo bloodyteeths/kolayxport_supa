@@ -58,6 +58,9 @@ export interface FieldAiState<V = string> {
   dismiss: () => void;
   /** AI credits Try again costs (CRITIQUE X6). */
   credits?: number;
+  /** Follow-up: revise the suggestion with the seller's instruction. */
+  refine?: (instruction: string) => void;
+  refineChips?: string[];
 }
 
 /** Market price band for Price & inventory (from `search_market` → `priceStats`, USD). */

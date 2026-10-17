@@ -8,7 +8,6 @@ import {
 } from '../../../lib/integrations/trendyolSearch';
 import type { TrendyolProduct } from '../../../lib/arbitrage/types';
 import { summarizeAmounts, groupMedian, type PriceSummary } from '../../../lib/research/stats';
-import { GEMINI_TEXT_MODEL } from '@/lib/ai/models';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const action = req.query.action as string;
@@ -142,9 +141,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(500).json({ error: 'Gemini API key not configured' });
       }
 
-      const { GoogleGenerativeAI } = await import('@google/generative-ai');
-      const genAI = new GoogleGenerativeAI(geminiKey);
-      const model = genAI.getGenerativeModel({ model: GEMINI_TEXT_MODEL });
+      const { getAiModel } = await import('@/lib/ai/gemini');
+      const model = getAiModel({ feature: 'trendyol.market_report', tier: 'deep', json: false });
 
       const analysis = analyzeProducts(products);
       const topProducts = products.slice(0, 20).map(p => ({

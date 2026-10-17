@@ -15906,7 +15906,12 @@
         "body": "Use the product finder, keyword explorer, listing doctor and shop tracker to decide what to sell, how to price it and which tags to use.",
         "action": "Go to Market research"
       },
-      "contact": "Stuck somewhere? Write to destek@kolayxport.com."
+      "contact": "Stuck somewhere? Write to destek@kolayxport.com.",
+      "library": {
+        "title": "Video guides",
+        "body": "A short narrated video and a step-by-step guide for every task: connecting a shop, AI listings, bulk editing, research, shipping labels, ETGB and more.",
+        "action": "Open the guide library"
+      }
     }
   },
   "site": {

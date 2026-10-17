@@ -51,6 +51,14 @@ export default function HowToUsePage() {
           </Box>
         ))}
       </Box>
+      <Section variant="card" sx={{ mt: '16px', mb: 0 }}>
+        <Box component="h2" sx={{ m: 0, fontSize: 15, lineHeight: '22px', fontWeight: 600, color: n[900] }}>{t('library.title')}</Box>
+        <Box sx={{ mt: '4px', fontSize: 14, lineHeight: '20px', color: n[700] }}>{t('library.body')}</Box>
+        <Box sx={{ mt: '10px' }}>
+          {/* Public library (content/tr/guides, generated with the videos by scripts/tutorials). */}
+          <Button variant="primary" size="sm" href="/nasil-kullanirim">{t('library.action')}</Button>
+        </Box>
+      </Section>
       <Box sx={{ mt: '16px', fontSize: 13, color: n[600] }}>{t('contact')}</Box>
     </Page>
   );

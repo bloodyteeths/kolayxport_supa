@@ -15906,7 +15906,12 @@
         "body": "Ürün bulucu, anahtar kelime gezgini, ilan doktoru ve mağaza takibi ile ne satacağınıza, fiyatınıza ve etiketlerinize karar verin.",
         "action": "Pazar araştırmasına git"
       },
-      "contact": "Takıldığınız bir yer olursa destek@kolayxport.com adresine yazın."
+      "contact": "Takıldığınız bir yer olursa destek@kolayxport.com adresine yazın.",
+      "library": {
+        "title": "Videolu rehberler",
+        "body": "Her iş için kısa, Türkçe seslendirmeli video ve adım adım yazılı rehber: mağaza bağlama, yapay zekâ ile ilan, toplu düzenleme, araştırma, kargo etiketi, ETGB ve daha fazlası.",
+        "action": "Rehber kütüphanesini açın"
+      }
     }
   },
   "site": {

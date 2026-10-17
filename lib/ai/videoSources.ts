@@ -126,6 +126,32 @@ export async function framesFromVideo(userId: string, file: string, keep = 6): P
 }
 
 /**
+ * The colour of a photo's free edges when they are plain (studio white, a seamless backdrop): the edges that the
+ * padding will continue — top + bottom strips for a wide photo in a tall frame, left + right for a tall one.
+ * null when the edges are busy (a real room, outdoors).
+ */
+async function plainEdgeColour(buf: Buffer, padded: 'horizontal' | 'vertical'): Promise<{ r: number; g: number; b: number } | null> {
+  const img = sharp(buf);
+  const meta = await img.metadata();
+  const w = meta.width ?? 0;
+  const h = meta.height ?? 0;
+  if (!w || !h) return null;
+  const band = Math.max(2, Math.round((padded === 'horizontal' ? h : w) * 0.03));
+  const strips = padded === 'horizontal'
+    ? [{ left: 0, top: 0, width: w, height: band }, { left: 0, top: h - band, width: w, height: band }]
+    : [{ left: 0, top: 0, width: band, height: h }, { left: w - band, top: 0, width: band, height: h }];
+  // stats() reads its own input: cut each strip out first.
+  const stats = await Promise.all(strips.map(async (r) => sharp(await sharp(buf).extract(r).removeAlpha().png().toBuffer()).stats()));
+  const channels = stats.flatMap((st) => st.channels.slice(0, 3));
+  if (channels.some((c) => c.stdev > 10)) return null;
+  const mean = (i: number) => Math.round(stats.reduce((sum, st) => sum + st.channels[i].mean, 0) / stats.length);
+  const r = mean(0), g = mean(1), b = mean(2);
+  // Both edges must be the same colour too.
+  const far = stats.some((st) => Math.abs(st.channels[0].mean - r) > 12 || Math.abs(st.channels[1].mean - g) > 12 || Math.abs(st.channels[2].mean - b) > 12);
+  return far ? null : { r, g, b };
+}
+
+/**
  * An anchor frame shaped like the video (9:16 / 16:9). Veo pads a photo of another shape with black bars (and then
  * animates them — a camera-app screen appeared on production). A small difference is cropped (the subject kept by
  * sharp's attention strategy); when a crop would cut more than 15 % of the product, the photo sits whole on a soft,
@@ -145,8 +171,13 @@ export async function fitToAspect(m: VideoMedia, aspect: '9:16' | '16:9'): Promi
     if (loss <= 0.15) {
       out = await sharp(buf).resize(W, H, { fit: 'cover', position: sharp.strategy.attention }).jpeg({ quality: 92 }).toBuffer();
     } else {
-      const bg = await sharp(buf).resize(W, H, { fit: 'cover' }).blur(40).modulate({ brightness: 1.03 }).toBuffer();
       const fg = await sharp(buf).resize(W, H, { fit: 'inside' }).toBuffer();
+      // A plain studio background (very common for product photos) is extended with its own colour — seamless.
+      // Anything else sits on a soft, blurred copy of itself.
+      const edge = await plainEdgeColour(buf, ratio > target ? 'horizontal' : 'vertical');
+      const bg = edge
+        ? await sharp({ create: { width: W, height: H, channels: 3, background: edge } }).png().toBuffer()
+        : await sharp(buf).resize(W, H, { fit: 'cover' }).blur(40).modulate({ brightness: 1.03 }).toBuffer();
       out = await sharp(bg).composite([{ input: fg, gravity: 'center' }]).jpeg({ quality: 92 }).toBuffer();
     }
     return { data: out.toString('base64'), mimeType: 'image/jpeg' };

@@ -18,5 +18,20 @@ if [ "$LOCAL" = "$REMOTE" ] && [ "${FORCE:-0}" != "1" ]; then exit 0; fi
 echo "$(date -Is) deploy start $(git rev-parse --short "$REMOTE") mode=$MODE"
 git checkout -- yarn.lock next-env.d.ts 2>/dev/null || true
 git pull -q --ff-only origin main
-bash scripts/deploy/hetzner-deploy.sh "$MODE"
-echo "$(date -Is) deploy done $(git rev-parse --short HEAD)"
+SHA=$(git rev-parse --short HEAD)
+if ! bash scripts/deploy/hetzner-deploy.sh "$MODE"; then
+  echo "$(date -Is) deploy FAILED $SHA (live site untouched)"
+  # Email once per failed version (Postmark creds read from the app .env at run time; no secrets in this file).
+  STATE=/home/deploy/.autodeploy-failed-sha
+  if [ "$(cat "$STATE" 2>/dev/null)" != "$SHA" ]; then
+    echo "$SHA" > "$STATE"
+    TOKEN=$(grep -E '^POSTMARK_SERVER_TOKEN=' "$APP/.env" | head -1 | cut -d= -f2- | tr -d '\042\047')
+    FROM=$(grep -E '^POSTMARK_FROM_EMAIL=' "$APP/.env" | head -1 | cut -d= -f2- | tr -d '\042\047')
+    BODY=$(printf 'Deploy of %s failed on the VPS; the live site still runs the previous version.\n\nLast log lines:\n%s\n' "$SHA" "$(tail -25 "$LOG")" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))')
+    [ -n "$TOKEN" ] && [ -n "$FROM" ] && curl -sS -m 20 -o /dev/null -X POST 'https://api.postmarkapp.com/email' \
+      -H 'Accept: application/json' -H 'Content-Type: application/json' -H "X-Postmark-Server-Token: $TOKEN" \
+      -d "{\"From\":\"$FROM\",\"To\":\"atillatkulu@gmail.com\",\"Subject\":\"KolayXport deploy failed ($SHA)\",\"TextBody\":$BODY,\"MessageStream\":\"outbound\"}" || true
+  fi
+  exit 1
+fi
+echo "$(date -Is) deploy done $SHA"

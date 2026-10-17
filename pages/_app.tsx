@@ -36,6 +36,17 @@ function intlOnError(error: { code?: string }) {
 
 // First path segment of Turkish marketing routes (SiteLayout sets <html lang> itself there).
 const SITE_TR_ROUTES = new Set(['', 'cozumler', 'entegrasyonlar', 'karsilastirma', 'nasil-kullanirim', 'blog', 'kurumsal', 'iletisim', 'ozellikler', 'kvkk-aydinlatma-metni', 'cerez-politikasi', 'gizlilik-politikasi', 'kullanim-sartlari', 'mesafeli-satis-sozlesmesi', 'on-bilgilendirme-formu']);
+
+// App routes need the full dictionary: start fetching it while React hydrates, not after.
+if (typeof window !== 'undefined') {
+  const seg = window.location.pathname.split('/')[1] ?? '';
+  if (seg !== 'en' && !SITE_TR_ROUTES.has(seg)) {
+    let stored: string | null = null;
+    try { stored = window.localStorage.getItem('kolayxport_locale'); } catch { /* storage blocked */ }
+    void loadMessages(stored === 'en' ? 'en' : 'tr');
+  }
+}
+
 import { ConfirmProvider } from '@/components/ds/overlay/ConfirmDialog';
 import LimitReachedDialog from '@/components/billing/LimitReachedDialog';
 import { installLimitInterceptor } from '@/lib/http/limitInterceptor';

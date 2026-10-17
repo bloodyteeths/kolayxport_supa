@@ -9,7 +9,7 @@ import { withUsageLimiter } from '@/lib/middleware/withUsageLimiter';
 import { syncWixRecentOrdersForUser } from '@/lib/sync/wix';
 import { syncShopifyRecentOrdersForUser } from '@/lib/sync/shopify';
 // Import Trendyol sync function from auto-sync script
-const { syncTrendyolRecentOrders } = require('../../../scripts/auto-sync-all-users.js');
+import { syncTrendyolRecentOrdersForUser } from '@/lib/sync/trendyol';
 
 async function handler(
   req: NextApiRequest,
@@ -107,25 +107,16 @@ async function handler(
           syncPromises.push(
             (async () => {
               try {
-                const user = await prisma.user.findUnique({ where: { id: userId } });
-                if (!user) throw new Error('User not found for Trendyol sync');
-                
-                const trendyolSettings = {
-                  trendyolApiKey: finalTrendyolApiKey,
-                  trendyolApiSecret: finalTrendyolApiSecret,
-                  trendyolSupplierId: finalTrendyolSupplierId,
-                };
-
                 logger.info(`[Fast Sync] Starting Trendyol sync for user ${userId}`);
-                await syncTrendyolRecentOrders(user, trendyolSettings);
-                
-                // Return a result structure compatible with syncAllOrders
+                // The current Trendyol sync (same as the scheduled one); the old scripts/auto-sync-all-users.js helper is
+                // archived and threw on every Refresh ("Orders could not be refreshed").
+                const m: any = await syncTrendyolRecentOrdersForUser(userId);
                 return {
-                  newOrders: 0, // Trendyol sync doesn't return these metrics in same format
-                  updatedOrders: 0,
-                  skippedOrders: 0,
-                  failedOrders: 0,
-                  errors: []
+                  newOrders: Number(m?.newOrders ?? m?.created ?? 0) || 0,
+                  updatedOrders: Number(m?.updatedOrders ?? m?.updated ?? 0) || 0,
+                  skippedOrders: Number(m?.skippedOrders ?? m?.skipped ?? 0) || 0,
+                  failedOrders: Number(m?.failedOrders ?? m?.failed ?? 0) || 0,
+                  errors: [],
                 };
               } catch (error: any) {
                 logger.error(`[Fast Sync] Trendyol sync failed for user ${userId}:`, error);

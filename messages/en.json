@@ -12802,7 +12802,8 @@
       "trackingCopied": "Tracking number copied",
       "fbaNoLabel": "Amazon ships this order. No label needed.",
       "upgradePaid": "Buyer paid for {upgrade} shipping",
-      "trendyolCargo": "Trendyol cargo number"
+      "trendyolCargo": "Trendyol cargo number",
+      "orderedChip": "Ordered"
     },
     "problem": {
       "addressIncomplete": "Address incomplete: {fields} missing",

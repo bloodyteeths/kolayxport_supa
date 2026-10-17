@@ -12802,7 +12802,8 @@
       "trackingCopied": "Takip numarası kopyalandı",
       "fbaNoLabel": "Bu siparişi Amazon gönderir. Etiket gerekmez.",
       "upgradePaid": "Alıcı {upgrade} kargo için ödeme yaptı",
-      "trendyolCargo": "Trendyol kargo numarası"
+      "trendyolCargo": "Trendyol kargo numarası",
+      "orderedChip": "Sipariş"
     },
     "problem": {
       "addressIncomplete": "Adres eksik: {fields} yok",

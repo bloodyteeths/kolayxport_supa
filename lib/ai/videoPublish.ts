@@ -3,7 +3,7 @@
 //  - eBay: Media API (apim.ebay.com/commerce/media/v1_beta: createVideo → uploadVideo → wait for LIVE), then the
 //    listing: Inventory API `product.videoIds` (eBay shows one video per listing) or, for listings made on eBay
 //    (legacy-<itemId>), Trading ReviseFixedPriceItem VideoDetails.VideoID. Scope sell.inventory.
-//  - Shopify: stagedUploadsCreate (VIDEO) → upload to the staged target → productCreateMedia (Shopify processes it).
+//  - Shopify: stagedUploadsCreate (VIDEO) → upload to the staged target → productUpdate(media:) (Shopify processes it).
 //  - Wix: product media from a signed public URL of the video (Wix imports it).
 //  - Amazon and Trendyol publish no video upload API: the studio downloads the file and links the seller panel.
 // Etsy goes through the staged listing editor (Sync to Etsy), not this module.
@@ -15,6 +15,7 @@ import { sanitizeInventoryItemPayload } from '@/lib/ebay/payloadRules';
 import { legacyEbayItemId } from '@/lib/ebay/legacy';
 import { setLegacyItemVideo } from '@/lib/ebay/legacyTrading';
 import { getValidAccessToken } from '@/lib/integrations/shopifyClient';
+import { shopifyGraphqlUrl } from '@/lib/integrations/shopifyApiVersion';
 import { createWixClient } from '@/lib/integrations/wixClient';
 import { ensureWixCatalogVersion, wixCatalogOptionsForSite } from '@/lib/integrations/wixSiteCatalog';
 import { signImagePath } from '@/lib/images/signedImageUrl';
@@ -105,7 +106,7 @@ async function publishEbay(userId: string, sku: string, file: string, title: str
 // ── Shopify ──────────────────────────────────────────────────────────────────────────────────────
 
 async function shopifyGql(shopDomain: string, token: string, query: string, variables: Record<string, unknown>) {
-  const r = await fetch(`https://${shopDomain}/admin/api/2024-10/graphql.json`, {
+  const r = await fetch(shopifyGraphqlUrl(shopDomain), {
     method: 'POST',
     headers: { 'X-Shopify-Access-Token': token, 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, variables }),
@@ -135,13 +136,14 @@ async function publishShopify(userId: string, productId: string, file: string, t
   form.append('file', new Blob([new Uint8Array(buf)], { type: 'video/mp4' }), filename);
   const up = await fetch(target.url, { method: 'POST', body: form });
   if (!up.ok) throw new Error(`Shopify video upload ${up.status}: ${(await up.text()).slice(0, 200)}`);
+  // productUpdate(media:) — productCreateMedia is deprecated on current API versions.
   const created = await shopifyGql(shop.shopDomain, token, `
-    mutation($productId: ID!, $media: [CreateMediaInput!]!) {
-      productCreateMedia(productId: $productId, media: $media) { media { ... on Video { id status } } mediaUserErrors { field message } }
-    }`, { productId: `gid://shopify/Product/${productId}`, media: [{ originalSource: target.resourceUrl, mediaContentType: 'VIDEO', alt: title.slice(0, 120) }] });
-  const errs = created?.productCreateMedia?.mediaUserErrors ?? [];
+    mutation($product: ProductUpdateInput!, $media: [CreateMediaInput!]) {
+      productUpdate(product: $product, media: $media) { product { id } userErrors { field message } }
+    }`, { product: { id: `gid://shopify/Product/${productId}` }, media: [{ originalSource: target.resourceUrl, mediaContentType: 'VIDEO', alt: title.slice(0, 120) }] });
+  const errs = created?.productUpdate?.userErrors ?? [];
   if (errs.length) throw new PublishError('rejected', `Shopify: ${errs.map((e: any) => e.message).join('; ').slice(0, 200)}`);
-  return { remoteId: String(created?.productCreateMedia?.media?.[0]?.id ?? '') };
+  return { remoteId: String(created?.productUpdate?.product?.id ?? '') };
 }
 
 // ── Wix ──────────────────────────────────────────────────────────────────────────────────────────

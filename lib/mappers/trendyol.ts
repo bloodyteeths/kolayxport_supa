@@ -35,6 +35,19 @@ export function mapTrendyolStatus(raw: string): string {
   }
 }
 
+/**
+ * Trendyol's `orderDate` is Turkey local time (GMT+3) written as if it were UTC: an order placed at 22:32 in
+ * Istanbul (19:32 UTC) arrives as the epoch of 22:32 UTC, so taken at face value every order looked 3 hours
+ * in the future. Türkiye has no DST since 2016, so the offset is a constant 3 hours.
+ */
+export const TRENDYOL_LOCAL_OFFSET_MS = 3 * 60 * 60 * 1000;
+
+export function trendyolOrderDateIso(orderDate: unknown): string | undefined {
+  const ms = Number(orderDate);
+  if (!orderDate || !Number.isFinite(ms) || ms <= 0) return undefined;
+  return new Date(ms - TRENDYOL_LOCAL_OFFSET_MS).toISOString();
+}
+
 export function toOrderItem(line: any, orderShipByDate?: string): NormalizedLineItem {
   // Combine productSize and productColor for variant info
   const variantInfo = [line.productSize, line.productColor]
@@ -117,9 +130,7 @@ export async function toOrderWithImages(order: any, productImages: Record<string
     marketplaceKey: order.id?.toString() || '',
     orderNumber: order.orderNumber || '',
     customerName,
-    uiOrderDate: order.orderDate
-      ? new Date(Number(order.orderDate)).toISOString()
-      : undefined,
+    uiOrderDate: trendyolOrderDateIso(order.orderDate),
     line_items,
     // Additional fields with fallbacks
     // Normalize Trendyol's own status vocabulary to the app-wide enum so
@@ -149,9 +160,7 @@ export async function toOrderWithImages(order: any, productImages: Record<string
       email: order.customerEmail || '',
     },
     // Additional required fields
-    marketplaceOrderDate: order.orderDate
-      ? new Date(Number(order.orderDate)).toISOString()
-      : undefined,
+    marketplaceOrderDate: trendyolOrderDateIso(order.orderDate),
     shipByDate,
     rawData: order,
     commodityDesc: line_items.length > 0 ? line_items[0].title : '',

@@ -1,0 +1,56 @@
+slug: siparisler-ve-etiket
+order: 7
+title: "Siparişleri görün, FedEx/UPS etiketi basın"
+description: "Etsy, eBay, Amazon ve Trendyol siparişlerinizi tek listede görün; kendi FedEx veya UPS hesabınızla yurt dışı kargo etiketini panelden oluşturun."
+keyword: "fedex ups kargo etiketi oluşturma"
+inventoryRefs: [orders-unified-list, label-fedex, label-ups, sender-profile, customs-commercial-invoice]
+tags: [kargo etiketi, fedex, ups, sipariş yönetimi, e-ihracat]
+startUrl: /app/labels
+ready: { text: "Emily Carter" }
+steps:
+  - say: "Merhaba! Bu videoda pazaryeri siparişlerinizi tek listede görüp FedEx ya da UPS etiketi oluşturacağız."
+  - title: "Siparişler sayfasını açın"
+    say: "Siparişler sayfasında Etsy, eBay, Amazon ve Trendyol siparişleriniz bir arada. Her satırda mağaza, tutar, durum ve kargolama tarihi görünür."
+    do:
+      - hover: { text: "Emily Carter" }
+    zoom: { selector: "#kx-main tbody tr:nth-child(1)", scale: 1.3 }
+  - title: "Gönderilecekleri bulun"
+    say: "Durum filtresiyle yalnızca gönderilecek ya da geciken siparişleri görebilirsiniz. Gecikenler kırmızıyla işaretlenir."
+    do:
+      - hover: { testid: filter-status }
+      - wait: 400
+      - hover: { text: "13 saat gecikti" }
+    zoom: { text: "13 saat gecikti", scale: 1.6 }
+  - title: "Etiket oluştur'a tıklayın"
+    say: "Etiket oluşturmak istediğiniz siparişin satırında Etiket oluştur'a tıklayın. Sağda etiket paneli açılır."
+    do:
+      - click: { role: button, name: "Etiket oluştur", exact: true }
+      - waitFor: { testid: label-carrier }
+      - wait: 600
+  - title: "Gönderen ve alıcıyı kontrol edin"
+    say: "Gönderen bilgisi Ayarlar'daki gönderici profilinizden gelir. Alıcı adresini burada kontrol edin, gerekirse düzenleyin."
+    do:
+      - hover: { testid: label-shipto }
+    zoom: { testid: label-shipto, scale: 1.4 }
+  - title: "Paket bilgilerini girin"
+    say: "Ağırlığı ve ölçüleri girin. Sık kullandığınız kutuları hazır paket olarak kaydedebilirsiniz."
+    do:
+      - hover: { testid: label-package }
+    zoom: { testid: label-package, scale: 1.4 }
+  - title: "Kargo servisini seçin"
+    say: "Kargo firmasını ve servisi seçin. Etiket kendi FedEx ya da UPS hesabınızla oluşur; ücret kargo firmasının size kestiği faturada görünür."
+    do:
+      - click: { role: radio, name: "FedEx International Economy" }
+      - wait: 500
+    zoom: { testid: label-carrier, scale: 1.3 }
+  - title: "Gümrük bilgilerini doldurun"
+    say: "Yurt dışı gönderilerde gümrük bölümüne ürün açıklamasını, GTİP kodunu ve değeri yazın. Ticari fatura etiketle birlikte elektronik olarak gider."
+    do:
+      - scrollTo: { testid: label-customs, block: start }
+    zoom: { testid: label-customs, scale: 1.3 }
+  - title: "Etiketi oluşturun"
+    say: "Her şey hazırsa Etiket oluştur'a basın. FedEx ve UPS hesabınızı Ayarlar'daki Kargo ve API anahtarları bölümünden bir kez bağlamanız yeterli."
+    do:
+      - hover: { testid: action-create-label }
+    zoom: { testid: action-create-label, scale: 1.6 }
+  - say: "Takıldığınız yerde Yardım sayfasından bize yazabilirsiniz. KolayXport'u 14 gün ücretsiz deneyebilirsiniz."

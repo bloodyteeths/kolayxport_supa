@@ -3,8 +3,10 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { stripe } from '../../../lib/stripe';
 import prisma from '../../../lib/prisma';
-import { STRIPE_PRICES, type PlanKey, type IntervalKey } from '../../../lib/stripePrices';
+import { type PlanKey, type IntervalKey } from '../../../lib/stripePrices';
+import { planFromPriceId as planFromPriceIdShared } from '@/lib/billing/stripeAccountServer';
 import { logger } from '@/lib/logger';
+import { contextFromMetadata, sendServerEvent } from '@/lib/tracking/server';
 import { logBillingEvent, logSecurityEvent } from '@/lib/admin/events';
 import { fulfilStripeCreditSession } from '@/lib/billing/aiCreditsPurchase';
 
@@ -49,14 +51,9 @@ async function recordWebhookEvent(args: {
   }
 }
 
-/** Reverse-lookup: given a Stripe price ID, return the plan name. */
+/** Reverse-lookup: given a Stripe price ID, return the plan name (base, legacy and per-currency ids). */
 function planFromPriceId(priceId: string): PlanKey | null {
-  for (const [plan, intervals] of Object.entries(STRIPE_PRICES)) {
-    for (const id of Object.values(intervals)) {
-      if (id === priceId) return plan as PlanKey;
-    }
-  }
-  return null;
+  return planFromPriceIdShared(priceId)?.plan ?? null;
 }
 
 // Disable body parsing to verify the raw body
@@ -217,6 +214,21 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
                 usageResetAt: subscription.status === 'active' ? usageResetAt : null,
               },
             });
+
+            // Funnel: server copy of `purchase` (consent + click ids captured at checkout, lib/tracking/server.ts).
+            // A subscription with a card on file is the conversion we optimise ads for, even when the remaining
+            // in-app trial carries over (amount_total 0): report the plan's price as the value.
+            const item = subscription.items.data[0]?.price;
+            const listValue = (item?.unit_amount ?? 0) / 100;
+            await sendServerEvent({
+              name: 'purchase',
+              eventId: checkoutSession.id,
+              email: checkoutSession.customer_details?.email ?? null,
+              userId: user.id,
+              value: (checkoutSession.amount_total ?? 0) > 0 ? (checkoutSession.amount_total ?? 0) / 100 : listValue,
+              currency: checkoutSession.currency || item?.currency || undefined,
+              params: { plan: String(plan || ''), interval: String(interval) },
+            }, contextFromMetadata(checkoutSession.metadata as Record<string, string>));
           }
           break;
         }

@@ -1,0 +1,18 @@
+{
+  "id": "demo-conv-3",
+  "platform": "wix",
+  "status": "answered",
+  "needsReply": false,
+  "unread": false,
+  "platformStatus": "open",
+  "customerName": "Anna Schmidt",
+  "customerEmail": "anna@example.com",
+  "subject": "Order arrived",
+  "lastMessageText": "Thank you, the towels arrived and they are beautiful!",
+  "lastMessageAt": "{{ago:1500m}}",
+  "lastMessageDate": "{{ago:1500m}}",
+  "lastFromCustomer": false,
+  "contactId": "demo-contact-3",
+  "unreadCount": 0,
+  "messages": []
+}

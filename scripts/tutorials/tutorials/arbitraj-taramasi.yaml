@@ -1,0 +1,51 @@
+slug: arbitraj-taramasi
+order: 6
+title: "Trendyol–eBay fiyat farkını bulun"
+description: "Trendyol'da satılan ürünlerin ABD eBay ve Etsy medyan fiyatlarını kargo dahil maliyetle karşılaştırın; kâr marjı olan ürünleri bulun. Pro planda."
+keyword: "trendyol ebay fiyat farkı"
+inventoryRefs: [arbitrage-price-gap, research-product-finder]
+tags: [ebay, trendyol, arbitraj, ürün araştırması, e-ihracat]
+startUrl: /app/research
+ready: { role: tab, name: "Ürün bulucu" }
+mocks:
+  - use: demo-cdn
+steps:
+  - say: "Merhaba! Bu videoda Trendyol'daki ürünlerin Amerika'da eBay'de kaça satıldığını karşılaştırıp fiyat farkı olanları bulacağız. Bu özellik Pro planda."
+  - title: "Ürün bulucuyu açın"
+    say: "Pazar araştırması sayfasında Ürün bulucu sekmesine geçin."
+    do:
+      - click: { role: tab, name: "Ürün bulucu" }
+      - waitFor: { role: radio, name: "Trendyol'dan" }
+  - title: "Trendyol'dan kaynağını seçin"
+    say: "Trendyol'dan seçeneğine tıklayın. Kaynak olarak Trendyol kategori çok satanlarını, sonra kategoriyi seçin. Biz Havlu kategorisine bakıyoruz."
+    do:
+      - click: { role: radio, name: "Trendyol'dan" }
+      - waitFor: { text: "Spa Havlu Seti" }
+      - hover: { testid: price-gap-category }
+    zoom: { testid: price-gap-category, scale: 1.5 }
+  - title: "Fiyatları karşılaştırın"
+    say: "Her satırda Trendyol fiyatı, ABD eBay'deki benzer ürünlerin medyan fiyatı ve Etsy medyanı yan yana durur. n, kaç ürünle karşılaştırıldığını gösterir."
+    do:
+      - hover: { text: "eBay ABD medyanı" }
+    zoom: { text: "eBay ABD medyanı", scale: 1.4 }
+  - title: "Eşleşme güvenine bakın"
+    say: "Ürünleri yapay zekâ eşleştirir. Eşleşme güveni ne kadar emin olduğunu söyler; orta olanları kendiniz kontrol edin."
+    do:
+      - hover: { text: "Eşleşme güveni" }
+    zoom: { text: "Eşleşme güveni", scale: 1.5 }
+  - title: "Kargo maliyetini ayarlayın"
+    say: "Toplam maliyete Türkiye'den kargo da eklenir. Kargo firmasını ve ağırlığı seçin ya da kendi kargo maliyetinizi yazın. Kullanılan döviz kuru da burada."
+    do:
+      - hover: { testid: price-gap-carrier }
+    zoom: { testid: price-gap-band, scale: 1.4 }
+  - title: "Kâr marjını okuyun"
+    say: "Kâr marjı sütunu tahmini kârı gösterir. Bu bir tahmindir; karar vermeden önce ürünü ve masraflarınızı kontrol edin."
+    do:
+      - hover: { text: "Kâr marjı" }
+    zoom: { text: "Kâr marjı", scale: 1.5 }
+  - title: "eBay'de listeleyin"
+    say: "Beğendiğiniz ürün için eBay'de listele düğmesiyle eBay ilanı oluşturmaya geçebilirsiniz."
+    do:
+      - hover: { role: button, name: "eBay'de listele" }
+    zoom: { role: button, name: "eBay'de listele", scale: 1.6 }
+  - say: "Takıldığınız yerde Yardım sayfasından bize yazabilirsiniz. KolayXport'u 14 gün ücretsiz deneyebilirsiniz."

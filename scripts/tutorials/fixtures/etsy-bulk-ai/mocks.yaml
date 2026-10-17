@@ -1,0 +1,3 @@
+# Bulk editor "Improve with AI" (Etsy): canned bulk_optimize answer for the three towel listings the
+# toplu-duzenleme tutorial selects (seeded ids 1790088343, 1790096262, 1790104181).
+- { url: "**/api/ai/etsy**", body: { action: bulk_optimize }, fixture: bulk-optimize.json }

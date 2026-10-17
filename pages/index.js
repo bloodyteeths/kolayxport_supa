@@ -1,15 +1,11 @@
-import React from 'react';
-import { NextIntlClientProvider } from 'next-intl';
-import trMessages from '../messages/tr.json';
-import HomeContent from '../components/marketing/HomeContent';
+import HomePage from '../components/site/HomePage';
+import { homeStaticProps } from '../lib/site/homeProps';
 
-// Route-locked Turkish homepage. The nested provider overrides the app-level
-// locale (which follows localStorage) so `/` always prerenders and renders
-// Turkish, including PublicNav/PublicFooter. English lives at /en.
-export default function HomePage() {
-  return (
-    <NextIntlClientProvider locale="tr" messages={trMessages} timeZone="Europe/Istanbul">
-      <HomeContent locale="tr" />
-    </NextIntlClientProvider>
-  );
+// Turkish home page. English twin: pages/en.js. Copy: messages/*.json → site.home.
+export default function Home(props) {
+  return <HomePage {...props} />;
+}
+
+export async function getStaticProps() {
+  return homeStaticProps('tr');
 }

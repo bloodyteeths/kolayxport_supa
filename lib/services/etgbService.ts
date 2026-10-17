@@ -51,11 +51,26 @@ export class EtgbService {
         recipientEmail
       });
 
+      // The exporter is the seller's own company (ShipperProfile), never a built-in default.
+      const profile = await prisma.shipperProfile.findUnique({
+        where: { userId },
+        select: { shipperName: true, shipperTinNumber: true, defaultHarmonizedCode: true, defaultCountryOfMfg: true },
+      });
+      if (!profile?.shipperName?.trim() || !profile?.shipperTinNumber?.trim()) {
+        throw new Error('ETGB exporter details missing. Please set your company name and tax number (VKN/TCKN) in Settings › Shipping.');
+      }
+
       // Create order batch
       const orderBatch: OrderBatch = {
         orders,
         batchId,
-        userId
+        userId,
+        exporter: {
+          name: profile.shipperName.trim(),
+          taxNumber: profile.shipperTinNumber.trim(),
+          defaultHsCode: profile.defaultHarmonizedCode,
+          defaultCountryOfMfg: profile.defaultCountryOfMfg,
+        },
       };
 
       // Generate Excel file

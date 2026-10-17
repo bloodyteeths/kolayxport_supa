@@ -1,0 +1,28 @@
+{
+  "id": "650000101",
+  "platform": "trendyol",
+  "status": "unanswered",
+  "needsReply": true,
+  "unread": true,
+  "platformStatus": "WAITING_FOR_ANSWER",
+  "customerName": "Gizem T.",
+  "subject": "Peştamal boyutu",
+  "lastMessageText": "Merhaba, peştamalın boyutu tam olarak kaç cm? Yıkayınca çeker mi?",
+  "lastMessageAt": "{{ago:80m}}",
+  "lastMessageDate": "{{ago:80m}}",
+  "lastFromCustomer": true,
+  "unreadCount": 1,
+  "productInfo": {
+    "id": "KX-PST-01-TY",
+    "title": "İndigo Çizgili Peştamal, %100 Pamuk Hamam Havlusu",
+    "imageUrl": "{{base}}/demo/peshtemal-indigo.jpg"
+  },
+  "messages": [
+    {
+      "id": "q-650000101",
+      "sender": "customer",
+      "text": "Merhaba, peştamalın boyutu tam olarak kaç cm? Yıkayınca çeker mi?",
+      "date": "{{ago:80m}}"
+    }
+  ]
+}

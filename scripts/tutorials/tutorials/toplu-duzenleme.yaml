@@ -1,0 +1,59 @@
+slug: toplu-duzenleme
+order: 3
+title: "Etsy ilanlarını toplu düzenleyin"
+description: "Birden çok Etsy ilanını tek tabloda seçin; fiyatı toplu değiştirin, başlık ve etiketleri yapay zekâyla iyileştirin, hepsini birlikte gönderin."
+keyword: "etsy toplu ilan düzenleme"
+inventoryRefs: [etsy-bulk-editor, ai-bulk-optimize, staged-drafts-send]
+tags: [etsy, toplu düzenleme, etsy fiyat güncelleme, yapay zeka]
+startUrl: /app/etsy-listings
+ready: { testid: action-bulkEdit }
+reseed: true            # the price and AI edits are saved as drafts in the demo account
+mocks:
+  - use: etsy-bulk-ai
+  - use: etsy-editor
+steps:
+  - say: "Merhaba! Bu videoda birden çok Etsy ilanını tek ekranda düzenleyeceğiz: önce fiyatları, sonra başlık ve etiketleri yapay zekâyla."
+  - title: "Toplu düzenlemeyi açın"
+    say: "Etsy ilanları sayfasında sağ üstteki Toplu düzenle'ye tıklayın. İlanlarınız düzenlenebilir bir tabloda açılır."
+    do:
+      - click: { testid: action-bulkEdit }
+      - waitFor: { selector: "#kx-main tr:has-text('Indigo Striped')" }
+      - wait: 800
+  - title: "İlanları seçin"
+    say: "Düzenlemek istediğiniz ilanları soldaki kutucuklardan seçin. Biz üç havlu ilanını seçiyoruz."
+    do:
+      - check: { selector: "#kx-main tr:has-text('Indigo Striped') input[type=checkbox]" }
+      - check: { selector: "#kx-main tr:has-text('Terracotta Turkish Towel') input[type=checkbox]" }
+      - check: { selector: "#kx-main tr:has-text('Sage Green Peshtemal') input[type=checkbox]" }
+      - hover: { testid: action-changePrice }
+  - title: "Fiyatı toplu değiştirin"
+    say: "Fiyatı değiştir'e tıklayın. Örneğin fiyatları yüzde on artırın. Yeni fiyatları onaylamadan önce görürsünüz."
+    do:
+      - click: { testid: action-changePrice }
+      - fill: { label: "Değer", value: "10" }
+      - wait: 600
+    zoom: { role: dialog, scale: 1.4 }
+  - title: "Değişikliği hazırlayın"
+    say: "Hazırla dediğinizde yeni fiyatlar tabloya taslak olarak işlenir. Etsy'de henüz hiçbir şey değişmez."
+    do:
+      - click: { testid: action-stagePrice }
+      - wait: 1200
+  - title: "Yapay zekâyla iyileştirin"
+    say: "Aynı ilanlar seçiliyken AI ile iyileştir'e tıklayın. Yapay zekâ başlıkları ve etiketleri İngilizce olarak yeniden yazar."
+    do:
+      - check: { selector: "#kx-main tr:has-text('Indigo Striped') input[type=checkbox]" }
+      - check: { selector: "#kx-main tr:has-text('Terracotta Turkish Towel') input[type=checkbox]" }
+      - check: { selector: "#kx-main tr:has-text('Sage Green Peshtemal') input[type=checkbox]" }
+      - click: { testid: action-improveWithAi }
+      - wait: 2500
+  - title: "Önerileri kontrol edin"
+    say: "Değişen hücreler renkli görünür. Beğenmediğiniz bir öneriyi hücreye tıklayıp düzeltebilir ya da Tüm düzenlemeleri at ile hepsini geri alabilirsiniz."
+    do:
+      - hover: { selector: "#kx-main tr:has-text('Indigo Striped') td:nth-child(3)" }
+    zoom: { selector: "#kx-main tr:has-text('Indigo Striped')", scale: 1.4 }
+  - title: "Hepsini Etsy'ye gönderin"
+    say: "Hazır olduğunuzda sağ üstteki gönder düğmesiyle bütün değişiklikleri tek seferde Etsy'ye gönderin."
+    do:
+      - hover: { testid: action-sendChanges }
+    zoom: { testid: action-sendChanges, scale: 1.5 }
+  - say: "Takıldığınız yerde Yardım sayfasından bize yazabilirsiniz. KolayXport'u 14 gün ücretsiz deneyebilirsiniz."

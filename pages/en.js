@@ -1,13 +1,10 @@
-import React from 'react';
-import { NextIntlClientProvider } from 'next-intl';
-import enMessages from '../messages/en.json';
-import HomeContent from '../components/marketing/HomeContent';
+import HomePage from '../components/site/HomePage';
+import { homeStaticProps } from '../lib/site/homeProps';
 
-// Route-locked English homepage — same sections as / via HomeContent.
-export default function HomePageEN() {
-  return (
-    <NextIntlClientProvider locale="en" messages={enMessages} timeZone="Europe/Istanbul">
-      <HomeContent locale="en" />
-    </NextIntlClientProvider>
-  );
+export default function HomeEn(props) {
+  return <HomePage {...props} />;
+}
+
+export async function getStaticProps() {
+  return homeStaticProps('en');
 }

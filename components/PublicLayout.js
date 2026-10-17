@@ -1,69 +1,22 @@
-import React from 'react';
-import PublicNav from './PublicNav';
-import PublicFooter from './PublicFooter';
-import { NextSeo } from 'next-seo';
-import { motion } from 'framer-motion';
+import { useLocale } from 'next-intl';
 import { useRouter } from 'next/router';
+import SiteLayout from './site/SiteLayout';
+
+// Public pages rendered through this wrapper that should be indexed (everything else here is
+// a system page: login, logout, auth, 404, errors).
+const INDEXABLE = new Set([]);
 
 /**
- * PublicLayout: For marketing/publicly accessible pages (e.g., homepage, /ozellikler, etc.)
- * Provides a public-facing layout without requiring authentication.
+ * Wrapper for public pages outside the marketing content system (pricing, login, auth, errors).
+ * Same header/footer as the marketing site, in the visitor's UI language.
  */
-
-const pageVariants = {
-  initial: {
-    opacity: 0,
-    // x: "-100vw",
-    // scale: 0.8
-  },
-  in: {
-    opacity: 1,
-    // x: 0,
-    // scale: 1
-  },
-  out: {
-    opacity: 0,
-    // x: "100vw",
-    // scale: 1.2
-  }
-};
-
-const pageTransition = {
-  type: "tween",
-  ease: "anticipate",
-  duration: 0.5
-};
-
-const PublicLayout = ({ children, title, description, seo = {} }) => {
+export default function PublicLayout({ children, title, description = '', seo = {} }) {
+  const locale = useLocale() === 'en' ? 'en' : 'tr';
   const router = useRouter();
-  const baseUrl = 'https://kolayxport.com';
-  const canonicalUrl = `${baseUrl}${router.asPath.split('?')[0]}`;
-
+  const noindex = seo.noindex ?? !INDEXABLE.has(router.pathname);
   return (
-    <>
-      <NextSeo
-        title={title}
-        description={description}
-        canonical={canonicalUrl}
-        {...seo}
-      />
-      <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800">
-        <PublicNav />
-        <motion.main 
-          className="flex-grow"
-          key={typeof window !== 'undefined' ? window.location.pathname : 'staticPath'} // Ensure key changes on route change for transition
-          initial="initial"
-          animate="in"
-          exit="out"
-          variants={pageVariants}
-          transition={pageTransition}
-        >
-          {children}
-        </motion.main>
-        <PublicFooter />
-      </div>
-    </>
+    <SiteLayout locale={locale} seo={{ title: title || 'KolayXport', description, path: router.pathname, noindex }}>
+      {children}
+    </SiteLayout>
   );
-};
-
-export default PublicLayout; 
+}

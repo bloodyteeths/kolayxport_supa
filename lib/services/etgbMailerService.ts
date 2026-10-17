@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import { logger } from '../logger';
 import prisma from '../prisma';
+import { renderEmailHtml } from '@/lib/email/layout';
 
 export interface SmtpConfig {
   host: string;
@@ -138,63 +139,23 @@ export class EtgbMailerService {
    * Generate HTML email template
    */
   private generateEmailTemplate(emailData: EtgbEmailData): string {
-    const attachmentList = emailData.attachments
-      .map(att => `<li>${att.filename}</li>`)
-      .join('');
+    const files = emailData.attachments.map((att) => `• ${att.filename}`).join('\n');
+    return renderEmailHtml({
+      title: 'ETGB dosyanız hazır',
+      preheader: `${emailData.orderCount} sipariş · ${emailData.batchId}`,
+      text: `Merhaba,
 
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <title>ETGB Export</title>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; }
-          .content { padding: 20px; }
-          .details { background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0; }
-          .attachments { margin-top: 20px; }
-          .footer { background-color: #f5f5f5; padding: 15px; text-align: center; font-size: 12px; color: #666; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>ETGB Export Hazır</h1>
-        </div>
-        
-        <div class="content">
-          <p>Merhaba,</p>
-          
-          <p>ETGB export dosyanız hazırlandı ve ekte gönderilmektedir.</p>
-          
-          <div class="details">
-            <h3>Export Detayları:</h3>
-            <ul>
-              <li><strong>Batch ID:</strong> ${emailData.batchId}</li>
-              <li><strong>Sipariş Sayısı:</strong> ${emailData.orderCount}</li>
-              <li><strong>Oluşturulma Tarihi:</strong> ${new Date().toLocaleString('tr-TR')}</li>
-            </ul>
-          </div>
-          
-          <div class="attachments">
-            <h3>Ekler:</h3>
-            <ul>
-              ${attachmentList}
-            </ul>
-          </div>
-          
-          <p>Herhangi bir sorunuz olursa lütfen bizimle iletişime geçin.</p>
-          
-          <p>İyi çalışmalar dileriz.</p>
-        </div>
-        
-        <div class="footer">
-          <p>Bu email KolayXport sistemi tarafından otomatik olarak gönderilmiştir.</p>
-          <p>Generated at: ${new Date().toISOString()}</p>
-        </div>
-      </body>
-      </html>
-    `;
+ETGB dosyanız hazırlandı ve bu e-postanın ekinde.
+
+Parti: ${emailData.batchId}
+Sipariş sayısı: ${emailData.orderCount}
+Oluşturulma: ${new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })}
+
+Ekler:
+${files}
+
+Bu e-posta KolayXport tarafından otomatik gönderildi. Sorunuz olursa bu e-postayı yanıtlayabilirsiniz.`,
+    });
   }
 
   /**

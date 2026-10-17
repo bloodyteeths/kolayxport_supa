@@ -4,20 +4,16 @@
  *
  * Two tables live here on purpose:
  *
- * 1. ENFORCED_* — exactly what `lib/middleware/withUsageLimiter.ts` enforces
- *    today (its `plans` table at :17–25 and `trialLimits` at :96). The
- *    middleware still carries its own copy: it is import-only for the UI track
- *    and the billing backend track rewrites it (tiers.md §2b). The parity test
- *    `test/billing/planLimits.test.ts` runs the real middleware against
- *    `getPlanLimits()` + `checkPlanLimit()` so the two cannot drift silently.
- *    `/api/user/settings` exposes these (`subscription.limits`), because a
- *    meter must show the limit that actually blocks the user.
+ * 1. ENFORCED_* + getPlanLimits/checkPlanLimit — what the server enforces.
+ *    `lib/middleware/withUsageLimiter.ts` calls these directly, so the UI meters
+ *    and the 402 responses cannot drift. `/api/user/settings` exposes the same
+ *    limits (`subscription.limits`).
  *
  * 2. DECIDED_PLAN_LIMITS — the launch tiers decided in design/launch/tiers.md
- *    §1 (Trial, Starter, Growth, Pro, Enterprise, shopify_free). Nothing
- *    enforces them yet. The billing track moves enforcement to them (and may
- *    move this table into `lib/billing/plans.ts`, tiers.md §1); until then they
- *    are for pricing/marketing copy only. See ENFORCEMENT_GAP below.
+ *    §1 (Trial, Starter, Growth, Pro, Enterprise, shopify_free). The enforced
+ *    numbers follow them; what is still different (the order meter counts sync
+ *    calls was fixed: it now counts new orders from manual/extension syncs; scheduled syncs, AI credits and store
+ *    counts are not metered) is in ENFORCEMENT_GAP.
  *
  * `null` = unlimited everywhere in this module (JSON-safe, unlike Infinity).
  */
@@ -40,19 +36,20 @@ export interface PlanLimits {
 /* ------------------------------------------------- 1. enforced today */
 
 /**
- * Byte-for-byte the middleware's `plans` table (withUsageLimiter.ts:17–25).
- * `pro` is absent on purpose: the middleware does not know it, so an active
- * `pro` user is answered `invalidPlan` today (see ENFORCEMENT_GAP).
+ * The limits `lib/middleware/withUsageLimiter.ts` enforces (it calls `getPlanLimits`
+ * and `checkPlanLimit` below). The numbers follow DECIDED_PLAN_LIMITS; the order
+ * meter counts new orders imported by manual and extension syncs (D6; scheduled syncs are not metered yet, see ENFORCEMENT_GAP).
  */
-export const ENFORCED_PLAN_LIMITS: Readonly<Record<'starter' | 'growth' | 'enterprise' | 'shopify_free', PlanLimits>> = {
-  starter: { orderSync: 200, label: 100 },
-  growth: { orderSync: 2000, label: 500 },
+export const ENFORCED_PLAN_LIMITS: Readonly<Record<'starter' | 'growth' | 'pro' | 'enterprise' | 'shopify_free', PlanLimits>> = {
+  starter: { orderSync: 500, label: 250 },
+  growth: { orderSync: 2000, label: 1000 },
+  pro: { orderSync: 6000, label: 3000 },
   enterprise: { orderSync: null, label: null },
   shopify_free: { orderSync: null, label: null },
 };
 
-/** withUsageLimiter.ts:96 — applies while `subscriptionStatus === 'trialing'` and the trial date is in the future. */
-export const ENFORCED_TRIAL_LIMITS: Readonly<PlanLimits> = { orderSync: 50, label: 10 };
+/** Applies to trial accounts (plan `trial`/null, status `trialing`) until the trial date plus the grace days. */
+export const ENFORCED_TRIAL_LIMITS: Readonly<PlanLimits> = { orderSync: 150, label: 30 };
 
 /**
  * Which branch of the middleware applies.
@@ -89,9 +86,12 @@ function toDate(v: Date | string | number | null | undefined): Date | null {
   return Number.isFinite(d.getTime()) ? d : null;
 }
 
+/** Statuses under which a paid plan keeps its limits: Stripe-trialing subscribers and past_due (Stripe still retrying). */
+const PAID_STATUSES = new Set(['active', 'trialing', 'past_due']);
+
 /**
- * The limits the middleware applies to a user, in the middleware's order:
- * shopify_free → trial → not active → invalid plan → plan.
+ * The limits the middleware applies to a user, in order:
+ * shopify_free → paid plan (active / trialing / past_due) → app trial incl. grace → not active → invalid plan.
  * Pure; `now` is injectable for tests.
  */
 export function getPlanLimits(
@@ -103,8 +103,12 @@ export function getPlanLimits(
   if (plan === 'shopify_free') {
     return { state: 'shopify_free', plan: 'shopify_free', limits: { orderSync: null, label: null }, period: null };
   }
+  if (hasEnforcedPlan(plan) && typeof status === 'string' && PAID_STATUSES.has(status)) {
+    return { state: 'active', plan, limits: { ...ENFORCED_PLAN_LIMITS[plan] }, period: 'month' };
+  }
   const trialEnd = toDate(trialExpiresAt);
-  if (status === 'trialing' && trialEnd && now < trialEnd) {
+  const graceEnd = trialEnd ? trialEnd.getTime() + DECIDED_GRACE_DAYS * 24 * 60 * 60 * 1000 : null;
+  if ((plan === 'trial' || plan == null) && status === 'trialing' && graceEnd !== null && now.getTime() < graceEnd) {
     return { state: 'trial', plan: 'trial', limits: { ...ENFORCED_TRIAL_LIMITS }, period: 'trial' };
   }
   if (status !== 'active') {
@@ -178,9 +182,14 @@ export const DECIDED_PLAN_LIMITS: Readonly<Record<PlanKey, DecidedPlan>> = {
   shopify_free: { limits: { orders: null, labels: null, connectedStores: 1, aiCredits: 100 }, stripeUpsell: false },
 };
 
-/** tiers.md §1 constants (display only until the billing track enforces them). */
+/** tiers.md §1 constants. The trial length is enforced at account creation via `newTrialExpiry`. */
 export const DECIDED_TRIAL_DAYS = 14;
 export const DECIDED_GRACE_DAYS = 3;
+
+/** Trial end for an account created at `now` (signup, Google OAuth, Shopify install). */
+export function newTrialExpiry(now: number = Date.now()): Date {
+  return new Date(now + DECIDED_TRIAL_DAYS * 24 * 60 * 60 * 1000);
+}
 
 /** Decided limits for a plan key; `undefined` for an unknown key. */
 export function getDecidedPlanLimits(plan: string | null | undefined): DecidedPlan | undefined {
@@ -194,15 +203,11 @@ export function getDecidedPlanLimits(plan: string | null | undefined): DecidedPl
  * Order meter: today counts sync API calls (`orderSyncCount`), decided counts orders (D6).
  */
 export const ENFORCEMENT_GAP: ReadonlyArray<{ plan: PlanKey; meter: 'orderSync→orders' | 'label→labels' | 'meter' | 'period'; enforced: string; decided: string }> = [
-  { plan: 'trial', meter: 'orderSync→orders', enforced: '50 sync calls', decided: '150 orders/month' },
-  { plan: 'trial', meter: 'label→labels', enforced: '10', decided: '30/month' },
-  { plan: 'trial', meter: 'period', enforced: 'Stripe trial (checkout: 30 days)', decided: '14 days + 3 days grace' },
-  { plan: 'starter', meter: 'orderSync→orders', enforced: '200 sync calls', decided: '500 orders/month' },
-  { plan: 'starter', meter: 'label→labels', enforced: '100', decided: '250/month' },
-  { plan: 'growth', meter: 'label→labels', enforced: '500', decided: '1000/month' },
-  { plan: 'growth', meter: 'orderSync→orders', enforced: '2000 sync calls', decided: '2000 orders/month' },
-  { plan: 'pro', meter: 'meter', enforced: 'unknown plan → invalidPlan (blocked)', decided: '6000 orders, 3000 labels/month' },
-  { plan: 'shopify_free', meter: 'meter', enforced: 'unlimited, no store cap', decided: '1 non-Shopify store' },
+  { plan: 'trial', meter: 'orderSync→orders', enforced: '150 new orders via manual / extension sync (scheduled syncs not metered yet, G16)', decided: '150 orders/month' },
+  { plan: 'starter', meter: 'orderSync→orders', enforced: '500 new orders via manual / extension sync', decided: '500 orders/month' },
+  { plan: 'growth', meter: 'orderSync→orders', enforced: '2000 new orders via manual / extension sync', decided: '2000 orders/month' },
+  { plan: 'pro', meter: 'orderSync→orders', enforced: '6000 new orders via manual / extension sync', decided: '6000 orders/month' },
+  { plan: 'shopify_free', meter: 'meter', enforced: 'unlimited, no store/AI cap', decided: '1 non-Shopify store, 100 AI credits' },
   // The middleware reads only User.subscriptionPlan; /api/user/settings also shows
   // shopify_free for an active ShopifyShop or billingProvider. Its `limits` follow
   // the middleware (raw plan), so such an account is reported trial/blocked, not unlimited.

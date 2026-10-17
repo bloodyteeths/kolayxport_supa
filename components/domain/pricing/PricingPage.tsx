@@ -23,7 +23,6 @@ import PublicLayout from '@/components/PublicLayout';
 import { Banner, useToast } from '@/components/ds/feedback';
 import { Button } from '@/components/ds/inputs';
 import { Bone, ErrorState } from '@/components/ds/state';
-import { useIsMobile } from '@/components/ds/page';
 import { requestPortal } from '@/components/domain/billing/usePortal';
 import { useAuth } from '@/lib/auth-context';
 import { useFormatters } from '@/lib/format';
@@ -117,9 +116,9 @@ export function PricingPage() {
   }, [urlHelpers.ready, gate, url.plan]);
 
   const showMoney = gate === 'show';
-  // Below 900px Growth (recommended) comes first: DOM order changes too, so reading/tab order match the screen.
-  const isMobile = useIsMobile();
-  const orderedPlans = isMobile ? MOBILE_ORDER : PRICING_PLANS;
+  // Below 900px Growth (recommended) comes first. Done with CSS `order` (see the grid below), not by
+  // re-ordering the DOM after hydration: that moved every card ~360px on phones (CLS 0.29, GTM audit).
+  const orderedPlans = PRICING_PLANS;
   // The SEO description carries a price, so it is gated like the money region: SSR (session unknown) and
   // any signed-in viewer not yet cleared for Stripe prices get the price-free line.
   const seoDescription = showMoney
@@ -135,7 +134,7 @@ export function PricingPage() {
       title={t('seo.title')}
       description={seoDescription}
     >
-      <NextSeo openGraph={{ images: [{ url: 'https://kolayxport.com/og-pricing.png', width: 1200, height: 630, alt: t('seo.ogAlt') }] }} />
+      <NextSeo openGraph={{ images: [{ url: 'https://kolayxport.com/og/default.png', width: 1200, height: 630, alt: t('seo.ogAlt') }] }} />
       <Box sx={{ bgcolor: neutral[50], color: neutral[800] }} data-testid="pricing-page" data-gate={gate}>
         <Box sx={{ maxWidth: layout.maxDetail, mx: 'auto', px: { xs: '16px', sm: '24px' }, pt: { xs: '24px', md: '48px' }, pb: '64px' }}>
           <PricingHeader />
@@ -198,6 +197,8 @@ export function PricingPage() {
                   display: 'grid',
                   gap: '16px',
                   gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' },
+                  // Mobile order = MOBILE_ORDER (Growth first) without moving DOM nodes after hydration.
+                  '@media (max-width: 899.95px)': Object.fromEntries(MOBILE_ORDER.map((p, i) => [`& > #plan-card-${p}`, { order: i }])),
                 }}
               >
                 {orderedPlans.map((plan) => (

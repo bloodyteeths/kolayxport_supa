@@ -26,7 +26,8 @@ import { SideNavFooter, type ShellUsage } from './SideNavFooter';
 export const BRAND_NAME = 'KolayXport';
 const noop = () => {};
 /** The flat `KX` app icon (shell-nav §1). */
-export const BRAND_ICON_SRC = '/icon-192x192.png';
+export const BRAND_ICON_SRC = '/brand/kolayxport-symbol.svg';
+export const BRAND_LOGO_SRC = '/brand/kolayxport-logo.svg';
 
 export type SideNavProps = {
   /** null while the session / model is loading: brand row + 8 skeleton rows. */
@@ -163,17 +164,23 @@ function BrandRow({ rail, onNavigate }: { rail: boolean; onNavigate?: () => void
           '&:focus-visible': { outline: 'none', boxShadow: focusRing },
         }}
       >
-        <Box
-          component="img"
-          src={BRAND_ICON_SRC}
-          alt=""
-          aria-hidden
-          sx={{ width: 24, height: 24, borderRadius: px(radius.sm), display: 'block', flexShrink: 0 }}
-        />
-        {rail ? null : (
-          <Typography component="span" variant="titleSm" sx={{ color: n[900], whiteSpace: 'nowrap' }}>
-            {BRAND_NAME}
-          </Typography>
+        {rail ? (
+          <Box
+            component="img"
+            src={BRAND_ICON_SRC}
+            alt=""
+            aria-hidden
+            sx={{ width: 28, height: 28, display: 'block', flexShrink: 0 }}
+          />
+        ) : (
+          // The wordmark is the logo (kolayXport, blade X); the name stays in aria-label.
+          <Box
+            component="img"
+            src={BRAND_LOGO_SRC}
+            alt=""
+            aria-hidden
+            sx={{ height: 24, width: 'auto', display: 'block', flexShrink: 0 }}
+          />
         )}
       </Box>
     </Box>

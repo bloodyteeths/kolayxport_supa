@@ -179,3 +179,10 @@ package-lock.json
 yarn.lock.backup
 kolay-xport/
 .next-old-root/
+
+# GTM generated media: review copies stay local; approved picks are exported to public/
+docs/gtm/brand/concepts/
+docs/gtm/brand/images/
+.cache/
+.venv-brand/
+public/media/tutorials/

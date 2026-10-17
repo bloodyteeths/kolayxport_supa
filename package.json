@@ -20,7 +20,12 @@
     "test:unit": "vitest",
     "test:api": "vitest --environment node",
     "test:all": "npm run test:unit && npm run test:api && npm run test:smoke",
-    "security:smoke": "tsc --noEmit && vitest run --pool=forks test/lib/logger.redactor test/lib/crypto/credentials test/lib/auth.internal-key test/lib/cron.idempotency test/lib/admin test/lib/auth/tokens test/lib/auth/credentials test/api/stripe.webhook test/api/wix.webhook test/api/shopify.webhook test/api/auth.extension test/api/ext.telemetry test/api/admin test/api/auth/password-reset-flow"
+    "security:smoke": "tsc --noEmit && vitest run --pool=forks test/lib/logger.redactor test/lib/crypto/credentials test/lib/auth.internal-key test/lib/cron.idempotency test/lib/admin test/lib/auth/tokens test/lib/auth/credentials test/api/stripe.webhook test/api/wix.webhook test/api/shopify.webhook test/api/auth.extension test/api/ext.telemetry test/api/admin test/api/auth/password-reset-flow",
+    "gtm:check-claims": "tsx scripts/gtm/check-claims.ts",
+    "gtm:og": "node scripts/brand/export-assets.mjs og",
+    "gtm:brand": "node scripts/brand/export-assets.mjs",
+    "gtm:preview": "node scripts/gtm/preview-pages.mjs",
+    "tutorials": "node scripts/tutorials/run.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
@@ -58,7 +63,9 @@
     "google-auth-library": "^9.15.1",
     "google-trends-api": "^4.9.2",
     "googleapis": "^148.0.0",
+    "js-yaml": "^3.14.1",
     "lucide-react": "^0.507.0",
+    "marked": "^18.1.1",
     "micro": "^10.0.1",
     "next": "^16.1.6",
     "next-auth": "^4.24.11",

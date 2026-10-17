@@ -14,16 +14,17 @@
  */
 import { toast, type ToastOptions } from 'react-hot-toast';
 import useLocaleStore from '@/lib/stores/useLocaleStore';
-import trMessages from '@/messages/tr.json';
-import enMessages from '@/messages/en.json';
+import { cachedMessages, loadMessages } from '@/lib/i18n/clientMessages';
 import { useLimitReachedStore } from '@/lib/http/limitInterceptor';
 
 const MAX_LEN = 140;
-const MESSAGES: Record<string, unknown> = { tr: trMessages, en: enMessages };
 
 /** Resolve a dotted i18n key against the current locale's messages (non-hook). */
 export function translateKey(key: string, fallback?: string): string {
-  const locale = useLocaleStore.getState().locale || 'tr';
+  const locale = (useLocaleStore.getState().locale || 'tr') as 'tr' | 'en';
+  // The dictionary is loaded by pages/_app.tsx before app screens render; on public pages it may not be yet.
+  const messages = cachedMessages(locale);
+  if (!messages) void loadMessages(locale);
   const lookup = (root: unknown): string | null => {
     let node: unknown = root;
     for (const part of key.split('.')) {
@@ -32,7 +33,7 @@ export function translateKey(key: string, fallback?: string): string {
     }
     return typeof node === 'string' ? node : null;
   };
-  return lookup(MESSAGES[locale]) ?? fallback ?? key;
+  return lookup(messages) ?? fallback ?? key;
 }
 
 const DEFAULT_FALLBACK_KEY = 'errors.unexpectedError';

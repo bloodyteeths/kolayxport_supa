@@ -35,6 +35,7 @@ import {
 const NOW = Date.now();
 const FUTURE = new Date(NOW + 5 * 86400_000);
 const PAST = new Date(NOW - 5 * 86400_000);
+const IN_GRACE = new Date(NOW - 1 * 86400_000);
 
 async function runMiddleware(kind: LimitKind) {
   let called = false;
@@ -50,20 +51,38 @@ async function runMiddleware(kind: LimitKind) {
 }
 
 describe('getPlanLimits — enforced numbers', () => {
-  it('trial 50/10, starter 200/100, growth 2000/500, enterprise and shopify_free unlimited', () => {
-    expect(getPlanLimits('starter', 'trialing', FUTURE).limits).toEqual({ orderSync: 50, label: 10 });
-    expect(getPlanLimits('starter', 'trialing', FUTURE).period).toBe('trial');
-    expect(getPlanLimits('starter', 'active', null).limits).toEqual({ orderSync: 200, label: 100 });
-    expect(getPlanLimits('growth', 'active', null).limits).toEqual({ orderSync: 2000, label: 500 });
+  it('trial 150/30, starter 500/250, growth 2000/1000, pro 6000/3000, enterprise and shopify_free unlimited', () => {
+    expect(getPlanLimits('trial', 'trialing', FUTURE).limits).toEqual({ orderSync: 150, label: 30 });
+    expect(getPlanLimits(null, 'trialing', FUTURE).period).toBe('trial');
+    expect(getPlanLimits('starter', 'active', null).limits).toEqual({ orderSync: 500, label: 250 });
+    expect(getPlanLimits('growth', 'active', null).limits).toEqual({ orderSync: 2000, label: 1000 });
     expect(getPlanLimits('growth', 'active', null).period).toBe('month');
+    expect(getPlanLimits('pro', 'active', null).limits).toEqual({ orderSync: 6000, label: 3000 });
     expect(getPlanLimits('enterprise', 'active', null).limits).toEqual({ orderSync: null, label: null });
     expect(getPlanLimits('shopify_free', null, null)).toMatchObject({ state: 'shopify_free', limits: { orderSync: null, label: null }, period: null });
+  });
+
+  it('enforced numbers equal the decided tiers', () => {
+    for (const p of ['starter', 'growth', 'pro'] as const) {
+      expect(ENFORCED_PLAN_LIMITS[p]).toEqual({ orderSync: DECIDED_PLAN_LIMITS[p].limits.orders, label: DECIDED_PLAN_LIMITS[p].limits.labels });
+    }
+    expect(ENFORCED_TRIAL_LIMITS).toEqual({ orderSync: DECIDED_PLAN_LIMITS.trial.limits.orders, label: DECIDED_PLAN_LIMITS.trial.limits.labels });
+  });
+
+  it('a paid plan keeps its limits while Stripe-trialing or past_due', () => {
+    expect(getPlanLimits('growth', 'trialing', FUTURE)).toMatchObject({ state: 'active', limits: { orderSync: 2000, label: 1000 } });
+    expect(getPlanLimits('pro', 'past_due', null)).toMatchObject({ state: 'active', plan: 'pro' });
+  });
+
+  it('the app trial runs on for the grace days after trialExpiresAt, then blocks', () => {
+    expect(getPlanLimits('trial', 'trialing', IN_GRACE)).toMatchObject({ state: 'trial' });
+    expect(getPlanLimits('trial', 'trialing', PAST)).toMatchObject({ state: 'noSubscription' });
   });
 
   it('blocked states expose 0 limits, never null (null means unlimited)', () => {
     expect(getPlanLimits('starter', 'canceled', null)).toMatchObject({ state: 'noSubscription', limits: { orderSync: 0, label: 0 }, period: null });
     expect(getPlanLimits(null, 'trialing', PAST)).toMatchObject({ state: 'noSubscription' });
-    expect(getPlanLimits('pro', 'active', null)).toMatchObject({ state: 'invalidPlan', limits: { orderSync: 0, label: 0 } });
+    expect(getPlanLimits('bogus', 'active', null)).toMatchObject({ state: 'invalidPlan', limits: { orderSync: 0, label: 0 } });
   });
 
   it('serialises to JSON without Infinity', () => {
@@ -74,15 +93,11 @@ describe('getPlanLimits — enforced numbers', () => {
     }
   });
 
-  it('enforced tables match the middleware source literally', async () => {
+  it('the middleware has no limits table of its own', async () => {
     const fs = await import('fs');
     const src = fs.readFileSync(require.resolve('../../lib/middleware/withUsageLimiter.ts'), 'utf8');
-    expect(src).toMatch(/starter: \{ orderSyncLimit: 200, labelLimit: 100 \}/);
-    expect(src).toMatch(/growth: \{ orderSyncLimit: 2000, labelLimit: 500 \}/);
-    expect(src).toMatch(/enterprise: \{ orderSyncLimit: Infinity, labelLimit: Infinity \}/);
-    expect(src).toMatch(/shopify_free: \{ orderSyncLimit: Infinity, labelLimit: Infinity \}/);
-    expect(src).toMatch(/trialLimits = \{ orderSync: 50, label: 10 \}/);
-    expect(ENFORCED_TRIAL_LIMITS).toEqual({ orderSync: 50, label: 10 });
+    expect(src).toMatch(/getPlanLimits\(/);
+    expect(src).not.toMatch(/orderSyncLimit/);
   });
 });
 
@@ -91,8 +106,8 @@ describe('middleware parity: withUsageLimiter decisions == getPlanLimits + check
 
   const plans = [null, 'trial', 'starter', 'growth', 'pro', 'enterprise', 'shopify_free', 'bogus'];
   const statuses = [null, 'trialing', 'active', 'canceled', 'past_due', 'incomplete'];
-  const trialDates = [null, PAST, FUTURE];
-  const counts = [0, 9, 10, 49, 50, 99, 100, 199, 200, 499, 500, 1999, 2000, 1_000_000];
+  const trialDates = [null, PAST, IN_GRACE, FUTURE];
+  const counts = [0, 29, 30, 149, 150, 249, 250, 499, 500, 999, 1000, 1999, 2000, 2999, 3000, 5999, 6000, 1_000_000];
   const kinds: LimitKind[] = ['orderSync', 'label'];
 
   const cases: Array<[string | null, string | null, Date | null, LimitKind, number]> = [];
@@ -113,7 +128,7 @@ describe('middleware parity: withUsageLimiter decisions == getPlanLimits + check
       const { called, res } = await runMiddleware(kind);
       const decision = getPlanLimits(plan, status, trial);
       const expected = checkPlanLimit(decision, kind, used);
-      const label = JSON.stringify({ plan, status, trial: trial && (trial < new Date() ? 'past' : 'future'), kind, used });
+      const label = JSON.stringify({ plan, status, trial: trial && (trial === IN_GRACE ? 'grace' : trial < new Date() ? 'past' : 'future'), kind, used });
       if (called !== expected.allowed) {
         mismatches.push(`${label}: middleware allowed=${called}, planLimits allowed=${expected.allowed}`);
         continue;
@@ -168,11 +183,8 @@ describe('decided tiers (design/launch/tiers.md §1)', () => {
 
   it('the documented gap matches the two tables (pins it until the billing track closes it)', () => {
     expect(ENFORCEMENT_GAP.length).toBeGreaterThan(0);
-    // Every plan listed with a label gap really differs.
-    for (const g of ENFORCEMENT_GAP.filter((x) => x.meter === 'label→labels')) {
-      const enforced = g.plan === 'trial' ? ENFORCED_TRIAL_LIMITS.label : (ENFORCED_PLAN_LIMITS as any)[g.plan].label;
-      expect(enforced).not.toBe(DECIDED_PLAN_LIMITS[g.plan].limits.labels);
-    }
-    expect('pro' in ENFORCED_PLAN_LIMITS).toBe(false);
+    // Label limits are closed: no label gaps remain.
+    expect(ENFORCEMENT_GAP.filter((x) => x.meter === 'label→labels')).toEqual([]);
+    expect('pro' in ENFORCED_PLAN_LIMITS).toBe(true);
   });
 });

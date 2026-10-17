@@ -36,8 +36,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const plainToken = await issueToken({ identifier: email, purpose: 'password_reset' });
       const base = process.env.NEXTAUTH_URL || 'https://kolayxport.com';
       const url = `${base.replace(/\/$/, '')}/auth/reset?token=${encodeURIComponent(plainToken)}`;
-      const { subject, textBody } = passwordResetEmailBody(url);
-      const sendResult = await sendEmail({ to: email, subject, textBody });
+      const { subject, textBody, htmlBody } = passwordResetEmailBody(url);
+      const sendResult = await sendEmail({ to: email, subject, textBody, htmlBody });
       logAuthEvent('info', {
         message: 'Password reset requested',
         operation: 'password.reset_requested',

@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
+import { isFeatureLockedError, requireFeature } from '@/lib/billing/requireFeature';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { refreshFinancialsIfStale } from '@/lib/finance/financialAutoSync';
@@ -702,6 +703,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const user = await getAuthUser(req, res);
       if (!user) return res.status(401).json({ error: 'Unauthorized. Please sign in.' });
       userId = user.id;
+      // Profit, payouts, transactions and product costs are Pro (lib/billing/featureMap.ts).
+      try {
+        await requireFeature(user.id, 'financials');
+      } catch (err) {
+        if (isFeatureLockedError(err)) return res.status(402).json(err.body());
+        throw err;
+      }
     }
     const marketplace = first(req.query.marketplace) || first(req.query.mp) || 'trendyol';
     const granularityRaw = first(req.query.granularity) || first(req.query.groupBy) || 'month';

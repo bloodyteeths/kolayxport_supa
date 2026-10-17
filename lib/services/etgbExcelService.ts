@@ -25,10 +25,19 @@ export interface EtgbOrderData {
   commercialInvoiceDate: string;
 }
 
+/** The seller's own company, from their ShipperProfile (Settings › shipping). */
+export interface EtgbExporter {
+  name: string;
+  taxNumber: string;
+  defaultHsCode?: string | null;
+  defaultCountryOfMfg?: string | null;
+}
+
 export interface OrderBatch {
   orders: (Order & { items: OrderItem[] })[];
   batchId: string;
   userId: string;
+  exporter: EtgbExporter;
 }
 
 export class EtgbExcelService {
@@ -71,7 +80,7 @@ export class EtgbExcelService {
       });
 
       // Convert orders to ETGB format
-      const etgbData = this.convertOrdersToEtgbFormat(orderBatch.orders);
+      const etgbData = this.convertOrdersToEtgbFormat(orderBatch.orders, orderBatch.exporter);
 
       // Create workbook
       const workbook = XLSX.utils.book_new();
@@ -125,22 +134,22 @@ export class EtgbExcelService {
   /**
    * Convert orders to ETGB data format
    */
-  private convertOrdersToEtgbFormat(orders: (Order & { items: OrderItem[] })[]): EtgbOrderData[] {
+  private convertOrdersToEtgbFormat(orders: (Order & { items: OrderItem[] })[], exporter: EtgbExporter): EtgbOrderData[] {
     return orders.flatMap(order => {
       // Handle orders without items
       if (!order.items || order.items.length === 0) {
-        return [this.orderToEtgbData(order, null)];
+        return [this.orderToEtgbData(order, null, exporter)];
       }
 
       // Create one row per item
-      return order.items.map(item => this.orderToEtgbData(order, item));
+      return order.items.map(item => this.orderToEtgbData(order, item, exporter));
     });
   }
 
   /**
    * Convert single order to ETGB format
    */
-  private orderToEtgbData(order: Order, item: OrderItem | null): EtgbOrderData {
+  private orderToEtgbData(order: Order, item: OrderItem | null, exporter: EtgbExporter): EtgbOrderData {
     const shippingAddr = order.shippingAddress as any;
     const raw: any = (order as any).rawData || {};
     const rawLineItems: any[] = Array.isArray(raw?.line_items) ? raw.line_items : [];
@@ -229,15 +238,16 @@ export class EtgbExcelService {
       trackingNumber: tracking,
       packageCount: 1,
       grossWeight: (item ? (order.weightKg || 0.5) : 0.5),
-      sender: 'TAMSAR TEKSTİL',
-      senderTaxOffice: '8180721000',
+      sender: exporter.name,
+      senderTaxOffice: exporter.taxNumber,
       recipient: order.customerName || shippingAddr?.name || '',
-      originCountry: order.countryOfMfg || 'TÜRKİYE',
+      originCountry: order.countryOfMfg || exporter.defaultCountryOfMfg || 'TÜRKİYE',
       tradeCountry: shippingAddr?.country_code || 'ABD',
       previousCountry: shippingAddr?.country_code || 'ABD',
       deliveryMethod: 'FOB',
-      commercialDescription: item?.productName || order.commodityDesc || 'Textile Product',
-      gtipNo: order.harmonizedCode || '6204439506',
+      // No invented fallbacks: a blank description / GTIP is visible to the broker, a wrong one is not.
+      commercialDescription: item?.productName || order.commodityDesc || '',
+      gtipNo: order.harmonizedCode || exporter.defaultHsCode || '',
       completionMethod: 'addon',
       completionMethodDescription: 'addon',
       currency: order.currency || 'USD',

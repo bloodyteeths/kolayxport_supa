@@ -43,7 +43,8 @@ const HOUR_MS = 60 * 60 * 1000;
 export const RESEARCH_TTL = { search: 6 * HOUR_MS, detail: 24 * HOUR_MS } as const;
 
 export const UPGRADE_URL = 'https://kolayxport.com/plan';
-export const SIGNUP_URL = 'https://kolayxport.com/login?mode=signup&utm_source=extension&utm_medium=limit';
+// Sign-in (the login page also offers sign-up). No trial wording: Shopify-connected accounts must never see trials.
+export const SIGNUP_URL = 'https://kolayxport.com/login?utm_source=extension&utm_medium=limit';
 
 /** Share of the daily marketplace budget after which only cached data is served. */
 export const BRAKE_RATIO = 0.8;

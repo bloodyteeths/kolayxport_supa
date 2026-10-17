@@ -19,7 +19,7 @@ const limitBody = (reason: string, extra: Record<string, unknown> = {}) => ({
   limit: 150,
   used: 150,
   resetAt: RESET,
-  upgradeUrl: reason === 'signed_out' ? 'https://kolayxport.com/login?mode=signup&utm_source=extension&utm_medium=limit' : 'https://kolayxport.com/plan',
+  upgradeUrl: reason === 'signed_out' ? 'https://kolayxport.com/login?utm_source=extension&utm_medium=limit' : 'https://kolayxport.com/plan',
   ...extra,
 });
 /** What background-simple.js hands the content script for a 429 research-limit answer. */
@@ -116,11 +116,11 @@ describe('Etsy overlays', () => {
       (m) => (m.type === 'kx_listing_stats' ? { error: 'NOT_AUTHENTICATED', status: 401 } : null), null);
     const so = await waitFor(() => cardIn(b.doc.getElementById('kx-listing-stats')));
     expect(so.getAttribute('data-kx-limit')).toBe('signed_out');
-    expect(norm(so.textContent)).toContain('Araştırma için ücretsiz deneyin');
+    expect(norm(so.textContent)).toContain('KolayXport hesabınıza giriş yapın');
     const btn = so.querySelector('.kx-limit-upgrade') as HTMLButtonElement;
-    expect(btn.textContent).toBe('14 gün ücretsiz deneyin');
+    expect(btn.textContent).toBe('Giriş yap');
     btn.click();
-    expect(b.opened).toEqual(['https://kolayxport.com/login?mode=signup&utm_source=extension&utm_medium=limit']);
+    expect(b.opened).toEqual(['https://kolayxport.com/login?utm_source=extension&utm_medium=limit']);
   });
 
   it('shop bar: global brake → busy card without an upgrade button', async () => {

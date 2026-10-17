@@ -267,7 +267,7 @@ describe('429 payload', () => {
 
   it('signed-out payload points to sign-up; others to /plan', () => {
     const at = new Date('2026-10-18T21:00:00.000Z');
-    expect(limitBody('signed_out', 0, 0, at).upgradeUrl).toBe('https://kolayxport.com/login?mode=signup&utm_source=extension&utm_medium=limit');
+    expect(limitBody('signed_out', 0, 0, at).upgradeUrl).toBe('https://kolayxport.com/login?utm_source=extension&utm_medium=limit');
     expect(limitBody('global_brake', 3, 150, at).upgradeUrl).toBe(UPGRADE_URL);
     expect(Object.keys(limitBody('global_brake', 3, 150, at)).sort()).toEqual(['error', 'limit', 'reason', 'resetAt', 'upgradeUrl', 'used']);
   });

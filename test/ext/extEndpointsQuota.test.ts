@@ -112,7 +112,7 @@ describe('/api/ext/research', () => {
     const r = makeRes();
     await researchHandler(post({ action: 'search_enrich', query: 'anon q 9' }, null, ip), r);
     expect(r.state.status).toBe(429);
-    expect(r.state.body).toMatchObject({ reason: 'signed_out', upgradeUrl: 'https://kolayxport.com/login?mode=signup&utm_source=extension&utm_medium=limit' });
+    expect(r.state.body).toMatchObject({ reason: 'signed_out', upgradeUrl: 'https://kolayxport.com/login?utm_source=extension&utm_medium=limit' });
 
     const r2 = makeRes();
     await researchHandler(post({ action: 'listings_batch', listingIds: ['1'] }, null), r2);

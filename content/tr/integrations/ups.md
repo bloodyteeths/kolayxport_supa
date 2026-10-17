@@ -8,7 +8,7 @@ inventoryRefs: [settings-connections, label-ups, customs-commercial-invoice, lab
 draft: false
 name: "UPS"
 kind: carrier
-status: partial
+status: production
 setupMinutes: 15
 connect: "API bilgileri: UPS geliştirici hesabınızdan aldığınız API Key ve API Secret ile UPS hesap numaranızı Ayarlar › Bağlantılar'a girersiniz."
 capabilities:

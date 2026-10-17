@@ -8,7 +8,7 @@ inventoryRefs: [settings-connections, order-sync-wix, wix-products, stock-sync, 
 draft: false
 name: "Wix"
 kind: marketplace
-status: beta
+status: production
 setupMinutes: 3
 connect: "Uygulama kurulumu: Ayarlar › Bağlantılar'dan KolayXport uygulamasını Wix sitenize kurup izin verirsiniz."
 capabilities:

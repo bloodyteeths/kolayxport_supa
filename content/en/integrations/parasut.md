@@ -8,7 +8,7 @@ inventoryRefs: [settings-connections, parasut-einvoice, etgb-excel-email]
 draft: false
 name: "Paraşüt"
 kind: accounting
-status: partial
+status: production
 setupMinutes: 10
 connect: "API credentials: you enter the Client ID, Client Secret, username, password and company ID from Paraşüt under Settings › Connections."
 capabilities:

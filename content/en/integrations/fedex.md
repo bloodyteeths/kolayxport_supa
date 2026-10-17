@@ -8,7 +8,7 @@ inventoryRefs: [settings-connections, label-fedex, customs-commercial-invoice, l
 draft: false
 name: "FedEx"
 kind: carrier
-status: partial
+status: production
 setupMinutes: 15
 connect: "API credentials: you enter the API Key and API Secret from your FedEx developer account, plus your FedEx account number, under Settings › Connections."
 capabilities:

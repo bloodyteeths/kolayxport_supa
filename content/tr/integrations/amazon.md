@@ -8,7 +8,7 @@ inventoryRefs: [settings-connections, order-sync-amazon, tracking-push-amazon, m
 draft: false
 name: "Amazon"
 kind: marketplace
-status: partial
+status: production
 setupMinutes: 5
 connect: "OAuth (SP-API): Ayarlar › Bağlantılar'da pazar yerinizi seçip Seller Central hesabınızla izin verirsiniz."
 capabilities:

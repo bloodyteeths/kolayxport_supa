@@ -8,7 +8,7 @@ inventoryRefs: [settings-connections, label-fedex, customs-commercial-invoice, l
 draft: false
 name: "FedEx"
 kind: carrier
-status: partial
+status: production
 setupMinutes: 15
 connect: "API bilgileri: FedEx geliştirici hesabınızdan aldığınız API Key ve API Secret ile FedEx hesap numaranızı Ayarlar › Bağlantılar'a girersiniz."
 capabilities:

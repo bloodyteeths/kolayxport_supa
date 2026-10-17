@@ -8,7 +8,7 @@ inventoryRefs: [settings-connections, label-ups, customs-commercial-invoice, lab
 draft: false
 name: "UPS"
 kind: carrier
-status: partial
+status: production
 setupMinutes: 15
 connect: "API credentials: you enter the API Key and API Secret from your UPS developer account, plus your UPS account number, under Settings › Connections."
 capabilities:

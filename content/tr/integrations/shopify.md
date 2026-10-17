@@ -8,7 +8,7 @@ inventoryRefs: [settings-connections, order-sync-shopify, shopify-products, stoc
 draft: false
 name: "Shopify"
 kind: marketplace
-status: partial
+status: production
 setupMinutes: 3
 connect: "OAuth: KolayXport uygulamasını Shopify App Store'dan ya da Ayarlar › Bağlantılar'dan kurup mağazanız için izin verirsiniz."
 capabilities:

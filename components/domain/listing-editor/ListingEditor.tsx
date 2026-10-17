@@ -433,6 +433,8 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
   // banner's "Remove delete"; the footer still sends it (with the type-to-confirm dialog).
   const formLocked = readOnly || queuedDelete;
   // A listing created on eBay (Trading API): title, description, price and stock only (lib/ebay/legacyTrading).
+  // …and with variations, price and stock are per variation on eBay: only title and description here.
+  const ebayLegacyVariations = Boolean((engine.view.meta.raw as { hasVariations?: boolean } | undefined)?.hasVariations);
   const ebayLegacy = marketplace === 'ebay' && Boolean((engine.view.meta.raw as { isLegacy?: boolean } | undefined)?.isLegacy);
   const count = changeCount(changes);
   // An open draft with no changes (e.g. after Undo) is not work: no Send/Discard, no "Not sent" pill. A failed,
@@ -1378,7 +1380,7 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
               return (
                 <Box key={s.id} data-le-section={s.id}>
                   {/* A listing created on eBay: only Title (title, description) and Price (price, stock) can be sent. */}
-                  {ebayLegacy && !LEGACY_EBAY_SECTIONS.has(s.id) ? (
+                  {ebayLegacy && (!LEGACY_EBAY_SECTIONS.has(s.id) || (s.id === 'price' && ebayLegacyVariations)) ? (
                     <ListingEditorContext.Provider value={{ ...(ctxValue as unknown as ListingEditorContextValue), readOnly: true }}>{comp}</ListingEditorContext.Provider>
                   ) : comp}
                   {s.id === 'photos' && startFaster ? <Box sx={{ mt: '16px' }}>{startFaster}</Box> : null}

@@ -39,7 +39,7 @@ export function SplitButton({ primary, options, variant = 'primary', size = 'md'
   const main = (
     <MuiButton
       {...base}
-      {...(primary.href && !primary.disabled ? { component: NextLink, href: primary.href } : {})}
+      {...(primary.href && !primary.disabled ? { component: NextLink, href: primary.href, ...(primary.href.startsWith('/api/') ? { prefetch: false } : {}) } : {})}
       onClick={primary.onClick}
       disabled={primary.disabled || primary.loading}
       aria-busy={primary.loading || undefined}
@@ -87,7 +87,7 @@ export function SplitButton({ primary, options, variant = 'primary', size = 'md'
             <MenuItem
               key={o.id}
               disabled={o.disabled}
-              {...(o.href && !o.disabled ? { component: NextLink, href: o.href } : {})}
+              {...(o.href && !o.disabled ? { component: NextLink, href: o.href, ...(o.href.startsWith('/api/') ? { prefetch: false } : {}) } : {})}
               onClick={() => { setOpen(false); o.onClick?.(); }}
               sx={{ gap: '8px', fontSize: 13, color: o.tone === 'danger' ? tone.danger.fg : neutral[800], flexWrap: 'wrap' }}
             >

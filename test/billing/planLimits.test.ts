@@ -166,7 +166,7 @@ describe('decided tiers (design/launch/tiers.md §1)', () => {
     expect(DECIDED_PLAN_LIMITS.growth.limits).toEqual({ orders: 2000, labels: 1000, connectedStores: 5, aiCredits: 1500 });
     expect(DECIDED_PLAN_LIMITS.pro.limits).toEqual({ orders: 6000, labels: 3000, connectedStores: 10, aiCredits: 3000 });
     expect(DECIDED_PLAN_LIMITS.enterprise.limits).toEqual({ orders: null, labels: null, connectedStores: null, aiCredits: 10000 });
-    expect(DECIDED_PLAN_LIMITS.shopify_free.limits).toEqual({ orders: null, labels: null, connectedStores: 1, aiCredits: 100 });
+    expect(DECIDED_PLAN_LIMITS.shopify_free.limits).toEqual({ orders: null, labels: null, connectedStores: 3, aiCredits: 300 });
   });
 
   it('never upsells Stripe to shopify_free or enterprise (rule 1.2.1)', () => {

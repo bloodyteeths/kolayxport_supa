@@ -50,7 +50,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
   const linkProps = href && !disabled
     ? external
       ? { component: 'a' as const, href, target: '_blank', rel: 'noopener noreferrer' }
-      : { component: NextLink, href }
+      : { component: NextLink, href, ...(href.startsWith('/api/') ? { prefetch: false } : {}) }
     : {};
   const btn = (
     <MuiIconButton

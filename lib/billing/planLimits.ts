@@ -179,7 +179,9 @@ export const DECIDED_PLAN_LIMITS: Readonly<Record<PlanKey, DecidedPlan>> = {
   growth: { limits: { orders: 2000, labels: 1000, connectedStores: 5, aiCredits: 1500 }, stripeUpsell: true },
   pro: { limits: { orders: 6000, labels: 3000, connectedStores: 10, aiCredits: 3000 }, stripeUpsell: true },
   enterprise: { limits: { orders: null, labels: null, connectedStores: null, aiCredits: 10000 }, stripeUpsell: false },
-  shopify_free: { limits: { orders: null, labels: null, connectedStores: 1, aiCredits: 100 }, stripeUpsell: false },
+  // Shopify merchants: free (App Store 1.2.1). 3 stores = their Shopify store + 2 marketplaces (the listing's multichannel
+  // promise); 300 credits so a default first video (192) works.
+  shopify_free: { limits: { orders: null, labels: null, connectedStores: 3, aiCredits: 300 }, stripeUpsell: false },
 };
 
 /** tiers.md §1 constants. The trial length is enforced at account creation via `newTrialExpiry`. */

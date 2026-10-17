@@ -119,7 +119,7 @@ function AppShellMount({ children }: { children: ReactNode }) {
 }
 
 
-export default function AppRoot({ children, session, shell }: { children: ReactNode; session?: unknown; shell: boolean }) {
+export function AppRoot({ children, session, shell }: { children: ReactNode; session?: unknown; shell: boolean }) {
   return (
     <SessionProvider session={session as never}>
     <AuthProvider>
@@ -149,3 +149,5 @@ export default function AppRoot({ children, session, shell }: { children: ReactN
     </SessionProvider>
   );
 }
+
+export default AppRoot;

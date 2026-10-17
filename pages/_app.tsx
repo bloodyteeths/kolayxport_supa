@@ -2,7 +2,7 @@ import { AppProps } from 'next/app';
 import "../styles/globals.css";
 import { DefaultSeo } from 'next-seo';
 import SEO from '../next-seo.config';
-import { ReactElement, ReactNode } from 'react';
+import { ReactElement, ReactNode, type ComponentType } from 'react';
 import { NextPage } from 'next';
 import { useRouter } from 'next/router';
 import { useEffect, useReducer, useRef, useState } from 'react';
@@ -15,8 +15,14 @@ import CookieConsent from '@/components/CookieConsent';
 import { captureAttribution, track } from '@/lib/tracking/events';
 import { isShellRoute } from '@/lib/nav/shellRoutes';
 
-// The app's provider tree is a separate chunk: marketing pages never load it (server-rendered where used).
-const AppRoot = dynamic(() => import('@/components/app/AppRoot'));
+// The app's provider tree is a separate chunk: marketing pages never load it. In production it is
+// server-rendered and Next preloads the chunk before hydration. `next dev` (Turbopack) neither preloads it
+// on the client (React then duplicated the tree) nor can require it synchronously on the server, so dev
+// renders app pages client-side only. Production SSR is unchanged (verified with `next build && next start`).
+const AppRoot: ComponentType<{ children: ReactNode; session?: unknown; shell: boolean }> = dynamic(
+  () => import('@/components/app/AppRoot'),
+  { ssr: process.env.NODE_ENV === 'production' },
+);
 
 export type NextPageWithLayout<P = {}, IP = P> = NextPage<P, IP> & {
   getLayout?: (page: ReactElement) => ReactNode;

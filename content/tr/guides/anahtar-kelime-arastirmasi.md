@@ -13,7 +13,8 @@ order: 5
 duration: PT1M13S
 video:
   file: anahtar-kelime-arastirmasi
-  youtubeId: ''
+  youtubeId: POX-IWeXD3o
+  uploadDate: '2026-10-17'
 steps:
   - name: Anahtar kelime gezginini açın
     text: Pazar araştırması sayfasında Anahtar kelime gezgini sekmesine geçin.

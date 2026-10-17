@@ -8,7 +8,7 @@ inventoryRefs: [settings-connections, order-sync-trendyol, trendyol-products, ai
 draft: false
 name: "Trendyol"
 kind: marketplace
-status: beta
+status: production
 setupMinutes: 5
 connect: "API bilgileri: Trendyol satıcı panelinden aldığınız API Key, API Secret ve Satıcı ID'yi Ayarlar › Bağlantılar'a girersiniz."
 capabilities:

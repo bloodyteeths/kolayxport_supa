@@ -8,7 +8,7 @@ inventoryRefs: [settings-connections, order-sync-wix, wix-products, stock-sync, 
 draft: false
 name: "Wix"
 kind: marketplace
-status: beta
+status: production
 setupMinutes: 3
 connect: "App install: from Settings › Connections you install the KolayXport app on your Wix site and grant access."
 capabilities:

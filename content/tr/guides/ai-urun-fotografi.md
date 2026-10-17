@@ -15,7 +15,8 @@ order: 4
 duration: PT1M3S
 video:
   file: ai-urun-fotografi
-  youtubeId: ''
+  youtubeId: QSYWeFE4I_8
+  uploadDate: '2026-10-17'
 steps:
   - name: Fotoğraflar bölümüne bakın
     text: >-

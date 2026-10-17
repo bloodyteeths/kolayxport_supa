@@ -15,7 +15,8 @@ order: 10
 duration: PT1M17S
 video:
   file: kar-raporu
-  youtubeId: ''
+  youtubeId: z5t8k9EENwI
+  uploadDate: '2026-10-17'
 steps:
   - name: Kâr sekmesini açın
     text: Ana sayfada Kâr sekmesine geçin.

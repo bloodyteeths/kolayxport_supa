@@ -8,7 +8,7 @@ inventoryRefs: [settings-connections, parasut-einvoice, etgb-excel-email]
 draft: false
 name: "Paraşüt"
 kind: accounting
-status: partial
+status: production
 setupMinutes: 10
 connect: "API bilgileri: Paraşüt'ten aldığınız Client ID, Client Secret, kullanıcı adı, şifre ve firma numaranızı Ayarlar › Bağlantılar'a girersiniz."
 capabilities:

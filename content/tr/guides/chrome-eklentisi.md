@@ -17,7 +17,8 @@ order: 12
 duration: PT1M8S
 video:
   file: chrome-eklentisi
-  youtubeId: ''
+  youtubeId: eZ1O_uqu09k
+  uploadDate: '2026-10-17'
 steps:
   - name: Yardım sayfasındaki adıma bakın
     text: 'Yardım sayfasında, KolayXport''u kurmanın dördüncü adımı Chrome eklentisi.'

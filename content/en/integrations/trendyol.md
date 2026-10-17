@@ -8,7 +8,7 @@ inventoryRefs: [settings-connections, order-sync-trendyol, trendyol-products, ai
 draft: false
 name: "Trendyol"
 kind: marketplace
-status: beta
+status: production
 setupMinutes: 5
 connect: "API credentials: you enter the API Key, API Secret and Supplier ID from your Trendyol seller panel under Settings › Connections."
 capabilities:

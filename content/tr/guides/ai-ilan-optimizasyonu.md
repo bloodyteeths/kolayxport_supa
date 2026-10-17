@@ -15,7 +15,8 @@ order: 2
 duration: PT1M14S
 video:
   file: ai-ilan-optimizasyonu
-  youtubeId: ''
+  youtubeId: 0lUVhwLfATE
+  uploadDate: '2026-10-17'
 steps:
   - name: İlanı açın
     text: Etsy ilanları sayfasında düzenlemek istediğiniz ilanın satırında Düzenle'ye tıklayın.

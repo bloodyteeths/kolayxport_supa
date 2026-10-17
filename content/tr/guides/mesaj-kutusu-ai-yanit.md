@@ -14,7 +14,8 @@ order: 11
 duration: PT1M11S
 video:
   file: mesaj-kutusu-ai-yanit
-  youtubeId: ''
+  youtubeId: VNM6NTX4XcA
+  uploadDate: '2026-10-17'
 steps:
   - name: Mesajlar sayfasını açın
     text: >-

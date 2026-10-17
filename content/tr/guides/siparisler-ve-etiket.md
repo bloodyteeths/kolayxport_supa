@@ -17,7 +17,8 @@ order: 7
 duration: PT1M29S
 video:
   file: siparisler-ve-etiket
-  youtubeId: ''
+  youtubeId: dJJ7ApyrI7E
+  uploadDate: '2026-10-17'
 steps:
   - name: Siparişler sayfasını açın
     text: >-

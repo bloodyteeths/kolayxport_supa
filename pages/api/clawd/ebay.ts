@@ -3,6 +3,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';
 import { getAuthUser } from '../../../lib/auth';
+import {
+  isExtensionRequest, withResearchQuota, sendResearchOutcome, captureHandler, sharedCacheKey, RESEARCH_TTL,
+} from '../../../lib/ext/researchQuota';
 import { hasValidInternalApiKeyHeader } from '../../../lib/security/internalApiKey';
 import {
   getApplicationToken,
@@ -108,7 +111,35 @@ export const config = {
   maxDuration: 60, // Allow up to 60s for legacy listing fetches
 };
 
-export default async function handler(
+/**
+ * Chrome-extension research calls (background-simple.js sends `X-KX-Client: ext/<version>`)
+ * go through the research quota (lib/ext/researchQuota.ts): shared cross-user cache, the
+ * global eBay brake and the per-plan daily lookups. Web-app calls (no header) and the
+ * internal API-key path keep the unchanged handler below.
+ */
+const EXT_QUOTA_ACTIONS = new Set(['get_item_details', 'analyze_seo']);
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const action = String(req.query.action || '');
+  if (req.method === 'GET' && EXT_QUOTA_ACTIONS.has(action) && isExtensionRequest(req) && !hasValidInternalApiKeyHeader(req)) {
+    const user = await getAuthUser(req, res);
+    if (!user) return res.status(401).json({ error: 'Unauthorized: Invalid or missing authentication' });
+    const q = req.query;
+    const site = String(q.marketplace_id || 'EBAY_US');
+    const isItem = action === 'get_item_details';
+    const cacheKey = isItem
+      ? sharedCacheKey('ebay', 'item', site, q.legacy_item_id as string)
+      : sharedCacheKey('ebay', 'seo', site, q.q as string, q.my_title as string, q.category_id as string);
+    const outcome = await withResearchQuota(
+      { req, userId: user.id, marketplace: 'ebay', cacheKey, ttl: isItem ? RESEARCH_TTL.detail : RESEARCH_TTL.search, apiCallsEstimate: 1 },
+      () => captureHandler(ebayHandler, req, res),
+    );
+    return sendResearchOutcome(res, outcome);
+  }
+  return ebayHandler(req, res);
+}
+
+async function ebayHandler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {

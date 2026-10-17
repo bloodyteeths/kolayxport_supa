@@ -22,6 +22,7 @@
 
   let currentAsin = null;
   let spForAsin = { asin: null, data: null };
+  let spLimit = { asin: null, resp: null }; // 429 research-limit answer for this ASIN
 
   function isProductPage() {
     return !!extractAsinFromUrl() || !!document.getElementById('dp-container');
@@ -78,6 +79,9 @@
       if (sidebar) sidebar.insertBefore(widget, sidebar.firstChild);
       else insertTarget.appendChild(widget);
     }
+
+    // Daily research limit / busy: one card instead of the numbers.
+    if (spLimit.asin === asin && spLimit.resp && shared.showLimitCard(widget, spLimit.resp, 'amazon_listing')) return;
 
     let salesBlock;
     if (fig.kind === 'amazon') {
@@ -157,7 +161,13 @@
 
     if (isNew) {
       requestSpApiSignals([asin], detectAmazonMarketplace()).then((resp) => {
-        if (currentAsin !== asin || !resp || !resp.available || !resp.items || !resp.items[asin]) return;
+        if (currentAsin !== asin || !resp) return;
+        if (resp.reason === 'research_limit' && resp.limit) {
+          spLimit = { asin, resp };
+          render(asin);
+          return;
+        }
+        if (!resp.available || !resp.items || !resp.items[asin]) return;
         spForAsin = { asin, data: resp.items[asin] };
         render(asin);
       });
@@ -181,6 +191,7 @@
   observeUrlChanges(() => {
     currentAsin = null;
     spForAsin = { asin: null, data: null };
+    spLimit = { asin: null, resp: null };
     setTimeout(processListingPage, 1000);
   });
 })();

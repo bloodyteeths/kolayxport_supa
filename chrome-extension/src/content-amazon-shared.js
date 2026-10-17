@@ -378,11 +378,15 @@ function requestSpApiSignals(asins, marketplace) {
   return new Promise((resolve) => {
     try {
       if (!chrome?.runtime?.sendMessage || !asins.length) return resolve(null);
+      const L = window.__KX_LIMIT;
       chrome.runtime.sendMessage(
-        { type: 'kx_amazon_enrich', params: { asins: asins.slice(0, 20), marketplace } },
+        { type: 'kx_amazon_enrich', params: { asins: asins.slice(0, 20), marketplace }, pv: L ? L.pageViewId() : undefined },
         (response) => {
           if (chrome.runtime.lastError || !response) return resolve(null);
           if (response.error) {
+            // 429 research limit: the overlays show the limit card instead of numbers.
+            const limit = L ? L.fromResponse(response) : null;
+            if (limit) return resolve({ available: false, reason: 'research_limit', limit });
             return resolve({ available: false, reason: response.status === 401 ? 'not_signed_in' : 'unavailable' });
           }
           resolve(response);
@@ -423,8 +427,17 @@ function observeUrlChanges(callback) {
   return observer;
 }
 
+/** Replace an overlay's content with the research-limit card for a `research_limit` SP-API answer. */
+function amzShowLimitCard(container, resp, surface) {
+  const L = window.__KX_LIMIT;
+  if (!L || !container || !resp || !resp.limit) return false;
+  L.render(container, resp.limit, { surface });
+  return true;
+}
+
 // Make shared functions available to other content scripts
 window.__kxAmzShared = {
+  showLimitCard: amzShowLimitCard,
   math: kxAmzMath,
   injectAmazonCSS,
   extractAsinFromUrl,

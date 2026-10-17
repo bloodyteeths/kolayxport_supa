@@ -81,7 +81,7 @@ describe('Amazon search overlay', () => {
     run('content-amazon-search.js');
     const doc = w.document as Document;
     const bar = await waitFor(() => doc.getElementById('kx-amz-research-summary'));
-    expect(bar.textContent).toContain('6 results on this page');
+    expect(bar.textContent).toContain('5 results + 1 ad on this page');
     expect(bar.textContent).toContain('of over 3,000');
     expect(bar.textContent).toContain('Ads: 1/6');
 

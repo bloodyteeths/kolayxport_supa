@@ -7,6 +7,9 @@ import { getEbayTokenFor } from '../../../lib/integrations/ebayClient';
 import { callEbayRateLimited } from '../../../lib/integrations/ebayRateLimiter';
 import { summarizePrices, buildFxTable, decodeEntities, type PriceSummary } from '../../../lib/research/stats';
 import { convertCurrency } from '../../../lib/finance/fx';
+import {
+  isExtensionRequest, withResearchQuota, sendResearchOutcome, captureHandler, sharedCacheKey, RESEARCH_TTL,
+} from '../../../lib/ext/researchQuota';
 
 /**
  * R0 honesty patch: robust price summary for eBay search results in the
@@ -93,7 +96,36 @@ function median(arr: number[]): number {
 // Handler
 // ---------------------------------------------------------------------------
 
-export default async function handler(
+/**
+ * Chrome-extension research calls (background-simple.js sends `X-KX-Client: ext/<version>`)
+ * go through the research quota (lib/ext/researchQuota.ts): shared cross-user cache, the
+ * global eBay brake and the per-plan daily lookups. The web app's research hub (no header)
+ * and the internal API-key path keep the unchanged handler below.
+ * One search = 1 Browse search + up to 20 item-detail calls.
+ */
+const EXT_QUOTA_ACTIONS = new Set(['product_database', 'niche_analyze']);
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const action = String(req.query.action || '');
+  if (req.method === 'GET' && EXT_QUOTA_ACTIONS.has(action) && isExtensionRequest(req) && !hasValidInternalApiKeyHeader(req)) {
+    const user = await getAuthUser(req, res);
+    if (!user) return res.status(401).json({ error: 'Unauthorized: Invalid or missing authentication' });
+    const q = req.query;
+    const site = String(q.marketplace_id || 'EBAY_US');
+    const cacheKey = action === 'product_database'
+      ? sharedCacheKey('ebay', action, site, q.q as string, q.category_id as string, q.min_price as string, q.max_price as string,
+        q.condition as string, (q.sort as string) || 'newlyListed', (q.limit as string) || '50', (q.offset as string) || '0')
+      : sharedCacheKey('ebay', action, site, q.q as string, q.category_id as string);
+    const outcome = await withResearchQuota(
+      { req, userId: user.id, marketplace: 'ebay', cacheKey, ttl: RESEARCH_TTL.search, apiCallsEstimate: 21 },
+      () => captureHandler(ebayResearchHandler, req, res),
+    );
+    return sendResearchOutcome(res, outcome);
+  }
+  return ebayResearchHandler(req, res);
+}
+
+async function ebayResearchHandler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {

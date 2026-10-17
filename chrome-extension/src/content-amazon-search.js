@@ -118,6 +118,16 @@
     if (existing && sig === lastBarSignature) return;
     lastBarSignature = sig;
 
+    // Daily research limit / busy: one card instead of the numbers.
+    if (spApi && spApi.reason === 'research_limit' && spApi.limit) {
+      const card = existing || document.createElement('div');
+      card.id = `${KX_AMZ_PREFIX}-summary`;
+      card.className = 'kx-stats-bar';
+      shared.showLimitCard(card, spApi, 'amazon_search');
+      if (!existing) resultsContainer.parentElement?.insertBefore(card, resultsContainer);
+      return;
+    }
+
     const organic = parsed.filter((p) => !p.sponsored);
     const sponsoredCount = parsed.length - organic.length;
 
@@ -172,7 +182,7 @@
     bar.innerHTML = `
       <div class="kx-stats-header">
         <span class="kx-stats-logo">KolayXport</span>
-        Amazon Market Snapshot · ${parsed.length} results on this page${total ? ` (of ${total.isLowerBound ? 'over ' : ''}${total.total.toLocaleString()})` : ''}
+        Amazon Market Snapshot · ${parsed.length - sponsoredCount} results + ${sponsoredCount} ad${sponsoredCount === 1 ? "" : "s"} on this page${total ? ` (of ${total.isLowerBound ? 'over ' : ''}${total.total.toLocaleString()})` : ''}
       </div>
       <div class="kx-stats-row">
         <span>Median price: <strong>${esc(M.formatMoney(M.median(prices), currency))}</strong></span>

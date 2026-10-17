@@ -148,6 +148,8 @@
         // Page signals are always the live ones from this render, not the cached copy.
         renderStatsBar(statsBar, data, page);
       } catch (err) {
+        // Daily research limit / busy / signed out (401 → sign-up card): one card instead of the numbers.
+        if (S.showLimitCard(statsBar, err, 'etsy_listing', true)) return;
         statsBar.textContent = '';
         const msg = err && err.status === 401 ? S.t('signInRequired') : (err && err.message) || S.t('loadFailed');
         statsBar.appendChild(header(msg));

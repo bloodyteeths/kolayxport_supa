@@ -286,14 +286,17 @@ function getEbayPageType() {
 // ---------------------------------------------------------------------------
 async function ebayApiCall(action, params = {}) {
   return new Promise((resolve, reject) => {
+    const L = window.__KX_LIMIT;
     chrome.runtime.sendMessage(
-      { type: 'kx_ebay_research', action, params },
+      { type: 'kx_ebay_research', action, params, pv: L ? L.pageViewId() : undefined },
       (response) => {
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message));
           return;
         }
         if (response?.error) {
+          // A 429 research-limit body rides along as err.limitInfo (lib/limitCard.js).
+          if (L) { reject(L.toError(response)); return; }
           reject(new Error(response.error));
           return;
         }
@@ -376,10 +379,20 @@ async function ebayIsOverlayEnabled() {
   });
 }
 
+/** Replace an overlay's numbers with the research-limit card when `err` carries a 429 payload. */
+function ebayShowLimitCard(container, err, surface) {
+  const L = window.__KX_LIMIT;
+  const info = L && (L.fromError(err) || L.fromResponse(err));
+  if (!info || !container) return false;
+  L.render(container, info, { surface });
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 window.__KX_EBAY_SHARED = {
+  showLimitCard: ebayShowLimitCard,
   KX_EBAY_PREFIX,
   API_BASE: EBAY_API_BASE,
   createOverlayContainer: createEbayOverlayContainer,

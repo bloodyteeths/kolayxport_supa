@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
-import { getListingStats, EtsyPublicApiError } from '@/lib/etsy/listingStats';
+import { getListingStats, sanitizePageSignals, EtsyPublicApiError } from '@/lib/etsy/listingStats';
+import { withResearchQuota, sendResearchOutcome, sharedCacheKey, RESEARCH_TTL } from '@/lib/ext/researchQuota';
 
 /**
  * POST /api/ext/listing-stats
@@ -9,6 +10,10 @@ import { getListingStats, EtsyPublicApiError } from '@/lib/etsy/listingStats';
  * Public Etsy listing stats for the Chrome extension overlay, with measured vs
  * estimated sales clearly separated (see lib/etsy/listingStats.ts).
  * Auth: any signed-in KolayXport user (Bearer token from /api/auth/extension).
+ *
+ * Research quota (lib/ext/researchQuota.ts): shared cross-user cache for 24 h keyed by
+ * listing id + the page price/currency (the only page signals that change the numbers;
+ * the rest are echoed back fresh), then the global Etsy brake and the daily lookup limit.
  */
 
 // Simple per-user rate limit (in-process): 120 lookups / 10 min.
@@ -41,8 +46,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!/^\d{4,20}$/.test(listingId)) return res.status(400).json({ error: 'valid listingId required' });
 
   try {
-    const stats = await getListingStats(listingId, req.body?.page);
-    return res.status(200).json(stats);
+    const page = sanitizePageSignals(req.body?.page);
+    const outcome = await withResearchQuota(
+      {
+        req,
+        userId: user.id,
+        marketplace: 'etsy',
+        cacheKey: sharedCacheKey('etsy', 'listing', 'etsy.com', listingId, page.pagePrice ?? '', page.pageCurrency ?? ''),
+        ttl: RESEARCH_TTL.detail,
+        apiCallsEstimate: 5, // listing + reviews + images + shop + shop reviews
+      },
+      async () => ({ status: 200, body: await getListingStats(listingId, req.body?.page) }),
+    );
+    // Shared hits carry another viewer's page signals: echo this page's own.
+    if (outcome.kind === 'ok' && outcome.source === 'shared_cache' && outcome.body && typeof outcome.body === 'object') {
+      outcome.body = { ...outcome.body, pageSignals: page };
+    }
+    return sendResearchOutcome(res, outcome);
   } catch (err) {
     if (err instanceof EtsyPublicApiError) {
       const status = err.status === 404 ? 404 : 502;

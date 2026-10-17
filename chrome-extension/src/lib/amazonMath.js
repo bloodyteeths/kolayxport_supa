@@ -413,8 +413,11 @@
   function formatCompact(n) {
     if (n == null || !isFinite(n)) return '—';
     const a = Math.abs(n);
-    if (a >= 1e6) return (n / 1e6).toFixed(a >= 1e7 ? 0 : 1).replace(/\.0$/, '') + 'M';
-    if (a >= 1e3) return (n / 1e3).toFixed(a >= 1e4 ? 0 : 1).replace(/\.0$/, '') + 'K';
+    // Truncate like Amazon does ("3,251 ratings" → "3.2K"), so our numbers match the page and a "≥" floor
+    // never rounds up past what Amazon actually reported.
+    const cut = (v, d) => { const f = 10 ** d; return String(Math.trunc(v * f) / f); };
+    if (a >= 1e6) return cut(n / 1e6, a >= 1e7 ? 0 : 1) + 'M';
+    if (a >= 1e3) return cut(n / 1e3, a >= 1e4 ? 0 : 1) + 'K';
     return String(Math.round(n));
   }
 

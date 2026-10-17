@@ -39,6 +39,7 @@
       ],
       "js": [
         "src/cache.js",
+        "src/lib/limitCard.js",
         "src/lib/etsyMath.js",
         "src/content-shared.js",
         "src/content-search.js",
@@ -89,6 +90,7 @@
       ],
       "js": [
         "src/cache.js",
+        "src/lib/limitCard.js",
         "src/lib/ebayMath.js",
         "src/content-ebay-shared.js",
         "src/content-ebay-search.js",
@@ -106,6 +108,7 @@
       ],
       "js": [
         "src/cache.js",
+        "src/lib/limitCard.js",
         "src/lib/amazonMath.js",
         "src/content-amazon-shared.js",
         "src/content-amazon-search.js",

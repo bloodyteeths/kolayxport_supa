@@ -64,18 +64,23 @@
       const pageData = M.parseListingPage(document, { currency: mkt.currency });
 
       try {
+        let limitErr = null;
+        const keepLimit = (e) => { if (!limitErr && e && e.limitInfo) limitErr = e; return null; };
         const [itemData, seoData] = await Promise.all([
           C.getOrFetch(
             `ebay_listing:v2:${mkt.id}:${itemId}`,
             'listing',
             () => S.apiCall('listing_enrich', { itemId, marketplace: mkt.id })
-          ).catch(() => null),
+          ).catch(keepLimit),
           title ? C.getOrFetch(
             `ebay_seo:v2:${mkt.id}:${itemId}`,
             'listing',
             () => S.apiCall('seo_analyze', { query: title.split(/\s+/).slice(0, 5).join(' '), title, marketplace: mkt.id })
-          ).catch(() => null) : null,
+          ).catch(keepLimit) : null,
         ]);
+
+        // Daily research limit / busy: one card instead of the numbers.
+        if (limitErr && S.showLimitCard(statsBar, limitErr, 'ebay_listing')) return;
 
         if (!itemData && !seoData && pageData.soldCount == null) {
           statsBar.remove();

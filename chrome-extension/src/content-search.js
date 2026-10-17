@@ -63,18 +63,24 @@
         summary = data?.summary || null;
         if (summary) renderSummaryBar(bar, summary, query, ctx.market);
       } catch (err) {
+        // Daily research limit / busy / signed out: one card instead of the numbers.
+        if (S.showLimitCard(bar, err, 'etsy_search')) return;
         bar.textContent = '';
         bar.appendChild(S.el('span', null, (err && err.message) || S.t('loadFailed'), 'opacity:0.7'));
       }
 
+      let limited = false;
       try {
         const ids = page.ids.slice(0, 96);
         if (ids.length) {
           await S.loadCardStats(ids, ctx, isCurrent, (_all, c) => {
-            if (summary && isCurrent()) renderSummaryBar(bar, summary, query, c.market);
+            if (summary && isCurrent() && !limited) renderSummaryBar(bar, summary, query, c.market);
           });
         }
-      } catch (_) { /* per-card rows are best-effort */ }
+      } catch (err) {
+        // Per-card rows are best-effort, but a research-limit answer replaces the bar.
+        if (isCurrent()) limited = S.showLimitCard(bar, err, 'etsy_search');
+      }
     }
 
     function item(label, value, valueStyle, title) {

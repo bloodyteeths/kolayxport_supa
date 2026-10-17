@@ -76,6 +76,9 @@
         }
       }
 
+      // Daily research limit / busy: one card instead of the numbers.
+      if (apiError && S.showLimitCard(bar, apiError, 'ebay_search')) return;
+
       const summary = M.buildSearchSummary({ api, page, refinements });
       if (!summary.items.length && !summary.resultCount) {
         bar.innerHTML = `<span style="opacity:0.7">${esc((apiError && apiError.message) || S.t('loadFailed'))}</span>`;

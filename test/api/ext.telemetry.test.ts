@@ -30,6 +30,7 @@ vi.mock('@/lib/admin/events', () => ({
 
 import handler from '@/pages/api/ext/telemetry';
 import { logger } from '@/lib/logger';
+import { logExtensionEvent } from '@/lib/admin/events';
 
 function makeReq(opts: { origin?: string; auth?: boolean; body?: any; method?: string }): NextApiRequest {
   return {
@@ -152,6 +153,30 @@ describe('POST /api/ext/telemetry', () => {
     const lastCall = warnCalls[warnCalls.length - 1];
     const details = lastCall[1];
     expect(details.domSnapshot).toBeUndefined();
+  });
+
+  it('accepts the research upgrade-click event (allow-listed fields only)', async () => {
+    (logExtensionEvent as any).mockClear();
+    const res = makeRes();
+    await handler(
+      makeReq({
+        origin: `chrome-extension://${process.env.OFFICIAL_EXTENSION_ID}`,
+        auth: true,
+        body: { events: [{ event: 'research_upgrade_click', reason: 'user_daily', surface: 'etsy_search', extensionVersion: '9.7.1', extra: 'dropped' }] },
+      }),
+      res,
+    );
+    expect(res.state.status).toBe(200);
+    expect(res.state.body.received).toBe(1);
+    const call = (logExtensionEvent as any).mock.calls[0][1];
+    expect(call).toMatchObject({ operation: 'telemetry.research_upgrade_click', userId: ACTING_USER_ID, details: { reason: 'user_daily', surface: 'etsy_search' } });
+    expect(JSON.stringify(call)).not.toContain('dropped');
+  });
+
+  it('rejects unknown event names', async () => {
+    const res = makeRes();
+    await handler(makeReq({ origin: 'https://kolayxport.com', auth: true, body: { events: [{ event: 'anything' }] } }), res);
+    expect(res.state.status).toBe(400);
   });
 
   it('rejects empty failures array with 400', async () => {

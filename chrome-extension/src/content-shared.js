@@ -240,17 +240,34 @@ const SELECTORS = {
 // ---------------------------------------------------------------------------
 // API Communication (via background script)
 // ---------------------------------------------------------------------------
+// A 429 research-limit answer rejects with err.limitInfo (see lib/limitCard.js);
+// every message carries the page-view id so one page view counts as one lookup.
+function _kxLimit() { return window.__KX_LIMIT || null; }
+
+function _kxPv() {
+  const L = _kxLimit();
+  return L ? L.pageViewId() : undefined;
+}
+
+function _kxError(response) {
+  const L = _kxLimit();
+  if (L) return L.toError(response);
+  const err = new Error(response.error);
+  err.status = response.status;
+  return err;
+}
+
 async function apiCall(action, params = {}) {
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage(
-      { type: 'kx_research', action, params },
+      { type: 'kx_research', action, params, pv: _kxPv() },
       (response) => {
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message));
           return;
         }
         if (response?.error) {
-          reject(new Error(response.error));
+          reject(_kxError(response));
           return;
         }
         resolve(response);
@@ -262,22 +279,35 @@ async function apiCall(action, params = {}) {
 async function listingStatsCall(listingId, page) {
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage(
-      { type: 'kx_listing_stats', params: { listingId, page } },
+      { type: 'kx_listing_stats', params: { listingId, page }, pv: _kxPv() },
       (response) => {
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message));
           return;
         }
         if (response?.error) {
-          const err = new Error(response.error);
-          err.status = response.status;
-          reject(err);
+          reject(_kxError(response));
           return;
         }
         resolve(response);
       }
     );
   });
+}
+
+/**
+ * Replace an overlay's numbers with the research-limit card when `err` (or a response)
+ * carries a 429 research-limit payload. `signedOutOn401`: also for a plain 401.
+ * Returns true when the card was shown.
+ */
+function showLimitCard(container, errOrResponse, surface, signedOutOn401) {
+  const L = _kxLimit();
+  if (!L || !container) return false;
+  let info = L.fromError(errOrResponse) || L.fromResponse(errOrResponse);
+  if (!info && signedOutOn401 && errOrResponse && errOrResponse.status === 401) info = L.signedOutInfo();
+  if (!info) return false;
+  L.render(container, info, { surface });
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -746,6 +776,13 @@ function buildCardRow(stats, ctx) {
   return row;
 }
 
+/** The whole listing card (price, shop, "Ad" label), never just the image link. */
+function findCardScope(link) {
+  const start = link.parentElement || link;
+  return start.closest('.v2-listing-card, [data-listing-card-v2], div[data-listing-id], li[data-listing-id]') ||
+         findListingCard(link);
+}
+
 function findListingCard(link) {
   return link.closest('[data-listing-id]') ||
          link.closest('[data-listing-card-v2]') ||
@@ -801,7 +838,9 @@ function collectPageCards() {
   document.querySelectorAll('a[href*="/listing/"]').forEach(link => {
     const match = link.href.match(/\/listing\/(\d+)/);
     if (!match || display[match[1]]) return;
-    const card = findListingCard(link);
+    // Price and "Ad" label live on the whole card. Etsy also puts data-listing-id on the image <a>,
+    // so findListingCard() (used for row placement) can return just the image link.
+    const card = findCardScope(link);
     ids.push(match[1]);
     display[match[1]] = { price: readCardPrice(card), isAd: isAdCard(card) };
   });
@@ -900,6 +939,7 @@ window.__KX_SHARED = {
   SELECTORS,
   apiCall,
   listingStatsCall,
+  showLimitCard,
   el, formatMoney, formatSales, confShort,
   buildCardRow, renderCardRows, loadCardStats, pageListingIds, findListingCard,
   collectPageCards, pageMarket, readCardPrice, isAdCard,

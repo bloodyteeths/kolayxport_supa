@@ -56,6 +56,8 @@
         if (!data?.shop) { bar.textContent = ''; return; }
         renderShopBar(bar, data);
       } catch (err) {
+        // Daily research limit / busy / signed out: one card instead of the numbers.
+        if (S.showLimitCard(bar, err, 'etsy_shop')) return;
         setMessage(bar, '⚠ ' + ((err && err.message) || S.t('loadFailed')), 0.7);
       }
 
@@ -66,7 +68,10 @@
           const page = S.collectPageCards();
           const ids = page.ids.slice(0, 96);
           if (ids.length && isCurrent()) await S.loadCardStats(ids, { display: page.display }, isCurrent);
-        } catch (_) { /* best-effort */ }
+        } catch (err) {
+          // Best-effort, but a research-limit answer replaces the bar.
+          if (isCurrent()) S.showLimitCard(bar, err, 'etsy_shop');
+        }
       }, 500);
     }
 

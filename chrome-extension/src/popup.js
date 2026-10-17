@@ -26,6 +26,8 @@ const _t = {
     importing: 'İçe aktarılıyor…',
     importSent: (n) => `${n} siparişin adresi gönderildi`,
     openingOrders: 'Etsy sipariş listesi açılıyor — adresler otomatik gönderilecek',
+    researchTitle: 'Araştırma',
+    researchUsage: (used, limit) => `Bugün: ${used} / ${limit} araştırma`,
   },
   en: {
     status: 'Status', checking: 'Checking...', connected: 'Connected',
@@ -43,6 +45,8 @@ const _t = {
     importing: 'Importing…',
     importSent: (n) => `Sent addresses for ${n} ${n === 1 ? 'order' : 'orders'}`,
     openingOrders: 'Opening your Etsy orders — addresses are sent automatically',
+    researchTitle: 'Research',
+    researchUsage: (used, limit) => `Today: ${used} / ${limit} lookups`,
   },
 };
 
@@ -74,7 +78,40 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupListeners();
   checkPendingTracking();
   checkPendingAddresses();
+  renderResearchQuota();
 });
+
+/**
+ * Research usage ("Bugün: X / Y araştırma") from the last research answer the background
+ * worker saw (`quota` on success, the 429 research-limit body when blocked). A stored
+ * state from before the last 00:00 Istanbul reset counts as 0 used and not blocked.
+ */
+async function renderResearchQuota() {
+  try {
+    const stored = await new Promise((r) => chrome.storage.local.get('kx_research_quota', r));
+    const q = stored && stored.kx_research_quota;
+    if (!q || typeof q.limit !== 'number') return;
+    const expired = q.resetAt && Date.parse(q.resetAt) <= Date.now();
+    $('researchCard').style.display = '';
+    if (q.limit > 0) {
+      $('researchUsage').textContent = t('researchUsage', expired ? 0 : Math.min(q.used, q.limit), q.limit);
+    } else {
+      $('researchUsage').style.display = 'none';
+    }
+    const box = $('researchLimit');
+    if (q.reason && !expired && window.__KX_LIMIT) {
+      box.style.display = '';
+      window.__KX_LIMIT.render(box, {
+        error: 'research_limit', reason: q.reason, used: q.used, limit: q.limit, resetAt: q.resetAt, upgradeUrl: q.upgradeUrl,
+      }, { surface: 'popup' });
+    } else {
+      box.style.display = 'none';
+      box.textContent = '';
+    }
+  } catch (_) {
+    // Silent fail — card stays hidden
+  }
+}
 
 // Auth check
 async function checkAuth() {

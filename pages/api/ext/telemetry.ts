@@ -25,10 +25,25 @@ interface SelectorFailure {
   domSnapshot?: string;
 }
 
+/**
+ * Product events from the extension UI (lib/limitCard.js). Allow-listed names and values only;
+ * no free text, no URLs.
+ */
+interface ExtensionEvent {
+  event: 'research_upgrade_click';
+  reason?: string;
+  surface?: string;
+  extensionVersion?: string;
+}
+
 interface TelemetryBody {
   failures: SelectorFailure[];
+  events?: ExtensionEvent[];
   debugMode?: boolean;
 }
+
+const EVENT_NAMES = new Set(['research_upgrade_click']);
+const EVENT_REASONS = new Set(['user_daily', 'global_brake', 'signed_out']);
 
 export const config = {
   api: {
@@ -100,7 +115,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { failures, debugMode } = (req.body || {}) as Partial<TelemetryBody>;
+    const { failures, events, debugMode } = (req.body || {}) as Partial<TelemetryBody>;
+
+    if (Array.isArray(events) && events.length && !(Array.isArray(failures) && failures.length)) {
+      const accepted = events
+        .slice(0, 20)
+        .filter((e) => e && EVENT_NAMES.has(e.event))
+        .map((e) => ({
+          event: e.event,
+          reason: typeof e.reason === 'string' && EVENT_REASONS.has(e.reason) ? e.reason : undefined,
+          surface: typeof e.surface === 'string' && /^[a-z0-9_-]{1,40}$/.test(e.surface) ? e.surface : undefined,
+          extensionVersion: typeof e.extensionVersion === 'string' ? e.extensionVersion.slice(0, 20) : undefined,
+        }));
+      if (!accepted.length) return res.status(400).json({ error: 'No valid events provided' });
+      for (const e of accepted) {
+        logExtensionEvent('info', {
+          message: `Extension event: ${e.event}`,
+          operation: `telemetry.${e.event}`,
+          userId: user.id,
+          details: { reason: e.reason, surface: e.surface, extensionVersion: e.extensionVersion },
+        });
+      }
+      return res.status(200).json({ received: accepted.length });
+    }
 
     if (!Array.isArray(failures) || failures.length === 0) {
       return res.status(400).json({ error: 'No failures provided' });

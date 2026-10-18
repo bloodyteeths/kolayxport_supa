@@ -11,6 +11,7 @@
  * - the async fetches (`/api/etsy-addresses`, `/api/listing-urls`) are split out into
  *   `fetchOrderEnrichment`, so the mapping itself is pure and unit-tested.
  */
+import { trendyolCargoInfo } from '@/lib/trendyol/cargoInfo';
 import { orderRowStatus } from '@/lib/ds/status/orders';
 import { logoDisplayName } from '@/lib/ds/logos';
 import { canonicalStore } from '@/lib/marketplaces/canonical';
@@ -640,6 +641,7 @@ export function toOrderRow(order: ApiOrder, ctx: ToOrderRowsContext = {}): Order
     label: hasLabel ? getLatestLabel(order) : null,
     labelFailure: failure,
     marketplaceCargoNumber: cargo,
+    trendyol: isTrendyol ? (({ cargoNumber, carrier, commonLabel, nextStatus }) => ({ cargoNumber, carrier, commonLabel, nextStatus }))(trendyolCargoInfo(raw)) : null,
     hepsiburada: isHepsiburada ? {
       packageNumber: raw.packageNumber ? String(raw.packageNumber) : null,
       cargoCompany: raw.cargoProviderName ? String(raw.cargoProviderName) : null,

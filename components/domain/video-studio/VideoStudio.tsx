@@ -22,13 +22,13 @@ import {
   BASIC_SCENES, DEFAULT_DIRECTION, UNIVERSAL_PRESETS, VIDEO_AUDIO, VIDEO_CAMERAS, VIDEO_EXPRESSIONS, VIDEO_LIGHTS, VIDEO_LOOKS, VIDEO_MOTIONS,
   directVideo, type VideoDirection,
 } from '@/lib/ai/videoDirector';
-import { VIDEO_TARGETS, VIDEO_TARGET_PROFILES, generationAspect, videoReadiness, type VideoFormat, type VideoTarget } from '@/lib/ai/videoTargets';
+import { VIDEO_TARGETS, VIDEO_TARGET_PROFILES, formatForPhoto, generationAspect, videoReadiness, type VideoFormat, type VideoTarget } from '@/lib/ai/videoTargets';
 import { canAfford, extendCredits, imageCredits, videoCredits } from '@/lib/billing/aiCredits';
 import { showCreditsDialog } from '@/lib/billing/creditsDialogStore';
 import { refreshCredits, useCredits } from '@/components/domain/credits/useCredits';
 import { LIMIT_UI_HEADER } from '@/lib/http/limitInterceptor';
 
-type Photo = { key: string; ref: string; src: string; landscape?: boolean; fromVideo?: boolean };
+type Photo = { key: string; ref: string; src: string; landscape?: boolean; ratio?: number; fromVideo?: boolean };
 type Qa = { status: 'running' | 'done' | 'failed'; match?: number; realism?: number; diffs?: { text: string; fix: string }[]; issues?: { text: string; fix: string }[]; autoFix?: string; autoFixMode?: 'fix' | 'safer' };
 type PhotoInfo = { view: 'front' | 'back' | 'side' | 'detail' | 'flat' | 'other'; fullBody: boolean; person: boolean };
 type Ideas = { kind: 'worn' | 'object'; shots: { label: string; hint: string; action: string; showsBack: boolean }[]; scenes: { label: string; prompt: string }[] };
@@ -254,7 +254,7 @@ export function VideoStudio() {
   const probe = (p: Photo) =>
     new Promise<Photo>((resolve) => {
       const img = new window.Image();
-      img.onload = () => resolve({ ...p, landscape: img.naturalWidth > img.naturalHeight * 1.1 });
+      img.onload = () => resolve({ ...p, landscape: img.naturalWidth > img.naturalHeight * 1.1, ratio: img.naturalHeight ? img.naturalWidth / img.naturalHeight : undefined });
       img.onerror = () => resolve(p);
       img.src = p.src;
     });
@@ -383,15 +383,15 @@ export function VideoStudio() {
   }, [auto, dir.preset, dir.shotText]);
   const autoChosen = Boolean(auto && !userPicked.current && start && start.ref === auto.start);
 
-  const sourceLandscape = ((mode === 'scene' ? photos[0] : start) ?? photos[0])?.landscape ?? false;
+  const source = (mode === 'scene' ? photos[0] : start) ?? photos[0];
+  const sourceLandscape = source?.landscape ?? false;
+  // The video takes the shape closest to the photo (a tall photo in a square video gets padded sides).
   useEffect(() => {
-    if (userFormat.current || !(start ?? photos[0])) return;
-    const wanted = profile.format;
-    const clash = (sourceLandscape && (wanted === '9:16' || wanted === '4:5')) || (!sourceLandscape && wanted === '16:9');
-    const pick = !clash ? wanted : profile.formats.includes('1:1') ? '1:1' : sourceLandscape ? '16:9' : '9:16';
+    if (userFormat.current || !source) return;
+    const pick = formatForPhoto(profile, source.ratio ?? (source.landscape ? 4 / 3 : 3 / 4));
     if (pick !== format) setFormat(pick);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceLandscape, target, start?.key]);
+  }, [source?.key, source?.ratio, target]);
   const effective = useMemo(() => (resolution !== '720p' ? { durationSec: 8 as const, resolution } : { durationSec, resolution }), [durationSec, resolution]);
   const direction: VideoDirection = { ...dir, target, format, ...(addPerson ? { mode: 'scene', person: true, addPerson: true } : { addPerson: undefined }) };
   const promptPreview = useMemo(() => directVideo(direction), [direction]); // eslint-disable-line react-hooks/exhaustive-deps

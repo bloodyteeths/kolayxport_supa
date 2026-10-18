@@ -58,7 +58,7 @@ export function keyframePrompt(d: VideoDirection, opts: { which: 'start' | 'end'
 }
 
 /** One keyframe from the product photos (Nano Banana Pro, 2K, the generation aspect). */
-export async function generateKeyframe(input: { userId: string; refs: VideoMedia[]; first?: VideoMedia | null; prompt: string; aspectRatio: '9:16' | '16:9' }): Promise<VideoMedia> {
+export async function generateKeyframe(input: { userId: string; refs: VideoMedia[]; first?: VideoMedia | null; prompt: string; aspectRatio: string }): Promise<VideoMedia> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY is not configured');
   const ai = new GoogleGenAI({ apiKey });
@@ -86,6 +86,27 @@ export async function generateKeyframe(input: { userId: string; refs: VideoMedia
     }
   }
   throw lastErr ?? new Error('No image model available');
+}
+
+/**
+ * Continues a photo's real scene into the blurred sides of a padded frame (Nano Banana Pro outpaint) — for a video
+ * whose shape differs from the photo. The caller lays the original photo back over the result (lib/ai/videoSources
+ * fitBox), so only the new sides come from the AI. Null on any failure (the blurred sides stay).
+ */
+export async function extendFrame(userId: string, padded: VideoMedia, aspect: string): Promise<VideoMedia | null> {
+  const supported = ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'];
+  if (!supported.includes(aspect)) return null;
+  try {
+    return await generateKeyframe({
+      userId, refs: [], first: padded, aspectRatio: aspect,
+      prompt: 'This photo sits in the centre of the frame; the blurred areas around it are only placeholders. Replace the blurred areas '
+        + 'with a sharp, natural continuation of the same real scene: the same room, wall, floor, furniture, light and perspective, as '
+        + 'if the original photo had been taken wider. Keep the centre photo exactly as it is (do not move, resize or change anything '
+        + 'in it). No new people or products, no text, no borders, no frames, no visible seams.',
+    });
+  } catch {
+    return null;
+  }
 }
 
 export type VideoQa = {

@@ -40,3 +40,40 @@ describe('square / 4:5 videos keep the whole product inside the crop', () => {
     expect(dark[dark.length - 1]).toBeLessThanOrEqual(1500);
   });
 });
+
+describe('the video shape follows the photo', () => {
+  it('a tall 3:4 photo for Etsy becomes 4:5, a near-square one stays square', async () => {
+    const { formatForPhoto, VIDEO_TARGET_PROFILES } = await import('@/lib/ai/videoTargets');
+    expect(formatForPhoto(VIDEO_TARGET_PROFILES.etsy, 3 / 4)).toBe('4:5');
+    expect(formatForPhoto(VIDEO_TARGET_PROFILES.etsy, 0.95)).toBe('1:1');
+    expect(formatForPhoto(VIDEO_TARGET_PROFILES.etsy, 16 / 9)).toBe('16:9');
+    // Wix has no 4:5: a tall photo goes square (padding is then continued by the AI, not blurred).
+    expect(formatForPhoto(VIDEO_TARGET_PROFILES.wix, 3 / 4)).toBe('1:1');
+    expect(formatForPhoto(VIDEO_TARGET_PROFILES.wix, 4 / 3)).toBe('16:9');
+    expect(formatForPhoto(VIDEO_TARGET_PROFILES.ebay, null)).toBe('16:9');
+  });
+});
+
+describe('padded sides continue the real scene', () => {
+  it('a busy-background photo is handed to the extender and laid back over its result unchanged', async () => {
+    // A photo with a noisy (non-plain) background: no plain colour to extend.
+    const w = 600, h = 800;
+    const noise = Buffer.alloc(w * h * 3);
+    for (let i = 0; i < noise.length; i++) noise[i] = (i * 7919) % 251;
+    const buf = await sharp(noise, { raw: { width: w, height: h, channels: 3 } }).jpeg().toBuffer();
+    let called = '';
+    const green = await sharp({ create: { width: 1080, height: 1080, channels: 3, background: { r: 0, g: 200, b: 0 } } }).png().toBuffer();
+    const out = await fitToAspect({ data: buf.toString('base64'), mimeType: 'image/jpeg' }, '9:16', '1:1', {
+      extend: async (_m, aspect) => { called = aspect; return { data: green.toString('base64'), mimeType: 'image/png' }; },
+    });
+    expect(called).toBe('1:1');
+    const o = Buffer.from(out.data, 'base64');
+    // Left side of the square (rows 420–1500 of the 9:16 frame): the extension (green), not a blurred copy.
+    const side = await sharp(await sharp(o).extract({ left: 10, top: 700, width: 80, height: 400 }).png().toBuffer()).stats();
+    expect(side.channels[1].mean).toBeGreaterThan(150);
+    expect(side.channels[0].mean).toBeLessThan(60);
+    // Centre: the photo itself (noisy), not green.
+    const mid = await sharp(await sharp(o).extract({ left: 500, top: 900, width: 80, height: 80 }).png().toBuffer()).stats();
+    expect(mid.channels[0].stdev).toBeGreaterThan(20);
+  });
+});

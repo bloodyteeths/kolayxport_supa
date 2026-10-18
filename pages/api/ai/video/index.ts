@@ -23,7 +23,7 @@ import { logUsage } from '@/lib/ai/gemini';
 import { directVideo, negativePrompt, normalizeDirection, type VideoDirection } from '@/lib/ai/videoDirector';
 import { finishInPlace, originalOf, pollVideo, saveVideo, startVideo, veoConstraints, VIDEO_UPLOAD_ROOT, type VideoMedia } from '@/lib/ai/video';
 import { fitToAspect, loadSource, loadSources, saveSourceImage } from '@/lib/ai/videoSources';
-import { checkVideo, generateKeyframe, keyframePrompt, matchSubjectScale, MAX_PRODUCT_REFS, type VideoQa } from '@/lib/ai/videoProduct';
+import { checkVideo, extendFrame, generateKeyframe, keyframePrompt, matchSubjectScale, MAX_PRODUCT_REFS, type VideoQa } from '@/lib/ai/videoProduct';
 import { extendCredits, imageCredits, videoCredits } from '@/lib/billing/aiCredits';
 import { isAiBudgetError, isNoCreditsError, refundCredits, spendCredits } from '@/lib/billing/aiCreditsServer';
 
@@ -213,10 +213,12 @@ async function prepareAndStart(l: Launch) {
       end = await generateKeyframe({ userId: job.userId, refs: l.products, first: start, prompt: keyframePrompt(d, { which: 'end', refCount: l.products.length, hasStart: true }), aspectRatio: l.aspectRatio });
       endRef = await saveSourceImage(job.userId, Buffer.from(end.data, 'base64'), extOf(end));
     }
-    // Anchor frames shaped like the video (no black bars for Veo to animate).
-    const first = await fitToAspect(start, l.aspectRatio, d.format);
+    // Anchor frames shaped like the video (no black bars for Veo to animate; the photo's own scene continues into the
+    // sides instead of blurred bars).
+    const extend = (m: VideoMedia, aspect: string) => extendFrame(job.userId, m, aspect);
+    const first = await fitToAspect(start, l.aspectRatio, d.format, { extend });
     // …and the end subject the same size and place as the start one (no zoom / "shrinking" at the end).
-    const last = end ? await matchSubjectScale(job.userId, first, await fitToAspect(end, l.aspectRatio, d.format), l.aspectRatio) : null;
+    const last = end ? await matchSubjectScale(job.userId, first, await fitToAspect(end, l.aspectRatio, d.format, { extend }), l.aspectRatio) : null;
     const started = await startVideo({
       mode: last ? 'interpolate' : 'image', prompt: l.prompt, negativePrompt: negativePrompt(d), image: first, lastFrame: last ?? undefined,
       aspectRatio: l.aspectRatio, durationSec: l.durationSec, resolution: l.resolution, quality: l.quality, variants: l.variants, seed: l.seed, audio: d.audio !== 'none',

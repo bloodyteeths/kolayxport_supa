@@ -4,15 +4,19 @@
  *  - "Trendyol label (ZPL)" → Trendyol's own common label for thermal printers (Trendyol Express / Aras only).
  * No manual status buttons: Trendyol sets Shipped/Delivered itself, the invoice provider sets Invoiced, and Picking is
  * reported on print when the seller turned it on (Settings › Sender › Trendyol). `pages/api/trendyol/cargo.ts`.
+ * A printed label shows "Label printed · date" (`Order.cargoLabelPrintedAt`, set by this route and by the Orders page's
+ * bulk "Trendyol labels"); these buttons stay as the reprint path (bulk never prints an order twice).
  */
 import React, { useState } from 'react';
 import { Box, Typography } from '@mui/material';
-import { useLocale, useTranslations } from 'next-intl';
+import { useFormatter, useLocale, useTranslations } from 'next-intl';
+import { useSWRConfig } from 'swr';
 import { Button } from '@/components/ds/inputs/Button';
 import { useToast } from '@/components/ds/feedback';
 import { neutral as n } from '@/lib/ds/tokens';
 import { icons } from '@/lib/ds/icons';
 import type { OrderRow } from '@/lib/orders/types';
+import { TRENDYOL_BULK_KEY } from '../TrendyolBulkLabels';
 
 async function errorOf(res: Response): Promise<string> {
   const body = await res.json().catch(() => ({}));
@@ -35,9 +39,18 @@ export function TrendyolCargoActions({ row }: { row: OrderRow }) {
   const [busy, setBusy] = useState<'pdf' | 'zpl' | null>(null);
   /** Trendyol answered COMMON_LABEL_NOT_ALLOWED: the store is not enabled for the common label. */
   const [zplBlocked, setZplBlocked] = useState(false);
+  const format = useFormatter();
+  const { mutate } = useSWRConfig();
+  /** Printed in this panel just now (the list row catches up on its next revalidation). */
+  const [printedNow, setPrintedNow] = useState<string | null>(null);
   const info = row.trendyol;
   if (!info?.cargoNumber) return null;
   const base = `/api/trendyol/cargo?orderId=${encodeURIComponent(row.id)}`;
+  const printedAt = info.labelPrintedAt ?? printedNow;
+  const markPrinted = () => {
+    if (!info.labelPrintedAt && !printedNow) setPrintedNow(new Date().toISOString());
+    void mutate(TRENDYOL_BULK_KEY);
+  };
 
   const openPdf = async () => {
     if (busy) return;
@@ -49,6 +62,7 @@ export function TrendyolCargoActions({ row }: { row: OrderRow }) {
       const url = URL.createObjectURL(await res.blob());
       if (win) win.location.href = url;
       else window.open(url, '_blank');
+      markPrinted();
     } catch (err) {
       win?.close();
       toast.error(t('labelFailed', { reason: (err as Error).message }));
@@ -69,6 +83,7 @@ export function TrendyolCargoActions({ row }: { row: OrderRow }) {
       a.download = `trendyol-${info.cargoNumber}.zpl`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      markPrinted();
     } catch (err) {
       if ((err as CargoError).code === 'common_label_not_allowed') {
         setZplBlocked(true);
@@ -96,6 +111,11 @@ export function TrendyolCargoActions({ row }: { row: OrderRow }) {
           <Typography variant="caption" component="span" sx={{ color: n[500] }}>{t('carrier', { name: info.carrier })}</Typography>
         )}
       </Box>
+      {printedAt && (
+        <Typography variant="caption" component="p" sx={{ m: 0, color: n[600] }} data-testid="trendyol-label-printed">
+          {t('printedAt', { date: format.dateTime(new Date(printedAt), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) })}
+        </Typography>
+      )}
     </Box>
   );
 }

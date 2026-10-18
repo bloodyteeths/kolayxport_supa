@@ -12870,7 +12870,8 @@
       "fixAddress": "Fix address",
       "deleteLabel": "Delete label…",
       "deleteOrder": "Remove from KolayXport…",
-      "copyAddress": "Copy"
+      "copyAddress": "Copy",
+      "labelsBar": "Label actions"
     },
     "toolbar": {
       "searchPlaceholder": "Search order #, buyer, SKU, tracking…",
@@ -17060,6 +17061,24 @@
     "pickingDone": "Trendyol: package is preparing (Picking)",
     "invoicedDone": "Trendyol: package is invoiced",
     "statusFailed": "Trendyol didn't accept the status: {reason}",
-    "zplNotAllowed": "Trendyol hasn't enabled its common label (ortak barkod) for your store. Ask your Trendyol category manager to turn it on. Until then, use “Print cargo label”: its barcode is your Trendyol cargo number."
+    "zplNotAllowed": "Trendyol hasn't enabled its common label (ortak barkod) for your store. Ask your Trendyol category manager to turn it on. Until then, use “Print cargo label”: its barcode is your Trendyol cargo number.",
+    "printedAt": "Label printed · {date}",
+    "bulk": {
+      "button": "Trendyol labels ({count})",
+      "printing": "Preparing labels…",
+      "menuLabel": "Trendyol label format",
+      "pdf": "PDF · every carrier",
+      "zpl": "ZPL (thermal printer) · Trendyol Express / Aras only",
+      "tooltip": "Labels of every unshipped Trendyol order not printed yet, in one file (up to {max} at a time)",
+      "preparing": "Preparing {count, plural, one {# Trendyol label} other {# Trendyol labels}}…",
+      "done": "{count, plural, one {# label printed} other {# labels printed}}",
+      "skippedNoCargo": "{count, plural, one {# order skipped} other {# orders skipped}}: no cargo number",
+      "skippedNotCommon": "{count, plural, one {# order skipped} other {# orders skipped}}: the carrier has no Trendyol common label, print it as PDF",
+      "skippedFailed": "{count, plural, one {# label} other {# labels}} not returned by Trendyol, try again shortly",
+      "remaining": "Press again for the remaining {count}",
+      "nothing": "No new Trendyol labels to print",
+      "nothingZpl": "No labels to print as ZPL: these orders' carrier isn't Trendyol Express / Aras. Print them as PDF",
+      "failed": "Couldn't create the Trendyol labels: {reason}"
+    }
   }
 }

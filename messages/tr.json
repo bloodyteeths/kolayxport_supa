@@ -12870,7 +12870,8 @@
       "fixAddress": "Adresi düzelt",
       "deleteLabel": "Etiketi sil…",
       "deleteOrder": "KolayXport'tan kaldır…",
-      "copyAddress": "Kopyala"
+      "copyAddress": "Kopyala",
+      "labelsBar": "Etiket işlemleri"
     },
     "toolbar": {
       "searchPlaceholder": "Sipariş no, alıcı, SKU, takip no ara…",
@@ -17060,6 +17061,24 @@
     "pickingDone": "Trendyol: paket hazırlanıyor (Picking)",
     "invoicedDone": "Trendyol: paket faturalandı",
     "statusFailed": "Trendyol durumu kabul etmedi: {reason}",
-    "zplNotAllowed": "Trendyol mağazanız için ortak barkod hizmetini açmamış. Trendyol kategori sorumlunuzdan açmasını isteyin. O zamana kadar “Kargo etiketini yazdır” ile yazdırın: barkodu Trendyol kargo numaranızdır."
+    "zplNotAllowed": "Trendyol mağazanız için ortak barkod hizmetini açmamış. Trendyol kategori sorumlunuzdan açmasını isteyin. O zamana kadar “Kargo etiketini yazdır” ile yazdırın: barkodu Trendyol kargo numaranızdır.",
+    "printedAt": "Etiket yazdırıldı · {date}",
+    "bulk": {
+      "button": "Trendyol etiketleri ({count})",
+      "printing": "Etiketler hazırlanıyor…",
+      "menuLabel": "Trendyol etiketi biçimi",
+      "pdf": "PDF · tüm kargo firmaları",
+      "zpl": "ZPL (termal yazıcı) · yalnız Trendyol Express / Aras",
+      "tooltip": "Kargoya verilmemiş ve henüz yazdırılmamış Trendyol siparişlerinin etiketleri tek dosyada (bir seferde en fazla {max})",
+      "preparing": "{count} Trendyol etiketi hazırlanıyor…",
+      "done": "{count} etiket yazdırıldı",
+      "skippedNoCargo": "{count} sipariş atlandı: kargo numarası yok",
+      "skippedNotCommon": "{count} sipariş atlandı: kargo firmasının Trendyol ortak etiketi yok, PDF ile yazdırın",
+      "skippedFailed": "{count} etiket Trendyol'dan alınamadı, birazdan tekrar deneyin",
+      "remaining": "Kalan {count} için tekrar basın",
+      "nothing": "Yazdırılacak yeni Trendyol etiketi yok",
+      "nothingZpl": "ZPL ile yazdırılacak etiket yok: bu siparişlerin kargo firması Trendyol Express / Aras değil. PDF ile yazdırın",
+      "failed": "Trendyol etiketleri oluşturulamadı: {reason}"
+    }
   }
 }

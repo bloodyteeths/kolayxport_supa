@@ -186,6 +186,9 @@ model Order {
   // Buyer-provided personalization / notes captured from marketplace
   // (e.g. Etsy message_from_buyer). Surfaced on the labels page detail view.
   customerNote                String?
+  // When a Trendyol cargo label (PDF/ZPL) was last downloaded for this order (bulk or single). Bulk printing skips
+  // orders where this is set. Not a sync field: the Trendyol sync never writes it (labelStatus is reset by sync).
+  cargoLabelPrintedAt         DateTime?
   items                       OrderItem[]          @relation("OrderToOrderItem")
   user                        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   shipments                   Shipment[]           @relation("OrderToShipment")

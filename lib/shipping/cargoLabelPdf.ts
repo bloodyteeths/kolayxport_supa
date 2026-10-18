@@ -37,7 +37,18 @@ const H = 150 * MM;
 const PAD = 5 * MM;
 
 export async function cargoLabelPdf(input: CargoLabelInput): Promise<Buffer> {
-  const doc = new PDFDocument({ size: [W, H], margin: 0, info: { Title: `${input.marketplace} ${input.cargoNumber}` } });
+  return cargoLabelsPdf([input]);
+}
+
+/**
+ * Several cargo labels in ONE PDF: one 100×150 mm page per parcel, drawn exactly like the single label
+ * (bulk "Trendyol labels" on the Orders page, pages/api/trendyol/cargo-bulk.ts).
+ */
+export async function cargoLabelsPdf(inputs: readonly CargoLabelInput[]): Promise<Buffer> {
+  if (!inputs.length) throw new Error('cargoLabelsPdf: no labels');
+  const first = inputs[0];
+  const title = inputs.length === 1 ? `${first.marketplace} ${first.cargoNumber}` : `${first.marketplace} (${inputs.length})`;
+  const doc = new PDFDocument({ size: [W, H], margin: 0, info: { Title: title } });
   const chunks: Buffer[] = [];
   const done = new Promise<Buffer>((resolve, reject) => {
     doc.on('data', (c: Buffer) => chunks.push(c));
@@ -54,6 +65,15 @@ export async function cargoLabelPdf(input: CargoLabelInput): Promise<Buffer> {
     regular = 'kx-regular';
     bold = 'kx-bold';
   }
+  inputs.forEach((input, i) => {
+    if (i > 0) doc.addPage({ size: [W, H], margin: 0 });
+    drawLabel(doc, input, regular, bold);
+  });
+  doc.end();
+  return done;
+}
+
+function drawLabel(doc: InstanceType<typeof PDFDocument>, input: CargoLabelInput, regular: string, bold: string) {
   const inner = W - 2 * PAD;
   let y = PAD;
 
@@ -120,7 +140,4 @@ export async function cargoLabelPdf(input: CargoLabelInput): Promise<Buffer> {
   if (input.contents) {
     doc.font(regular).fontSize(8).fillColor('#444').text(`${input.t.contents}: `, PAD, y, { continued: true, width: inner }).fillColor('#000').text(input.contents, { width: inner, height: H - y - PAD, ellipsis: true });
   }
-
-  doc.end();
-  return done;
 }

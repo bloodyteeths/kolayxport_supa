@@ -31,7 +31,7 @@
     tr: {
       results: 'Sonuç', typical: 'Tipik fiyat', range: 'Fiyat aralığı', ads: 'Reklam', top5: 'İlk 5 satıcı payı',
       pageSales: 'Sayfa satışı/gün', pageRevenue: 'Sayfa cirosu/gün', measuredOf: '{n}/{m} ürün ölçüldü',
-      perDay: '{n} satış/gün', revDay: '{v}/gün', ratingsMonth: '+{n} değerlendirme/ay', firstSeen: 'İlk okuma, satış hızı birkaç gün içinde',
+      perDay: '{n} satış/gün', revDay: '{v}/gün', ratingsMonth: '+{n} değerlendirme/ay', firstSeen: 'Ölçülüyor: satış hızı birkaç saat/gün içinde',
       orders: '{n} sipariş', fav: '♥ {n}', analyse: 'KolayXport’ta analiz et', storeTitle: '{name} mağazası',
       salesDay: 'Satış/gün', revenueDay: 'Ciro/gün', ratingGrowth: 'Değerlendirme artışı', baskets: 'Sepette', favorites: 'Favori',
       views24: 'Görüntülenme (24 saat)', sellers: 'Satıcı sayısı', lifetime: 'Toplam satış', priceChange: 'Fiyat değişimi',
@@ -50,7 +50,7 @@
     en: {
       results: 'Results', typical: 'Typical price', range: 'Price range', ads: 'Ads', top5: 'Top-5 seller share',
       pageSales: 'Page sales/day', pageRevenue: 'Page revenue/day', measuredOf: '{n}/{m} products measured',
-      perDay: '{n} sales/day', revDay: '{v}/day', ratingsMonth: '+{n} ratings/month', firstSeen: 'First reading, sales speed within days',
+      perDay: '{n} sales/day', revDay: '{v}/day', ratingsMonth: '+{n} ratings/month', firstSeen: 'Measuring: sales speed within hours/days',
       orders: '{n} orders', fav: '♥ {n}', analyse: 'Analyse in KolayXport', storeTitle: '{name} store',
       salesDay: 'Sales/day', revenueDay: 'Revenue/day', ratingGrowth: 'Rating growth', baskets: 'In baskets', favorites: 'Favorites',
       views24: 'Views (24 h)', sellers: 'Sellers', lifetime: 'Lifetime sales', priceChange: 'Price change',
@@ -75,7 +75,7 @@
   }
   function loc() { return lang() === 'en' ? 'en-US' : 'tr-TR'; }
   function num(n, d) { return n == null ? '—' : new Intl.NumberFormat(loc(), { maximumFractionDigits: d == null ? 0 : d }).format(n); }
-  function tl(n) { return n == null ? '—' : new Intl.NumberFormat(loc(), { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(n); }
+  function tl(n) { return n == null ? '—' : new Intl.NumberFormat(loc(), { style: 'currency', currency: 'TRY', currencyDisplay: 'narrowSymbol', maximumFractionDigits: 0 }).format(n); }
   function short(n) { return n == null ? '—' : new Intl.NumberFormat(loc(), { notation: 'compact', maximumFractionDigits: 1 }).format(n); }
   function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
   function median(a) { var s = a.filter(function (x) { return x != null && x > 0; }).sort(function (x, y) { return x - y; }); return s.length ? s[Math.floor(s.length / 2)] : null; }

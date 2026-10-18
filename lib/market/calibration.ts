@@ -40,13 +40,15 @@ export function poolRatio(pools: StorePool[]): { ordersPerRating: number; n: num
 async function storePool(userId: string, since: Date): Promise<StorePool> {
   const products = await prisma.trendyolProduct.findMany({
     where: { userId, productContentId: { not: null } },
-    select: { barcode: true, productContentId: true },
+    select: { barcode: true, stockCode: true, productContentId: true },
   });
   if (products.length === 0) return { orders: 0, newRatings: 0 };
+  // Order lines carry the sku as Trendyol sent it (barcode or the seller's stock code): match both.
   const byContent = new Map<string, string[]>();
   for (const p of products) {
     const list = byContent.get(p.productContentId as string) ?? [];
     list.push(p.barcode);
+    if (p.stockCode) list.push(p.stockCode);
     byContent.set(p.productContentId as string, list);
   }
   const obs = await prisma.marketProductObservation.findMany({
@@ -77,16 +79,67 @@ async function storePool(userId: string, since: Date): Promise<StorePool> {
   return { orders, newRatings };
 }
 
-export async function runMarketCalibration(): Promise<{ calibrated: boolean; n: number; stores: number }> {
+/**
+ * Lifetime pool (bootstrap, no waiting): products the store started selling after its order history in KolayXport
+ * begins (first order ≥ 14 days after the store's first synced order), so their whole life is in both counts:
+ * Σ real orders vs Σ current public rating count (latest crowd reading). Aggregates only.
+ */
+async function lifetimePool(userId: string): Promise<StorePool> {
+  const products = await prisma.trendyolProduct.findMany({ where: { userId, productContentId: { not: null } }, select: { barcode: true, stockCode: true, productContentId: true } });
+  if (!products.length) return { orders: 0, newRatings: 0 };
+  const rows = await prisma.$queryRawUnsafe<Array<{ sku: string; orders: bigint; first: Date }>>(
+    `SELECT i.sku, SUM(i.quantity)::bigint AS orders, MIN(o."uiOrderDate") AS first
+       FROM "OrderItem" i JOIN "Order" o ON o.id = i."orderId"
+      WHERE o."userId" = $1 AND o.source = 'trendyol' AND o."uiOrderDate" IS NOT NULL AND i.sku IS NOT NULL
+      GROUP BY i.sku`,
+    userId,
+  );
+  if (!rows.length) return { orders: 0, newRatings: 0 };
+  const storeStart = Math.min(...rows.map((r) => r.first.getTime()));
+  const bySku = new Map(rows.map((r) => [r.sku, r]));
+  const crowd = await prisma.marketProduct.findMany({
+    where: { mkt: 'trendyol', productId: { in: products.map((p) => p.productContentId as string) }, ratingCount: { not: null } },
+    select: { productId: true, ratingCount: true },
+  });
+  const ratingsByContent = new Map(crowd.map((c) => [c.productId, c.ratingCount as number]));
+  let orders = 0;
+  let ratings = 0;
+  const counted = new Set<string>();
+  const usedSku = new Set<string>();
+  for (const p of products) {
+    const cid = p.productContentId as string;
+    const rc = ratingsByContent.get(cid);
+    if (rc == null) continue;
+    const skus = [p.barcode, p.stockCode].filter((x): x is string => Boolean(x) && !usedSku.has(x as string));
+    const hits = skus.map((k) => bySku.get(k)).filter((r): r is NonNullable<typeof r> => Boolean(r));
+    if (!hits.length) continue;
+    const first = Math.min(...hits.map((h) => h.first.getTime()));
+    if (first < storeStart + 14 * DAY) continue;
+    for (const k of skus) usedSku.add(k);
+    orders += hits.reduce((a, h) => a + Number(h.orders), 0);
+    if (!counted.has(cid)) { ratings += rc; counted.add(cid); }
+  }
+  return { orders, newRatings: ratings };
+}
+
+export async function runMarketCalibration(): Promise<{ calibrated: boolean; n: number; stores: number; mode?: string }> {
   const since = new Date(Date.now() - WINDOW_DAYS * DAY);
   const users = await prisma.trendyolProduct.findMany({ where: { productContentId: { not: null } }, distinct: ['userId'], select: { userId: true } });
   const pools: StorePool[] = [];
   for (const u of users) pools.push(await storePool(u.userId, since));
-  const r = poolRatio(pools);
-  if (!r) return { calibrated: false, n: pools.reduce((s, p) => s + p.newRatings, 0), stores: pools.filter((p) => p.newRatings > 0).length };
-  const cal: Calibration = { ordersPerRating: r.ordersPerRating, n: r.n, source: `${r.stores} store${r.stores === 1 ? '' : 's'}`, computedAt: new Date().toISOString() };
+  let r = poolRatio(pools);
+  let mode = 'growth';
+  if (!r) {
+    // Not enough rating growth observed yet: lifetime totals of products launched inside the order history.
+    const life: StorePool[] = [];
+    for (const u of users) life.push(await lifetimePool(u.userId));
+    r = poolRatio(life);
+    mode = 'lifetime';
+    if (!r) return { calibrated: false, n: life.reduce((s, p) => s + p.newRatings, 0), stores: life.filter((p) => p.newRatings > 0).length, mode };
+  }
+  const cal: Calibration = { ordersPerRating: r.ordersPerRating, n: r.n, source: `${r.stores} store${r.stores === 1 ? '' : 's'}${mode === 'lifetime' ? ' (lifetime)' : ''}`, computedAt: new Date().toISOString() };
   await writeShared(CALIBRATION_KEY, cal, 3 * DAY);
-  return { calibrated: true, n: r.n, stores: r.stores };
+  return { calibrated: true, n: r.n, stores: r.stores, mode };
 }
 
 export async function readCalibration(): Promise<Calibration | null> {

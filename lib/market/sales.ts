@@ -32,6 +32,9 @@ export interface SalesView {
 }
 
 export const MIN_SPAN_DAYS = 3;
+/** A popular product's rating count moves within hours: ≥ MIN_FAST_DELTA new ratings over ≥ MIN_FAST_HOURS count too. */
+export const MIN_FAST_HOURS = 4;
+export const MIN_FAST_DELTA = 5;
 const DAY = 86_400_000;
 
 /** Pure: first and last usable rating readings in the window (default 60 days back from the latest). */
@@ -42,9 +45,10 @@ export function ratingGrowth(readings: Reading[], windowDays = 60): { per30d: nu
   const from = last.at.getTime() - windowDays * DAY;
   const first = rs.find((r) => r.at.getTime() >= from) ?? rs[0];
   const spanDays = (last.at.getTime() - first.at.getTime()) / DAY;
-  if (spanDays < MIN_SPAN_DAYS) return null;
   const delta = Math.max(0, (last.ratingCount as number) - (first.ratingCount as number));
-  return { per30d: Math.round((delta / spanDays) * 30 * 10) / 10, spanDays: Math.round(spanDays) };
+  const fast = spanDays * 24 >= MIN_FAST_HOURS && delta >= MIN_FAST_DELTA;
+  if (spanDays < MIN_SPAN_DAYS && !fast) return null;
+  return { per30d: Math.round((delta / spanDays) * 30 * 10) / 10, spanDays: Math.round(spanDays * 10) / 10 };
 }
 
 export function salesView(readings: Reading[], opts: { price: number | null; ratingCount: number | null; ordersAtLeast: number | null; calibration: Calibration | null }): SalesView {

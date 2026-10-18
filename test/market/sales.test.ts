@@ -11,7 +11,12 @@ const at = (d: string) => new Date(`2026-10-${d}T12:00:00Z`);
 describe('ratingGrowth (measured)', () => {
   it('needs two readings at least 3 days apart', () => {
     expect(ratingGrowth([{ at: at('01'), ratingCount: 100, price: 1 }])).toBeNull();
-    expect(ratingGrowth([{ at: at('01'), ratingCount: 100, price: 1 }, { at: at('03'), ratingCount: 110, price: 1 }])).toBeNull();
+    expect(ratingGrowth([{ at: at('01'), ratingCount: 100, price: 1 }, { at: at('03'), ratingCount: 102, price: 1 }])).toBeNull();
+  });
+  it('popular products: ≥ 5 new ratings over ≥ 4 hours count', () => {
+    const h = (x: number) => new Date(Date.UTC(2026, 9, 18, x));
+    expect(ratingGrowth([{ at: h(10), ratingCount: 6633, price: 1 }, { at: h(12), ratingCount: 6640, price: 1 }])).toBeNull();
+    expect(ratingGrowth([{ at: h(10), ratingCount: 6633, price: 1 }, { at: h(16), ratingCount: 6639, price: 1 }])).toEqual({ per30d: 720, spanDays: 0.3 });
   });
   it('per 30 days; a dropped rating never makes growth negative', () => {
     expect(ratingGrowth([{ at: at('01'), ratingCount: 100, price: 1 }, { at: at('11'), ratingCount: 110, price: 1 }])).toEqual({ per30d: 30, spanDays: 10 });

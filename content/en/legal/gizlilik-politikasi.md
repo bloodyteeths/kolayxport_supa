@@ -57,6 +57,16 @@ When you use AI features (title, description and tag suggestions, image generati
 
 AI output is a suggestion; you must review and approve it before it is sent to a marketplace. The Service does not make automated decisions with legal effect about you or your buyers based on AI output. We use the Gemini API on the paid tier; on that tier Google does not use the content sent to train its models. Google's API terms govern Google's processing of this data.
 
+### Connecting your own AI (Claude, ChatGPT and other MCP clients)
+
+You can connect an AI assistant you use, such as Claude or ChatGPT, to your KolayXport account through our connector (`https://kolayxport.com/api/mcp`). You start the connection, and you choose what it may do on our consent screen or when you create a personal key in Settings › AI.
+
+- **What the AI provider receives:** only what the AI asks for while you use it: your own orders (order number, dates, marketplace, items, prices, discounts, shipping, tax, the buyer's country), your listings and stock, sales totals, and fees, payouts and balances from your synced finance records. The AI provider (for example Anthropic or OpenAI) processes this under its own terms and privacy policy, which you accepted with that provider.
+- **Buyer personal data:** buyer names and shipping addresses are shared only if you tick "Share buyer names and shipping addresses" for that connection; this is off by default. Buyer data from Amazon orders, e-mail addresses and phone numbers are never shared through the connector. When you turn this on, you send your buyers' data to the AI provider as the data controller, so make sure you have a legal basis for it.
+- **What the AI can change:** nothing on the marketplaces. Write actions only create drafts in KolayXport, which you review and send yourself.
+- **What we store:** the connection (its permissions, creation and last use time) and a hashed copy of its access token; we never store the token in readable form. We log which tool was called, when and whether buyer data was returned, not the content of the answers. These logs are system logs (see Retention).
+- **Stopping:** revoke the connection in Settings › AI or remove the connector in your AI app. A revoked connection stops working immediately; connections also have an expiry date.
+
 ## 5. Who we share data with
 
 We share data only with the following, and only as far as necessary:

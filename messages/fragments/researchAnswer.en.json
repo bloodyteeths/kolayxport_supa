@@ -64,7 +64,7 @@
       "market": {
         "label": "Total sales of the top {count} listings",
         "sales": "~{count} sales/mo",
-        "revenue": "~{amount} revenue/mo",
+        "revenue": "{amount} revenue/mo",
         "basis": "Numbers for {counted} of {listed} listings ({measured} measured, the rest estimated). Sales by other sellers are not included.",
         "loading": "Working out sales…",
         "few": "Not enough sales data for this search yet. Search again in a few days to see measured sales."

@@ -61,7 +61,10 @@ export function TopListingsTable({ rows, mkt, total, source, sort, onSortChange,
       const shown = s.monthlySales < 1 ? '<1' : fmt.num(Math.round(s.monthlySales));
       return t('top.salesValue', { count: shown, kind: s.kind });
     }
-    if (s.monthlySalesUpperBound != null) return t('top.salesUpTo', { count: fmt.num(Math.max(1, Math.ceil(s.monthlySalesUpperBound))) });
+    // An upper bound only informs when it is small: "up to 92/mo" on a day-old listing is the shop's total, not a hint.
+    if (s.monthlySalesUpperBound != null && s.monthlySalesUpperBound <= 10) {
+      return t('top.salesUpTo', { count: fmt.num(Math.max(1, Math.ceil(s.monthlySalesUpperBound))) });
+    }
     return '—';
   };
   const revenueText = (r: TopListing): string => {

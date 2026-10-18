@@ -1,0 +1,1 @@
+{ "paymentPolicies": [ { "paymentPolicyId": "6203001", "name": "eBay managed payments", "description": "Demo payment policy" } ] }

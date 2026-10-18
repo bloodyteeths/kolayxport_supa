@@ -1,0 +1,4 @@
+{ "fulfillmentPolicies": [
+  { "fulfillmentPolicyId": "6201001", "name": "Worldwide from Istanbul, FedEx 3-5 days", "description": "Demo shipping policy" },
+  { "fulfillmentPolicyId": "6201002", "name": "Small parcel, tracked 7-12 days", "description": "Demo shipping policy" }
+] }

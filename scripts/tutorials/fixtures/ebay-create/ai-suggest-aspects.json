@@ -1,0 +1,49 @@
+{
+  "aspects": {
+    "Brand": [
+      "Handmade"
+    ],
+    "Material": [
+      "Ceramic"
+    ],
+    "Type": [
+      "Bowl"
+    ],
+    "Set Includes": [
+      "Bowl"
+    ],
+    "Color": [
+      "Blue"
+    ],
+    "Pattern": [
+      "Floral"
+    ],
+    "Product Line": [
+      "Iznik"
+    ],
+    "Production Style": [
+      "Art Pottery"
+    ],
+    "Production Technique": [
+      "Pottery"
+    ],
+    "Country of Origin": [
+      "Turkey"
+    ],
+    "Origin": [
+      "Turkish"
+    ],
+    "Shape": [
+      "Round"
+    ],
+    "Theme": [
+      "Floral"
+    ],
+    "Vintage": [
+      "No"
+    ],
+    "Handmade": [
+      "Yes"
+    ]
+  }
+}

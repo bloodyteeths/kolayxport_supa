@@ -1,0 +1,33 @@
+# New eBay listing (/app/ebay-listings/new) with "Fotoğraflardan doldur" — "ebay-ilan-olusturma" tutorial.
+#
+# REAL, captured once and replayed (capture: true; see scripts/tutorials/README.md):
+#   - the AI answers of our own server (identify the product from the photo, title, item specifics, price,
+#     description, AI photo) — billed Gemini key;
+#   - eBay APPLICATION-token reads of our own server: category suggestions, item specifics (aspects) and
+#     conditions for the category, and the market research the price suggestion is based on.
+# Capture as the local demo user with its (fake) eBay user token removed, so every eBay call uses the app token:
+#   npx tsx scripts/tutorials/ebay-capture-prep.mts && TUTORIAL_CAPTURE=1 TUTORIAL_DRY=1 DEMO_PASSWORD=… \
+#     node scripts/tutorials/record.mjs ebay-ilan-olusturma && npx tsx scripts/demo/seed-demo-account.ts
+#
+# SYNTHETIC (the demo account has no real eBay seller connection, never a real token): the seller's business
+# policies and store categories (user-token reads), answered here and never sent to eBay.
+# Every eBay / Etsy write (publish, offer, inventory_item, revise, draft send) is refused by the safety rules in
+# mocks.mjs.
+- { url: "**/api/clawd/ebay-ai?**", method: POST, query: { action: identify_product }, fixture: ai-identify-product.json, capture: true }
+- { url: "**/api/clawd/ebay-ai?**", method: POST, query: { action: optimize_title }, fixture: ai-optimize-title.json, capture: true }
+- { url: "**/api/clawd/ebay-ai?**", method: POST, query: { action: suggest_aspects }, fixture: ai-suggest-aspects.json, capture: true }
+- { url: "**/api/clawd/ebay-ai?**", method: POST, query: { action: suggest_price }, fixture: ai-suggest-price.json, capture: true }
+- { url: "**/api/clawd/ebay-ai?**", method: POST, query: { action: generate_description }, fixture: ai-generate-description.json, capture: true }
+- { url: "**/api/clawd/ebay-research?**", query: { action: niche_analyze }, fixture: research-niche.json, capture: true }
+- { url: "**/api/clawd/ebay?**", method: GET, query: { action: category_suggestions }, fixture: category-suggestions.json, capture: true }
+- { url: "**/api/clawd/ebay?**", method: GET, query: { action: item_aspects }, fixture: item-aspects.json, capture: true }
+- { url: "**/api/clawd/ebay?**", method: GET, query: { action: item_conditions }, fixture: item-conditions.json, capture: true }
+- { url: "**/api/ai/generate-image**", method: POST, fixture: generate-image.json, capture: true }
+# Synthetic seller data (user-token reads).
+- { url: "**/api/clawd/ebay?**", method: GET, query: { action: fulfillment_policies }, fixture: fulfillment-policies.json }
+- { url: "**/api/clawd/ebay?**", method: GET, query: { action: return_policies }, fixture: return-policies.json }
+- { url: "**/api/clawd/ebay?**", method: GET, query: { action: payment_policies }, fixture: payment-policies.json }
+- { url: "**/api/clawd/ebay?**", method: GET, query: { action: store_categories }, json: { categories: ["Iznik Ceramics", "Turkish Towels", "Silver Jewelry"] } }
+- { url: "**/api/clawd/ebay?**", method: GET, query: { action: locations }, json: { locations: [{ merchantLocationKey: "demo-istanbul", name: "Istanbul workshop" }] } }
+# Any other eBay read (user token): never reaches eBay while recording.
+- { url: "**/api/clawd/ebay?**", method: GET, json: {} }

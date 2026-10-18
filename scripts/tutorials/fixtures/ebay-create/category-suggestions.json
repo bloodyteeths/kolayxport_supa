@@ -1,0 +1,225 @@
+{
+  "categorySuggestions": [
+    {
+      "category": {
+        "categoryId": "262366",
+        "categoryName": "Bowls"
+      },
+      "categoryTreeNodeLevel": 3,
+      "categoryTreeNodeAncestors": [
+        {
+          "categoryId": "262364",
+          "categoryName": "Decorative Cookware, Dinnerware & Serveware",
+          "categoryTreeNodeLevel": 2,
+          "categorySubtreeNodeHref": "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=262364"
+        },
+        {
+          "categoryId": "870",
+          "categoryName": "Pottery & Glass",
+          "categoryTreeNodeLevel": 1,
+          "categorySubtreeNodeHref": "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=870"
+        }
+      ]
+    },
+    {
+      "category": {
+        "categoryId": "262408",
+        "categoryName": "Vases"
+      },
+      "categoryTreeNodeLevel": 3,
+      "categoryTreeNodeAncestors": [
+        {
+          "categoryId": "262384",
+          "categoryName": "Decorative Pottery & Glassware",
+          "categoryTreeNodeLevel": 2,
+          "categorySubtreeNodeHref": "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=262384"
+        },
+        {
+          "categoryId": "870",
+          "categoryName": "Pottery & Glass",
+          "categoryTreeNodeLevel": 1,
+          "categorySubtreeNodeHref": "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=870"
+        }
+      ]
+    },
+    {
+      "category": {
+        "categoryId": "262379",
+        "categoryName": "Plates"
+      },
+      "categoryTreeNodeLevel": 3,
+      "categoryTreeNodeAncestors": [
+        {
+          "categoryId": "262364",
+          "categoryName": "Decorative Cookware, Dinnerware & Serveware",
+          "categoryTreeNodeLevel": 2,
+          "categorySubtreeNodeHref": "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=262364"
+        },
+        {
+          "categoryId": "870",
+          "categoryName": "Pottery & Glass",
+          "categoryTreeNodeLevel": 1,
+          "categorySubtreeNodeHref": "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=870"
+        }
+      ]
+    },
+    {
+      "category": {
+        "categoryId": "36019",
+        "categoryName": "Decorative Plates & Bowls"
+      },
+      "categoryTreeNodeLevel": 4,
+      "categoryTreeNodeAncestors": [
+        {
+          "categoryId": "262984",
+          "categoryName": "Decorative Accessories",
+          "categoryTreeNodeLevel": 3,
+          "categorySubtreeNodeHref": "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=262984"
+        },
+        {
+          "categoryId": "10033",
+          "categoryName": "Home Décor",
+          "categoryTreeNodeLevel": 2,
+          "categorySubtreeNodeHref": "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=10033"
+        },
+        {
+          "categoryId": "11700",
+          "categoryName": "Home & Garden",
+          "categoryTreeNodeLevel": 1,
+          "categorySubtreeNodeHref": "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=11700"
+        }
+      ]
+    },
+    {
+      "category": {
+        "categoryId": "262375",
+        "categoryName": "Jars"
+      },
+      "categoryTreeNodeLevel": 3,
+      "categoryTreeNodeAncestors": [
+        {
+          "categoryId": "262364",
+          "categoryName": "Decorative Cookware, Dinnerware & Serveware",
+          "categoryTreeNodeLevel": 2,
+          "categorySubtreeNodeHref": "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=262364"
+        },
+        {
+          "categoryId": "870",
+          "categoryName": "Pottery & Glass",
+          "categoryTreeNodeLevel": 1,
+          "categorySubtreeNodeHref": "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=870"
+        }
+      ]
+    },
+    {
+      "category": {
+        "categoryId": "36028",
+        "categoryName": "Bowls"
+      },
+      "categoryTreeNodeLevel": 4,
+      "categoryTreeNodeAncestors": [
+        {
+          "categoryId": "36027",
+          "categoryName": "Dinnerware & Serveware",
+          "categoryTreeNodeLevel": 3,
+          "categorySubtreeNodeHref": "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=36027"
+        },
+        {
+          "categoryId": "20625",
+          "categoryName": "Kitchen, Dining & Bar",
+          "categoryTreeNodeLevel": 2,
+          "categorySubtreeNodeHref": "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=20625"
+        },
+        {
+          "categoryId": "11700",
+          "categoryName": "Home & Garden",
+          "categoryTreeNodeLevel": 1,
+          "categorySubtreeNodeHref": "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=11700"
+        }
+      ]
+    },
+    {
+      "category": {
+        "categoryId": "14343",
+        "categoryName": "Pottery"
+      },
+      "categoryTreeNodeLevel": 5,
+      "categoryTreeNodeAncestors": [
+        {
+          "categoryId": "14342",
+          "categoryName": "Mexico",
+          "categoryTreeNodeLevel": 4,
+          "categorySubtreeNodeHref": "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=14342"
+        },
+        {
+          "categoryId": "13740",
+          "categoryName": "Latin American",
+          "categoryTreeNodeLevel": 3,
+          "categorySubtreeNodeHref": "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=13740"
+        },
+        {
+          "categoryId": "3913",
+          "categoryName": "Cultures & Ethnicities",
+          "categoryTreeNodeLevel": 2,
+          "categorySubtreeNodeHref": "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=3913"
+        },
+        {
+          "categoryId": "1",
+          "categoryName": "Collectibles",
+          "categoryTreeNodeLevel": 1,
+          "categorySubtreeNodeHref": "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=1"
+        }
+      ]
+    },
+    {
+      "category": {
+        "categoryId": "165484",
+        "categoryName": "Middle Eastern"
+      },
+      "categoryTreeNodeLevel": 3,
+      "categoryTreeNodeAncestors": [
+        {
+          "categoryId": "3913",
+          "categoryName": "Cultures & Ethnicities",
+          "categoryTreeNodeLevel": 2,
+          "categorySubtreeNodeHref": "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=3913"
+        },
+        {
+          "categoryId": "1",
+          "categoryName": "Collectibles",
+          "categoryTreeNodeLevel": 1,
+          "categorySubtreeNodeHref": "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=1"
+        }
+      ]
+    },
+    {
+      "category": {
+        "categoryId": "261669",
+        "categoryName": "Bowls"
+      },
+      "categoryTreeNodeLevel": 4,
+      "categoryTreeNodeAncestors": [
+        {
+          "categoryId": "261667",
+          "categoryName": "Dinnerware & Serveware",
+          "categoryTreeNodeLevel": 3,
+          "categorySubtreeNodeHref": "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=261667"
+        },
+        {
+          "categoryId": "13905",
+          "categoryName": "Kitchen & Home",
+          "categoryTreeNodeLevel": 2,
+          "categorySubtreeNodeHref": "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=13905"
+        },
+        {
+          "categoryId": "1",
+          "categoryName": "Collectibles",
+          "categoryTreeNodeLevel": 1,
+          "categorySubtreeNodeHref": "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=1"
+        }
+      ]
+    }
+  ],
+  "categoryTreeId": "0",
+  "categoryTreeVersion": "134"
+}

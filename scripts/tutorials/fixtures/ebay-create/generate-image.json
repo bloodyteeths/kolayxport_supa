@@ -1,0 +1,6 @@
+{
+  "image_base64": "{{base64:scripts/tutorials/fixtures/ebay-create/generate-image.image_base64.jpg}}",
+  "mime_type": "image/jpeg",
+  "text": null,
+  "aspect_ratio": "1:1"
+}

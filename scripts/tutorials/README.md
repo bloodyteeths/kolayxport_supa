@@ -137,6 +137,7 @@ lets the request through. Fixture strings may use `{{base}}` (app URL), `{{now}}
 | `etgb-on` | ETGB switched on with a made-up broker address. |
 | `demo-cdn` | Price-gap product images on the fake `demo-cdn.kolayxport.test` host. |
 | `etsy-create` | New Etsy listing: real AI answers (title, tags, description, AI photo) captured once from our own server with `TUTORIAL_CAPTURE=1 TUTORIAL_DRY=1 node scripts/tutorials/record.mjs etsy-ilan-olusturma`, replayed afterwards (`capture: true` rules). |
+| `ebay-create` | New eBay listing, "Fotoğraflardan doldur": real AI answers plus real eBay app-token reads (category suggestions, item specifics, conditions, market research) captured once after `npx tsx scripts/tutorials/ebay-capture-prep.mts` (drops the demo user's fake eBay user token so only the app token is used; re-seed after). Business policies and store categories are synthetic (user-token reads). |
 | `video-studio` | Video Studio: listing photo, photo analysis, the job (preparing → running → done + quality check) and the mp4. A **real** Video Studio result made once with `npx tsx scripts/tutorials/make-video-fixture.ts` (Veo via `lib/ai/video`, billed `GEMINI_API_KEY`; `generation.json` records model, prompt and QA). Follow-ups, edits and publishing are refused while recording. |
 
 **Safety net (always on):** every request to a host other than the app, `localhost` and Google Fonts is aborted

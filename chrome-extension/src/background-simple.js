@@ -89,7 +89,13 @@ chrome.runtime.onInstalled.addListener(async () => {
   chrome.storage.local.remove(['kx_logs', 'kx_api_key']);
   clearToken();
   await checkAuthentication({ force: true });
-  chrome.contextMenus.create({ id: 'syncNow', title: 'Sync Etsy Orders Now', contexts: ['action'] });
+  // Remove first: on an update or reload the old item can still exist, and creating the same id again
+  // throws "Cannot create item with duplicate id syncNow".
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({ id: 'syncNow', title: 'Etsy siparişlerini şimdi aktar', contexts: ['action'] }, () => {
+      void chrome.runtime.lastError; // read it so Chrome doesn't log "Unchecked runtime.lastError"
+    });
+  });
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {

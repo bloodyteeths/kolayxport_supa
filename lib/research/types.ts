@@ -122,6 +122,11 @@ export interface TopListing {
   url: string | null;
   thumbUrl: string | null;
   price: { amount: number; currency: string } | null;
+  /**
+   * `price` in the search's summary currency (same FX table as the price summary), so a list mixing MAD/£/€/$ reads in
+   * one currency. Null/absent when no rate exists or the price is already in that currency (then `price` is it).
+   */
+  priceConverted?: { amount: number; currency: string } | null;
   /** Lifetime counter, render "(all time)". Etsy: favorites; eBay: null. */
   favorites: number | null;
   /** From `original_creation_timestamp` (never the renew date). Null when unknown. */

@@ -133,12 +133,16 @@ export function normalizeTopListing(raw: unknown, fallbackCurrency: string): Top
   const priceObj = isObj(raw.price) ? raw.price : null;
   const amount = priceObj ? num(priceObj.amount) : num(raw.price);
   const shopObj = isObj(raw.shop) ? raw.shop : {};
+  const convObj = isObj(raw.priceConverted) ? raw.priceConverted : null;
+  const convAmount = convObj ? num(convObj.amount) : null;
+  const convCurrency = convObj ? str(convObj.currency) : null;
   return {
     id,
     title: decodeEntities(str(raw.title) ?? ''),
     url: str(raw.url),
     thumbUrl: str(raw.thumbUrl) ?? str(raw.imageUrl),
     price: amount === null ? null : { amount, currency: (priceObj ? str(priceObj.currency) : null) ?? str(raw.currency) ?? fallbackCurrency },
+    priceConverted: convAmount !== null && convCurrency ? { amount: convAmount, currency: convCurrency } : null,
     favorites: num(raw.favorites),
     ageDays: num(raw.ageDays),
     shop: { id: str(shopObj.id), name: decodeEntities(str(shopObj.name) ?? '') || null, url: str(shopObj.url) },

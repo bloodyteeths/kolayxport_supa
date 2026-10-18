@@ -22,7 +22,8 @@ import {
   isBudgetError, modeTaxonomy, newcomerShare, normalizeQuery, priceSummaryFor, requestLocale, searchEtsy, sha1, toTopListings,
   top5Share, userRateLimit, TOP_N, type EtsySearchItem, type Formatters,
 } from '@/lib/research/etsySearch';
-import { decodeEntities } from '@/lib/research/stats';
+import { buildFxTable, decodeEntities } from '@/lib/research/stats';
+import { convertCurrency } from '@/lib/finance/fx';
 import {
   isResearchMkt, type Guarded, type ProductsData, type ProductsResult, type ResearchErrorBody, type ResearchMkt,
   type ResearchResponse, type ResearchSectionError, type SourceNoteProps, type TopListing,
@@ -39,13 +40,31 @@ const no = (reasonKey: string): Guarded<number> => ({ value: null, kind: 'measur
 export function sortTop(top: TopListing[], sort: TopSort): TopListing[] {
   if (sort === 'relevance') return top;
   const s = [...top];
-  const price = (t: TopListing) => t.price?.amount ?? null;
+  const price = (t: TopListing) => t.priceConverted?.amount ?? t.price?.amount ?? null;
   const cmp = (a: number | null, b: number | null, dir: 1 | -1) => (a == null ? 1 : b == null ? -1 : (a - b) * dir);
   if (sort === 'price.asc') s.sort((a, b) => cmp(price(a), price(b), 1));
   if (sort === 'price.desc') s.sort((a, b) => cmp(price(a), price(b), -1));
   if (sort === 'favorites') s.sort((a, b) => cmp(a.favorites, b.favorites, -1));
   if (sort === 'newest') s.sort((a, b) => cmp(a.ageDays, b.ageDays, 1));
   return s;
+}
+
+/** Pure: add `priceConverted` (in `currency`) to listings priced in another currency, from an FX table (1 unit → rate). */
+export function withConvertedPrices(top: TopListing[], currency: string, fx: Record<string, number>): TopListing[] {
+  const target = currency.toUpperCase();
+  return top.map((t) => {
+    if (!t.price) return t;
+    const from = t.price.currency.toUpperCase() === 'TL' ? 'TRY' : t.price.currency.toUpperCase();
+    if (from === target) return t;
+    const rate = fx[from];
+    return { ...t, priceConverted: rate ? { amount: Math.round(t.price.amount * rate * 100) / 100, currency: target } : null };
+  });
+}
+
+/** Converted copies of `top` in the summary currency (best effort: no rate → unchanged). */
+export async function convertTop(top: TopListing[], currency: string): Promise<TopListing[]> {
+  const fx = await buildFxTable(top.map((t) => t.price?.currency), currency, convertCurrency).catch(() => ({}));
+  return withConvertedPrices(top, currency, fx);
 }
 
 /** SourceNote for a price sample: "287 of 300 listings used · 13 excluded (no FX rate)". */
@@ -106,7 +125,7 @@ export async function researchEtsy(
     demand,
     newcomers,
     buyerWords: words,
-    top: sortTop(toTopListings(top, shops, details, nowMs), opts.sort),
+    top: sortTop(await convertTop(toTopListings(top, shops, details, nowMs), price.currency), opts.sort),
     categoryHint: modeTaxonomy(top),
     draftTags: draftTagsFrom(words),
     fetchedAt: served.fetchedAt,
@@ -207,7 +226,7 @@ export async function researchEbay(
     demand,
     newcomers,
     buyerWords: [],
-    top: sortTop(topListings, opts.sort),
+    top: sortTop(await convertTop(topListings, price.currency), opts.sort),
     categoryHint,
     draftTags: [],
     fetchedAt: served.fetchedAt,

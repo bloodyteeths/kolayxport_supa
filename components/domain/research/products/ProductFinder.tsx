@@ -54,6 +54,7 @@ import { rememberSearch } from '../home/recentSearches';
 import { routeResearchSearch, type QuestionKey } from '../home/routeSearch';
 import { ApiSourceNote } from './ApiSourceNote';
 import { EvidenceCard } from './EvidenceCard';
+import { AnswerCard } from './AnswerCard';
 import { PriceCard } from './PriceCard';
 import { CompetitionCard } from './CompetitionCard';
 import { DemandCard } from './DemandCard';
@@ -64,7 +65,8 @@ import { TopListingPanel } from './TopListingPanel';
 import { ComparePanel } from './ComparePanel';
 import { SeedChips } from './SeedChips';
 import { StageToListingModal, type StageMode } from './StageToListingModal';
-import { PriceGap, PriceGapSourceSegment, usePriceGapSource } from './PriceGapTable';
+import { PriceGap, usePriceGapSource } from './PriceGapTable';
+import { useFeatureAction } from '@/lib/billing/useFeatureAction';
 
 export const COUNTRIES = ['US', 'GB', 'DE', 'CA', 'AU', 'FR'] as const;
 export const COMPARE_MAX = 3;
@@ -167,11 +169,29 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
   const router = useRouter();
   const toast = useToast();
   const mobile = useIsMobile();
-  const market = useResearchMkt('products', { amazonEligible });
-  const { mkt } = market;
+  const baseMarket = useResearchMkt('products', { amazonEligible });
   const [url, setUrl] = useUrlState(PRODUCTS_SCHEMA);
   const [source, setSource] = usePriceGapSource();
-  const priceGap = source === 'trendyol';
+  // Trendyol is one of the marketplace chips: on Product finder it opens the Price gap view (Trendyol → eBay/Etsy),
+  // so there is no second "Search | From Trendyol" switch. An old `?source=trendyol` link shows Trendyol selected.
+  const priceGap = source === 'trendyol' || baseMarket.mkt === 'trendyol';
+  // Price gap is Pro; accounts that must never see plan-locked features (shopify_free) get no Trendyol chip here,
+  // exactly like the old "From Trendyol" segment (useFeatureAction('arbitrage').visible).
+  const arbitrage = useFeatureAction('arbitrage');
+  const market = React.useMemo(
+    () => ({
+      ...baseMarket,
+      options: arbitrage.visible ? baseMarket.options : baseMarket.options.filter((o) => o.value !== 'trendyol'),
+      mkt: priceGap ? ('trendyol' as const) : baseMarket.mkt,
+      setMkt: (m: Parameters<typeof baseMarket.setMkt>[0]) => {
+        if (m === 'trendyol') setSource('trendyol');
+        else if (source === 'trendyol') setSource('search');
+        baseMarket.setMkt(m);
+      },
+    }),
+    [baseMarket, priceGap, source, setSource, arbitrage.visible],
+  );
+  const { mkt } = market;
   const q = url.q?.trim() ?? '';
   const compareList = parseCompare(url.compare);
   const comparing = compareList.length >= 2;
@@ -187,6 +207,8 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
   const [stageMode, setStageMode] = React.useState<StageMode | null>(null);
   const [openRow, setOpenRow] = React.useState<TopListing | null>(null);
   const [hint, setHint] = React.useState<QuestionKey | null>(null);
+  /** The analyst cards (evidence, price band, competition, demand inputs, newcomers) under the answer card. */
+  const [detailsOpen, setDetailsOpen] = React.useState(false);
 
   const params = !priceGap && !comparing && q && !amazonBlocked ? { q, mkt, country: url.country, sort: url.sort as ProductSort } : null;
   const result = useResearchProducts(params);
@@ -331,12 +353,8 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
   // ── toolbar ────────────────────────────────────────────────────────────────────────────────────────
   const countryOptions = COUNTRIES.map((c) => ({ value: c, label: c }));
   const searchPrimary = !ready || comparing;
-  const sourceSegment = <PriceGapSourceSegment value={source} onChange={setSource} size={mobile ? 'md' : 'sm'} />;
-  const toolbar = priceGap ? (
-    <Box sx={{ mb: '12px' }}>{sourceSegment}</Box>
-  ) : (
+  const toolbar = priceGap ? null : (
     <Box sx={{ mb: '12px' }}>
-      <Box sx={{ mb: '8px', '&:empty': { display: 'none' } }}>{sourceSegment}</Box>
       <Box
         component="form"
         role="search"
@@ -513,6 +531,14 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
             <ErrorState variant="stale" staleSince={new Date(r.fetchedAt)} onRetry={result.region.retry} />
           </Box>
         ) : null}
+        <AnswerCard result={r} onUsePrice={stageMkt ? (amount, currency) => setStageMode({ kind: 'price', amount, currency }) : undefined} />
+        <Box sx={{ mb: '16px' }}>
+          <Button variant="ghost" size="sm" onClick={() => setDetailsOpen((v) => !v)} aria-expanded={detailsOpen} data-testid="research-details-toggle">
+            {detailsOpen ? t('answer.detailsHide') : t('answer.detailsShow')}
+          </Button>
+        </Box>
+        {detailsOpen ? (
+        <>
         <Box sx={{ mb: '12px' }}>
           <ApiSourceNote source={result.source} data-testid="research-products-source" />
         </Box>
@@ -539,6 +565,8 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
             </Typography>
           ) : null;
         })}
+        </>
+        ) : null}
         {mkt === 'etsy' && r.buyerWords.length ? (
           <BuyerWordsCard
             words={r.buyerWords}

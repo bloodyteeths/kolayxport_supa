@@ -61,7 +61,7 @@ export function TopListingsTable({ rows, mkt, total, source, sort, onSortChange,
       ),
       mobile: 'title',
     },
-    { key: 'price', header: t('top.col.price'), type: 'money', width: 110, value: (r) => r.price?.amount ?? null, currency: (r) => r.price?.currency, mobile: 'subtitle' },
+    { key: 'price', header: t('top.col.price'), type: 'money', width: 110, value: (r) => r.priceConverted?.amount ?? r.price?.amount ?? null, currency: (r) => r.priceConverted?.currency ?? r.price?.currency, mobile: 'subtitle' },
     {
       key: 'favorites',
       header: t('top.col.favorites'),

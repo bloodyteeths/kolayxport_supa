@@ -25,12 +25,16 @@ import type {
   UnifiedConversation,
 } from '@/types/messages';
 import { toOpenKey, type InboxStore } from './useInboxUrlState';
+import { isMessagePlatform, MESSAGE_PLATFORMS } from '@/lib/messages/platforms';
 
 export const INBOX_PAGE_SIZE = 30;
 export const INBOX_POLL_MS = 120_000;
 export const COUNT_REFRESH_DELAY_MS = 4_000;
 
-const PLATFORMS: readonly MessagePlatform[] = ['wix', 'trendyol'];
+const PLATFORMS: readonly MessagePlatform[] = MESSAGE_PLATFORMS;
+
+/** `useConnections().has()` per inbox platform (undefined = still loading). Hepsiburada is optional for older callers. */
+export type InboxConnected = { wix: boolean | undefined; trendyol: boolean | undefined; hepsiburada?: boolean | undefined };
 const ERROR_CODES: readonly PlatformErrorCode[] = ['permission', 'auth', 'credentials', 'rateLimited', 'unavailable'];
 
 export const convKey = toOpenKey;
@@ -59,9 +63,7 @@ export class InboxFetchError extends Error {
   }
 }
 
-function isPlatform(v: unknown): v is MessagePlatform {
-  return v === 'wix' || v === 'trendyol';
-}
+const isPlatform = isMessagePlatform;
 
 /** Defensive parse of a list body (old servers, partial payloads). */
 export function parseInboxPage(raw: unknown): InboxListResponse {
@@ -220,7 +222,7 @@ export function applyLocalState(
       const serverCaughtUp = last !== null && last >= sentAt && c.lastFromCustomer === false;
       if (reopened || (c.platform === 'wix' && serverCaughtUp)) {
         // Wix: a newer customer message re-opens the thread, and once the server shows the reply the local
-        // mark is no longer needed (the row stops being muted). Trendyol keeps its mark (one-shot answer).
+        // mark is no longer needed (the row stops being muted). Trendyol/Hepsiburada keep their mark (one-shot answer).
         expired.push(k);
       } else {
         next = {
@@ -291,8 +293,8 @@ export type ListRegion =
 export function listRegion(args: {
   state: AsyncState;
   loaded: boolean;
-  /** `useConnections().has()` for Wix and Trendyol (undefined = still loading). */
-  connected: { wix: boolean | undefined; trendyol: boolean | undefined };
+  /** `useConnections().has()` per platform (undefined = still loading). */
+  connected: InboxConnected;
   enabledPlatforms: MessagePlatform[];
   /** Platforms with a `platformErrors` entry in the current response. */
   failedPlatforms?: readonly MessagePlatform[];
@@ -305,7 +307,7 @@ export function listRegion(args: {
   const { state, loaded, connected, enabledPlatforms, visibleCount, view, filtered } = args;
   const failed = args.failedPlatforms ?? [];
   const rowCount = args.rowCount ?? visibleCount;
-  if (loaded && connected.wix === false && connected.trendyol === false && enabledPlatforms.length === 0) return { kind: 'noStore' };
+  if (loaded && connected.wix === false && connected.trendyol === false && connected.hepsiburada !== true && enabledPlatforms.length === 0) return { kind: 'noStore' };
   if (!loaded) {
     if (state === 'error') return { kind: 'error' };
     if (state === 'slow') return { kind: 'slow' };
@@ -326,7 +328,7 @@ export function listRegion(args: {
  * of platforms seen so far and the current selection.
  */
 export function storeFilterPlatforms(
-  connected: { wix: boolean | undefined; trendyol: boolean | undefined },
+  connected: InboxConnected,
   seen: Iterable<MessagePlatform>,
   current: InboxStore,
 ): MessagePlatform[] {

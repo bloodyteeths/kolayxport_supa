@@ -61,7 +61,7 @@ function warn(msg: string, details: Record<string, unknown>) {
 export async function connectedDirectChannels(userId: string): Promise<Set<string>> {
   const [etsy, cred, shopify, wix] = await Promise.all([
     prisma.etsyShop.count({ where: { userId, isActive: true } }),
-    prisma.credential.findUnique({ where: { userId }, select: { ebayAccessToken: true, trendyolApiKey: true, amazonRefreshToken: true } }),
+    prisma.credential.findUnique({ where: { userId }, select: { ebayAccessToken: true, trendyolApiKey: true, amazonRefreshToken: true, hepsiburadaApiKey: true, hepsiburadaMerchantId: true } }),
     prisma.shopifyShop.count({ where: { userId, isActive: true } }),
     prisma.wixSite.count({ where: { userId, isActive: true } }),
   ]);
@@ -70,6 +70,7 @@ export async function connectedDirectChannels(userId: string): Promise<Set<strin
   if (cred?.ebayAccessToken) s.add('ebay');
   if (cred?.trendyolApiKey) s.add('trendyol');
   if (cred?.amazonRefreshToken) s.add('amazon');
+  if (cred?.hepsiburadaApiKey && cred?.hepsiburadaMerchantId) s.add('hepsiburada');
   if (shopify) s.add('shopify');
   if (wix) s.add('wix');
   return s;

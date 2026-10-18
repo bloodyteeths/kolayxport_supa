@@ -4,7 +4,7 @@
 // useListingDraft.ts` (`useListingEditor()`); nothing here talks to a marketplace.
 
 /** Marketplaces the editor workspace serves (M6: etsy, ebay; M6b: trendyol, wix, shopify). */
-export type EditorMarketplace = 'etsy' | 'ebay' | 'trendyol' | 'wix' | 'shopify';
+export type EditorMarketplace = 'etsy' | 'ebay' | 'trendyol' | 'wix' | 'shopify' | 'hepsiburada';
 
 /** Section ids (listing-editor §2.1 + marketplace-editors §3). Order lives in `sections.ts`. */
 export type SectionId =

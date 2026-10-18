@@ -24,6 +24,7 @@ export const EXPORT_ID_MEANING: Record<ListingMarketplace, string> = {
   trendyol: 'barcode',
   wix: 'id',
   shopify: 'id',
+  hepsiburada: 'hb_sku',
 };
 
 export type CsvCell = string | number | boolean | null | undefined;

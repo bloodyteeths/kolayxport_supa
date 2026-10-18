@@ -80,10 +80,11 @@ export function effectiveConnected(storeConnected: boolean | undefined, conn: { 
 }
 
 /** Marketplaces whose balance is an estimate (§2.3 "~" + the existing reserve/approx notes); eBay reports real funds. */
-export const BALANCE_NOTE: Partial<Record<FinanceMarketplace, 'etsy' | 'amazon' | 'trendyol'>> = {
+export const BALANCE_NOTE: Partial<Record<FinanceMarketplace, 'etsy' | 'amazon' | 'trendyol' | 'hepsiburada'>> = {
   etsy: 'etsy',
   amazon: 'amazon',
   trendyol: 'trendyol',
+  hepsiburada: 'hepsiburada',
 };
 
 /** Monday-start week key (pure calendar arithmetic). */

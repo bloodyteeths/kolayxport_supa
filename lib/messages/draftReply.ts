@@ -10,13 +10,14 @@
 // once it lands, `toThreadMessage` can delegate to G1's Wix normalizer.
 
 import { decodeEntities } from '@/lib/text/decodeEntities';
-import { AI_DRAFT_MAX, TRENDYOL_ANSWER_MIN, TRENDYOL_STATUS } from '@/lib/messages/limits';
+import { AI_DRAFT_MAX, HEPSIBURADA_ANSWER_MIN, HEPSIBURADA_STATUS, TRENDYOL_ANSWER_MIN, TRENDYOL_STATUS } from '@/lib/messages/limits';
+import { hepsiburadaFromSeller } from '@/lib/messages/normalize';
 
 // ─── Public contract (consumed by G6 `useThread.ts` / `Composer.tsx`) ───────────────────────────────
 
-export type DraftPlatform = 'wix' | 'trendyol';
+export type DraftPlatform = 'wix' | 'trendyol' | 'hepsiburada';
 
-/** Body of `POST /api/messages/draft-reply`. `id` = Wix conversationId | Trendyol questionId. */
+/** Body of `POST /api/messages/draft-reply`. `id` = Wix conversationId | Trendyol questionId | Hepsiburada issue number. */
 export interface DraftReplyRequest {
   platform: DraftPlatform;
   id: string;
@@ -100,7 +101,7 @@ export interface DraftContext {
   shopName: string | null;
   customerName: string | null;
   thread: DraftThreadMessage[];
-  /** Wix only. `null` = the order lookup failed (the model is told it cannot see orders). */
+  /** Wix, and Hepsiburada questions about an order. `null` = the order lookup failed (the model is told it cannot see orders). */
   orders?: DraftOrderFact[] | null;
   /** Trendyol only. `null` = product not in the local catalog. */
   product?: DraftProductFact | null;
@@ -318,6 +319,12 @@ export function buildDraftPrompt(ctx: DraftContext): string {
   };
   if (ctx.platform === 'wix') {
     facts.orders = ctx.orders === null ? 'ORDER LOOKUP FAILED: you cannot see this customer\'s orders' : (ctx.orders ?? []);
+  } else if (ctx.platform === 'hepsiburada') {
+    facts.productName = ctx.productName ?? null;
+    facts.product = 'NOT IN CATALOG: no price, stock or attribute data available';
+    if (ctx.orders !== undefined) {
+      facts.orders = ctx.orders === null ? 'ORDER LOOKUP FAILED: you cannot see this order' : ctx.orders;
+    }
   } else {
     facts.productName = ctx.productName ?? null;
     facts.product = ctx.product ?? 'NOT IN CATALOG: no price, stock or attribute data available';
@@ -329,10 +336,14 @@ export function buildDraftPrompt(ctx: DraftContext): string {
 
   const language = ctx.platform === 'trendyol'
     ? 'Write in Turkish (Trendyol is a Turkish marketplace), with correct Turkish characters.'
-    : 'Write in the same language the customer used in their most recent message.';
+    : ctx.platform === 'hepsiburada'
+      ? 'Write in Turkish (Hepsiburada is a Turkish marketplace), with correct Turkish characters.'
+      : 'Write in the same language the customer used in their most recent message.';
   const platformRules = ctx.platform === 'trendyol'
     ? '- This is a public product question on Trendyol. The answer is shown on the product page and the seller can answer only once.\n- Never include links, URLs, email addresses, phone numbers, social media handles or any contact details (Trendyol rejects them).'
-    : '- This is a private message in the shop\'s Wix inbox.\n- Do not include links, URLs, email addresses or phone numbers.';
+    : ctx.platform === 'hepsiburada'
+      ? '- This is a customer question on Hepsiburada ("Satıcıya Sor"). It must be answered within one business day.\n- Never include links, URLs, email addresses, phone numbers, social media handles or any contact details (Hepsiburada rejects them).'
+      : '- This is a private message in the shop\'s Wix inbox.\n- Do not include links, URLs, email addresses or phone numbers.';
 
   return [
     'You draft a reply for an online seller to send to a customer. The seller will review and edit it before sending.',
@@ -417,9 +428,10 @@ export function validateDraft(parsed: unknown, platform: DraftPlatform, factsTex
   const reply = obj.reply.replace(/\r\n/g, '\n').trim();
   if (!reply) return { ok: false, reason: 'empty' };
   if (platform === 'trendyol' && reply.length < TRENDYOL_ANSWER_MIN) return { ok: false, reason: 'tooShort' };
+  if (platform === 'hepsiburada' && reply.length < HEPSIBURADA_ANSWER_MIN) return { ok: false, reason: 'tooShort' };
   if (reply.length > DRAFT_REPLY_MAX_CHARS) return { ok: false, reason: 'tooLong' };
   if (/\[[^\]]{1,30}\]|\{(customer|product|order|name)\}/i.test(reply)) return { ok: false, reason: 'placeholder' };
-  if (platform === 'trendyol' && containsContactInfo(reply)) return { ok: false, reason: 'contactInfo' };
+  if ((platform === 'trendyol' || platform === 'hepsiburada') && containsContactInfo(reply)) return { ok: false, reason: 'contactInfo' };
   if (inventedIdentifiers(reply, factsText).length > 0) return { ok: false, reason: 'inventedId' };
   const allowed = new Set<string>(DRAFT_MISSING_KEYS);
   const missing = Array.isArray(obj.missing)
@@ -470,6 +482,11 @@ export interface DraftWixSource {
 /** The Trendyol client method the builder uses (subset of `TrendyolApiClient`). */
 export interface DraftTrendyolSource {
   getQuestions(params: { status?: string; page?: number; size?: number }): Promise<{ content?: any[] }>;
+}
+
+/** The Hepsiburada client method the builder uses (subset of `HepsiburadaClient`). */
+export interface DraftHepsiburadaSource {
+  getQuestion(number: string | number): Promise<any>;
 }
 
 /** The Prisma delegates the builder reads. `savedReply` is optional: it exists only after backend BR-4. */
@@ -623,6 +640,99 @@ export async function buildTrendyolDraftContext(args: {
     thread,
     product,
     productName: str(q.productName) ? decodeEntities(str(q.productName) as string) : null,
+    toneExamples,
+  };
+}
+
+/** Hepsiburada issue → thread (conversations oldest first; `lastContent` when there are none). */
+export function hepsiburadaThreadFromIssue(q: Record<string, any>): DraftThreadMessage[] {
+  const convs: any[] = Array.isArray(q?.conversations) ? q.conversations : [];
+  const out = convs
+    .map((c): DraftThreadMessage | null => {
+      const text = str(c?.content);
+      if (!text) return null;
+      return { sender: hepsiburadaFromSeller(c?.from, c?.type) ? 'seller' : 'customer', text: clip(decodeEntities(text), MAX_MESSAGE_CHARS), date: iso(c?.createdAt) };
+    })
+    .filter((m): m is DraftThreadMessage => !!m)
+    .sort((a, b) => (a.date ? Date.parse(a.date) : 0) - (b.date ? Date.parse(b.date) : 0))
+    .slice(-MAX_THREAD_MESSAGES);
+  if (!out.length) {
+    const text = str(q?.lastContent);
+    if (text) out.push({ sender: 'customer', text: clip(decodeEntities(text), MAX_MESSAGE_CHARS), date: iso(q?.createdAt) });
+  }
+  return out;
+}
+
+/** Local Hepsiburada order row (subset) for an order-related question. */
+interface LocalHbOrderRow extends LocalOrderRow {
+  status?: string | null;
+  externalStatus?: string | null;
+  uiOrderDate?: Date | string | null;
+  totalPrice?: number | null;
+  currency?: string | null;
+  items?: { shipBy: Date | string | null; productName?: string | null; quantity?: number | null }[];
+}
+
+export async function buildHepsiburadaDraftContext(args: {
+  userId: string;
+  issueNumber: string;
+  hepsiburada: DraftHepsiburadaSource;
+  db: DraftDb;
+  shopName: string | null;
+}): Promise<DraftContext> {
+  const { userId, issueNumber, hepsiburada, db } = args;
+  let q: Record<string, any> | null;
+  try {
+    q = await hepsiburada.getQuestion(issueNumber);
+  } catch (e: any) {
+    const status = Number(e?.status || 0);
+    throw new DraftSourceError(status === 404 ? 'notFound' : 'unavailable', 'hepsiburada question fetch failed');
+  }
+  if (!q) throw new DraftSourceError('notFound', 'question not found');
+  const status = String(q.status ?? '').toLowerCase();
+  if (status === HEPSIBURADA_STATUS.answered.toLowerCase()) throw new DraftSourceError('alreadyAnswered');
+  if (status && status !== HEPSIBURADA_STATUS.waiting.toLowerCase()) throw new DraftSourceError('notAnswerable');
+
+  const thread = hepsiburadaThreadFromIssue(q);
+  if (!thread.some((m) => m.sender === 'customer')) throw new DraftSourceError('notFound', 'empty question');
+
+  // Order-related question: the local order (synced by lib/hepsiburada/orderSync) gives status / tracking facts.
+  let orders: DraftOrderFact[] | null | undefined;
+  const orderNumber = str(q.orderNumber);
+  if (orderNumber) {
+    try {
+      const rows = (await db.order.findMany({
+        where: { userId, marketplace: 'Hepsiburada', orderNumber },
+        select: {
+          orderNumber: true, trackingNumber: true, shippedAt: true, labelStatus: true, shipByAt: true, deliveredAt: true,
+          status: true, externalStatus: true, uiOrderDate: true, totalPrice: true, currency: true,
+          items: { select: { shipBy: true, productName: true, quantity: true } },
+        },
+        take: 1,
+      })) as LocalHbOrderRow[];
+      orders = rows.map((r) => mergeLocalOrder({
+        orderNumber: r.orderNumber,
+        status: str(r.externalStatus) ?? str(r.status),
+        createdDate: iso(r.uiOrderDate),
+        items: (r.items ?? []).map((i) => ({ name: decodeEntities(str(i.productName) ?? ''), quantity: Number(i.quantity) || 1 })).filter((i) => i.name).slice(0, 10),
+        total: r.totalPrice != null ? `${r.totalPrice} ${r.currency || 'TRY'}` : null,
+        trackingNumber: null, shippedAt: null, labelStatus: null, shipBy: null, deliveredAt: null,
+      }, r));
+    } catch {
+      orders = null;
+    }
+  }
+
+  const toneExamples = await loadToneExamples(db, userId, 'hepsiburada');
+  const productName = str(q.product?.name);
+  return {
+    platform: 'hepsiburada',
+    shopName: args.shopName,
+    customerName: null,
+    thread,
+    product: null,
+    productName: productName ? decodeEntities(productName) : null,
+    ...(orders !== undefined ? { orders } : {}),
     toneExamples,
   };
 }

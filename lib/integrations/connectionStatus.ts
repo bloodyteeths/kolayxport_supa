@@ -17,6 +17,7 @@ import prisma from '@/lib/prisma';
 import { getOpenReauthFlags, resolveNotification, type OpenReauthFlag } from '@/lib/notifications';
 import { isShopReauthBlocked } from '@/lib/etsy/etsyToken';
 import { getReconnectFlags } from '@/lib/integrations/authFailures';
+import { isHepsiburadaEnabled } from '@/lib/config';
 
 export const CONNECTION_PROVIDERS = [
   'etsy',
@@ -87,6 +88,8 @@ export interface ConnectionEntry {
   /** True when at least one connected account must be re-authorised by the user. */
   needsReauth: boolean;
   reason?: ConnectionReason;
+  /** false: the integration is not enabled for this user yet (feature flag); the tile stays non-self-serve. */
+  available?: boolean;
 }
 
 export interface ExtensionStatus {
@@ -454,10 +457,13 @@ export async function getConnectionStatus(userId: string): Promise<ConnectionSta
       name: c?.trendyolSupplierId ? `Trendyol ${c.trendyolSupplierId}` : 'Trendyol',
       externalId: c?.trendyolSupplierId ?? null,
     }),
-    hepsiburada: credentialEntry([c?.hepsiburadaApiKey, c?.hepsiburadaMerchantId], {
-      name: c?.hepsiburadaMerchantId ? `Hepsiburada ${c.hepsiburadaMerchantId}` : 'Hepsiburada',
-      externalId: c?.hepsiburadaMerchantId ?? null,
-    }),
+    hepsiburada: {
+      ...credentialEntry([c?.hepsiburadaApiKey, c?.hepsiburadaMerchantId], {
+        name: c?.hepsiburadaMerchantId ? `Hepsiburada ${c.hepsiburadaMerchantId}` : 'Hepsiburada',
+        externalId: c?.hepsiburadaMerchantId ?? null,
+      }),
+      available: isHepsiburadaEnabled(userId),
+    },
     veeqo: credentialEntry([c?.veeqoApiKey], { name: 'Veeqo', externalId: null }),
     shippo: credentialEntry([c?.shippoToken], { name: 'Shippo', externalId: null }),
     fedex: credentialEntry([c?.fedexApiKey, c?.fedexApiSecret, c?.fedexAccountNumber], {

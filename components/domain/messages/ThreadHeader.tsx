@@ -17,6 +17,7 @@ import { neutral as n, type as typeScale } from '@/lib/ds/tokens';
 import { useFormatters } from '@/lib/format';
 import type { MessageStatusKey } from '@/lib/ds/status/vocabulary';
 import type { UnifiedConversation } from '@/types/messages';
+import { isQuestionPlatform } from '@/lib/messages/platforms';
 
 export interface ThreadHeaderProps {
   conversation: UnifiedConversation;
@@ -38,7 +39,8 @@ export function ThreadHeader({ conversation: c, layout = 'pane', pill, rawStatus
   const t = useTranslations('messages.thread');
   const tOverlay = useTranslations('ds.overlay');
   const f = useFormatters();
-  const isTrendyol = c.platform === 'trendyol';
+  // Q&A platforms show the product (Trendyol, Hepsiburada); Wix shows the customer.
+  const isTrendyol = isQuestionPlatform(c.platform);
   const name = c.customerName?.trim() || t('customer');
   const when = f.relative(c.lastMessageAt, now);
   const caption = isTrendyol ? t('asked', { time: when }) : t('lastMessage', { time: when });

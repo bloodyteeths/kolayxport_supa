@@ -108,6 +108,8 @@ export const settingsBEn = {
       accountNumber: 'Account number', mngCustomerNumber: 'Customer number', mngPassword: 'Password',
       clientId: 'Client ID', clientSecret: 'Client secret', username: 'Username', password: 'Password',
       companyId: 'Company ID',
+      merchantId: 'Store ID (Mağaza ID)',
+      serviceKey: 'Service key (Servis Anahtarı)',
     },
   },
 } as const;
@@ -219,6 +221,8 @@ export const settingsBTr = {
       accountNumber: 'Hesap numarası', mngCustomerNumber: 'Müşteri numarası', mngPassword: 'Şifre',
       clientId: 'İstemci ID', clientSecret: 'İstemci gizli anahtarı', username: 'Kullanıcı adı', password: 'Şifre',
       companyId: 'Firma ID',
+      merchantId: 'Mağaza ID',
+      serviceKey: 'Servis anahtarı',
     },
   },
 } as const;

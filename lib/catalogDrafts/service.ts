@@ -56,6 +56,7 @@ import {
   shopifyValuesFromCache,
   trendyolValuesFromCache,
   wixValuesFromCache,
+  hepsiburadaValuesFromCache,
   type CanonicalValues,
 } from './values';
 
@@ -331,12 +332,13 @@ export type CatalogExecutors = Record<CatalogMarketplace, CatalogExecutor>;
 let defaultExecutors: CatalogExecutors | null = null;
 async function loadDefaultExecutors(): Promise<CatalogExecutors> {
   if (defaultExecutors) return defaultExecutors;
-  const [{ trendyolExecutor }, { wixExecutor }, { shopifyExecutor }] = await Promise.all([
+  const [{ trendyolExecutor }, { wixExecutor }, { shopifyExecutor }, { hepsiburadaExecutor }] = await Promise.all([
     import('./executors/trendyol'),
     import('./executors/wix'),
     import('./executors/shopify'),
+    import('./executors/hepsiburada'),
   ]);
-  defaultExecutors = { trendyol: trendyolExecutor, wix: wixExecutor, shopify: shopifyExecutor };
+  defaultExecutors = { trendyol: trendyolExecutor, wix: wixExecutor, shopify: shopifyExecutor, hepsiburada: hepsiburadaExecutor };
   return defaultExecutors;
 }
 
@@ -521,6 +523,12 @@ export async function resolveStoreId(userId: string, marketplace: CatalogMarketp
     if (!supplierId || (wanted && wanted !== supplierId)) throw new CatalogDraftError('STORE_NOT_FOUND', 'Trendyol store not found');
     return supplierId;
   }
+  if (marketplace === 'hepsiburada') {
+    const cred = await prisma.credential.findUnique({ where: { userId }, select: { hepsiburadaMerchantId: true } });
+    const merchantId = cred?.hepsiburadaMerchantId?.trim() || null;
+    if (!merchantId || (wanted && wanted !== merchantId)) throw new CatalogDraftError('STORE_NOT_FOUND', 'Hepsiburada store not found');
+    return merchantId;
+  }
   if (marketplace === 'wix') {
     const site = await prisma.wixSite.findFirst({
       where: { userId, isActive: true, ...(wanted ? { id: wanted } : {}) },
@@ -552,6 +560,13 @@ export async function loadCacheSnapshot(
     });
     if (!p) return null;
     return { snapshot: trendyolValuesFromCache(p), updatedAt: p.trendyolLastUpdate ?? null };
+  }
+  if (marketplace === 'hepsiburada') {
+    const p = await prisma.hepsiburadaListing.findUnique({
+      where: { userId_merchantId_hbSku: { userId, merchantId: storeId, hbSku: externalId } },
+    });
+    if (!p) return null;
+    return { snapshot: hepsiburadaValuesFromCache(p), updatedAt: null };
   }
   if (marketplace === 'wix') {
     const p = await prisma.wixProduct.findUnique({
@@ -1191,7 +1206,8 @@ async function markSynced(
  * pull. Best effort: a health refresh never fails a send.
  */
 async function refreshHealthBestEffort(marketplace: CatalogMarketplace, storeId: string, userId: string, ids: string[]) {
-  if (ids.length === 0) return;
+  // Hepsiburada listings have no health score (content is HB's catalog).
+  if (ids.length === 0 || marketplace === 'hepsiburada') return;
   try {
     const { refreshHealth } = await import('@/lib/listings/refreshHealth');
     const res = await refreshHealth(marketplace, { storeId, userId, ids });

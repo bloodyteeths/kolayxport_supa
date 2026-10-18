@@ -79,6 +79,7 @@ export const initialFormData: UserSettingsResponse = {
   shippingSettings: { etgbRecipientEmail: '', etgbEnabled: false },
   integrationSettings: {
     veeqoApiKey: '', shippoToken: '', trendyolApiKey: '', trendyolApiSecret: '', trendyolSupplierId: '',
+    hepsiburadaMerchantId: '', hepsiburadaApiKey: '',
     fedexApiKey: '', fedexApiSecret: '', fedexAccountNumber: '', upsApiKey: '', upsApiSecret: '', upsAccountNumber: '',
     mngCustomerNumber: '', mngPassword: '',
     parasutClientId: '', parasutClientSecret: '', parasutUsername: '', parasutPassword: '', parasutCompanyId: '',

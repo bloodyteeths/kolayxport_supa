@@ -252,7 +252,10 @@ export function providersUnlocked(providers: readonly string[], known: Known): b
 
 function isVisible(req: NavRequires | undefined, known: Known, ctx: { showConnectCta: boolean; stockSyncConfigured: boolean }) {
   if (!req) return true;
-  if (req.kind === 'providers') return providersUnlocked(req.providers, known);
+  if (req.kind === 'providers') {
+    if (req.knownOnly) return req.providers.some((p) => known(p) === true);
+    return providersUnlocked(req.providers, known);
+  }
   if (req.kind === 'connectCta') return ctx.showConnectCta;
   // stockSync: ≥ 2 stores connected (unknown counts as maybe), or configured.
   if (ctx.stockSyncConfigured) return true;

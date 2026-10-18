@@ -36,7 +36,7 @@ const toUtc = (day: string) => Date.UTC(Number(day.slice(0, 4)), Number(day.slic
 export interface FinanceScope {
   /** The marketplace shown (URL `mp`, else the first connected one, else Etsy). */
   mp: FinanceMarketplace;
-  /** false when the URL names a marketplace without a payments ledger (Wix, Shopify, Hepsiburada). */
+  /** false when the URL names a marketplace without a payments ledger (Wix, Shopify). */
   supported: boolean;
   /** Raw URL `mp` (for the not-supported message). */
   requested: string | undefined;

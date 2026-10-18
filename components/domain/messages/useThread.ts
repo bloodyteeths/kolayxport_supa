@@ -12,7 +12,8 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { composerMode, type ComposerMode } from '@/lib/messages/threadState';
 import { findUnfilledTokens } from '@/lib/messages/fillVariables';
-import { TRENDYOL_ANSWER_MAX, TRENDYOL_ANSWER_MIN, WIX_REPLY_MAX } from '@/lib/messages/limits';
+import { TRENDYOL_ANSWER_MIN } from '@/lib/messages/limits';
+import { isQuestionPlatform, replyLimits } from '@/lib/messages/platforms';
 import { DRAFT_MISSING_KEYS, type DraftMissing, type DraftReplyErrorCode } from '@/lib/messages/draftReply';
 import { calendarDay } from '@/lib/format';
 import { useUnsavedChangesGuard } from '@/lib/hooks/useUnsavedChangesGuard';
@@ -109,7 +110,7 @@ export type ComposerError =
   | { kind: 'generic' };
 
 export function maxLengthFor(platform: MessagePlatform): number {
-  return platform === 'trendyol' ? TRENDYOL_ANSWER_MAX : WIX_REPLY_MAX;
+  return replyLimits(platform).max;
 }
 
 /** Client-side checks before the POST (messages §5.3 "Send: validates"). */
@@ -118,7 +119,8 @@ export function validateComposerText(platform: MessagePlatform, text: string): C
   if (!trimmed) return { kind: 'empty' };
   const tokens = findUnfilledTokens(text);
   if (tokens.length > 0) return { kind: 'unfilled', tokens };
-  if (platform === 'trendyol' && trimmed.length < TRENDYOL_ANSWER_MIN) return { kind: 'tooShort', min: TRENDYOL_ANSWER_MIN };
+  const { min } = replyLimits(platform);
+  if (isQuestionPlatform(platform) && trimmed.length < min) return { kind: 'tooShort', min };
   if (trimmed.length > maxLengthFor(platform)) return { kind: 'tooLong', max: maxLengthFor(platform) };
   return null;
 }
@@ -273,8 +275,8 @@ export function postMarkSeen(platform: MessagePlatform, id: string, seen = true)
 }
 
 export function replyBody(c: Pick<UnifiedConversation, 'platform' | 'id'>, text: string): Record<string, string> {
-  return c.platform === 'trendyol'
-    ? { platform: 'trendyol', questionId: c.id, text }
+  return isQuestionPlatform(c.platform)
+    ? { platform: c.platform, questionId: c.id, text }
     : { platform: 'wix', conversationId: c.id, text };
 }
 
@@ -355,7 +357,7 @@ export function useThread(conversation: UnifiedConversation, options: UseThreadO
   const storageKey = draftStorageKey(platform, id);
   const [sentAt, setSentAt] = useState<string | null>(null);
   const mode = composerMode(conversation, {
-    locallyAnsweredAt: locallyAnsweredAt ?? (platform === 'trendyol' ? sentAt : null),
+    locallyAnsweredAt: locallyAnsweredAt ?? (isQuestionPlatform(platform) ? sentAt : null),
   });
 
   // History. Wix fetches the thread; Trendyol renders the list payload.

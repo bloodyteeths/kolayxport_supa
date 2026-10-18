@@ -189,6 +189,7 @@ export const MARKETPLACE_LIMITS: Record<ListingMarketplace, MarketplaceLimits> =
   trendyol: { titleMax: 100, tags: null, priceMin: 0.01, qtyMin: 0, qtyMax: 99999 },
   wix: { titleMax: 80, tags: null, priceMin: 0, qtyMin: 0, qtyMax: 99999 },
   shopify: { titleMax: 255, tags: { max: 250, maxLen: 255 }, priceMin: 0, qtyMin: 0, qtyMax: 999999 },
+  hepsiburada: { titleMax: 200, tags: null, priceMin: 0.01, qtyMin: 0, qtyMax: 20000 },
 };
 
 /** The id column the template and the mapping step name (`listing_id` for Etsy, as the legacy import). */
@@ -198,6 +199,7 @@ export const ID_COLUMN: Record<ListingMarketplace, string> = {
   trendyol: 'barcode',
   wix: 'id',
   shopify: 'id',
+  hepsiburada: 'hb_sku',
 };
 
 /**
@@ -212,6 +214,7 @@ export const STAGEABLE_FIELDS: Record<ListingMarketplace, readonly Exclude<Edita
   trendyol: ['price', 'quantity'],
   wix: ['title', 'price', 'quantity'],
   shopify: ['title', 'price', 'quantity', 'tags'],
+  hepsiburada: ['price', 'quantity'],
 };
 
 /**
@@ -248,6 +251,7 @@ function idAliases(marketplace: ListingMarketplace): string[] {
     trendyol: ['barcode', 'barkod'],
     wix: ['product_id', 'wix_product_id'],
     shopify: ['product_id', 'shopify_product_id'],
+    hepsiburada: ['hb_sku', 'hbsku', 'hepsiburada_sku', 'sku'],
   };
   return Array.from(new Set([...base, ...extra[marketplace]]));
 }

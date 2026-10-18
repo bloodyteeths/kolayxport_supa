@@ -49,7 +49,16 @@ export async function getValidAccessToken(shopId: string): Promise<string> {
 
   if (!res.ok) {
     const err = await res.text().catch(() => '');
-    logger.error('Shopify token refresh failed', undefined, { shopId, status: res.status, body: err });
+    logger.error('Shopify token refresh failed', undefined, { shopId, status: res.status, body: err.slice(0, 300) });
+    // 401/403 = grant revoked (app uninstalled without our webhook arriving), 404 = store deleted (e.g. Shopify's
+    // review test stores). Either way it can only come back through a fresh install, which re-activates the row —
+    // so deactivate it instead of leaving a dead "reconnect" store that every sync and page trips over.
+    if (res.status === 401 || res.status === 403 || res.status === 404) {
+      await prisma.shopifyShop
+        .update({ where: { id: shopId }, data: { isActive: false, accessToken: '', refreshToken: null, tokenExpiresAt: null } })
+        .catch(() => undefined);
+      logger.warn('Shopify shop deactivated: token refresh rejected', { shopId, shopDomain: shop.shopDomain, status: res.status });
+    }
     throw new Error(`Token refresh failed: ${res.status}`);
   }
 

@@ -4,15 +4,15 @@ import { decodeCursor, encodeCursor, nextTrendyolPage, START_CURSOR } from '@/li
 describe('lib/messages/cursor', () => {
   it('absent cursor is the first page of both sources', () => {
     expect(decodeCursor(undefined)).toEqual(START_CURSOR);
-    expect(decodeCursor('')).toEqual({ t: 0, w: '' });
+    expect(decodeCursor('')).toEqual({ t: 0, w: '', h: 1 });
   });
 
   it('round-trips and is url-safe', () => {
-    const c = { t: 3, w: 'abc+/=?&é' };
+    const c = { t: 3, w: 'abc+/=?&é', h: null };
     const enc = encodeCursor(c)!;
     expect(enc).toMatch(/^[A-Za-z0-9_-]+$/);
     expect(decodeCursor(enc)).toEqual(c);
-    expect(decodeCursor(encodeCursor({ t: null, w: 'x' }))).toEqual({ t: null, w: 'x' });
+    expect(decodeCursor(encodeCursor({ t: null, w: 'x' }))).toEqual({ t: null, w: 'x', h: null });
   });
 
   it('is null when both sources are exhausted', () => {

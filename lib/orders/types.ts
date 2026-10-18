@@ -413,8 +413,10 @@ export interface OrderRow {
 
   label: LatestLabel | null;
   labelFailure: LabelFailure | null;
-  /** Trendyol's pre-assigned cargo number (not a label; shown under Label & tracking). */
+  /** Trendyol's / Hepsiburada's pre-assigned cargo number (not a label; shown under Label & tracking). */
   marketplaceCargoNumber: string | null;
+  /** Hepsiburada orders: package state for the "Pack & print label" action (HB-contracted cargo). */
+  hepsiburada?: { packageNumber: string | null; cargoCompany: string | null; canPack: boolean } | null;
   trackingSubmission: TrackingSubmissionSummary | null;
   carrierCost: CarrierCost | null;
 

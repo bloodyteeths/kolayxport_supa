@@ -15,6 +15,7 @@ import {
   TRANSACTION_CATEGORIES,
 } from '@/lib/finance/classifyTransaction';
 import { localDateKey, parseTz, windowFromKeys } from '@/lib/finance/periods';
+import { handleHepsiburadaFinanceSync } from '@/lib/hepsiburada/finance';
 
 const TRENDYOL_API_BASE = 'https://apigw.trendyol.com/integration';
 const EBAY_FINANCES_BASE = 'https://apiz.ebay.com';
@@ -2288,6 +2289,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
         if (marketplace === 'amazon') {
           return await handleAmazonSync(userId, req.body, res);
+        }
+        if (marketplace === 'hepsiburada') {
+          return await handleHepsiburadaFinanceSync(userId, req.body, res);
         }
         return await handleSync(userId, req.body, res);
       }

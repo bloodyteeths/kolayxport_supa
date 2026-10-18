@@ -7,9 +7,10 @@ import { ebayConfig } from './ebay';
 import { trendyolConfig } from './trendyol';
 import { wixConfig } from './wix';
 import { shopifyConfig } from './shopify';
+import { hepsiburadaConfig } from './hepsiburada';
 
 export type { ListingsConfig } from './types';
-export { etsyConfig, ebayConfig, trendyolConfig, wixConfig, shopifyConfig };
+export { etsyConfig, ebayConfig, trendyolConfig, wixConfig, shopifyConfig, hepsiburadaConfig };
 export { SCHEDULED_SENDS_ENABLED } from './shared';
 
 export const LISTINGS_CONFIGS: Record<ListingMarketplace, ListingsConfig> = {
@@ -18,6 +19,7 @@ export const LISTINGS_CONFIGS: Record<ListingMarketplace, ListingsConfig> = {
   trendyol: trendyolConfig,
   wix: wixConfig,
   shopify: shopifyConfig,
+  hepsiburada: hepsiburadaConfig,
 };
 
 export function listingsConfig(marketplace: ListingMarketplace): ListingsConfig {
@@ -34,6 +36,7 @@ export const MARKETPLACE_NAME: Record<ListingMarketplace, string> = {
   trendyol: 'Trendyol',
   wix: 'Wix',
   shopify: 'Shopify',
+  hepsiburada: 'Hepsiburada',
 };
 
 /** Marketplaces whose cache has the backend freshness chip (`components/etsy-history/CacheFreshnessChip`, W3 §2a). */

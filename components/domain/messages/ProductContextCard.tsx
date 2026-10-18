@@ -15,7 +15,7 @@ import { Bone } from '@/components/ds/state/Skeletons';
 import { icons } from '@/lib/ds/icons';
 import { neutral as n, type as typeScale } from '@/lib/ds/tokens';
 import { listingHref as navListingHref } from '@/lib/nav/links';
-import type { ProductContext, UnifiedConversation } from '@/types/messages';
+import type { MessagePlatform, ProductContext, UnifiedConversation } from '@/types/messages';
 import { jsonFetcher, MESSAGES_API } from './useThread';
 
 export function productContextUrl(productMainId: string): string {
@@ -50,12 +50,15 @@ export function useProductContext(productMainId: string | null | undefined): Use
 
 export interface ProductContextCardProps {
   productInfo: NonNullable<UnifiedConversation['productInfo']>;
+  /** Default 'trendyol'. Hepsiburada has no local catalog lookup here: the Q&A payload only. */
+  platform?: MessagePlatform;
 }
 
-export function ProductContextCard({ productInfo }: ProductContextCardProps) {
+export function ProductContextCard({ productInfo, platform = 'trendyol' }: ProductContextCardProps) {
   const t = useTranslations('messages.context');
   const tThread = useTranslations('messages.thread');
-  const { product, loading, error, retry } = useProductContext(productInfo.id);
+  const isHepsiburada = platform === 'hepsiburada';
+  const { product, loading, error, retry } = useProductContext(isHepsiburada ? null : productInfo.id);
   const [capSize, capLine] = typeScale.caption;
   const [titleSize, titleLine, titleWeight] = typeScale.titleSm;
   const title = product?.title || productInfo.title;
@@ -99,8 +102,8 @@ export function ProductContextCard({ productInfo }: ProductContextCardProps) {
             </Button>
           )}
           {productInfo.webUrl && (
-            <Button variant="ghost" size="sm" icon={icons.externalLink} href={productInfo.webUrl} external data-testid="view-on-trendyol">
-              {tThread('viewOnTrendyol')}
+            <Button variant="ghost" size="sm" icon={icons.externalLink} href={productInfo.webUrl} external data-testid={isHepsiburada ? 'view-on-hepsiburada' : 'view-on-trendyol'}>
+              {isHepsiburada ? tThread('viewOnHepsiburada') : tThread('viewOnTrendyol')}
             </Button>
           )}
         </Box>

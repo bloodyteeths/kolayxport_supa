@@ -19,7 +19,7 @@ import { useConfirm } from '@/components/ds/overlay/ConfirmDialog';
 import { useFormatters } from '@/lib/format';
 import { accent, neutral as n, radius, tone } from '@/lib/ds/tokens';
 import {
-  BASIC_SCENES, DEFAULT_DIRECTION, OBJECT_PRESETS, PERSON_PRESETS, VIDEO_AUDIO, VIDEO_CAMERAS, VIDEO_EXPRESSIONS, VIDEO_LIGHTS, VIDEO_LOOKS, VIDEO_MOTIONS,
+  BASIC_SCENES, DEFAULT_DIRECTION, UNIVERSAL_PRESETS, VIDEO_AUDIO, VIDEO_CAMERAS, VIDEO_EXPRESSIONS, VIDEO_LIGHTS, VIDEO_LOOKS, VIDEO_MOTIONS,
   directVideo, type VideoDirection,
 } from '@/lib/ai/videoDirector';
 import { VIDEO_TARGETS, VIDEO_TARGET_PROFILES, generationAspect, videoReadiness, type VideoFormat, type VideoTarget } from '@/lib/ai/videoTargets';
@@ -159,6 +159,8 @@ export function VideoStudio() {
   const userFormat = useRef(false);
   // Shots and settings the AI suggests for THIS product (any category, any marketplace).
   const [ideas, setIdeas] = useState<Ideas | null>(null);
+  // Is a person in the seller's photos? ("With a person" adds one with AI when not.)
+  const [photosPerson, setPhotosPerson] = useState<boolean | null>(null);
 
   // ── Product photos ──
   const [mp, setMp] = useState<Mp>('etsy');
@@ -173,6 +175,9 @@ export function VideoStudio() {
 
   // ── Direction ──
   const [dir, setDir] = useState<VideoDirection>({ ...DEFAULT_DIRECTION, audio: 'none' });
+  // "With a person" on photos without one: the AI builds the frames with a real-looking person using the product.
+  const addPerson = dir.preset === 'withPerson' && photosPerson === false;
+  const mode = addPerson ? 'scene' : dir.mode;
   const set = <K extends keyof VideoDirection>(k: K, v: VideoDirection[K]) => setDir((d) => ({ ...d, [k]: v }));
   const [start, setStart] = useState<Photo | null>(null);
   const [end, setEnd] = useState<Photo | null>(null);
@@ -315,7 +320,7 @@ export function VideoStudio() {
   };
 
   const assign = (p: Photo) => {
-    if (dir.mode === 'scene') return;
+    if (mode === 'scene') return;
     userPicked.current = true;
     if (start?.key === p.key) { setStart(null); setSlot('start'); return; }
     if (end?.key === p.key) { setEnd(null); setSlot('end'); return; }
@@ -323,7 +328,7 @@ export function VideoStudio() {
   };
 
   const roleOf = (p: Photo): string | null => {
-    if (dir.mode === 'scene') return null;
+    if (mode === 'scene') return null;
     if (start?.key === p.key) return t('role.start');
     if (end?.key === p.key) return t('role.end');
     return null;
@@ -353,7 +358,9 @@ export function VideoStudio() {
         const kind: 'worn' | 'object' = d.product?.kind === 'worn' ? 'worn' : 'object';
         const shots = Array.isArray(d.shots) ? d.shots : [];
         setIdeas({ kind, shots, scenes: Array.isArray(d.scenes) ? d.scenes : [] });
-        const person = userPerson.current ? undefined : d.photos.some((x: any) => x.person);
+        const anyPerson = d.photos.some((x: any) => x.person);
+        setPhotosPerson(anyPerson);
+        const person = userPerson.current ? undefined : anyPerson;
         setDir((dd) => {
           const next = { ...dd, productKind: kind, ...(person === undefined ? {} : { person }) };
           // Unless the seller chose a shot, start with the best suggestion for this product.
@@ -376,7 +383,7 @@ export function VideoStudio() {
   }, [auto, dir.preset, dir.shotText]);
   const autoChosen = Boolean(auto && !userPicked.current && start && start.ref === auto.start);
 
-  const sourceLandscape = ((dir.mode === 'scene' ? photos[0] : start) ?? photos[0])?.landscape ?? false;
+  const sourceLandscape = ((mode === 'scene' ? photos[0] : start) ?? photos[0])?.landscape ?? false;
   useEffect(() => {
     if (userFormat.current || !(start ?? photos[0])) return;
     const wanted = profile.format;
@@ -386,11 +393,11 @@ export function VideoStudio() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceLandscape, target, start?.key]);
   const effective = useMemo(() => (resolution !== '720p' ? { durationSec: 8 as const, resolution } : { durationSec, resolution }), [durationSec, resolution]);
-  const direction: VideoDirection = { ...dir, target, format };
+  const direction: VideoDirection = { ...dir, target, format, ...(addPerson ? { mode: 'scene', person: true, addPerson: true } : { addPerson: undefined }) };
   const promptPreview = useMemo(() => directVideo(direction), [direction]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const missing = dir.mode === 'scene' ? (photos.length ? null : t('need.photos')) : !start ? t('need.start') : null;
-  const aiStart = dir.mode === 'scene';
+  const missing = mode === 'scene' ? (photos.length ? null : t('need.photos')) : !start ? t('need.start') : null;
+  const aiStart = mode === 'scene';
   const aiEnd = !end && lock && turning && productRefs.length > 0;
   const cost = videoCredits({ quality, resolution: effective.resolution, durationSec: effective.durationSec, variants }) + (aiStart ? imageCredits() : 0) + (aiEnd ? imageCredits() : 0);
   const affordable = canAfford(balance, cost);
@@ -460,7 +467,7 @@ export function VideoStudio() {
     if (missing) return;
     if (dir.person && !consent) { toast.error(t('error.consent')); return; }
     await post('/api/ai/video', {
-      sources: { start: dir.mode === 'scene' ? null : start?.ref, end: dir.mode === 'scene' ? null : end?.ref, product: productRefs },
+      sources: { start: mode === 'scene' ? null : start?.ref, end: mode === 'scene' ? null : end?.ref, product: productRefs },
       direction, lock, aspectRatio: generationAspect(format, sourceLandscape), durationSec: effective.durationSec, resolution: effective.resolution,
       quality, variants, seed: null,
       listingRef: listing ? `${listing.mp}:${listing.id}${listing.store ? `:${listing.store}` : ''}` : null, title: listing?.title ?? null,
@@ -606,13 +613,13 @@ export function VideoStudio() {
               </Box>
             )}
 
-            {dir.mode === 'image' ? (
+            {mode === 'image' ? (
               <Box sx={{ display: 'flex', gap: '8px' }}>
                 <Slot label={t('slot.start')} photo={start} active={slot === 'start'} placeholder={t('slot.startHint')} onSelect={() => setSlot('start')} onClear={() => { userPicked.current = true; setStart(null); setSlot('start'); }} clearLabel={t('slot.clear')} />
                 <Slot label={t('slot.end')} photo={end} active={slot === 'end'} placeholder={aiEnd ? t('slot.endAi') : t('slot.endHint')} onSelect={() => setSlot('end')} onClear={() => { userPicked.current = true; setEnd(null); setSlot('end'); }} clearLabel={t('slot.clear')} />
               </Box>
             ) : null}
-            {dir.mode === 'image' && autoChosen ? <Box sx={{ fontSize: 12, color: n[500] }}>{t('slot.auto')}</Box> : null}
+            {mode === 'image' && autoChosen ? <Box sx={{ fontSize: 12, color: n[500] }}>{t('slot.auto')}</Box> : null}
 
             {photosLoading ? <Box sx={{ fontSize: 13, color: n[500] }}>{t('photos.loading')}</Box> : null}
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: '8px' }}>
@@ -622,7 +629,7 @@ export function VideoStudio() {
                 return (
                   <Box key={p.key} sx={{ position: 'relative' }}>
                     <Box component="button" type="button" onClick={() => assign(p)} aria-pressed={Boolean(role)}
-                      sx={{ display: 'block', width: '100%', p: 0, aspectRatio: '1', borderRadius: '8px', overflow: 'hidden', cursor: dir.mode === 'scene' ? 'default' : 'pointer', bgcolor: n[100],
+                      sx={{ display: 'block', width: '100%', p: 0, aspectRatio: '1', borderRadius: '8px', overflow: 'hidden', cursor: mode === 'scene' ? 'default' : 'pointer', bgcolor: n[100],
                         border: `2px solid ${role ? accent[600] : 'transparent'}`, opacity: used ? 1 : 0.45 }}>
                       <Box component="img" src={p.src} alt="" sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                       {role ? <Box sx={{ position: 'absolute', left: 4, bottom: 4, px: '6px', py: '1px', borderRadius: '6px', bgcolor: accent[600], color: '#fff', fontSize: 11, fontWeight: 600 }}>{role}</Box> : null}
@@ -657,7 +664,7 @@ export function VideoStudio() {
                   </Box>
                 );
               })}
-              {[...(dir.person ? PERSON_PRESETS : OBJECT_PRESETS), ...(!dir.person && ideas?.kind === 'worn' ? (['hanger'] as const) : []), 'custom' as const].map((x) => {
+              {[...UNIVERSAL_PRESETS, 'custom' as const].map((x) => {
                 const on = dir.preset === x && (x !== 'custom' || !dir.shotText);
                 return (
                   <Box key={x} component="button" type="button" aria-pressed={on}
@@ -670,6 +677,7 @@ export function VideoStudio() {
               })}
             </Box>
             {!ideas && photos.length ? <Box sx={{ fontSize: 12, color: n[500] }}>{t('shot.thinking')}</Box> : null}
+            {addPerson ? <Box sx={{ fontSize: 12, color: n[500] }}>{t('shot.addPerson')}</Box> : null}
             {turning && !end && !lock ? <Box sx={{ fontSize: 12, color: tone.warning.fg }}>{t('shot.backWarning')}</Box> : null}
             <Labeled label={t('director.scene')}>
               <Box role="radiogroup" aria-label={t('director.scene')} sx={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>

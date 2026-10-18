@@ -21,7 +21,7 @@ interface MessageCountState {
   failed: boolean;
   fetch: (opts?: MessageCountFetchOptions) => Promise<void>;
   /** Optimistically decrement one platform's unread count (e.g. after answering). */
-  decrement: (platform: 'wix' | 'trendyol') => void;
+  decrement: (platform: 'wix' | 'trendyol' | 'hepsiburada') => void;
 }
 
 // Monotonic request id: only the latest response may write counts, so a slow
@@ -29,7 +29,7 @@ interface MessageCountState {
 let latestRequestId = 0;
 
 const useMessageCountStore = create<MessageCountState>((set, get) => ({
-  counts: { wix: 0, trendyol: 0, total: 0 },
+  counts: { wix: 0, trendyol: 0, hepsiburada: 0, total: 0 },
   loading: false,
   fetchedAt: null,
   failed: false,
@@ -60,7 +60,7 @@ const useMessageCountStore = create<MessageCountState>((set, get) => ({
   decrement: (platform) => {
     const { counts } = get();
     const next = { ...counts, [platform]: Math.max(0, (counts[platform] || 0) - 1) };
-    next.total = next.wix + next.trendyol;
+    next.total = next.wix + next.trendyol + (next.hepsiburada || 0);
     set({ counts: next });
   },
 }));

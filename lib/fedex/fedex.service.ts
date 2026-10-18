@@ -174,7 +174,8 @@ export async function createFedexShipment(
   }
 
   const shipperPhoneCleaned = String(shipper.shipperPhoneNumber).replace(/\D/g, '') || DEFAULT_PHONE_NUMBER_TS;
-  const accessToken = await getFedExOAuthToken(shipper, FEDEX_API_BASE_URL);
+  const fedexBase = shipper.fedexBaseUrl || FEDEX_API_BASE_URL;
+  const accessToken = await getFedExOAuthToken(shipper, fedexBase);
   const shipDate = new Date().toISOString().split('T')[0];
 
   let dimensionsPayload: any = null;
@@ -350,7 +351,7 @@ export async function createFedexShipment(
   logger.info('[FedEx Service] Sending FedEx Ship API request for orderId: ' + orderData.orderId, { payloadSummary: { service: orderData.serviceType, recipientCountry: orderData.recipientCountry }});
 
   try {
-    const shipApiUrl = `${FEDEX_API_BASE_URL}/ship/v1/shipments`;
+    const shipApiUrl = `${fedexBase}/ship/v1/shipments`;
     const apiResponse = await axios.post(shipApiUrl, requestPayload, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -365,7 +366,7 @@ export async function createFedexShipment(
       logger.info(`[FedEx Service] Shipment queued asynchronously. jobId=${jobId}`);
       
       try {
-        const asyncResponse = await retrieveAsyncShipment(jobId, shipper.fedexAccountNumber, accessToken);
+        const asyncResponse = await retrieveAsyncShipment(jobId, shipper.fedexAccountNumber, accessToken, fedexBase);
         const { trackingNumber, labelUrl } = extractShipmentDetails(asyncResponse);
         const alerts = asyncResponse.output.alerts || [];
         
@@ -423,7 +424,7 @@ export async function createFedexShipment(
 
     // A rejected token must not be served again from the cache for this tenant.
     if (errorResponse?.status === 401) {
-      invalidateFedExToken(shipper, FEDEX_API_BASE_URL);
+      invalidateFedExToken(shipper, fedexBase);
     }
 
     let errorMessage = `FedEx Ship API Exception: ${error.message}`;

@@ -233,7 +233,7 @@ function applyTx(l: Lines, tx: TxCents): void {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const FINANCE_MARKETPLACES = new Set(['etsy', 'trendyol', 'ebay', 'amazon']);
+const FINANCE_MARKETPLACES = new Set(['etsy', 'trendyol', 'ebay', 'amazon', 'hepsiburada']);
 const CANCELLED_STATUSES = new Set(['CANCELLED', 'cancelled', 'Cancelled', 'canceled', 'Canceled']);
 
 function countList<K extends string>(m: Map<string, number>, field: K): Array<{ currency: string } & Record<K, number>> {
@@ -246,13 +246,13 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/** trendyol → TRY; else the cursor's balance currency; else the most frequent ledger currency; else USD. */
+/** trendyol / hepsiburada → TRY; else the cursor's balance currency; else the most frequent ledger currency; else USD. */
 export function pickDashboardCurrency(
   marketplace: string,
   balanceCurrency: string | null | undefined,
   txCurrencies: Iterable<string | null | undefined>,
 ): string {
-  if (marketplace.toLowerCase() === 'trendyol') return 'TRY';
+  if (marketplace.toLowerCase() === 'trendyol' || marketplace.toLowerCase() === 'hepsiburada') return 'TRY';
   if (balanceCurrency && balanceCurrency.trim()) return normalizeCurrency(balanceCurrency);
   const counts = new Map<string, number>();
   for (const c of txCurrencies) {

@@ -13,6 +13,7 @@ import { stockJobs } from '@/lib/stock/jobs';
 import { listingJobs } from '@/lib/etsy/listingJobs';
 import { orderJobs } from '@/lib/orders/jobs';
 import { notificationJobs } from '@/lib/notificationCenter/jobs';
+import { hepsiburadaJobs } from '@/lib/hepsiburada/jobs';
 
 const MINUTE = 60_000;
 
@@ -102,4 +103,4 @@ function dedupe(jobs: ScheduledJob[]): ScheduledJob[] {
   return out;
 }
 
-export const allJobs: ScheduledJob[] = dedupe([...coreJobs, ...stockJobs, ...listingJobs, ...orderJobs, ...notificationJobs, ...listingsGridJobs]);
+export const allJobs: ScheduledJob[] = dedupe([...coreJobs, ...stockJobs, ...listingJobs, ...orderJobs, ...notificationJobs, ...listingsGridJobs, ...hepsiburadaJobs]);

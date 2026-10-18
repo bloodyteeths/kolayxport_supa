@@ -125,7 +125,13 @@ export function MessagesPage({ now, pollMs }: MessagesPageProps = {}) {
   const openKey = open ?? null;
 
   const connections = useConnections();
-  const connected = { wix: connections.has('wix'), trendyol: connections.has('trendyol') };
+  // Hepsiburada counts only once it is enabled for this user (`available`, MARKETPLACE_HEPSIBURADA flag).
+  const hbHas = connections.has('hepsiburada');
+  const connected = {
+    wix: connections.has('wix'),
+    trendyol: connections.has('trendyol'),
+    hepsiburada: hbHas === undefined ? undefined : hbHas && connections.get('hepsiburada')?.available !== false,
+  };
 
   const [surfaceRef, surfaceTop] = useSurfaceTop(!mobile);
   const inbox = useInbox({ view, platform: store, keepKey: openKey, pollMs });
@@ -369,7 +375,7 @@ export function MessagesPage({ now, pollMs }: MessagesPageProps = {}) {
     ) : null;
 
   // A Wix row answered from this tab stays muted only in the Needs reply view (so the list does not jump
-  // under the cursor, §5.3); Trendyol keeps the mark everywhere (one-shot answer).
+  // under the cursor, §5.3); Trendyol / Hepsiburada keep the mark everywhere (one-shot answer).
   const rowAnsweredAt = (k: string) => (view === 'needs_reply' || !k.startsWith('wix:') ? inbox.locallyAnsweredAt(k) : null);
 
   const list = (

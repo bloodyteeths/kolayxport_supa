@@ -61,6 +61,7 @@ model User {
   financialTransactions   FinancialTransaction[]
   financialSyncCursors    FinancialSyncCursor[]
   trendyolProducts        TrendyolProduct[]
+  hepsiburadaListings     HepsiburadaListing[]
   wixSites                WixSite[]                @relation("UserWixSites")
   wixProducts             WixProduct[]
   shopifyShops            ShopifyShop[]            @relation("UserShopifyShops")
@@ -83,6 +84,7 @@ model User {
   aiUsage                 AiUsage[]
   aiVideoJobs             AiVideoJob[]
   aiCreditEntries         AiCreditEntry[]
+  aiConnections           AiConnection[]
   notificationSettings    NotificationSettings?
   stockSettings           StockSettings?
   stockItems              StockItem[]
@@ -2430,4 +2432,121 @@ model AiCreditEntry {
   @@unique([kind, bucket, ref])
   @@index([userId, createdAt])
   @@index([userId, bucket, period])
+}
+
+/// "Connect your own AI" (MCP, /api/mcp): one AI client a seller connected (Claude, ChatGPT, Cursor …).
+/// Tokens are stored as SHA-256 hashes only; every tool call is scoped to `userId`. lib/mcp/*.
+model AiConnection {
+  id          String    @id @default(cuid())
+  userId      String
+  /// The client's name (OAuth client_name) or the seller's label for a personal key
+  name        String
+  /// oauth | token
+  kind        String
+  clientId    String?
+  tokenHash   String    @unique
+  /// First characters of the token, to recognise it in the list
+  tokenPrefix String
+  refreshHash String?   @unique
+  /// read | write (write = staged drafts only, never a direct marketplace change)
+  scopes      String[]
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// OAuth 2.1 public clients registered dynamically (RFC 7591) by AI apps connecting to /api/mcp.
+model McpOAuthClient {
+  id           String   @id
+  name         String
+  redirectUris String[]
+  createdAt    DateTime @default(now())
+}
+
+/// One-time authorization codes (PKCE S256), 10 minutes.
+model McpOAuthCode {
+  codeHash      String    @id
+  clientId      String
+  userId        String
+  redirectUri   String
+  codeChallenge String
+  scopes        String[]
+  expiresAt     DateTime
+  usedAt        DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([userId])
+}
+
+/// Hepsiburada listing cache (listing-external `listings` joined with catalog `all-products-of-merchant` for
+/// title/images/barcode). Refreshed by the hepsiburada-listings job and the listings "Pull" action.
+model HepsiburadaListing {
+  id          String  @id @default(cuid())
+  userId      String
+  merchantId  String
+  hbSku       String
+  merchantSku String?
+  listingId   String?
+  productId   String?
+  barcode     String?
+
+  title        String?
+  brand        String?
+  categoryId   Int?
+  categoryName String?
+  images       Json?
+  thumbnailUrl String?
+
+  price                      Decimal? @db.Decimal(12, 2)
+  availableStock             Int      @default(0)
+  dispatchTime               Int?
+  maximumPurchasableQuantity Int?
+  cargoCompanies             String[] @default([])
+  isSalable                  Boolean  @default(false)
+  isSuspended                Boolean  @default(false)
+  isLocked                   Boolean  @default(false)
+  isFrozen                   Boolean  @default(false)
+  /// Stock owned by HB's warehouse: never pushed.
+  isFulfilledByHB            Boolean  @default(false)
+  deactivationReasons        String[] @default([])
+  raw                        Json?
+
+  syncedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, merchantId, hbSku])
+  @@index([userId, merchantId])
+  @@index([userId, merchantSku])
+  @@index([userId, barcode])
+}
+
+/// Async Hepsiburada uploads (price/stock/inventory uploads, product import/update tickets) we still have to
+/// resolve. `source` says who is waiting for the result (stock push, catalog draft, editor).
+model HepsiburadaUploadBatch {
+  id         String    @id @default(cuid())
+  userId     String
+  merchantId String
+  kind       String // inventory | stock | price | import | update
+  uploadId   String
+  status     String    @default("pending") // pending | done | failed
+  source     String? // stock | catalogDraft | editor | bulk
+  sourceRef  String?
+  itemCount  Int       @default(0)
+  items      Json?
+  errors     Json?
+  attempts   Int       @default(0)
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([userId, kind, uploadId])
+  @@index([status, createdAt])
+  @@index([userId, status])
 }

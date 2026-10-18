@@ -23,12 +23,13 @@ import { notify, resolveNotification, notificationKeys, NOTIFICATION_LINKS } fro
 
 export const AUTH_FAILURE_THRESHOLD = 3;
 
-export type AuthTrackedProvider = 'shopify' | 'trendyol' | 'amazon';
+export type AuthTrackedProvider = 'shopify' | 'trendyol' | 'amazon' | 'hepsiburada';
 
 const PROVIDER_NAMES: Record<AuthTrackedProvider, string> = {
   shopify: 'Shopify',
   trendyol: 'Trendyol',
   amazon: 'Amazon',
+  hepsiburada: 'Hepsiburada',
 };
 
 /** Error thrown/recorded when a sync skips a connection that needs reconnecting. */

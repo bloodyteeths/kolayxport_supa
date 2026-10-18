@@ -2,7 +2,8 @@
 // (flag `messages`). Rule for dates: fields the legacy page reads stay `string` and use '' when the
 // platform sent no time; every new field uses `null`. No field ever falls back to "now" (D2).
 
-export type MessagePlatform = 'wix' | 'trendyol';
+/** Q&A platforms (one question, seller answers): trendyol, hepsiburada. Chat platforms: wix. */
+export type MessagePlatform = 'wix' | 'trendyol' | 'hepsiburada';
 
 /** `GET /api/messages?action=list&view=` */
 export type InboxView = 'needs_reply' | 'unread' | 'all';
@@ -49,6 +50,8 @@ export interface UnifiedConversation {
   rejectReason?: string | null;
   /** Trendyol rejected-answer text, to prefill the composer (messages §5.2). */
   rejectedAnswerText?: string | null;
+  /** Hepsiburada: answer deadline (`expireDate`, 1 business day). null/absent when the platform sent none. */
+  expiresAt?: string | null;
   customerName: string;
   /** Wix contact email (Trendyol: absent). */
   customerEmail?: string;
@@ -61,7 +64,7 @@ export interface UnifiedConversation {
   lastMessageDate: string;
   /** true = newest message from the customer, false = from the seller, null = unknown. */
   lastFromCustomer: boolean | null;
-  /** Wix newest order number, once the context rail has loaded orders for this contact. */
+  /** Wix newest order number, once the context rail has loaded orders for this contact. Hepsiburada: the order the question is about. */
   orderRef?: string;
   productInfo?: {
     id: string;
@@ -100,6 +103,8 @@ export interface InboxListResponse extends MessagesListResponse {
 export interface MessageCountsResponse {
   wix: number;
   trendyol: number;
+  /** Absent from servers before the Hepsiburada inbox. */
+  hepsiburada?: number;
   total: number;
 }
 

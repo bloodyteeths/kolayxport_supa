@@ -81,6 +81,7 @@ export function SavedReplyFields({ value, onChange, errors, disabled, autoFocusT
     { value: 'all', label: t('fields.allStores') },
     { value: 'wix', label: platformName('wix') },
     { value: 'trendyol', label: platformName('trendyol') },
+    { value: 'hepsiburada', label: platformName('hepsiburada') },
   ];
 
   const rememberCaret = () => {

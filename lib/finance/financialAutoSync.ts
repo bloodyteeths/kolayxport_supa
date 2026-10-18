@@ -7,6 +7,7 @@ import {
   handleEbaySync,
   handleAmazonSync,
 } from '@/pages/api/finance/settlements';
+import { handleHepsiburadaFinanceSync } from '@/lib/hepsiburada/finance';
 
 // Financial data must be correct without the user ever pressing "sync". Two
 // consumers drive this module: the sync-financials cron (every 6h, all users)
@@ -15,7 +16,7 @@ import {
 // /api/finance/settlements via a mock res — the handlers only ever call
 // res.status().json() and update FinancialSyncCursor on success.
 
-export const FINANCE_MARKETPLACES = ['trendyol', 'etsy', 'ebay', 'amazon'] as const;
+export const FINANCE_MARKETPLACES = ['trendyol', 'etsy', 'ebay', 'amazon', 'hepsiburada'] as const;
 export type FinanceMarketplace = (typeof FINANCE_MARKETPLACES)[number];
 
 const DAY_MS = 86_400_000;
@@ -51,6 +52,7 @@ export async function runFinancialSync(
     case 'etsy': await handleEtsySync(userId, body, res); break;
     case 'ebay': await handleEbaySync(userId, body, res); break;
     case 'amazon': await handleAmazonSync(userId, body, res); break;
+    case 'hepsiburada': await handleHepsiburadaFinanceSync(userId, body, res); break;
   }
   return result();
 }

@@ -628,19 +628,26 @@ export function useListingDraft<F extends FieldMap>(opts: UseListingDraftOptions
     }
   }, [adapter, shopId, recoverDraftCheck]);
 
-  /** Pull the live listing; keep every field the user changed (never overwrite a dirty field). */
-  const refreshRemote = React.useCallback(async () => {
+  /**
+   * Pull the live listing; keep every field the user changed (never overwrite a dirty field).
+   * `afterOwnSend`: the refresh right after our own successful send. Our write bumped the marketplace's
+   * updatedAt, so it is not a remote change, and every edit just went out: adopt the remote values as they are
+   * now (the marketplace may normalise what we sent, e.g. HTML or tag order) instead of keeping our copies, which
+   * would show as "1 change not sent".
+   */
+  const refreshRemote = React.useCallback(async (opts: { afterOwnSend?: boolean } = {}) => {
     const l = live.current;
     if (l.mode !== 'edit' || !l.listingId) return;
     const loaded = await adapter.load({ shopId, listingId: l.listingId });
     const prevRemote = live.current.remote;
-    const keep = prevRemote ? adapter.changedKeys(prevRemote, live.current.fields) : [];
-    const savedKeep = prevRemote && live.current.savedFields ? adapter.changedKeys(prevRemote, live.current.savedFields) : [];
+    const keep = prevRemote && !opts.afterOwnSend ? adapter.changedKeys(prevRemote, live.current.fields) : [];
+    const savedKeep = prevRemote && live.current.savedFields && !opts.afterOwnSend ? adapter.changedKeys(prevRemote, live.current.savedFields) : [];
     if (!mounted.current) return;
     setRemote(loaded.fields);
     setBaseline(loaded.fields);
     const before = live.current.meta.updatedAt;
-    if (before && loaded.meta.updatedAt && loaded.meta.updatedAt.getTime() !== before.getTime()) setRemoteChangedAt(loaded.meta.updatedAt);
+    if (opts.afterOwnSend) setRemoteChangedAt(null);
+    else if (before && loaded.meta.updatedAt && loaded.meta.updatedAt.getTime() !== before.getTime()) setRemoteChangedAt(loaded.meta.updatedAt);
     setMeta(loaded.meta);
     setFieldsState((cur) => ({ ...loaded.fields, ...pick(cur, keep) }));
     const saved = live.current.savedFields;
@@ -718,13 +725,16 @@ export function useListingDraft<F extends FieldMap>(opts: UseListingDraftOptions
           setExtra({});
           setSendIssues([]);
         }
+        let refreshed = false;
         try {
-          await refreshRemote();
+          await refreshRemote({ afterOwnSend: true });
+          refreshed = true;
         } catch {
           /* the send succeeded; the refresh can be retried from SyncMeta */
         }
         if (mounted.current) {
-          commitSaved(live.current.fields);
+          // refreshRemote already committed the fresh remote values as saved; only fall back to the form copy.
+          if (!refreshed) commitSaved(live.current.fields);
           setSaveState('idle');
         }
         return { outcome: 'sent', listingId: result.listingId, warnings: result.warnings };

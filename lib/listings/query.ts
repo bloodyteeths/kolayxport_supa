@@ -48,7 +48,7 @@ export interface ModelDelegate {
 /** The Prisma client (or a test fake with the same delegates). */
 export type ListingsDb = Record<string, any>;
 
-export type CacheModelName = 'EtsyListing' | 'EbayListing' | 'TrendyolProduct' | 'WixProduct' | 'ShopifyProduct';
+export type CacheModelName = 'EtsyListing' | 'EbayListing' | 'TrendyolProduct' | 'WixProduct' | 'ShopifyProduct' | 'HepsiburadaListing';
 export type DraftModelName = 'EtsyListingDraft' | 'EbayListingDraft' | 'CatalogDraft';
 
 let fieldOverride: ((model: string, field: string) => boolean) | null = null;

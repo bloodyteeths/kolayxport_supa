@@ -150,8 +150,9 @@ export function tileModel(spec: IntegrationSpec, ctx: TileContext): TileModel {
     canReconnect: connected && (spec.kind === 'oauth' || spec.kind === 'install'),
   };
 
-  // Hepsiburada: set up by our support team; never a self-serve connect.
-  if (spec.id === 'hepsiburada') {
+  // Hepsiburada before it is enabled for this user (MARKETPLACE_HEPSIBURADA / ALLOW_HEPSIBURADA_USERS): set up by
+  // our support team, no self-serve connect. Once enabled it is a normal credentials tile (Mağaza ID + servis anahtarı).
+  if (spec.id === 'hepsiburada' && entry?.available !== true) {
     if (connected) {
       return {
         id: spec.id, status, knownStatus: known, button: null, ...base, canDisconnect: false, canReconnect: false,

@@ -20,7 +20,7 @@ import {
   sendCatalogDrafts,
   stageCatalogDraft,
   type CatalogDraftDTO,
-  type CatalogMarketplace,
+  type CatalogMarketplace as DraftCatalogMarketplace,
   type CatalogQueuedActionType,
   type SendSummary,
 } from '@/lib/catalogDrafts/client';
@@ -48,7 +48,11 @@ import type {
   StageFieldsInput,
 } from './types';
 
-export type { CatalogMarketplace };
+/**
+ * Catalog marketplaces served by the full-page editor frame. Hepsiburada stages CatalogDrafts too, but its listings
+ * have no editable content (HB's catalog owns it), so it uses its own listing page (components/domain/hepsiburada).
+ */
+export type CatalogMarketplace = Exclude<DraftCatalogMarketplace, 'hepsiburada'>;
 
 /** Brand names (not translated). */
 export const CATALOG_DISPLAY_NAME: Record<CatalogMarketplace, string> = { trendyol: 'Trendyol', wix: 'Wix', shopify: 'Shopify' };

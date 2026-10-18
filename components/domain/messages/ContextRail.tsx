@@ -10,6 +10,7 @@ import { Button } from '@/components/ds/inputs/Button';
 import { SidePanelSection } from '@/components/ds/overlay/SidePanelSection';
 import { neutral as n, type as typeScale } from '@/lib/ds/tokens';
 import type { UnifiedConversation } from '@/types/messages';
+import { isQuestionPlatform } from '@/lib/messages/platforms';
 import { OrderContextList } from './OrderContextList';
 import { ProductContextCard } from './ProductContextCard';
 
@@ -38,7 +39,7 @@ export interface ContextRailProps {
 /** Title of the rail / panel / sheet for this thread. */
 export function useContextTitle(conversation: Pick<UnifiedConversation, 'platform'>): string {
   const t = useTranslations('messages.context');
-  return conversation.platform === 'trendyol' ? t('product') : t('title');
+  return isQuestionPlatform(conversation.platform) ? t('product') : t('title');
 }
 
 export function ContextRail({
@@ -76,7 +77,14 @@ export function ContextRail({
       )}
       {!isWix && conversation.productInfo && (
         <SidePanelSection id="msg-context-product" title={t('product')}>
-          <ProductContextCard productInfo={conversation.productInfo} />
+          <ProductContextCard productInfo={conversation.productInfo} platform={conversation.platform} />
+        </SidePanelSection>
+      )}
+      {conversation.platform === 'hepsiburada' && conversation.orderRef && (
+        <SidePanelSection id="msg-context-hb-order" title={t('questionOrder')}>
+          <Box data-testid="context-hb-order" sx={{ fontSize: denseSize, lineHeight: `${denseLine}px`, color: n[800] }}>
+            <CopyText value={conversation.orderRef} />
+          </Box>
         </SidePanelSection>
       )}
       {!isWix && conversation.customerName?.trim() && (

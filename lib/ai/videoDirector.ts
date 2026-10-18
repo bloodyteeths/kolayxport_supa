@@ -16,11 +16,13 @@
 export const VIDEO_MODES = ['image', 'scene'] as const;
 export type VideoMode = (typeof VIDEO_MODES)[number];
 
-export const VIDEO_PRESETS = ['turntable', 'hero', 'detail', 'lifestyle', 'flatlay', 'twirl', 'walk', 'pose', 'frontBack', 'hanger', 'custom'] as const;
-/** Shots for any product (no person). */
-export const OBJECT_PRESETS: readonly VideoPreset[] = ['turntable', 'hero', 'detail', 'lifestyle', 'flatlay'];
-/** Shots when a person wears or holds the product. */
-export const PERSON_PRESETS: readonly VideoPreset[] = ['twirl', 'walk', 'pose', 'frontBack', 'detail', 'hero'];
+export const VIDEO_PRESETS = ['hero', 'orbit', 'turntable', 'detail', 'lifestyle', 'withPerson', 'reveal', 'flatlay', 'twirl', 'walk', 'pose', 'frontBack', 'hanger', 'custom'] as const;
+/**
+ * The built-in shots: universal — they work for a dress, a phone case, shoes, flowers or a sculpture (founder: "video
+ * options should be universal"). Product-specific shots (a twirl, a back-bow close-up …) come from the AI suggestions
+ * made from the seller's own photos (lib/ai/videoProduct analyzePhotos). Older presets stay valid for old jobs.
+ */
+export const UNIVERSAL_PRESETS: readonly VideoPreset[] = ['hero', 'orbit', 'turntable', 'detail', 'lifestyle', 'withPerson', 'reveal', 'flatlay'];
 export type VideoPreset = (typeof VIDEO_PRESETS)[number];
 
 export const VIDEO_LOOKS = ['phone', 'studio', 'cinematic'] as const;
@@ -55,6 +57,8 @@ export type VideoDirection = {
   showsBack?: boolean;
   /** 'worn' (clothing, shoes, jewellery on a person) or 'object' — picks the lock wording. */
   productKind?: 'worn' | 'object';
+  /** "With a person" on photos without one: AI adds a real-looking person using the product (keyframes). */
+  addPerson?: boolean;
   /** Free text from the seller (any language; Veo understands it). */
   notes?: string;
   /** Extra things to avoid, on top of the defaults. */
@@ -67,7 +71,7 @@ export type VideoDirection = {
 };
 
 export const DEFAULT_DIRECTION: VideoDirection = {
-  mode: 'image', preset: 'turntable', look: 'phone', camera: 'auto', motion: 'subtle', person: true, expression: 'natural',
+  mode: 'image', preset: 'hero', look: 'phone', camera: 'auto', motion: 'subtle', person: true, expression: 'natural',
   scene: 'keep', light: 'daylight', audio: 'none', grain: true,
 };
 
@@ -76,6 +80,18 @@ const PRESET_ACTION: Record<VideoPreset, { person: string; product: string }> = 
   turntable: {
     person: 'The model slowly turns through a full circle, showing the product from the front, the side and the back.',
     product: 'The product turns slowly through a full circle on a turntable as one rigid piece, showing every side.',
+  },
+  orbit: {
+    person: 'The camera moves slowly in a gentle arc of about 30 degrees around the person, who stays relaxed and natural; the product stays the focus.',
+    product: 'The product stays still while the camera moves slowly in a gentle arc of about 30 degrees around it, showing its shape and depth.',
+  },
+  withPerson: {
+    person: 'A real person naturally wears, holds or uses the product in an everyday moment, with small natural movements; the product stays the focus and always clearly visible.',
+    product: 'A real person naturally wears, holds or uses the product in an everyday moment, with small natural movements; the product stays the focus and always clearly visible.',
+  },
+  reveal: {
+    person: 'Soft light glides slowly across the product while it is worn, revealing its texture and colour.',
+    product: 'Soft light glides slowly across the still product, revealing its texture, finish and colour, as the camera holds steady.',
   },
   hero: {
     person: 'The model stands naturally while the camera moves gently in to a sharp hero shot, the whole product still in frame.',
@@ -87,7 +103,7 @@ const PRESET_ACTION: Record<VideoPreset, { person: string; product: string }> = 
   },
   lifestyle: {
     person: 'A real, candid moment: the person uses or wears the product naturally in the setting, filmed as it happens.',
-    product: 'The product in a real everyday moment in the setting, placed or used naturally.',
+    product: 'The product in its natural place in a real everyday setting (on a table, a shelf, in a room or outdoors), with gentle natural movement of light and camera.',
   },
   flatlay: {
     person: 'Top-down view of the product laid flat; the camera slowly lowers and turns slightly.',
@@ -201,13 +217,14 @@ export function neutralPeople(text: string): string {
 }
 
 /** "The product is exactly the one in the photos" — an instruction, never a description. Pure. */
-export function lockSentence(person: boolean, kind?: VideoDirection['productKind']): string {
+export function lockSentence(person: boolean, kind?: VideoDirection['productKind'], addPerson = false): string {
   // (No "body" / "skin" / "age" words for people: see neutralPeople.)
   const detail = kind === 'worn'
     ? 'the same cut, colours, fabric, pattern, prints, lace, embroidery and embellishments (same number, size and position), sleeves, neckline, fastenings and length'
     : 'the same shape, proportions, colours, materials, textures, parts, buttons and any printed text or logos';
   return `The product must be exactly the one in the photos in every frame: ${detail}. Never add, remove, move or redesign any detail.`
-    + (person ? ' Keep the same model exactly as in the photos: the same face, hair and look.' : '');
+    + (person && !addPerson ? ' Keep the same model exactly as in the photos: the same face, hair and look.' : '')
+    + (addPerson ? ' The person is a natural-looking real adult; the product, not the person, is the subject.' : '');
 }
 
 /** How a real person behaves on camera. Pure. */
@@ -236,7 +253,7 @@ export function directVideo(d: VideoDirection, changes: string[] = [], opts: { s
   const parts: string[] = [
     look.intro,
     product ? `The product: ${product}.` : '',
-    lockSentence(d.person, d.productKind),
+    lockSentence(d.person, d.productKind, d.addPerson === true),
     d.preset === 'custom' && clean(d.shotText, 300) ? ppl(clean(d.shotText, 300)) : PRESET_ACTION[d.preset][who],
     // A tight zoom past what the photos show makes Veo invent details (seen on a Wix dress: bodice made up, head cut).
     d.preset === 'detail' ? '' : `The whole product${d.person ? ' and the model\'s head' : ''} stay in frame for the whole shot: no extreme close-ups, the camera never moves closer than the photos show.`,
@@ -293,6 +310,7 @@ export function normalizeDirection(v: unknown): VideoDirection {
     grain: o.grain === undefined ? DEFAULT_DIRECTION.grain : Boolean(o.grain),
     shotText: clean(o.shotText, 300) || undefined,
     showsBack: o.showsBack === true || undefined,
+    addPerson: o.addPerson === true || undefined,
     productKind: o.productKind === 'worn' || o.productKind === 'object' ? o.productKind : undefined,
     notes: clean(o.notes, 800) || undefined,
     avoid: clean(o.avoid, 300) || undefined,

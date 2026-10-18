@@ -3,7 +3,7 @@
 // currencies). Renders inside the shared `ReportsPage` frame (group C), which owns the date range, the tabs, the
 // `financials` FeatureGate around this body and hides the header actions on a locked tab.
 //
-// Body by state (§3, `profitView`): not supported (Wix/Shopify/Hepsiburada deep link) · connect · skeleton ·
+// Body by state (§3, `profitView`): not supported (Wix/Shopify deep link) · connect · skeleton ·
 // page error · never synced ("Get your Etsy payments" + [Refresh from Etsy], the only action; no header primary) ·
 // empty range ([Show last 90 days]) · ready (banners, 4 KPIs, P&L + trend chart side by side ≥ 1200, product table).
 // Primary (§4.1): "Add product costs" while costs are missing (Export CSV becomes the secondary), else "Export CSV".

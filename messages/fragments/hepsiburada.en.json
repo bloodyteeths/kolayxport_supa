@@ -1,0 +1,31 @@
+{
+  "settings": {
+    "credentials": {
+      "field": {
+        "merchantId": "Store ID (Mağaza ID)",
+        "serviceKey": "Service key (Servis Anahtarı)"
+      },
+      "uuidFormat": "Paste the Store ID exactly as shown in the Hepsiburada panel (e.g. 069f1e61-8b6f-…)",
+      "hepsiburadaVerify": {
+        "title": "Hepsiburada didn't accept these details",
+        "credentials": "Check the Store ID and service key. In the Hepsiburada panel, open Entegratör bilgileri, add KolayXport as an integrator, then copy the service key it shows for KolayXport.",
+        "integrator": "The Hepsiburada integration isn't configured on our side yet. Your details are saved; contact support.",
+        "failed": "We couldn't reach Hepsiburada to check the connection. Your details are saved; try again in a few minutes.",
+        "pending": "Hepsiburada can take up to 2 hours to activate a newly added integrator. Your details are saved; we'll keep trying, or check again later."
+      }
+    }
+  },
+  "orders": {
+    "row": {
+      "hepsiburadaCargo": "Hepsiburada cargo barcode"
+    }
+  },
+  "hepsiburada": {
+    "orders": {
+      "printLabel": "Print cargo label",
+      "packAndPrint": "Pack & print label",
+      "cargoCompany": "Cargo: {name}",
+      "labelFailed": "Couldn't get the Hepsiburada label: {reason}"
+    }
+  }
+}

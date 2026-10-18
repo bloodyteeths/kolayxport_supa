@@ -28,6 +28,9 @@ const END_POSE: Partial<Record<VideoDirection['preset'], string>> = {
   pose: 'The person stands in a different, relaxed natural pose a few seconds later.',
   lifestyle: 'A few seconds later in the same moment: a different natural pose.',
   hero: 'The camera has moved in closer: a sharp hero view of the product.',
+  orbit: 'The camera has moved a little around the product: the same shot from a slightly different angle.',
+  reveal: 'The light has moved across: the whole product clearly and evenly lit.',
+  withPerson: 'A few seconds later: the person still naturally using the product, in a slightly different pose.',
 };
 
 export function endPoseFor(d: Pick<VideoDirection, 'preset' | 'showsBack'>): string {
@@ -41,9 +44,9 @@ export function keyframePrompt(d: VideoDirection, opts: { which: 'start' | 'end'
   const parts = [
     opts.which === 'end' && opts.hasStart
       ? `Image 1 is the first frame of a video. Create the LAST frame of the same continuous shot a few seconds later: the same ${d.person ? 'person, ' : ''}place, light and camera distance. ${endPoseFor(d)}`
-      : `Create the first frame of a real product video: ${d.person ? 'the same person from the photos wearing or holding exactly this product, natural and relaxed, the whole product in frame' : 'the product fully in frame'}.`,
+      : `Create the first frame of a real product video: ${d.addPerson ? 'a real, natural-looking adult naturally wearing, holding or using exactly this product in the setting; the product is the focus and fully recognisable' : d.person ? 'the same person from the photos wearing or holding exactly this product, natural and relaxed, the whole product in frame' : 'the product fully in frame'}.`,
     `${productImgs} are real photos of the product${d.product ? ` (${d.person ? neutralPeople(d.product) : d.product})` : ''} from different angles.`,
-    lockSentence(d.person, d.productKind),
+    lockSentence(d.person, d.productKind, d.addPerson === true),
     d.person ? personSentence(d) : '',
     opts.which === 'start' || !opts.hasStart ? sceneSentence(d) : '',
     d.format === '1:1' || d.format === '4:5'

@@ -96,8 +96,8 @@ export type EditorPanel = 'health' | 'preview' | 'review' | 'history' | 'profile
 export type SectionComponents = Partial<Record<SectionId, React.ComponentType<ListingSectionProps & Record<string, unknown>>>>;
 
 export interface ListingEditorProps<F extends FieldMap> {
-  /** Etsy/eBay (M6) or the CatalogDraft marketplaces Trendyol/Wix/Shopify (M6b, `CatalogEditorRoute`). */
-  marketplace: EditorMarketplace;
+  /** Etsy/eBay (M6) or the CatalogDraft marketplaces Trendyol/Wix/Shopify (M6b, `CatalogEditorRoute`). Hepsiburada has its own listing page. */
+  marketplace: Exclude<EditorMarketplace, 'hepsiburada'>;
   adapter: ListingEditorAdapter<F>;
   shopId: string;
   /** Shop display name (preview, delete type-to-confirm). */
@@ -145,7 +145,7 @@ export interface EditorSlots<F extends FieldMap> {
 export const SECTION_GAP = 24;
 export const SECTION_GAP_MOBILE = 16;
 
-const MP_NAME: Record<EditorMarketplace, string> = { etsy: 'Etsy', ebay: 'eBay', trendyol: 'Trendyol', wix: 'Wix', shopify: 'Shopify' };
+const MP_NAME: Record<EditorMarketplace, string> = { etsy: 'Etsy', ebay: 'eBay', trendyol: 'Trendyol', wix: 'Wix', shopify: 'Shopify', hepsiburada: 'Hepsiburada' };
 
 /** The CatalogDraft marketplaces (marketplace-editors §1): no preview, no profiles, one create primary. */
 const isCatalogMarketplace = (m: EditorMarketplace): m is 'trendyol' | 'wix' | 'shopify' => m === 'trendyol' || m === 'wix' || m === 'shopify';

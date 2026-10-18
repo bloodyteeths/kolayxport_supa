@@ -6,7 +6,7 @@
 
 import { normalizeRaw, type ListingStatusKey } from './vocabulary';
 
-export type ListingMarketplace = 'etsy' | 'ebay' | 'trendyol' | 'wix' | 'shopify';
+export type ListingMarketplace = 'etsy' | 'ebay' | 'trendyol' | 'wix' | 'shopify' | 'hepsiburada';
 
 export interface ListingStatusInput {
   /** Etsy `state`. */
@@ -27,6 +27,12 @@ export interface ListingStatusInput {
   trackInventory?: boolean | null;
   // Shopify
   totalInventory?: number | null;
+  // Hepsiburada
+  isSalable?: boolean | null;
+  isSuspended?: boolean | null;
+  isLocked?: boolean | null;
+  isFrozen?: boolean | null;
+  availableStock?: number | null;
 }
 
 const ETSY: Record<string, ListingStatusKey> = {
@@ -67,6 +73,11 @@ export function listingStatus(row: ListingStatusInput, marketplace: ListingMarke
       if (row.trackInventory && (row.totalInventory ?? 0) === 0) return 'sold_out';
       return s === 'active' ? 'active' : 'inactive';
     }
+    case 'hepsiburada':
+      // Suspended / locked / frozen by HB, or not salable while stocked → inactive; no stock → sold out.
+      if (row.isSuspended || row.isLocked || row.isFrozen) return 'inactive';
+      if ((row.availableStock ?? 0) <= 0) return 'sold_out';
+      return row.isSalable ? 'active' : 'inactive';
     default:
       return 'inactive';
   }

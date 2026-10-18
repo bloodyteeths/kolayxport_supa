@@ -23,11 +23,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const results: Array<{ userId: string; marketplace: string; ok: boolean; detail?: string }> = [];
 
   try {
-    // Only users who ever had ledger data or have Trendyol credentials —
+    // Only users who ever had ledger data or have Trendyol / Hepsiburada credentials —
     // avoids hammering marketplace APIs for accounts with nothing connected.
-    const [cursorUsers, trendyolCreds] = await Promise.all([
+    const [cursorUsers, trendyolCreds, hepsiburadaCreds] = await Promise.all([
       prisma.financialSyncCursor.findMany({ select: { userId: true, marketplace: true } }),
       prisma.credential.findMany({ where: { trendyolSupplierId: { not: null } }, select: { userId: true } }),
+      // Flag-gated per user inside the sync (a disabled user answers 400 = skipped).
+      prisma.credential.findMany({ where: { hepsiburadaMerchantId: { not: null }, hepsiburadaApiKey: { not: null } }, select: { userId: true } }),
     ]);
 
     const targets = new Map<string, Set<string>>();
@@ -39,6 +41,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     for (const c of trendyolCreds) {
       if (!targets.has(c.userId)) targets.set(c.userId, new Set());
       targets.get(c.userId)!.add('trendyol');
+    }
+    for (const c of hepsiburadaCreds) {
+      if (!targets.has(c.userId)) targets.set(c.userId, new Set());
+      targets.get(c.userId)!.add('hepsiburada');
     }
 
     const now = Date.now();

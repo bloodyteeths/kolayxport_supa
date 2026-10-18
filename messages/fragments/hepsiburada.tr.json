@@ -1,0 +1,31 @@
+{
+  "settings": {
+    "credentials": {
+      "field": {
+        "merchantId": "Mağaza ID",
+        "serviceKey": "Servis anahtarı"
+      },
+      "uuidFormat": "Mağaza ID'yi Hepsiburada panelinde göründüğü gibi yapıştırın (ör. 069f1e61-8b6f-…)",
+      "hepsiburadaVerify": {
+        "title": "Hepsiburada bu bilgileri kabul etmedi",
+        "credentials": "Mağaza ID ve servis anahtarını kontrol edin. Hepsiburada panelinde Entegratör bilgileri'ni açın, KolayXport'u entegratör olarak ekleyin ve KolayXport için gösterilen servis anahtarını kopyalayın.",
+        "integrator": "Hepsiburada entegrasyonu bizim tarafımızda henüz yapılandırılmadı. Bilgileriniz kaydedildi; destekle iletişime geçin.",
+        "failed": "Bağlantıyı kontrol etmek için Hepsiburada'ya ulaşamadık. Bilgileriniz kaydedildi; birkaç dakika sonra tekrar deneyin.",
+        "pending": "Hepsiburada'nın yeni eklenen entegratörü etkinleştirmesi 2 saati bulabilir. Bilgileriniz kaydedildi; tekrar denemeye devam edeceğiz, isterseniz daha sonra tekrar kontrol edin."
+      }
+    }
+  },
+  "orders": {
+    "row": {
+      "hepsiburadaCargo": "Hepsiburada kargo barkodu"
+    }
+  },
+  "hepsiburada": {
+    "orders": {
+      "printLabel": "Kargo etiketini yazdır",
+      "packAndPrint": "Paketle ve etiketi yazdır",
+      "cargoCompany": "Kargo: {name}",
+      "labelFailed": "Hepsiburada etiketi alınamadı: {reason}"
+    }
+  }
+}

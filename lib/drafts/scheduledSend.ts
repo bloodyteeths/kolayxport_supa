@@ -215,6 +215,7 @@ const LISTINGS_LINK: Record<ScheduledMarketplace, string> = {
   trendyol: '/app/trendyol-urunler',
   wix: '/app/wix-urunler',
   shopify: '/app/shopify-urunler',
+  hepsiburada: '/app/hepsiburada-urunler',
 };
 
 const zero = (): ScheduledTally => ({ sent: 0, failed: 0, conflicts: 0, skipped: 0, pending: 0, empty: 0, legacy: 0 });

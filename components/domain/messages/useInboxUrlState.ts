@@ -1,12 +1,12 @@
 // components/domain/messages/useInboxUrlState.ts (messages G5) — the inbox's URL state (DS P3, messages §1,
 // §5.3): saved view, store filter, search and the open thread live in the query, so a reload or a shared
-// link restores them. `open` is `{platform}:{id}` (`wix:abc`, `trendyol:123`).
+// link restores them. `open` is `{platform}:{id}` (`wix:abc`, `trendyol:123`, `hepsiburada:4567`).
 import { useCallback, useMemo } from 'react';
 import { urlField, useUrlState, type UrlStateOf } from '@/lib/ds/useUrlState';
 import type { InboxView, MessagePlatform } from '@/types/messages';
 
 export const INBOX_VIEWS = ['needs_reply', 'unread', 'all'] as const satisfies readonly InboxView[];
-export const INBOX_STORES = ['all', 'wix', 'trendyol'] as const;
+export const INBOX_STORES = ['all', 'wix', 'trendyol', 'hepsiburada'] as const;
 export type InboxStore = (typeof INBOX_STORES)[number];
 
 export const INBOX_URL_SCHEMA = {
@@ -30,7 +30,7 @@ export function parseOpenKey(raw: string | null | undefined): OpenRef | null {
   if (i <= 0) return null;
   const platform = raw.slice(0, i);
   const id = raw.slice(i + 1);
-  if ((platform !== 'wix' && platform !== 'trendyol') || !id) return null;
+  if ((platform !== 'wix' && platform !== 'trendyol' && platform !== 'hepsiburada') || !id) return null;
   return { platform, id };
 }
 

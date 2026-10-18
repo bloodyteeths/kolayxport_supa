@@ -6,7 +6,7 @@ import type { EditorMarketplace, EditorNavState } from './types';
 
 export const EDITOR_NAV_KEY = 'kx:editorNav';
 
-const MARKETPLACES: readonly EditorMarketplace[] = ['etsy', 'ebay', 'trendyol', 'wix', 'shopify'];
+const MARKETPLACES: readonly EditorMarketplace[] = ['etsy', 'ebay', 'trendyol', 'wix', 'shopify', 'hepsiburada'];
 const MAX_IDS = 500;
 
 /** Validates an untrusted value read from storage. */
@@ -91,6 +91,7 @@ const LIST_ROUTE: Record<EditorMarketplace, string> = {
   trendyol: '/app/trendyol-urunler',
   wix: '/app/wix-urunler',
   shopify: '/app/shopify-urunler',
+  hepsiburada: '/app/hepsiburada-urunler',
 };
 
 const STORE_PARAM: Record<EditorMarketplace, string | null> = {
@@ -99,6 +100,7 @@ const STORE_PARAM: Record<EditorMarketplace, string | null> = {
   trendyol: null,
   wix: 'site',
   shopify: 'shop',
+  hepsiburada: null,
 };
 
 function withStore(path: string, marketplace: EditorMarketplace, storeId: string | null | undefined, extra?: Record<string, string>): string {

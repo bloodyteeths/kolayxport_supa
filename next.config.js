@@ -155,6 +155,16 @@ const nextConfig = {
     ];
   },
 
+  // "Connect your own AI" (MCP): AI apps look up OAuth metadata at the well-known paths (RFC 8414 / RFC 9728).
+  async rewrites() {
+    return [
+      { source: '/.well-known/oauth-authorization-server', destination: '/api/mcp/oauth/metadata' },
+      { source: '/.well-known/oauth-authorization-server/:path*', destination: '/api/mcp/oauth/metadata' },
+      { source: '/.well-known/oauth-protected-resource', destination: '/api/mcp/oauth/resource' },
+      { source: '/.well-known/oauth-protected-resource/:path*', destination: '/api/mcp/oauth/resource' },
+    ];
+  },
+
   // Security headers
   async headers() {
     return [

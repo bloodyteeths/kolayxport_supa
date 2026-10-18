@@ -13,6 +13,7 @@ import { ebayAdapter } from '@/lib/listings/adapters/ebay';
 import { trendyolAdapter } from '@/lib/listings/adapters/trendyol';
 import { wixAdapter } from '@/lib/listings/adapters/wix';
 import { shopifyAdapter } from '@/lib/listings/adapters/shopify';
+import { hepsiburadaAdapter } from '@/lib/listings/adapters/hepsiburada';
 
 export const LISTINGS_ADAPTERS: Record<ListingMarketplace, ListingsAdapter> = {
   etsy: etsyAdapter,
@@ -20,6 +21,7 @@ export const LISTINGS_ADAPTERS: Record<ListingMarketplace, ListingsAdapter> = {
   trendyol: trendyolAdapter,
   wix: wixAdapter,
   shopify: shopifyAdapter,
+  hepsiburada: hepsiburadaAdapter,
 };
 
 /** `?ids=` on the list endpoint: at most one page. */

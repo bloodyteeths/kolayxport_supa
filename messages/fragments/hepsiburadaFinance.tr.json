@@ -1,0 +1,9 @@
+{
+  "reports": {
+    "payouts": {
+      "balanceNote": {
+        "hepsiburada": "Hepsiburada API’si anlık bakiye vermiyor. Bu, senkronlanan dönemde henüz ödenmemiş (“ödenecek” durumundaki) kayıtların tahmini toplamıdır."
+      }
+    }
+  }
+}

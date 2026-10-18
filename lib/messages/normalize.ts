@@ -13,7 +13,16 @@ import type {
   UnifiedMessage,
 } from '@/types/messages';
 import type { InboxThreadRow } from './inboxCache';
-import { PREVIEW_MAX, TRENDYOL_ANSWER_MAX, TRENDYOL_ANSWER_MIN, TRENDYOL_STATUS } from './limits';
+import {
+  HEPSIBURADA_ANSWER_MAX,
+  HEPSIBURADA_ANSWER_MIN,
+  HEPSIBURADA_STATUS,
+  HEPSIBURADA_STATUS_CODE,
+  PREVIEW_MAX,
+  TRENDYOL_ANSWER_MAX,
+  TRENDYOL_ANSWER_MIN,
+  TRENDYOL_STATUS,
+} from './limits';
 
 // ─── Dates ──────────────────────────────────────────────
 
@@ -112,6 +121,97 @@ export function normalizeTrendyolQuestion(q: any, lastSeenAt?: Date | string | n
       title: q.productName || '',
       imageUrl: q.imageUrl,
       webUrl: q.webUrl,
+    } : undefined,
+    unreadCount: needsReply ? 1 : 0,
+    messages,
+  };
+}
+
+// ─── Hepsiburada ────────────────────────────────────────
+
+/** Only WaitingForAnswer needs a reply (HB "Rejected" = the seller reported the question). */
+export function hepsiburadaNeedsReply(status: string | null | undefined): boolean {
+  return String(status ?? '').trim().toLowerCase() === HEPSIBURADA_STATUS.waiting.toLowerCase();
+}
+
+/** HB `status=` query code for a view (undefined = every status). */
+export function hepsiburadaStatusForFilter(filter: ListFilter): number | undefined {
+  if (filter === 'needs_reply' || filter === 'unread' || filter === 'unanswered') return HEPSIBURADA_STATUS_CODE.waiting;
+  if (filter === 'answered') return HEPSIBURADA_STATUS_CODE.answered;
+  return undefined;
+}
+
+/** HB conversation `from`: customer vs seller. Values are not documented ("Müşteri/Satıcı"); match loosely. */
+export function hepsiburadaFromSeller(from: unknown, type?: unknown): boolean {
+  const f = `${String(from ?? '')} ${String(type ?? '')}`.toLowerCase();
+  return /merchant|seller|satıcı|satici|answer|cevap|yan[ıi]t/.test(f);
+}
+
+/** Search link for the product on hepsiburada.com (HB product URLs need the slug; the SKU search always works). */
+export function hepsiburadaProductUrl(sku: string | null | undefined): string | undefined {
+  const s = String(sku ?? '').trim();
+  return s ? `https://www.hepsiburada.com/ara?q=${encodeURIComponent(s)}` : undefined;
+}
+
+/**
+ * HB issue (`GET /api/v1.0/issues`, IssueViewModel) → conversation. `id` is the issue *number* (the answer and
+ * detail endpoints take it). Messages come from `conversations[]`, oldest first; with none, the question is
+ * `lastContent`.
+ */
+export function normalizeHepsiburadaQuestion(q: any, lastSeenAt?: Date | string | null): UnifiedConversation {
+  const platformStatus = String(q?.status ?? '');
+  const needsReply = hepsiburadaNeedsReply(platformStatus);
+  const askedAt = toIso(q?.createdAt);
+  const number = String(q?.issueNumber ?? q?.number ?? q?.id ?? '');
+
+  const convs: any[] = Array.isArray(q?.conversations) ? q.conversations : [];
+  let messages: UnifiedMessage[] = convs
+    .map((c, i): UnifiedMessage => ({
+      id: String(c?.id ?? `${number}-${i}`),
+      sender: hepsiburadaFromSeller(c?.from, c?.type) ? 'seller' : 'customer',
+      text: String(c?.content ?? ''),
+      date: toIso(c?.createdAt) ?? '',
+    }))
+    .filter((m) => m.text !== '');
+  messages.sort((a, b) => (toMs(a.date) ?? 0) - (toMs(b.date) ?? 0));
+  if (messages.length === 0) {
+    messages = [{ id: `${number}-q`, sender: 'customer', text: String(q?.lastContent ?? ''), date: askedAt ?? '' }];
+  }
+
+  const last = messages[messages.length - 1];
+  const sellerAnswer = [...messages].reverse().find((m) => m.sender === 'seller');
+  const isAnswered = platformStatus.toLowerCase() === HEPSIBURADA_STATUS.answered.toLowerCase();
+  const answeredAt = sellerAnswer ? (sellerAnswer.date || null) : isAnswered ? toIso(q?.lastModifiedAt) : null;
+  const lastMessageAt = (last?.date || null) ?? askedAt;
+  const lastFromCustomer = last ? last.sender === 'customer' : null;
+  const unread = isUnread({ needsReply, lastMessageAt, lastSeenAt: lastSeenAt ?? null });
+  const rejectReason = convs.map((c) => c?.rejectReason).find((r) => typeof r === 'string' && r.trim()) || null;
+  const product = q?.product || {};
+  const sku = product?.sku || product?.stockCode || '';
+
+  return {
+    id: number,
+    platform: 'hepsiburada',
+    status: needsReply ? 'unanswered' : 'answered',
+    needsReply,
+    unread,
+    platformStatus,
+    answeredAt,
+    rejectReason,
+    rejectedAnswerText: null,
+    expiresAt: needsReply ? toIso(q?.expireDate) : null,
+    customerName: '',
+    subject: product?.name || q?.subject?.description || '',
+    lastMessageText: preview(last?.text ?? q?.lastContent),
+    lastMessageAt,
+    lastMessageDate: lastMessageAt ?? '',
+    lastFromCustomer,
+    ...(q?.orderNumber ? { orderRef: String(q.orderNumber) } : {}),
+    productInfo: product?.name || sku ? {
+      id: String(sku),
+      title: product?.name || '',
+      imageUrl: product?.imageUrl || undefined,
+      webUrl: hepsiburadaProductUrl(sku),
     } : undefined,
     unreadCount: needsReply ? 1 : 0,
     messages,
@@ -257,6 +357,10 @@ export function validateReplyText(platform: MessagePlatform, text: string): Repl
   if (platform === 'trendyol') {
     if (len < TRENDYOL_ANSWER_MIN) return 'tooShort';
     if (len > TRENDYOL_ANSWER_MAX) return 'tooLong';
+  }
+  if (platform === 'hepsiburada') {
+    if (len < HEPSIBURADA_ANSWER_MIN) return 'tooShort';
+    if (len > HEPSIBURADA_ANSWER_MAX) return 'tooLong';
   }
   return null;
 }

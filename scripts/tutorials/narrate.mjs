@@ -14,6 +14,7 @@ import { execFileSync } from 'node:child_process';
 import { GoogleGenAI } from '@google/genai';
 import { CONFIG, WORK, ensure, ffmpeg, durationSec, hash, loadTutorial } from './lib.mjs';
 import { judgeTake, isPerfect, score, respell, writeReport, missingTerms } from './voiceQa.mjs';
+import { cleanClip } from './cleanClip.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const ENGINE = process.env.TTS_ENGINE === 'say' ? 'say' : 'gemini';
@@ -89,6 +90,7 @@ async function voiceOne(ai, text, file) {
     console.warn(`  take ${take} is ${d.toFixed(1)}s for ${words(text)} words (max ${maxSec(text).toFixed(1)}s), retrying`);
   }
   fs.renameSync(best.out, file);
+  cleanClip(file);
 }
 
 /** Final quality: up to MAX_TAKES takes, each transcribed and judged; mispronounced terms get respelled next take. */
@@ -112,6 +114,7 @@ async function voiceFinal(ai, text, file, meta = {}) {
     respellTerms = [...new Set([...respellTerms, ...q.mispronounced, ...missingTerms(text, q.transcript)])];
   }
   fs.renameSync(best.out, file);
+  cleanClip(file);
   fs.writeFileSync(file.replace(/\.wav$/, '.qa.json'), JSON.stringify({ text, takes: best.take, q: best.q }, null, 2));
   return best.q;
 }
@@ -154,6 +157,7 @@ async function voiceBatch(ai, items, dir) {
   }
   for (const p of pieces) {
     ffmpeg(['-ss', p.from.toFixed(3), '-to', p.to.toFixed(3), '-i', whole, '-af', POLISH, '-ar', '48000', '-ac', '1', p.file], { quiet: true });
+    cleanClip(p.file);
   }
   fs.unlinkSync(whole);
   return true;

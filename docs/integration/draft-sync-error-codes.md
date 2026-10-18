@@ -55,6 +55,11 @@ return each draft with:
 | `ebay.draftSync.rejected` | 400/409/422 or validation wording | none |
 | `ebay.draftSync.failed` | anything else | none |
 | `ebay.draftSync.interrupted` | reserved (eBay recovers stale `syncing` inline and re-runs the send) | none |
+| `ebay.draftSync.videoProcessing` | listing video uploaded (Media API) but not LIVE within the send's wait; everything else was sent, the draft keeps only the video row (`payload.ebayVideoId`, no re-upload) as `failed` | none |
+| `ebay.draftSync.videoRejected` | eBay processed the video to BLOCKED / PROCESSING_FAILED; everything else was sent, the row is flagged `payload.rejected` | none |
+| `ebay.draftSync.videoReconnect` | Media API 401/403 (token without `sell.inventory` or expired); refused before any listing call | none |
+| `ebay.draftSync.videoTooLarge` | video over 150 MB (157,286,400 bytes) | none |
+| `ebay.draftSync.videoFileMissing` | the staged video file is gone from the upload dir | none |
 
 ### Legacy eBay listings (`EBAY_LEGACY_LISTING`)
 

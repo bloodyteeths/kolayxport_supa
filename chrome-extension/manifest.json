@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "KolayXport — Etsy, eBay & Amazon Research Tool",
-  "version": "9.10.1",
-  "description": "Research overlays for Etsy, eBay & Amazon (tracked sales, SEO, competition) plus Etsy order sync and tracking entry for KolayXport.",
+  "name": "KolayXport — Etsy, eBay, Amazon & Trendyol Research Tool",
+  "version": "9.11.1",
+  "description": "Research overlays for Etsy, eBay, Amazon & Trendyol (tracked sales, SEO, competition) plus Etsy order sync and tracking entry for KolayXport.",
   "author": "Kolayxport",
   "icons": {
     "16": "icons/icon-16.png",
@@ -30,7 +30,8 @@
     "https://www.amazon.com/*",
     "https://www.amazon.com.tr/*",
     "https://www.amazon.de/*",
-    "https://www.amazon.co.uk/*"
+    "https://www.amazon.co.uk/*",
+    "https://www.trendyol.com/*"
   ],
   "content_scripts": [
     {
@@ -122,6 +123,17 @@
         "src/content-amazon-shared.js",
         "src/content-amazon-search.js",
         "src/content-amazon-listing.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://www.trendyol.com/sr*"
+      ],
+      "js": [
+        "src/lib/lang.js",
+        "src/content-trendyol-search.js"
       ],
       "run_at": "document_idle",
       "all_frames": false

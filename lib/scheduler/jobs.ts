@@ -22,6 +22,7 @@ const MINUTE = 60_000;
  *  send-scheduled-drafts   every 5 min   lib/drafts/scheduledSend (HTTP fallback: /api/cron/send-scheduled-drafts)
  *  research-snapshots      daily 06:00   lib/research/watchAdapter (HTTP fallback: /api/cron/research-snapshots)
  *  research-cache-prune    daily 04:10   delete expired ResearchCache rows
+ *  research-market-index   daily 05:20   lib/research/marketIndex (re-snapshot searched niches → measured sales)
  *  research-ebay-items     daily 06:30   lib/research/ebayItemTracker (eBay seller/item watches: EbayPriceSnapshot)
  *  arbitrage-index-refresh every 6 h     lib/arbitrage/indexRefresh (Price gap: Trendyol/eBay indexes + AI matches)
  * Loaded lazily so the draft services are not imported when the scheduler module loads.
@@ -35,6 +36,18 @@ const listingsGridJobs: ScheduledJob[] = [
     run: async (ctx) => {
       const { scheduledSendJob } = await import('@/lib/drafts/scheduledSend');
       return scheduledSendJob.run(ctx);
+    },
+  },
+  {
+    // Market index (lib/research/marketIndex): re-snapshot the listing sets Product finder showed sales for in the
+    // last 14 days, so the next search of a niche gets measured sales instead of estimates. Stops at the Etsy budget.
+    name: 'research-market-index',
+    dailyAtUtc: '05:20',
+    timeoutMs: 40 * MINUTE,
+    maxAttemptsPerBucket: 1,
+    run: async ({ signal }) => {
+      const { runMarketIndex } = await import('@/lib/research/marketIndex');
+      return runMarketIndex(signal);
     },
   },
   {

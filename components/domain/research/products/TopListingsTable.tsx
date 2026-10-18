@@ -15,6 +15,7 @@ import { neutral } from '@/lib/ds/tokens';
 import type { ActionSpec } from '@/components/ds/page';
 import type { ResearchMkt, SourceNoteProps, TopListing } from '@/lib/research/types';
 import { PRODUCT_SORTS, type ProductSort } from '@/lib/research/hooks/useResearchProducts';
+import { displayRevenue, type ListingSales } from '@/lib/research/hooks/useListingSales';
 import { MKT_NAME } from '../ResearchLayout';
 import { ApiSourceNote } from './ApiSourceNote';
 
@@ -29,6 +30,9 @@ export type TopListingsTableProps = {
   onOpen: (row: TopListing) => void;
   onStartFrom: (row: TopListing) => void;
   loading?: boolean;
+  /** Estimated monthly sales per listing id (Etsy; /api/research/sales). Absent = no sales columns. */
+  sales?: Record<string, ListingSales>;
+  salesLoading?: boolean;
 };
 
 /** Pure: compact age from days ("12 d", "5 mo", "2 y"); null = "—". */
@@ -39,7 +43,7 @@ export function ageParts(days: number | null): { unit: 'days' | 'months' | 'year
   return { unit: 'years', count: Math.floor(days / 365.25) };
 }
 
-export function TopListingsTable({ rows, mkt, total, source, sort, onSortChange, onOpen, onStartFrom, loading }: TopListingsTableProps) {
+export function TopListingsTable({ rows, mkt, total, source, sort, onSortChange, onOpen, onStartFrom, loading, sales, salesLoading }: TopListingsTableProps) {
   const t = useTranslations('research');
   const fmt = useDsFormat();
   const ageText = (d: number | null) => {
@@ -47,6 +51,40 @@ export function TopListingsTable({ rows, mkt, total, source, sort, onSortChange,
     return a ? t(`top.age.${a.unit}`, { count: a.count }) : '—';
   };
   const favText = (n: number | null) => (n === null ? '—' : t('top.favoritesAll', { count: fmt.num(n) }));
+
+  const salesText = (r: TopListing): string => {
+    const s = sales?.[r.id];
+    if (!s) return salesLoading ? '…' : '—';
+    if (s.kind === 'pending') return '…';
+    if (s.monthlySales != null && (s.kind === 'measured' || s.kind === 'estimated')) {
+      // Whole sales: "~6/mo" (a fraction reads like false precision); under one a month → "<1".
+      const shown = s.monthlySales < 1 ? '<1' : fmt.num(Math.round(s.monthlySales));
+      return t('top.salesValue', { count: shown, kind: s.kind });
+    }
+    // An upper bound only informs when it is small: "up to 92/mo" on a day-old listing is the shop's total, not a hint.
+    if (s.monthlySalesUpperBound != null && s.monthlySalesUpperBound <= 10) {
+      return t('top.salesUpTo', { count: fmt.num(Math.max(1, Math.ceil(s.monthlySalesUpperBound))) });
+    }
+    return '—';
+  };
+  const revenueText = (r: TopListing): string => {
+    const rev = displayRevenue(r, sales?.[r.id]);
+    return rev ? fmt.money(rev.amount, rev.currency, { approx: true }) : sales?.[r.id] || !salesLoading ? '—' : '…';
+  };
+  const salesColumns: Column<TopListing>[] = sales
+    ? [
+        { key: 'sales', header: t('top.col.sales'), width: 130, align: 'right', render: salesText, mobileRender: (r) => t('top.salesCard', { value: salesText(r) }), mobile: 'subtitle' },
+        { key: 'revenue', header: t('top.col.revenue'), width: 120, align: 'right', render: revenueText, mobile: 'meta' },
+      ]
+    : [];
+
+  // Trendyol: the marketplace's own signals instead of our estimates (order badge "100+", ratings count).
+  const trendyolColumns: Column<TopListing>[] = mkt === 'trendyol'
+    ? [
+        { key: 'orders', header: t('top.col.orders'), width: 120, align: 'right', render: (r) => r.orderBadge ? t('top.ordersBadge', { badge: r.orderBadge }) : '—', mobile: 'subtitle' },
+        { key: 'ratings', header: t('top.col.ratings'), width: 110, align: 'right', render: (r) => (r.ratingCount != null ? fmt.num(r.ratingCount) : '—'), mobile: 'meta' },
+      ]
+    : [];
 
   const columns: Column<TopListing>[] = [
     { key: 'thumb', header: '', type: 'thumb', width: 64, value: (r) => r.thumbUrl, thumbAlt: () => '', mobile: 'media' },
@@ -61,7 +99,9 @@ export function TopListingsTable({ rows, mkt, total, source, sort, onSortChange,
       ),
       mobile: 'title',
     },
-    { key: 'price', header: t('top.col.price'), type: 'money', width: 110, value: (r) => r.price?.amount ?? null, currency: (r) => r.price?.currency, mobile: 'subtitle' },
+    { key: 'price', header: t('top.col.price'), type: 'money', width: 110, value: (r) => r.priceConverted?.amount ?? r.price?.amount ?? null, currency: (r) => r.priceConverted?.currency ?? r.price?.currency, mobile: 'subtitle' },
+    ...salesColumns,
+    ...trendyolColumns,
     {
       key: 'favorites',
       header: t('top.col.favorites'),

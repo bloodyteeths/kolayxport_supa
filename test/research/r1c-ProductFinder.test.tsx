@@ -114,7 +114,12 @@ describe('Product finder states', () => {
   it('results: evidence, four cards, buyer words, top listings, source notes; robust median, no "avg"', async () => {
     router.query = { q: 'halloween decor' };
     const view = renderPage();
-    await waitFor(() => expect(screen.getByTestId('research-cards')).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId('research-answer')).toBeTruthy());
+    // The decision first: score + plain verdict + tiles; the analyst cards sit under "Show details".
+    expect(screen.getByTestId('research-answer-price').textContent).toContain('$38.00');
+    expect(screen.queryByTestId('research-cards')).toBeNull();
+    fireEvent.click(screen.getByTestId('research-details-toggle'));
+    expect(screen.getByTestId('research-cards')).toBeTruthy();
     expect(screen.getByText('Most sell between $24.00 and $58.00 (median $38.00)')).toBeTruthy();
     expect(screen.getByTestId('research-card-price').textContent).toContain('$38.00');
     expect(screen.getByTestId('research-products-source').textContent).toMatch(/287 of 300 listings used · 13 excluded/);
@@ -130,7 +135,7 @@ describe('Product finder states', () => {
     renderPage();
     await waitFor(() => expect(screen.getByTestId('research-budget')).toBeTruthy());
     expect(screen.getByText("Showing cached results: Etsy's daily limit is close")).toBeTruthy();
-    expect(screen.getByTestId('research-cards')).toBeTruthy();
+    expect(screen.getByTestId('research-answer')).toBeTruthy();
   });
 
   it('0 results: no-results state with "Try a broader phrase" removing the last word', async () => {
@@ -163,9 +168,10 @@ describe('Product finder states', () => {
   it('TR locale renders Turkish labels', async () => {
     router.query = { q: 'halloween decor' };
     renderPage('tr');
-    await waitFor(() => expect(screen.getByTestId('research-cards')).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId('research-answer')).toBeTruthy());
     expect(screen.getAllByText('Ürün bulucu').length).toBeGreaterThan(0);
-    expect(screen.getByText('Talep sinyali')).toBeTruthy();
+    expect(screen.getByTestId('research-answer-demand').textContent).toContain('Talep');
+    expect(screen.getByText('Detayları göster')).toBeTruthy();
   });
 });
 
@@ -173,7 +179,7 @@ describe('Draft a listing (primary) writes a prefill, never a marketplace', () =
   it('desktop header primary → sessionStorage prefill + creator route (the new editor)', async () => {
     router.query = { q: 'halloween decor' };
     renderPage();
-    await waitFor(() => expect(screen.getByTestId('research-cards')).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId('research-answer')).toBeTruthy());
     fireEvent.click(screen.getByText('Draft a listing'));
     await waitFor(() => expect(router.push).toHaveBeenCalledWith('/app/etsy-listings/new?prefill=session'));
     const prefill = JSON.parse(window.sessionStorage.getItem(LISTING_PREFILL_KEY) ?? '{}');
@@ -186,7 +192,7 @@ describe('Draft a listing (primary) writes a prefill, never a marketplace', () =
     setViewport('mobile');
     router.query = { q: 'halloween decor' };
     renderPage();
-    await waitFor(() => expect(screen.getByTestId('research-cards')).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId('research-answer')).toBeTruthy());
     expect(screen.getAllByText('Draft a listing').length).toBeGreaterThan(0);
     expect(marketplaceWrites()).toEqual([]);
   });
@@ -207,12 +213,13 @@ describe('compare mode', () => {
 });
 
 describe('review fixes', () => {
-  it('Trendyol (not served yet) is an info state, never an error page', async () => {
+  it('Trendyol with no browser snapshot yet: "Search on Trendyol" (extension), never an error page', async () => {
     router.query = { q: 'kolye', mkt: 'trendyol' };
-    productsBody = { data: null, errors: [{ section: 'marketplace', key: 'research.products.trendyolLater' }] };
+    productsBody = { data: null, errors: [{ section: 'marketplace', key: 'research.products.trendyolOpen' }] };
     renderPage();
-    await waitFor(() => expect(screen.getByTestId('research-products-notice')).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId('research-trendyol-open')).toBeTruthy());
     expect(screen.queryByTestId('research-products-error')).toBeNull();
+    expect(screen.getByTestId('research-mkt-trendyol').getAttribute('aria-checked')).toBe('true');
   });
 
   it('budget with nothing cached: one info state, no error, no duplicate banner', async () => {

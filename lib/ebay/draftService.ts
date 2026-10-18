@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { classifyEbayDraftSyncError, EBAY_DRAFT_ERROR } from '@/lib/drafts/syncErrors';
@@ -8,7 +9,8 @@ import { callEbayRateLimited } from '@/lib/integrations/ebayRateLimiter';
 import { sanitizeInventoryItemPayload } from '@/lib/ebay/payloadRules';
 import { EbayDraftError, classifyEbayError } from '@/lib/ebay/draftErrors';
 import { isLegacyEbaySku, legacyEbayItemId } from '@/lib/ebay/legacy';
-import { getLegacyItem, legacyChanges, legacySnapshots, reviseLegacyItem } from '@/lib/ebay/legacyTrading';
+import { getLegacyItem, legacyChanges, legacySnapshots, removeLegacyItemVideo, reviseLegacyItem, setLegacyItemVideo } from '@/lib/ebay/legacyTrading';
+import { EbayMediaError, uploadEbayVideoFile, waitForEbayVideo, type MediaDeps } from '@/lib/ebay/mediaApi';
 import { EMPTY_CANCELLABLE_STATUSES, isEbayDraftEmpty, isEmptyPatchValue, type EmptyDraftOptions } from '@/lib/drafts/emptyDraft';
 import {
   DEFAULT_MARKETPLACE,
@@ -18,12 +20,15 @@ import {
   computeEbayDiff,
   dropRejectedKeys,
   findCreateAction,
+  imageMediaOnly,
   isEmptyPatch,
   mergeJson,
   mergeQueuedActions,
   normalizeSellerSku,
   removeActions,
+  videoIntent,
   withHtmlDescriptions,
+  withVideo,
   type EbayCreateAction,
   type EbayCreateProgress,
   type EbayDiffField,
@@ -192,11 +197,13 @@ export async function getOrCreateDraft(params: {
  * with a reason instead of being staged and failing later. Exported for tests.
  */
 export function legacyStageParams<T extends { inventoryFields?: JsonMap; offerFields?: JsonMap; variationFields?: JsonMap | null; queuedActions?: any[]; media?: Array<JsonMap> }>(params: T): T {
-  if ((params.media && params.media.length) || (params.variationFields && !isEmptyPatch(params.variationFields)) || (params.queuedActions && params.queuedActions.length)) {
+  // A video (Trading ReviseFixedPriceItem VideoDetails) is the one media change a legacy listing takes.
+  const photoMedia = (params.media || []).filter((m) => m?.kind !== 'video');
+  if (photoMedia.length || (params.variationFields && !isEmptyPatch(params.variationFields)) || (params.queuedActions && params.queuedActions.length)) {
     throw new EbayDraftError('LEGACY_UNSUPPORTED_FIELDS', 'Only title, description, price and quantity can be changed for this listing', {
       status: 409,
       key: 'draftSync.legacyUnsupportedFields',
-      params: { fields: params.media?.length ? 'photos' : params.queuedActions?.length ? 'actions' : 'variations' },
+      params: { fields: photoMedia.length ? 'photos' : params.queuedActions?.length ? 'actions' : 'variations' },
     });
   }
   const inv = params.inventoryFields || {};
@@ -481,14 +488,18 @@ export async function syncDraft(draftId: string, userId: string) {
     const marketplaceId = DEFAULT_MARKETPLACE;
     const results: any[] = [];
 
-    // --- Listing created on eBay: Trading API (title, description, price, quantity) ---
+    // --- Video first (Media API upload + wait): a reconnect / too-large refusal stops before anything changes on
+    // eBay; a video eBay is still processing (or rejected) never blocks the rest of the listing. ---
+    const video = await resolveDraftVideo(token, draft, videoTitle(draft));
+
+    // --- Listing created on eBay: Trading API (title, description, price, quantity, video) ---
     if (isLegacyEbaySku(draft.sku)) {
-      return await syncLegacyDraft({ draft, attemptId: attempt.id, token, userId });
+      return await syncLegacyDraft({ draft, attemptId: attempt.id, token, userId, video });
     }
 
     // --- F1: new listing (queued `create`) ---
     if (createAction) {
-      return await syncCreateDraft({ draft, createAction, attemptId: attempt.id, token, marketplaceId });
+      return await syncCreateDraft({ draft, createAction, attemptId: attempt.id, token, marketplaceId, video });
     }
 
     // --- Conflict check ---
@@ -640,9 +651,10 @@ export async function syncDraft(draftId: string, userId: string) {
     }
 
     // --- Process media ops (images live in product.imageUrls on the inventory_item) ---
-    if (draft.media.length > 0) {
+    const imageMedia = imageMediaOnly(draft.media);
+    if (imageMedia.length > 0) {
       const currentInventory = await fetchInventoryItem(token, draft.sku, marketplaceId);
-      const { imageUrls, changed } = applyMediaOps([...(currentInventory?.product?.imageUrls || [])], draft.media);
+      const { imageUrls, changed } = applyMediaOps([...(currentInventory?.product?.imageUrls || [])], imageMedia);
 
       if (changed) {
         const updatedInventory = {
@@ -706,6 +718,16 @@ export async function syncDraft(draftId: string, userId: string) {
       results.push({ step: 'variationPatch', groupKey });
     }
 
+    // --- Video (product.videoIds on the inventory item, or the group's videoIds) ---
+    if (video.kind === 'set' || video.kind === 'remove') {
+      await attachInventoryVideo(token, draft.sku, marketplaceId, video.kind === 'set' ? video.videoId : null);
+      results.push({ step: 'video', ...(video.kind === 'set' ? { videoId: video.videoId } : { removed: true }) });
+    }
+
+    if (video.kind === 'pending' || video.kind === 'rejected') {
+      return await finishWithVideoPending({ draft, attemptId: attempt.id, video, results });
+    }
+
     // --- Success ---
     await prisma.ebayListingDraft.update({
       where: { id: draft.id },
@@ -749,8 +771,9 @@ export function legacyConflicts(base: { inventory: JsonMap; offer: JsonMap }, li
   return out;
 }
 
-async function syncLegacyDraft(input: { draft: any; attemptId: string; token: string; userId: string }) {
+async function syncLegacyDraft(input: { draft: any; attemptId: string; token: string; userId: string; video?: DraftVideoOutcome }) {
   const { draft, attemptId, token, userId } = input;
+  const video = input.video ?? { kind: 'none' as const };
   const itemId = legacyEbayItemId(draft.sku) as string;
   const changes = legacyChanges(draft.inventoryPatch as JsonMap, draft.offerPatch as JsonMap);
   const item = await getLegacyItem(token, itemId);
@@ -766,19 +789,37 @@ async function syncLegacyDraft(input: { draft: any; attemptId: string; token: st
     return { status: 'conflict' as const, draftId: draft.id, code: 'REMOTE_CHANGED', key: 'draftSync.conflict', changedFields: changed };
   }
   const sent = await reviseLegacyItem(token, item, changes);
+  if (video.kind === 'set' || video.kind === 'remove') {
+    if (item.status && item.status !== 'Active') {
+      throw new EbayDraftError('LISTING_ENDED', 'You are not allowed to revise ended listings.', { status: 409, key: 'draftSync.listingEnded' });
+    }
+    if (video.kind === 'set') await setLegacyItemVideo(token, itemId, video.videoId);
+    else if (item.videoId) await removeLegacyItemVideo(token, itemId);
+    sent.push('video');
+  }
+  const actions = [{ step: 'legacyRevise', itemId, fields: sent }];
+  if (video.kind === 'pending' || video.kind === 'rejected') {
+    const r = await finishWithVideoPending({ draft, attemptId, video, results: actions });
+    await updateLegacyCache(userId, draft.sku, changes);
+    return r;
+  }
   await prisma.ebayListingDraft.update({ where: { id: draft.id }, data: { status: 'synced', syncedAt: new Date(), lastSyncError: null } });
-  await prisma.ebayDraftSyncAttempt.update({ where: { id: attemptId }, data: { status: 'success', finishedAt: new Date(), result: { actions: [{ step: 'legacyRevise', itemId, fields: sent }] } } });
-  // The list reads the EbayListing cache: show the sent values right away.
+  await prisma.ebayDraftSyncAttempt.update({ where: { id: attemptId }, data: { status: 'success', finishedAt: new Date(), result: { actions } } });
+  await updateLegacyCache(userId, draft.sku, changes);
+  cleanupDraftMedia(draft.media);
+  return { status: 'success' as const, draftId: draft.id, results: [{ step: 'legacyRevise', fields: sent }] };
+}
+
+/** The list reads the EbayListing cache: show the sent values right away. */
+async function updateLegacyCache(userId: string, sku: string, changes: ReturnType<typeof legacyChanges>) {
   const data: Record<string, unknown> = {};
   if (changes.title !== undefined) data.title = changes.title;
   if (changes.description !== undefined) data.description = changes.description;
   if (changes.price !== undefined) data.priceValue = changes.price.value;
   if (changes.quantity !== undefined) data.quantity = changes.quantity;
   if (Object.keys(data).length) {
-    await prisma.ebayListing.updateMany({ where: { userId, sku: draft.sku }, data }).catch((err: any) => logger.warn('eBay legacy cache update failed', { sku: draft.sku, error: err?.message }));
+    await prisma.ebayListing.updateMany({ where: { userId, sku }, data }).catch((err: any) => logger.warn('eBay legacy cache update failed', { sku, error: err?.message }));
   }
-  cleanupDraftMedia(draft.media);
-  return { status: 'success' as const, draftId: draft.id, results: [{ step: 'legacyRevise', fields: sent }] };
 }
 
 // ---------------------------------------------------------------------------
@@ -844,8 +885,10 @@ async function syncCreateDraft(input: {
   attemptId: string;
   token: string;
   marketplaceId: string;
+  video?: DraftVideoOutcome;
 }) {
   const { draft, createAction, attemptId, token, marketplaceId } = input;
+  const video = input.video ?? { kind: 'none' as const };
   // The eBay SKU: locked once something exists on eBay (progress.sku), else the seller's own SKU, else the
   // draft's generated local key. The row is re-keyed to it only after a successful send, so the editor (which
   // stages by its local key) never loses the draft while a send fails.
@@ -858,6 +901,7 @@ async function syncCreateDraft(input: {
     variationPatch: draft.variationPatch,
     media: draft.media,
     marketplaceId,
+    videoId: video.kind === 'set' ? video.videoId : null,
   });
   if (plan.missing.length) {
     throw new EbayDraftError('CREATE_INCOMPLETE', `Missing before listing on eBay: ${plan.missing.join(', ')}`, {
@@ -1003,6 +1047,33 @@ async function syncCreateDraft(input: {
   }
 
   const mainOfferId = progress.offerIds![ebaySku] || Object.values(progress.offerIds!)[0] || null;
+  if (video.kind === 'pending' || video.kind === 'rejected') {
+    // The listing exists on eBay; only its video is left. The draft becomes an edit draft of the new listing
+    // (create action done, re-keyed to the eBay SKU) holding just the video row, so "Try sending again"
+    // attaches the video once eBay finishes processing it.
+    if (ebaySku !== draft.sku) await prisma.ebayDraftMedia.updateMany({ where: { draftId: draft.id }, data: { sku: ebaySku } });
+    const r = await finishWithVideoPending({
+      draft,
+      attemptId,
+      video,
+      results,
+      attemptExtra: { created: true, progress },
+      draftExtra: {
+        offerId: mainOfferId,
+        listingId: progress.listingId || null,
+        ...(ebaySku !== draft.sku ? { sku: ebaySku } : {}),
+      },
+    });
+    return {
+      ...r,
+      created: true,
+      sku: ebaySku,
+      offerId: mainOfferId,
+      offerIds: progress.offerIds,
+      listingId: progress.listingId || null,
+      published: Boolean(progress.published),
+    };
+  }
   await prisma.ebayListingDraft.update({
     where: { id: draft.id },
     data: {
@@ -1201,8 +1272,220 @@ export async function bulkSyncDrafts(draftIds: string[], userId: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Video (Media API) — staged rows: kind 'video', operation 'upload' (localPath; payload.ebayVideoId once uploaded)
+// or 'delete' (payload.videoId: the listing's current video).
+// ---------------------------------------------------------------------------
+
+export type DraftVideoOutcome =
+  | { kind: 'none' }
+  | { kind: 'set'; videoId: string }
+  | { kind: 'remove' }
+  | { kind: 'pending'; videoId: string; rowId: string }
+  | { kind: 'rejected'; rowId: string; message: string };
+
+function videoTitle(draft: any): string {
+  const t = draft?.inventoryPatch?.product?.title || draft?.baseSnapshotInventory?.product?.title
+    || findCreateAction(draft?.queuedActions)?.payload?.inventory?.product?.title || draft?.sku || '';
+  return String(t);
+}
+
+/**
+ * Uploads the staged video to the Media API (once: the eBay video id is kept on the row) and waits for LIVE.
+ * Still PROCESSING after the wait → `pending` (the next send checks again, no re-upload). BLOCKED /
+ * PROCESSING_FAILED → `rejected` (the row is kept, flagged, so the seller replaces or removes it).
+ * 401/403 → `draftSync.videoReconnect` (the token lacks sell.inventory or expired), thrown before any listing call.
+ */
+export async function resolveDraftVideo(
+  token: string,
+  draft: { id: string; media: Array<{ id: string; kind: string; operation: string; localPath: string | null; payload: any }> },
+  title: string,
+  opts: { timeoutMs?: number; deps?: MediaDeps } = {},
+): Promise<DraftVideoOutcome> {
+  const intent = videoIntent(draft.media);
+  if (!intent) return { kind: 'none' };
+  if (intent.type === 'remove') return { kind: 'remove' };
+  const row = intent.row;
+  const payload = (row.payload && typeof row.payload === 'object' ? row.payload : {}) as JsonMap;
+  if (payload.rejected) return { kind: 'rejected', rowId: row.id, message: String(payload.rejectedMessage || 'rejected') };
+  try {
+    let videoId = typeof payload.ebayVideoId === 'string' && payload.ebayVideoId ? payload.ebayVideoId : null;
+    if (!videoId) {
+      if (!row.localPath || !fs.existsSync(row.localPath)) {
+        throw new EbayDraftError('VIDEO_FILE_MISSING', 'The staged video file is missing; add the video again', { status: 410, key: 'draftSync.videoFileMissing' });
+      }
+      videoId = await uploadEbayVideoFile(token, row.localPath, title, opts.deps);
+      await prisma.ebayDraftMedia.update({ where: { id: row.id }, data: { payload: { ...payload, ebayVideoId: videoId } } });
+    }
+    const waited = await waitForEbayVideo(token, videoId, { timeoutMs: opts.timeoutMs }, opts.deps);
+    return waited.state === 'live' ? { kind: 'set', videoId } : { kind: 'pending', videoId, rowId: row.id };
+  } catch (err) {
+    if (err instanceof EbayMediaError) {
+      if (err.code === 'RECONNECT') {
+        throw new EbayDraftError('VIDEO_RECONNECT', err.message, { status: 403, key: 'draftSync.videoReconnect' });
+      }
+      if (err.code === 'TOO_LARGE') {
+        throw new EbayDraftError('VIDEO_TOO_LARGE', err.message, { status: 422, key: 'draftSync.videoTooLarge' });
+      }
+      if (err.code === 'REJECTED') {
+        await prisma.ebayDraftMedia.update({
+          where: { id: row.id },
+          data: { payload: { ...payload, ebayVideoId: null, rejected: true, rejectedMessage: err.message.slice(0, 300) } },
+        });
+        return { kind: 'rejected', rowId: row.id, message: err.message };
+      }
+    }
+    throw err;
+  }
+}
+
+/**
+ * Sets (videoId) or removes (null) the video of an Inventory API listing: product.videoIds on the inventory
+ * item, or videoIds on the inventory item group when the SKU is a group key (variations). PUT replaces the
+ * whole resource, so the live resource is read first.
+ */
+export async function attachInventoryVideo(token: string, sku: string, marketplaceId: string, videoId: string | null) {
+  let item: any = null;
+  try {
+    item = await fetchInventoryItem(token, sku, marketplaceId);
+  } catch (err: any) {
+    if (!String(err?.message || '').includes('404')) throw err;
+  }
+  if (item && (item.product || item.sku)) {
+    const next = { ...item, product: withVideo(item.product || {}, videoId) };
+    await callEbayRateLimited(`${EBAY_API_BASE}/sell/inventory/v1/inventory_item/${encodeURIComponent(sku)}`, {
+      token, marketplaceId, options: { method: 'PUT', body: JSON.stringify(sanitizeInventoryItemPayload(next)) },
+    });
+    return 'item' as const;
+  }
+  const groupUrl = `${EBAY_API_BASE}/sell/inventory/v1/inventory_item_group/${encodeURIComponent(sku)}`;
+  const group = await callEbayRateLimited<any>(groupUrl, { token, marketplaceId });
+  const { inventoryItemGroupKey: _key, ...body } = group || {};
+  await callEbayRateLimited(groupUrl, { token, marketplaceId, options: { method: 'PUT', body: JSON.stringify(withVideo(body, videoId)) } });
+  return 'group' as const;
+}
+
+/**
+ * Everything but the video reached eBay. The draft keeps only the video row (other rows and patches were sent)
+ * and stays open as `failed` with `ebay.draftSync.videoProcessing` / `videoRejected`, so the editor shows it and
+ * "Try sending again" finishes it (no re-upload while eBay processes). The attempt itself succeeded.
+ */
+async function finishWithVideoPending(input: {
+  draft: any;
+  attemptId: string;
+  video: Extract<DraftVideoOutcome, { kind: 'pending' | 'rejected' }>;
+  results: any[];
+  attemptExtra?: JsonMap;
+  draftExtra?: JsonMap;
+}) {
+  const { draft, attemptId, video, results } = input;
+  const key = video.kind === 'pending' ? 'draftSync.videoProcessing' : 'draftSync.videoRejected';
+  const sentRows = (draft.media as Array<{ id: string; localPath: string | null }>).filter((m) => m.id !== video.rowId);
+  if (sentRows.length) {
+    await prisma.ebayDraftMedia.deleteMany({ where: { draftId: draft.id, id: { in: sentRows.map((m) => m.id) } } });
+    cleanupDraftMedia(sentRows);
+  }
+  await prisma.ebayListingDraft.update({
+    where: { id: draft.id },
+    data: {
+      status: 'failed',
+      lastSyncError: `ebay.${key}`,
+      syncedAt: new Date(),
+      inventoryPatch: {},
+      offerPatch: {},
+      variationPatch: Prisma.DbNull,
+      queuedActions: [],
+      ...(input.draftExtra || {}),
+    },
+  });
+  await prisma.ebayDraftSyncAttempt.update({
+    where: { id: attemptId },
+    data: {
+      status: 'success',
+      finishedAt: new Date(),
+      result: { actions: results, video: video.kind === 'pending' ? 'processing' : 'rejected', ...(input.attemptExtra || {}) } as any,
+    },
+  });
+  return {
+    status: 'success' as const,
+    draftId: draft.id,
+    results,
+    video: { state: video.kind === 'pending' ? 'processing' : 'rejected' },
+    warnings: [{ key: `ebay.${key}` }],
+  };
+}
+
+/** Drops staged media rows of an open draft (undo a staged video / photo) and their files. Never calls eBay. */
+export async function removeDraftMediaRows(draftId: string, userId: string, mediaIds: string[]) {
+  const draft = await prisma.ebayListingDraft.findFirst({ where: { id: draftId, userId } });
+  if (!draft) throw draftNotFound();
+  if (draft.status === 'syncing') {
+    throw new EbayDraftError('DRAFT_SENDING', 'Draft is being sent', { status: 409, key: 'draftSync.draftSyncing' });
+  }
+  if (!OPEN_STATUSES.includes(draft.status)) {
+    throw new EbayDraftError('DRAFT_NOT_EDITABLE', `Draft can't be edited right now (${draft.status})`, {
+      status: 409,
+      key: 'draftSync.draftNotEditable',
+      params: { status: draft.status },
+    });
+  }
+  const rows = await prisma.ebayDraftMedia.findMany({ where: { draftId: draft.id, id: { in: mediaIds } } });
+  if (rows.length) {
+    await prisma.ebayDraftMedia.deleteMany({ where: { draftId: draft.id, id: { in: rows.map((r) => r.id) } } });
+    cleanupDraftMedia(rows);
+  }
+  await cancelDraftIfEmpty(draft.id, userId);
+  return prisma.ebayListingDraft.findUnique({ where: { id: draft.id }, include: DRAFT_INCLUDE });
+}
+
+/**
+ * Stages a video upload from a file already on this server (Video Studio result): copied into the draft's
+ * upload dir. One video per listing: earlier staged video rows (uploads and removals) are dropped.
+ */
+export async function stageDraftVideoFile(params: {
+  userId: string;
+  sku: string;
+  sourcePath: string;
+  filename: string;
+  contentType?: string;
+  payload?: JsonMap;
+  /** A new listing not staged yet: create the draft without reading eBay. */
+  isNew?: boolean;
+}) {
+  const draft = params.isNew
+    ? await getOrCreateDraft({ userId: params.userId, sku: params.sku, isNew: true })
+    : await upsertDraftPatch({ userId: params.userId, sku: params.sku, inventoryFields: {} });
+  if (!draft) throw draftNotFound();
+  const media = await createDraftMediaFile({
+    userId: params.userId,
+    draftId: draft.id,
+    sku: params.sku,
+    kind: 'video',
+    operation: 'upload',
+    tempPath: params.sourcePath,
+    filename: params.filename,
+    contentType: params.contentType,
+    payload: params.payload,
+  });
+  await dropOtherVideoRows(draft.id, media.id);
+  return { draftId: draft.id, media };
+}
+
+/** One staged video per draft: removes every other video row (and its file) once a new upload is staged. */
+export async function dropOtherVideoRows(draftId: string, keepId: string) {
+  const rows = await prisma.ebayDraftMedia.findMany({ where: { draftId, kind: 'video', NOT: { id: keepId } } });
+  if (!rows.length) return;
+  await prisma.ebayDraftMedia.deleteMany({ where: { id: { in: rows.map((r) => r.id) } } });
+  cleanupDraftMedia(rows);
+}
+
+// ---------------------------------------------------------------------------
 // Media file helpers
 // ---------------------------------------------------------------------------
+
+/** Root of staged eBay draft files (photos, videos). */
+export function draftUploadRoot() {
+  return path.resolve(UPLOAD_ROOT);
+}
 
 export function draftUploadDir(userId: string, draftId: string) {
   return path.join(UPLOAD_ROOT, userId, draftId);
@@ -1222,7 +1505,8 @@ export async function createDraftMediaFile(params: {
 }) {
   const dir = draftUploadDir(params.userId, params.draftId);
   await fs.promises.mkdir(dir, { recursive: true });
-  const safeName = `${Date.now()}-${params.filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+  // Random part: two stagings in the same millisecond (a replaced video) must not share (and delete) one file.
+  const safeName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${params.filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
   const target = path.join(dir, safeName);
   await fs.promises.copyFile(params.tempPath, target);
 

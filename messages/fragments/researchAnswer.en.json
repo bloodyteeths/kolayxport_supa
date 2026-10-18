@@ -1,0 +1,83 @@
+{
+  "research": {
+    "answer": {
+      "title": "Short answer",
+      "band": {
+        "good": "Good opportunity",
+        "ok": "Fair opportunity",
+        "hard": "Hard market",
+        "unknown": "Not enough data"
+      },
+      "scoreOf": "opportunity score out of {max}",
+      "signal": "estimated signal",
+      "reason": {
+        "demand": {
+          "high": "Demand is high.",
+          "medium": "Demand is moderate.",
+          "low": "Demand is low."
+        },
+        "competition": {
+          "low": "Few competitors.",
+          "medium": "Competition is moderate.",
+          "high": "Competition is very high."
+        },
+        "newcomersOk": "New shops can still reach the top results.",
+        "newcomersHard": "The top results belong to established shops.",
+        "dominated": "A few big shops hold most of the market.",
+        "price": "Most sell between {low} and {high}."
+      },
+      "tile": {
+        "demand": "Demand",
+        "demandSub": "Google interest, search suggestions and favorites",
+        "price": "Typical price",
+        "priceSub": "Most sell for {low}–{high}",
+        "priceFew": "Not enough listings for a price",
+        "competition": "Competition",
+        "competitionSub": "{count} listings",
+        "newcomers": "New sellers",
+        "newcomersOk": "New shops in the top 48: you can get in",
+        "newcomersHard": "Few new shops in the top 48",
+        "newcomersNa": "Not measurable on this marketplace"
+      },
+      "level": {
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low",
+        "unknown": "Unclear"
+      },
+      "competition": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High"
+      },
+      "usePrice": "Use this price",
+      "why": "How is this score calculated?",
+      "part": {
+        "demand": "Demand ({weight}% weight): {value}/100",
+        "competition": "Competition ({weight}% weight): {value}/100 — falls as listings grow",
+        "newcomers": "New sellers ({weight}% weight): {value}/100 — more new shops at the top is better",
+        "concentration": "Spread-out market ({weight}% weight): {value}/100 — the less the top 5 shops hold, the better",
+        "note": "The score comes from what this search measured; Etsy shares no search volume, so demand is an estimate."
+      },
+      "detailsShow": "Show details",
+      "detailsHide": "Hide details",
+      "market": {
+        "label": "Total sales of the top {count} listings",
+        "sales": "~{count} sales/mo",
+        "revenue": "{amount} revenue/mo",
+        "basis": "Numbers for {counted} of {listed} listings ({measured} measured, the rest estimated). Sales by other sellers are not included.",
+        "loading": "Working out sales…",
+        "few": "Not enough sales data for this search yet. Search again in a few days to see measured sales."
+      }
+    },
+    "top": {
+      "col": {
+        "sales": "Monthly sales",
+        "revenue": "Monthly revenue"
+      },
+      "salesValue": "~{count}/mo {kind, select, measured {· measured} other {· estimate}}",
+      "salesUpTo": "up to {count}/mo",
+      "salesCard": "Sales: {value}"
+    }
+  }
+}

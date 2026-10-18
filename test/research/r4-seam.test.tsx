@@ -92,11 +92,21 @@ afterEach(() => {
 });
 
 describe('Product finder × Price gap seam', () => {
-  it('search mode shows the source segment above the search; picking "From Trendyol" sets ?source=trendyol', async () => {
+  it('Trendyol chip searches Trendyol (?mkt=trendyol); Price gap is its own button (?source=trendyol)', async () => {
     renderPage();
-    await waitFor(() => expect(screen.getByTestId('price-gap-source')).toBeTruthy());
-    expect(screen.getByTestId('research-products-search')).toBeTruthy();
-    fireEvent.click(screen.getByText('From Trendyol'));
+    await waitFor(() => expect(screen.getByTestId('research-mkt-trendyol')).toBeTruthy());
+    expect(screen.queryByTestId('price-gap-source')).toBeNull();
+    fireEvent.click(screen.getByTestId('research-mkt-trendyol'));
+    await waitFor(() => expect(router.replace).toHaveBeenCalled());
+    const last = router.replace.mock.calls.at(-1)?.[0] as { query: Record<string, string> };
+    expect(last.query.mkt).toBe('trendyol');
+    expect(last.query.source).toBeUndefined();
+  });
+
+  it('Pro: the "Price gap" button on Trendyol opens ?source=trendyol', async () => {
+    router.query = { mkt: 'trendyol' };
+    renderPage();
+    fireEvent.click(await screen.findByTestId('research-open-price-gap'));
     await waitFor(() => expect(router.replace).toHaveBeenCalled());
     const last = router.replace.mock.calls.at(-1)?.[0] as { query: Record<string, string> };
     expect(last.query.source).toBe('trendyol');
@@ -118,12 +128,14 @@ describe('Product finder × Price gap seam', () => {
     expect(callsTo('/api/research/price-gap')).toHaveLength(0);
   });
 
-  it('shopify_free: no segment in search mode; by URL a neutral locked state with no Stripe link', async () => {
+  it('shopify_free: no Price gap button in search mode; by URL a neutral locked state with no Stripe link', async () => {
     entitlement = F.shopify();
     renderPage();
     await waitFor(() => expect(callsTo('/api/billing/entitlement').length).toBeGreaterThan(0));
     await act(async () => {});
     expect(screen.queryByTestId('price-gap-source')).toBeNull();
+    // The Trendyol chip is plain research (no plan lock); the Pro "Price gap" button is not offered here.
+    expect(screen.queryByTestId('research-open-price-gap')).toBeNull();
     cleanup();
     router.query = { source: 'trendyol' };
     renderPage();

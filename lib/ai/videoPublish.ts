@@ -1,6 +1,6 @@
 // lib/ai/videoPublish.ts — sends a finished Video Studio video to the seller's listing (SERVER ONLY).
 // Founder 2026-10-17: "add to listing" must not be download-and-upload. Per marketplace:
-//  - eBay: Media API (apim.ebay.com/commerce/media/v1_beta: createVideo → uploadVideo → wait for LIVE), then the
+//  - eBay: Media API (lib/ebay/mediaApi: createVideo → uploadVideo → wait for LIVE), then the
 //    listing: Inventory API `product.videoIds` (eBay shows one video per listing) or, for listings made on eBay
 //    (legacy-<itemId>), Trading ReviseFixedPriceItem VideoDetails.VideoID. Scope sell.inventory.
 //  - Shopify: stagedUploadsCreate (VIDEO) → upload to the staged target → productUpdate(media:) (Shopify processes it).
@@ -14,6 +14,7 @@ import { callEbayRateLimited } from '@/lib/integrations/ebayRateLimiter';
 import { sanitizeInventoryItemPayload } from '@/lib/ebay/payloadRules';
 import { legacyEbayItemId } from '@/lib/ebay/legacy';
 import { setLegacyItemVideo } from '@/lib/ebay/legacyTrading';
+import { EbayMediaError, uploadEbayVideoFile, waitForEbayVideo } from '@/lib/ebay/mediaApi';
 import { getValidAccessToken } from '@/lib/integrations/shopifyClient';
 import { shopifyGraphqlUrl } from '@/lib/integrations/shopifyApiVersion';
 import { createWixClient } from '@/lib/integrations/wixClient';
@@ -37,8 +38,6 @@ export class PublishError extends Error {
   }
 }
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
 /** Signed public URL of a video file (marketplaces fetch it without a session). */
 export function publicVideoUrl(jobId: string, origin?: string): string {
   return `${appBaseUrl(origin)}/api/ai/video/public?${new URLSearchParams({ id: jobId, sig: signImagePath(`video:${jobId}`) })}`;
@@ -46,43 +45,24 @@ export function publicVideoUrl(jobId: string, origin?: string): string {
 
 // ── eBay ─────────────────────────────────────────────────────────────────────────────────────────
 
-const EBAY_MEDIA = 'https://apim.ebay.com/commerce/media/v1_beta';
 const EBAY_API = 'https://api.ebay.com';
-const EBAY_MAX_BYTES = 157_286_400;
 
+/** Media API upload + wait for LIVE (lib/ebay/mediaApi); errors mapped to the studio's publish keys. */
 async function ebayUploadVideo(token: string, file: string, title: string): Promise<string> {
-  const buf = await fs.promises.readFile(file);
-  if (buf.length > EBAY_MAX_BYTES) throw new PublishError('tooLarge', 'eBay videos can be at most 150 MB');
-  const auth = { Authorization: `Bearer ${token}` };
-  const c = await fetch(`${EBAY_MEDIA}/video`, {
-    method: 'POST',
-    headers: { ...auth, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: title.slice(0, 80) || 'Product video', size: buf.length, classification: ['ITEM'] }),
-  });
-  if (c.status !== 201) {
-    const text = await c.text();
-    if (c.status === 401 || c.status === 403) throw new PublishError('reconnect', `eBay createVideo ${c.status}: ${text.slice(0, 200)}`);
-    throw new Error(`eBay createVideo ${c.status}: ${text.slice(0, 300)}`);
-  }
-  const videoId = (c.headers.get('location') || '').split('/').filter(Boolean).pop();
-  if (!videoId) throw new Error('eBay createVideo returned no video id');
-  const u = await fetch(`${EBAY_MEDIA}/video/${encodeURIComponent(videoId)}/upload`, {
-    method: 'POST',
-    headers: { ...auth, 'Content-Type': 'application/octet-stream', 'Content-Length': String(buf.length) },
-    body: buf,
-  });
-  if (!u.ok) throw new Error(`eBay uploadVideo ${u.status}: ${(await u.text()).slice(0, 300)}`);
-  // PENDING_UPLOAD → PROCESSING → LIVE | PROCESSING_FAILED | BLOCKED
-  for (let i = 0; i < 48; i++) {
-    await sleep(5000);
-    const g = await fetch(`${EBAY_MEDIA}/video/${encodeURIComponent(videoId)}`, { headers: auth });
-    const j: any = await g.json().catch(() => null);
-    if (j?.status === 'LIVE') return videoId;
-    if (j?.status === 'BLOCKED' || j?.status === 'PROCESSING_FAILED') {
-      throw new PublishError('rejected', `eBay video ${j.status}: ${JSON.stringify(j.statusMessage ?? '').slice(0, 200)}`);
+  try {
+    const videoId = await uploadEbayVideoFile(token, file, title);
+    // Up to 4 minutes here: the studio sends in the background and polls the job.
+    const r = await waitForEbayVideo(token, videoId, { timeoutMs: 240_000 });
+    if (r.state !== 'live') throw new PublishError('processing', 'eBay is still processing the video');
+    return videoId;
+  } catch (err) {
+    if (err instanceof EbayMediaError) {
+      if (err.code === 'RECONNECT') throw new PublishError('reconnect', err.message);
+      if (err.code === 'TOO_LARGE') throw new PublishError('tooLarge', err.message);
+      if (err.code === 'REJECTED') throw new PublishError('rejected', err.message);
     }
+    throw err;
   }
-  throw new PublishError('processing', 'eBay is still processing the video');
 }
 
 async function publishEbay(userId: string, sku: string, file: string, title: string): Promise<{ remoteId: string }> {

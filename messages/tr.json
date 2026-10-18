@@ -149,7 +149,8 @@
       "tryAgain": "Girişe dön",
       "backHome": "Ana Sayfaya Dön"
     },
-    "loggingOut": "Çıkış yapılıyor…"
+    "loggingOut": "Çıkış yapılıyor…",
+    "signInWithApple": "Apple ile giriş yap"
   },
   "nav": {
     "overview": "Genel Bakış",
@@ -5752,10 +5753,10 @@
       "aiGeneratorTitle": "AI Görsel Oluşturucu",
       "promptLabel": "Ne oluşturmak istiyorsunuz?",
       "promptPlaceholder": "Örneğin: Beyaz arka planda profesyonel ürün fotoğrafı, ahşap bebek oyuncağı",
-      "referenceImageOptional": "Referans Görsel (isteğe bağlı)",
+      "referenceImageOptional": "Referans görseller",
       "uploadFromFile": "Dosyadan Yükle",
       "referenceAlt": "Referans",
-      "orPickExisting": "Veya mevcut görsellerden seç:",
+      "orPickExisting": "İlandaki tüm fotoğraflar referans olarak kullanılır (en fazla 8). Çıkarmak istediğinize dokunun:",
       "refAlt": "Ref {index}",
       "generating": "Oluşturuluyor...",
       "generateImage": "Görsel Oluştur",
@@ -6707,7 +6708,13 @@
       "priceInvalid": "eBay fiyatı kabul etmedi. Fiyatı kontrol edin.",
       "quantityInvalid": "eBay stok adedini kabul etmedi. Stoğu kontrol edin.",
       "legacyUnsupportedFields": "Bu ilan eBay'de oluşturulmuş; KolayXport'tan yalnızca başlık, açıklama, fiyat ve stok değiştirilebilir. Diğer değişiklikleri eBay'de yapın.",
-      "legacyVariationsPriceStock": "Bu ilanın varyasyonları var; fiyat ve stok her varyasyon için eBay'de ayarlanır. Başlık ve açıklama değişiklikleri gönderilebilir."
+      "legacyVariationsPriceStock": "Bu ilanın varyasyonları var; fiyat ve stok her varyasyon için eBay'de ayarlanır. Başlık ve açıklama değişiklikleri gönderilebilir.",
+      "videoProcessing": "İlan gönderildi. eBay videoyu hâlâ işliyor: eklemek için birkaç dakika sonra tekrar gönderin.",
+      "videoRejected": "İlan gönderildi ama eBay videoyu kabul etmedi. Değiştirin veya kaldırın.",
+      "videoReconnect": "Video göndermek için Ayarlar → Bağlantılar'dan eBay'i yeniden bağlayın. eBay'de hiçbir şey değiştirilmedi.",
+      "videoTooLarge": "eBay videoları en fazla 150 MB olabilir.",
+      "videoFileMissing": "Video dosyası bulunamadı. Videoyu tekrar ekleyin.",
+      "videoType": "MP4 veya MOV video kullanın."
     },
     "validation": {
       "variantSkuDuplicate": "Her varyasyonun SKU kodu farklı olmalı",
@@ -11269,7 +11276,8 @@
       "etsy": "Etsy yanıt vermedi",
       "ebay": "eBay'e ulaşılamadı",
       "stale": "Kayıtlı sonuçlar gösteriliyor: son kontrol tamamlanamadı",
-      "generic": "Araştırma sonuçları yüklenemedi"
+      "generic": "Araştırma sonuçları yüklenemedi",
+      "trendyol": "Trendyol verisi okunamadı"
     },
     "mkt": {
       "amazonIneligible": "Amazon araştırması için uygun bir Amazon Associates hesabı gerekir",
@@ -11278,7 +11286,8 @@
       "switchTo": "Pazaryeri: {name}"
     },
     "products": {
-      "trendyolLater": "Trendyol ürün araştırması Fiyat farkı aracıyla gelecek"
+      "trendyolLater": "Trendyol ürün araştırması Fiyat farkı aracıyla gelecek",
+      "trendyolOpen": "Trendyol'da aramak gerekiyor"
     },
     "empty": {
       "products": "Fiyatları, rekabeti ve alıcı kelimelerini görmek için bir fikir arayın",
@@ -11298,7 +11307,8 @@
       "outliers": "olağan dışı fiyatlar",
       "notAvailableEbay": "eBay bu veriyi paylaşmıyor",
       "implausible": "Kontrol edin: olağan dışı fiyat aralığı",
-      "notEnoughSignal": "Yeterli sinyal yok"
+      "notEnoughSignal": "Yeterli sinyal yok",
+      "notAvailableTrendyol": "Trendyol'da ölçülemiyor"
     },
     "demand": {
       "trendsUnavailable": "Google Trends yanıt vermedi",
@@ -11325,7 +11335,8 @@
       "basisNoVolume": "{n} ilan, Etsy arama hacmi paylaşmıyor",
       "basisEbay": "{n} aktif eBay ilanı, eBay satış geçmişi paylaşmıyor",
       "title": "Kanıtlar",
-      "noVolume": "Etsy arama hacmi paylaşmıyor"
+      "noVolume": "Etsy arama hacmi paylaşmıyor",
+      "basisTrendyol": "Trendyol arama sayfasından {n} ürün (tarayıcınızdan)"
     },
     "sourceName": {
       "etsySearch": "Etsy araması",
@@ -11344,7 +11355,8 @@
       "myShopTags": "Mağazanızın etiketleri",
       "rankTracker": "KolayXport sıralama takibi",
       "shopCounters": "Etsy mağaza sayaçları, her gün 06:00 UTC",
-      "priceGap": "Trendyol + eBay ABD fiyat endeksi"
+      "priceGap": "Trendyol + eBay ABD fiyat endeksi",
+      "trendyolSnapshot": "Trendyol araması (tarayıcı)"
     },
     "explain": {
       "failed": "Açıklama düzgün oluşturulamadı",
@@ -11548,7 +11560,11 @@
         "price": "Fiyat",
         "favorites": "Favoriler",
         "age": "Yaş",
-        "shop": "Mağaza"
+        "shop": "Mağaza",
+        "sales": "Aylık satış",
+        "revenue": "Aylık ciro",
+        "orders": "Trendyol sipariş",
+        "ratings": "Değerlendirme"
       },
       "favoritesAll": "{count} (tüm zamanlar)",
       "favoritesCard": "{count} favori (tüm zamanlar)",
@@ -11568,7 +11584,11 @@
       "shopActive": "Aktif ilanlar",
       "shopSince": "Açılış",
       "shopFailed": "Mağaza yüklenemedi",
-      "watchItem": "Bu ürünü izle"
+      "watchItem": "Bu ürünü izle",
+      "salesValue": "~{count}/ay {kind, select, measured {· ölçüldü} other {· tahmin}}",
+      "salesUpTo": "en çok {count}/ay",
+      "salesCard": "Satış: {value}",
+      "ordersBadge": "{badge} sipariş"
     },
     "source": {
       "searchApiOrder": "{marketplace} araması (API sırası, kişiselleştirilmemiş)",
@@ -11971,6 +11991,84 @@
       "refreshIndex": "Fiyatları yenile",
       "indexUpdated": "Fiyatlar güncellendi: {date}",
       "refreshFailed": "Fiyatlar yenilenemedi. Daha sonra tekrar deneyin"
+    },
+    "answer": {
+      "title": "Kısa cevap",
+      "band": {
+        "good": "İyi fırsat",
+        "ok": "Orta fırsat",
+        "hard": "Zor pazar",
+        "unknown": "Yeterli veri yok"
+      },
+      "scoreOf": "{max} üzerinden fırsat puanı",
+      "signal": "tahmini sinyal",
+      "reason": {
+        "demand": {
+          "high": "Talep yüksek.",
+          "medium": "Talep orta seviyede.",
+          "low": "Talep düşük."
+        },
+        "competition": {
+          "low": "Rakip az.",
+          "medium": "Rekabet orta.",
+          "high": "Rekabet çok yüksek."
+        },
+        "newcomersOk": "Yeni açılan dükkanlar da üst sıralara çıkabiliyor.",
+        "newcomersHard": "Üst sıralar eski dükkanların elinde.",
+        "dominated": "Birkaç büyük dükkan pazarın çoğunu tutuyor.",
+        "price": "Çoğu ürün {low}–{high} arasında satılıyor."
+      },
+      "tile": {
+        "demand": "Talep",
+        "demandSub": "Google ilgisi, arama önerileri ve favoriler",
+        "price": "Ortalama fiyat",
+        "priceSub": "Çoğu {low}–{high} arası",
+        "priceFew": "Fiyat için yeterli ilan yok",
+        "competition": "Rekabet",
+        "competitionSub": "{count} ilan",
+        "newcomers": "Yeni satıcılar",
+        "newcomersOk": "İlk 48'de yeni dükkan var: girilebilir",
+        "newcomersHard": "İlk 48'de yeni dükkan az",
+        "newcomersNa": "Bu pazaryerinde ölçülemiyor"
+      },
+      "level": {
+        "high": "Yüksek",
+        "medium": "Orta",
+        "low": "Düşük",
+        "unknown": "Belirsiz"
+      },
+      "competition": {
+        "low": "Az",
+        "medium": "Orta",
+        "high": "Çok"
+      },
+      "usePrice": "Bu fiyatı kullan",
+      "why": "Bu puan nasıl hesaplandı?",
+      "part": {
+        "demand": "Talep (%{weight} ağırlık): {value}/100",
+        "competition": "Rekabet (%{weight} ağırlık): {value}/100 — ilan sayısı arttıkça düşer",
+        "newcomers": "Yeni satıcılar (%{weight} ağırlık): {value}/100 — yeni dükkanlar üstte ne kadar çoksa o kadar iyi",
+        "concentration": "Dağınık pazar (%{weight} ağırlık): {value}/100 — ilk 5 dükkan ne kadar az tutuyorsa o kadar iyi",
+        "note": "Puan, bu aramada ölçtüğümüz verilerden hesaplanır; Etsy arama hacmini paylaşmaz, bu yüzden talep tahminidir."
+      },
+      "detailsShow": "Detayları göster",
+      "detailsHide": "Detayları gizle",
+      "market": {
+        "label": "İlk {count} ilanın toplam satışı",
+        "sales": "~{count} satış/ay",
+        "revenue": "{amount} ciro/ay",
+        "basis": "{listed} ilandan {counted} tanesi için sayı var ({measured} ölçüldü, kalanı tahmin). Diğer satıcıların satışları buna dahil değil.",
+        "loading": "Satışlar hesaplanıyor…",
+        "few": "Bu arama için yeterli satış verisi yok. Birkaç gün içinde aynı aramayı tekrar yaparsanız ölçülmüş satışlar görünür."
+      }
+    },
+    "trendyol": {
+      "openTitle": "Bu Trendyol araması henüz analiz edilmedi",
+      "openBody": "Trendyol aramaları yalnızca tarayıcınızda açılabiliyor. Aramayı Trendyol'da açın; KolayXport eklentisi sayfadaki ürünleri okuyup analizi buraya getirir.",
+      "openCta": "Trendyol'da ara",
+      "needsExtension": "KolayXport Chrome eklentisi gerekir (sürüm 9.11 veya üstü).",
+      "waiting": "Trendyol sekmesi açıldı. Sayfa yüklenince sonuçlar burada görünecek…",
+      "priceGap": "Fiyat farkı: Trendyol → yurt dışı"
     }
   },
   "ds": {
@@ -14600,7 +14698,15 @@
       "unsupported": "MP4, WebM veya MOV dosyası kullanın",
       "tooLarge": "Videolar en fazla 100 MB olabilir",
       "pendingRemoveViaDiscard": "Bu yeni video yalnızca taslağınızda. Kaldırmak için değişiklikleri atın",
-      "confirmRemoveTitle": "Video kaldırılsın mı?"
+      "confirmRemoveTitle": "Video kaldırılsın mı?",
+      "ebayUnsupported": "MP4 veya MOV video kullanın",
+      "ebayTooLarge": "eBay videoları en fazla 150 MB olabilir",
+      "ebayStaged": "Video eklendi. Değişiklikleri gönderdiğinizde eBay'e gider.",
+      "ebayStageFailed": "Video eklenemedi. Tekrar deneyin.",
+      "ebayUploading": "Video ekleniyor…",
+      "ebayProcessing": "eBay bu videoyu hâlâ işliyor. İlana eklemek için birkaç dakika sonra tekrar gönderin.",
+      "ebayRejected": "eBay bu videoyu kabul etmedi. Değiştirin veya kaldırın.",
+      "ebayReconnect": "Video eklemek için Ayarlar → Bağlantılar'dan eBay'i yeniden bağlayın."
     },
     "variations": {
       "ebayReadOnlyHint": "Varyasyon başına fiyat ve stok henüz buradan gönderilemiyor. eBay'de değiştirin",
@@ -16764,7 +16870,9 @@
       "from": "baş (sn)",
       "to": "son (sn)",
       "trimApply": "Uygula",
-      "useEtsy": "Etsy ilanına ekle"
+      "useEtsy": "Etsy ilanına ekle",
+      "useEbay": "eBay ilanına ekle",
+      "useEbayHint": "Video ilana değişiklik olarak eklenir. Değişiklikleri gönderdiğinizde eBay'e gider."
     },
     "delete": "Sil",
     "deleteTitle": "Bu video silinsin mi?",

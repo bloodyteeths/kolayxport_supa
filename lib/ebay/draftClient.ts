@@ -156,13 +156,16 @@ export async function resolveEbayDraft(draftId: string, keep: string[]) {
 export async function stageEbayDraftFile(input: {
   sku: string;
   file: File;
-  kind: 'image';
+  kind: 'image' | 'video';
   operation?: string;
   rank?: number;
   payload?: Record<string, any>;
+  /** A new listing not staged yet (local SKU): the server creates its draft without reading eBay. */
+  isNew?: boolean;
 }) {
   const form = new FormData();
   form.append('sku', input.sku);
+  if (input.isNew) form.append('isNew', '1');
   form.append('file', input.file);
   form.append('kind', input.kind);
   form.append('operation', input.operation || 'upload');
@@ -170,4 +173,40 @@ export async function stageEbayDraftFile(input: {
   if (input.payload) form.append('payload', JSON.stringify(input.payload));
   const res = await fetch('/api/ebay-drafts/media', { method: 'POST', body: form });
   return parseOrThrow(res);
+}
+
+/** Un-stages media rows (a staged video upload / removal) of one draft. Never calls eBay. Returns the draft. */
+export async function removeEbayDraftMedia(draftId: string, mediaIds: string[]) {
+  const res = await fetch(`/api/ebay-drafts/${encodeURIComponent(draftId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ removeMediaIds: mediaIds }),
+  });
+  const data = await parseOrThrow(res);
+  return data.draft;
+}
+
+/** Stages a finished Video Studio video (AiVideoJob id) as this listing's video. Never calls eBay. */
+export async function stageEbayAiVideo(input: { sku: string; jobId: string; isNew?: boolean }) {
+  const res = await fetch('/api/ebay-drafts/video', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sku: input.sku, jobId: input.jobId, isNew: input.isNew === true }),
+  });
+  return parseOrThrow(res);
+}
+
+export interface EbayVideoInfoView {
+  videoId: string;
+  status: string;
+  statusMessage?: string;
+  thumbnailUrl?: string;
+  playUrl?: string;
+}
+
+/** The listing's current eBay video (Media API getVideo): status, thumbnail, playable URL. */
+export async function fetchEbayVideoInfo(videoId: string): Promise<EbayVideoInfoView> {
+  const res = await fetch(`/api/ebay-drafts/video?${new URLSearchParams({ videoId })}`);
+  const data = await parseOrThrow(res);
+  return data.video;
 }

@@ -5,8 +5,8 @@
 //
 // Marketplace = a filter, not a page: `?mkt=` in the URL, remembered per viewer (localStorage `kx.research.mkt`,
 // try/catch), default the first connected of Etsy → eBay → Trendyol → Amazon. Options per tool follow §3.2
-// (hidden options never render; a disabled option carries its reason). Mobile: the shell TopBar owns the title,
-// so the switch moves into ⋯ ("Marketplace: eBay") and the tabs scroll horizontally (the allowed h-scroll).
+// (hidden options never render; a disabled option carries its reason). The picker is always on screen as big chips
+// (MarketChips) on phone and desktop: the old corner FilterButton / mobile ⋯ items hid the choice on phones.
 //
 // The hub is the only research UI: no flag gate, no legacy fallbacks (the old research routes only redirect here,
 // lib/research/legacyRoutes.ts).
@@ -14,14 +14,13 @@ import * as React from 'react';
 import Box from '@mui/material/Box';
 import { useTranslations } from 'next-intl';
 import { Page, PageHeader, type ActionSpec } from '@/components/ds/page';
-import { useIsMobile } from '@/components/ds/page/useViewport';
-import { FilterButton } from '@/components/ds/toolbar/FilterButton';
 import type { FilterOption } from '@/components/ds/toolbar/types';
 import { LogoTile } from '@/components/ds/data/LogoTile';
 import { Tabs } from '@/components/ds/inputs/Tabs';
 import { useConnections } from '@/lib/hooks/useConnections';
 import { urlField, useUrlState } from '@/lib/ds/useUrlState';
 import { RESEARCH_MKTS, isResearchMkt as isMkt, type ResearchMkt } from '@/lib/research/types';
+import { MarketChips } from './MarketChips';
 
 export { RESEARCH_MKTS };
 
@@ -150,7 +149,7 @@ export function useResearchMkt(tab: ResearchTab, ctx: MktEligibilityContext = {}
       RESEARCH_MKTS.filter((m) => mktAvailability(tab, m, { amazonEligible }) !== 'hidden').map((m) => ({
         value: m,
         label: MKT_NAME[m],
-        leading: <LogoTile brand={m} size={16} />,
+        leading: <LogoTile brand={m} size={20} />,
         disabledReason: mktAvailability(tab, m, { amazonEligible }) === 'disabled' ? t('mkt.amazonIneligible') : undefined,
       })),
     [tab, amazonEligible, t],
@@ -170,7 +169,7 @@ export type ResearchLayoutProps = {
   /** The tool's one primary (none on Home). On mobile it goes to the StickyActionBar (state-driven). */
   primaryAction?: ActionSpec;
   secondaryActions?: ActionSpec[];
-  /** Tool overflow (⋯). On mobile the marketplace switch is prepended here. */
+  /** Tool overflow (⋯). */
   overflowActions?: ActionSpec[];
   /** Mobile placement of the primary (default 'sticky'). */
   mobilePrimary?: 'sticky' | 'menu' | 'none';
@@ -192,39 +191,11 @@ export function ResearchLayout({
   'data-testid': testId,
 }: ResearchLayoutProps) {
   const t = useTranslations('research');
-  const mobile = useIsMobile();
   const { mkt, setMkt, options } = market;
   const toolLabel = t(`tabs.${tab}`);
   const title = t('title');
 
   const tabs = RESEARCH_TABS.map((value) => ({ value, label: t(`tabs.${value}`), href: researchToolHref(value, mkt) }));
-
-  const mktSwitch = (
-    <FilterButton
-      label={t('mkt.label')}
-      value={mkt}
-      options={options}
-      required
-      onChange={(v) => {
-        const next = Array.isArray(v) ? v[0] : v;
-        if (next && isMkt(next)) setMkt(next);
-      }}
-      data-testid="research-mkt"
-    />
-  );
-
-  // Mobile (C2 slot rule): no mobileAction; ⋯ holds the marketplace switch and the tool overflow.
-  const mobileMktItems: ActionSpec[] = mobile
-    ? options
-        .filter((o) => o.value !== mkt)
-        .map((o) => ({
-          id: `research-mkt-${o.value}`,
-          label: t('mkt.switchTo', { name: o.label }),
-          onClick: () => isMkt(o.value) && setMkt(o.value),
-          disabled: Boolean(o.disabledReason),
-          disabledReason: o.disabledReason,
-        }))
-    : [];
 
   return (
     <Page
@@ -236,12 +207,12 @@ export function ResearchLayout({
       <PageHeader
         title={title}
         subtitle={tab === 'home' ? t('subtitle') : undefined}
-        actionsSlot={mobile ? undefined : mktSwitch}
         primaryAction={primaryAction}
         secondaryActions={secondaryActions}
-        overflowActions={[...mobileMktItems, ...(overflowActions ?? [])]}
+        overflowActions={overflowActions}
         mobilePrimary={mobilePrimary}
       />
+      <MarketChips value={mkt} options={options} onChange={setMkt} />
       <Box
         sx={{
           position: 'sticky',

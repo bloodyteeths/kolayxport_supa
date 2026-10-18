@@ -21,6 +21,7 @@
 // lib/etsy/seoRules; HTML entities are decoded on the way in (decodeEntities) so "one&#39;s" never reaches a field
 // and is never sent back. Listing content stays English (P5); only the one-line rationale follows the UI locale
 // (the Etsy title API writes its explanation in Turkish, so it is shown only in TR).
+import { AI_MAX_REFERENCE_IMAGES } from '@/lib/ai/referenceImages';
 import { useAiCostsVisible } from '@/components/domain/credits/useCredits';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -1304,7 +1305,8 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
           body: {
             prompt,
             marketplace,
-            reference_image_urls: (o.referenceUrls ?? []).filter((u) => /^https:\/\//.test(u)).slice(0, 3),
+            // Our own relative photo URLs (staged / uploaded) are read from disk by the server; public https too.
+            reference_image_urls: (o.referenceUrls ?? []).filter((u) => /^https:\/\//.test(u) || u.startsWith('/api/')).slice(0, AI_MAX_REFERENCE_IMAGES),
             ...(o.whiteBackground !== undefined ? { white_background: o.whiteBackground } : {}),
           },
         });

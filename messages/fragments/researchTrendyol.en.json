@@ -1,0 +1,34 @@
+{
+  "research": {
+    "trendyol": {
+      "openTitle": "This Trendyol search hasn't been analysed yet",
+      "openBody": "Trendyol searches can only be opened in your browser. Open the search on Trendyol; the KolayXport extension reads the products on the page and brings the analysis here.",
+      "openCta": "Search on Trendyol",
+      "needsExtension": "Needs the KolayXport Chrome extension (version 9.11 or later).",
+      "waiting": "Trendyol tab opened. Results will appear here once the page loads…",
+      "priceGap": "Price gap: Trendyol → abroad"
+    },
+    "evidence": {
+      "basisTrendyol": "{n} products from the Trendyol search page (your browser)"
+    },
+    "guard": {
+      "notAvailableTrendyol": "Not measurable on Trendyol"
+    },
+    "sourceName": {
+      "trendyolSnapshot": "Trendyol search (browser)"
+    },
+    "error": {
+      "trendyol": "Couldn't read Trendyol data"
+    },
+    "products": {
+      "trendyolOpen": "Needs a Trendyol search"
+    },
+    "top": {
+      "col": {
+        "orders": "Trendyol orders",
+        "ratings": "Ratings"
+      },
+      "ordersBadge": "{badge} orders"
+    }
+  }
+}

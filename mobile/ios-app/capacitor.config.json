@@ -1,0 +1,49 @@
+{
+  "appId": "com.kolayxport.app",
+  "appName": "KolayXport",
+  "webDir": "www",
+  "server": {
+    "url": "https://kolayxport.com/app?src=ios",
+    "allowNavigation": [
+      "kolayxport.com",
+      "*.kolayxport.com",
+      "appleid.apple.com",
+      "*.etsy.com",
+      "etsy.com",
+      "*.ebay.com",
+      "*.ebay.co.uk",
+      "*.ebay.de",
+      "signin.ebay.com",
+      "auth.ebay.com",
+      "*.amazon.com",
+      "*.amazon.co.uk",
+      "*.amazon.de",
+      "sellercentral.amazon.com",
+      "sellercentral-europe.amazon.com",
+      "*.myshopify.com",
+      "accounts.shopify.com",
+      "admin.shopify.com",
+      "*.wix.com",
+      "*.wixapis.com"
+    ]
+  },
+  "ios": {
+    "contentInset": "never",
+    "scheme": "KolayXport",
+    "limitsNavigationsToAppBoundDomains": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 800,
+      "backgroundColor": "#F7F8FB",
+      "showSpinner": false
+    },
+    "PushNotifications": {
+      "presentationOptions": [
+        "badge",
+        "sound",
+        "alert"
+      ]
+    }
+  }
+}

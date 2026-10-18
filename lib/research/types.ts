@@ -122,12 +122,21 @@ export interface TopListing {
   url: string | null;
   thumbUrl: string | null;
   price: { amount: number; currency: string } | null;
+  /**
+   * `price` in the search's summary currency (same FX table as the price summary), so a list mixing MAD/£/€/$ reads in
+   * one currency. Null/absent when no rate exists or the price is already in that currency (then `price` is it).
+   */
+  priceConverted?: { amount: number; currency: string } | null;
   /** Lifetime counter, render "(all time)". Etsy: favorites; eBay: null. */
   favorites: number | null;
   /** From `original_creation_timestamp` (never the renew date). Null when unknown. */
   ageDays: number | null;
   shop: { id: string | null; name: string | null; url: string | null };
   tags: string[];
+  /** Trendyol: the marketplace's own order badge as shown ("100+"). */
+  orderBadge?: string | null;
+  /** Trendyol: number of ratings (a sales trace: buyers who rated). */
+  ratingCount?: number | null;
 }
 
 export interface BuyerWord {

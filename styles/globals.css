@@ -40,6 +40,16 @@ body:has([data-testid='app-shell']) {
   padding-bottom: 0;
 }
 
+/* iOS 26 home-screen app added with the old black-translucent status bar: the viewport is one status-bar height
+   short of the screen while the page is shorter than the screen (WebKit 301108), so the fixed tab bar stopped above
+   a dead band and its taps failed. A min-height of screen height on <html> gets the full viewport back; the min()
+   keeps opaque-status-bar phones (top inset 0) at 100%. Installed apps only. */
+@media (display-mode: standalone) {
+  html {
+    min-height: min(100lvh, calc(100% + env(safe-area-inset-top, 0px)));
+  }
+}
+
 /* ─── Legacy utilities (flattened in M0, deleted in M10) ─────────────── */
 
 .glass {

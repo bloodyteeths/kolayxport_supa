@@ -34,7 +34,10 @@ export default function MyDocument({ lang }) {
 
         {/* PWA meta tags */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        {/* Opaque status bar, not black-translucent: iOS 26 lays a translucent home-screen app out one status-bar
+            height short of the screen (WebKit 301108), which left a dead band under the tab bar where taps failed.
+            iOS reads this when the app is added to the home screen; globals.css covers apps added before. */}
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="KolayXport" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="application-name" content="KolayXport" />

@@ -1,6 +1,6 @@
 // components/domain/listing-editor/sections/PhotosSection.tsx — listing-editor §2.1 #1 "Photos & video" (M6 Group C).
 // One photo strip at the top of the editor (Etsy 20, eBay 24): drag / keyboard reorder, drop files anywhere on the
-// strip, staged badges (New, Will be removed, missing alt text), a trailing video tile (Etsy), and the photo panel
+// strip, staged badges (New, Will be removed, missing alt text), a trailing video tile (Etsy, eBay), and the photo panel
 // (large preview, alt text with an inline AI proposal, Make primary, Replace, Remove).
 // Etsy staging stays inside `components/etsy/{ImageManager,VideoUploader}` (embedded mode, same draft calls and
 // mediaSafety rules); eBay pictures stay the `images` field the eBay adapter stages. Nothing here sends anything:
@@ -24,6 +24,7 @@ import type { DraftRow, ListingSectionProps } from '@/lib/listingEditor/types';
 import EtsyImageManager, { type ImageManagerHandle } from '@/components/etsy/ImageManager';
 import VideoUploader, { type VideoUploaderHandle } from '@/components/etsy/VideoUploader';
 import EbayImageManager, { type EbayImageManagerHandle } from '@/components/ebay/ImageManager';
+import EbayVideoUploader, { type EbayVideoStatus, type EbayVideoUploaderHandle } from '@/components/ebay/VideoUploader';
 import { useListingEditor, useRegisterDraftSection } from '../useListingDraft';
 import type { WriteAltText } from './PhotoPanel';
 import { PHOTO_MAX, type EtsyImageLike, type PhotosSummary } from './photosModel';
@@ -34,7 +35,7 @@ export interface PhotosSectionHandle {
   generatePhoto(): void;
   /** Etsy only. */
   pasteLinks(): void;
-  /** Etsy only: opens the video (or the file picker when there is none). */
+  /** Opens the video (or the file picker when there is none). Etsy and eBay. */
   openVideo(): void;
   /** Etsy only: "Write alt text for N" (score fix `ai_alt_text`). */
   writeMissingAlt(): void;
@@ -371,14 +372,38 @@ function asUrlList(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((u): u is string => typeof u === 'string' && u.length > 0) : [];
 }
 
+/** The listing's current eBay video id (Inventory product.videoIds[0]; legacy listings: VideoDetails, same shape). */
+export function ebayRemoteVideoId(raw: unknown): string | null {
+  const ids = (raw as { product?: { videoIds?: unknown } } | null | undefined)?.product?.videoIds;
+  const first = Array.isArray(ids) ? ids.find((v) => typeof v === 'string' && v) : null;
+  return typeof first === 'string' ? first : null;
+}
+
+/** Same-origin editor path the Video Studio returns to with `?aiVideo=<job>` (create: the resumable draft URL). */
+export function ebayStudioReturnPath(mode: 'create' | 'edit', sku: string, draftId: string | null | undefined): string {
+  if (mode === 'create') return draftId ? `/app/ebay-listings/new?draft=${encodeURIComponent(draftId)}` : '/app/ebay-listings/new';
+  return `/app/ebay-listings/${encodeURIComponent(sku)}`;
+}
+
 function EbayPhotos({ id = 'photos', handleRef }: PhotosSectionProps) {
   const t = useTranslations('listingEditor');
   const ed = useListingEditor();
-  const { readOnly, reportFacts, setField, mode, marketplaceName } = ed;
+  const { readOnly, reportFacts, setField, mode, marketplaceName, ctx, reloadDraft, notifyChange, saveNow } = ed;
   const ref = React.useRef<EbayImageManagerHandle | null>(null);
+  const videoRef = React.useRef<EbayVideoUploaderHandle | null>(null);
   const images = asUrlList(ed.view.fields.images);
   const baseline = asUrlList(ed.remote?.images);
   const [summary, setSummary] = React.useState<PhotosSummary | null>(null);
+  const [videoTile, setVideoTile] = React.useState<StripVideo | null>(null);
+  const [videoStatus, setVideoStatus] = React.useState<EbayVideoStatus | null>(null);
+  const router = useRouter();
+  const isMobile = useIsMobile();
+  const sku = ctx.listingId ? String(ctx.listingId) : '';
+  const remoteVideoId = mode === 'edit' ? ebayRemoteVideoId(ed.view.meta.raw) : null;
+  // A listing created on eBay (legacy, Trading API): pictures stay read-only here, the video can change.
+  const legacy = Boolean((ed.view.meta.raw as { isLegacy?: boolean } | undefined)?.isLegacy);
+  const photosReadOnly = readOnly || legacy;
+  const draftId = ed.draft?.id ?? null;
 
   useRegisterDraftSection({
     id: 'photos',
@@ -387,16 +412,66 @@ function EbayPhotos({ id = 'photos', handleRef }: PhotosSectionProps) {
     stage: () => ref.current?.stage() ?? Promise.resolve(),
     changes: () => [{ group: 'photos' }],
   });
+  useRegisterDraftSection({
+    id: 'photos',
+    key: 'photos:video',
+    isDirty: () => videoRef.current?.isDirty() ?? false,
+    stage: () => videoRef.current?.stage() ?? Promise.resolve(),
+    changes: () => [{ group: 'video' }],
+  });
 
+  const hasVideo = Boolean(videoTile && videoTile.staged !== 'delete');
   React.useEffect(() => {
-    if (summary) reportFacts({ images: summary.images, hasVideo: false });
-  }, [summary, reportFacts]);
+    if (summary) reportFacts({ images: summary.images, hasVideo });
+  }, [summary, hasVideo, reportFacts]);
+
+  const afterVideo = React.useCallback(() => {
+    // Video rows live on the draft: re-read it so "Not sent yet" and the change list include the video.
+    void reloadDraft();
+    notifyChange();
+  }, [reloadDraft, notifyChange]);
+
+  // New listing: save the fields first so the draft carries its create action (and the URL its ?draft=).
+  const ensureDraft = React.useCallback(async () => {
+    if (mode !== 'create' || ed.draft) return;
+    await saveNow().catch(() => false);
+    await reloadDraft().catch(() => null);
+  }, [mode, ed.draft, saveNow, reloadDraft]);
+
+  // "Create video" opens the Video Studio with this listing; "Add to the eBay listing" there comes back with
+  // ?aiVideo=<job>, which stages that video here (copied server side) and drops the parameter.
+  const openVideoStudio = React.useCallback(async () => {
+    await ensureDraft();
+    const fresh = mode === 'create' ? (await reloadDraft().catch(() => null))?.id ?? draftId : draftId;
+    const q = new URLSearchParams({
+      mp: 'ebay',
+      listing: sku,
+      title: String(ed.view.fields.title ?? '').slice(0, 140),
+      ret: ebayStudioReturnPath(mode === 'create' ? 'create' : 'edit', sku, fresh),
+    });
+    void router.push(`/app/video-studio?${q}`);
+  }, [ensureDraft, mode, reloadDraft, draftId, sku, ed.view.fields.title, router]);
+
+  const stagedAiVideo = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    const job = typeof router.query.aiVideo === 'string' ? router.query.aiVideo : null;
+    if (!job || !sku || readOnly || stagedAiVideo.current === job || !videoRef.current) return;
+    stagedAiVideo.current = job;
+    void (async () => {
+      try {
+        await videoRef.current?.stageAiVideo(job);
+      } finally {
+        const { aiVideo: _drop, ...rest } = router.query;
+        void router.replace({ pathname: router.pathname, query: rest, hash: 'photos' }, undefined, { shallow: true });
+      }
+    })();
+  }, [router, sku, readOnly]);
 
   React.useImperativeHandle(handleRef, () => ({
     openUpload: () => ref.current?.openUpload(),
     generatePhoto: () => ref.current?.openGenerate(),
     pasteLinks: () => undefined,
-    openVideo: () => undefined,
+    openVideo: () => videoRef.current?.open(),
     writeMissingAlt: () => undefined,
     openPhoto: () => ref.current?.openPhoto(),
   }), []);
@@ -411,6 +486,16 @@ function EbayPhotos({ id = 'photos', handleRef }: PhotosSectionProps) {
     )
     : t('photos.noPhotos', { marketplace: marketplaceName });
 
+  const videoNote = videoStatus?.reconnect
+    ? { text: t('video.ebayReconnect'), color: tone.warning.fg }
+    : videoStatus?.rejected
+      ? { text: t('video.ebayRejected'), color: tone.danger.fg }
+      : videoStatus?.processing
+        ? { text: t('video.ebayProcessing'), color: neutral[600] }
+        : videoStatus?.busy
+          ? { text: t('video.ebayUploading'), color: neutral[600] }
+          : null;
+
   return (
     <Section id={sectionAnchorId(id)} title={t('section.photosEbay')} variant="plain" data-testid="le-section-photos">
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: '12px', minWidth: 0 }}>
@@ -423,19 +508,46 @@ function EbayPhotos({ id = 'photos', handleRef }: PhotosSectionProps) {
           productTitle={String(ed.view.fields.title ?? '')}
           maxImages={PHOTO_MAX.ebay}
           onSummary={setSummary}
-          readOnly={readOnly}
+          readOnly={photosReadOnly}
           emptyMessage={emptyMessage}
+          video={sku ? videoTile : null}
+          onOpenVideo={() => videoRef.current?.open()}
+          onAddVideo={sku && !videoStatus?.busy ? () => videoRef.current?.pick() : undefined}
+          onUndoDeleteVideo={() => videoRef.current?.undoRemove()}
         />
+        {sku ? (
+          <EbayVideoUploader
+            ref={videoRef}
+            sku={sku}
+            remoteVideoId={remoteVideoId}
+            isNew={mode === 'create'}
+            ensureDraft={ensureDraft}
+            onVideoChanged={afterVideo}
+            onTileChange={setVideoTile}
+            onStatus={setVideoStatus}
+            draftVersion={mediaVersion(ed.draft)}
+            readOnly={readOnly}
+            onLocalChange={notifyChange}
+          />
+        ) : null}
+        {videoNote ? (
+          <Box role="status" data-testid="ebay-video-note" sx={{ fontSize: 12, lineHeight: '16px', color: videoNote.color }}>{videoNote.text}</Box>
+        ) : null}
         {mode === 'create' && images.length === 0 ? (
           <Box sx={{ fontSize: 12, color: neutral[500] }}>{t('photos.hintEbay', { max: PHOTO_MAX.ebay })}</Box>
         ) : null}
-        {!readOnly && !full ? (
+        {!readOnly ? (
           <PhotoActions
             primary={[
-              { id: 'choose', anchor: 'photos', label: t('photos.choose'), icon: icons.upload, onClick: () => ref.current?.openUpload() },
-              { id: 'generate', label: t('ai.generatePhoto'), icon: icons.ai, onClick: () => ref.current?.openGenerate() },
+              ...(!full && !legacy ? [{ id: 'choose', anchor: 'photos', label: t('photos.choose'), icon: icons.upload, onClick: () => ref.current?.openUpload() }] : []),
+              ...(!full && !legacy ? [{ id: 'generate', label: t('ai.generatePhoto'), icon: icons.ai, onClick: () => ref.current?.openGenerate() }] : []),
+              ...(sku ? [{ id: 'aiVideo', label: t('aiVideo.open'), icon: icons.video, onClick: () => { void openVideoStudio(); } }] : []),
+              ...(sku && !hasVideo && !isMobile ? [{ id: 'video', label: t('video.add'), icon: icons.video, onClick: () => videoRef.current?.pick() }] : []),
+              // Legacy listing: the strip is read-only (pictures), so the video opens from here.
+              ...(sku && legacy && videoTile ? [{ id: 'openVideo', label: t('video.label'), icon: icons.video, onClick: () => videoRef.current?.open() }] : []),
             ]}
-            more={[]}
+            more={sku && !hasVideo && isMobile ? [{ id: 'video', label: t('video.add'), icon: icons.video, onClick: () => videoRef.current?.pick() }] : []}
+            videoAnchor={Boolean(sku) && !hasVideo}
           />
         ) : null}
       </Box>

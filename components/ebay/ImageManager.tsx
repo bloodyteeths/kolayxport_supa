@@ -20,8 +20,9 @@ import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import ImageIcon from '@mui/icons-material/Image';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import { AI_MAX_REFERENCE_IMAGES } from '@/lib/ai/referenceImages';
 // Embedded mode (listing editor M6, Group C): DS strip + photo panel. The picture list stays a controlled field.
-import { ImageGrid, moveItem } from '@/components/ds/inputs/ImageGrid';
+import { ImageGrid, moveItem, type StripVideo } from '@/components/ds/inputs/ImageGrid';
 import { PhotoPanel } from '@/components/domain/listing-editor/sections/PhotoPanel';
 import { IMAGE_TYPES, summarizeEbayPhotos, type PhotosSummary } from '@/components/domain/listing-editor/sections/photosModel';
 
@@ -44,6 +45,12 @@ interface ImageManagerProps {
   readOnly?: boolean;
   /** Embedded: text of the inline dropzone when there are no photos. */
   emptyMessage?: React.ReactNode;
+  /** Embedded: the listing video as the strip's trailing tile (components/ebay/VideoUploader). */
+  video?: StripVideo | null;
+  onOpenVideo?: () => void;
+  /** Embedded: shows the "Add video" tile when there is no video. */
+  onAddVideo?: () => void;
+  onUndoDeleteVideo?: () => void;
 }
 
 /** Ref handle of the embedded eBay ImageManager (registered by PhotosSection as `photos:images`). */
@@ -72,6 +79,7 @@ const MAX_SIZE = 12 * 1024 * 1024; // 12MB
 
 const ImageManager = forwardRef<EbayImageManagerHandle, ImageManagerProps>(function ImageManager({
   images, onImagesChanged, maxImages = 24, productTitle, embedded = false, baseline, onSummary, readOnly = false, emptyMessage,
+  video, onOpenVideo, onAddVideo, onUndoDeleteVideo,
 }, ref) {
   const t = useTranslations('ebay.imageManager');
   const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null);
@@ -89,7 +97,9 @@ const ImageManager = forwardRef<EbayImageManagerHandle, ImageManagerProps>(funct
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiPreview, setAiPreview] = useState<{ base64: string; mimeType: string } | null>(null);
   const [aiRefImage, setAiRefImage] = useState<{ base64: string; mimeType: string } | null>(null);
-  const [aiRefUrl, setAiRefUrl] = useState<string | null>(null); // URL-based reference (from existing images)
+  // Listing photos the seller took out of the references. Every listing photo is a reference by default, so the
+  // AI keeps the real product instead of drawing one from the prompt alone.
+  const [aiRefExcluded, setAiRefExcluded] = useState<ReadonlySet<string>>(() => new Set());
   const [aiUploading, setAiUploading] = useState(false);
 
   const sortedImages = images || [];
@@ -227,7 +237,7 @@ const ImageManager = forwardRef<EbayImageManagerHandle, ImageManagerProps>(funct
     setAiOpen(true);
     setAiPreview(null);
     setAiRefImage(null);
-    setAiRefUrl(null);
+    setAiRefExcluded(new Set());
     // Auto-fill prompt from product title if available
     if (productTitle && !aiPrompt) {
       setAiPrompt(productTitle);
@@ -268,12 +278,10 @@ const ImageManager = forwardRef<EbayImageManagerHandle, ImageManagerProps>(funct
         prompt: aiPrompt.trim(),
       };
 
-      if (aiRefImage) {
-        body.reference_image = aiRefImage.base64;
-        body.reference_mime_type = aiRefImage.mimeType;
-      } else if (aiRefUrl) {
-        body.reference_image_url = aiRefUrl;
-      }
+      // An uploaded file plus every listing photo still selected (cover first), up to the model's reference limit.
+      if (aiRefImage) body.reference_images = [{ data: aiRefImage.base64, mime_type: aiRefImage.mimeType }];
+      const refUrls = sortedImages.filter((u) => !aiRefExcluded.has(u));
+      if (refUrls.length) body.reference_image_urls = refUrls.slice(0, Math.max(0, AI_MAX_REFERENCE_IMAGES - (aiRefImage ? 1 : 0)));
 
       const res = await fetch('/api/ai/generate-image', {
         method: 'POST',
@@ -394,18 +402,18 @@ const ImageManager = forwardRef<EbayImageManagerHandle, ImageManagerProps>(funct
                 >
                   {t('uploadFromFile')}
                 </Button>
-                {/* Show current reference */}
-                {(aiRefImage || aiRefUrl) && (
+                {/* Uploaded reference */}
+                {aiRefImage && (
                   <>
                     <img
-                      src={aiRefImage ? `data:${aiRefImage.mimeType};base64,${aiRefImage.base64}` : aiRefUrl!}
+                      src={`data:${aiRefImage.mimeType};base64,${aiRefImage.base64}`}
                       alt={t('referenceAlt')}
                       style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 4, border: '2px solid #1976d2' }}
                     />
                     <Button
                       size="small"
                       color="error"
-                      onClick={() => { setAiRefImage(null); setAiRefUrl(null); }}
+                      onClick={() => setAiRefImage(null)}
                       disabled={aiGenerating}
                       sx={{ minWidth: 0, px: 1 }}
                     >
@@ -421,13 +429,22 @@ const ImageManager = forwardRef<EbayImageManagerHandle, ImageManagerProps>(funct
                     {t('orPickExisting')}
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                    {sortedImages.map((imgUrl, idx) => (
+                    {sortedImages.map((imgUrl, idx) => {
+                      const selected = !aiRefExcluded.has(imgUrl);
+                      return (
                       <Box
                         key={idx}
+                        role="checkbox"
+                        aria-checked={selected}
+                        aria-label={t('refAlt', { index: idx + 1 })}
                         onClick={() => {
                           if (aiGenerating) return;
-                          setAiRefImage(null);
-                          setAiRefUrl(imgUrl);
+                          setAiRefExcluded((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(imgUrl)) next.delete(imgUrl);
+                            else next.add(imgUrl);
+                            return next;
+                          });
                         }}
                         sx={{
                           width: 44,
@@ -435,8 +452,8 @@ const ImageManager = forwardRef<EbayImageManagerHandle, ImageManagerProps>(funct
                           borderRadius: 1,
                           overflow: 'hidden',
                           cursor: aiGenerating ? 'default' : 'pointer',
-                          border: aiRefUrl === imgUrl ? '2px solid #1976d2' : '1px solid #ddd',
-                          opacity: aiGenerating ? 0.5 : 1,
+                          border: selected ? '2px solid #1976d2' : '1px solid #ddd',
+                          opacity: aiGenerating ? 0.5 : selected ? 1 : 0.4,
                           transition: 'border 0.15s',
                           '&:hover': aiGenerating ? {} : { borderColor: '#1976d2' },
                         }}
@@ -447,7 +464,8 @@ const ImageManager = forwardRef<EbayImageManagerHandle, ImageManagerProps>(funct
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         />
                       </Box>
-                    ))}
+                      );
+                    })}
                   </Box>
                 </Box>
               )}
@@ -609,6 +627,10 @@ const ImageManager = forwardRef<EbayImageManagerHandle, ImageManagerProps>(funct
           accept={IMAGE_TYPES.join(',')}
           disabled={readOnly || uploading}
           emptyMessage={emptyMessage ?? tLe('photos.noPhotos', { marketplace: 'eBay' })}
+          video={video}
+          onOpenVideo={onOpenVideo}
+          onAddVideo={readOnly ? undefined : onAddVideo}
+          onUndoDeleteVideo={readOnly ? undefined : onUndoDeleteVideo}
         />
         {uploading ? (
           <Box role="status" sx={{ fontSize: 12, lineHeight: '16px', color: 'text.secondary' }}>{t('uploadingProgress', { progress: uploadProgress })}</Box>

@@ -54,6 +54,8 @@ import { rememberSearch } from '../home/recentSearches';
 import { routeResearchSearch, type QuestionKey } from '../home/routeSearch';
 import { ApiSourceNote } from './ApiSourceNote';
 import { EvidenceCard } from './EvidenceCard';
+import { AnswerCard } from './AnswerCard';
+import { marketTotals, useListingSales } from '@/lib/research/hooks/useListingSales';
 import { PriceCard } from './PriceCard';
 import { CompetitionCard } from './CompetitionCard';
 import { DemandCard } from './DemandCard';
@@ -64,7 +66,8 @@ import { TopListingPanel } from './TopListingPanel';
 import { ComparePanel } from './ComparePanel';
 import { SeedChips } from './SeedChips';
 import { StageToListingModal, type StageMode } from './StageToListingModal';
-import { PriceGap, PriceGapSourceSegment, usePriceGapSource } from './PriceGapTable';
+import { PriceGap, usePriceGapSource } from './PriceGapTable';
+import { useFeatureAction } from '@/lib/billing/useFeatureAction';
 
 export const COUNTRIES = ['US', 'GB', 'DE', 'CA', 'AU', 'FR'] as const;
 export const COMPARE_MAX = 3;
@@ -160,6 +163,8 @@ export type ProductFinderProps = {
   amazonEligible?: boolean;
 };
 
+const EMPTY_TOP: TopListing[] = [];
+
 export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {}) {
   const t = useTranslations('research');
   const root = useTranslations();
@@ -167,11 +172,27 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
   const router = useRouter();
   const toast = useToast();
   const mobile = useIsMobile();
-  const market = useResearchMkt('products', { amazonEligible });
-  const { mkt } = market;
+  const baseMarket = useResearchMkt('products', { amazonEligible });
   const [url, setUrl] = useUrlState(PRODUCTS_SCHEMA);
   const [source, setSource] = usePriceGapSource();
+  // Trendyol is a marketplace chip: Product finder researches Trendyol from the extension's browser snapshot
+  // (Trendyol blocks our servers). The Price gap view (Trendyol → eBay/Etsy, Pro) is one button away
+  // (`?source=trendyol`), shown with Trendyol selected.
   const priceGap = source === 'trendyol';
+  // Price gap is Pro: its button follows useFeatureAction('arbitrage').visible (never offered when not visible).
+  const arbitrage = useFeatureAction('arbitrage');
+  const market = React.useMemo(
+    () => ({
+      ...baseMarket,
+      mkt: priceGap ? ('trendyol' as const) : baseMarket.mkt,
+      setMkt: (m: Parameters<typeof baseMarket.setMkt>[0]) => {
+        if (source === 'trendyol') setSource('search');
+        baseMarket.setMkt(m);
+      },
+    }),
+    [baseMarket, priceGap, source, setSource, arbitrage.visible],
+  );
+  const { mkt } = market;
   const q = url.q?.trim() ?? '';
   const compareList = parseCompare(url.compare);
   const comparing = compareList.length >= 2;
@@ -187,12 +208,29 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
   const [stageMode, setStageMode] = React.useState<StageMode | null>(null);
   const [openRow, setOpenRow] = React.useState<TopListing | null>(null);
   const [hint, setHint] = React.useState<QuestionKey | null>(null);
+  /** Trendyol search opened in another tab: re-check for the extension's snapshot. */
+  const [trendyolWaiting, setTrendyolWaiting] = React.useState(false);
+  /** The analyst cards (evidence, price band, competition, demand inputs, newcomers) under the answer card. */
+  const [detailsOpen, setDetailsOpen] = React.useState(false);
 
   const params = !priceGap && !comparing && q && !amazonBlocked ? { q, mkt, country: url.country, sort: url.sort as ProductSort } : null;
   const result = useResearchProducts(params);
   const compare = useResearchCompare(!priceGap && comparing && !amazonBlocked ? compareList : [], { mkt, country: url.country });
   const data = result.data;
   const ready = Boolean(data) && (result.region.state === 'ready' || result.region.state === 'stale');
+  const waitingForSnapshot = mkt === 'trendyol' && result.notice?.key === 'research.products.trendyolOpen';
+  React.useEffect(() => {
+    if (!waitingForSnapshot || !trendyolWaiting) return undefined;
+    const id = window.setInterval(() => result.region.retry?.(), 4000);
+    const stop = window.setTimeout(() => setTrendyolWaiting(false), 3 * 60_000);
+    return () => { window.clearInterval(id); window.clearTimeout(stop); };
+  }, [waitingForSnapshot, trendyolWaiting, result.region]);
+  // Estimated monthly sales for the top listings (Etsy), loaded after the result so the answer shows first.
+  const salesState = useListingSales(mkt, !priceGap && !comparing && ready && data ? data.top : EMPTY_TOP);
+  const marketSales = React.useMemo(() => {
+    if (!data || mkt !== 'etsy') return undefined;
+    return { ...marketTotals(data.top, salesState.sales), loading: salesState.loading, listed: data.top.length };
+  }, [data, mkt, salesState.sales, salesState.loading]);
 
   // `#price` from the "What price should I charge?" chip: scroll once the card exists.
   React.useEffect(() => {
@@ -331,12 +369,15 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
   // ── toolbar ────────────────────────────────────────────────────────────────────────────────────────
   const countryOptions = COUNTRIES.map((c) => ({ value: c, label: c }));
   const searchPrimary = !ready || comparing;
-  const sourceSegment = <PriceGapSourceSegment value={source} onChange={setSource} size={mobile ? 'md' : 'sm'} />;
-  const toolbar = priceGap ? (
-    <Box sx={{ mb: '12px' }}>{sourceSegment}</Box>
-  ) : (
+  const toolbar = priceGap ? null : (
     <Box sx={{ mb: '12px' }}>
-      <Box sx={{ mb: '8px', '&:empty': { display: 'none' } }}>{sourceSegment}</Box>
+      {mkt === 'trendyol' && arbitrage.visible ? (
+        <Box sx={{ mb: '8px' }}>
+          <Button variant="ghost" size="sm" icon={icons.research} onClick={() => setSource('trendyol')} data-testid="research-open-price-gap">
+            {t('trendyol.priceGap')}
+          </Button>
+        </Box>
+      ) : null}
       <Box
         component="form"
         role="search"
@@ -461,6 +502,27 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
         </Box>
       </EmptyState>
     );
+  } else if (result.notice?.key === 'research.products.trendyolOpen') {
+    // Trendyol blocks servers: the seller's browser opens the search, the extension posts the page's data and this
+    // page re-checks every few seconds (useTrendyolSnapshotPoll) until the answer is there.
+    body = (
+      <EmptyState
+        kind="first-use"
+        brand="trendyol"
+        title={t('trendyol.openTitle')}
+        body={t('trendyol.openBody')}
+        action={{
+          id: 'trendyol-open',
+          label: t('trendyol.openCta'),
+          onClick: () => {
+            window.open(`https://www.trendyol.com/sr?q=${encodeURIComponent(q)}&kx=1`, '_blank', 'noopener');
+            setTrendyolWaiting(true);
+          },
+        }}
+        footnote={trendyolWaiting ? t('trendyol.waiting') : t('trendyol.needsExtension')}
+        data-testid="research-trendyol-open"
+      />
+    );
   } else if (result.notice) {
     // Marketplace not served yet / budget with nothing cached: an info state, never an error page (§3.2).
     const n = result.notice;
@@ -513,6 +575,14 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
             <ErrorState variant="stale" staleSince={new Date(r.fetchedAt)} onRetry={result.region.retry} />
           </Box>
         ) : null}
+        <AnswerCard result={r} market={marketSales} onUsePrice={stageMkt ? (amount, currency) => setStageMode({ kind: 'price', amount, currency }) : undefined} />
+        <Box sx={{ mb: '16px' }}>
+          <Button variant="ghost" size="sm" onClick={() => setDetailsOpen((v) => !v)} aria-expanded={detailsOpen} data-testid="research-details-toggle">
+            {detailsOpen ? t('answer.detailsHide') : t('answer.detailsShow')}
+          </Button>
+        </Box>
+        {detailsOpen ? (
+        <>
         <Box sx={{ mb: '12px' }}>
           <ApiSourceNote source={result.source} data-testid="research-products-source" />
         </Box>
@@ -539,6 +609,8 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
             </Typography>
           ) : null;
         })}
+        </>
+        ) : null}
         {mkt === 'etsy' && r.buyerWords.length ? (
           <BuyerWordsCard
             words={r.buyerWords}
@@ -555,6 +627,8 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
           onOpen={setOpenRow}
           onStartFrom={startFrom}
           loading={result.isValidating && !ready}
+          sales={mkt === 'etsy' ? salesState.sales : undefined}
+          salesLoading={salesState.loading}
         />
       </>
     );

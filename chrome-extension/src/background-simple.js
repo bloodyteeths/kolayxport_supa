@@ -242,6 +242,13 @@ async function handleMessage(request, sender, sendResponse) {
       return;
     }
 
+    // --- Trendyol / marketplace search snapshot (the page the seller is browsing; Trendyol blocks servers) ---
+    if (request.type === 'kx_market_snapshot') {
+      const r = await apiFetch('/api/research/snapshot', { method: 'POST', body: request.params || {} });
+      sendResponse(r.ok ? r.data : { error: errorOf(r, 'snapshot_failed'), status: r.status });
+      return;
+    }
+
     // --- eBay research ---
     if (request.type === 'kx_ebay_research') {
       const params = request.params || {};

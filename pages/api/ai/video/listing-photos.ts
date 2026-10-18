@@ -36,7 +36,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       photos = (data?.results ?? []).map((img: any) => ({ id: String(img.listing_image_id), src: img.url_570xN || img.url_fullxfull, fullSrc: img.url_fullxfull || img.url_570xN }));
     } else if (mp === 'ebay') {
       const row = await prisma.ebayListing.findFirst({ where: { userId: user.id, sku: id }, select: { imageUrls: true, imageUrl: true } });
-      const urls = row?.imageUrls?.length ? row.imageUrls : row?.imageUrl ? [row.imageUrl] : [];
+      let urls = row?.imageUrls?.length ? row.imageUrls : row?.imageUrl ? [row.imageUrl] : [];
+      if (!urls.length) {
+        // A new listing (local SKU, not on eBay yet): its photos are the open draft's staged picture URLs.
+        const draft = await prisma.ebayListingDraft.findFirst({
+          where: { userId: user.id, sku: id, status: { in: ['draft', 'failed', 'conflict'] } },
+          orderBy: { updatedAt: 'desc' },
+          select: { inventoryPatch: true },
+        });
+        const staged = (draft?.inventoryPatch as { product?: { imageUrls?: unknown } } | null)?.product?.imageUrls;
+        urls = Array.isArray(staged) ? staged.filter((u): u is string => typeof u === 'string') : [];
+      }
       photos = urls.map((u, i) => ({ id: String(i), src: u, fullSrc: u }));
     } else if (mp === 'shopify') {
       const row = await prisma.shopifyProduct.findFirst({ where: { userId: user.id, shopifyProductId: id }, select: { images: true } });

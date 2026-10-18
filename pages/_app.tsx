@@ -15,6 +15,7 @@ import CookieConsent from '@/components/CookieConsent';
 import { captureAttribution, track } from '@/lib/tracking/events';
 import { isShellRoute } from '@/lib/nav/shellRoutes';
 import { markPlayClient } from '@/lib/billing/playClient';
+import { installIosBridge } from '@/lib/nativeApp/iosBridge';
 
 // The app's provider tree is a separate chunk: marketing pages never load it. In production it is
 // server-rendered and Next preloads the chunk before hydration. `next dev` (Turbopack) neither preloads it
@@ -57,7 +58,11 @@ if (typeof window !== 'undefined') {
 }
 
 // Before the first render: a Google Play app launch (/app?src=play) hides all purchasing (lib/billing/playClient.ts).
-if (typeof window !== 'undefined') markPlayClient();
+if (typeof window !== 'undefined') {
+  markPlayClient();
+  // App Store app: downloads → Share sheet, push registration (lib/nativeApp/iosBridge.ts). No-op elsewhere.
+  installIosBridge();
+}
 
 function MyApp({ Component, pageProps }: AppProps) {
   const router = useRouter();

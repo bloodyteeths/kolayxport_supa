@@ -22,7 +22,10 @@ import {
   isBudgetError, modeTaxonomy, newcomerShare, normalizeQuery, priceSummaryFor, requestLocale, searchEtsy, sha1, toTopListings,
   top5Share, userRateLimit, TOP_N, type EtsySearchItem, type Formatters,
 } from '@/lib/research/etsySearch';
-import { decodeEntities } from '@/lib/research/stats';
+import { buildFxTable, decodeEntities } from '@/lib/research/stats';
+import { convertCurrency } from '@/lib/finance/fx';
+import { readShared } from '@/lib/research/etsySearch';
+import { snapshotKey, snapshotResult, type MarketSnapshot } from '@/lib/research/marketSnapshot';
 import {
   isResearchMkt, type Guarded, type ProductsData, type ProductsResult, type ResearchErrorBody, type ResearchMkt,
   type ResearchResponse, type ResearchSectionError, type SourceNoteProps, type TopListing,
@@ -39,13 +42,31 @@ const no = (reasonKey: string): Guarded<number> => ({ value: null, kind: 'measur
 export function sortTop(top: TopListing[], sort: TopSort): TopListing[] {
   if (sort === 'relevance') return top;
   const s = [...top];
-  const price = (t: TopListing) => t.price?.amount ?? null;
+  const price = (t: TopListing) => t.priceConverted?.amount ?? t.price?.amount ?? null;
   const cmp = (a: number | null, b: number | null, dir: 1 | -1) => (a == null ? 1 : b == null ? -1 : (a - b) * dir);
   if (sort === 'price.asc') s.sort((a, b) => cmp(price(a), price(b), 1));
   if (sort === 'price.desc') s.sort((a, b) => cmp(price(a), price(b), -1));
   if (sort === 'favorites') s.sort((a, b) => cmp(a.favorites, b.favorites, -1));
   if (sort === 'newest') s.sort((a, b) => cmp(a.ageDays, b.ageDays, 1));
   return s;
+}
+
+/** Pure: add `priceConverted` (in `currency`) to listings priced in another currency, from an FX table (1 unit → rate). */
+export function withConvertedPrices(top: TopListing[], currency: string, fx: Record<string, number>): TopListing[] {
+  const target = currency.toUpperCase();
+  return top.map((t) => {
+    if (!t.price) return t;
+    const from = t.price.currency.toUpperCase() === 'TL' ? 'TRY' : t.price.currency.toUpperCase();
+    if (from === target) return t;
+    const rate = fx[from];
+    return { ...t, priceConverted: rate ? { amount: Math.round(t.price.amount * rate * 100) / 100, currency: target } : null };
+  });
+}
+
+/** Converted copies of `top` in the summary currency (best effort: no rate → unchanged). */
+export async function convertTop(top: TopListing[], currency: string): Promise<TopListing[]> {
+  const fx = await buildFxTable(top.map((t) => t.price?.currency), currency, convertCurrency).catch(() => ({}));
+  return withConvertedPrices(top, currency, fx);
 }
 
 /** SourceNote for a price sample: "287 of 300 listings used · 13 excluded (no FX rate)". */
@@ -106,7 +127,7 @@ export async function researchEtsy(
     demand,
     newcomers,
     buyerWords: words,
-    top: sortTop(toTopListings(top, shops, details, nowMs), opts.sort),
+    top: sortTop(await convertTop(toTopListings(top, shops, details, nowMs), price.currency), opts.sort),
     categoryHint: modeTaxonomy(top),
     draftTags: draftTagsFrom(words),
     fetchedAt: served.fetchedAt,
@@ -207,13 +228,37 @@ export async function researchEbay(
     demand,
     newcomers,
     buyerWords: [],
-    top: sortTop(topListings, opts.sort),
+    top: sortTop(await convertTop(topListings, price.currency), opts.sort),
     categoryHint,
     draftTags: [],
     fetchedAt: served.fetchedAt,
     cached: served.cached,
   };
   return { result, source: priceSource('research.sourceName.ebayBrowse', served.fetchedAt, price, items.length), errors };
+}
+
+// ─── Trendyol (from the extension's browser snapshot) ───────────────────────
+
+/** Thrown when no snapshot exists yet: the UI offers "Search on Trendyol" (the extension then captures it). */
+export class NoSnapshotError extends Error {
+  constructor() { super('no_snapshot'); }
+}
+
+export async function researchTrendyol(
+  q: string,
+  opts: { fmt: Formatters },
+): Promise<{ result: ProductsResult; source: SourceNoteProps; errors: ResearchSectionError[] }> {
+  const hit = await readShared<MarketSnapshot>(snapshotKey('trendyol', q));
+  if (!hit) throw new NoSnapshotError();
+  const [trendsMean, autocompleteSources] = await Promise.all([fetchTrendsMean(q), fetchAutocompleteSources(q)]);
+  const demand = demandSignal({ trendsMean, autocompleteSources, engagement: null });
+  const result = snapshotResult(hit.data, {
+    demand,
+    cached: true,
+    evidence: (p) => buildEvidence({ ...p, money: opts.fmt.money, percent: opts.fmt.percent, count: opts.fmt.count, noVolume: true, basisKey: 'research.evidence.basisTrendyol' }),
+  });
+  const errors: ResearchSectionError[] = hit.fresh ? [] : [{ section: 'all', key: 'research.error.stale' }];
+  return { result, source: priceSource('research.sourceName.trendyolSnapshot', hit.fetchedAt, result.price, hit.data.items.length), errors };
 }
 
 // ─── Handler ────────────────────────────────────────────────────────────────
@@ -250,7 +295,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const fmt = formattersFor(requestLocale(req));
 
   if (mkt === 'amazon') return unavailable(res, mkt, 'research.mkt.amazonIneligible');
-  if (mkt === 'trendyol') return unavailable(res, mkt, 'research.products.trendyolLater');
 
   if (!userRateLimit(user.id, 'research:products', 20)) {
     return res.status(429).json({ error: 'rate_limited' } satisfies ResearchErrorBody);
@@ -259,15 +303,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const runs = await Promise.all(queries.map(async (q) => {
       try {
+        if (mkt === 'trendyol') return await researchTrendyol(q, { fmt });
         return mkt === 'ebay'
           ? await researchEbay(q, { country, sort, fmt })
           : await researchEtsy(q, { country, taxonomyId, sort, fmt });
       } catch (err) {
+        if (err instanceof NoSnapshotError) return { noSnapshot: true as const };
         if (isBudgetError(err)) return { budget: true as const };
         throw err;
       }
     }));
-    const done = runs.filter((r): r is Exclude<typeof r, { budget: true }> => !('budget' in r));
+    // Trendyol with no browser snapshot yet: the UI offers "Search on Trendyol" (the extension captures the page).
+    if (mkt === 'trendyol' && runs.every((r) => 'noSnapshot' in r)) return unavailable(res, mkt, 'research.products.trendyolOpen');
+    const done = runs.filter((r): r is Exclude<typeof r, { budget: true } | { noSnapshot: true }> => !('budget' in r) && !('noSnapshot' in r));
     if (done.length === 0) {
       const body: ResearchResponse<ProductsData> = {
         data: null,
@@ -284,7 +332,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json(body);
   } catch (err) {
     logger.error('[research/products] failed', err as Error, { mkt });
-    const key = mkt === 'ebay' ? 'research.error.ebay' : 'research.error.etsy';
+    const key = mkt === 'ebay' ? 'research.error.ebay' : mkt === 'trendyol' ? 'research.error.trendyol' : 'research.error.etsy';
     return res.status(502).json({ error: 'server_error', key } satisfies ResearchErrorBody);
   }
 }

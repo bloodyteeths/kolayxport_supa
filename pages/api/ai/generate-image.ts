@@ -8,6 +8,7 @@ import crypto from 'crypto';
 import { imageCredits } from '@/lib/billing/aiCredits';
 import { isAiBudgetError, isNoCreditsError, refundCredits, spendCredits } from '@/lib/billing/aiCreditsServer';
 import { isReadablePhotoUrl, loadImageForUser } from '@/lib/images/ownImage';
+import { AI_MAX_REFERENCE_IMAGES } from '@/lib/ai/referenceImages';
 
 export const config = {
   api: {
@@ -30,7 +31,9 @@ const SUPPORTED_ASPECT_RATIOS = ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4'
 const MIN_OUTPUT_WIDTH = 2000;
 /** Longest side cap to keep payloads reasonable. */
 const MAX_OUTPUT_SIDE = 3000;
-const MAX_REFERENCE_IMAGES = 3;
+const MAX_REFERENCE_IMAGES = AI_MAX_REFERENCE_IMAGES;
+/** References above this size are shrunk (1600px JPEG) so several photos stay well inside the model's request limit. */
+const REFERENCE_SHRINK_BYTES = 1.5 * 1024 * 1024;
 /**
  * Native output size. '2K' already yields ≥ 2000px width at 4:3 (no upscaling);
  * '4K' is supported by the Gemini 3 image models but is slower/costlier and
@@ -40,6 +43,21 @@ const IMAGE_SIZE = ['1K', '2K', '4K'].includes(process.env.GEMINI_IMAGE_SIZE || 
 const MAX_REFERENCE_BYTES = 8 * 1024 * 1024;
 
 type RefPart = { inlineData: { mimeType: string; data: string } };
+
+/** Large photos are re-encoded to 1600px JPEG: the product stays recognisable and 8 references fit one request. */
+async function shrinkReference(ref: RefPart): Promise<RefPart> {
+  if (ref.inlineData.data.length * 0.75 <= REFERENCE_SHRINK_BYTES) return ref;
+  try {
+    const out = await sharp(Buffer.from(ref.inlineData.data, 'base64'))
+      .rotate()
+      .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 88 })
+      .toBuffer();
+    return { inlineData: { mimeType: 'image/jpeg', data: out.toString('base64') } };
+  } catch {
+    return ref;
+  }
+}
 
 function inlineReference(data: unknown, mimeType: unknown): RefPart | null {
   if (typeof data !== 'string' || !data) return null;
@@ -103,7 +121,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const ai = new GoogleGenAI({ apiKey });
 
-    // Reference images (max 3): inline uploads first, then URLs
+    // Reference images (up to MAX_REFERENCE_IMAGES): inline uploads first, then URLs
     // (e.g. the listing's existing photos, or the previous AI result for a follow-up).
     const parts: any[] = [];
     const inlineRefs: RefPart[] = [];
@@ -126,7 +144,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const img = await loadImageForUser(user.id, u);
       return img && img.data.length <= MAX_REFERENCE_BYTES * 1.4 ? { inlineData: { mimeType: img.mimeType, data: img.data } } : null;
     }))).filter((r): r is RefPart => !!r);
-    parts.push(...inlineRefs.slice(0, MAX_REFERENCE_IMAGES), ...urlRefs);
+    parts.push(...(await Promise.all([...inlineRefs.slice(0, MAX_REFERENCE_IMAGES), ...urlRefs].map(shrinkReference))));
 
     const refCount = parts.length;
     const style = whiteBackground

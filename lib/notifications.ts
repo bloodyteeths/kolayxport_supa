@@ -38,6 +38,7 @@ import { publishLive } from '@/lib/live/publish';
 import { loadNotificationConfigSafe, resolvePrefs, type ResolvedPrefs } from '@/lib/notificationCenter/preferences';
 import { kickDispatcher, OPEN_DELIVERY_STATUSES } from '@/lib/notificationCenter/outbox';
 import { isNotificationGroup, typesInGroup, type NotificationGroup } from '@/lib/notificationCenter/registry';
+import { PUSH_TYPES, hasPushDevice } from '@/lib/notificationCenter/channels/push';
 
 export type NotificationSeverity = 'info' | 'warning' | 'error';
 
@@ -328,6 +329,10 @@ async function afterRaise(
     deliveries.push({ notificationId: row.id, channel: 'email', raiseSeq, status: prefs.emailMode === 'digest' ? 'digest' : 'pending' });
   }
   if (prefs.telegram) deliveries.push({ notificationId: row.id, channel: 'telegram', raiseSeq, status: 'pending' });
+  // App Store app push (channels/push.ts): urgent types only, while the type is on in-app.
+  if (prefs.inApp && PUSH_TYPES.has(String(row.type)) && (await hasPushDevice(userId).catch(() => false))) {
+    deliveries.push({ notificationId: row.id, channel: 'push', raiseSeq, status: 'pending' });
+  }
   if (deliveries.length) {
     try {
       // A first raise (raiseSeq 0) has no earlier deliveries: skip the extra queries.

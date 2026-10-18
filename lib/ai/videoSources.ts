@@ -151,8 +151,42 @@ async function plainEdgeColour(buf: Buffer, padded: 'horizontal' | 'vertical'): 
   return far ? null : { r, g, b };
 }
 
-/** Fits a photo into a w×h box: a small shape difference is cropped (subject kept), a big one is padded. */
-async function fitBox(buf: Buffer, bw: number, bh: number): Promise<Buffer> {
+/**
+ * Fills the padded sides of a frame with a real continuation of the photo's scene (AI outpaint), given the padded frame
+ * and its aspect. Returns null when it could not (the blurred padding is kept).
+ */
+export type FrameExtender = (padded: VideoMedia, aspect: string) => Promise<VideoMedia | null>;
+
+/** Reduced w:h ratio string for the image model ('1:1', '4:5', '9:16', '16:9' …). Pure. */
+export function aspectLabel(w: number, h: number): string {
+  const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
+  const g = gcd(w, h);
+  return `${w / g}:${h / g}`;
+}
+
+/** The photo with its edges facing the padding faded out over `feather` px (alpha), so it blends into an extension. */
+async function feathered(fg: Buffer, sides: 'horizontal' | 'vertical', feather: number): Promise<Buffer> {
+  const { data, info } = await sharp(fg).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width: w, height: h } = info;
+  const out = Buffer.alloc(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const d = sides === 'vertical' ? Math.min(x, w - 1 - x) : Math.min(y, h - 1 - y);
+      const i = (y * w + x) * 3;
+      const o = (y * w + x) * 4;
+      out[o] = data[i]; out[o + 1] = data[i + 1]; out[o + 2] = data[i + 2];
+      out[o + 3] = d >= feather ? 255 : Math.round((255 * d) / feather);
+    }
+  }
+  return sharp(out, { raw: { width: w, height: h, channels: 4 } }).png().toBuffer();
+}
+
+/**
+ * Fits a photo into a w×h box: a small shape difference is cropped (subject kept), a big one is padded — with the
+ * photo's own plain background colour, else (with `extend`) a real continuation of its scene, else a blurred copy.
+ * The photo itself is always laid back over an AI extension pixel for pixel, so the product cannot change.
+ */
+async function fitBox(buf: Buffer, bw: number, bh: number, extend?: FrameExtender): Promise<Buffer> {
   const meta = await sharp(buf).metadata();
   const ratio = (meta.width ?? bw) / (meta.height ?? bh);
   const target = bw / bh;
@@ -160,28 +194,42 @@ async function fitBox(buf: Buffer, bw: number, bh: number): Promise<Buffer> {
   if (loss <= 0.15) return sharp(buf).resize(bw, bh, { fit: 'cover', position: sharp.strategy.attention }).png().toBuffer();
   const fg = await sharp(buf).resize(bw, bh, { fit: 'inside' }).toBuffer();
   // A plain studio background (very common for product photos) is extended with its own colour — seamless.
-  // Anything else sits on a soft, blurred copy of itself.
-  const edge = await plainEdgeColour(buf, ratio > target ? 'horizontal' : 'vertical');
-  const bg = edge
-    ? await sharp({ create: { width: bw, height: bh, channels: 3, background: edge } }).png().toBuffer()
-    : await sharp(buf).resize(bw, bh, { fit: 'cover' }).blur(40).modulate({ brightness: 1.03 }).toBuffer();
-  return sharp(bg).composite([{ input: fg, gravity: 'center' }]).png().toBuffer();
+  const sides = ratio > target ? 'horizontal' : 'vertical';
+  const edge = await plainEdgeColour(buf, sides);
+  if (edge) {
+    const bg = await sharp({ create: { width: bw, height: bh, channels: 3, background: edge } }).png().toBuffer();
+    return sharp(bg).composite([{ input: fg, gravity: 'center' }]).png().toBuffer();
+  }
+  // Anything else: blurred copy behind, then (when possible) the AI continues the real scene into those sides —
+  // blurred side bars look fake (the quality check flagged "blurred vertical borders" on production).
+  const blurBg = await sharp(buf).resize(bw, bh, { fit: 'cover' }).blur(40).modulate({ brightness: 1.03 }).toBuffer();
+  const padded = await sharp(blurBg).composite([{ input: fg, gravity: 'center' }]).png().toBuffer();
+  if (!extend) return padded;
+  try {
+    const ext = await extend({ data: padded.toString('base64'), mimeType: 'image/png' }, aspectLabel(bw, bh));
+    if (!ext) return padded;
+    const bg = await sharp(Buffer.from(ext.data, 'base64')).resize(bw, bh, { fit: 'fill' }).removeAlpha().png().toBuffer();
+    const feather = Math.max(8, Math.round(Math.min(bw, bh) * 0.02));
+    return sharp(bg).composite([{ input: await feathered(fg, sides, feather), gravity: 'center' }]).png().toBuffer();
+  } catch {
+    return padded;
+  }
 }
 
 /**
  * An anchor frame shaped like the video (9:16 / 16:9). Veo pads a photo of another shape with black bars (and then
  * animates them — a camera-app screen appeared on production). A small difference is cropped (the subject kept by
  * sharp's attention strategy); when a crop would cut more than 15 % of the product, the photo sits whole on its own
- * plain background colour or a soft, blurred copy of itself.
+ * plain background colour, or on an AI continuation of its scene (`opts.extend`), or a soft, blurred copy of itself.
  * With a square / 4:5 final `format` (a centre crop after generation) the photo is fitted into that centre box, so a
  * tall product is never cut by the crop (a statue lost its head and base on production).
  */
-export async function fitToAspect(m: VideoMedia, aspect: '9:16' | '16:9', format?: string): Promise<VideoMedia> {
+export async function fitToAspect(m: VideoMedia, aspect: '9:16' | '16:9', format?: string, opts: { extend?: FrameExtender } = {}): Promise<VideoMedia> {
   const [W, H] = aspect === '9:16' ? [1080, 1920] : [1920, 1080];
   const [bw, bh] = format === '1:1' ? [Math.min(W, H), Math.min(W, H)] : format === '4:5' ? (aspect === '9:16' ? [1080, 1350] : [864, 1080]) : [W, H];
   try {
     const buf = await sharp(Buffer.from(m.data, 'base64')).rotate().toBuffer();
-    const box = await fitBox(buf, bw, bh);
+    const box = await fitBox(buf, bw, bh, opts.extend);
     let out: Buffer;
     if (bw === W && bh === H) out = await sharp(box).jpeg({ quality: 92 }).toBuffer();
     else {

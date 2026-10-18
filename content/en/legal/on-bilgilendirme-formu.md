@@ -26,7 +26,7 @@ The consumer rights in this form apply to individuals or legal entities who buy 
 | Tax office / no. | [TODO(owner): vergi dairesi] / 6222605496 |
 | Phone | [TODO(owner): telefon] |
 | E-mail | destek@kolayxport.com |
-| Registered e-mail (KEP) | [TODO(owner): KEP adresi] |
+| Registered e-mail (KEP) | modsonsyazilim@hs01.kep.tr |
 | ETBİS registration | [TODO(owner): ETBİS kayıt numarası/durumu] |
 | Website | https://kolayxport.com |
 
@@ -66,7 +66,7 @@ If you do not give this confirmation, or no exception applies, you can send your
 
 - E-mail: destek@kolayxport.com (subject: "Notice of withdrawal")
 - In writing: Beyazevler Mah. 80053 Sok. Tanrıkulu Apt. No:8 İç Kapı No:02, 01170 Çukurova / Adana, Türkiye
-- KEP: [TODO(owner): KEP adresi]
+- KEP: modsonsyazilim@hs01.kep.tr
 
 We refund the total amount you paid within **14 days** of receiving your notice of withdrawal, using the payment method you used and at no cost to you.
 

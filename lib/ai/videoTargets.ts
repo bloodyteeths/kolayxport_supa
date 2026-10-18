@@ -38,6 +38,20 @@ export const VIDEO_TARGET_PROFILES: Record<VideoTarget, VideoTargetProfile> = {
 };
 
 /** Veo generates 16:9 or 9:16; square / 4:5 are centre crops of the matching orientation. Pure. */
+/**
+ * The video shape for a photo of width/height `ratio`: the marketplace's default when it fits the photo (≤15 % would
+ * be cropped), else the allowed shape closest to the photo — a tall 3:4 photo in a square video needs padding at the
+ * sides (it looked fake on production), in a 4:5 one it barely changes. Ties keep the marketplace's order. Pure.
+ */
+export function formatForPhoto(profile: { format: VideoFormat; formats: VideoFormat[] }, ratio: number | null | undefined): VideoFormat {
+  if (!ratio || !Number.isFinite(ratio) || ratio <= 0) return profile.format;
+  const value: Record<VideoFormat, number> = { '1:1': 1, '4:5': 0.8, '9:16': 9 / 16, '16:9': 16 / 9 };
+  const loss = (f: VideoFormat) => (ratio > value[f] ? 1 - value[f] / ratio : 1 - ratio / value[f]);
+  if (loss(profile.format) <= 0.15) return profile.format;
+  const order = [profile.format, ...profile.formats.filter((f) => f !== profile.format)];
+  return order.reduce((best, f) => (loss(f) < loss(best) - 0.01 ? f : best), order[0]);
+}
+
 export function generationAspect(format: VideoFormat, sourceLandscape: boolean): '9:16' | '16:9' {
   if (format === '16:9') return '16:9';
   if (format === '9:16') return '9:16';

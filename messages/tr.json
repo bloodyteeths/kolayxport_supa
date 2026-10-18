@@ -16606,7 +16606,8 @@
       "avoidPlaceholder": "ör. başka ürünler, eller",
       "look": "Görünüm",
       "motionHint": "Hızlı hareket ürün detaylarını değiştirebilir; en doğru sonuç için \"Hafif\".",
-      "sceneNeedsScene": "Ortamı değiştirmek için \"Yeni sahne\"yi seçin; \"Fotoğrafımdan\" fotoğraftaki ortamı korur."
+      "sceneNeedsScene": "Ortamı değiştirmek için \"Yeni sahne\"yi seçin; \"Fotoğrafımdan\" fotoğraftaki ortamı korur.",
+      "promptAiHint": "Bu temel yönergedir. Son metni yapay zekâ, videonun başlayacağı kareye ve ürün fotoğraflarınıza bakarak sizin ürününüz için yazar."
     },
     "expression": {
       "smiling": "Gülümseyen",
@@ -16818,7 +16819,8 @@
       "autoFixShow": "Göster",
       "isAutoFix": "Bu sürüm kalite kontrolünün bulduğu farklara göre otomatik düzeltildi (ücretsiz).",
       "autoFixSafer": "Ürün bu çekimde fazla değişti: daha güvenli bir çekimle (ürün sabit, kamera yaklaşıyor) otomatik yeniden hazırlanıyor (ücretsiz).",
-      "autoFixNotBetter": "Otomatik düzeltme daha iyi olmadı: en iyi sürüm gösteriliyor. Farklı bir çekim türü deneyebilirsiniz."
+      "autoFixNotBetter": "Otomatik düzeltme daha iyi olmadı: en iyi sürüm gösteriliyor. Farklı bir çekim türü deneyebilirsiniz.",
+      "trimmed": "Sorunlu saniyeler kesildi: {from}–{to} sn kullanıldı ({of} sn içinden)."
     },
     "publish": {
       "button": "{marketplace} ilanına ekle",
@@ -16873,7 +16875,8 @@
       "detail": "Detay",
       "flat": "Serili",
       "other": "Diğer"
-    }
+    },
+    "notesDropped": "Notunuzdan çıkarılanlar:"
   },
   "credits": {
     "title": "AI kredisi al",

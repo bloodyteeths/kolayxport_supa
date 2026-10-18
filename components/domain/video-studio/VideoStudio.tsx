@@ -22,16 +22,18 @@ import {
   BASIC_SCENES, DEFAULT_DIRECTION, UNIVERSAL_PRESETS, VIDEO_AUDIO, VIDEO_CAMERAS, VIDEO_EXPRESSIONS, VIDEO_LIGHTS, VIDEO_LOOKS, VIDEO_MOTIONS,
   directVideo, type VideoDirection,
 } from '@/lib/ai/videoDirector';
-import { VIDEO_TARGETS, VIDEO_TARGET_PROFILES, generationAspect, videoReadiness, type VideoFormat, type VideoTarget } from '@/lib/ai/videoTargets';
+import type { ProductProfile } from '@/lib/ai/videoShots';
+import { VIDEO_TARGETS, VIDEO_TARGET_PROFILES, formatForPhoto, generationAspect, videoReadiness, type VideoFormat, type VideoTarget } from '@/lib/ai/videoTargets';
 import { canAfford, extendCredits, imageCredits, videoCredits } from '@/lib/billing/aiCredits';
 import { showCreditsDialog } from '@/lib/billing/creditsDialogStore';
 import { refreshCredits, useCredits } from '@/components/domain/credits/useCredits';
 import { LIMIT_UI_HEADER } from '@/lib/http/limitInterceptor';
 
-type Photo = { key: string; ref: string; src: string; landscape?: boolean; fromVideo?: boolean };
-type Qa = { status: 'running' | 'done' | 'failed'; match?: number; realism?: number; diffs?: { text: string; fix: string }[]; issues?: { text: string; fix: string }[]; autoFix?: string; autoFixMode?: 'fix' | 'safer' };
+type Photo = { key: string; ref: string; src: string; landscape?: boolean; ratio?: number; fromVideo?: boolean };
+type QaNote = { text: string; fix: string; at?: number };
+type Qa = { status: 'running' | 'done' | 'failed'; match?: number; realism?: number; diffs?: QaNote[]; issues?: QaNote[]; autoFix?: string; autoFixMode?: 'fix' | 'safer'; trimmed?: { from: number; to: number; of: number } };
 type PhotoInfo = { view: 'front' | 'back' | 'side' | 'detail' | 'flat' | 'other'; fullBody: boolean; person: boolean };
-type Ideas = { kind: 'worn' | 'object'; shots: { label: string; hint: string; action: string; showsBack: boolean }[]; scenes: { label: string; prompt: string }[] };
+type Ideas = { kind: 'worn' | 'object'; profile?: ProductProfile; shots: { label: string; hint: string; action: string; showsBack: boolean }[]; scenes: { label: string; prompt: string }[] };
 type Job = {
   id: string; parentId: string | null; groupId: string | null; variantIndex: number; status: 'preparing' | 'running' | 'done' | 'failed';
   mode: string; instruction: string | null; aspectRatio: string; durationSec: number; resolution: string; quality: string;
@@ -254,7 +256,7 @@ export function VideoStudio() {
   const probe = (p: Photo) =>
     new Promise<Photo>((resolve) => {
       const img = new window.Image();
-      img.onload = () => resolve({ ...p, landscape: img.naturalWidth > img.naturalHeight * 1.1 });
+      img.onload = () => resolve({ ...p, landscape: img.naturalWidth > img.naturalHeight * 1.1, ratio: img.naturalHeight ? img.naturalWidth / img.naturalHeight : undefined });
       img.onerror = () => resolve(p);
       img.src = p.src;
     });
@@ -272,6 +274,8 @@ export function VideoStudio() {
       userPicked.current = false;
       userShot.current = false;
       setIdeas(null);
+      // A new product: the old one's profile must not shape this one's video.
+      setDir((d) => ({ ...d, profile: undefined }));
       setStart(probed[0] ?? null);
       setEnd(null);
       setSlot('end');
@@ -357,12 +361,13 @@ export function VideoStudio() {
         setAuto({ start: d.start ?? null, end: d.end ?? null });
         const kind: 'worn' | 'object' = d.product?.kind === 'worn' ? 'worn' : 'object';
         const shots = Array.isArray(d.shots) ? d.shots : [];
-        setIdeas({ kind, shots, scenes: Array.isArray(d.scenes) ? d.scenes : [] });
+        const profile = d.product?.profile && typeof d.product.profile === 'object' ? (d.product.profile as ProductProfile) : undefined;
+        setIdeas({ kind, profile, shots, scenes: Array.isArray(d.scenes) ? d.scenes : [] });
         const anyPerson = d.photos.some((x: any) => x.person);
         setPhotosPerson(anyPerson);
         const person = userPerson.current ? undefined : anyPerson;
         setDir((dd) => {
-          const next = { ...dd, productKind: kind, ...(person === undefined ? {} : { person }) };
+          const next = { ...dd, productKind: kind, profile, ...(person === undefined ? {} : { person }) };
           // Unless the seller chose a shot, start with the best suggestion for this product.
           if (!userShot.current && shots[0]) return { ...next, preset: 'custom', shotText: shots[0].action, showsBack: Boolean(shots[0].showsBack) };
           return next;
@@ -383,15 +388,15 @@ export function VideoStudio() {
   }, [auto, dir.preset, dir.shotText]);
   const autoChosen = Boolean(auto && !userPicked.current && start && start.ref === auto.start);
 
-  const sourceLandscape = ((mode === 'scene' ? photos[0] : start) ?? photos[0])?.landscape ?? false;
+  const source = (mode === 'scene' ? photos[0] : start) ?? photos[0];
+  const sourceLandscape = source?.landscape ?? false;
+  // The video takes the shape closest to the photo (a tall photo in a square video gets padded sides).
   useEffect(() => {
-    if (userFormat.current || !(start ?? photos[0])) return;
-    const wanted = profile.format;
-    const clash = (sourceLandscape && (wanted === '9:16' || wanted === '4:5')) || (!sourceLandscape && wanted === '16:9');
-    const pick = !clash ? wanted : profile.formats.includes('1:1') ? '1:1' : sourceLandscape ? '16:9' : '9:16';
+    if (userFormat.current || !source) return;
+    const pick = formatForPhoto(profile, source.ratio ?? (source.landscape ? 4 / 3 : 3 / 4));
     if (pick !== format) setFormat(pick);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceLandscape, target, start?.key]);
+  }, [source?.key, source?.ratio, target]);
   const effective = useMemo(() => (resolution !== '720p' ? { durationSec: 8 as const, resolution } : { durationSec, resolution }), [durationSec, resolution]);
   const direction: VideoDirection = { ...dir, target, format, ...(addPerson ? { mode: 'scene', person: true, addPerson: true } : { addPerson: undefined }) };
   const promptPreview = useMemo(() => directVideo(direction), [direction]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -544,7 +549,11 @@ export function VideoStudio() {
   const fixes = qa?.status === 'done' ? [...(qa.diffs ?? []), ...(qa.issues ?? [])].map((x) => x.fix).filter(Boolean) : [];
   // The automatic fix the server started after a failed check (stored on the take's first variant).
   const groupMain = cur ? jobs.find((j) => j.id === cur.groupId) ?? cur : null;
-  const autoFixJob = groupMain?.qa?.autoFix ? jobs.find((j) => j.id === groupMain.qa!.autoFix) ?? null : null;
+  const autoFixMain = groupMain?.qa?.autoFix ? jobs.find((j) => j.id === groupMain.qa!.autoFix) ?? null : null;
+  // The automatic retry makes two takes: the better one counts.
+  const autoFixGroup = autoFixMain ? jobs.filter((j) => (j.groupId ?? j.id) === (autoFixMain.groupId ?? autoFixMain.id)) : [];
+  const autoFixJob = autoFixGroup.length ? autoFixGroup.reduce((b, j) => (qaScore(j) > qaScore(b) ? j : b), autoFixMain!) : autoFixMain;
+  const autoFixChecked = autoFixGroup.length > 0 && autoFixGroup.every((j) => j.status === 'failed' || j.qa?.status === 'done' || j.qa?.status === 'failed');
   const autoFixDone = useRef<Set<string>>(new Set());
   // When every variant of a take is checked, show the best one (unless the seller picked a variant).
   const pickedVariant = useRef<Set<string>>(new Set());
@@ -558,7 +567,7 @@ export function VideoStudio() {
   // The fixed version is shown only when its check says it is better than the take's best variant.
   const takeBest = groupMain ? jobs.filter((j) => j.groupId === groupMain.groupId).reduce((b, j) => Math.max(b, qaScore(j)), -1) : -1;
   const fixBetter = Boolean(autoFixJob && autoFixJob.qa?.status === 'done' && qaScore(autoFixJob) > takeBest);
-  const fixWorse = Boolean(autoFixJob && (autoFixJob.qa?.status === 'done' || autoFixJob.qa?.status === 'failed') && !fixBetter);
+  const fixWorse = Boolean(autoFixJob && autoFixChecked && !fixBetter);
   useEffect(() => {
     if (!autoFixJob || !fixBetter || autoFixDone.current.has(autoFixJob.id)) return;
     autoFixDone.current.add(autoFixJob.id);
@@ -768,6 +777,7 @@ export function VideoStudio() {
                 {showPrompt ? t('output.hidePrompt') : t('output.showPrompt')}
               </Box>
               {showPrompt ? <Box component="pre" sx={{ m: 0, p: '10px', bgcolor: n[50], borderRadius: '8px', fontSize: 12, lineHeight: '18px', whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: n[700] }}>{promptPreview}</Box> : null}
+              {showPrompt ? <Box sx={{ fontSize: 12, color: n[500] }}>{t('director.promptAiHint')}</Box> : null}
             </Block>
           ) : null}
 
@@ -834,6 +844,9 @@ export function VideoStudio() {
             {cur && cur.status === 'done' && qa ? (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px', p: '10px', borderRadius: '8px', bgcolor: n[50], border: `1px solid ${n[200]}` }} data-testid="video-qa">
                 <Box sx={{ fontSize: 13, fontWeight: 600, color: n[800] }}>{t('qa.title')}</Box>
+                {Array.isArray((cur?.direction as any)?.notesDropped) && (cur?.direction as any).notesDropped.length ? (
+                  <Box sx={{ fontSize: 12, color: n[600] }}><b>{t('notesDropped')}</b>{((cur?.direction as any).notesDropped as string[]).map((x) => <Box key={x}>• {x}</Box>)}</Box>
+                ) : null}
                 {qa.status === 'running' ? <Box sx={{ fontSize: 12, color: n[600] }}>{t('qa.running')}</Box> : null}
                 {qa.status === 'failed' ? <Box sx={{ fontSize: 12, color: n[500] }}>{t('qa.failed')}</Box> : null}
                 {qa.status === 'done' ? (
@@ -842,8 +855,9 @@ export function VideoStudio() {
                       <ScorePill label={t('qa.match')} value={qa.match} />
                       <ScorePill label={t('qa.realism')} value={qa.realism} />
                     </Box>
-                    {qa.diffs?.length ? <Box sx={{ fontSize: 12, color: n[700] }}><b>{t('qa.diffs')}</b>{qa.diffs.map((d) => <Box key={d.text}>• {d.text}</Box>)}</Box> : null}
-                    {qa.issues?.length ? <Box sx={{ fontSize: 12, color: n[700] }}><b>{t('qa.issues')}</b>{qa.issues.map((d) => <Box key={d.text}>• {d.text}</Box>)}</Box> : null}
+                    {qa.trimmed ? <Box sx={{ fontSize: 12, color: n[600] }}>{t('qa.trimmed', { from: qa.trimmed.from, to: qa.trimmed.to, of: qa.trimmed.of })}</Box> : null}
+                    {qa.diffs?.length ? <Box sx={{ fontSize: 12, color: n[700] }}><b>{t('qa.diffs')}</b>{qa.diffs.map((d) => <Box key={d.text}>• {d.text}{d.at !== undefined ? ` (${d.at} s)` : ''}</Box>)}</Box> : null}
+                    {qa.issues?.length ? <Box sx={{ fontSize: 12, color: n[700] }}><b>{t('qa.issues')}</b>{qa.issues.map((d) => <Box key={d.text}>• {d.text}{d.at !== undefined ? ` (${d.at} s)` : ''}</Box>)}</Box> : null}
                     {!qa.diffs?.length && !qa.issues?.length ? <Box sx={{ fontSize: 12, color: tone.success.fg }}>{t('qa.clean')}</Box> : null}
                     {fixes.length ? (
                       <Button variant="secondary" size="sm" onClick={() => void followUp(`Fix: ${fixes.join('; ')}`.slice(0, 400))} disabled={Boolean(busy)} loading={busy === 'followUp'}>

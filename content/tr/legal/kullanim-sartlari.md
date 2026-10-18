@@ -162,4 +162,4 @@ Bu Şartların bir hükmünün geçersiz sayılması, diğer hükümlerin geçer
 
 Sorularınız için: destek@kolayxport.com
 Yazılı bildirim adresi: MODSONS YAZILIM E-TİCARET İTHALAT İHRACAT LİMİTED ŞİRKETİ, Beyazevler Mah. 80053 Sok. Tanrıkulu Apt. No:8 İç Kapı No:02, 01170 Çukurova / Adana
-KEP: [TODO(owner): KEP adresi]
+KEP: modsonsyazilim@hs01.kep.tr

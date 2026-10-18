@@ -8,7 +8,7 @@
 import type { EffectiveSettings } from '../preferences';
 import type { RenderableNotification } from '../render';
 
-export type ChannelName = 'inApp' | 'email' | 'telegram';
+export type ChannelName = 'inApp' | 'email' | 'telegram' | 'push';
 
 export interface ChannelRecipient {
   userId: string;

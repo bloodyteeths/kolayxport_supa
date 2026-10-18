@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { useTranslations } from 'next-intl';
 import { PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH } from '@/lib/auth/passwordPolicy';
 import { newEventId, readAttribution, track } from '@/lib/tracking/events';
+import { isIosApp } from '@/lib/billing/playClient';
 
 // Policy codes returned by /api/auth/signup (lib/auth/passwordPolicy.ts) that
 // have a localised message under auth.errors.<code>.
@@ -42,6 +43,19 @@ export default function AuthForm() {
   const [resentStatus, setResentStatus] = useState('');
   const router = useRouter();
   const callbackUrl = safeCallbackUrl(router.query.callbackUrl);
+  // Google blocks its sign-in inside embedded iOS WebViews (disallowed_useragent), so the App Store app shows
+  // Sign in with Apple instead (guideline 4.8). Apple shows wherever the server has it configured.
+  const [iosApp, setIosApp] = useState(false);
+  const [appleEnabled, setAppleEnabled] = useState(false);
+  useEffect(() => {
+    setIosApp(isIosApp());
+    let alive = true;
+    fetch('/api/auth/providers')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((p) => { if (alive && p && p.apple) setAppleEnabled(true); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   // Marketing and pricing CTAs link to /login?mode=signup; open the signup form for them.
   const queryMode = Array.isArray(router.query.mode) ? router.query.mode[0] : router.query.mode;
@@ -145,6 +159,18 @@ export default function AuthForm() {
     }
   };
 
+  const handleApple = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      track('start_signup', { method: 'apple', mode: isSignUp ? 'signup' : 'signin' });
+      await signIn('apple', { callbackUrl });
+    } catch {
+      setError(t('errors.signInFailed'));
+      setLoading(false);
+    }
+  };
+
   const handleGoogle = async () => {
     setError('');
     setLoading(true);
@@ -223,14 +249,28 @@ export default function AuthForm() {
         <hr className="flex-1 border-gray-300" />
       </div>
 
-      <button
-        onClick={handleGoogle}
-        className="w-full py-2 bg-white text-gray-700 border border-gray-300 rounded hover:bg-gray-50 transition flex items-center justify-center"
-        disabled={loading}
-      >
-        <img src="/google-icon.png" alt="Google" className="w-5 h-5 mr-2" />
-        {t('signInWithGoogle')}
-      </button>
+      {appleEnabled ? (
+        <button
+          onClick={handleApple}
+          className="mb-3 w-full py-2 bg-black text-white rounded hover:bg-gray-900 transition flex items-center justify-center"
+          disabled={loading}
+          data-testid="signin-apple"
+        >
+          <svg aria-hidden="true" viewBox="0 0 814 1000" className="w-4 h-4 mr-2" fill="currentColor"><path d="M788 341c-6 4-108 62-108 190 0 148 130 200 134 202-1 3-21 72-69 142-43 62-88 124-156 124s-86-40-165-40c-77 0-104 41-167 41s-107-58-157-129C42 788 0 674 0 566 0 393 113 301 224 301c59 0 108 39 145 39 35 0 90-41 157-41 25 0 117 2 177 89zM554 159c28-33 48-79 48-125 0-6-1-13-2-18-45 2-99 30-132 68-26 29-50 75-50 122 0 7 1 14 2 16 3 1 8 2 13 2 41 0 92-27 121-65z"/></svg>
+          {t('signInWithApple')}
+        </button>
+      ) : null}
+
+      {iosApp ? null : (
+        <button
+          onClick={handleGoogle}
+          className="w-full py-2 bg-white text-gray-700 border border-gray-300 rounded hover:bg-gray-50 transition flex items-center justify-center"
+          disabled={loading}
+        >
+          <img src="/google-icon.png" alt="Google" className="w-5 h-5 mr-2" />
+          {t('signInWithGoogle')}
+        </button>
+      )}
 
       <p className="mt-4 text-center text-sm text-gray-600">
         {isSignUp ? t('alreadyHaveAccount') : t('noAccount')}

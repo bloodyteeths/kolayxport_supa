@@ -149,7 +149,8 @@
       "tryAgain": "Girişe dön",
       "backHome": "Ana Sayfaya Dön"
     },
-    "loggingOut": "Çıkış yapılıyor…"
+    "loggingOut": "Çıkış yapılıyor…",
+    "signInWithApple": "Apple ile giriş yap"
   },
   "nav": {
     "overview": "Genel Bakış",

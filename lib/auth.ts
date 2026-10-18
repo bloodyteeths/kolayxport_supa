@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth';
 import { decode, encode } from 'next-auth/jwt';
 import { NextApiRequest, NextApiResponse } from 'next';
 import GoogleProvider from 'next-auth/providers/google';
+import AppleProvider from 'next-auth/providers/apple';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import bcrypt from 'bcryptjs';
@@ -9,6 +10,7 @@ import crypto from 'crypto';
 import prisma from '@/lib/prisma';
 import { credentialsAuthorize } from '@/lib/auth/credentials';
 import { newTrialExpiry } from '@/lib/billing/planLimits';
+import { appleClientSecret, appleConfigured } from '@/lib/auth/appleSecret';
 
 // PrismaAdapter is only needed for OAuth (Google) to auto-create User + Account records.
 // We wrap it to prevent it from interfering with CredentialsProvider sign-in,
@@ -38,7 +40,19 @@ export const authOptions = {
         return credentialsAuthorize(credentials?.email, credentials?.password);
       },
     }),
+    // Sign in with Apple (App Store guideline 4.8). Only when its keys are set (lib/auth/appleSecret.ts).
+    ...(appleConfigured()
+      ? [AppleProvider({ clientId: process.env.APPLE_SERVICES_ID!, clientSecret: appleClientSecret() })]
+      : []),
   ],
+  // Apple answers with a cross-site form POST (response_mode=form_post), which drops SameSite=Lax cookies, so the
+  // short-lived OAuth check cookies are SameSite=None (Secure). Session/CSRF cookies keep NextAuth's defaults.
+  cookies: process.env.NODE_ENV === 'production'
+    ? Object.fromEntries((['pkceCodeVerifier', 'state', 'nonce'] as const).map((k) => [k, {
+        name: `__Secure-next-auth.${k === 'pkceCodeVerifier' ? 'pkce.code_verifier' : k}`,
+        options: { httpOnly: true, sameSite: 'none' as const, path: '/', secure: true, maxAge: 900 },
+      }]))
+    : undefined,
   secret: process.env.NEXTAUTH_SECRET,
   session: {
     strategy: 'jwt' as const,

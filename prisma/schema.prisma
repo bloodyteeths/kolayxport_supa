@@ -86,6 +86,7 @@ model User {
   aiCreditEntries         AiCreditEntry[]
   aiConnections           AiConnection[]
   notificationSettings    NotificationSettings?
+  pushDevices             PushDevice[]
   stockSettings           StockSettings?
   stockItems              StockItem[]
 }
@@ -2552,4 +2553,17 @@ model HepsiburadaUploadBatch {
   @@unique([userId, kind, uploadId])
   @@index([status, createdAt])
   @@index([userId, status])
+}
+
+/// Native app push targets (App Store app: APNs device tokens). lib/push/apns.ts, channel 'push'.
+model PushDevice {
+  id         String   @id @default(cuid())
+  userId     String
+  platform   String // ios
+  token      String   @unique
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

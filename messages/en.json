@@ -149,7 +149,8 @@
       "tryAgain": "Back to sign in",
       "backHome": "Back to home"
     },
-    "loggingOut": "Signing out…"
+    "loggingOut": "Signing out…",
+    "signInWithApple": "Sign in with Apple"
   },
   "nav": {
     "overview": "Overview",

@@ -78,6 +78,14 @@ export function TopListingsTable({ rows, mkt, total, source, sort, onSortChange,
       ]
     : [];
 
+  // Trendyol: the marketplace's own signals instead of our estimates (order badge "100+", ratings count).
+  const trendyolColumns: Column<TopListing>[] = mkt === 'trendyol'
+    ? [
+        { key: 'orders', header: t('top.col.orders'), width: 120, align: 'right', render: (r) => r.orderBadge ? t('top.ordersBadge', { badge: r.orderBadge }) : '—', mobile: 'subtitle' },
+        { key: 'ratings', header: t('top.col.ratings'), width: 110, align: 'right', render: (r) => (r.ratingCount != null ? fmt.num(r.ratingCount) : '—'), mobile: 'meta' },
+      ]
+    : [];
+
   const columns: Column<TopListing>[] = [
     { key: 'thumb', header: '', type: 'thumb', width: 64, value: (r) => r.thumbUrl, thumbAlt: () => '', mobile: 'media' },
     {
@@ -93,6 +101,7 @@ export function TopListingsTable({ rows, mkt, total, source, sort, onSortChange,
     },
     { key: 'price', header: t('top.col.price'), type: 'money', width: 110, value: (r) => r.priceConverted?.amount ?? r.price?.amount ?? null, currency: (r) => r.priceConverted?.currency ?? r.price?.currency, mobile: 'subtitle' },
     ...salesColumns,
+    ...trendyolColumns,
     {
       key: 'favorites',
       header: t('top.col.favorites'),

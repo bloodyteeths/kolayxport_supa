@@ -24,6 +24,8 @@ import {
 } from '@/lib/research/etsySearch';
 import { buildFxTable, decodeEntities } from '@/lib/research/stats';
 import { convertCurrency } from '@/lib/finance/fx';
+import { readShared } from '@/lib/research/etsySearch';
+import { snapshotKey, snapshotResult, type MarketSnapshot } from '@/lib/research/marketSnapshot';
 import {
   isResearchMkt, type Guarded, type ProductsData, type ProductsResult, type ResearchErrorBody, type ResearchMkt,
   type ResearchResponse, type ResearchSectionError, type SourceNoteProps, type TopListing,
@@ -235,6 +237,30 @@ export async function researchEbay(
   return { result, source: priceSource('research.sourceName.ebayBrowse', served.fetchedAt, price, items.length), errors };
 }
 
+// ─── Trendyol (from the extension's browser snapshot) ───────────────────────
+
+/** Thrown when no snapshot exists yet: the UI offers "Search on Trendyol" (the extension then captures it). */
+export class NoSnapshotError extends Error {
+  constructor() { super('no_snapshot'); }
+}
+
+export async function researchTrendyol(
+  q: string,
+  opts: { fmt: Formatters },
+): Promise<{ result: ProductsResult; source: SourceNoteProps; errors: ResearchSectionError[] }> {
+  const hit = await readShared<MarketSnapshot>(snapshotKey('trendyol', q));
+  if (!hit) throw new NoSnapshotError();
+  const [trendsMean, autocompleteSources] = await Promise.all([fetchTrendsMean(q), fetchAutocompleteSources(q)]);
+  const demand = demandSignal({ trendsMean, autocompleteSources, engagement: null });
+  const result = snapshotResult(hit.data, {
+    demand,
+    cached: true,
+    evidence: (p) => buildEvidence({ ...p, money: opts.fmt.money, percent: opts.fmt.percent, count: opts.fmt.count, noVolume: true, basisKey: 'research.evidence.basisTrendyol' }),
+  });
+  const errors: ResearchSectionError[] = hit.fresh ? [] : [{ section: 'all', key: 'research.error.stale' }];
+  return { result, source: priceSource('research.sourceName.trendyolSnapshot', hit.fetchedAt, result.price, hit.data.items.length), errors };
+}
+
 // ─── Handler ────────────────────────────────────────────────────────────────
 
 function unavailable(res: NextApiResponse, mkt: ResearchMkt, key: string) {
@@ -269,7 +295,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const fmt = formattersFor(requestLocale(req));
 
   if (mkt === 'amazon') return unavailable(res, mkt, 'research.mkt.amazonIneligible');
-  if (mkt === 'trendyol') return unavailable(res, mkt, 'research.products.trendyolLater');
 
   if (!userRateLimit(user.id, 'research:products', 20)) {
     return res.status(429).json({ error: 'rate_limited' } satisfies ResearchErrorBody);
@@ -278,15 +303,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const runs = await Promise.all(queries.map(async (q) => {
       try {
+        if (mkt === 'trendyol') return await researchTrendyol(q, { fmt });
         return mkt === 'ebay'
           ? await researchEbay(q, { country, sort, fmt })
           : await researchEtsy(q, { country, taxonomyId, sort, fmt });
       } catch (err) {
+        if (err instanceof NoSnapshotError) return { noSnapshot: true as const };
         if (isBudgetError(err)) return { budget: true as const };
         throw err;
       }
     }));
-    const done = runs.filter((r): r is Exclude<typeof r, { budget: true }> => !('budget' in r));
+    // Trendyol with no browser snapshot yet: the UI offers "Search on Trendyol" (the extension captures the page).
+    if (mkt === 'trendyol' && runs.every((r) => 'noSnapshot' in r)) return unavailable(res, mkt, 'research.products.trendyolOpen');
+    const done = runs.filter((r): r is Exclude<typeof r, { budget: true } | { noSnapshot: true }> => !('budget' in r) && !('noSnapshot' in r));
     if (done.length === 0) {
       const body: ResearchResponse<ProductsData> = {
         data: null,
@@ -303,7 +332,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json(body);
   } catch (err) {
     logger.error('[research/products] failed', err as Error, { mkt });
-    const key = mkt === 'ebay' ? 'research.error.ebay' : 'research.error.etsy';
+    const key = mkt === 'ebay' ? 'research.error.ebay' : mkt === 'trendyol' ? 'research.error.trendyol' : 'research.error.etsy';
     return res.status(502).json({ error: 'server_error', key } satisfies ResearchErrorBody);
   }
 }

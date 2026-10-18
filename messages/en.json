@@ -11276,7 +11276,8 @@
       "etsy": "Etsy didn't respond",
       "ebay": "Couldn't reach eBay",
       "stale": "Showing saved results: the latest check didn't finish",
-      "generic": "Couldn't load research results"
+      "generic": "Couldn't load research results",
+      "trendyol": "Couldn't read Trendyol data"
     },
     "mkt": {
       "amazonIneligible": "Amazon research needs an eligible Amazon Associates account",
@@ -11285,7 +11286,8 @@
       "switchTo": "Marketplace: {name}"
     },
     "products": {
-      "trendyolLater": "Trendyol product research arrives with the Price gap tool"
+      "trendyolLater": "Trendyol product research arrives with the Price gap tool",
+      "trendyolOpen": "Needs a Trendyol search"
     },
     "empty": {
       "products": "Search an idea to see prices, competition and buyer words",
@@ -11305,7 +11307,8 @@
       "outliers": "unusual prices",
       "notAvailableEbay": "eBay doesn't share this",
       "implausible": "Check: unusual price range",
-      "notEnoughSignal": "Not enough signal"
+      "notEnoughSignal": "Not enough signal",
+      "notAvailableTrendyol": "Not measurable on Trendyol"
     },
     "demand": {
       "trendsUnavailable": "Google Trends didn't respond",
@@ -11332,7 +11335,8 @@
       "basisNoVolume": "{n, plural, one {# listing} other {# listings}}, Etsy shares no search volume",
       "basisEbay": "{n, plural, one {# active eBay listing} other {# active eBay listings}}, eBay shares no sold history",
       "title": "Evidence",
-      "noVolume": "Etsy shares no search volume"
+      "noVolume": "Etsy shares no search volume",
+      "basisTrendyol": "{n} products from the Trendyol search page (your browser)"
     },
     "sourceName": {
       "etsySearch": "Etsy search",
@@ -11351,7 +11355,8 @@
       "myShopTags": "Your shop's tags",
       "rankTracker": "KolayXport rank tracker",
       "shopCounters": "Etsy shop counters, daily at 06:00 UTC",
-      "priceGap": "Trendyol + eBay US price index"
+      "priceGap": "Trendyol + eBay US price index",
+      "trendyolSnapshot": "Trendyol search (browser)"
     },
     "explain": {
       "failed": "The explanation didn't come out right",
@@ -11557,7 +11562,9 @@
         "age": "Age",
         "shop": "Shop",
         "sales": "Monthly sales",
-        "revenue": "Monthly revenue"
+        "revenue": "Monthly revenue",
+        "orders": "Trendyol orders",
+        "ratings": "Ratings"
       },
       "favoritesAll": "{count} (all time)",
       "favoritesCard": "{count} favorites (all time)",
@@ -11580,7 +11587,8 @@
       "watchItem": "Watch this item",
       "salesValue": "~{count}/mo {kind, select, measured {· measured} other {· estimate}}",
       "salesUpTo": "up to {count}/mo",
-      "salesCard": "Sales: {value}"
+      "salesCard": "Sales: {value}",
+      "ordersBadge": "{badge} orders"
     },
     "source": {
       "searchApiOrder": "{marketplace} search (API order, not personalized)",
@@ -12053,6 +12061,14 @@
         "loading": "Working out sales…",
         "few": "Not enough sales data for this search yet. Search again in a few days to see measured sales."
       }
+    },
+    "trendyol": {
+      "openTitle": "This Trendyol search hasn't been analysed yet",
+      "openBody": "Trendyol searches can only be opened in your browser. Open the search on Trendyol; the KolayXport extension reads the products on the page and brings the analysis here.",
+      "openCta": "Search on Trendyol",
+      "needsExtension": "Needs the KolayXport Chrome extension (version 9.11 or later).",
+      "waiting": "Trendyol tab opened. Results will appear here once the page loads…",
+      "priceGap": "Price gap: Trendyol → abroad"
     }
   },
   "ds": {

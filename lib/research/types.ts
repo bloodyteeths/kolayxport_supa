@@ -133,6 +133,10 @@ export interface TopListing {
   ageDays: number | null;
   shop: { id: string | null; name: string | null; url: string | null };
   tags: string[];
+  /** Trendyol: the marketplace's own order badge as shown ("100+"). */
+  orderBadge?: string | null;
+  /** Trendyol: number of ratings (a sales trace: buyers who rated). */
+  ratingCount?: number | null;
 }
 
 export interface BuyerWord {

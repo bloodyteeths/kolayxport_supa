@@ -213,13 +213,13 @@ describe('compare mode', () => {
 });
 
 describe('review fixes', () => {
-  it('Trendyol chip on Product finder opens the Price gap view (no search request, never an error page)', async () => {
+  it('Trendyol with no browser snapshot yet: "Search on Trendyol" (extension), never an error page', async () => {
     router.query = { q: 'kolye', mkt: 'trendyol' };
+    productsBody = { data: null, errors: [{ section: 'marketplace', key: 'research.products.trendyolOpen' }] };
     renderPage();
-    await act(async () => {});
+    await waitFor(() => expect(screen.getByTestId('research-trendyol-open')).toBeTruthy());
     expect(screen.queryByTestId('research-products-error')).toBeNull();
     expect(screen.getByTestId('research-mkt-trendyol').getAttribute('aria-checked')).toBe('true');
-    expect(fetchMock.mock.calls.some(([u]) => String(u).startsWith('/api/research/products'))).toBe(false);
   });
 
   it('budget with nothing cached: one info state, no error, no duplicate banner', async () => {

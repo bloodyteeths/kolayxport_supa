@@ -1,0 +1,34 @@
+{
+  "research": {
+    "trendyol": {
+      "openTitle": "Bu Trendyol araması henüz analiz edilmedi",
+      "openBody": "Trendyol aramaları yalnızca tarayıcınızda açılabiliyor. Aramayı Trendyol'da açın; KolayXport eklentisi sayfadaki ürünleri okuyup analizi buraya getirir.",
+      "openCta": "Trendyol'da ara",
+      "needsExtension": "KolayXport Chrome eklentisi gerekir (sürüm 9.11 veya üstü).",
+      "waiting": "Trendyol sekmesi açıldı. Sayfa yüklenince sonuçlar burada görünecek…",
+      "priceGap": "Fiyat farkı: Trendyol → yurt dışı"
+    },
+    "evidence": {
+      "basisTrendyol": "Trendyol arama sayfasından {n} ürün (tarayıcınızdan)"
+    },
+    "guard": {
+      "notAvailableTrendyol": "Trendyol'da ölçülemiyor"
+    },
+    "sourceName": {
+      "trendyolSnapshot": "Trendyol araması (tarayıcı)"
+    },
+    "error": {
+      "trendyol": "Trendyol verisi okunamadı"
+    },
+    "products": {
+      "trendyolOpen": "Trendyol'da aramak gerekiyor"
+    },
+    "top": {
+      "col": {
+        "orders": "Trendyol sipariş",
+        "ratings": "Değerlendirme"
+      },
+      "ordersBadge": "{badge} sipariş"
+    }
+  }
+}

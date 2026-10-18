@@ -11276,7 +11276,8 @@
       "etsy": "Etsy yanıt vermedi",
       "ebay": "eBay'e ulaşılamadı",
       "stale": "Kayıtlı sonuçlar gösteriliyor: son kontrol tamamlanamadı",
-      "generic": "Araştırma sonuçları yüklenemedi"
+      "generic": "Araştırma sonuçları yüklenemedi",
+      "trendyol": "Trendyol verisi okunamadı"
     },
     "mkt": {
       "amazonIneligible": "Amazon araştırması için uygun bir Amazon Associates hesabı gerekir",
@@ -11285,7 +11286,8 @@
       "switchTo": "Pazaryeri: {name}"
     },
     "products": {
-      "trendyolLater": "Trendyol ürün araştırması Fiyat farkı aracıyla gelecek"
+      "trendyolLater": "Trendyol ürün araştırması Fiyat farkı aracıyla gelecek",
+      "trendyolOpen": "Trendyol'da aramak gerekiyor"
     },
     "empty": {
       "products": "Fiyatları, rekabeti ve alıcı kelimelerini görmek için bir fikir arayın",
@@ -11305,7 +11307,8 @@
       "outliers": "olağan dışı fiyatlar",
       "notAvailableEbay": "eBay bu veriyi paylaşmıyor",
       "implausible": "Kontrol edin: olağan dışı fiyat aralığı",
-      "notEnoughSignal": "Yeterli sinyal yok"
+      "notEnoughSignal": "Yeterli sinyal yok",
+      "notAvailableTrendyol": "Trendyol'da ölçülemiyor"
     },
     "demand": {
       "trendsUnavailable": "Google Trends yanıt vermedi",
@@ -11332,7 +11335,8 @@
       "basisNoVolume": "{n} ilan, Etsy arama hacmi paylaşmıyor",
       "basisEbay": "{n} aktif eBay ilanı, eBay satış geçmişi paylaşmıyor",
       "title": "Kanıtlar",
-      "noVolume": "Etsy arama hacmi paylaşmıyor"
+      "noVolume": "Etsy arama hacmi paylaşmıyor",
+      "basisTrendyol": "Trendyol arama sayfasından {n} ürün (tarayıcınızdan)"
     },
     "sourceName": {
       "etsySearch": "Etsy araması",
@@ -11351,7 +11355,8 @@
       "myShopTags": "Mağazanızın etiketleri",
       "rankTracker": "KolayXport sıralama takibi",
       "shopCounters": "Etsy mağaza sayaçları, her gün 06:00 UTC",
-      "priceGap": "Trendyol + eBay ABD fiyat endeksi"
+      "priceGap": "Trendyol + eBay ABD fiyat endeksi",
+      "trendyolSnapshot": "Trendyol araması (tarayıcı)"
     },
     "explain": {
       "failed": "Açıklama düzgün oluşturulamadı",
@@ -11557,7 +11562,9 @@
         "age": "Yaş",
         "shop": "Mağaza",
         "sales": "Aylık satış",
-        "revenue": "Aylık ciro"
+        "revenue": "Aylık ciro",
+        "orders": "Trendyol sipariş",
+        "ratings": "Değerlendirme"
       },
       "favoritesAll": "{count} (tüm zamanlar)",
       "favoritesCard": "{count} favori (tüm zamanlar)",
@@ -11580,7 +11587,8 @@
       "watchItem": "Bu ürünü izle",
       "salesValue": "~{count}/ay {kind, select, measured {· ölçüldü} other {· tahmin}}",
       "salesUpTo": "en çok {count}/ay",
-      "salesCard": "Satış: {value}"
+      "salesCard": "Satış: {value}",
+      "ordersBadge": "{badge} sipariş"
     },
     "source": {
       "searchApiOrder": "{marketplace} araması (API sırası, kişiselleştirilmemiş)",
@@ -12053,6 +12061,14 @@
         "loading": "Satışlar hesaplanıyor…",
         "few": "Bu arama için yeterli satış verisi yok. Birkaç gün içinde aynı aramayı tekrar yaparsanız ölçülmüş satışlar görünür."
       }
+    },
+    "trendyol": {
+      "openTitle": "Bu Trendyol araması henüz analiz edilmedi",
+      "openBody": "Trendyol aramaları yalnızca tarayıcınızda açılabiliyor. Aramayı Trendyol'da açın; KolayXport eklentisi sayfadaki ürünleri okuyup analizi buraya getirir.",
+      "openCta": "Trendyol'da ara",
+      "needsExtension": "KolayXport Chrome eklentisi gerekir (sürüm 9.11 veya üstü).",
+      "waiting": "Trendyol sekmesi açıldı. Sayfa yüklenince sonuçlar burada görünecek…",
+      "priceGap": "Fiyat farkı: Trendyol → yurt dışı"
     }
   },
   "ds": {

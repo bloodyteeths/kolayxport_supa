@@ -175,20 +175,18 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
   const baseMarket = useResearchMkt('products', { amazonEligible });
   const [url, setUrl] = useUrlState(PRODUCTS_SCHEMA);
   const [source, setSource] = usePriceGapSource();
-  // Trendyol is one of the marketplace chips: on Product finder it opens the Price gap view (Trendyol → eBay/Etsy),
-  // so there is no second "Search | From Trendyol" switch. An old `?source=trendyol` link shows Trendyol selected.
-  const priceGap = source === 'trendyol' || baseMarket.mkt === 'trendyol';
-  // Price gap is Pro; accounts that must never see plan-locked features (shopify_free) get no Trendyol chip here,
-  // exactly like the old "From Trendyol" segment (useFeatureAction('arbitrage').visible).
+  // Trendyol is a marketplace chip: Product finder researches Trendyol from the extension's browser snapshot
+  // (Trendyol blocks our servers). The Price gap view (Trendyol → eBay/Etsy, Pro) is one button away
+  // (`?source=trendyol`), shown with Trendyol selected.
+  const priceGap = source === 'trendyol';
+  // Price gap is Pro: its button follows useFeatureAction('arbitrage').visible (never offered when not visible).
   const arbitrage = useFeatureAction('arbitrage');
   const market = React.useMemo(
     () => ({
       ...baseMarket,
-      options: arbitrage.visible ? baseMarket.options : baseMarket.options.filter((o) => o.value !== 'trendyol'),
       mkt: priceGap ? ('trendyol' as const) : baseMarket.mkt,
       setMkt: (m: Parameters<typeof baseMarket.setMkt>[0]) => {
-        if (m === 'trendyol') setSource('trendyol');
-        else if (source === 'trendyol') setSource('search');
+        if (source === 'trendyol') setSource('search');
         baseMarket.setMkt(m);
       },
     }),
@@ -210,6 +208,8 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
   const [stageMode, setStageMode] = React.useState<StageMode | null>(null);
   const [openRow, setOpenRow] = React.useState<TopListing | null>(null);
   const [hint, setHint] = React.useState<QuestionKey | null>(null);
+  /** Trendyol search opened in another tab: re-check for the extension's snapshot. */
+  const [trendyolWaiting, setTrendyolWaiting] = React.useState(false);
   /** The analyst cards (evidence, price band, competition, demand inputs, newcomers) under the answer card. */
   const [detailsOpen, setDetailsOpen] = React.useState(false);
 
@@ -218,6 +218,13 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
   const compare = useResearchCompare(!priceGap && comparing && !amazonBlocked ? compareList : [], { mkt, country: url.country });
   const data = result.data;
   const ready = Boolean(data) && (result.region.state === 'ready' || result.region.state === 'stale');
+  const waitingForSnapshot = mkt === 'trendyol' && result.notice?.key === 'research.products.trendyolOpen';
+  React.useEffect(() => {
+    if (!waitingForSnapshot || !trendyolWaiting) return undefined;
+    const id = window.setInterval(() => result.region.retry?.(), 4000);
+    const stop = window.setTimeout(() => setTrendyolWaiting(false), 3 * 60_000);
+    return () => { window.clearInterval(id); window.clearTimeout(stop); };
+  }, [waitingForSnapshot, trendyolWaiting, result.region]);
   // Estimated monthly sales for the top listings (Etsy), loaded after the result so the answer shows first.
   const salesState = useListingSales(mkt, !priceGap && !comparing && ready && data ? data.top : EMPTY_TOP);
   const marketSales = React.useMemo(() => {
@@ -364,6 +371,13 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
   const searchPrimary = !ready || comparing;
   const toolbar = priceGap ? null : (
     <Box sx={{ mb: '12px' }}>
+      {mkt === 'trendyol' && arbitrage.visible ? (
+        <Box sx={{ mb: '8px' }}>
+          <Button variant="ghost" size="sm" icon={icons.research} onClick={() => setSource('trendyol')} data-testid="research-open-price-gap">
+            {t('trendyol.priceGap')}
+          </Button>
+        </Box>
+      ) : null}
       <Box
         component="form"
         role="search"
@@ -487,6 +501,27 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
           />
         </Box>
       </EmptyState>
+    );
+  } else if (result.notice?.key === 'research.products.trendyolOpen') {
+    // Trendyol blocks servers: the seller's browser opens the search, the extension posts the page's data and this
+    // page re-checks every few seconds (useTrendyolSnapshotPoll) until the answer is there.
+    body = (
+      <EmptyState
+        kind="first-use"
+        brand="trendyol"
+        title={t('trendyol.openTitle')}
+        body={t('trendyol.openBody')}
+        action={{
+          id: 'trendyol-open',
+          label: t('trendyol.openCta'),
+          onClick: () => {
+            window.open(`https://www.trendyol.com/sr?q=${encodeURIComponent(q)}&kx=1`, '_blank', 'noopener');
+            setTrendyolWaiting(true);
+          },
+        }}
+        footnote={trendyolWaiting ? t('trendyol.waiting') : t('trendyol.needsExtension')}
+        data-testid="research-trendyol-open"
+      />
     );
   } else if (result.notice) {
     // Marketplace not served yet / budget with nothing cached: an info state, never an error page (§3.2).

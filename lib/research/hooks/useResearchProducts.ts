@@ -147,6 +147,8 @@ export function normalizeTopListing(raw: unknown, fallbackCurrency: string): Top
     ageDays: num(raw.ageDays),
     shop: { id: str(shopObj.id), name: decodeEntities(str(shopObj.name) ?? '') || null, url: str(shopObj.url) },
     tags: Array.isArray(raw.tags) ? raw.tags.filter((t): t is string => typeof t === 'string' && t.trim().length > 0).map((t) => decodeEntities(t)) : [],
+    orderBadge: str(raw.orderBadge),
+    ratingCount: num(raw.ratingCount),
   };
 }
 

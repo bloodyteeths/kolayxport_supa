@@ -11,7 +11,7 @@ import Box from '@mui/material/Box';
 import useSWR from 'swr';
 import { useRouter } from 'next/router';
 import { useTranslations } from 'next-intl';
-import { Page, PageHeader, SyncMeta, type ActionSpec } from '@/components/ds/page';
+import { ActionButton, Page, PageHeader, StickyActionBar, SyncMeta, type ActionSpec } from '@/components/ds/page';
 import { useIsMobile } from '@/components/ds/page/useViewport';
 import { Toolbar, useLocalSavedViews, type FilterValues } from '@/components/ds/toolbar';
 import { DataTable, LogoTile, type DataTableState } from '@/components/ds/data';
@@ -65,7 +65,9 @@ import {
 import { isLabelable, orderColumns, orderInlineAction, orderRowActions, pagePrimaryKind, type OrderRowHandlers, type OrdersT } from './orderColumns';
 import { useOrdersBulkActions } from './OrdersBulkActions';
 import { OrdersExportMenu } from './OrdersExportMenu';
+import { useTrendyolBulkLabels } from './TrendyolBulkLabels';
 import { OrdersEmptyState, ordersEmptyKind } from './OrdersEmptyState';
+import { isPlayClient } from '@/lib/billing/playClient';
 
 const DENSITY_KEY = 'kx.orders.density';
 const SETTINGS_KEY = '/api/user/settings';
@@ -129,7 +131,7 @@ export function OrdersPage({ now }: OrdersPageProps = {}) {
   const sub = settings?.subscription ?? null;
   const shopifyFree = sub?.billingProvider === 'shopify_free' || sub?.subscriptionPlan === 'shopify_free';
   /** "See plans" only for a known, non-shopify_free account (never while unknown; pro-gating §1, Shopify review). */
-  const stripeUpsell = sub != null && !shopifyFree;
+  const stripeUpsell = sub != null && !shopifyFree && !isPlayClient();
   const syncLimit = sub?.limits?.orderSync;
   const limitText = typeof syncLimit === 'number' && syncLimit > 0 ? t('limit.syncs', { limit: syncLimit }) : t('limit.syncsReached');
   const etgbEnabled = Boolean(settings?.shippingSettings?.etgbEnabled);
@@ -393,6 +395,13 @@ export function OrdersPage({ now }: OrdersPageProps = {}) {
     { id: 'refreshOrders', label: t('actions.refresh'), icon: icons.pull, onClick: () => void pull(), disabled: list.pulling },
   ];
 
+  // "Trendyol labels (N)": every unshipped, not yet printed Trendyol order in one file (TrendyolBulkLabels.tsx).
+  const trendyolBulk = useTrendyolBulkLabels({ enabled: connections.has('trendyol') === true, onPrinted: refreshAll });
+  // Phones: with Trendyol labels to print, the header's sticky primary moves into our own bar: one thin row above
+  // the tab bar, "Trendyol (N)" and "Create N labels" half width each. A selection's bulk bar owns the bottom
+  // while it is open.
+  const trendyolMobileBar = mobile && trendyolBulk.count > 0 && selectedIds.length === 0;
+
   // ⌘K: saved views as "Go to …" (header actions register themselves through PageHeader).
   const viewCommands = React.useMemo<Command[]>(
     () =>
@@ -477,14 +486,44 @@ export function OrdersPage({ now }: OrdersPageProps = {}) {
         title={t('page.title')}
         count={knownTotal}
         meta={meta}
-        actionsSlot={mobile ? undefined : <OrdersExportMenu selectedIds={[]} query={query} matchingTotal={list.total} data-testid="orders-header-export" />}
+        actionsSlot={
+          mobile ? undefined : (
+            <>
+              <OrdersExportMenu selectedIds={[]} query={query} matchingTotal={list.total} data-testid="orders-header-export" />
+              {trendyolBulk.render({ size: 'sm' })}
+            </>
+          )
+        }
         primaryAction={headerPrimary}
+        mobilePrimary={trendyolMobileBar ? 'none' : 'sticky'}
         secondaryActions={primaryKind === 'none' ? [createLabelsAction].filter(() => labelableOnPage.length > 0) : undefined}
         overflowActions={mobile ? [...headerOverflow, { id: 'export', label: t('actions.export'), icon: icons.download, onClick: () => setHeaderExportOpen(true) }] : headerOverflow}
         data-testid="orders-header"
       />
       {mobile ? (
         <OrdersExportMenu selectedIds={[]} query={query} matchingTotal={list.total} hideTrigger open={headerExportOpen} onOpenChange={setHeaderExportOpen} data-testid="orders-header-export" />
+      ) : null}
+      {trendyolMobileBar ? (
+        <StickyActionBar
+          ariaLabel={t('actions.labelsBar')}
+          primarySlot={
+            <Box
+              sx={{
+                display: 'flex',
+                gap: '8px',
+                '& > *': { flex: '1 1 0', minWidth: 0, display: 'flex' },
+                '& [data-testid="orders-trendyol-labels"] > button:first-of-type': { flex: 1, minWidth: 0 },
+                // Thinner than the bar's 48px default: two half-width buttons on one 40px row.
+                '&& .MuiButtonBase-root': { minHeight: 40, height: 40 },
+                '& .MuiButton-root': { px: '10px', overflow: 'hidden', textOverflow: 'ellipsis' },
+              }}
+            >
+              {trendyolBulk.render({ size: 'md', variant: headerPrimary ? 'secondary' : 'primary', compact: true })}
+              {headerPrimary ? <ActionButton action={headerPrimary} variant="primary" size="md" fullWidth /> : null}
+            </Box>
+          }
+          data-testid="orders-mobile-labels-bar"
+        />
       ) : null}
 
       <Toolbar
@@ -576,6 +615,7 @@ export function OrdersPage({ now }: OrdersPageProps = {}) {
         activeRowId={openId}
         data-testid="orders-table"
       />
+      {/* Page leaves room for one 48px sticky row; the stacked Trendyol + Create bar has a second one. */}
 
       {/* One SidePanel at a time (orders §1.1). */}
       <OrderPanel

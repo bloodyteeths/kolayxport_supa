@@ -5,6 +5,7 @@ import { getAuthUser } from '../../../lib/auth';
 import { getAiModel, parseAiJson, refineFromBody } from '../../../lib/ai/gemini';
 import { aiContext, withAiContext } from '../../../lib/ai/context';
 import { hasValidInternalApiKeyHeader } from '../../../lib/security/internalApiKey';
+import { conditionLine, generateDescriptionPrompt, identifyProductPrompt, optimizeTitlePrompt } from '../../../lib/ebay/aiPrompts';
 
 export const config = { maxDuration: 120 };
 
@@ -114,26 +115,7 @@ async function handleOptimizeTitle(body: OptimizeTitleInput): Promise<OptimizeTi
     throw new InputError('title is required and must be a string');
   }
 
-  const systemPrompt = `You are an expert eBay listing optimization specialist. Your job is to analyze eBay listing titles and optimize them for maximum search visibility and sales.
-
-Rules for eBay title optimization:
-- Maximum 80 characters
-- Include high-value keywords buyers actually search for
-- Put the most important keywords first
-- Avoid filler words like "WOW", "L@@K", "AMAZING"
-- Include brand, model, size, color, condition when relevant
-- Use spaces, not special characters, to separate keywords
-- Do NOT use all caps for entire title
-${marketResearch ? '\nWhen market research data is provided, study competitor titles to identify high-performing keywords and patterns. Incorporate proven keywords from top-selling listings.' : ''}
-
-You MUST respond with ONLY valid JSON in this exact format:
-{
-  "optimizedTitle": "the optimized title (max 80 chars)",
-  "suggestions": ["suggestion 1", "suggestion 2", "suggestion 3"],
-  "score": { "before": 0, "after": 0 }
-}
-
-Score is 0-100 based on: keyword relevance (30%), keyword placement (20%), length usage (20%), readability (15%), completeness (15%).`;
+  const systemPrompt = optimizeTitlePrompt({ hasResearch: Boolean(marketResearch) });
 
   const userMsg = [
     `Current title: "${title}"`,
@@ -156,6 +138,8 @@ interface GenerateDescriptionInput {
   condition?: string;
   price?: number;
   marketResearch?: MarketResearch;
+  /** 'text': plain paragraphs + "• " bullets (the listing editor's description field); HTML otherwise. */
+  format?: 'html' | 'text';
 }
 
 interface GenerateDescriptionOutput {
@@ -171,24 +155,8 @@ async function handleGenerateDescription(
     throw new InputError('title is required and must be a string');
   }
 
-  const systemPrompt = `You are an expert eBay listing copywriter. Generate professional, conversion-optimized eBay listing descriptions in clean HTML.
-
-Rules:
-- Use clean, semantic HTML (h2, p, ul/li, strong, etc.)
-- Include a compelling intro paragraph
-- List key features/specifications in bullet points
-- Add a condition section if condition info is provided
-- Include a brief shipping/returns note placeholder
-- Keep it professional and trustworthy – no hype or spam
-- Use inline styles sparingly for readability (font-family, padding)
-- Do NOT include external CSS links or JavaScript
-- The HTML should render well in eBay's description viewer
-${marketResearch ? '\nWhen market research data is provided, use competitive insights to highlight differentiators. If the item is priced below average, emphasize value. Reference features that top-selling competitors highlight.' : ''}
-
-You MUST respond with ONLY valid JSON in this exact format:
-{
-  "description": "<div>...the HTML description...</div>"
-}`;
+  const format = body.format === 'text' ? 'text' : 'html';
+  const systemPrompt = generateDescriptionPrompt({ hasResearch: Boolean(marketResearch), format });
 
   const aspectLines = aspects
     ? Object.entries(aspects)
@@ -198,11 +166,11 @@ You MUST respond with ONLY valid JSON in this exact format:
 
   const userMsg = [
     `Title: "${title}"`,
-    condition ? `Condition: ${condition}` : '',
+    conditionLine(condition),
     price ? `Price: $${price}` : '',
     aspectLines ? `Item Specifics:\n${aspectLines}` : '',
     marketResearch ? '\n' + formatMarketContext(marketResearch) : '',
-    'Generate a professional eBay listing description in HTML.',
+    format === 'text' ? 'Generate a professional eBay listing description as plain text.' : 'Generate a professional eBay listing description in HTML.',
   ]
     .filter(Boolean)
     .join('\n');
@@ -549,6 +517,8 @@ interface IdentifyProductOutput {
   productName: string;
   keywords: string[];
   suggestedCondition?: string;
+  /** True only when the photos clearly show use or wear (the editor proposes NEW otherwise). */
+  wearVisible?: boolean;
   notes?: string;
 }
 
@@ -561,23 +531,7 @@ async function handleIdentifyProduct(body: IdentifyProductInput, userId: string 
   if (images.length === 0) throw new InputError('None of the photos could be read');
   const where = body.marketplace === 'etsy' ? 'Etsy' : 'eBay';
 
-  const systemPrompt = `You identify physical products from photographs so they can be listed on ${where}.
-
-Look at the photo(s) and describe the single main product for sale. Ignore backgrounds, props,
-hands, packaging that is not the product, and any watermarks.
-
-Rules:
-- "seed" must read like a short search phrase a seller would type: material, product type and
-  one or two defining attributes. 5-15 words. No marketing adjectives, no punctuation.
-- "productName" is the plain product type (e.g. "Wooden jewelry box").
-- "keywords" are 5-10 lowercase English terms a buyer would actually search for.
-- "suggestedCondition" is one of NEW, LIKE_NEW, VERY_GOOD, GOOD, ACCEPTABLE, or omit it if the
-  photo does not make the condition clear.
-- Everything in English — ${where}'s search index is English.
-- If the photo shows no identifiable product, set seed to an empty string and explain in "notes".
-
-Respond with ONLY valid JSON:
-{ "seed": "...", "productName": "...", "keywords": ["..."], "suggestedCondition": "NEW", "notes": "" }`;
+  const systemPrompt = identifyProductPrompt(where);
 
   const parts: any[] = [{ text: `Identify the product in these photos for an ${where} listing.` }, ...images.map((m) => ({ inlineData: { data: m.data, mimeType: m.mimeType } }))];
   const result = await getAiModel({ ...aiContext('ebay.vision'), system: systemPrompt }).generateContent(parts);

@@ -108,7 +108,7 @@ Bağladığınız pazaryeri ve kargo hizmetlerine yapılan aktarımlar sizin tal
 
 Kişisel verilerinizi işleme amacının gerektirdiği süre boyunca ve mevzuatta öngörülen süreler kadar saklarız. Başlıca süreler:
 
-- **Hesap verileri:** hesabınız açık olduğu sürece; hesabın kapatılmasından sonra [TODO(owner): hesap kapatıldıktan sonra silme süresi, ör. 30 gün] içinde silinir veya anonimleştirilir; yasal saklama yükümlülüğü olan kayıtlar hariç.
+- **Hesap verileri:** hesabınız açık olduğu sürece; hesap silindiğinde hemen silinir ve dönüşümlü yedeklerden en geç yaklaşık 3 ay içinde çıkar; yasal saklama yükümlülüğü olan kayıtlar hariç.
 - **Fatura, ödeme ve sözleşme kayıtları:** Türk Ticaret Kanunu ve Vergi Usul Kanunu kapsamındaki süreler boyunca (10 yıla kadar); mesafeli sözleşme kayıtları en az 3 yıl.
 - **Bağlı hesap erişim anahtarları:** bağlantı devam ettiği sürece; bağlantıyı kestiğinizde silinir.
 - **Sistem ve güvenlik kayıtları:** en fazla 12 ay; şifre ve erişim anahtarları gibi gizli bilgiler kayıtlara yazılmadan önce maskelenir.

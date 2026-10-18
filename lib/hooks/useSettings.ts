@@ -31,6 +31,7 @@ export interface UserSettingsResponse {
   shippingSettings?: {
     etgbRecipientEmail?: string | null;
     etgbEnabled?: boolean;
+    trendyolAutoPicking?: boolean;
     [key: string]: unknown;
   } | null;
   integrationSettings?: Record<string, string | null | undefined> | null;

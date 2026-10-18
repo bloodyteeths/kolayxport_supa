@@ -16,6 +16,7 @@ import { DEFAULT_TIME_ZONE } from '@/lib/format';
 import useLocaleStore, { type AppLocale } from '@/lib/stores/useLocaleStore';
 import { USER_SETTINGS_KEY } from '@/lib/shipping/useSenderProfile';
 import { PanelHeading, SettingsRow } from './sender';
+import { DeleteAccountSection } from './DeleteAccountSection';
 
 /** Same SWR key as the notification-center preferences panel, so both views share one cache entry. */
 export const PREFERENCES_API = '/api/notifications/preferences';
@@ -184,6 +185,8 @@ export function PreferencesPanel({ heading = true, onDirtyChange }: PreferencesP
           )}
         </SettingsRow>
       </Section>
+
+      <DeleteAccountSection />
 
       <StickyActionBar
         visible={dirty}

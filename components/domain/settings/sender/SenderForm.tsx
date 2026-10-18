@@ -262,6 +262,14 @@ export function SenderForm(props: SenderFormProps) {
         )}
       </Section>
 
+      <Section variant="card" id="sender-trendyol" title={t('group.trendyol')} description={t('trendyolHelp')}>
+        <SettingsRow label={t('trendyolAutoPicking')} helper={t('trendyolAutoPickingHelper')} data-testid="sender-row-trendyolAutoPicking">
+          {(id) => (
+            <Switch id={id} checked={Boolean(sh?.trendyolAutoPicking)} onChange={(on) => onChangeShipping('trendyolAutoPicking', on)} />
+          )}
+        </SettingsRow>
+      </Section>
+
       {onSave ? (
         <StickyActionBar
           visible={showBar}

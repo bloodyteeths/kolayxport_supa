@@ -2,6 +2,7 @@
 // approval page for Shopify-billed accounts (lib/billing/aiCreditsPurchase). Session user only.
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
+import { isPlayRequest } from '@/lib/billing/playClient';
 import { logger } from '@/lib/logger';
 import { creditPack } from '@/lib/billing/aiCredits';
 import { getCreditBalance } from '@/lib/billing/aiCreditsServer';
@@ -12,6 +13,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ code: 'methodNotAllowed' });
   }
+  // Google Play app: nothing is sold in the Android app (lib/billing/playClient.ts).
+  if (isPlayRequest(req)) return res.status(403).json({ error: 'Not available in the app', code: 'playApp' });
   const user = await getAuthUser(req, res);
   if (!user) return res.status(401).json({ code: 'unauthorized' });
   const pack = creditPack(req.body?.packId);

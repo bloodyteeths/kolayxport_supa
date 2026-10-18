@@ -14,6 +14,7 @@
 // Header: in the locked state only the title and meta stay (no primary). Trial: `PlanTag` after the title.
 // Below 900 px the studio is not offered (bulk-grid §3.4 message). PhotoStudio never sends: it stages, and the
 // listings / BulkGrid "Send N changes" picks the drafts up.
+import { useAiCostsVisible } from '@/components/domain/credits/useCredits';
 import * as React from 'react';
 import Box from '@mui/material/Box';
 import { useTranslations } from 'next-intl';
@@ -135,6 +136,8 @@ interface StudioBodyProps {
 }
 
 function StudioBody({ studio, ids, tab, onTabChange, backHref, onHeader }: StudioBodyProps) {
+  // No credit costs for Shopify-connected accounts (App Store 1.2.1).
+  const showCosts = useAiCostsVisible();
   const t = useTranslations('photoStudio');
   const tEtsy = useTranslations('etsy');
   const tEditor = useTranslations('listingEditor');
@@ -253,7 +256,7 @@ function StudioBody({ studio, ids, tab, onTabChange, backHref, onHeader }: Studi
       primary: studio.load === 'ready' && listings.length > 0 ? {
         id: 'stage',
         label: tab === 'photos'
-          ? plan.credits > 0
+          ? plan.credits > 0 && showCosts
             ? t('stageWithCredits', { stage: t('stage', { count: changes }), credits: t('credits', { count: plan.credits }) })
             : t('stage', { count: changes })
           : t('video.stage', { count: changes }),
@@ -265,7 +268,7 @@ function StudioBody({ studio, ids, tab, onTabChange, backHref, onHeader }: Studi
       } : undefined,
     });
     // primaryKey covers every displayed field.
-  }, [primaryKey, studio.load, listings.length]);
+  }, [primaryKey, studio.load, listings.length, showCosts]);
   React.useEffect(() => () => onHeader({}), [onHeader]);
 
   // ── States ───────────────────────────────────────────────────────────────────────────────────────
@@ -309,7 +312,7 @@ function StudioBody({ studio, ids, tab, onTabChange, backHref, onHeader }: Studi
     summaryParts.push(changes > 0
       ? t('summary', { changes, listings: tab === 'photos' ? plan.listings : videoPlan.items.length + videoPlan.uploads.length })
       : t('blocker.nothing'));
-    if (tab === 'photos' && plan.credits > 0) summaryParts.push(t('credits', { count: plan.credits }));
+    if (tab === 'photos' && plan.credits > 0 && showCosts) summaryParts.push(t('credits', { count: plan.credits }));
     if (fullCount) summaryParts.push(t('full', { count: fullCount }));
     if (otherSkipped.length && skipReason) summaryParts.push(t('skipped', { count: otherSkipped.length, reason: t(`skip.${skipReason}`) }));
   }

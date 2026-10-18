@@ -65,7 +65,10 @@ vi.mock('@/lib/hooks/useOrdersList', () => ({
   },
   useOrder: () => ({ row: undefined, state: 'empty', mutate: vi.fn() }),
 }));
-vi.mock('@/lib/hooks/useConnections', () => ({ useConnections: () => ({ anyMarketplace: true }) }));
+const connected = { trendyol: false };
+vi.mock('@/lib/hooks/useConnections', () => ({
+  useConnections: () => ({ anyMarketplace: true, has: (p: string) => (p === 'trendyol' ? connected.trendyol : false) }),
+}));
 vi.mock('@/lib/hooks/useMarketplaceOptions', () => ({
   useMarketplaceOptions: () => ({ marketplaceOptions: [{ value: 'Etsy', label: 'Etsy', count: 3 }], isLoading: false, isError: false }),
 }));
@@ -131,6 +134,7 @@ beforeEach(() => {
   router.query = {};
   router.replace.mockClear();
   router.push.mockClear();
+  connected.trendyol = false;
   list.rows = [];
   list.total = 0;
   list.state = 'ready';
@@ -369,5 +373,60 @@ describe('banner zone', () => {
     renderPage();
     await act(async () => {});
     expect(screen.getAllByTestId('orders-stale')).toHaveLength(1);
+  });
+});
+
+describe('Trendyol bulk labels', () => {
+  function withTrendyolCount(eligible: number) {
+    connected.trendyol = true;
+    const base = (globalThis.fetch as any).getMockImplementation();
+    (globalThis.fetch as any).mockImplementation(async (url: string, init?: RequestInit) => {
+      if (String(url) === '/api/trendyol/cargo-bulk' && !init?.method) {
+        return new Response(JSON.stringify({ eligible, skippedNoCargoNumber: 1 }), { status: 200 });
+      }
+      return base(url, init);
+    });
+  }
+
+  it('desktop: "Trendyol labels (N)" sits in the header next to Create N labels, PDF / ZPL in its menu', async () => {
+    withTrendyolCount(3);
+    list.rows = ROWS;
+    list.total = ROWS.length;
+    renderPage();
+    await act(async () => {});
+    const header = screen.getByTestId('orders-header');
+    expect(within(header).getByRole('button', { name: 'Trendyol labels (3)' })).toBeTruthy();
+    fireEvent.click(within(header).getByRole('button', { name: 'Trendyol label format' }));
+    expect(screen.getByRole('menuitem', { name: 'PDF · every carrier' })).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: 'ZPL (thermal printer) · Trendyol Express / Aras only' })).toBeTruthy();
+  });
+
+  it('hidden when nothing is left to print or Trendyol is not connected', async () => {
+    withTrendyolCount(0);
+    list.rows = ROWS;
+    list.total = ROWS.length;
+    renderPage();
+    await act(async () => {});
+    expect(screen.queryByTestId('orders-trendyol-labels')).toBeNull();
+    cleanup();
+    connected.trendyol = false;
+    renderPage();
+    await act(async () => {});
+    expect(screen.queryByTestId('orders-trendyol-labels')).toBeNull();
+  });
+
+  it('phone (TR): both buttons on one row of one sticky bar (short Trendyol label); the header no longer renders its own', async () => {
+    setViewport('mobile');
+    withTrendyolCount(18);
+    list.rows = ROWS;
+    list.total = ROWS.length;
+    renderPage('tr');
+    await act(async () => {});
+    const bars = screen.getAllByTestId('orders-mobile-labels-bar');
+    expect(bars).toHaveLength(1);
+    expect(screen.queryByTestId('sticky-action-bar')).toBeNull();
+    const labelable = ROWS.filter((r) => r.canLabel).length;
+    expect(within(bars[0]).getByRole('button', { name: 'Trendyol (18)' })).toBeTruthy();
+    expect(within(bars[0]).getByRole('button', { name: `${labelable} etiket oluştur` })).toBeTruthy();
   });
 });

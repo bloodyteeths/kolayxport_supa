@@ -12,6 +12,7 @@
 // Supported fields only: anything else staged on a legacy draft is refused before eBay is called.
 
 import { EbayDraftError } from './draftErrors';
+import { descriptionToEbayHtml } from './payloadRules';
 
 const TRADING_URL = 'https://api.ebay.com/ws/api.dll';
 const COMPAT = '1193';
@@ -125,7 +126,8 @@ export function legacyChanges(inventoryPatch: JsonMap | null | undefined, offerP
   const product = inv.product || {};
   if (typeof product.title === 'string') out.title = product.title;
   const desc = typeof product.description === 'string' ? product.description : typeof ofr.listingDescription === 'string' ? ofr.listingDescription : undefined;
-  if (desc !== undefined) out.description = desc;
+  // The editor's field may hold plain text: the Trading API gets HTML (descriptionToEbayHtml keeps HTML as it is).
+  if (desc !== undefined) out.description = descriptionToEbayHtml(desc);
   const q = inv.availability?.shipToLocationAvailability?.quantity;
   if (q !== undefined && q !== null) out.quantity = Math.max(0, Math.floor(Number(q) || 0));
   const p = ofr.pricingSummary?.price;

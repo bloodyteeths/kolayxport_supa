@@ -641,7 +641,9 @@ export function toOrderRow(order: ApiOrder, ctx: ToOrderRowsContext = {}): Order
     label: hasLabel ? getLatestLabel(order) : null,
     labelFailure: failure,
     marketplaceCargoNumber: cargo,
-    trendyol: isTrendyol ? (({ cargoNumber, carrier, commonLabel, nextStatus }) => ({ cargoNumber, carrier, commonLabel, nextStatus }))(trendyolCargoInfo(raw)) : null,
+    trendyol: isTrendyol
+      ? (({ cargoNumber, carrier, commonLabel, nextStatus }) => ({ cargoNumber, carrier, commonLabel, nextStatus, labelPrintedAt: iso(order.cargoLabelPrintedAt) }))(trendyolCargoInfo(raw))
+      : null,
     hepsiburada: isHepsiburada ? {
       packageNumber: raw.packageNumber ? String(raw.packageNumber) : null,
       cargoCompany: raw.cargoProviderName ? String(raw.cargoProviderName) : null,

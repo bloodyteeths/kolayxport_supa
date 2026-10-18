@@ -23,6 +23,7 @@ import {
   mergeQueuedActions,
   normalizeSellerSku,
   removeActions,
+  withHtmlDescriptions,
   type EbayCreateAction,
   type EbayCreateProgress,
   type EbayDiffField,
@@ -617,7 +618,8 @@ export async function syncDraft(draftId: string, userId: string) {
     }
 
     // --- Apply inventoryPatch ---
-    const inventoryPatch = draft.inventoryPatch as JsonMap;
+    // Plain-text descriptions (the editor's field) go to eBay as HTML; HTML ones unchanged.
+    const inventoryPatch = withHtmlDescriptions(draft.inventoryPatch as JsonMap, 'inventory') as JsonMap;
     if (!isEmptyPatch(inventoryPatch)) {
       const current = await fetchInventoryItem(token, draft.sku, marketplaceId);
       const merged = applyInventoryPatch(current, inventoryPatch);
@@ -666,7 +668,7 @@ export async function syncDraft(draftId: string, userId: string) {
     }
 
     // --- Apply offerPatch ---
-    const offerPatch = draft.offerPatch as JsonMap;
+    const offerPatch = withHtmlDescriptions(draft.offerPatch as JsonMap, 'offer') as JsonMap;
     if (!isEmptyPatch(offerPatch) && draft.offerId) {
       const currentOffer = await fetchOffer(token, draft.offerId, marketplaceId);
       const merged = mergeJson(currentOffer, offerPatch);

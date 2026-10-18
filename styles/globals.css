@@ -33,6 +33,13 @@ body {
   color: var(--color-neutral-800);
 }
 
+/* The signed-in app shell is a 100dvh flex column that handles the bottom safe area itself (tab bar, <main>).
+   With body's bottom padding on top of it the document overflowed by the inset (~34px in the home-screen
+   iPhone app), the root scrolled under the fixed tab bar and its taps stopped landing. */
+body:has([data-testid='app-shell']) {
+  padding-bottom: 0;
+}
+
 /* ─── Legacy utilities (flattened in M0, deleted in M10) ─────────────── */
 
 .glass {

@@ -8,7 +8,7 @@
 //        like an edit, and `buildCreatePlan` turns it into the creator's eBay calls.
 //   F3 — `computeEbayDiff` / `dropRejectedKeys` power Review differences.
 
-import { normalizeCondition, sanitizeAspects, sanitizeInventoryItemPayload } from './payloadRules';
+import { descriptionToEbayHtml, normalizeCondition, sanitizeAspects, sanitizeInventoryItemPayload } from './payloadRules';
 
 export type JsonMap = Record<string, any>;
 
@@ -289,9 +289,10 @@ export function buildCreatePlan(input: {
   product.imageUrls = applyMediaOps(Array.isArray(product.imageUrls) ? product.imageUrls : [], input.media).imageUrls;
 
   const title = typeof product.title === 'string' ? product.title.trim() : '';
-  const description = typeof product.description === 'string' ? product.description.trim() : '';
+  // The editor's description field holds plain text (AI / typed) or HTML: eBay gets HTML (descriptionToEbayHtml).
+  const description = descriptionToEbayHtml(typeof product.description === 'string' ? product.description : '');
   const listingDescription = typeof offerIn.listingDescription === 'string' && offerIn.listingDescription.trim()
-    ? offerIn.listingDescription.trim()
+    ? descriptionToEbayHtml(offerIn.listingDescription)
     : description;
   const quantity = toQty(inventory.availability?.shipToLocationAvailability?.quantity, 1);
   const price = offerIn.pricingSummary?.price?.value;
@@ -515,4 +516,19 @@ export function dropRejectedKeys(input: {
     dropped.push(f.key);
   }
   return { inventoryPatch, offerPatch, dropped };
+}
+
+/**
+ * A staged patch pair with its description as eBay gets it: the editor stores plain text (or HTML the seller typed)
+ * in `product.description` / `listingDescription`; plain text becomes paragraphs + lists, HTML is kept. Pure.
+ */
+export function withHtmlDescriptions(patch: JsonMap | null | undefined, source: 'inventory' | 'offer'): JsonMap | null | undefined {
+  if (!patch || typeof patch !== 'object') return patch;
+  if (source === 'inventory') {
+    const product = patch.product;
+    if (!product || typeof product !== 'object' || typeof product.description !== 'string') return patch;
+    return { ...patch, product: { ...product, description: descriptionToEbayHtml(product.description) } };
+  }
+  if (typeof patch.listingDescription !== 'string') return patch;
+  return { ...patch, listingDescription: descriptionToEbayHtml(patch.listingDescription) };
 }

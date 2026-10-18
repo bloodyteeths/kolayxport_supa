@@ -4,6 +4,10 @@
  *        pdf → our 100×150 mm cargo label (Code 128 of the cargo number), works for every carrier
  *        zpl → Trendyol's common label (Trendyol Express / Aras on Trendyol-paid cargo) for thermal printers
  *   POST status  { orderId, status: 'Picking' | 'Invoiced', invoiceNumber? }   report the package status to Trendyol
+ * A downloaded label (pdf or zpl) sets `Order.cargoLabelPrintedAt` when still empty, so the Orders page's bulk
+ * "Trendyol labels" (cargo-bulk.ts) does not print it again.
+ * With Settings › Sender › Trendyol "auto Picking" on, printing a label (pdf or zpl) also reports Picking while the
+ * package is still Created. Shipped/Delivered are set by Trendyol itself; Invoiced is left to the invoice provider.
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
@@ -12,14 +16,29 @@ import { getAuthUser } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 import { isTrendyolEnabled } from '@/lib/config';
 import { cargoLabelPdf } from '@/lib/shipping/cargoLabelPdf';
-import { contentsOf, fetchCommonLabel, isCommonLabelNotAllowed, loadTrendyolOrder, recipientOf, senderOf, trendyolCargoInfo, trendyolClientFor, trendyolErrorText } from '@/lib/trendyol/cargo';
+import {
+  autoPicking,
+  cargoLabelInputOf,
+  fetchCommonLabel,
+  isCommonLabelNotAllowed,
+  loadTrendyolOrder,
+  markCargoLabelsPrinted,
+  senderOf,
+  trendyolCargoInfo,
+  trendyolClientFor,
+  trendyolErrorText,
+} from '@/lib/trendyol/cargo';
 
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 
-const CAPTIONS = {
-  tr: { recipient: 'Alıcı', sender: 'Gönderen', order: 'Sipariş', package: 'Paket', contents: 'İçerik', deci: 'Desi' },
-  en: { recipient: 'Recipient', sender: 'Sender', order: 'Order', package: 'Package', contents: 'Contents', deci: 'Deci' },
-};
+/** First print of this order's label: remember it (bulk skips it). Never fails the label. */
+async function markPrinted(userId: string, orderId: string) {
+  try {
+    await markCargoLabelsPrinted(userId, [orderId]);
+  } catch (err) {
+    logger.warn('[TRENDYOL CARGO] could not mark label printed', { userId, orderId, error: (err as Error)?.message });
+  }
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const user = await getAuthUser(req, res);
@@ -43,24 +62,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!info.commonLabel) return res.status(409).json({ error: 'Trendyol has no common label for this carrier; use the PDF label', code: 'not_common_label' });
         const boxes = Math.min(Math.max(Number(req.query.boxes) || 1, 1), 20);
         const docs = await fetchCommonLabel(client, info.cargoNumber, boxes);
+        await markPrinted(user.id, loaded.order.id);
+        await autoPicking(user.id, loaded.order.id, loaded.raw, client);
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename="trendyol-${info.cargoNumber}.zpl"`);
         res.setHeader('Cache-Control', 'private, no-store');
         return res.status(200).send(docs.join('\n'));
       }
       const locale = str(req.query.locale) === 'en' ? 'en' : 'tr';
-      const pdf = await cargoLabelPdf({
-        carrier: info.carrier || 'Trendyol',
-        cargoNumber: info.cargoNumber,
-        marketplace: 'Trendyol',
-        orderNumber: loaded.order.orderNumber || String(loaded.raw.orderNumber || ''),
-        packageId: info.packageId,
-        recipient: recipientOf(loaded.raw),
-        sender: await senderOf(client, user.id),
-        contents: contentsOf(loaded.raw),
-        deci: Number(loaded.raw.cargoDeci) || null,
-        t: CAPTIONS[locale],
-      });
+      const pdf = await cargoLabelPdf(cargoLabelInputOf(loaded.order, loaded.raw, info, await senderOf(client, user.id), locale));
+      await markPrinted(user.id, loaded.order.id);
+      await autoPicking(user.id, loaded.order.id, loaded.raw, client);
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename="trendyol-${info.cargoNumber}.pdf"`);
       res.setHeader('Cache-Control', 'private, no-store');

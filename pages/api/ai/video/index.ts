@@ -315,6 +315,16 @@ async function launchTake(userId: string, body: any, locale: 'tr' | 'en', opts: 
         if (r) { direction.notesEn = r.en || undefined; dropped.push(...r.dropped); }
       }
     }
+    // A custom setting ("Custom…" background, or an AI-suggested one) is checked the same way: what the seller typed
+    // in any language becomes a real place in English, and a cartoon / fantasy background is left out and shown.
+    delete direction.sceneTextEn;
+    if (direction.scene === 'custom' && direction.sceneText) {
+      if (parentDir?.sceneText === direction.sceneText && parentDir?.sceneTextEn) direction.sceneTextEn = parentDir.sceneTextEn;
+      else {
+        const r = await interpretNotes(userId, { notes: direction.sceneText, profile: direction.profile, product: direction.product, person: direction.person, locale, setting: true });
+        if (r) { direction.sceneTextEn = r.en || undefined; dropped.push(...r.dropped); }
+      }
+    }
     if (instruction) {
       const r = await interpretNotes(userId, { notes: instruction, profile: direction.profile, product: direction.product, shot: direction.shotText, person: direction.person, locale });
       if (r) { direction.instructionEn = r.en || undefined; dropped.push(...r.dropped); }

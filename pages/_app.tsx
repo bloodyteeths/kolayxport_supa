@@ -14,6 +14,7 @@ import { cachedMessages, loadMessages } from '@/lib/i18n/clientMessages';
 import CookieConsent from '@/components/CookieConsent';
 import { captureAttribution, track } from '@/lib/tracking/events';
 import { isShellRoute } from '@/lib/nav/shellRoutes';
+import { markPlayClient } from '@/lib/billing/playClient';
 
 // The app's provider tree is a separate chunk: marketing pages never load it. In production it is
 // server-rendered and Next preloads the chunk before hydration. `next dev` (Turbopack) neither preloads it
@@ -43,7 +44,7 @@ function intlOnError(error: { code?: string }) {
 }
 
 // First path segment of Turkish marketing routes (SiteLayout sets <html lang> itself there).
-const SITE_TR_ROUTES = new Set(['', 'fiyatlandirma', 'cozumler', 'entegrasyonlar', 'karsilastirma', 'nasil-kullanirim', 'blog', 'kurumsal', 'iletisim', 'ozellikler', 'kvkk-aydinlatma-metni', 'cerez-politikasi', 'gizlilik-politikasi', 'kullanim-sartlari', 'mesafeli-satis-sozlesmesi', 'on-bilgilendirme-formu']);
+const SITE_TR_ROUTES = new Set(['', 'fiyatlandirma', 'cozumler', 'entegrasyonlar', 'karsilastirma', 'nasil-kullanirim', 'blog', 'kurumsal', 'iletisim', 'ozellikler', 'kvkk-aydinlatma-metni', 'cerez-politikasi', 'gizlilik-politikasi', 'kullanim-sartlari', 'mesafeli-satis-sozlesmesi', 'on-bilgilendirme-formu', 'hesap-silme']);
 
 // App routes need the full dictionary: start fetching it while React hydrates, not after.
 if (typeof window !== 'undefined') {
@@ -54,6 +55,9 @@ if (typeof window !== 'undefined') {
     void loadMessages(stored === 'en' ? 'en' : 'tr');
   }
 }
+
+// Before the first render: a Google Play app launch (/app?src=play) hides all purchasing (lib/billing/playClient.ts).
+if (typeof window !== 'undefined') markPlayClient();
 
 function MyApp({ Component, pageProps }: AppProps) {
   const router = useRouter();

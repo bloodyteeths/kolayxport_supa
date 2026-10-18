@@ -36,6 +36,7 @@ import { OrdersChartCard } from './OrdersChartCard';
 import { BestSellersCard } from './BestSellersCard';
 import { STORE_PROVIDERS, StoresStrip } from './StoresStrip';
 import { SetupChecklist, shouldShowSetup, useSetupDismissed, type SetupFacts } from './SetupChecklist';
+import { isPlayClient } from '@/lib/billing/playClient';
 
 export const ETSY_NEW_LISTING_HREF = '/app/etsy-listings/new';
 export const EBAY_NEW_LISTING_HREF = '/app/ebay-listings/new';
@@ -117,7 +118,8 @@ export function OverviewPage({ now: nowProp }: OverviewPageProps = {}) {
   const [dismissed, dismiss] = useSetupDismissed(user?.id ?? null);
   const now = nowProp ?? new Date();
 
-  const summary = ov.summary;
+  // Google Play app: usage rows never point at plans (lib/billing/playClient.ts).
+  const summary = ov.summary?.usage && isPlayClient() ? { ...ov.summary, usage: { ...ov.summary.usage, hideBilling: true } } : ov.summary;
   const usage = summary?.usage ?? null;
   const hideBilling = Boolean(usage?.hideBilling);
 

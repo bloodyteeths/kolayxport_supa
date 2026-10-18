@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { ChevronDown, Menu, X } from 'lucide-react';
 import { CASES, localePath, SIGNUP_HREF, type SiteLocale } from '@/lib/site/routes';
+import { usePlayClient } from '@/lib/billing/usePlayClient';
 
 interface Props { locale: SiteLocale; path: string; hasTwin: boolean; tone: 'paper' | 'ink' }
 
@@ -30,9 +31,11 @@ export default function SiteHeader({ locale, path, hasTwin, tone }: Props) {
     return () => { document.body.style.overflow = ''; };
   }, [open]);
 
+  // No pricing link inside the Google Play app (lib/billing/playClient.ts).
+  const play = usePlayClient();
   const links = [
     { href: href('/entegrasyonlar'), label: t('nav.integrations') },
-    { href: href('/fiyatlandirma'), label: t('nav.pricing') },
+    ...(play ? [] : [{ href: href('/fiyatlandirma'), label: t('nav.pricing') }]),
     { href: href('/nasil-kullanirim'), label: t('nav.help') },
     { href: href('/blog'), label: t('nav.blog') },
   ];

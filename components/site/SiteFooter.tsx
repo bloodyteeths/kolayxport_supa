@@ -3,10 +3,12 @@ import { useTranslations } from 'next-intl';
 import { COMPANY, addressLine } from '@/lib/site/company';
 import { CASES, localePath, type SiteLocale } from '@/lib/site/routes';
 import { openCookiePreferences } from './cookieConsent';
+import { usePlayClient } from '@/lib/billing/usePlayClient';
 
 export default function SiteFooter({ locale }: { locale: SiteLocale }) {
   const t = useTranslations('site');
   const href = (p: string) => localePath(locale, p);
+  const play = usePlayClient();
   const social = Object.entries(COMPANY.social).filter(([, url]) => !!url) as [string, string][];
 
   const cols: { title: string; links: { href: string; label: string }[] }[] = [
@@ -16,7 +18,7 @@ export default function SiteFooter({ locale }: { locale: SiteLocale }) {
       links: [
         { href: href('/ozellikler'), label: t('footer.features') },
         { href: href('/entegrasyonlar'), label: t('footer.integrations') },
-        { href: href('/fiyatlandirma'), label: t('footer.pricing') },
+        ...(play ? [] : [{ href: href('/fiyatlandirma'), label: t('footer.pricing') }]),
         { href: href('/nasil-kullanirim'), label: t('footer.help') },
         { href: href('/blog'), label: t('footer.blog') },
         { href: href('/karsilastirma'), label: t('footer.compare') },

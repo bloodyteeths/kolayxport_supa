@@ -34,6 +34,7 @@ We use cookies in three categories:
 | `__Secure-next-auth.callback-url` | Cookie | Returns you to the right page after sign-in | Browser session |
 | `next-auth.state`, `next-auth.pkce.code_verifier` (with secure prefix) | Cookie, HttpOnly | Security of Sign in with Google | About 15 minutes |
 | `ebay_csrf`, `amazon_csrf` | Cookie, HttpOnly | Security check while connecting an eBay or Amazon account | 10 minutes |
+| `kx_client` | Cookie | Remembers that the app was opened from the Android app on Google Play (no purchase screens are shown there) | 400 days |
 | `cookie-consent` | Local storage | Remembers your cookie choice | Until you delete it |
 | `kolayxport_locale` | Local storage | Remembers your language (Turkish/English) | Until you delete it |
 | `kx.*`, `kx_*` and similar app keys | Local / session storage | Remembers choices you make in the app (table columns, saved views, recent searches, dismissed notices, order sound setting, unsent drafts) on your device | Local storage: until you delete it; session storage: until the tab closes |

@@ -5,6 +5,7 @@ import { useLocale } from 'next-intl';
 import { jsonFetcher } from '@/lib/billing/entitlementCore';
 import type { CreditBalance } from '@/lib/billing/aiCredits';
 import type { Currency } from '@/lib/billing/types';
+import { isPlayClient } from '@/lib/billing/playClient';
 
 export const CREDITS_KEY_PREFIX = '/api/ai/credits?';
 
@@ -14,7 +15,19 @@ export function useCredits(enabled = true) {
     revalidateOnFocus: true,
     dedupingInterval: 5000,
   });
-  return { balance: swr.data ?? null, loading: swr.isLoading, error: swr.error, currency, refresh: () => swr.mutate() };
+  // Google Play app: no packs to buy and no credit prices (playClient.ts), like a Shopify-connected account.
+  const balance = swr.data && isPlayClient() ? { ...swr.data, neutral: true, channel: null } : swr.data ?? null;
+  return { balance, loading: swr.isLoading, error: swr.error, currency, refresh: () => swr.mutate() };
+}
+
+/**
+ * Whether AI buttons may show what they cost ("· 3 kredi"). Hidden for Shopify-connected accounts (App Store 1.2.1:
+ * nothing they see shows prices or credit costs; `balance.neutral`, as the Video Studio does) and until the balance
+ * is known, so a reviewer never sees a cost flash before it loads.
+ */
+export function useAiCostsVisible(): boolean {
+  const { balance } = useCredits();
+  return balance ? !balance.neutral : false;
 }
 
 export function refreshCredits() {

@@ -74,7 +74,7 @@ export async function fetchMatchingIds(
 }
 
 /** iOS Safari / PWA / in-app WebViews ignore a blob download that fires after the tap (gesture expired). */
-function needsGestureDownload(): boolean {
+export function needsGestureDownload(): boolean {
   if (typeof navigator === 'undefined' || typeof window === 'undefined') return false;
   const ua = navigator.userAgent || '';
   const iOS = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1);

@@ -14,6 +14,7 @@
 import useSWR from 'swr';
 import { useAsyncRegion, type AsyncState } from '@/lib/ds/useAsyncState';
 import type { BillingState, Currency, Entitlement, Feature, Interval, MeterKey, MeterUsage, PlanKey } from './types';
+import { isPlayClient } from './playClient';
 import { ENTITLEMENT_KEY, SETTINGS_KEY, HttpError, jsonFetcher, normalizeEntitlement, entitlementFromSettings, type SettingsSubscription } from './entitlementCore';
 
 // The pure helpers live in ./entitlementCore (server-safe); re-exported so existing imports keep working.
@@ -56,7 +57,9 @@ export function useEntitlement(options: UseEntitlementOptions = {}): UseEntitlem
     dedupingInterval: 30_000,
   });
   const derived = needFallback && settings.data ? entitlementFromSettings(settings.data?.subscription ?? null) : null;
-  const data = live ?? derived ?? undefined;
+  const known = live ?? derived ?? undefined;
+  // Google Play app: no Stripe surface anywhere (playClient.ts), whatever the account's provider.
+  const data = known && isPlayClient() ? { ...known, stripeUpsell: false } : known;
 
   const waitingFallback = needFallback && settings.data === undefined && !settings.error;
   const combined = {

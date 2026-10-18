@@ -101,6 +101,7 @@ import { DuplicatesPanel } from './tools/DuplicatesPanel';
 import { CsvImportPanel } from './tools/CsvImportPanel';
 import { ExportCsvModal, type ExportScope } from './tools/ExportCsvModal';
 import { ScheduledSendsPanel } from './tools/ScheduledSendsPanel';
+import { isPlayClient } from '@/lib/billing/playClient';
 
 const SETTINGS_KEY = '/api/user/settings';
 const DEFAULT_TIMEZONE = 'Europe/Istanbul';
@@ -294,7 +295,7 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
 
   const { data: settings } = useSWR<SettingsSlice>(SETTINGS_KEY, settingsFetcher, { revalidateOnFocus: false, dedupingInterval: 300_000 });
   const sub = settings?.subscription ?? null;
-  const stripeUpsell = sub != null && sub.billingProvider !== 'shopify_free' && sub.subscriptionPlan !== 'shopify_free';
+  const stripeUpsell = sub != null && sub.billingProvider !== 'shopify_free' && sub.subscriptionPlan !== 'shopify_free' && !isPlayClient();
   const timezone = settings?.preferences?.timezone || DEFAULT_TIMEZONE;
 
   // ── connection (§7: not connected / reconnect / couldn't check) ──────────────────────────────────────

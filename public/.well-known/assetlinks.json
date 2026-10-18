@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.kolayxport.app",
+      "sha256_cert_fingerprints": [
+        "20:7C:27:56:D0:BC:4D:90:35:0B:B9:BF:A2:2E:30:FD:56:A8:82:52:83:04:50:3D:2F:63:A6:B5:6E:97:A1:96",
+        "A1:A8:C7:DB:EA:68:58:4A:B1:FB:89:94:5A:7D:56:D4:9F:A6:C1:65:88:29:C9:6B:C5:89:4D:D2:03:C6:8B:49"
+      ]
+    }
+  }
+]

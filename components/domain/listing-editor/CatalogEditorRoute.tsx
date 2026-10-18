@@ -10,6 +10,7 @@
 //   A cross-list price is only pre-filled when its currency is the store's (no silent $25 → ₺25).
 // - A create Send whose new id is not numeric (Wix GUID, alphanumeric Trendyol barcode) is moved to the edit route
 //   here (the engine only does it for numeric ids), so the create workspace can never stage a second create.
+import { useAiCostsVisible } from '@/components/domain/credits/useCredits';
 import * as React from 'react';
 import { useRouter } from 'next/router';
 import { useTranslations } from 'next-intl';
@@ -248,6 +249,7 @@ export interface CatalogEditorRouteProps {
 
 export function CatalogEditorRoute({ marketplace, mode }: CatalogEditorRouteProps) {
   const t = useTranslations('listingEditor');
+  const showCosts = useAiCostsVisible();
   const router = useRouter();
   const toast = useToast();
   const param = STORE_PARAM[marketplace];
@@ -373,7 +375,7 @@ export function CatalogEditorRoute({ marketplace, mode }: CatalogEditorRouteProp
           marketplace,
           onCopy: () => setPicker(true),
           // Trendyol: the cross-list copy writes a Turkish title + description (AI proposals, M6b-E fillListing).
-          credits: marketplace === 'trendyol' ? fillCredits('trendyol') : undefined,
+          credits: marketplace === 'trendyol' && showCosts ? fillCredits('trendyol') : undefined,
         })
       : () => null;
   const common = {

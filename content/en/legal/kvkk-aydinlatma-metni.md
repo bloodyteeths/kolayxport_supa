@@ -108,7 +108,7 @@ Transfers to the marketplaces and carriers you connect happen on your instructio
 
 We keep personal data for as long as the purpose requires and for the periods set by law. Main periods:
 
-- **Account data:** while your account is open; deleted or anonymised within [TODO(owner): hesap kapatıldıktan sonra silme süresi, ör. 30 gün] after closure, except records we must keep by law.
+- **Account data:** while your account is open; deleted immediately when the account is deleted and gone from the rotating backups within about 3 months at most, except records we must keep by law.
 - **Invoices, payments and contract records:** for the periods set by the Turkish Commercial Code and Tax Procedure Law (up to 10 years); distance contract records for at least 3 years.
 - **Access tokens for connected accounts:** while the connection exists; deleted when you disconnect.
 - **System and security logs:** up to 12 months; secrets such as passwords and access tokens are masked before they are written to logs.

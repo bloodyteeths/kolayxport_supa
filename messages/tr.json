@@ -1394,7 +1394,8 @@
         "address": "Adres",
         "customs": "Gümrük ve para birimi",
         "importer": "Kayıtlı ithalatçı",
-        "etgb": "ETGB"
+        "etgb": "ETGB",
+        "trendyol": "Trendyol"
       },
       "field": {
         "companyName": "Şirket adı",
@@ -1435,7 +1436,10 @@
         "PERSONAL_NATIONAL": "TC kimlik no",
         "BUSINESS_UNION": "AB işletme no",
         "PERSONAL_UNION": "AB kişisel no"
-      }
+      },
+      "trendyolHelp": "KolayXport'un Trendyol paketlerinizle nasıl çalışacağı.",
+      "trendyolAutoPicking": "Etiket yazdırınca “hazırlanıyor” bildir",
+      "trendyolAutoPickingHelper": "KolayXport'tan kargo etiketi yazdırdığınızda paket Trendyol'da Hazırlanıyor (Picking) olarak işaretlenir. Kargoya verildi ve teslim edildi durumlarını Trendyol, Faturalandı durumunu fatura sağlayıcınız ayarlar."
     },
     "saveFailed": "Kaydedilemedi. Değişiklikleriniz duruyor.",
     "credentials": {
@@ -1754,6 +1758,20 @@
       "revokeFailed": "Bağlantı kaldırılamadı. Tekrar deneyin.",
       "createFailed": "Anahtar oluşturulamadı. Tekrar deneyin.",
       "privacy": "Alıcılarınızın adı, adresi, e-postası ve telefonu yapay zekâ uygulamalarına hiç gönderilmez (siparişlerde yalnızca ülke). Bağlantılar en geç bir yılda kendiliğinden sona erer."
+    },
+    "deleteAccount": {
+      "title": "Hesabı sil",
+      "helper": "Hesabınızı ve tüm verilerinizi kalıcı olarak siler. Geri alınamaz.",
+      "open": "Hesabı sil",
+      "modalTitle": "Hesabınız kalıcı olarak silinsin mi?",
+      "modalBody": "Siparişler, ilanlar, bağlı mağazalar, görseller ve tüm ayarlar hemen silinir; etkin bir aboneliğiniz varsa iptal edilir. Bu işlem geri alınamaz.",
+      "confirmLabel": "Onaylamak için e-posta adresinizi yazın: {email}",
+      "passwordLabel": "Şifre",
+      "passwordHelper": "E-posta ve şifreyle giriş yapıyorsanız gerekli. Google ile giriş yapıyorsanız boş bırakın.",
+      "confirmButton": "Hesabı kalıcı olarak sil",
+      "wrongPassword": "Şifre yanlış.",
+      "confirmMismatch": "E-posta adresi hesabınızla eşleşmiyor.",
+      "failed": "Hesap silinemedi. Lütfen tekrar deneyin veya destek@kolayxport.com adresine yazın."
     }
   },
   "importer": {
@@ -12852,7 +12870,8 @@
       "fixAddress": "Adresi düzelt",
       "deleteLabel": "Etiketi sil…",
       "deleteOrder": "KolayXport'tan kaldır…",
-      "copyAddress": "Kopyala"
+      "copyAddress": "Kopyala",
+      "labelsBar": "Etiket işlemleri"
     },
     "toolbar": {
       "searchPlaceholder": "Sipariş no, alıcı, SKU, takip no ara…",
@@ -17042,6 +17061,25 @@
     "pickingDone": "Trendyol: paket hazırlanıyor (Picking)",
     "invoicedDone": "Trendyol: paket faturalandı",
     "statusFailed": "Trendyol durumu kabul etmedi: {reason}",
-    "zplNotAllowed": "Trendyol mağazanız için ortak barkod hizmetini açmamış. Trendyol kategori sorumlunuzdan açmasını isteyin. O zamana kadar “Kargo etiketini yazdır” ile yazdırın: barkodu Trendyol kargo numaranızdır."
+    "zplNotAllowed": "Trendyol mağazanız için ortak barkod hizmetini açmamış. Trendyol kategori sorumlunuzdan açmasını isteyin. O zamana kadar “Kargo etiketini yazdır” ile yazdırın: barkodu Trendyol kargo numaranızdır.",
+    "printedAt": "Etiket yazdırıldı · {date}",
+    "bulk": {
+      "button": "Trendyol etiketleri ({count})",
+      "buttonShort": "Trendyol ({count})",
+      "printing": "Etiketler hazırlanıyor…",
+      "menuLabel": "Trendyol etiketi biçimi",
+      "pdf": "PDF · tüm kargo firmaları",
+      "zpl": "ZPL (termal yazıcı) · yalnız Trendyol Express / Aras",
+      "tooltip": "Kargoya verilmemiş ve henüz yazdırılmamış Trendyol siparişlerinin etiketleri tek dosyada (bir seferde en fazla {max})",
+      "preparing": "{count} Trendyol etiketi hazırlanıyor…",
+      "done": "{count} etiket yazdırıldı",
+      "skippedNoCargo": "{count} sipariş atlandı: kargo numarası yok",
+      "skippedNotCommon": "{count} sipariş atlandı: kargo firmasının Trendyol ortak etiketi yok, PDF ile yazdırın",
+      "skippedFailed": "{count} etiket Trendyol'dan alınamadı, birazdan tekrar deneyin",
+      "remaining": "Kalan {count} için tekrar basın",
+      "nothing": "Yazdırılacak yeni Trendyol etiketi yok",
+      "nothingZpl": "ZPL ile yazdırılacak etiket yok: bu siparişlerin kargo firması Trendyol Express / Aras değil. PDF ile yazdırın",
+      "failed": "Trendyol etiketleri oluşturulamadı: {reason}"
+    }
   }
 }

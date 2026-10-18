@@ -24,6 +24,7 @@
 // eBay lane (legacy EbayListingsLegacy `handleAIBulkOptimize`): `/api/clawd/ebay-ai?action=bulk_optimize_titles`
 // (existing action, ≤ 10 listings per request, title only). Titles are guarded with `guardEbayTitle` (entity-decoded,
 // not garbled, ≤ 80 characters; Etsy's house style is NOT applied). Same staging path: suggestions are cell edits.
+import { useAiCostsVisible } from '@/components/domain/credits/useCredits';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import {
@@ -321,6 +322,8 @@ const key = (rowId: string, field: string) => `${rowId}\u0000${field}`;
 
 export function useBulkAi(options: UseBulkAiOptions): UseBulkAi {
   const t = useTranslations();
+  // No credit costs for Shopify-connected accounts (App Store 1.2.1).
+  const showCosts = useAiCostsVisible();
   const opts = useRef(options);
   opts.current = options;
 
@@ -542,7 +545,7 @@ export function useBulkAi(options: UseBulkAiOptions): UseBulkAi {
     });
   }, []);
 
-  const costLabel = useCallback((n: number) => t('bulk.ai.cost', { count: bulkAiCredits(n) }), [t]);
+  const costLabel = useCallback((n: number) => (showCosts ? t('bulk.ai.cost', { count: bulkAiCredits(n) }) : ''), [t, showCosts]);
 
   const running = status === 'running';
   const metaLabel = running ? t('bulk.ai.progress', { done: progress.done, total: progress.total }) : null;

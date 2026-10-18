@@ -47,6 +47,11 @@ import {
 import { copyPickQuery, copyPickerRows, copySourcesFor } from '@/components/domain/listing-editor/CatalogCopyPicker';
 import { trendyolFieldsFromProduct } from '@/components/domain/listing-editor/adapters/trendyol';
 import type { FieldMap, ListingView } from '@/lib/listingEditor/types';
+// AI credit costs are hidden for Shopify-connected accounts (useAiCostsVisible reads the credit balance). Shown here,
+// without the balance request, unless a test switches them off.
+const aiCosts = vi.hoisted(() => ({ visible: true }));
+vi.mock('@/components/domain/credits/useCredits', async (orig) => ({ ...(await orig<Record<string, unknown>>()), useAiCostsVisible: () => aiCosts.visible }));
+
 
 const fetches: string[] = [];
 function stubListings(body: unknown, status = 200) {

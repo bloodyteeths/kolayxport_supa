@@ -3,10 +3,12 @@
  * cargo), our own PDF cargo label for every order (Code 128 of the cargo number), and the package statuses the
  * seller reports (Picking → Invoiced). Reads the raw shipment package kept in `Order.rawData` (lib/mappers/trendyol.ts).
  */
+import { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { createTrendyolClient, type TrendyolApiClient } from '@/lib/integrations/trendyolApiClient';
-import type { CargoLabelParty } from '@/lib/shipping/cargoLabelPdf';
+import type { CargoLabelInput, CargoLabelParty } from '@/lib/shipping/cargoLabelPdf';
+import { trendyolCargoInfo as cargoInfoOf, type TrendyolCargoInfo as CargoInfo } from './cargoInfo';
 
 export async function trendyolClientFor(userId: string): Promise<TrendyolApiClient | null> {
   const cred = await prisma.credential.findUnique({
@@ -120,4 +122,84 @@ export function contentsOf(raw: Record<string, any>): string | null {
   const lines: any[] = Array.isArray(raw.lines) ? raw.lines : [];
   if (!lines.length) return null;
   return lines.map((l) => `${Number(l?.quantity) || 1} × ${l?.productName || l?.merchantSku || ''}`.trim()).join(', ').slice(0, 240);
+}
+
+export const CARGO_LABEL_CAPTIONS = {
+  tr: { recipient: 'Alıcı', sender: 'Gönderen', order: 'Sipariş', package: 'Paket', contents: 'İçerik', deci: 'Desi' },
+  en: { recipient: 'Recipient', sender: 'Sender', order: 'Order', package: 'Package', contents: 'Contents', deci: 'Deci' },
+};
+
+/** The PDF cargo label of one stored Trendyol order (single label route and bulk). */
+export function cargoLabelInputOf(
+  order: { orderNumber?: string | null },
+  raw: Record<string, any>,
+  info: CargoInfo,
+  sender: CargoLabelParty | null,
+  locale: 'tr' | 'en',
+): CargoLabelInput {
+  return {
+    carrier: info.carrier || 'Trendyol',
+    cargoNumber: info.cargoNumber || '',
+    marketplace: 'Trendyol',
+    orderNumber: order.orderNumber || String(raw.orderNumber || ''),
+    packageId: info.packageId,
+    recipient: recipientOf(raw),
+    sender,
+    contents: contentsOf(raw),
+    deci: Number(raw.cargoDeci) || null,
+    t: CARGO_LABEL_CAPTIONS[locale],
+  };
+}
+
+/** Seller opted in to "report Picking when a cargo label is printed" (Settings › Sender › Trendyol). */
+export async function autoPickingEnabled(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { shippingSettings: true } });
+  return !!(user?.shippingSettings as any)?.trendyolAutoPicking;
+}
+
+/**
+ * Best effort: report Picking for a Created package when the seller opted in. Never fails the label.
+ * `enabled` skips the settings read when the caller already has it (bulk).
+ */
+export async function autoPicking(userId: string, orderId: string, raw: Record<string, any>, client: TrendyolApiClient | null, enabled?: boolean) {
+  if (!client) return;
+  const info = cargoInfoOf(raw);
+  if (info.nextStatus !== 'Picking' || !info.packageId || !info.lines.length) return;
+  if (!(enabled ?? (await autoPickingEnabled(userId)))) return;
+  try {
+    await client.updatePackageStatus(info.packageId, info.lines, 'Picking');
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { externalStatus: 'Picking', rawData: { ...raw, status: 'Picking' } as unknown as Prisma.InputJsonValue },
+    });
+  } catch (err) {
+    logger.warn('[TRENDYOL CARGO] auto Picking failed', { userId, orderId, ...trendyolErrorText(err) });
+  }
+}
+
+/**
+ * Mark cargo labels printed (bulk printing skips these). Only rows still unmarked and owned by `userId`;
+ * returns how many rows changed.
+ */
+export async function markCargoLabelsPrinted(userId: string, orderIds: readonly string[], at = new Date()): Promise<number> {
+  if (!orderIds.length) return 0;
+  const res = await prisma.order.updateMany({
+    where: { id: { in: [...orderIds] }, userId, cargoLabelPrintedAt: null },
+    data: { cargoLabelPrintedAt: at },
+  });
+  return res.count;
+}
+
+/** Run `fn` over `items` with at most `limit` in flight; results in input order. */
+export async function mapLimit<T, R>(items: readonly T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i], i);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(Math.max(1, limit), items.length) }, worker));
+  return out;
 }

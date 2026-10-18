@@ -1,5 +1,7 @@
 import { useEffect, type ReactNode } from 'react';
 import { NextSeo } from 'next-seo';
+import { useRouter } from 'next/router';
+import { isPlayClient } from '@/lib/billing/playClient';
 import { useTranslations } from 'next-intl';
 import { SITE_URL } from '@/lib/site/company';
 import { localePath, type SiteLocale } from '@/lib/site/routes';
@@ -29,6 +31,8 @@ interface Props {
   children: ReactNode;
   /** Dark hero pages render the header on ink. */
   tone?: 'paper' | 'ink';
+  /** Login / auth / error pages (PublicLayout) stay in the Google Play app; marketing pages hand over to /app. */
+  keepInPlayApp?: boolean;
 }
 
 /**
@@ -36,12 +40,12 @@ interface Props {
  * getStaticProps (`siteMessageProps`). Sets
  * canonical + hreflang + OG, the Organization/WebSite JSON-LD, the brand fonts, header and footer.
  */
-export default function SiteLayout({ locale, seo, jsonLd = [], children, tone = 'paper' }: Props) {
+export default function SiteLayout({ locale, seo, jsonLd = [], children, tone = 'paper', keepInPlayApp = false }: Props) {
   // The intl provider lives in pages/_app.tsx: marketing pages pass `siteLocale` + their message subset.
-  return <SiteShell locale={locale} seo={seo} jsonLd={jsonLd} tone={tone}>{children}</SiteShell>;
+  return <SiteShell locale={locale} seo={seo} jsonLd={jsonLd} tone={tone} keepInPlayApp={keepInPlayApp}>{children}</SiteShell>;
 }
 
-function SiteShell({ locale, seo, jsonLd = [], children, tone }: Props) {
+function SiteShell({ locale, seo, jsonLd = [], children, tone, keepInPlayApp }: Props) {
   const t = useTranslations('site');
   const self = localePath(locale, seo.path);
   const canonical = `${SITE_URL}${self === '/' ? '' : self}` || SITE_URL;
@@ -52,6 +56,13 @@ function SiteShell({ locale, seo, jsonLd = [], children, tone }: Props) {
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
+
+  // The Google Play app is the product only: marketing pages carry prices and plan links (Play payments
+  // policy), so they hand over to the app (a signed-out user lands on /login from there). playClient.ts.
+  const router = useRouter();
+  useEffect(() => {
+    if (!keepInPlayApp && isPlayClient()) void router.replace('/app');
+  }, [router, keepInPlayApp]);
 
   return (
     <>

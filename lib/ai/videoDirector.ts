@@ -49,6 +49,8 @@ export type VideoDirection = {
   expression: (typeof VIDEO_EXPRESSIONS)[number];
   scene: (typeof VIDEO_SCENES)[number];
   sceneText?: string;
+  /** The seller's custom setting as a checked English description (server, lib/ai/videoNotes) — used instead. */
+  sceneTextEn?: string;
   light: (typeof VIDEO_LIGHTS)[number];
   audio: (typeof VIDEO_AUDIO)[number];
   /** Light film grain after generation (real camera sensors have it; clean AI output reads as fake). */
@@ -250,8 +252,9 @@ export function audioLine(d: Pick<VideoDirection, 'audio'>): string {
 }
 export const EXPRESSION_TEXT = (d: Pick<VideoDirection, 'expression'>): string => EXPRESSION[d.expression] ?? EXPRESSION.natural;
 
-export function sceneSentence(d: Pick<VideoDirection, 'scene' | 'sceneText' | 'light'>): string {
-  const scene = d.scene === 'custom' ? (clean(d.sceneText, 300) ? `Setting: ${clean(d.sceneText, 300)}.` : '') : SCENE[d.scene];
+export function sceneSentence(d: Pick<VideoDirection, 'scene' | 'sceneText' | 'sceneTextEn' | 'light'>): string {
+  const text = clean(d.sceneTextEn, 300) || clean(d.sceneText, 300);
+  const scene = d.scene === 'custom' ? (text ? `Setting: ${text}.` : '') : SCENE[d.scene];
   return [scene, LIGHT[d.light]].filter(Boolean).join(' ');
 }
 
@@ -359,6 +362,7 @@ export function normalizeDirection(v: unknown): VideoDirection {
     expression: pick(VIDEO_EXPRESSIONS, o.expression, DEFAULT_DIRECTION.expression),
     scene: pick(VIDEO_SCENES, o.scene, DEFAULT_DIRECTION.scene),
     sceneText: clean(o.sceneText, 300) || undefined,
+    sceneTextEn: clean(o.sceneTextEn, 300) || undefined,
     light: pick(VIDEO_LIGHTS, o.light, DEFAULT_DIRECTION.light),
     audio: pick(VIDEO_AUDIO, o.audio, DEFAULT_DIRECTION.audio),
     grain: o.grain === undefined ? DEFAULT_DIRECTION.grain : Boolean(o.grain),

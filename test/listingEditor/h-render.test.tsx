@@ -18,11 +18,17 @@ import { encodeAspects, decodeAspects } from '@/components/domain/listing-editor
 import { FieldSuggestion } from '@/components/ds/inputs/FieldSuggestion';
 import { useListingAI, type AiListingInput, type UseListingAI } from '@/components/domain/listing-editor/useListingAI';
 import { AiFillCard } from '@/components/domain/listing-editor/AiFillCard';
+import { clearEbayCategoryLabels, ebayCategoryLabel } from '@/components/domain/listing-editor/ebayCategoryLabels';
 import { ReviewDifferencesPanel } from '@/components/domain/listing-editor/ReviewDifferencesPanel';
 import { ProfilesModal, PROFILE_STORAGE_KEY } from '@/components/domain/listing-editor/ProfilesModal';
 import { ScheduleModal } from '@/components/domain/listing-editor/ScheduleModal';
 import { H_EN, H_TR, mergeMessages } from './h-messages';
 import { ETSY_PORT_EN, ETSY_PORT_TR } from '../listings/etsy-port-messages';
+// AI credit costs are hidden for Shopify-connected accounts (useAiCostsVisible reads the credit balance). Shown here,
+// without the balance request, unless a test switches them off.
+const aiCosts = vi.hoisted(() => ({ visible: true }));
+vi.mock('@/components/domain/credits/useCredits', async (orig) => ({ ...(await orig<Record<string, unknown>>()), useAiCostsVisible: () => aiCosts.visible }));
+
 
 type Locale = 'en' | 'tr';
 // + the listings-etsy port keys (profile delete) until messages/*.json are merged.
@@ -297,12 +303,22 @@ describe.each<Locale>(['en', 'tr'])('AiFillCard (%s)', (locale) => {
   });
 });
 
-function EbayFillHarness({ setField }: { setField: (k: string, v: unknown) => void }) {
+function EbayFillHarness({ setField, photoUrls }: { setField: (k: string, v: unknown) => void; photoUrls?: string[] }) {
   const ai = useListingAI({ marketplace: 'ebay', input: { title: '', description: '' }, setField, getField: () => '' });
-  return <AiFillCard ai={ai} />;
+  return <AiFillCard ai={ai} photoUrls={photoUrls} />;
 }
 
 describe.each<Locale>(['en', 'tr'])('AiFillCard eBay (%s)', (locale) => {
+  it('Shopify-connected accounts see no credit cost (App Store 1.2.1)', () => {
+    aiCosts.visible = false;
+    try {
+      wrap(<EbayFillHarness setField={vi.fn()} />, locale);
+      expect(screen.queryByTestId('le-ai-fill-cost')).toBeNull();
+      expect(screen.getByTestId('le-ai-fill-run').getAttribute('aria-label') ?? '').not.toMatch(/credit|kredi/i);
+    } finally {
+      aiCosts.visible = true;
+    }
+  });
   it('shows every proposal (no eBay section renders the frame\'s) and the real cost before Use all', async () => {
     route = (c) => {
       if (c.url.startsWith('/api/clawd/ebay-research')) return { json: {} };
@@ -329,6 +345,45 @@ describe.each<Locale>(['en', 'tr'])('AiFillCard eBay (%s)', (locale) => {
     expect(setField).toHaveBeenCalledWith('categoryId', '123');
     expect(setField).not.toHaveBeenCalledWith('categoryName', expect.anything());
     neverSent();
+  });
+
+  // The captured tutorial run (a photo of a NEW Iznik bowl): identify said LIKE_NEW, the category field showed
+  // "Category #262366", the description field showed HTML source.
+  it('fill from photos: NEW condition checked against the category, category name kept, plain-text description', async () => {
+    clearEbayCategoryLabels();
+    route = (c) => {
+      if (c.url.includes('identify_product')) return { json: { seed: 'handmade Turkish ceramic bowl blue tulip floral Iznik style pottery', productName: 'Ceramic decorative bowl', keywords: ['iznik pottery'], suggestedCondition: 'LIKE_NEW', notes: '' } };
+      if (c.url.startsWith('/api/clawd/ebay-research')) return { json: {} };
+      if (c.url.startsWith('/api/clawd/ebay?action=category_suggestions')) return { json: { categorySuggestions: [{ category: { categoryId: '262366', categoryName: 'Bowls' }, categoryTreeNodeAncestors: [{ categoryName: 'Pottery & Glass' }] }] } };
+      if (c.url.startsWith('/api/clawd/ebay?action=item_conditions')) return { json: { categoryId: '262366', itemConditions: [], conditionRequired: false } };
+      if (c.url.startsWith('/api/clawd/ebay?action=item_aspects')) return { json: { aspects: [{ localizedAspectName: 'Material', aspectConstraint: { aspectRequired: true } }] } };
+      if (c.url.includes('optimize_title')) return { json: { optimizedTitle: 'Turkish Iznik Ceramic Bowl Blue Tulip Floral Handmade Pottery' } };
+      if (c.url.includes('suggest_aspects')) return { json: { aspects: { Material: ['Ceramic'] } } };
+      if (c.url.includes('suggest_price')) return { json: {} };
+      if (c.url.includes('generate_description')) return { json: { description: '<div style="font-family: Arial"><h2>Turkish Iznik Bowl</h2><p>A hand painted ceramic bowl with a blue tulip pattern, new and unused.</p><ul><li>Blue and white</li></ul></div>' } };
+      return undefined;
+    };
+    const setField = vi.fn();
+    wrap(<EbayFillHarness setField={setField} photoUrls={['/api/clawd/serve-image?f=bowl.jpg']} />, locale);
+    fireEvent.click(screen.getByTestId('le-ai-fill-run'));
+    await screen.findByTestId('le-ai-fill-use-all');
+
+    // Condition: LIKE_NEW from a clean photo → NEW, validated against the category's list.
+    expect(calls.some((c) => c.url.startsWith('/api/clawd/ebay?action=item_conditions&category_id=262366'))).toBe(true);
+    const desc = calls.find((c) => c.url.includes('generate_description'))!;
+    expect(desc.body).toMatchObject({ condition: 'NEW', format: 'text' });
+    expect(screen.getByTestId('le-ai-fill-proposal-condition').textContent).toContain(locale === 'en' ? 'New' : 'Yeni');
+
+    fireEvent.click(screen.getByTestId('le-ai-fill-use-all'));
+    expect(setField).toHaveBeenCalledWith('condition', 'NEW');
+    // Category: the id is stored, the name the suggestion carried is kept for the category field.
+    expect(setField).toHaveBeenCalledWith('categoryId', '262366');
+    expect(ebayCategoryLabel('262366')).toBe('Bowls');
+    // Description: the plain-text field gets text, no markup.
+    const written = setField.mock.calls.find(([k]) => k === 'description')?.[1] as string;
+    expect(written).toBe('Turkish Iznik Bowl\n\nA hand painted ceramic bowl with a blue tulip pattern, new and unused.\n\n• Blue and white');
+    neverSent();
+    clearEbayCategoryLabels();
   });
 });
 

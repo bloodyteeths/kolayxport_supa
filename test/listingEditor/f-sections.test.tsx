@@ -23,6 +23,7 @@ import {
   parseCategorySuggestions,
 } from '@/components/domain/listing-editor/sections/EbayFieldSections';
 import { flatKeys, withF } from './f-messages';
+import { clearEbayCategoryLabels, rememberEbayCategoryLabel } from '@/components/domain/listing-editor/ebayCategoryLabels';
 
 type Locale = 'en' | 'tr';
 
@@ -113,6 +114,32 @@ describe.each<Locale>(['en', 'tr'])('eBay sections render (%s)', (locale) => {
     expect(screen.getByText(locale === 'en' ? 'Choose a category' : 'Bir kategori seçin')).toBeTruthy();
     expect((screen.getByDisplayValue('BOX-1') as HTMLInputElement).readOnly).toBe(true);
     await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledWith(expect.stringContaining('store_categories'), expect.anything()));
+  });
+});
+
+describe.each<Locale>(['en', 'tr'])('eBay category field shows the name (%s)', (locale) => {
+  afterEach(() => clearEbayCategoryLabels());
+
+  it('a category the AI fill applied shows its name, not "Category #id"', async () => {
+    rememberEbayCategoryLabel('262366', 'Bowls');
+    const { value } = makeCtx({ fields: { categoryId: '262366' } });
+    renderIn(<EbayDetailsSection />, value, locale);
+    expect(screen.getByDisplayValue('Bowls')).toBeTruthy();
+    expect(screen.queryByDisplayValue(/#262366/)).toBeNull();
+    expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.some(([u]) => String(u).includes('category_info'))).toBe(false);
+  });
+
+  it('an id nobody named in this session (reload, existing listing) is looked up once', async () => {
+    const base = globalThis.fetch as ReturnType<typeof vi.fn>;
+    const inner = base.getMockImplementation()!;
+    base.mockImplementation(async (url: string, init?: RequestInit) => (String(url).includes('action=category_info&category_id=262366')
+      ? json({ categoryId: '262366', categoryName: 'Bowls', leaf: true })
+      : inner(url, init)));
+    const { value } = makeCtx({ fields: { categoryId: '262366' } });
+    renderIn(<EbayDetailsSection />, value, locale);
+    expect(screen.getByDisplayValue(locale === 'en' ? 'Category #262366' : 'Kategori #262366')).toBeTruthy();
+    await waitFor(() => expect(screen.getByDisplayValue('Bowls')).toBeTruthy());
+    expect(base.mock.calls.filter(([u]) => String(u).includes('category_info')).length).toBe(1);
   });
 });
 

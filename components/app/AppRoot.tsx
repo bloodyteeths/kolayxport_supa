@@ -26,6 +26,7 @@ import { MoreSheetConnected } from '@/components/ds/shell/MoreSheet';
 import { CommandPalette, GoShortcutHint } from '@/components/ds/shell/CommandPalette';
 import { useGoShortcuts } from '@/lib/nav/useGoShortcuts';
 import { isShellRoute } from '@/lib/nav/shellRoutes';
+import { isPlayClient } from '@/lib/billing/playClient';
 
 // Inter via next/font (self-hosted). latin-ext covers ğ ş ı İ. Exposed as --font-inter at :root below.
 // preload: false — marketing pages never use Inter; app pages fetch it on first use (then cached).
@@ -74,10 +75,11 @@ function DsAppProviders({ children }: { children: ReactNode }) {
   const sub = data?.subscription ?? null;
   // Only an explicit Stripe account gets the upsell. A NULL billingProvider (e.g. the Shopify 1.2.1
   // reviewer-account shape) is unknown → null, never true.
+  // The Google Play app never shows an upsell (playClient.ts).
   const stripeUpsell =
     !sub || !sub.billingProvider
       ? null
-      : sub.billingProvider === 'stripe' && sub.subscriptionPlan !== 'shopify_free';
+      : sub.billingProvider === 'stripe' && sub.subscriptionPlan !== 'shopify_free' && !isPlayClient();
   return (
     <FormatProvider timeZone={data?.timezone ?? undefined}>
       <PlanTagProvider stripeUpsell={stripeUpsell}>{children}</PlanTagProvider>

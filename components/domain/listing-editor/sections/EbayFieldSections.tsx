@@ -15,7 +15,8 @@ import { useToast } from '@/components/ds/feedback/toast';
 import { useFormatters } from '@/lib/format';
 import { icons } from '@/lib/ds/icons';
 import { neutral } from '@/lib/ds/tokens';
-import { TITLE_MAX as EBAY_TITLE_MAX } from '@/lib/ebay/payloadRules';
+import { TITLE_MAX as EBAY_TITLE_MAX, descriptionToEbayHtml } from '@/lib/ebay/payloadRules';
+import { rememberEbayCategoryLabel, rememberEbayCategoryLabels, useEbayCategoryLabel } from '../ebayCategoryLabels';
 import { SELLER_SKU_MAX } from '@/lib/ebay/draftPlan';
 import { fieldAnchorId, sectionAnchorId } from '@/lib/listingEditor/sections';
 import type { FieldMap, ListingSectionProps, ListingView } from '@/lib/listingEditor/types';
@@ -212,7 +213,8 @@ export function EbayTitleSection({ id = 'title', aiTitle: aiTitleProp, aiDescrip
             labelAction={aiButton(aiDescription, t('ai.writeDescription'))}
             required
           >
-            {/* eBay renders the HTML itself; the live preview in the rail shows it sandboxed (MarketplacePreview). */}
+            {/* Plain text (paragraphs, "• " bullets) or HTML the seller types; plain text becomes HTML when sent
+                (descriptionToEbayHtml). The live preview in the rail shows what eBay gets (MarketplacePreview). */}
             <TextArea
               id={fieldAnchorId('description')}
               value={f.description}
@@ -356,7 +358,6 @@ async function fetchJson(url: string): Promise<unknown> {
 export function EbayDetailsSection({ id = 'details' }: Partial<ListingSectionProps>) {
   const t = useTranslations('listingEditor');
   const { f, ro, errorFor, dirty, set, ed } = useEbayFields();
-  const [categoryLabel, setCategoryLabel] = React.useState<Record<string, string>>({});
   const [conditions, setConditions] = React.useState<Array<{ conditionId: string; conditionDescription?: string }>>([]);
   const [storeCats, setStoreCats] = React.useState<{ status: 'loading' | 'ready' | 'error'; items: string[] }>({ status: 'loading', items: [] });
   const [storeNonce, setStoreNonce] = React.useState(0);
@@ -391,12 +392,27 @@ export function EbayDetailsSection({ id = 'details' }: Partial<ListingSectionPro
 
   const loadCategories = React.useCallback(async (query: string) => {
     const opts = parseCategorySuggestions(await fetchJson(`/api/clawd/ebay?action=category_suggestions&q=${encodeURIComponent(query)}`));
-    setCategoryLabel((m) => ({ ...m, ...Object.fromEntries(opts.map((o) => [o.value, o.label])) }));
+    rememberEbayCategoryLabels(opts.map((o) => [o.value, o.label] as const));
     return opts;
   }, []);
 
+  // The name comes from whoever set the id (a search here, the AI fill's suggestion); an id nobody named in this
+  // session (reload, existing listing) is looked up once. "Category #<id>" only while that runs or if it fails.
+  const knownLabel = useEbayCategoryLabel(f.categoryId);
+  React.useEffect(() => {
+    if (!f.categoryId || knownLabel) return undefined;
+    let cancelled = false;
+    fetchJson(`/api/clawd/ebay?action=category_info&category_id=${encodeURIComponent(f.categoryId)}`)
+      .then((d) => {
+        const name = (d as { categoryName?: unknown } | null)?.categoryName;
+        if (!cancelled) rememberEbayCategoryLabel(f.categoryId, name);
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [f.categoryId, knownLabel]);
+
   const categoryValue: ComboboxOption | null = f.categoryId
-    ? { value: f.categoryId, label: categoryLabel[f.categoryId] ?? t('field.categoryId', { id: f.categoryId }) }
+    ? { value: f.categoryId, label: knownLabel ?? t('field.categoryId', { id: f.categoryId }) }
     : null;
   const storeOptions: ComboboxOption[] = Array.from(new Set([...storeCats.items, ...f.storeCategoryNames])).map((n) => ({ value: n, label: n }));
 
@@ -500,7 +516,8 @@ export function ebayPreviewModel(view: ListingView<FieldMap>, _shopName: string 
   return {
     title: f.title,
     subtitle: f.subtitle || null,
-    description: f.description,
+    // What eBay gets: plain text becomes paragraphs / lists, HTML stays as typed.
+    description: descriptionToEbayHtml(f.description),
     price: Number.isFinite(price) ? price : null,
     priceRange: view.facts.variations?.priceRange ?? null,
     currency: f.currency || view.meta.currency,

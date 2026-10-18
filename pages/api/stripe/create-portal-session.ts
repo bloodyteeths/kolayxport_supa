@@ -19,6 +19,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import type Stripe from 'stripe';
 import { getAuthUser } from '@/lib/auth';
+import { isPlayRequest } from '@/lib/billing/playClient';
 import { stripe } from '@/lib/stripe';
 import {
   appBaseUrl,
@@ -34,6 +35,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader('Allow', ['POST']);
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  // Google Play app: nothing is sold in the Android app (lib/billing/playClient.ts).
+  if (isPlayRequest(req)) return res.status(403).json({ error: 'Not available in the app', code: 'playApp' });
 
   const authUser = await getAuthUser(req, res);
   if (!authUser) return res.status(401).json({ error: 'Not authenticated' });

@@ -13,5 +13,15 @@
     "invoicedDone": "Trendyol: paket faturalandı",
     "statusFailed": "Trendyol durumu kabul etmedi: {reason}",
     "zplNotAllowed": "Trendyol mağazanız için ortak barkod hizmetini açmamış. Trendyol kategori sorumlunuzdan açmasını isteyin. O zamana kadar “Kargo etiketini yazdır” ile yazdırın: barkodu Trendyol kargo numaranızdır."
+  },
+  "settings": {
+    "sender": {
+      "group": {
+        "trendyol": "Trendyol"
+      },
+      "trendyolHelp": "KolayXport'un Trendyol paketlerinizle nasıl çalışacağı.",
+      "trendyolAutoPicking": "Etiket yazdırınca “hazırlanıyor” bildir",
+      "trendyolAutoPickingHelper": "KolayXport'tan kargo etiketi yazdırdığınızda paket Trendyol'da Hazırlanıyor (Picking) olarak işaretlenir. Kargoya verildi ve teslim edildi durumlarını Trendyol, Faturalandı durumunu fatura sağlayıcınız ayarlar."
+    }
   }
 }

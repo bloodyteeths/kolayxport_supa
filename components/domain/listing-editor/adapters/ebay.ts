@@ -63,7 +63,7 @@ export const EBAY_PENDING_DRAFT_STATUSES = ['draft', 'failed', 'conflict', 'sync
 export interface EbayEditorFields extends FieldMap {
   title: string;
   subtitle: string;
-  /** HTML allowed (eBay renders it sanitized). */
+  /** Plain text (paragraphs, "• " bullets) or HTML; plain text is sent as HTML (lib/ebay/payloadRules descriptionToEbayHtml). */
   description: string;
   /** Public image URLs in order (first = primary). */
   images: string[];

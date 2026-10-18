@@ -1476,7 +1476,8 @@
         "address": "Address",
         "customs": "Customs & currency",
         "importer": "Importer of record",
-        "etgb": "ETGB"
+        "etgb": "ETGB",
+        "trendyol": "Trendyol"
       },
       "field": {
         "companyName": "Company name",
@@ -1517,7 +1518,10 @@
         "PERSONAL_NATIONAL": "Personal ID number",
         "BUSINESS_UNION": "EU business ID",
         "PERSONAL_UNION": "EU personal ID"
-      }
+      },
+      "trendyolHelp": "How KolayXport works with your Trendyol packages.",
+      "trendyolAutoPicking": "Report “preparing” when I print the label",
+      "trendyolAutoPickingHelper": "When you print a cargo label from KolayXport, the package is marked as Picking (Hazırlanıyor) on Trendyol. Shipped and Delivered are set by Trendyol; Invoiced by your invoice provider."
     },
     "saveFailed": "Couldn't save. Your changes are still here.",
     "credentials": {
@@ -1836,6 +1840,20 @@
       "revokeFailed": "Could not remove the connection. Try again.",
       "createFailed": "Could not create the key. Try again.",
       "privacy": "Your buyers' names, addresses, e-mails and phone numbers are never sent to AI apps (orders carry the country only). Connections end by themselves after a year at the latest."
+    },
+    "deleteAccount": {
+      "title": "Delete account",
+      "helper": "Permanently deletes your account and all your data. This cannot be undone.",
+      "open": "Delete account",
+      "modalTitle": "Delete your account permanently?",
+      "modalBody": "Orders, listings, connected stores, images and all settings are deleted immediately, and an active subscription is cancelled. This cannot be undone.",
+      "confirmLabel": "Type your e-mail address to confirm: {email}",
+      "passwordLabel": "Password",
+      "passwordHelper": "Required if you sign in with e-mail and password. Leave empty if you sign in with Google.",
+      "confirmButton": "Delete account permanently",
+      "wrongPassword": "Wrong password.",
+      "confirmMismatch": "The e-mail address does not match your account.",
+      "failed": "The account could not be deleted. Please try again or write to destek@kolayxport.com."
     }
   },
   "fedex": {
@@ -12852,7 +12870,8 @@
       "fixAddress": "Fix address",
       "deleteLabel": "Delete label…",
       "deleteOrder": "Remove from KolayXport…",
-      "copyAddress": "Copy"
+      "copyAddress": "Copy",
+      "labelsBar": "Label actions"
     },
     "toolbar": {
       "searchPlaceholder": "Search order #, buyer, SKU, tracking…",
@@ -17042,6 +17061,25 @@
     "pickingDone": "Trendyol: package is preparing (Picking)",
     "invoicedDone": "Trendyol: package is invoiced",
     "statusFailed": "Trendyol didn't accept the status: {reason}",
-    "zplNotAllowed": "Trendyol hasn't enabled its common label (ortak barkod) for your store. Ask your Trendyol category manager to turn it on. Until then, use “Print cargo label”: its barcode is your Trendyol cargo number."
+    "zplNotAllowed": "Trendyol hasn't enabled its common label (ortak barkod) for your store. Ask your Trendyol category manager to turn it on. Until then, use “Print cargo label”: its barcode is your Trendyol cargo number.",
+    "printedAt": "Label printed · {date}",
+    "bulk": {
+      "button": "Trendyol labels ({count})",
+      "buttonShort": "Trendyol ({count})",
+      "printing": "Preparing labels…",
+      "menuLabel": "Trendyol label format",
+      "pdf": "PDF · every carrier",
+      "zpl": "ZPL (thermal printer) · Trendyol Express / Aras only",
+      "tooltip": "Labels of every unshipped Trendyol order not printed yet, in one file (up to {max} at a time)",
+      "preparing": "Preparing {count, plural, one {# Trendyol label} other {# Trendyol labels}}…",
+      "done": "{count, plural, one {# label printed} other {# labels printed}}",
+      "skippedNoCargo": "{count, plural, one {# order skipped} other {# orders skipped}}: no cargo number",
+      "skippedNotCommon": "{count, plural, one {# order skipped} other {# orders skipped}}: the carrier has no Trendyol common label, print it as PDF",
+      "skippedFailed": "{count, plural, one {# label} other {# labels}} not returned by Trendyol, try again shortly",
+      "remaining": "Press again for the remaining {count}",
+      "nothing": "No new Trendyol labels to print",
+      "nothingZpl": "No labels to print as ZPL: these orders' carrier isn't Trendyol Express / Aras. Print them as PDF",
+      "failed": "Couldn't create the Trendyol labels: {reason}"
+    }
   }
 }

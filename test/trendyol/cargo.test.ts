@@ -58,6 +58,13 @@ describe('trendyolCargoInfo', () => {
     expect(trendyolCargoInfo({ ...raw, shipmentPackageStatus: 'Shipped' }).nextStatus).toBeNull();
     expect(trendyolCargoInfo({}).cargoNumber).toBeNull();
   });
+
+  it('real Trendyol Express Marketplace package: status Created + shipmentPackageStatus ReadyToShip → Picking next', () => {
+    const info = trendyolCargoInfo({ ...raw, cargoProviderName: 'Trendyol Express Marketplace', status: 'Created', shipmentPackageStatus: 'ReadyToShip' });
+    expect(info.packageStatus).toBe('Created');
+    expect(info.nextStatus).toBe('Picking');
+    expect(trendyolCargoInfo({ ...raw, status: 'Picking', shipmentPackageStatus: 'ReadyToShip' }).nextStatus).toBe('Invoiced');
+  });
 });
 
 describe('Trendyol error text', () => {

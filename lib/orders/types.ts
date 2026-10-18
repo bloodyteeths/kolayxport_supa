@@ -173,6 +173,8 @@ export interface ApiOrder {
   shippingUpgrade?: string | null;
   giftMessage?: string | null;
   customerNote?: string | null;
+  /** Trendyol: when the cargo label was printed (pages/api/trendyol/cargo-bulk.ts). */
+  cargoLabelPrintedAt?: string | null;
   manualShippingCost?: number | string | null;
   manualShippingCostCurrency?: string | null;
   weightKg?: number | null;
@@ -418,7 +420,14 @@ export interface OrderRow {
   /** Hepsiburada orders: package state for the "Pack & print label" action (HB-contracted cargo). */
   hepsiburada?: { packageNumber: string | null; cargoCompany: string | null; canPack: boolean } | null;
   /** Trendyol orders: cargo label + package status actions (lib/trendyol/cargoInfo.ts). */
-  trendyol?: { cargoNumber: string | null; carrier: string | null; commonLabel: boolean; nextStatus: 'Picking' | 'Invoiced' | null } | null;
+  trendyol?: {
+    cargoNumber: string | null;
+    carrier: string | null;
+    commonLabel: boolean;
+    nextStatus: 'Picking' | 'Invoiced' | null;
+    /** ISO time the cargo label was printed (bulk or single); bulk printing skips these. */
+    labelPrintedAt: string | null;
+  } | null;
   trackingSubmission: TrackingSubmissionSummary | null;
   carrierCost: CarrierCost | null;
 

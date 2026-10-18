@@ -1,15 +1,14 @@
 /**
  * OrderPanel › Label & tracking, Trendyol orders:
  *  - "Print cargo label" → our 100×150 mm PDF (Code 128 of Trendyol's cargo number), any carrier, any printer;
- *  - "Trendyol label (ZPL)" → Trendyol's own common label for thermal printers (Trendyol Express / Aras only);
- *  - report the package status Trendyol expects from the seller: Picking, then Invoiced with the invoice number.
- * `pages/api/trendyol/cargo.ts` does the work.
+ *  - "Trendyol label (ZPL)" → Trendyol's own common label for thermal printers (Trendyol Express / Aras only).
+ * No manual status buttons: Trendyol sets Shipped/Delivered itself, the invoice provider sets Invoiced, and Picking is
+ * reported on print when the seller turned it on (Settings › Sender › Trendyol). `pages/api/trendyol/cargo.ts`.
  */
 import React, { useState } from 'react';
 import { Box, Typography } from '@mui/material';
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ds/inputs/Button';
-import { TextField } from '@/components/ds/inputs/TextField';
 import { useToast } from '@/components/ds/feedback';
 import { neutral as n } from '@/lib/ds/tokens';
 import { icons } from '@/lib/ds/icons';
@@ -33,14 +32,11 @@ export function TrendyolCargoActions({ row }: { row: OrderRow }) {
   const t = useTranslations('trendyolCargo');
   const locale = useLocale();
   const toast = useToast();
-  const [busy, setBusy] = useState<'pdf' | 'zpl' | 'status' | null>(null);
-  const [invoiceNumber, setInvoiceNumber] = useState('');
-  const [reported, setReported] = useState<'Picking' | 'Invoiced' | null>(null);
+  const [busy, setBusy] = useState<'pdf' | 'zpl' | null>(null);
   /** Trendyol answered COMMON_LABEL_NOT_ALLOWED: the store is not enabled for the common label. */
   const [zplBlocked, setZplBlocked] = useState(false);
   const info = row.trendyol;
   if (!info?.cargoNumber) return null;
-  const next = reported === 'Picking' ? 'Invoiced' : reported === 'Invoiced' ? null : info.nextStatus;
   const base = `/api/trendyol/cargo?orderId=${encodeURIComponent(row.id)}`;
 
   const openPdf = async () => {
@@ -85,26 +81,6 @@ export function TrendyolCargoActions({ row }: { row: OrderRow }) {
     }
   };
 
-  const report = async (status: 'Picking' | 'Invoiced') => {
-    if (busy) return;
-    setBusy('status');
-    try {
-      const res = await fetch(`${base}&action=status`, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: row.id, status, invoiceNumber: status === 'Invoiced' ? invoiceNumber.trim() : undefined }),
-      });
-      if (!res.ok) throw new Error(await errorOf(res));
-      setReported(status);
-      toast.success(status === 'Picking' ? t('pickingDone') : t('invoicedDone'));
-    } catch (err) {
-      toast.error(t('statusFailed', { reason: (err as Error).message }));
-    } finally {
-      setBusy(null);
-    }
-  };
-
   return (
     <Box sx={{ mt: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }} data-testid="trendyol-cargo-actions">
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -120,32 +96,6 @@ export function TrendyolCargoActions({ row }: { row: OrderRow }) {
           <Typography variant="caption" component="span" sx={{ color: n[500] }}>{t('carrier', { name: info.carrier })}</Typography>
         )}
       </Box>
-      {next === 'Picking' && (
-        <Box>
-          <Button variant="ghost" size="sm" icon={icons.done} onClick={() => void report('Picking')} loading={busy === 'status'} data-testid="trendyol-picking">
-            {t('reportPicking')}
-          </Button>
-        </Box>
-      )}
-      {next === 'Invoiced' && (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <Box sx={{ width: 220, maxWidth: '100%' }}>
-            <TextField size="sm" value={invoiceNumber} onChange={(v) => setInvoiceNumber(v)} placeholder={t('invoicePlaceholder')} aria-label={t('invoiceNumber')} mono data-testid="trendyol-invoice-number" />
-          </Box>
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={icons.done}
-            onClick={() => void report('Invoiced')}
-            loading={busy === 'status'}
-            disabled={!invoiceNumber.trim()}
-            disabledReason={t('invoiceRequired')}
-            data-testid="trendyol-invoiced"
-          >
-            {t('reportInvoiced')}
-          </Button>
-        </Box>
-      )}
     </Box>
   );
 }

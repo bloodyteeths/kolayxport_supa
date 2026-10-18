@@ -4,6 +4,8 @@
  *        pdf → our 100×150 mm cargo label (Code 128 of the cargo number), works for every carrier
  *        zpl → Trendyol's common label (Trendyol Express / Aras on Trendyol-paid cargo) for thermal printers
  *   POST status  { orderId, status: 'Picking' | 'Invoiced', invoiceNumber? }   report the package status to Trendyol
+ * With Settings › Sender › Trendyol "auto Picking" on, printing a label (pdf or zpl) also reports Picking while the
+ * package is still Created. Shipped/Delivered are set by Trendyol itself; Invoiced is left to the invoice provider.
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
@@ -20,6 +22,24 @@ const CAPTIONS = {
   tr: { recipient: 'Alıcı', sender: 'Gönderen', order: 'Sipariş', package: 'Paket', contents: 'İçerik', deci: 'Desi' },
   en: { recipient: 'Recipient', sender: 'Sender', order: 'Order', package: 'Package', contents: 'Contents', deci: 'Deci' },
 };
+
+/** Best effort: report Picking for a Created package when the seller opted in. Never fails the label. */
+async function autoPicking(userId: string, orderId: string, raw: Record<string, any>, client: Awaited<ReturnType<typeof trendyolClientFor>>) {
+  if (!client) return;
+  const info = trendyolCargoInfo(raw);
+  if (info.nextStatus !== 'Picking' || !info.packageId || !info.lines.length) return;
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { shippingSettings: true } });
+  if (!(user?.shippingSettings as any)?.trendyolAutoPicking) return;
+  try {
+    await client.updatePackageStatus(info.packageId, info.lines, 'Picking');
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { externalStatus: 'Picking', rawData: { ...raw, status: 'Picking' } as unknown as Prisma.InputJsonValue },
+    });
+  } catch (err) {
+    logger.warn('[TRENDYOL CARGO] auto Picking failed', { userId, orderId, ...trendyolErrorText(err) });
+  }
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const user = await getAuthUser(req, res);
@@ -43,6 +63,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!info.commonLabel) return res.status(409).json({ error: 'Trendyol has no common label for this carrier; use the PDF label', code: 'not_common_label' });
         const boxes = Math.min(Math.max(Number(req.query.boxes) || 1, 1), 20);
         const docs = await fetchCommonLabel(client, info.cargoNumber, boxes);
+        await autoPicking(user.id, loaded.order.id, loaded.raw, client);
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename="trendyol-${info.cargoNumber}.zpl"`);
         res.setHeader('Cache-Control', 'private, no-store');
@@ -61,6 +82,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         deci: Number(loaded.raw.cargoDeci) || null,
         t: CAPTIONS[locale],
       });
+      await autoPicking(user.id, loaded.order.id, loaded.raw, client);
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename="trendyol-${info.cargoNumber}.pdf"`);
       res.setHeader('Cache-Control', 'private, no-store');

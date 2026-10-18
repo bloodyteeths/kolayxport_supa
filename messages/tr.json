@@ -1394,7 +1394,8 @@
         "address": "Adres",
         "customs": "Gümrük ve para birimi",
         "importer": "Kayıtlı ithalatçı",
-        "etgb": "ETGB"
+        "etgb": "ETGB",
+        "trendyol": "Trendyol"
       },
       "field": {
         "companyName": "Şirket adı",
@@ -1435,7 +1436,10 @@
         "PERSONAL_NATIONAL": "TC kimlik no",
         "BUSINESS_UNION": "AB işletme no",
         "PERSONAL_UNION": "AB kişisel no"
-      }
+      },
+      "trendyolHelp": "KolayXport'un Trendyol paketlerinizle nasıl çalışacağı.",
+      "trendyolAutoPicking": "Etiket yazdırınca “hazırlanıyor” bildir",
+      "trendyolAutoPickingHelper": "KolayXport'tan kargo etiketi yazdırdığınızda paket Trendyol'da Hazırlanıyor (Picking) olarak işaretlenir. Kargoya verildi ve teslim edildi durumlarını Trendyol, Faturalandı durumunu fatura sağlayıcınız ayarlar."
     },
     "saveFailed": "Kaydedilemedi. Değişiklikleriniz duruyor.",
     "credentials": {

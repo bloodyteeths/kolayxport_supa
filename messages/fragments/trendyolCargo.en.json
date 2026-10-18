@@ -13,5 +13,15 @@
     "invoicedDone": "Trendyol: package is invoiced",
     "statusFailed": "Trendyol didn't accept the status: {reason}",
     "zplNotAllowed": "Trendyol hasn't enabled its common label (ortak barkod) for your store. Ask your Trendyol category manager to turn it on. Until then, use “Print cargo label”: its barcode is your Trendyol cargo number."
+  },
+  "settings": {
+    "sender": {
+      "group": {
+        "trendyol": "Trendyol"
+      },
+      "trendyolHelp": "How KolayXport works with your Trendyol packages.",
+      "trendyolAutoPicking": "Report “preparing” when I print the label",
+      "trendyolAutoPickingHelper": "When you print a cargo label from KolayXport, the package is marked as Picking (Hazırlanıyor) on Trendyol. Shipped and Delivered are set by Trendyol; Invoiced by your invoice provider."
+    }
   }
 }

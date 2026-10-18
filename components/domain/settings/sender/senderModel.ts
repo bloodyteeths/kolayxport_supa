@@ -6,6 +6,8 @@ export type SenderProfile = Record<string, string | null | undefined>;
 export interface SenderShipping {
   etgbRecipientEmail?: string | null;
   etgbEnabled?: boolean;
+  /** Report "Picking" to Trendyol when the cargo label is printed from KolayXport (pages/api/trendyol/cargo.ts). */
+  trendyolAutoPicking?: boolean;
 }
 
 /** Field names of `shipperProfile` (unchanged PATCH contract of /api/user/settings). */

@@ -47,8 +47,10 @@ export default function CookieConsent() {
       role="dialog"
       aria-modal="false"
       aria-labelledby="kx-cookie-title"
-      className="[font-family:ui-sans-serif,system-ui,-apple-system,'Segoe_UI',Roboto,sans-serif] fixed inset-x-3 bottom-3 z-[60] mx-auto max-w-[560px] rounded-2xl border border-slate-200 bg-white p-4 text-slate-800 shadow-[0_20px_50px_-20px_rgba(11,18,32,.45)] sm:inset-x-auto sm:right-4 sm:bottom-4"
-      style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
+      className="[font-family:ui-sans-serif,system-ui,-apple-system,'Segoe_UI',Roboto,sans-serif] fixed inset-x-3 z-[1060] mx-auto max-w-[560px] rounded-2xl border border-slate-200 bg-white p-4 text-slate-800 shadow-[0_20px_50px_-20px_rgba(11,18,32,.45)] sm:inset-x-auto sm:right-4"
+      // Above the app's mobile tab bar (z 1050, `--kx-bottom-nav` = its height + safe area while mounted): the
+      // home-screen iPhone app has its own storage, so the banner shows again there and its buttons sat under the bar.
+      style={{ bottom: 'calc(var(--kx-bottom-nav, env(safe-area-inset-bottom, 0px)) + 12px)' }}
     >
       <p id="kx-cookie-title" className="text-sm font-semibold text-slate-900">{t('title')}</p>
       <p className="mt-1 text-[13px] leading-relaxed text-slate-600">

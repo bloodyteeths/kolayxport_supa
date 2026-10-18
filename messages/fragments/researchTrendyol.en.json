@@ -29,6 +29,14 @@
         "ratings": "Ratings"
       },
       "ordersBadge": "{badge} orders"
+    },
+    "demand": {
+      "input": {
+        "trendyolFavorites": "Trendyol favorites"
+      },
+      "value": {
+        "trendyolFavorites": "{value} favorites (median, top results, all time)"
+      }
     }
   }
 }

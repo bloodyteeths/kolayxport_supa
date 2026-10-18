@@ -434,15 +434,15 @@ function trendsLib(): any {
  * or an empty timeline throws inside `live()`, so nothing is written to the shared cache (a stale value is served if
  * one exists) and one transient miss does not blank the input for every user for 24 h.
  */
-export async function fetchTrendsMean(q: string): Promise<number | null> {
-  const key = `public:trends:mean:${sha1(normalizeQuery(q))}`;
+export async function fetchTrendsMean(q: string, geo: 'US' | 'TR' = 'US'): Promise<number | null> {
+  const key = `public:trends:mean:${geo === 'US' ? '' : `${geo}:`}${sha1(normalizeQuery(q))}`;
   try {
     const served = await cachedLive<number | null>(key, SIGNAL_TTL_MS, async () => {
       const lib = trendsLib();
       if (!lib) throw new Error('google-trends-api unavailable');
       const startTime = new Date(Date.now() - 365 * DAY_MS);
       const raw = await Promise.race([
-        lib.interestOverTime({ keyword: q, startTime, geo: 'US' }),
+        lib.interestOverTime({ keyword: q, startTime, geo }),
         new Promise<null>((resolve) => setTimeout(() => resolve(null), 8_000)),
       ]);
       if (!raw) throw new Error('trends timeout');

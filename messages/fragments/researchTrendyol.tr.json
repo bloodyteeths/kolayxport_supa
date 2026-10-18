@@ -29,6 +29,14 @@
         "ratings": "Değerlendirme"
       },
       "ordersBadge": "{badge} sipariş"
+    },
+    "demand": {
+      "input": {
+        "trendyolFavorites": "Trendyol favorileri"
+      },
+      "value": {
+        "trendyolFavorites": "{value} favori (ortanca, ilk sonuçlar, tüm zamanlar)"
+      }
     }
   }
 }

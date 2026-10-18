@@ -93,7 +93,7 @@ export interface ResearchErrorBody {
 
 // ─── Demand Signal (RR §6.2) ───────────────────────────────────────────────
 
-export type DemandInputKey = 'googleTrends' | 'autocomplete' | 'engagement';
+export type DemandInputKey = 'googleTrends' | 'autocomplete' | 'engagement' | 'trendyolFavorites';
 
 export interface DemandInput {
   key: DemandInputKey;

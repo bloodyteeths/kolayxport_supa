@@ -25,7 +25,7 @@ import {
 import { buildFxTable, decodeEntities } from '@/lib/research/stats';
 import { convertCurrency } from '@/lib/finance/fx';
 import { readShared } from '@/lib/research/etsySearch';
-import { snapshotKey, snapshotResult, type MarketSnapshot } from '@/lib/research/marketSnapshot';
+import { medianFavorites, snapshotKey, snapshotResult, trendyolDemand, type MarketSnapshot } from '@/lib/research/marketSnapshot';
 import {
   isResearchMkt, type Guarded, type ProductsData, type ProductsResult, type ResearchErrorBody, type ResearchMkt,
   type ResearchResponse, type ResearchSectionError, type SourceNoteProps, type TopListing,
@@ -250,8 +250,8 @@ export async function researchTrendyol(
 ): Promise<{ result: ProductsResult; source: SourceNoteProps; errors: ResearchSectionError[] }> {
   const hit = await readShared<MarketSnapshot>(snapshotKey('trendyol', q));
   if (!hit) throw new NoSnapshotError();
-  const [trendsMean, autocompleteSources] = await Promise.all([fetchTrendsMean(q), fetchAutocompleteSources(q)]);
-  const demand = demandSignal({ trendsMean, autocompleteSources, engagement: null });
+  const trendsMean = await fetchTrendsMean(q, 'TR');
+  const demand = trendyolDemand(trendsMean, medianFavorites(hit.data));
   const result = snapshotResult(hit.data, {
     demand,
     cached: true,

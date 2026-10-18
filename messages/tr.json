@@ -11323,12 +11323,14 @@
       "input": {
         "googleTrends": "Google ilgisi",
         "autocomplete": "Otomatik tamamlama",
-        "engagement": "Etkileşim"
+        "engagement": "Etkileşim",
+        "trendyolFavorites": "Trendyol favorileri"
       },
       "value": {
         "googleTrends": "{value} (12 ay)",
         "autocomplete": "3 öneri listesinin {value} tanesinde",
-        "engagement": "ayda {value} favori (medyan)"
+        "engagement": "ayda {value} favori (medyan)",
+        "trendyolFavorites": "{value} favori (ortanca, ilk sonuçlar, tüm zamanlar)"
       },
       "inputMissing": "mevcut değil"
     },

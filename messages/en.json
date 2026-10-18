@@ -11323,12 +11323,14 @@
       "input": {
         "googleTrends": "Google interest",
         "autocomplete": "Autocomplete",
-        "engagement": "Engagement"
+        "engagement": "Engagement",
+        "trendyolFavorites": "Trendyol favorites"
       },
       "value": {
         "googleTrends": "{value} (12 months)",
         "autocomplete": "in {value} of 3 suggestion lists",
-        "engagement": "{value} favorites per month (median)"
+        "engagement": "{value} favorites per month (median)",
+        "trendyolFavorites": "{value} favorites (median, top results, all time)"
       },
       "inputMissing": "not available"
     },

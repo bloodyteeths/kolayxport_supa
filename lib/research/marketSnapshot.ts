@@ -12,7 +12,7 @@
  */
 import { decodeEntities, summarizeAmounts } from './stats';
 import { normalizeQuery, sha1 } from './etsySearch';
-import type { DemandSignal, Guarded, ProductsResult, TopListing, Evidence } from './types';
+import type { DemandInput, DemandSignal, Guarded, ProductsResult, TopListing, Evidence } from './types';
 
 export type SnapshotMkt = 'trendyol';
 export const SNAPSHOT_MKTS: readonly SnapshotMkt[] = ['trendyol'];
@@ -182,4 +182,36 @@ export function snapshotFacts(s: MarketSnapshot): { sponsoredShare: number; with
     withOrderBadge: organic.filter((i) => i.ordersAtLeast != null).length,
     organic: organic.length,
   };
+}
+
+/** Favorites of a top Trendyol result at which the favorites input is full (log scale; all-time counts). */
+export const TRENDYOL_FAVORITES_FULL_SCALE = 50_000;
+
+/** Median all-time favorites of the first 24 organic results, null below 8 results with a count. */
+export function medianFavorites(s: MarketSnapshot): number | null {
+  const favs = s.items.filter((i) => !i.sponsored && i.favorites != null).slice(0, 24).map((i) => i.favorites as number).sort((a, b) => a - b);
+  if (favs.length < 8) return null;
+  const m = Math.floor(favs.length / 2);
+  return favs.length % 2 ? favs[m] : Math.round((favs[m - 1] + favs[m]) / 2);
+}
+
+/**
+ * Pure: Trendyol demand signal = Google Trends for Turkey + median favorites on the Trendyol page. US suggestion
+ * sources (Google/Amazon/eBay US) say nothing about Turkish shoppers, so they are not used here. Two inputs needed.
+ */
+export function trendyolDemand(trendsMean: number | null, favorites: number | null): DemandSignal {
+  const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
+  const inputs: DemandInput[] = [
+    trendsMean == null
+      ? { key: 'googleTrends', value: null, normalized: null, ok: false, reasonKey: 'research.demand.trendsUnavailable' }
+      : { key: 'googleTrends', value: trendsMean, normalized: clamp01(trendsMean / 100), ok: true },
+    favorites == null
+      ? { key: 'trendyolFavorites', value: null, normalized: null, ok: false, reasonKey: 'research.guard.insufficient' }
+      : { key: 'trendyolFavorites', value: favorites, normalized: clamp01(Math.log10(1 + favorites) / Math.log10(1 + TRENDYOL_FAVORITES_FULL_SCALE)), ok: true },
+  ];
+  const used = inputs.filter((i) => i.ok && i.normalized != null).map((i) => i.normalized as number);
+  if (used.length < 2) return { tier: null, inputs, kind: 'signal' };
+  const mean = used.reduce((a, v) => a + v, 0) / used.length;
+  const tier = Math.max(1, Math.min(5, 1 + Math.round(mean * 4))) as 1 | 2 | 3 | 4 | 5;
+  return { tier, inputs, kind: 'signal' };
 }

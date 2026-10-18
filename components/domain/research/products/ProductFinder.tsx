@@ -400,7 +400,8 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
             data-testid="research-products-search"
           />
         </Box>
-        <FilterButton
+        {/* Trendyol is Turkey only: no country to pick. */}
+        {mkt === 'trendyol' ? null : <FilterButton
           label={t('toolbar.country')}
           value={url.country}
           options={countryOptions}
@@ -411,7 +412,7 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
             if (next && (COUNTRIES as readonly string[]).includes(next)) setUrl({ country: next as (typeof COUNTRIES)[number] });
           }}
           data-testid="research-country"
-        />
+        />}
         <Button
           variant="secondary"
           size={mobile ? 'md' : 'sm'}

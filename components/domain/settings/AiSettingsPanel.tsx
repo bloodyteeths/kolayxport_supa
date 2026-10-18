@@ -12,6 +12,7 @@ import { useToast } from '@/components/ds/feedback';
 import { neutral as n } from '@/lib/ds/tokens';
 import { AI_PREF_MARKETPLACES, preferencesBlock, type AiMarketplaceKey, type AiPreferenceValue } from '@/lib/ai/preferences';
 import { PanelHeading, SettingsRow } from './sender';
+import { AiConnectionsCard } from './AiConnectionsCard';
 
 const KEY = '/api/ai/preferences';
 const EMPTY: Required<Omit<AiPreferenceValue, 'tone' | 'brand' | 'notes'>> & { tone: string; brand: string; notes: string } = { tone: '', include: [], avoid: [], brand: '', notes: '' };
@@ -96,6 +97,7 @@ export function AiSettingsPanel({ heading = true }: { heading?: boolean }) {
               <Box component="pre" sx={{ m: 0, whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 13, lineHeight: '20px', color: n[800] }}>{preview}</Box>
             </Box>
           ) : null}
+          <Box sx={{ mt: '16px' }}><AiConnectionsCard /></Box>
         </>
       )}
       <StickyActionBar

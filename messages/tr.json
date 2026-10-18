@@ -1692,6 +1692,58 @@
       "save": "Kaydet",
       "saving": "Kaydediliyor…",
       "discardConfirm": "Kaydedilmemiş değişiklikler silinsin mi?"
+    },
+    "aiConnect": {
+      "title": "Kendi yapay zekânızı bağlayın",
+      "description": "Claude, ChatGPT veya Cursor'ı mağazanıza bağlayın: siparişlerinizi, ilanlarınızı, stok ve satışlarınızı sorabilir, ilan taslakları hazırlatabilirsiniz. Her bağlantı yalnızca sizin hesabınızı görür; taslaklar siz onaylamadan pazaryerine gitmez.",
+      "serverUrl": "Sunucu adresi (MCP)",
+      "app": {
+        "claude": {
+          "name": "Claude (claude.ai / masaüstü)",
+          "steps": [
+            "Ayarlar → Bağlayıcılar → Özel bağlayıcı ekle",
+            "Adı: KolayXport, URL: yukarıdaki adres",
+            "Bağlan → KolayXport'ta \"İzin ver\""
+          ]
+        },
+        "chatgpt": {
+          "name": "ChatGPT",
+          "steps": [
+            "Ayarlar → Uygulamalar ve Bağlayıcılar → Gelişmiş → Geliştirici modu",
+            "Bağlayıcı oluştur → URL: yukarıdaki adres, kimlik doğrulama: OAuth",
+            "Bağlan → KolayXport'ta \"İzin ver\""
+          ]
+        }
+      },
+      "key": {
+        "title": "Kişisel anahtar (Claude Code, Cursor ve diğer uygulamalar)",
+        "hint": "Başlık (header) ile bağlanan uygulamalar için. Anahtar yalnızca bir kez gösterilir; kimseyle paylaşmayın.",
+        "namePlaceholder": "ör. Cursor",
+        "permission": "İzin",
+        "create": "Anahtar oluştur",
+        "once": "Bu anahtarı şimdi kopyalayın: bir daha gösterilmez.",
+        "claudeCode": "Claude Code için:"
+      },
+      "defaultName": "Kişisel anahtar",
+      "scope": {
+        "read": "Yalnızca okuma",
+        "write": "Okuma + taslak hazırlama"
+      },
+      "kind": {
+        "oauth": "Uygulama girişi",
+        "token": "Anahtar {prefix}…"
+      },
+      "connected": "Bağlı uygulamalar",
+      "none": "Henüz bağlı bir yapay zekâ yok.",
+      "lastUsed": "son kullanım {date}",
+      "neverUsed": "henüz kullanılmadı",
+      "revoke": "Kaldır",
+      "revokeTitle": "{name} bağlantısı kaldırılsın mı?",
+      "revokeBody": "Bu uygulama hesabınıza hemen erişemez. İsterseniz sonra yeniden bağlayabilirsiniz.",
+      "revoked": "Bağlantı kaldırıldı",
+      "revokeFailed": "Bağlantı kaldırılamadı. Tekrar deneyin.",
+      "createFailed": "Anahtar oluşturulamadı. Tekrar deneyin.",
+      "privacy": "Alıcılarınızın adı, adresi, e-postası ve telefonu yapay zekâ uygulamalarına hiç gönderilmez (siparişlerde yalnızca ülke). Bağlantılar en geç bir yılda kendiliğinden sona erer."
     }
   },
   "importer": {
@@ -16828,5 +16880,24 @@
     },
     "neutralTitle": "Bu ayın AI üretim hakkı doldu",
     "neutralBody": "Bu ayki AI görsel ve video üretim hakkınızı kullandınız. Hakkınız {date} tarihinde yenilenir."
+  },
+  "mcp": {
+    "consent": {
+      "pageTitle": "Yapay zekâ bağlantısı",
+      "loading": "Kontrol ediliyor…",
+      "invalidTitle": "Bu bağlantı isteği geçersiz",
+      "invalidBody": "Bağlantıyı yapay zekâ uygulamanızdan yeniden başlatın.",
+      "title": "{app} KolayXport hesabınıza bağlanmak istiyor",
+      "subtitle": "İzin verirseniz bu uygulama mağazanızla ilgili sorularınızı yanıtlayabilir.",
+      "canTitle": "Görebilecekleri:",
+      "canOrders": "Siparişleriniz (alıcının adı ve adresi olmadan, yalnızca ülke)",
+      "canListings": "İlanlarınız, fiyat ve stoklar",
+      "canSales": "Satış özetleri",
+      "write": "İlan taslağı da hazırlayabilsin",
+      "writeHint": "Başlık, açıklama, etiket, fiyat — siz KolayXport'ta gönderene kadar pazaryerinde hiçbir şey değişmez.",
+      "never": "Bağlantıyı istediğiniz an Ayarlar → Yapay zekâ bölümünden kaldırabilirsiniz.",
+      "deny": "Vazgeç",
+      "allow": "İzin ver"
+    }
   }
 }

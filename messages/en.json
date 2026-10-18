@@ -1774,6 +1774,58 @@
       "save": "Save",
       "saving": "Saving…",
       "discardConfirm": "Discard unsaved changes?"
+    },
+    "aiConnect": {
+      "title": "Connect your own AI",
+      "description": "Connect Claude, ChatGPT or Cursor to your shop: ask about your orders, listings, stock and sales, and have it prepare listing drafts. Each connection sees only your account; drafts never reach a marketplace until you approve them.",
+      "serverUrl": "Server address (MCP)",
+      "app": {
+        "claude": {
+          "name": "Claude (claude.ai / desktop)",
+          "steps": [
+            "Settings → Connectors → Add custom connector",
+            "Name: KolayXport, URL: the address above",
+            "Connect → \"Allow\" in KolayXport"
+          ]
+        },
+        "chatgpt": {
+          "name": "ChatGPT",
+          "steps": [
+            "Settings → Apps & Connectors → Advanced → Developer mode",
+            "Create connector → URL: the address above, authentication: OAuth",
+            "Connect → \"Allow\" in KolayXport"
+          ]
+        }
+      },
+      "key": {
+        "title": "Personal key (Claude Code, Cursor and other apps)",
+        "hint": "For apps that connect with a header. The key is shown only once; never share it.",
+        "namePlaceholder": "e.g. Cursor",
+        "permission": "Permission",
+        "create": "Create key",
+        "once": "Copy this key now: it will not be shown again.",
+        "claudeCode": "For Claude Code:"
+      },
+      "defaultName": "Personal key",
+      "scope": {
+        "read": "Read only",
+        "write": "Read + prepare drafts"
+      },
+      "kind": {
+        "oauth": "App sign-in",
+        "token": "Key {prefix}…"
+      },
+      "connected": "Connected apps",
+      "none": "No AI connected yet.",
+      "lastUsed": "last used {date}",
+      "neverUsed": "not used yet",
+      "revoke": "Remove",
+      "revokeTitle": "Remove the {name} connection?",
+      "revokeBody": "This app loses access to your account at once. You can connect it again later.",
+      "revoked": "Connection removed",
+      "revokeFailed": "Could not remove the connection. Try again.",
+      "createFailed": "Could not create the key. Try again.",
+      "privacy": "Your buyers' names, addresses, e-mails and phone numbers are never sent to AI apps (orders carry the country only). Connections end by themselves after a year at the latest."
     }
   },
   "fedex": {
@@ -16828,5 +16880,24 @@
     },
     "neutralTitle": "This month's AI generation is used up",
     "neutralBody": "You have used this month's AI image and video generation. It renews on {date}."
+  },
+  "mcp": {
+    "consent": {
+      "pageTitle": "AI connection",
+      "loading": "Checking…",
+      "invalidTitle": "This connection request is not valid",
+      "invalidBody": "Start the connection again from your AI app.",
+      "title": "{app} wants to connect to your KolayXport account",
+      "subtitle": "If you allow it, this app can answer your questions about your shop.",
+      "canTitle": "It can see:",
+      "canOrders": "Your orders (no buyer names or addresses, country only)",
+      "canListings": "Your listings, prices and stock",
+      "canSales": "Sales summaries",
+      "write": "Also let it prepare listing drafts",
+      "writeHint": "Title, description, tags, price — nothing changes on a marketplace until you send it in KolayXport.",
+      "never": "You can remove the connection any time in Settings → AI.",
+      "deny": "Cancel",
+      "allow": "Allow"
+    }
   }
 }

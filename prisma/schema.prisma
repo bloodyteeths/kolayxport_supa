@@ -83,6 +83,7 @@ model User {
   aiUsage                 AiUsage[]
   aiVideoJobs             AiVideoJob[]
   aiCreditEntries         AiCreditEntry[]
+  aiConnections           AiConnection[]
   notificationSettings    NotificationSettings?
   stockSettings           StockSettings?
   stockItems              StockItem[]
@@ -2430,4 +2431,52 @@ model AiCreditEntry {
   @@unique([kind, bucket, ref])
   @@index([userId, createdAt])
   @@index([userId, bucket, period])
+}
+
+/// "Connect your own AI" (MCP, /api/mcp): one AI client a seller connected (Claude, ChatGPT, Cursor …).
+/// Tokens are stored as SHA-256 hashes only; every tool call is scoped to `userId`. lib/mcp/*.
+model AiConnection {
+  id          String    @id @default(cuid())
+  userId      String
+  /// The client's name (OAuth client_name) or the seller's label for a personal key
+  name        String
+  /// oauth | token
+  kind        String
+  clientId    String?
+  tokenHash   String    @unique
+  /// First characters of the token, to recognise it in the list
+  tokenPrefix String
+  refreshHash String?   @unique
+  /// read | write (write = staged drafts only, never a direct marketplace change)
+  scopes      String[]
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// OAuth 2.1 public clients registered dynamically (RFC 7591) by AI apps connecting to /api/mcp.
+model McpOAuthClient {
+  id           String   @id
+  name         String
+  redirectUris String[]
+  createdAt    DateTime @default(now())
+}
+
+/// One-time authorization codes (PKCE S256), 10 minutes.
+model McpOAuthCode {
+  codeHash      String    @id
+  clientId      String
+  userId        String
+  redirectUri   String
+  codeChallenge String
+  scopes        String[]
+  expiresAt     DateTime
+  usedAt        DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([userId])
 }

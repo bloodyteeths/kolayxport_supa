@@ -9,9 +9,11 @@ import { MCP_TOOLS, ToolError, toolsFor } from '@/lib/mcp/tools';
 
 const PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 const SERVER_INFO = { name: 'kolayxport', title: 'KolayXport', version: '1.0.0' };
-const INSTRUCTIONS = 'KolayXport is the seller\'s multi-marketplace back office (Etsy, eBay, Amazon, Trendyol, Shopify, Wix). '
-  + 'Use get_store_overview first. Orders never include buyer names or addresses. stage_listing_changes only prepares drafts: '
-  + 'tell the seller to review and send them in KolayXport; nothing changes on a marketplace by itself.';
+const INSTRUCTIONS = 'KolayXport is the seller\'s multi-marketplace back office (Etsy, eBay, Amazon, Trendyol, Hepsiburada, Shopify, Wix). '
+  + 'Use get_store_overview first. Orders never include buyer names or addresses. For listing work: audit_listing, then seo_rules + '
+  + 'research_keywords (keywords from real data, never invented), check_listing_text before staging. Every write tool '
+  + '(stage_listing_changes, create_listing_draft, add_listing_photos) only prepares drafts: tell the seller to review and send them in '
+  + 'KolayXport (give the reviewUrl); nothing changes on a marketplace by itself. generate_product_image uses the seller\'s AI credits.';
 
 /** Per-connection rate limit: 60 calls a minute (in-process). */
 const calls = new Map<string, number[]>();

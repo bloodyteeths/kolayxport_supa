@@ -7,7 +7,8 @@
 //  - No buyer personal data leaves to the AI provider: no names, addresses, e-mails or phones (Amazon's data rules
 //    forbid it, and the seller's buyers never agreed to it). Orders carry country only.
 //  - Writes are staged drafts only (scope 'write'): nothing changes on a marketplace until the seller reviews and sends
-//    it in KolayXport — the same rule as every editor.
+//    it in KolayXport — the same rule as every editor. Listing tools (audit, SEO, research, staged changes, new
+//    listings, photos, AI images): lib/mcp/listingTools.
 import prisma from '@/lib/prisma';
 import { listListings, type ListingsAdapter } from '@/lib/listings/query';
 import { parseListingsQuery, type ListingMarketplace } from '@/lib/listings/types';
@@ -18,31 +19,14 @@ import { wixAdapter } from '@/lib/listings/adapters/wix';
 import { shopifyAdapter } from '@/lib/listings/adapters/shopify';
 import { hepsiburadaAdapter } from '@/lib/listings/adapters/hepsiburada';
 import { classifyOrderStatus } from '@/lib/orders/orderStatus';
-import { sanitizeEtsyBatchFields } from '@/lib/bulk/batchStage';
-import { assertShopOwnership, getEtsyAccessToken, upsertDraftPatch as stageEtsy } from '@/lib/etsy/draftService';
-import { upsertDraftPatch as stageEbay } from '@/lib/ebay/draftService';
 import { mcpBaseUrl, type McpAuth, type McpScope } from './tokens';
 
 const ADAPTERS: Record<ListingMarketplace, ListingsAdapter> = { etsy: etsyAdapter, ebay: ebayAdapter, trendyol: trendyolAdapter, wix: wixAdapter, shopify: shopifyAdapter, hepsiburada: hepsiburadaAdapter };
 const MARKETPLACES = Object.keys(ADAPTERS) as ListingMarketplace[];
 
-export class ToolError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ToolError';
-  }
-}
-
-type JsonSchema = Record<string, unknown>;
-export type McpTool = {
-  name: string;
-  title: string;
-  description: string;
-  scope: McpScope;
-  readOnly: boolean;
-  inputSchema: JsonSchema;
-  run: (auth: McpAuth, args: Record<string, any>) => Promise<unknown>;
-};
+export { ToolError, type McpTool } from './types';
+import { ToolError, type McpTool } from './types';
+import { LISTING_TOOLS } from './listingTools';
 
 const int = (v: unknown, def: number, min: number, max: number) => {
   const n = Math.round(Number(v));
@@ -350,60 +334,7 @@ const salesSummary: McpTool = {
   },
 };
 
-const stageListingChanges: McpTool = {
-  name: 'stage_listing_changes',
-  title: 'Stage listing changes',
-  description: 'Prepares changes to an Etsy or eBay listing as a KolayXport draft — title, description, tags (Etsy, up to 13, 20 characters each), price (Etsy). NOTHING changes on the marketplace: the seller reviews the draft and sends it from KolayXport. Returns the link to review it.',
-  scope: 'write', readOnly: false,
-  inputSchema: {
-    type: 'object',
-    required: ['marketplace', 'id'],
-    properties: {
-      marketplace: { type: 'string', enum: ['etsy', 'ebay'] },
-      id: { type: 'string', description: 'Etsy listing id or eBay SKU' },
-      title: { type: 'string' },
-      description: { type: 'string' },
-      tags: { type: 'array', items: { type: 'string' }, description: 'Etsy only' },
-      price: { type: 'number', description: 'Etsy only, in the listing currency' },
-    },
-    additionalProperties: false,
-  },
-  async run(auth, a) {
-    const marketplace = str(a.marketplace, 10);
-    const id = str(a.id, 120);
-    const title = typeof a.title === 'string' ? a.title.trim().slice(0, 140) : undefined;
-    const description = typeof a.description === 'string' ? a.description.slice(0, 50_000) : undefined;
-    if (marketplace === 'etsy') {
-      if (!/^\d{1,20}$/.test(id)) throw new ToolError('Etsy listing id must be a number');
-      const listing = await prisma.etsyListing.findFirst({ where: { etsyListingId: BigInt(id), etsyShop: { userId: auth.userId } }, select: { etsyShopId: true } });
-      if (!listing) throw new ToolError('Listing not found');
-      await assertShopOwnership(auth.userId, listing.etsyShopId);
-      const raw: Record<string, unknown> = {};
-      if (title !== undefined) raw.title = title;
-      if (description !== undefined) raw.description = description;
-      if (Array.isArray(a.tags)) raw.tags = a.tags.map((x: unknown) => String(x));
-      if (a.price !== undefined) raw.price = a.price;
-      const { fields, rejected } = sanitizeEtsyBatchFields(raw);
-      if (!Object.keys(fields).length) throw new ToolError(rejected.length ? `Nothing valid to stage: ${rejected.map((r) => r.field ?? r.key).join(', ')}` : 'Give at least one of title, description, tags, price');
-      const token = await getEtsyAccessToken(listing.etsyShopId, auth.userId).catch(() => undefined);
-      await stageEtsy({ userId: auth.userId, shopId: listing.etsyShopId, listingId: id, fields, ...(token ? { accessToken: token } : {}) });
-      return { staged: true, marketplace, id, fields: Object.keys(fields), skipped: rejected.map((r) => r.field ?? r.key), reviewUrl: `${mcpBaseUrl()}/app/etsy-listings/${id}?shop=${encodeURIComponent(listing.etsyShopId)}`, note: 'Nothing changed on Etsy yet: the seller reviews and sends the draft in KolayXport.' };
-    }
-    if (marketplace === 'ebay') {
-      const listing = await prisma.ebayListing.findFirst({ where: { userId: auth.userId, sku: id }, select: { sku: true, marketplaceId: true, offerId: true } });
-      if (!listing) throw new ToolError('Listing not found');
-      const product: Record<string, unknown> = {};
-      if (title !== undefined) product.title = title.slice(0, 80);
-      if (description !== undefined) product.description = description;
-      if (!Object.keys(product).length) throw new ToolError('For eBay give title and/or description');
-      await stageEbay({ userId: auth.userId, sku: listing.sku, marketplaceId: listing.marketplaceId, ...(listing.offerId ? { offerId: listing.offerId } : {}), inventoryFields: { product } });
-      return { staged: true, marketplace, id, fields: Object.keys(product), reviewUrl: `${mcpBaseUrl()}/app/ebay-listings/${encodeURIComponent(id)}`, note: 'Nothing changed on eBay yet: the seller reviews and sends the draft in KolayXport.' };
-    }
-    throw new ToolError('Staging is available for etsy and ebay');
-  },
-};
-
-export const MCP_TOOLS: McpTool[] = [getStoreOverview, listOrders, getOrder, listListingsTool, getListing, lowStock, salesSummary, stageListingChanges];
+export const MCP_TOOLS: McpTool[] = [getStoreOverview, listOrders, getOrder, listListingsTool, getListing, lowStock, salesSummary, ...LISTING_TOOLS];
 
 export function toolsFor(scopes: McpScope[]): McpTool[] {
   return MCP_TOOLS.filter((t) => scopes.includes(t.scope));

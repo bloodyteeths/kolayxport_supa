@@ -36,8 +36,29 @@ describe('MCP tools', () => {
       expect(props.some((p) => /user|tenant|account/i.test(p))).toBe(false);
     }
   });
-  it('only the draft tool writes, and it is marked so', () => {
-    expect(MCP_TOOLS.filter((t) => !t.readOnly).map((t) => t.name)).toEqual(['stage_listing_changes']);
+  it('only draft / photo tools write, all need the write scope', () => {
+    const writers = MCP_TOOLS.filter((t) => !t.readOnly);
+    expect(writers.map((t) => t.name).sort()).toEqual(['add_listing_photos', 'create_listing_draft', 'generate_product_image', 'stage_listing_changes']);
+    expect(writers.every((t) => t.scope === 'write')).toBe(true);
+    expect(new Set(MCP_TOOLS.map((t) => t.name)).size).toBe(MCP_TOOLS.length);
+  });
+  it('the Etsy rules the AI reads are the seller\'s own', async () => {
+    const tool = MCP_TOOLS.find((t) => t.name === 'seo_rules')!;
+    const r: any = await tool.run({ userId: 'u', connectionId: 'c', scopes: ['read'], name: 't' }, { marketplace: 'etsy' });
+    expect(r.title).toMatchObject({ min: 100, max: 140 });
+    expect(r.tags).toMatchObject({ count: 13, maxLength: 20 });
+    expect(JSON.stringify(r)).toMatch(/Commas are the only separators/);
+  });
+  it('check_listing_text flags Etsy title and tag problems before staging', async () => {
+    const tool = MCP_TOOLS.find((t) => t.name === 'check_listing_text')!;
+    const r: any = await tool.run({ userId: 'u', connectionId: 'c', scopes: ['read'], name: 't' }, { marketplace: 'etsy', title: 'baby dress - pink | girl', tags: ['this tag is far too long for etsy', 'pink'] });
+    expect(r.title.ok).toBe(false);
+    expect(r.title.issues).toContain('disallowed_separator');
+    expect(r.tags.tooLong.length).toBe(1);
+  });
+  it('photo links must be public https', async () => {
+    const tool = MCP_TOOLS.find((t) => t.name === 'generate_product_image')!;
+    await expect(tool.run({ userId: 'u', connectionId: 'c', scopes: ['write'], name: 't' }, { prompt: 'x', referencePhotoUrls: ['http://127.0.0.1/a.jpg'] })).rejects.toThrow(/public https/);
   });
 });
 

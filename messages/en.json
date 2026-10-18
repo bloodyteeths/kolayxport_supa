@@ -1786,7 +1786,7 @@
     },
     "aiConnect": {
       "title": "Connect your own AI",
-      "description": "Connect Claude, ChatGPT or Cursor to your shop: ask about your orders, listings, stock and sales, and have it prepare listing drafts. Each connection sees only your account; drafts never reach a marketplace until you approve them.",
+      "description": "Connect Claude, ChatGPT or Cursor to your shop: ask about your orders, listings, stock and sales; have it audit listing health, do SEO from real market research, and prepare price and stock changes, new listings and photos as drafts. Each connection sees only your account; drafts never reach a marketplace until you approve them.",
       "serverUrl": "Server address (MCP)",
       "app": {
         "claude": {
@@ -16911,10 +16911,10 @@
       "subtitle": "If you allow it, this app can answer your questions about your shop.",
       "canTitle": "It can see:",
       "canOrders": "Your orders (no buyer names or addresses, country only)",
-      "canListings": "Your listings, prices and stock",
-      "canSales": "Sales summaries",
-      "write": "Also let it prepare listing drafts",
-      "writeHint": "Title, description, tags, price — nothing changes on a marketplace until you send it in KolayXport.",
+      "canListings": "Your listings, prices, stock and listing health",
+      "canSales": "Sales summaries and market research",
+      "write": "Also let it prepare drafts",
+      "writeHint": "Listing text, prices, stock, new listings and photos — nothing changes on a marketplace until you send it in KolayXport. AI-generated photos use your AI credits.",
       "never": "You can remove the connection any time in Settings → AI.",
       "deny": "Cancel",
       "allow": "Allow"

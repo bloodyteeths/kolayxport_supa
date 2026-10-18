@@ -1704,7 +1704,7 @@
     },
     "aiConnect": {
       "title": "Kendi yapay zekânızı bağlayın",
-      "description": "Claude, ChatGPT veya Cursor'ı mağazanıza bağlayın: siparişlerinizi, ilanlarınızı, stok ve satışlarınızı sorabilir, ilan taslakları hazırlatabilirsiniz. Her bağlantı yalnızca sizin hesabınızı görür; taslaklar siz onaylamadan pazaryerine gitmez.",
+      "description": "Claude, ChatGPT veya Cursor'ı mağazanıza bağlayın: siparişlerinizi, ilanlarınızı, stok ve satışlarınızı sorabilir; ilan sağlığını denetletebilir, gerçek pazar araştırmasıyla SEO yaptırabilir, fiyat ve stok değişikliği, yeni ilan ve fotoğraf taslakları hazırlatabilirsiniz. Her bağlantı yalnızca sizin hesabınızı görür; taslaklar siz onaylamadan pazaryerine gitmez.",
       "serverUrl": "Sunucu adresi (MCP)",
       "app": {
         "claude": {
@@ -16911,10 +16911,10 @@
       "subtitle": "İzin verirseniz bu uygulama mağazanızla ilgili sorularınızı yanıtlayabilir.",
       "canTitle": "Görebilecekleri:",
       "canOrders": "Siparişleriniz (alıcının adı ve adresi olmadan, yalnızca ülke)",
-      "canListings": "İlanlarınız, fiyat ve stoklar",
-      "canSales": "Satış özetleri",
-      "write": "İlan taslağı da hazırlayabilsin",
-      "writeHint": "Başlık, açıklama, etiket, fiyat — siz KolayXport'ta gönderene kadar pazaryerinde hiçbir şey değişmez.",
+      "canListings": "İlanlarınız, fiyat, stok ve ilan sağlığı",
+      "canSales": "Satış özetleri ve pazar araştırması",
+      "write": "Taslak da hazırlayabilsin",
+      "writeHint": "İlan metni, fiyat, stok, yeni ilan ve fotoğraf — siz KolayXport'ta gönderene kadar pazaryerinde hiçbir şey değişmez. Yapay zekâ ile görsel üretirse AI kredinizden düşer.",
       "never": "Bağlantıyı istediğiniz an Ayarlar → Yapay zekâ bölümünden kaldırabilirsiniz.",
       "deny": "Vazgeç",
       "allow": "İzin ver"

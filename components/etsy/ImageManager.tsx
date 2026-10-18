@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { useTranslations } from 'next-intl';
+import { AI_MAX_REFERENCE_IMAGES } from '@/lib/ai/referenceImages';
 import {
   Box,
   IconButton,
@@ -608,7 +609,7 @@ const ImageManager = forwardRef<ImageManagerHandle, ImageManagerProps>(function 
       const referenceUrls: string[] = [];
       if (aiRefUrl) referenceUrls.push(aiRefUrl);
       for (const img of sortedImages) {
-        if (referenceImages.length + referenceUrls.length >= 3) break;
+        if (referenceImages.length + referenceUrls.length >= AI_MAX_REFERENCE_IMAGES) break;
         const url = img.url_fullxfull || img.url_570xN;
         if (url && (url.startsWith('https://') || url.startsWith('/api/')) && !referenceUrls.includes(url)) referenceUrls.push(url);
       }
@@ -622,7 +623,7 @@ const ImageManager = forwardRef<ImageManagerHandle, ImageManagerProps>(function 
           aspect_ratio: '4:3',
           white_background: aiWhiteBg,
           reference_images: referenceImages,
-          reference_image_urls: referenceUrls.slice(0, Math.max(0, 3 - referenceImages.length)),
+          reference_image_urls: referenceUrls.slice(0, Math.max(0, AI_MAX_REFERENCE_IMAGES - referenceImages.length)),
         }),
       });
 

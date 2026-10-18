@@ -1324,7 +1324,11 @@ export function ListingEditor<F extends FieldMap>(props: ListingEditorProps<F>) 
       </Box>
     );
   } else {
-    const pristine = mode === 'create' && engine.saveState === 'idle' && !draft;
+    // "Start faster" stays until the listing has a title (or while the fill runs). It used to vanish on the first
+    // save — autosave after uploading photos hid "Fill from photos" exactly when it became useful.
+    const fieldsAny = view.fields as Record<string, unknown>;
+    const titled = String(fieldsAny.title ?? fieldsAny.name ?? '').trim().length > 0;
+    const pristine = mode === 'create' && (!titled || ai.fill.running);
     const startFaster = !pristine
       ? null
       : props.slots?.startFaster

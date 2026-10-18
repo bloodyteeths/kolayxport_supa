@@ -7,6 +7,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import sharp from 'sharp';
 import { isUnsafeUrl } from './safeUrl';
+import { loadImageForUser, ownPath } from '@/lib/images/ownImage';
 import { VIDEO_SOURCE_ROOT, type VideoMedia } from './video';
 
 const run = promisify(execFile);
@@ -41,6 +42,11 @@ export async function loadSource(userId: string, ref: string | null | undefined)
     const buf = await fs.promises.readFile(path.join(dir, file));
     const ext = path.extname(file).slice(1).toLowerCase();
     return { data: buf.toString('base64'), mimeType: ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg' };
+  }
+  // Our own photo URLs (staged Etsy photos, uploads) are read from disk for this seller (lib/images/ownImage).
+  if (ownPath(ref)) {
+    const own = await loadImageForUser(userId, ref);
+    return own && Buffer.byteLength(own.data, 'base64') <= MAX_IMAGE_BYTES ? own : null;
   }
   if (isUnsafeUrl(ref)) return null;
   // Etsy CDN: ask for the full-size photo (570xN thumbnails make soft videos).

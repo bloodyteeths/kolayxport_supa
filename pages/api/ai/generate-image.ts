@@ -7,6 +7,7 @@ import sharp from 'sharp';
 import crypto from 'crypto';
 import { imageCredits } from '@/lib/billing/aiCredits';
 import { isAiBudgetError, isNoCreditsError, refundCredits, spendCredits } from '@/lib/billing/aiCreditsServer';
+import { isReadablePhotoUrl, loadImageForUser } from '@/lib/images/ownImage';
 
 export const config = {
   api: {
@@ -40,21 +41,6 @@ const MAX_REFERENCE_BYTES = 8 * 1024 * 1024;
 
 type RefPart = { inlineData: { mimeType: string; data: string } };
 
-async function fetchReference(url: string): Promise<RefPart | null> {
-  if (!url || typeof url !== 'string' || isUnsafeUrl(url)) return null;
-  try {
-    const imgRes = await fetch(url);
-    if (!imgRes.ok) return null;
-    const buf = Buffer.from(await imgRes.arrayBuffer());
-    if (buf.length === 0 || buf.length > MAX_REFERENCE_BYTES) return null;
-    const contentType = (imgRes.headers.get('content-type') || 'image/jpeg').split(';')[0];
-    if (!contentType.startsWith('image/')) return null;
-    return { inlineData: { mimeType: contentType, data: buf.toString('base64') } };
-  } catch {
-    return null;
-  }
-}
-
 function inlineReference(data: unknown, mimeType: unknown): RefPart | null {
   if (typeof data !== 'string' || !data) return null;
   const m = typeof mimeType === 'string' && mimeType.startsWith('image/') ? mimeType : 'image/jpeg';
@@ -63,30 +49,6 @@ function inlineReference(data: unknown, mimeType: unknown): RefPart | null {
   return { inlineData: { mimeType: m, data: base64 } };
 }
 
-/** Block SSRF: reject non-https or internal/private IPs */
-function isUnsafeUrl(url: string): boolean {
-  if (!url.startsWith('https://')) return true;
-  try {
-    const host = new URL(url).hostname.toLowerCase();
-    if (
-      host === 'localhost' ||
-      host === '127.0.0.1' ||
-      host === '[::1]' ||
-      host.startsWith('10.') ||
-      host.startsWith('192.168.') ||
-      host.startsWith('0.') ||
-      host.endsWith('.local') ||
-      host.endsWith('.internal') ||
-      /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
-      /^169\.254\./.test(host)
-    ) {
-      return true;
-    }
-  } catch {
-    return true;
-  }
-  return false;
-}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -112,8 +74,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: 'prompt is required', code: 'missing_prompt' });
   }
 
-  // Legacy single reference URL is still validated strictly.
-  if (reference_image_url && isUnsafeUrl(reference_image_url)) {
+  // Legacy single reference URL: our own photo URL (relative too) or a public https one.
+  if (reference_image_url && (typeof reference_image_url !== 'string' || !isReadablePhotoUrl(reference_image_url))) {
     return res.status(400).json({ error: 'Invalid reference image URL', code: 'invalid_reference_image' });
   }
 
@@ -159,7 +121,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       for (const u of reference_image_urls) if (typeof u === 'string' && u && !urls.includes(u)) urls.push(u);
     }
     const urlSlots = Math.max(0, MAX_REFERENCE_IMAGES - inlineRefs.length);
-    const urlRefs = (await Promise.all(urls.slice(0, urlSlots).map(fetchReference))).filter((r): r is RefPart => !!r);
+    // Staged / uploaded photos come as our own relative URLs: read from disk for this seller (lib/images/ownImage).
+    const urlRefs = (await Promise.all(urls.slice(0, urlSlots).map(async (u): Promise<RefPart | null> => {
+      const img = await loadImageForUser(user.id, u);
+      return img && img.data.length <= MAX_REFERENCE_BYTES * 1.4 ? { inlineData: { mimeType: img.mimeType, data: img.data } } : null;
+    }))).filter((r): r is RefPart => !!r);
     parts.push(...inlineRefs.slice(0, MAX_REFERENCE_IMAGES), ...urlRefs);
 
     const refCount = parts.length;

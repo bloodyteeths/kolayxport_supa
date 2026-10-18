@@ -58,8 +58,12 @@ export async function cargoLabelPdf(input: CargoLabelInput): Promise<Buffer> {
   let y = PAD;
 
   // Header: carrier + marketplace.
-  doc.font(bold).fontSize(16).fillColor('#000').text(input.carrier, PAD, y, { width: inner * 0.65, lineBreak: false, ellipsis: true });
-  doc.font(regular).fontSize(9).text(input.marketplace, PAD + inner * 0.65, y + 4, { width: inner * 0.35, align: 'right' });
+  // Long carrier names ("Trendyol Express Marketplace") shrink to one line instead of wrapping into the barcode.
+  let carrierSize = 16;
+  doc.font(bold);
+  while (carrierSize > 9 && doc.fontSize(carrierSize).widthOfString(input.carrier) > inner * 0.72) carrierSize -= 0.5;
+  doc.fontSize(carrierSize).fillColor('#000').text(input.carrier, PAD, y + (16 - carrierSize) / 2, { width: inner * 0.72, height: 20, lineBreak: false, ellipsis: true });
+  doc.font(regular).fontSize(9).text(input.marketplace, PAD + inner * 0.72, y + 4, { width: inner * 0.28, align: 'right' });
   y += 24;
   doc.moveTo(PAD, y).lineTo(W - PAD, y).lineWidth(1).stroke();
   y += 6;

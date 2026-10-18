@@ -1,3 +1,5 @@
+import { vi } from 'vitest';
+vi.mock('@/lib/prisma', () => ({ default: {} }));
 import { describe, expect, it } from 'vitest';
 import { code128Modules, code128Values } from '@/lib/barcode/code128';
 import { trendyolCargoInfo } from '@/lib/trendyol/cargoInfo';
@@ -55,5 +57,15 @@ describe('trendyolCargoInfo', () => {
     expect(trendyolCargoInfo({ ...raw, shipmentPackageStatus: 'Picking' }).nextStatus).toBe('Invoiced');
     expect(trendyolCargoInfo({ ...raw, shipmentPackageStatus: 'Shipped' }).nextStatus).toBeNull();
     expect(trendyolCargoInfo({}).cargoNumber).toBeNull();
+  });
+});
+
+describe('Trendyol error text', () => {
+  it('reads COMMON_LABEL_NOT_ALLOWED from the real 400 body', async () => {
+    const { trendyolErrorText, isCommonLabelNotAllowed } = await import('@/lib/trendyol/cargo');
+    const err = { status: 400, endpoint: '/sellers/1/common-label/x', body: { error: { status: 400, errors: [{ code: 400, type: 'COMMON_LABEL_NOT_ALLOWED', title: 'Bu servisi kullanmak için yetkiniz bulunmamaktadır. Kategori sorumlunuz ile iletişime geçiniz.' }] } } };
+    expect(trendyolErrorText(err)).toEqual({ code: 'COMMON_LABEL_NOT_ALLOWED', text: 'Bu servisi kullanmak için yetkiniz bulunmamaktadır. Kategori sorumlunuz ile iletişime geçiniz.' });
+    expect(isCommonLabelNotAllowed(err)).toBe(true);
+    expect(isCommonLabelNotAllowed({ status: 400, body: { rawError: '' } })).toBe(false);
   });
 });

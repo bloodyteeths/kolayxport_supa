@@ -14474,7 +14474,8 @@
       "fillNeedsSeed": "Önce ne sattığınızı birkaç kelimeyle yazın",
       "fillNeedsSeedOrPhoto": "Önce bir fotoğraf ekleyin veya ne sattığınızı yazın",
       "attributesNeedCategory": "Önce kategori seçin: özellikler kategoriye göre değişir",
-      "noAttributeIdeas": "Kalan özellikler için emin olunan bir değer yok. Bunları kendiniz doldurun"
+      "noAttributeIdeas": "Kalan özellikler için emin olunan bir değer yok. Bunları kendiniz doldurun",
+      "fillFromPhotosHelpEtsy": "Fotoğraflarınıza bakar; başlığı, açıklamayı ve etiketleri yazar. Her alanı siz onaylarsınız"
     },
     "price": {
       "bandTitle": "Benzer ilanların satış fiyatı",
@@ -17040,6 +17041,7 @@
     "invoiceRequired": "Önce fatura numarasını girin",
     "pickingDone": "Trendyol: paket hazırlanıyor (Picking)",
     "invoicedDone": "Trendyol: paket faturalandı",
-    "statusFailed": "Trendyol durumu kabul etmedi: {reason}"
+    "statusFailed": "Trendyol durumu kabul etmedi: {reason}",
+    "zplNotAllowed": "Trendyol mağazanız için ortak barkod hizmetini açmamış. Trendyol kategori sorumlunuzdan açmasını isteyin. O zamana kadar “Kargo etiketini yazdır” ile yazdırın: barkodu Trendyol kargo numaranızdır."
   }
 }

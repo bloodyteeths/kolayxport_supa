@@ -602,14 +602,15 @@ const ImageManager = forwardRef<ImageManagerHandle, ImageManagerProps>(function 
       if (previous) referenceImages.push({ data: previous.base64, mime_type: previous.mimeType });
       if (aiRefFile) referenceImages.push({ data: await fileToBase64(aiRefFile), mime_type: aiRefFile.type });
 
-      // Explicitly chosen listing photo first, then the listing's synced photos (cover first).
+      // Explicitly chosen listing photo first, then the listing's photos (cover first) — staged ones too: their
+      // relative preview URLs are read from disk by the server for this seller (lib/images/ownImage). Before, they
+      // were skipped and the image was generated from text alone.
       const referenceUrls: string[] = [];
       if (aiRefUrl) referenceUrls.push(aiRefUrl);
       for (const img of sortedImages) {
         if (referenceImages.length + referenceUrls.length >= 3) break;
-        if (img.is_pending_upload) continue;
         const url = img.url_fullxfull || img.url_570xN;
-        if (url && url.startsWith('https://') && !referenceUrls.includes(url)) referenceUrls.push(url);
+        if (url && (url.startsWith('https://') || url.startsWith('/api/')) && !referenceUrls.includes(url)) referenceUrls.push(url);
       }
 
       const res = await fetch('/api/ai/generate-image', {

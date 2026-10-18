@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { logger } from '../../../lib/logger';
+import { isReadablePhotoUrl, loadImageForUser } from '@/lib/images/ownImage';
 import { getAuthUser } from '../../../lib/auth';
 import { getAiModel, parseAiJson, refineFromBody } from '../../../lib/ai/gemini';
 import { aiContext, withAiContext } from '../../../lib/ai/context';
@@ -533,56 +534,13 @@ Variation option to fill: ${aspectName}`;
 }
 
 // ---------------------------------------------------------------------------
-// Vision helper — reads an image the seller already uploaded to our own storage
-// ---------------------------------------------------------------------------
-
-/** Only our own upload host is fetchable: these URLs come from the client. */
-function isOwnImageUrl(url: string): boolean {
-  const base =
-    process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || 'https://kolayxport.com';
-  try {
-    const u = new URL(url);
-    const b = new URL(base);
-    return u.protocol === 'https:' && u.host === b.host && u.pathname.startsWith('/api/clawd/serve-image');
-  } catch {
-    return false;
-  }
-}
-
-async function fetchImageAsInlineData(
-  url: string
-): Promise<{ inlineData: { data: string; mimeType: string } }> {
-  const res = await fetch(url);
-  if (!res.ok) throw new InputError(`Could not read the uploaded image (${res.status})`);
-  const mimeType = res.headers.get('content-type') || 'image/jpeg';
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.length > 6 * 1024 * 1024) {
-    throw new InputError('Image is too large to analyse');
-  }
-  return { inlineData: { data: buf.toString('base64'), mimeType } };
-}
-
-async function askGeminiVision<T>(
-  systemPrompt: string,
-  userMessage: string,
-  imageUrls: string[]
-): Promise<T> {
-  const parts: any[] = [{ text: userMessage }];
-  for (const url of imageUrls.slice(0, 4)) {
-    parts.push(await fetchImageAsInlineData(url));
-  }
-  const result = await getAiModel({ ...aiContext('ebay.vision'), system: systemPrompt }).generateContent(parts);
-  const parsed = parseAiJson<T>(result.response.text());
-  if (parsed === null) throw new Error('Failed to parse AI response as JSON');
-  return parsed;
-}
-
-// ---------------------------------------------------------------------------
 // 7. Identify a product from its photos
 // ---------------------------------------------------------------------------
 
 interface IdentifyProductInput {
   imageUrls: string[];
+  /** Which marketplace the listing is for (the Etsy editor uses this too); eBay when missing. */
+  marketplace?: string;
 }
 
 interface IdentifyProductOutput {
@@ -594,11 +552,16 @@ interface IdentifyProductOutput {
   notes?: string;
 }
 
-async function handleIdentifyProduct(body: IdentifyProductInput): Promise<IdentifyProductOutput> {
-  const urls = (body.imageUrls || []).filter(isOwnImageUrl);
+async function handleIdentifyProduct(body: IdentifyProductInput, userId: string | null): Promise<IdentifyProductOutput> {
+  // Our own photo URLs (relative too: staged / uploaded, not yet on the marketplace) are read from disk for this
+  // seller; public https photos (an Etsy listing's CDN images) are fetched (lib/images/ownImage).
+  const urls = (Array.isArray(body.imageUrls) ? body.imageUrls : []).filter((u): u is string => typeof u === 'string' && isReadablePhotoUrl(u)).slice(0, 4);
   if (urls.length === 0) throw new InputError('imageUrls is required');
+  const images = (await Promise.all(urls.map((u) => loadImageForUser(userId, u)))).filter((x): x is NonNullable<typeof x> => Boolean(x));
+  if (images.length === 0) throw new InputError('None of the photos could be read');
+  const where = body.marketplace === 'etsy' ? 'Etsy' : 'eBay';
 
-  const systemPrompt = `You identify physical products from photographs so they can be listed on eBay.
+  const systemPrompt = `You identify physical products from photographs so they can be listed on ${where}.
 
 Look at the photo(s) and describe the single main product for sale. Ignore backgrounds, props,
 hands, packaging that is not the product, and any watermarks.
@@ -610,17 +573,17 @@ Rules:
 - "keywords" are 5-10 lowercase English terms a buyer would actually search for.
 - "suggestedCondition" is one of NEW, LIKE_NEW, VERY_GOOD, GOOD, ACCEPTABLE, or omit it if the
   photo does not make the condition clear.
-- Everything in English — eBay's search index is English.
+- Everything in English — ${where}'s search index is English.
 - If the photo shows no identifiable product, set seed to an empty string and explain in "notes".
 
 Respond with ONLY valid JSON:
 { "seed": "...", "productName": "...", "keywords": ["..."], "suggestedCondition": "NEW", "notes": "" }`;
 
-  return askGeminiVision<IdentifyProductOutput>(
-    systemPrompt,
-    'Identify the product in these photos for an eBay listing.',
-    urls
-  );
+  const parts: any[] = [{ text: `Identify the product in these photos for an ${where} listing.` }, ...images.map((m) => ({ inlineData: { data: m.data, mimeType: m.mimeType } }))];
+  const result = await getAiModel({ ...aiContext('ebay.vision'), system: systemPrompt }).generateContent(parts);
+  const parsed = parseAiJson<IdentifyProductOutput>(result.response.text());
+  if (parsed === null) throw new Error('Failed to parse AI response as JSON');
+  return parsed;
 }
 
 // ---------------------------------------------------------------------------
@@ -713,7 +676,7 @@ export default async function handler(
         break;
 
       case 'identify_product':
-        result = await handleIdentifyProduct(req.body);
+        result = await handleIdentifyProduct(req.body, userId);
         break;
 
       case 'suggest_variation_values':

@@ -9,8 +9,9 @@
 //  - eBay: "Fill from photos" (identify_product reads the seller's photos → research → title → category → item
 //    specifics → price → description, the old creator's 7-step autofill). Without a photo it uses the one-line
 //    "What are you selling?" text instead.
-//  - Etsy: the Etsy AI endpoints read text, not images (listing-editor §4.3), so the button says "Fill with AI" and
-//    needs the one-line description; category stays a manual pick in v1. No claim the photos were read.
+//  - Etsy: "Fill from photos" too (2026-10-18: it used to read text only, unlike eBay): identify_product reads the
+//    photos (staged ones as well, lib/images/ownImage) → research → title → description → tags. Without a photo it
+//    needs the one-line description; category stays a manual pick in v1.
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import Box from '@mui/material/Box';
@@ -55,7 +56,8 @@ export function AiFillCard({ ai, photoUrls, onApplyProfile, onCopyExisting, inli
   const fmt = useFormatters();
   const [seed, setSeed] = useState('');
   const isEbay = ai.marketplace === 'ebay';
-  const canReadPhotos = isEbay && ownImageUrls(photoUrls).length > 0;
+  const readsPhotos = isEbay || ai.marketplace === 'etsy';
+  const canReadPhotos = readsPhotos && ownImageUrls(photoUrls).length > 0;
   const btn = ai.buttonState('fill');
   const running = ai.fill.running;
   const ready = FILL_KEYS.filter((k) => ai.proposals[k]?.status === 'ready'
@@ -126,7 +128,7 @@ export function AiFillCard({ ai, photoUrls, onApplyProfile, onCopyExisting, inli
       <FormField
         label={t('start.seedLabel')}
         optional={canReadPhotos}
-        helper={isEbay ? t('ai.fillFromPhotosHelp') : t('ai.fillFromTextHelp')}
+        helper={isEbay ? t('ai.fillFromPhotosHelp') : canReadPhotos ? t('ai.fillFromPhotosHelpEtsy') : t('ai.fillFromTextHelp')}
         counter={{ value: seed.length, max: SEED_MAX }}
       >
         <TextField
@@ -149,11 +151,11 @@ export function AiFillCard({ ai, photoUrls, onApplyProfile, onCopyExisting, inli
           loading={running}
           loadingLabel={t('ai.writing')}
           disabled={!canRun || btn.disabled}
-          disabledReason={btn.disabled ? btn.disabledReason : isEbay ? t('start.needSeedOrPhoto') : t('start.needSeed')}
-          aria-label={`${isEbay && canReadPhotos ? t('ai.fillFromPhotos') : t('ai.fillWithAi')} · ${costLabel}`}
+          disabledReason={btn.disabled ? btn.disabledReason : readsPhotos ? t('start.needSeedOrPhoto') : t('start.needSeed')}
+          aria-label={`${canReadPhotos ? t('ai.fillFromPhotos') : t('ai.fillWithAi')} · ${costLabel}`}
           data-testid="le-ai-fill-run"
         >
-          {isEbay && canReadPhotos ? t('ai.fillFromPhotos') : t('ai.fillWithAi')}
+          {canReadPhotos ? t('ai.fillFromPhotos') : t('ai.fillWithAi')}
         </Button>
         <Box component="span" sx={{ fontSize: 12, lineHeight: '16px', color: neutral[500] }} data-testid="le-ai-fill-cost">{costLabel}</Box>
         {ready > 0 && !running ? (

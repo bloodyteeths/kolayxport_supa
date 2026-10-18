@@ -11,6 +11,7 @@
     "invoiceRequired": "Enter the invoice number first",
     "pickingDone": "Trendyol: package is preparing (Picking)",
     "invoicedDone": "Trendyol: package is invoiced",
-    "statusFailed": "Trendyol didn't accept the status: {reason}"
+    "statusFailed": "Trendyol didn't accept the status: {reason}",
+    "zplNotAllowed": "Trendyol hasn't enabled its common label (ortak barkod) for your store. Ask your Trendyol category manager to turn it on. Until then, use “Print cargo label”: its barcode is your Trendyol cargo number."
   }
 }

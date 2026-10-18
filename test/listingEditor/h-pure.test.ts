@@ -101,9 +101,15 @@ describe('AI guards', () => {
     expect(creditsFor('fill', { marketplace: 'ebay' })).toBe(5);
   });
 
-  it('identify_product gets only own-hosted photos, at most 4', () => {
-    const own = 'https://kolayxport.com/api/clawd/serve-image?id=1';
-    expect(ownImageUrls([own, 'https://evil.example/x.jpg', own, own, own, own])).toEqual([own, own, own, own]);
+  it('identify_product gets only photos the server can read for the seller, at most 4', () => {
+    const own = (n: number) => `https://kolayxport.com/api/clawd/serve-image?path=u/${n}.jpg`;
+    expect(ownImageUrls([own(1), 'https://evil.example/x.jpg', own(1), own(2), own(3), own(4), own(5)])).toEqual([own(1), own(2), own(3), own(4)]);
+    // Staged Etsy photos and uploads come as relative URLs (they were dropped before, tutorial bug 2026-10-18),
+    // a live listing's photos from the marketplace CDN.
+    expect(ownImageUrls(['/api/etsy-drafts/media-preview?id=abc', '/api/clawd/serve-image?path=u/1.jpg', 'https://i.etsystatic.com/1/r/il/x/1/il_fullxfull.1_a.jpg']))
+      .toEqual(['/api/etsy-drafts/media-preview?id=abc', '/api/clawd/serve-image?path=u/1.jpg', 'https://i.etsystatic.com/1/r/il/x/1/il_fullxfull.1_a.jpg']);
+    expect(ownImageUrls(['/api/orders/export', 'blob:https://kolayxport.com/x', 'https://evil.example/api/clawd/serve-image?path=a'])).toEqual([]);
+    expect(fillCredits('etsy', true)).toBe(4);
   });
 });
 

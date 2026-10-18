@@ -32,10 +32,14 @@ export async function fetchCommonLabel(client: TrendyolApiClient, cargoNumber: s
   try {
     const existing = await read();
     if (existing.length) return existing;
-  } catch { /* not created yet */ }
+  } catch (err) {
+    // Not enabled for this seller: every further call fails the same way.
+    if (isCommonLabelNotAllowed(err)) throw err;
+  }
   try {
     await client.createCommonLabel(cargoNumber, { boxQuantity });
   } catch (err: any) {
+    if (isCommonLabelNotAllowed(err)) throw err;
     // 409/400 "already requested" is fine; anything else means no common label for this package.
     if (err?.status !== 409 && err?.status !== 400) throw err;
   }
@@ -60,8 +64,24 @@ export function recipientOf(raw: Record<string, any>): CargoLabelParty {
   return { name, lines: [street, [area, a.postalCode].filter(Boolean).join(' ')].filter(Boolean), phone: a.phone || null };
 }
 
-/** Sender: the seller's default Trendyol shipment address, else the KolayXport shipper profile. */
+/**
+ * Sender: the seller's default Trendyol shipment address, else the KolayXport shipper profile. Trendyol's address
+ * carries no name, so the name comes from the shipper profile (company) when Trendyol has none.
+ */
 export async function senderOf(client: TrendyolApiClient | null, userId: string): Promise<CargoLabelParty | null> {
+  const p = await prisma.shipperProfile.findUnique({ where: { userId } });
+  const profileName = (p?.shipperName || p?.shipperPersonName || '').trim();
+  const fromTrendyol = await trendyolSender(client, userId);
+  if (fromTrendyol) return { ...fromTrendyol, name: fromTrendyol.name || profileName, phone: fromTrendyol.phone || p?.shipperPhoneNumber || null };
+  if (!p?.shipperName && !p?.shipperStreet1) return null;
+  return {
+    name: profileName,
+    lines: [[p.shipperStreet1, p.shipperStreet2].filter(Boolean).join(' '), [p.shipperCity, p.shipperPostalCode].filter(Boolean).join(' ')].filter(Boolean),
+    phone: p.shipperPhoneNumber || null,
+  };
+}
+
+async function trendyolSender(client: TrendyolApiClient | null, userId: string): Promise<CargoLabelParty | null> {
   if (client) {
     try {
       const res: any = await client.getAddresses();
@@ -78,13 +98,22 @@ export async function senderOf(client: TrendyolApiClient | null, userId: string)
       logger.warn('[TRENDYOL CARGO] supplier addresses failed', { userId, error: (err as Error)?.message });
     }
   }
-  const p = await prisma.shipperProfile.findUnique({ where: { userId } });
-  if (!p?.shipperName && !p?.shipperStreet1) return null;
+  return null;
+}
+
+/** Trendyol error body → its own message ("errors[0].title" / "message"), or ''. */
+export function trendyolErrorText(err: any): { code: string; text: string } {
+  const b = err?.body;
+  const e0 = Array.isArray(b?.error?.errors) ? b.error.errors[0] : Array.isArray(b?.errors) ? b.errors[0] : null;
   return {
-    name: p.shipperName || p.shipperPersonName || '',
-    lines: [[p.shipperStreet1, p.shipperStreet2].filter(Boolean).join(' '), [p.shipperCity, p.shipperPostalCode].filter(Boolean).join(' ')].filter(Boolean),
-    phone: p.shipperPhoneNumber || null,
+    code: String(e0?.type || e0?.key || b?.error?.type || ''),
+    text: String(e0?.title || e0?.message || b?.message || b?.error?.message || '').trim(),
   };
+}
+
+/** Trendyol refuses the common label for sellers it has not enabled (kategori sorumlusu turns it on). */
+export function isCommonLabelNotAllowed(err: any): boolean {
+  return trendyolErrorText(err).code === 'COMMON_LABEL_NOT_ALLOWED';
 }
 
 export function contentsOf(raw: Record<string, any>): string | null {

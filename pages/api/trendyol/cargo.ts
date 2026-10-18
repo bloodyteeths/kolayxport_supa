@@ -12,7 +12,7 @@ import { getAuthUser } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 import { isTrendyolEnabled } from '@/lib/config';
 import { cargoLabelPdf } from '@/lib/shipping/cargoLabelPdf';
-import { contentsOf, fetchCommonLabel, loadTrendyolOrder, recipientOf, senderOf, trendyolCargoInfo, trendyolClientFor } from '@/lib/trendyol/cargo';
+import { contentsOf, fetchCommonLabel, isCommonLabelNotAllowed, loadTrendyolOrder, recipientOf, senderOf, trendyolCargoInfo, trendyolClientFor, trendyolErrorText } from '@/lib/trendyol/cargo';
 
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 
@@ -88,10 +88,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(400).json({ error: `Unknown action: ${action || '(none)'}` });
   } catch (err: any) {
-    logger.warn('[TRENDYOL CARGO] action failed', { action, userId: user.id, status: err?.status, error: err?.message });
-    if (typeof err?.status === 'number' && err.status >= 400 && err.status < 500) {
-      return res.status(err.status).json({ error: err.message || 'Trendyol API error', details: err.body });
+    const ty = trendyolErrorText(err);
+    logger.warn('[TRENDYOL CARGO] action failed', { action, userId: user.id, status: err?.status, code: ty.code, error: ty.text || err?.message });
+    if (isCommonLabelNotAllowed(err)) {
+      return res.status(409).json({ error: ty.text || 'Trendyol has not enabled the common label for this store', code: 'common_label_not_allowed' });
     }
-    return res.status(502).json({ error: err?.message || 'Trendyol API error', details: err?.body });
+    const message = ty.text ? `Trendyol: ${ty.text}` : err?.message || 'Trendyol API error';
+    if (typeof err?.status === 'number' && err.status >= 400 && err.status < 500) {
+      return res.status(err.status).json({ error: message, code: ty.code || undefined });
+    }
+    return res.status(502).json({ error: message, code: ty.code || undefined });
   }
 }

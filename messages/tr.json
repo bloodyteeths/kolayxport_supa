@@ -14474,7 +14474,8 @@
       "fillNeedsSeed": "Önce ne sattığınızı birkaç kelimeyle yazın",
       "fillNeedsSeedOrPhoto": "Önce bir fotoğraf ekleyin veya ne sattığınızı yazın",
       "attributesNeedCategory": "Önce kategori seçin: özellikler kategoriye göre değişir",
-      "noAttributeIdeas": "Kalan özellikler için emin olunan bir değer yok. Bunları kendiniz doldurun"
+      "noAttributeIdeas": "Kalan özellikler için emin olunan bir değer yok. Bunları kendiniz doldurun",
+      "fillFromPhotosHelpEtsy": "Fotoğraflarınıza bakar; başlığı, açıklamayı ve etiketleri yazar. Her alanı siz onaylarsınız"
     },
     "price": {
       "bandTitle": "Benzer ilanların satış fiyatı",

@@ -343,7 +343,7 @@ export const AI_CREDITS = { text: 1, image: 10 } as const;
  * eBay = title, item specifics, price, description, plus identify_product when photos are read.
  */
 export function fillCredits(marketplace: AiMarketplace, readsPhotos = marketplace === 'ebay'): number {
-  if (marketplace === 'etsy') return 3 * AI_CREDITS.text;
+  if (marketplace === 'etsy') return (3 + (readsPhotos ? 1 : 0)) * AI_CREDITS.text;
   // Trendyol copy: Turkish title + Turkish description (marketplace-editors §5.1 "AI, 2 credits").
   if (marketplace === 'trendyol') return 2 * AI_CREDITS.text;
   if (marketplace !== 'ebay') return 0;
@@ -652,8 +652,27 @@ export function toMarketBand(b: AiPriceBand): MarketBand {
 }
 
 /** Own-hosted photo URLs only (identify_product rejects anything else). */
+/** Photo URLs our own server serves (staged Etsy media, uploads) — relative ones too (they were dropped before). */
+const OWN_PHOTO_PATH = /^\/api\/(clawd\/serve-image|etsy-drafts\/media-preview|ai\/video\/source)(\?|$)/;
+/** Marketplace CDNs a listing's live photos come from. */
+const MARKET_CDN = /^https:\/\/(i\.etsystatic\.com|i\.ebayimg\.com|static\.wixstatic\.com|cdn\.shopify\.com|cdn\.dsmcdn\.com)\//;
+
+/** The photos the AI can read for the seller (lib/images/ownImage reads ours from disk). Pure, exported for tests. */
 export function ownImageUrls(urls: readonly string[] | undefined): string[] {
-  return (urls ?? []).filter((u) => /^https:\/\/[^/]+\/api\/clawd\/serve-image/.test(u)).slice(0, 4);
+  const out: string[] = [];
+  for (const u of urls ?? []) {
+    if (typeof u !== 'string' || !u || out.includes(u)) continue;
+    let ok = OWN_PHOTO_PATH.test(u) || MARKET_CDN.test(u);
+    if (!ok) {
+      try {
+        const x = new URL(u);
+        const host = typeof window !== 'undefined' ? window.location.host : 'kolayxport.com';
+        ok = (x.protocol === 'https:' || x.protocol === 'http:') && (x.host === host || x.host === 'kolayxport.com') && OWN_PHOTO_PATH.test(`${x.pathname}${x.search ? '?' : ''}`);
+      } catch { ok = false; }
+    }
+    if (ok) out.push(u);
+  }
+  return out.slice(0, 4);
 }
 
 const DEFAULT_FIELD_KEYS: Record<AiMarketplace, Record<FillKey, string>> = {
@@ -807,7 +826,7 @@ export const FILL_LABEL_KEY: Record<FillKey, string> = {
   condition: 'listingEditor.field.condition',
 };
 
-const ETSY_STEPS = ['research', 'title', 'description', 'tags'];
+const ETSY_STEPS = ['identify', 'research', 'title', 'description', 'tags'];
 const EBAY_STEPS = ['identify', 'research', 'title', 'category', 'specifics', 'price', 'description'];
 const TRENDYOL_STEPS = ['title', 'description'];
 
@@ -1291,19 +1310,22 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
         put(key, { status: 'error', ...f });
       };
 
-      if (marketplace === 'ebay') {
+      // The photos first (eBay and Etsy): what the product is becomes the seed for every other step.
+      if (marketplace === 'ebay' || marketplace === 'etsy') {
         const urls = ownImageUrls(o.imageUrls);
         if (urls.length) {
           mark('identify', 'running');
-          claim('condition');
+          if (marketplace === 'ebay') claim('condition');
           claim('title');
           try {
-            const data = await ebayAi('identify_product', { imageUrls: urls });
+            const r = await http('/api/clawd/ebay-ai?action=identify_product', { method: 'POST', body: { imageUrls: urls, marketplace } });
+            if (!r.ok || !r.data || typeof r.data !== 'object') throw new AiCallError(r.ok ? 502 : r.status, r.data);
+            const data = r.data as Record<string, unknown>;
             const found = coerceAiString(data.seed).slice(0, 200);
             if (found) seed = found;
             const cond = coerceAiString(data.suggestedCondition).toUpperCase();
             // Bare VERY_GOOD / GOOD / ACCEPTABLE are not valid eBay conditions: mapped like every other writer.
-            if (/^(NEW|LIKE_NEW|VERY_GOOD|GOOD|ACCEPTABLE)$/.test(cond)) put('condition', { status: 'ready', value: normalizeCondition(cond) ?? cond });
+            if (marketplace === 'ebay' && /^(NEW|LIKE_NEW|VERY_GOOD|GOOD|ACCEPTABLE)$/.test(cond)) put('condition', { status: 'ready', value: normalizeCondition(cond) ?? cond });
             mark('identify', found ? 'done' : 'error');
           } catch (err) {
             mark('identify', 'error');
@@ -1314,7 +1336,7 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
         }
       }
       if (!seed || seed.length < 3) {
-        finish(t(marketplace === 'ebay' ? 'listingEditor.ai.fillNeedsSeedOrPhoto' : 'listingEditor.ai.fillNeedsSeed'));
+        finish(t(marketplace === 'ebay' || marketplace === 'etsy' ? 'listingEditor.ai.fillNeedsSeedOrPhoto' : 'listingEditor.ai.fillNeedsSeed'));
         return;
       }
 

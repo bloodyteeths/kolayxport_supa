@@ -14474,7 +14474,8 @@
       "fillNeedsSeed": "Describe what you're selling in a few words first",
       "fillNeedsSeedOrPhoto": "Add a photo or describe what you're selling first",
       "attributesNeedCategory": "Choose a category first: attributes depend on it",
-      "noAttributeIdeas": "No confident values for the remaining attributes. Fill them yourself"
+      "noAttributeIdeas": "No confident values for the remaining attributes. Fill them yourself",
+      "fillFromPhotosHelpEtsy": "Reads your photos and writes the title, description and tags. You review every field"
     },
     "price": {
       "bandTitle": "What similar listings sell for",

@@ -1758,6 +1758,20 @@
       "revokeFailed": "Bağlantı kaldırılamadı. Tekrar deneyin.",
       "createFailed": "Anahtar oluşturulamadı. Tekrar deneyin.",
       "privacy": "Alıcılarınızın adı, adresi, e-postası ve telefonu yapay zekâ uygulamalarına hiç gönderilmez (siparişlerde yalnızca ülke). Bağlantılar en geç bir yılda kendiliğinden sona erer."
+    },
+    "deleteAccount": {
+      "title": "Hesabı sil",
+      "helper": "Hesabınızı ve tüm verilerinizi kalıcı olarak siler. Geri alınamaz.",
+      "open": "Hesabı sil",
+      "modalTitle": "Hesabınız kalıcı olarak silinsin mi?",
+      "modalBody": "Siparişler, ilanlar, bağlı mağazalar, görseller ve tüm ayarlar hemen silinir; etkin bir aboneliğiniz varsa iptal edilir. Bu işlem geri alınamaz.",
+      "confirmLabel": "Onaylamak için e-posta adresinizi yazın: {email}",
+      "passwordLabel": "Şifre",
+      "passwordHelper": "E-posta ve şifreyle giriş yapıyorsanız gerekli. Google ile giriş yapıyorsanız boş bırakın.",
+      "confirmButton": "Hesabı kalıcı olarak sil",
+      "wrongPassword": "Şifre yanlış.",
+      "confirmMismatch": "E-posta adresi hesabınızla eşleşmiyor.",
+      "failed": "Hesap silinemedi. Lütfen tekrar deneyin veya destek@kolayxport.com adresine yazın."
     }
   },
   "importer": {

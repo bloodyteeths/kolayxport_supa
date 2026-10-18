@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import { useMemo } from 'react';
 import { senderMissing } from './validate';
 import { senderCountry, toIso2, type PackagePreset, type SenderProfile } from './labelDraft';
+import { isPlayClient } from '@/lib/billing/playClient';
 
 export const USER_SETTINGS_KEY = '/api/user/settings';
 
@@ -88,7 +89,7 @@ export function useSenderProfile(enabled = true): UseSenderProfile {
       baseCurrency: baseCurrencyOf(sender),
       etgbEnabled: !!shippingSettings.etgbEnabled,
       etgbEmail: (shippingSettings.etgbRecipientEmail || '').trim() || null,
-      stripeUpsell: plan !== 'shopify_free' && provider !== 'shopify_free',
+      stripeUpsell: plan !== 'shopify_free' && provider !== 'shopify_free' && !isPlayClient(),
       state: data ? 'ready' : error ? 'error' : isLoading || enabled ? 'loading' : 'ready',
       error,
       mutate: () => mutate(),

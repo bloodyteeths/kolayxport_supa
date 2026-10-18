@@ -75,7 +75,7 @@ Hizmet'i kullanırken şunları yapmamayı kabul edersiniz:
 
 - Hizmet'e yüklediğiniz veya bağlı hesaplarınızdan aktarılan içerik ve veriler size (veya ilgili hak sahiplerine) aittir. Bunları yalnızca Hizmet'i size sunmak için kullanmamıza izin verirsiniz.
 - Kişisel verilerin işlenmesi [KVKK Aydınlatma Metni](/kvkk-aydinlatma-metni) ve [Gizlilik Politikası](/gizlilik-politikasi)'na tabidir. Alıcılarınızın verileri bakımından siz veri sorumlusu, KolayXport veri işleyendir; alıcılarınızı aydınlatmak ve gerekli hukuki sebebe sahip olmak sizin sorumluluğunuzdadır. [TODO(owner): kurumsal müşteriler için ayrı bir Veri İşleme Sözleşmesi (DPA) sunulacak mı?]
-- Hesabınız kapandığında verileriniz [TODO(owner): hesap kapatıldıktan sonra silme süresi, ör. 30 gün] içinde silinir; bu süre içinde verilerinizin bir kopyasını isteyebilirsiniz. Yasal saklama yükümlülüğü olan kayıtlar hariçtir.
+- Hesabınızı **Ayarlar › Tercihler › Hesabı sil** adımıyla kendiniz silebilirsiniz; verileriniz hemen silinir ve dönüşümlü yedeklerden en geç yaklaşık 3 ay içinde çıkar. Verilerinizin bir kopyasını istiyorsanız silmeden önce destek@kolayxport.com adresine yazın. Yasal saklama yükümlülüğü olan kayıtlar hariçtir.
 
 ## 8. Bağlı hesaplar ve üçüncü taraf koşulları
 

@@ -1840,6 +1840,20 @@
       "revokeFailed": "Could not remove the connection. Try again.",
       "createFailed": "Could not create the key. Try again.",
       "privacy": "Your buyers' names, addresses, e-mails and phone numbers are never sent to AI apps (orders carry the country only). Connections end by themselves after a year at the latest."
+    },
+    "deleteAccount": {
+      "title": "Delete account",
+      "helper": "Permanently deletes your account and all your data. This cannot be undone.",
+      "open": "Delete account",
+      "modalTitle": "Delete your account permanently?",
+      "modalBody": "Orders, listings, connected stores, images and all settings are deleted immediately, and an active subscription is cancelled. This cannot be undone.",
+      "confirmLabel": "Type your e-mail address to confirm: {email}",
+      "passwordLabel": "Password",
+      "passwordHelper": "Required if you sign in with e-mail and password. Leave empty if you sign in with Google.",
+      "confirmButton": "Delete account permanently",
+      "wrongPassword": "Wrong password.",
+      "confirmMismatch": "The e-mail address does not match your account.",
+      "failed": "The account could not be deleted. Please try again or write to destek@kolayxport.com."
     }
   },
   "fedex": {

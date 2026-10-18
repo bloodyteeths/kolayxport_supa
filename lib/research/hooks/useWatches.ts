@@ -40,6 +40,7 @@ import type {
   WatchesData,
 } from '@/lib/research/watchAdapter';
 import { ResearchFetchError, errorsOf } from './useResearchProducts';
+import { isPlayClient } from '@/lib/billing/playClient';
 
 export { ResearchFetchError };
 export type { AlertRules, FastestListing, SalesPoint, WatchDetail, WatchItemInfo, WatchListingLite, WatchQuota, WatchSummary, WatchType, WatchesData };
@@ -259,7 +260,7 @@ export function normalizeQuota(v: unknown, used: number): WatchQuota {
     limit: limit !== null && limit >= 0 ? Math.floor(limit) : null,
     plan: (str(q.plan) as WatchQuota['plan']) ?? null,
     // Anything but an explicit true = no Stripe upsell (shopify_free safe direction).
-    stripeUpsell: q.stripeUpsell === true,
+    stripeUpsell: q.stripeUpsell === true && !isPlayClient(),
   };
 }
 

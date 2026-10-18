@@ -12,6 +12,7 @@ import { useTranslations } from 'next-intl';
 import { Banner } from '@/components/ds/feedback/Banner';
 import { layout, px } from '@/lib/ds/tokens';
 import { BILLING_HREF, type ShellMeterKind, type ShellUsage } from './SideNavFooter';
+import { isPlayClient } from '@/lib/billing/playClient';
 
 export type AccountBannerProps = {
   usage: ShellUsage | null | undefined;
@@ -26,7 +27,7 @@ export type AccountBannerState =
 
 /** Pure: which banner (if any) the account needs. */
 export function accountBannerState(usage: ShellUsage | null | undefined): AccountBannerState {
-  if (!usage || usage.state === 'shopify_free' || usage.planKey === 'shopifyFree') return null;
+  if (!usage || usage.state === 'shopify_free' || usage.planKey === 'shopifyFree' || isPlayClient()) return null;
   if (usage.blocked) return { kind: usage.blocked };
   const m = usage.limitReached;
   if (m && m.limit !== null && m.limit > 0) return { kind: 'limitReached', meter: m.kind, limit: m.limit };

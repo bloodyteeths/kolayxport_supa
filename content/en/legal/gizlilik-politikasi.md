@@ -3,13 +3,13 @@ title: "Privacy Policy | KolayXport"
 description: "What data KolayXport processes, how it protects sellers' buyer data, how long it keeps data and who it shares it with. All the details are here."
 h1: "Privacy Policy"
 keyword: "kolayxport privacy policy"
-updated: 2026-10-17
+updated: 2026-10-18
 effective: 2026-10-17
 lawyerReviewed: true
 inventoryRefs: []
 ---
 
-This Privacy Policy explains how MODSONS YAZILIM E-TİCARET İTHALAT İHRACAT LİMİTED ŞİRKETİ ("KolayXport", "we") processes data through the kolayxport.com website, the KolayXport app and the KolayXport Chrome extension (together, the "Service"). The statutory notice under KVKK Art. 10 is in the [KVKK Privacy Notice](/en/kvkk-aydinlatma-metni) and cookies are covered in the [Cookie Policy](/en/cerez-politikasi). This policy adds to them. The Turkish version prevails.
+This Privacy Policy explains how MODSONS YAZILIM E-TİCARET İTHALAT İHRACAT LİMİTED ŞİRKETİ ("KolayXport", "we") processes data through the kolayxport.com website, the KolayXport app (on the web and the Android app on Google Play) and the KolayXport Chrome extension (together, the "Service"). The statutory notice under KVKK Art. 10 is in the [KVKK Privacy Notice](/en/kvkk-aydinlatma-metni) and cookies are covered in the [Cookie Policy](/en/cerez-politikasi). This policy adds to them. The Turkish version prevails.
 
 ## 1. Whose data, whose responsibility?
 
@@ -55,7 +55,7 @@ When you use AI features (title, description and tag suggestions, image generati
 - In reply drafts (only when you press the button): the latest messages in that conversation, the buyer's display name, order summaries such as order number and product details, and your shop name.
 - Buyer personal data from Amazon orders is not sent to the AI service.
 
-AI output is a suggestion; you must review and approve it before it is sent to a marketplace. The Service does not make automated decisions with legal effect about you or your buyers based on AI output. Google's API terms govern Google's processing of this data. [TODO(owner): kullanılan Gemini API hesabının ücretli katmanda olduğunu ve Google'ın bu katmanda girdileri model eğitimi için kullanmadığını teyit edin]
+AI output is a suggestion; you must review and approve it before it is sent to a marketplace. The Service does not make automated decisions with legal effect about you or your buyers based on AI output. We use the Gemini API on the paid tier; on that tier Google does not use the content sent to train its models. Google's API terms govern Google's processing of this data.
 
 ## 5. Who we share data with
 
@@ -83,7 +83,7 @@ No system can be perfectly secure. As of this date KolayXport **does not hold** 
 
 ## 7. Retention
 
-- **Account data:** while your account is open; deleted or anonymised within [TODO(owner): hesap kapatıldıktan sonra silme süresi, ör. 30 gün] after closure. Invoices and contract records we must keep by law are kept for the required period (up to 10 years).
+- **Account data:** while your account is open. When you delete your account, your data is deleted immediately and leaves the rotating backups within about 3 months at most. Invoices and contract records we must keep by law are kept for the required period (up to 10 years).
 - **Buyer personal data** (name, address, phone, e-mail, notes): kept for at most **90 days** from the order date and then deleted automatically. Order details that contain no personal data (order number, amount, SKU, status) are kept for reporting. [TODO(owner): üretimde PII_PURGE_DRY_RUN=false ayarlandığını ve silme işinin gerçekten çalıştığını teyit edin; Amazon verileri için Amazon'un Veri Koruma Politikası'ndaki daha kısa süreyi (teslimattan sonra 30 gün) karşılayıp karşılamadığımızı kontrol edin]
 - **Access tokens for connected accounts:** while the connection exists; deleted when you disconnect.
 - **Marketplace listing data:** refreshed in line with each marketplace's API terms; Etsy listing data is refreshed at least every 6 hours and other Etsy content at least every 24 hours.
@@ -92,7 +92,7 @@ No system can be perfectly secure. As of this date KolayXport **does not hold** 
 
 ## 8. Your rights and deleting your data
 
-Your rights under KVKK Art. 11 and how to apply are explained in the KVKK Privacy Notice. To close your account, get a copy of your data or ask for deletion, write to destek@kolayxport.com from the e-mail address registered in your account. You can disconnect marketplace accounts in settings at any time.
+Your rights under KVKK Art. 11 and how to apply are explained in the KVKK Privacy Notice. You can permanently delete your account and data yourself under **Settings › Preferences › Delete account**, on the web or in the Android app; the steps are on the [Account deletion](/en/hesap-silme) page. To get a copy of your data, or to ask for deletion if you cannot sign in, write to destek@kolayxport.com from the e-mail address registered in your account. You can disconnect marketplace accounts in settings at any time.
 
 If you are a seller's buyer, please send requests about your data to that seller first; we forward requests we receive to the seller.
 

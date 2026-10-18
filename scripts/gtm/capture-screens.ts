@@ -6,8 +6,12 @@
  *   npx tsx scripts/gtm/capture-screens.ts           # all screens, TR then EN
  *   npx tsx scripts/gtm/capture-screens.ts orders profit --locale=en --preview=/tmp/prev
  *
+ *   npx tsx scripts/gtm/capture-screens.ts --play          # Google Play phone shots (see PLAY_SCREENS)
+ *
  * Env: BASE_URL (default http://localhost:3100), DEMO_EMAIL, DEMO_PASSWORD, CHROME_PATH.
  * Output: public/marketing/screens/<id>.webp (TR) and public/marketing/screens/en/<id>.webp (EN), 2x DPR.
+ * --play: design/play-listing/screens/<locale>/<nn>-<id>.png, 1080x1920 (360x640 at 3x, Play's 9:16), in the
+ * Play app mode (kx_client=play cookie: no prices or upgrade prompts, lib/billing/playClient.ts).
  *
  * A few screens read live marketplace APIs on load (Etsy editor, inbox). For those the browser-side
  * requests to our own API routes are answered with synthetic fixtures (page.route), so no marketplace is
@@ -32,6 +36,10 @@ const args = process.argv.slice(2);
 const only = args.filter((a) => !a.startsWith('--'));
 const localeArg = args.find((a) => a.startsWith('--locale='))?.split('=')[1];
 const previewDir = args.find((a) => a.startsWith('--preview='))?.split('=')[1];
+const PLAY = args.includes('--play');
+const PLAY_OUT = path.join(ROOT, 'design', 'play-listing', 'screens');
+/** Store order of the Google Play phone screenshots (ids from SCREENS, plus the overview). */
+const PLAY_SCREENS = ['overview', 'orders', 'etsy-listings', 'listing-editor', 'research', 'profit', 'inbox', 'stock-sync'];
 const LOCALES: Array<'tr' | 'en'> = localeArg === 'tr' || localeArg === 'en' ? [localeArg] : ['tr', 'en'];
 
 type Locale = 'tr' | 'en';
@@ -270,6 +278,7 @@ async function clickFirst(page: Page, selectors: string[], timeout = 4000) {
 }
 
 const SCREENS: Screen[] = [
+  { id: 'overview', path: '/app', ready: 'text=/Emily|Michael|Sarah|Iznik|Etsy/', settleMs: 4000 },
   { id: 'orders', path: '/app/labels', ready: 'text=/Emily|Michael|Sarah|Jessica|Daniel|Olivia|Lena|Camille|Ayşe|Mehmet/' },
   {
     id: 'labels', path: '/app/labels', ready: 'text=/Emily|Michael|Sarah|Jessica|Olivia|Lena/',
@@ -373,6 +382,15 @@ async function capture(ctx: BrowserContext, screen: Screen, locale: Locale) {
   } else {
     buf = await page.screenshot();
   }
+  if (PLAY) {
+    const dir = path.join(PLAY_OUT, locale);
+    fs.mkdirSync(dir, { recursive: true });
+    const n = String(PLAY_SCREENS.indexOf(screen.id) + 1).padStart(2, '0');
+    // 24-bit PNG (no alpha), as Play requires.
+    await sharp(buf).flatten({ background: '#ffffff' }).png().toFile(path.join(dir, `${n}-${screen.id}.png`));
+    await page.close();
+    return;
+  }
   const dir = locale === 'tr' ? OUT : path.join(OUT, 'en');
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, `${screen.id}.webp`);
@@ -388,11 +406,14 @@ async function main() {
   const browser = await chromium.launch({ executablePath: CHROME, headless: true });
   try {
     for (const locale of LOCALES) {
-      for (const mobile of [false, true]) {
-        const screens = SCREENS.filter((s) => !!s.mobile === mobile && (only.length === 0 || only.includes(s.id)));
+      for (const mobile of PLAY ? [true] : [false, true]) {
+        const screens = PLAY
+          ? PLAY_SCREENS.filter((id) => only.length === 0 || only.includes(id))
+            .map((id) => ({ ...SCREENS.find((s) => s.id === id)!, mobile: true, crop: 'page' as const }))
+          : SCREENS.filter((s) => !!s.mobile === mobile && s.id !== 'overview' && (only.length === 0 || only.includes(s.id)));
         if (!screens.length) continue;
         const ctx = await browser.newContext({
-          viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 900 },
+          viewport: PLAY ? { width: 360, height: 640 } : mobile ? { width: 390, height: 844 } : { width: 1440, height: 900 },
           deviceScaleFactor: mobile ? 3 : 2,
           isMobile: mobile, hasTouch: mobile,
           locale: locale === 'tr' ? 'tr-TR' : 'en-US',
@@ -406,6 +427,7 @@ async function main() {
         }, [locale]);
         await installMocks(ctx);
         await login(ctx);
+        if (PLAY) await ctx.addCookies([{ name: 'kx_client', value: 'play', url: BASE }]);
         for (const s of screens) {
           try { await capture(ctx, s, locale); } catch (e) { console.error(`  FAILED ${s.id}: ${(e as Error).message}`); }
         }

@@ -34,6 +34,7 @@ Bu politika, MODSONS YAZILIM E-TİCARET İTHALAT İHRACAT LİMİTED ŞİRKETİ'n
 | `__Secure-next-auth.callback-url` | Çerez | Girişten sonra doğru sayfaya dönmenizi sağlar | Tarayıcı oturumu |
 | `next-auth.state`, `next-auth.pkce.code_verifier` (güvenli önekli) | Çerez, HttpOnly | Google ile girişin güvenliği | Yaklaşık 15 dakika |
 | `ebay_csrf`, `amazon_csrf` | Çerez, HttpOnly | eBay veya Amazon hesabı bağlarken güvenlik doğrulaması | 10 dakika |
+| `kx_client` | Çerez | Uygulamanın Google Play'deki Android uygulamasından açıldığını hatırlar (uygulamada satın alma ekranları gösterilmez) | 400 gün |
 | `cookie-consent` | Yerel depolama | Çerez tercihinizi hatırlar | Siz silene kadar |
 | `kolayxport_locale` | Yerel depolama | Dil tercihinizi (Türkçe/İngilizce) hatırlar | Siz silene kadar |
 | `kx.*`, `kx_*` ve benzeri uygulama anahtarları | Yerel / oturum depolaması | Uygulamada yaptığınız seçimleri (tablo sütunları, kayıtlı görünümler, son aramalar, kapatılan uyarılar, sipariş sesi ayarı, kaydedilmemiş taslaklar) cihazınızda hatırlar | Yerel depolamada siz silene kadar; oturum depolamasında sekme kapanana kadar |

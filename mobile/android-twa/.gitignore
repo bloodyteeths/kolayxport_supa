@@ -1,0 +1,10 @@
+# Build output and local machine files. The signing keystore lives OUTSIDE the repo (~/kolayxport-play-signing).
+.gradle/
+build/
+app/build/
+local.properties
+*.apk
+*.aab
+*.idsig
+*.jks
+*.keystore

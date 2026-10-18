@@ -78,6 +78,7 @@ import { BulkToolbar, filterGridRows, type BulkShow } from './BulkToolbar';
 import { useBulkAi } from './useBulkAi';
 import { withAiMarker } from './AiProposalCell';
 import { useStockManagedRows } from '@/components/domain/listings/stockManaged';
+import { isPlayClient } from '@/lib/billing/playClient';
 
 // ─── URL ────────────────────────────────────────────────────────────────────
 
@@ -361,7 +362,7 @@ export function BulkEditPage({ marketplace, transport: injectedTransport, stagin
 
   const { data: settings } = useSWR<SettingsSlice>('/api/user/settings', settingsFetcher, { revalidateOnFocus: false, dedupingInterval: 300_000 });
   const sub = settings?.subscription ?? null;
-  const stripeUpsell = sub != null && sub.billingProvider !== 'shopify_free' && sub.subscriptionPlan !== 'shopify_free';
+  const stripeUpsell = sub != null && sub.billingProvider !== 'shopify_free' && sub.subscriptionPlan !== 'shopify_free' && !isPlayClient();
 
   const connections = useConnections();
   const notConnected = connections.has(marketplace) === false || list.error?.code === 'not_connected';

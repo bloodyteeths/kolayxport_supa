@@ -77,7 +77,7 @@ You agree not to:
 
 - Content and data you upload or bring in from connected accounts belong to you (or the relevant rights holders). You allow us to use them only to provide the Service to you.
 - Processing of personal data is governed by the [KVKK Privacy Notice](/en/kvkk-aydinlatma-metni) and the [Privacy Policy](/en/gizlilik-politikasi). For your buyers' data you are the data controller and KolayXport is the data processor; you are responsible for informing your buyers and having the necessary legal basis. [TODO(owner): kurumsal müşteriler için ayrı bir Veri İşleme Sözleşmesi (DPA) sunulacak mı?]
-- When your account is closed, your data is deleted within [TODO(owner): hesap kapatıldıktan sonra silme süresi, ör. 30 gün]; during this time you can ask for a copy. Records we must keep by law are excluded.
+- You can delete your account yourself under **Settings › Preferences › Delete account**; your data is deleted immediately and leaves the rotating backups within about 3 months at most. If you want a copy of your data, write to destek@kolayxport.com before deleting. Records we must keep by law are excluded.
 
 ## 8. Connected accounts and third-party terms
 

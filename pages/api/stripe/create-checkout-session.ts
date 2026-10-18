@@ -9,12 +9,15 @@ import { stripe } from '@/lib/stripe';
 import { getAuthUser } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 import { checkoutSuccessUrl, checkoutCancelUrl } from '@/lib/billing/checkoutUrls';
+import { isPlayRequest } from '@/lib/billing/playClient';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).end('Method Not Allowed');
   }
+  // Google Play app: nothing is sold in the Android app (lib/billing/playClient.ts).
+  if (isPlayRequest(req)) return res.status(403).json({ error: 'Not available in the app', code: 'playApp' });
 
   const user = await getAuthUser(req, res);
   if (!user) return res.status(401).json({ error: 'Unauthorized' });

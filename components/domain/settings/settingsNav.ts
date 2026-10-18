@@ -10,6 +10,7 @@ import { runStatus } from '@/lib/ds/status/runs';
 import type { ConnectionProvider, ConnectionsMap } from '@/lib/integrations/connectionStatus';
 import type { SettingsFormSection, SettingsSlice } from '@/lib/hooks/useSettings';
 import { SECTION_SLICES } from '@/lib/hooks/useSettings';
+import { isPlayClient } from '@/lib/billing/playClient';
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────────────────────────
 /** `?tab=` keys. The five existing keys are unchanged (links in notifications, AppLayout, portal return). */
@@ -182,7 +183,7 @@ export function buildSettingsNav(input: SettingsNavInputs, copy: SettingsNavCopy
         const enterprise = b.plan === 'enterprise' || b.state === 'enterprise';
         // Shopify wording only for Shopify billing. Enterprise also has `stripeUpsell: false` (manual
         // invoicing) — it keeps the normal "Plan & billing" label with the plan name, no Shopify claim.
-        if (b.plan === 'shopify_free' || b.state === 'shopify_free' || (!b.stripeUpsell && !enterprise)) {
+        if (b.plan === 'shopify_free' || b.state === 'shopify_free' || (!b.stripeUpsell && !enterprise && !isPlayClient())) {
           return { ...base, label: t('nav.billingShopify'), summary: t('nav.summary.billingShopify') };
         }
         if (BILLING_DANGER_STATES.has(b.state)) {

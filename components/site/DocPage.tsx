@@ -60,6 +60,7 @@ export default function DocPage(props: DocPageProps) {
       locale={locale}
       seo={{ title: m.title, description: m.description, path, hasTwin: doc.hasTwin, ogImage: props.ogImage, type: type === 'blog' ? 'article' : 'website' }}
       jsonLd={schema}
+      keepInPlayApp={type === 'legal'}
     >
       <Body {...props} crumbs={crumbs} faq={faq} />
     </SiteLayout>

@@ -11,6 +11,7 @@ import { DECIDED_GRACE_DAYS } from './planLimits';
 import { PLAN_LADDER, currencyCode, effectivePrice, nextPlanFor } from './price';
 import type { Currency, Entitlement, Interval, MeterKey, PaidPlanKey, PlanKey, PortalFlow, PricedPlanKey } from './types';
 import { isPaidPlan } from './types';
+import { isPlayClient } from './playClient';
 
 export const DAY_MS = 86_400_000;
 /** A trial with this many days or fewer left shows its days line in warning-fg (§9.3). */
@@ -42,7 +43,7 @@ export function daysUntil(iso: string | null | undefined, now: Date): number | n
 
 /** true when the account must never see Stripe / pricing surfaces (the one check, §0.2). */
 export function isNeutralBilling(e: Pick<Entitlement, 'stripeUpsell' | 'plan' | 'state'> | null | undefined): boolean {
-  if (!e) return true;
+  if (!e || isPlayClient()) return true;
   return e.stripeUpsell !== true || e.plan === 'shopify_free' || e.state === 'shopify_free';
 }
 
@@ -166,6 +167,11 @@ export function billingView(e: Entitlement | null | undefined, now: Date = new D
       secondary: href('contactUs', CONTACT_HREF),
       invoices: 'ifAny',
     };
+  }
+
+  // Google Play app: the plan and its status only — no prices, actions or invoices (playClient.ts).
+  if (isPlayClient()) {
+    return { ...emptyView('neutral'), planName: e.plan, pill: subscriptionStatus(e) };
   }
 
   if (isNeutralBilling(e)) {

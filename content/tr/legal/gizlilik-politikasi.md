@@ -3,13 +3,13 @@ title: "Gizlilik Politikası | KolayXport"
 description: "KolayXport hangi verileri işler, satıcıların alıcı verilerini nasıl korur, verileri ne kadar saklar ve kimlerle paylaşır? Tüm ayrıntılar bu sayfada."
 h1: "Gizlilik Politikası"
 keyword: "kolayxport gizlilik politikası"
-updated: 2026-10-17
+updated: 2026-10-18
 effective: 2026-10-17
 lawyerReviewed: true
 inventoryRefs: []
 ---
 
-Bu Gizlilik Politikası, MODSONS YAZILIM E-TİCARET İTHALAT İHRACAT LİMİTED ŞİRKETİ'nin ("KolayXport", "biz") kolayxport.com web sitesi, KolayXport uygulaması ve KolayXport Chrome uzantısı (birlikte "Hizmet") kapsamında verileri nasıl işlediğini açıklar. KVKK md. 10 kapsamındaki yasal aydınlatma [KVKK Aydınlatma Metni](/kvkk-aydinlatma-metni)'nde, çerezler [Çerez Politikası](/cerez-politikasi)'nda yer alır. Bu politika onları tamamlar.
+Bu Gizlilik Politikası, MODSONS YAZILIM E-TİCARET İTHALAT İHRACAT LİMİTED ŞİRKETİ'nin ("KolayXport", "biz") kolayxport.com web sitesi, KolayXport uygulaması (web ve Google Play'deki Android uygulaması) ve KolayXport Chrome uzantısı (birlikte "Hizmet") kapsamında verileri nasıl işlediğini açıklar. KVKK md. 10 kapsamındaki yasal aydınlatma [KVKK Aydınlatma Metni](/kvkk-aydinlatma-metni)'nde, çerezler [Çerez Politikası](/cerez-politikasi)'nda yer alır. Bu politika onları tamamlar.
 
 ## 1. Kimin verisi, kimin sorumluluğunda?
 
@@ -55,7 +55,7 @@ Yapay zekâ özelliklerini (başlık, açıklama ve etiket önerisi, görsel ür
 - Mesaj yanıt taslağında (yalnızca düğmeye bastığınızda): ilgili konuşmanın son mesajları, alıcının görünen adı, sipariş numarası ve ürün bilgisi gibi sipariş özetleri ile mağaza adınız.
 - Amazon siparişlerine ait alıcı kişisel verileri yapay zekâ hizmetine gönderilmez.
 
-Yapay zekâ çıktıları öneridir; pazaryerine gönderilmeden önce sizin incelemeniz ve onaylamanız gerekir. Hizmet, yapay zekâ çıktısına dayanarak sizin veya alıcılarınız hakkında hukuki sonuç doğuran otomatik bir karar vermez. Google'ın bu verileri işlemesine Google'ın API koşulları uygulanır. [TODO(owner): kullanılan Gemini API hesabının ücretli katmanda olduğunu ve Google'ın bu katmanda girdileri model eğitimi için kullanmadığını teyit edin]
+Yapay zekâ çıktıları öneridir; pazaryerine gönderilmeden önce sizin incelemeniz ve onaylamanız gerekir. Hizmet, yapay zekâ çıktısına dayanarak sizin veya alıcılarınız hakkında hukuki sonuç doğuran otomatik bir karar vermez. Gemini API'yi ücretli katmanda kullanırız; Google bu katmanda gönderilen içerikleri modellerini eğitmek için kullanmaz. Google'ın bu verileri işlemesine Google'ın API koşulları uygulanır.
 
 ## 5. Paylaştığımız taraflar
 
@@ -83,7 +83,7 @@ Hiçbir sistem mutlak güvenlik sağlayamaz. KolayXport'un bu tarih itibarıyla 
 
 ## 7. Saklama süreleri
 
-- **Hesap verileri:** hesabınız açık olduğu sürece; kapatmadan sonra [TODO(owner): hesap kapatıldıktan sonra silme süresi, ör. 30 gün] içinde silinir veya anonimleştirilir. Yasal saklama yükümlülüğü olan fatura ve sözleşme kayıtları ilgili süre boyunca (10 yıla kadar) saklanır.
+- **Hesap verileri:** hesabınız açık olduğu sürece. Hesabınızı sildiğinizde verileriniz hemen silinir; dönüşümlü yedeklerden en geç yaklaşık 3 ay içinde çıkar. Yasal saklama yükümlülüğü olan fatura ve sözleşme kayıtları ilgili süre boyunca (10 yıla kadar) saklanır.
 - **Alıcı kişisel verileri** (ad, adres, telefon, e-posta, notlar): sipariş tarihinden itibaren en fazla **90 gün** saklanır, ardından otomatik olarak silinir. Raporlama için kişisel veri içermeyen sipariş bilgileri (sipariş numarası, tutar, ürün kodu, durum) korunur. [TODO(owner): üretimde PII_PURGE_DRY_RUN=false ayarlandığını ve silme işinin gerçekten çalıştığını teyit edin; Amazon verileri için Amazon'un Veri Koruma Politikası'ndaki daha kısa süreyi (teslimattan sonra 30 gün) karşılayıp karşılamadığımızı kontrol edin]
 - **Bağlı hesap erişim anahtarları:** bağlantı sürdükçe; bağlantıyı kestiğinizde silinir.
 - **Pazaryeri ilan verileri:** pazaryerlerinin API koşullarına uygun olarak yenilenir; Etsy ilan verileri en geç 6 saatte, diğer Etsy içerikleri en geç 24 saatte bir yenilenir.
@@ -92,7 +92,7 @@ Hiçbir sistem mutlak güvenlik sağlayamaz. KolayXport'un bu tarih itibarıyla 
 
 ## 8. Haklarınız ve verilerinizin silinmesi
 
-KVKK md. 11 kapsamındaki haklarınız ve başvuru yolu KVKK Aydınlatma Metni'nde açıklanmıştır. Hesabınızı kapatmak, verilerinizin bir kopyasını almak veya silinmesini istemek için hesabınızda kayıtlı e-posta adresinizden destek@kolayxport.com adresine yazabilirsiniz. Pazaryeri bağlantılarınızı ayarlardan dilediğiniz zaman kesebilirsiniz.
+KVKK md. 11 kapsamındaki haklarınız ve başvuru yolu KVKK Aydınlatma Metni'nde açıklanmıştır. Hesabınızı ve verilerinizi **Ayarlar › Tercihler › Hesabı sil** adımıyla web'de veya Android uygulamasında kendiniz kalıcı olarak silebilirsiniz; adımlar [Hesap silme](/hesap-silme) sayfasındadır. Verilerinizin bir kopyasını almak veya giriş yapamıyorsanız silinmesini istemek için hesabınızda kayıtlı e-posta adresinizden destek@kolayxport.com adresine yazabilirsiniz. Pazaryeri bağlantılarınızı ayarlardan dilediğiniz zaman kesebilirsiniz.
 
 Bir satıcının alıcısıysanız, verilerinizle ilgili talebinizi öncelikle o satıcıya iletmenizi öneririz; bize ulaşan talepleri satıcıya yönlendiririz.
 

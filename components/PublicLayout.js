@@ -15,7 +15,7 @@ export default function PublicLayout({ children, title, description = '', seo = 
   const router = useRouter();
   const noindex = seo.noindex ?? !INDEXABLE.has(router.pathname);
   return (
-    <SiteLayout locale={locale} seo={{ title: title || 'KolayXport', description, path: router.pathname, noindex }}>
+    <SiteLayout locale={locale} seo={{ title: title || 'KolayXport', description, path: router.pathname, noindex }} keepInPlayApp>
       {children}
     </SiteLayout>
   );

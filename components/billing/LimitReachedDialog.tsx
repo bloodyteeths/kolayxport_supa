@@ -16,6 +16,7 @@ import { useTranslations } from 'next-intl';
 import { toast } from 'react-hot-toast';
 import useLocaleStore from '@/lib/stores/useLocaleStore';
 import { useLimitReachedStore, type LimitReachedInfo } from '@/lib/http/limitInterceptor';
+import { isPlayClient } from '@/lib/billing/playClient';
 
 /** Mirrors lib/middleware/withUsageLimiter.ts (trial 50/10; plans table). Keep in sync. */
 const LIMITS: Record<string, { orderSync: number; label: number }> = {
@@ -79,7 +80,8 @@ export default function LimitReachedDialog() {
   const isShopifyFree = sub?.billingProvider === 'shopify_free' || sub?.subscriptionPlan === 'shopify_free';
   const providerKnown = !!data || !!error;
   // If we can't tell the billing provider, never show Stripe upsell wording.
-  const neutral = !!error || isShopifyFree;
+  // The Google Play app never points at plans either (playClient.ts).
+  const neutral = !!error || isShopifyFree || isPlayClient();
 
   useEffect(() => {
     if (info && isShopifyFree) {

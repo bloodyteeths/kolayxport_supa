@@ -66,6 +66,7 @@ import { isLabelable, orderColumns, orderInlineAction, orderRowActions, pagePrim
 import { useOrdersBulkActions } from './OrdersBulkActions';
 import { OrdersExportMenu } from './OrdersExportMenu';
 import { OrdersEmptyState, ordersEmptyKind } from './OrdersEmptyState';
+import { isPlayClient } from '@/lib/billing/playClient';
 
 const DENSITY_KEY = 'kx.orders.density';
 const SETTINGS_KEY = '/api/user/settings';
@@ -129,7 +130,7 @@ export function OrdersPage({ now }: OrdersPageProps = {}) {
   const sub = settings?.subscription ?? null;
   const shopifyFree = sub?.billingProvider === 'shopify_free' || sub?.subscriptionPlan === 'shopify_free';
   /** "See plans" only for a known, non-shopify_free account (never while unknown; pro-gating §1, Shopify review). */
-  const stripeUpsell = sub != null && !shopifyFree;
+  const stripeUpsell = sub != null && !shopifyFree && !isPlayClient();
   const syncLimit = sub?.limits?.orderSync;
   const limitText = typeof syncLimit === 'number' && syncLimit > 0 ? t('limit.syncs', { limit: syncLimit }) : t('limit.syncsReached');
   const etgbEnabled = Boolean(settings?.shippingSettings?.etgbEnabled);

@@ -154,10 +154,9 @@ export const financeSummary: McpTool = {
   description:
     'Money the seller actually made, from the marketplace financial records KolayXport syncs (the Financials page): gross sales, marketplace fees by type '
     + '(transaction, processing, listing, shipping labels, ads, refunds, discounts), product costs, net profit and margin, payouts to the bank, and the current '
-    + 'marketplace balance with the time it was synced; eBay also reports funds on hold. Use it for "how much money is Etsy holding", "what is my balance", '
-    + '"what are my fees", "how much did I pay for ads", "net profit", "when was I paid". Period: last 7/30/90 days or from/to dates; optionally one '
+    + 'marketplace balance with the time it was synced; eBay also reports funds on hold. Period: last 7/30/90 days or from/to dates; optionally one '
     + 'marketplace (etsy, ebay, trendyol, amazon, hepsiburada). Reads synced data only (never live), so it can lag by hours; lastSyncedAt says when. '
-    + 'Etsy does not report reserves separately, so held funds are not available for Etsy. Order counts and order value per marketplace: sales_summary.',
+    + 'Etsy does not report reserves separately, so held funds are not available for Etsy.',
   scope: 'read', readOnly: true,
   inputSchema: {
     type: 'object',

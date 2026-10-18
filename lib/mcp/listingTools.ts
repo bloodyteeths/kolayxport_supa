@@ -162,7 +162,7 @@ const SEO_RULES: Record<Mkt, Record<string, unknown>> = {
 const seoRules: McpTool = {
   name: 'seo_rules',
   title: 'Listing rules per marketplace',
-  description: 'The title / tag / description / photo rules KolayXport applies for a marketplace (Etsy: the seller\'s own rules — Title Case, commas only, 100–140 characters, 13 tags of ≤ 20 characters not repeating title words, English keywords from research). Returns rules only; it does not check a text (check_listing_text does).',
+  description: 'The title / tag / description / photo rules KolayXport applies for a marketplace (Etsy: the seller\'s own rules — Title Case, commas only, 100–140 characters, 13 tags of ≤ 20 characters not repeating title words, English keywords from research). Returns rules only; it does not check a text.',
   scope: 'read', readOnly: true,
   inputSchema: { type: 'object', required: ['marketplace'], properties: { marketplace: { type: 'string', enum: ALL } }, additionalProperties: false },
   async run(_auth, a) {
@@ -174,7 +174,7 @@ const seoRules: McpTool = {
 const checkListingText: McpTool = {
   name: 'check_listing_text',
   title: 'Check proposed listing text',
-  description: 'Checks a proposed title (and Etsy tags) against the marketplace rules BEFORE staging: length, separators, Title Case, repeated words, keyword stacking, tag length / count / overlap with the title. Returns the issues found; it changes nothing.',
+  description: 'Checks a proposed title (and Etsy tags) against the marketplace rules: length, separators, Title Case, repeated words, keyword stacking, tag length / count / overlap with the title. Returns the issues found; it changes nothing.',
   scope: 'read', readOnly: true,
   inputSchema: { type: 'object', required: ['marketplace'], properties: { marketplace: { type: 'string', enum: ALL }, title: { type: 'string' }, tags: { type: 'array', items: { type: 'string' } } }, additionalProperties: false },
   async run(_auth, a) {
@@ -190,7 +190,7 @@ const checkListingText: McpTool = {
 const researchKeywords: McpTool = {
   name: 'research_keywords',
   title: 'Market research',
-  description: 'What buyers and competitors use for a search on Etsy or eBay (KolayXport market research): price range, competition, the words buyers use (Etsy), suggested tags (Etsy) and the top listings with titles, prices, favourites and tags. Reads KolayXport\'s market research (live marketplace search results, cached); the seller\'s own sales are in sales_summary / finance_summary.',
+  description: 'What buyers and competitors use for a search on Etsy or eBay (KolayXport market research): price range, competition, the words buyers use (Etsy), suggested tags (Etsy) and the top listings with titles, prices, favourites and tags. Reads KolayXport\'s market research (live marketplace search results, cached).',
   scope: 'read', readOnly: true, openWorld: true,
   inputSchema: { type: 'object', required: ['marketplace', 'query'], properties: { marketplace: { type: 'string', enum: ['etsy', 'ebay'] }, query: { type: 'string' }, country: { type: 'string', description: 'Two-letter market, default US' } }, additionalProperties: false },
   async run(auth, a) {
@@ -222,7 +222,7 @@ const stageListingChanges: McpTool = {
   inputSchema: {
     type: 'object', required: ['marketplace', 'id'],
     properties: {
-      marketplace: { type: 'string', enum: ALL }, id: { type: 'string', description: 'As list_listings returns it' },
+      marketplace: { type: 'string', enum: ALL }, id: { type: 'string', description: 'The listing id shown in listing results' },
       title: { type: 'string' }, description: { type: 'string' }, tags: { type: 'array', items: { type: 'string' } },
       price: { type: 'number', description: 'Major units in the listing currency' }, quantity: { type: 'integer', minimum: 0 },
     },
@@ -297,7 +297,7 @@ const stageListingChanges: McpTool = {
 const createListingDraft: McpTool = {
   name: 'create_listing_draft',
   title: 'Create a new listing draft',
-  description: 'Starts a NEW listing as a KolayXport draft on etsy, ebay, trendyol, wix or shopify with title, description, price, quantity, tags (Etsy, Shopify) and photos (public https links — e.g. from generate_product_image). Staged draft only: nothing is created on the marketplace; the seller completes the remaining fields (category, shipping, policies …) in the editor at reviewUrl and sends it.',
+  description: 'Starts a NEW listing as a KolayXport draft on etsy, ebay, trendyol, wix or shopify with title, description, price, quantity, tags (Etsy, Shopify) and photos (public https links). Staged draft only: nothing is created on the marketplace; the seller completes the remaining fields (category, shipping, policies …) in the editor at reviewUrl and sends it.',
   scope: 'write', readOnly: false,
   inputSchema: {
     type: 'object', required: ['marketplace', 'title'],
@@ -373,7 +373,7 @@ const createListingDraft: McpTool = {
 const addListingPhotos: McpTool = {
   name: 'add_listing_photos',
   title: 'Add photos to a listing',
-  description: 'Stages photos (public https links, e.g. from generate_product_image) onto an existing listing on etsy, ebay, trendyol, wix or shopify as a draft. Staged draft only: the photos are added on the marketplace only when the seller reviews and sends the draft in KolayXport.',
+  description: 'Stages photos (public https links) onto an existing listing on etsy, ebay, trendyol, wix or shopify as a draft. Staged draft only: the photos are added on the marketplace only when the seller reviews and sends the draft in KolayXport.',
   scope: 'write', readOnly: false,
   inputSchema: { type: 'object', required: ['marketplace', 'id', 'photoUrls'], properties: { marketplace: { type: 'string', enum: ['etsy', 'ebay', 'trendyol', 'wix', 'shopify'] }, id: { type: 'string' }, photoUrls: { type: 'array', items: { type: 'string' }, minItems: 1 } }, additionalProperties: false },
   async run(auth, a) {
@@ -419,12 +419,12 @@ const addListingPhotos: McpTool = {
 const generateImage: McpTool = {
   name: 'generate_product_image',
   title: 'Generate a product photo',
-  description: `Makes a listing photo with AI (Nano Banana Pro) from the seller\'s reference photos and an instruction (e.g. "on a white background", "in a cosy nursery", "worn by a model"); the product stays exactly as in the references. Returns a public link to the image (it is not added to any listing; add_listing_photos or create_listing_draft do that). Cost: ${IMAGE_CREDITS} of the seller\'s KolayXport AI credits per image (refunded if generation fails); fails with a message when credits are insufficient.`,
+  description: `Makes a listing photo with AI (Nano Banana Pro) from the seller\'s reference photos and an instruction (e.g. "on a white background", "in a cosy nursery", "worn by a model"); the product stays exactly as in the references. Returns a public link to the image (it is not added to any listing). Cost: ${IMAGE_CREDITS} of the seller\'s KolayXport AI credits per image (refunded if generation fails); fails with a message when credits are insufficient.`,
   scope: 'write', readOnly: false, openWorld: true,
   inputSchema: {
     type: 'object', required: ['prompt'],
     properties: {
-      prompt: { type: 'string' }, referencePhotoUrls: { type: 'array', items: { type: 'string' }, description: 'Up to 10 https photos of the product (e.g. from get_listing)' },
+      prompt: { type: 'string' }, referencePhotoUrls: { type: 'array', items: { type: 'string' }, description: 'Up to 10 https photos of the product (e.g. the photo links of the listing)' },
       aspectRatio: { type: 'string', enum: IMAGE_ASPECTS }, whiteBackground: { type: 'boolean' },
     },
     additionalProperties: false,

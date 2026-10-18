@@ -209,7 +209,7 @@ async function etsyShopIds(userId: string): Promise<string[]> {
 const getStoreOverview: McpTool = {
   name: 'get_store_overview',
   title: 'Store overview',
-  description: 'Snapshot of the seller\'s KolayXport account: listing counts per marketplace; orders in the last 7 and 30 days (per marketplace and per ship-to country), how many wait to ship and how many are late; the 5 newest orders; when each marketplace\'s financial records were last synced. Money totals: sales_summary (order value) and finance_summary (fees, profit, payouts, balance).',
+  description: 'Snapshot of the seller\'s KolayXport account: listing counts per marketplace; orders in the last 7 and 30 days (per marketplace and per ship-to country), how many wait to ship and how many are late; the 5 newest orders; when each marketplace\'s financial records were last synced.',
   scope: 'read', readOnly: true,
   inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   async run(auth) {
@@ -259,7 +259,7 @@ const getStoreOverview: McpTool = {
 const listOrders: McpTool = {
   name: 'list_orders',
   title: 'List orders',
-  description: 'The seller\'s orders, newest first (up to 100), filtered by state (open = waiting to ship, shipped, delivered, cancelled), marketplace and age. Each order: number, marketplace and shop, state, dates, tracking, ship-to country, a money summary (items subtotal, discount, shipping, tax, total, currency) and items with the unit price paid. Buyer name and shipping address only if the seller allowed them for this connection (never Amazon); e-mail and phone are never included. Full breakdown of one order: get_order.',
+  description: 'The seller\'s orders, newest first (up to 100), filtered by state (open = waiting to ship, shipped, delivered, cancelled), marketplace and age. Each order: number, marketplace and shop, state, dates, tracking, ship-to country, a money summary (items subtotal, discount, shipping, tax, total, currency) and items with the unit price paid. Buyer name and shipping address only if the seller allowed them for this connection (never Amazon); e-mail and phone are never included.',
   scope: 'read', readOnly: true,
   inputSchema: {
     type: 'object',
@@ -309,7 +309,7 @@ const getOrder: McpTool = {
 const listListingsTool: McpTool = {
   name: 'list_listings',
   title: 'List listings',
-  description: 'The seller\'s listings on one marketplace (etsy, ebay, trendyol, wix, shopify, hepsiburada) from KolayXport\'s synced copy, 50 per page: id, title, price, stock, status, link, health. Optional title search. Sales per item: sales_summary.',
+  description: 'The seller\'s listings on one marketplace (etsy, ebay, trendyol, wix, shopify, hepsiburada) from KolayXport\'s synced copy, 50 per page: id, title, price, stock, status, link, health. Optional title search.',
   scope: 'read', readOnly: true,
   inputSchema: {
     type: 'object',
@@ -377,7 +377,7 @@ async function listingDetail(userId: string, marketplace: ListingMarketplace, id
 const getListing: McpTool = {
   name: 'get_listing',
   title: 'Get one listing',
-  description: 'Full details of one listing (title, description, tags, price, stock, status). id = Etsy listing id, eBay SKU, Trendyol barcode, Hepsiburada SKU, Wix or Shopify product id (as list_listings returns it). From KolayXport\'s synced copy.',
+  description: 'Full details of one listing (title, description, tags, price, stock, status). id = Etsy listing id, eBay SKU, Trendyol barcode, Hepsiburada SKU, Wix or Shopify product id (the id shown in listing results). From KolayXport\'s synced copy.',
   scope: 'read', readOnly: true,
   inputSchema: { type: 'object', required: ['marketplace', 'id'], properties: { marketplace: { type: 'string', enum: MARKETPLACES }, id: { type: 'string' } }, additionalProperties: false },
   async run(auth, a) {
@@ -420,7 +420,7 @@ const lowStock: McpTool = {
 const salesSummary: McpTool = {
   name: 'sales_summary',
   title: 'Sales summary',
-  description: 'Order count and gross order value (what buyers paid, incl. shipping and tax) per marketplace and currency for the last N days (default 30, max 365), cancelled orders excluded, plus the 10 best-selling items by quantity. Not net of fees or refunds: fees, payouts, balance and profit are in finance_summary.',
+  description: 'Order count and gross order value (what buyers paid, incl. shipping and tax) per marketplace and currency for the last N days (default 30, max 365), cancelled orders excluded, plus the 10 best-selling items by quantity. Not net of fees or refunds.',
   scope: 'read', readOnly: true,
   inputSchema: { type: 'object', properties: { days: { type: 'integer', minimum: 1, maximum: 365 } }, additionalProperties: false },
   async run(auth, a) {

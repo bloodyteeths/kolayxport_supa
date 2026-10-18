@@ -469,11 +469,11 @@ export function buyerRecordCount(result: unknown): number {
   return n;
 }
 
-/** AI image generation can be switched off server-wide (MCP_DISABLE_IMAGE_TOOL=1): Claude's Connectors Directory does
- * not accept connectors that generate images through AI models. */
+/** AI image generation is off unless MCP_ENABLE_IMAGE_TOOL=1: Claude's Connectors Directory does not accept connectors
+ * that generate images through AI models (sellers make AI photos in the KolayXport app instead). */
 export function activeTools(): McpTool[] {
-  const off = /^(1|true|yes)$/i.test(process.env.MCP_DISABLE_IMAGE_TOOL || '');
-  return off ? MCP_TOOLS.filter((t) => t.name !== 'generate_product_image') : MCP_TOOLS;
+  const on = /^(1|true|yes)$/i.test(process.env.MCP_ENABLE_IMAGE_TOOL || '');
+  return on ? MCP_TOOLS : MCP_TOOLS.filter((t) => t.name !== 'generate_product_image');
 }
 
 export function toolsFor(scopes: McpScope[]): McpTool[] {

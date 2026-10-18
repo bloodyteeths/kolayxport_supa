@@ -317,7 +317,15 @@ describe('finance_summary', () => {
 });
 
 describe('tools/list for the Claude and ChatGPT directories', () => {
-  const all = listedTools(['read', 'write', 'orders:buyer']);
+  // Every tool, the opt-in image tool included, so its annotations are checked too.
+  const all = (() => {
+    process.env.MCP_ENABLE_IMAGE_TOOL = '1';
+    try {
+      return listedTools(['read', 'write', 'orders:buyer']);
+    } finally {
+      delete process.env.MCP_ENABLE_IMAGE_TOOL;
+    }
+  })();
   it('every tool: title, annotations with explicit booleans, name ≤ 64', () => {
     expect(all.length).toBe(MCP_TOOLS.length);
     for (const t of all) {
@@ -338,12 +346,13 @@ describe('tools/list for the Claude and ChatGPT directories', () => {
     expect(all.find((t) => t.name === 'generate_product_image')!.description).toMatch(/\d+ of the seller's KolayXport AI credits per image/);
     expect(listedTools(['read']).every((t) => t.annotations.readOnlyHint)).toBe(true);
   });
-  it('the image tool can be switched off for the directory', () => {
-    process.env.MCP_DISABLE_IMAGE_TOOL = '1';
+  it('the image tool is off by default (Claude directory) and only on with MCP_ENABLE_IMAGE_TOOL=1', () => {
+    expect(listedTools(['read', 'write']).map((t) => t.name)).not.toContain('generate_product_image');
+    process.env.MCP_ENABLE_IMAGE_TOOL = '1';
     try {
-      expect(listedTools(['read', 'write']).map((t) => t.name)).not.toContain('generate_product_image');
+      expect(listedTools(['read', 'write']).map((t) => t.name)).toContain('generate_product_image');
     } finally {
-      delete process.env.MCP_DISABLE_IMAGE_TOOL;
+      delete process.env.MCP_ENABLE_IMAGE_TOOL;
     }
   });
   it('loopback redirect URIs match on any port; others exactly', () => {

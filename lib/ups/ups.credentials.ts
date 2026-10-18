@@ -26,7 +26,7 @@ export async function getUpsCredentialsForUser(userId: string): Promise<UpsCrede
   });
   const apiKey = decryptIfNeeded(creds?.upsApiKey) as string | null;
   const apiSecret = decryptIfNeeded(creds?.upsApiSecret) as string | null;
-  const accountNumber = creds?.upsAccountNumber ?? null;
+  const accountNumber = decryptIfNeeded(creds?.upsAccountNumber) as string | null;
   if (!apiKey || !apiSecret || !accountNumber) {
     throw new Error('Missing UPS credentials for user. Please ensure upsApiKey, upsApiSecret, and upsAccountNumber are set.');
   }

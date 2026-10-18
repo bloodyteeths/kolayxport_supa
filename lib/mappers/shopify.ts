@@ -53,14 +53,23 @@ export function toOrder(shopifyOrder: any, shopDomain?: string): UIOrder {
 
   const lineItems = (shopifyOrder.line_items || []).map(toLineItem);
 
-  const shippingAddressStr = [
-    shipping.address1,
-    shipping.address2,
-    shipping.city,
-    shipping.province,
-    shipping.zip,
-    shipping.country,
-  ].filter(Boolean).join(', ');
+  // Structured like every other channel (labels JSON.parse it; the ship-to panel reads street1/state/…).
+  // A comma-joined string made the panel fall back to unrelated fields and a label once went out with state "DE".
+  const hasShipping = Boolean(shipping.address1 || shipping.city || shipping.zip);
+  const shippingAddress = hasShipping
+    ? {
+        name: shipping.name || customerName,
+        company: shipping.company || undefined,
+        street1: shipping.address1 || '',
+        street2: shipping.address2 || '',
+        city: shipping.city || '',
+        state: shipping.province_code || shipping.province || '',
+        postal: shipping.zip || '',
+        country: shipping.country_code || shipping.country || '',
+        phone: shipping.phone || shopifyOrder.phone || billing.phone || '',
+        email: shopifyOrder.email || '',
+      }
+    : null;
 
   return {
     id: String(shopifyOrder.id),
@@ -75,7 +84,7 @@ export function toOrder(shopifyOrder: any, shopDomain?: string): UIOrder {
     externalStatus: `${shopifyOrder.financial_status || ''}/${shopifyOrder.fulfillment_status || 'unfulfilled'}`,
     currency: shopifyOrder.currency || 'USD',
     totalPrice: parseFloat(shopifyOrder.total_price) || 0,
-    shippingAddress: shippingAddressStr || null,
+    shippingAddress: shippingAddress ? JSON.stringify(shippingAddress) : null,
     to_address: {
       name: shipping.name || customerName,
       phone: shipping.phone || shopifyOrder.phone || billing.phone || customer.phone || '',

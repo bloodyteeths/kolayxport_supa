@@ -226,7 +226,7 @@ async function handler(
       // Stored encrypted at rest; plaintext passes through unchanged.
       fedexApiKey: decryptIfNeeded(integrationSettingsDb.fedexApiKey) as string,
       fedexApiSecret: decryptIfNeeded(integrationSettingsDb.fedexApiSecret) as string,
-      fedexAccountNumber: integrationSettingsDb.fedexAccountNumber,
+      fedexAccountNumber: decryptIfNeeded(integrationSettingsDb.fedexAccountNumber) as string,
       shipperName: shipperProfileDb.shipperName || '',
       shipperPersonName: shipperProfileDb.shipperPersonName || '',
       shipperPhoneNumber: shipperProfileDb.shipperPhoneNumber || '',

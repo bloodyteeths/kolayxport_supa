@@ -23,6 +23,7 @@ const MINUTE = 60_000;
  *  research-snapshots      daily 06:00   lib/research/watchAdapter (HTTP fallback: /api/cron/research-snapshots)
  *  research-cache-prune    daily 04:10   delete expired ResearchCache rows
  *  research-market-index   daily 05:20   lib/research/marketIndex (re-snapshot searched niches → measured sales)
+ *  market-retention        daily 04:40   lib/market/retention (crowd Trendyol/HB readings: thin to daily after 90 days)
  *  research-ebay-items     daily 06:30   lib/research/ebayItemTracker (eBay seller/item watches: EbayPriceSnapshot)
  *  arbitrage-index-refresh every 6 h     lib/arbitrage/indexRefresh (Price gap: Trendyol/eBay indexes + AI matches)
  * Loaded lazily so the draft services are not imported when the scheduler module loads.
@@ -36,6 +37,16 @@ const listingsGridJobs: ScheduledJob[] = [
     run: async (ctx) => {
       const { scheduledSendJob } = await import('@/lib/drafts/scheduledSend');
       return scheduledSendJob.run(ctx);
+    },
+  },
+  {
+    name: 'market-retention',
+    dailyAtUtc: '04:40',
+    timeoutMs: 20 * MINUTE,
+    maxAttemptsPerBucket: 1,
+    run: async () => {
+      const { runMarketRetention } = await import('@/lib/market/retention');
+      return runMarketRetention();
     },
   },
   {

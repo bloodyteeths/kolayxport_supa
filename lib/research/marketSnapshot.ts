@@ -14,8 +14,14 @@ import { decodeEntities, summarizeAmounts } from './stats';
 import { normalizeQuery, sha1 } from './etsySearch';
 import type { DemandInput, DemandSignal, Guarded, ProductsResult, TopListing, Evidence } from './types';
 
-export type SnapshotMkt = 'trendyol';
-export const SNAPSHOT_MKTS: readonly SnapshotMkt[] = ['trendyol'];
+export type SnapshotMkt = 'trendyol' | 'hepsiburada';
+export const SNAPSHOT_MKTS: readonly SnapshotMkt[] = ['trendyol', 'hepsiburada'];
+
+/** Per-marketplace input rules: product id shape, page host, image CDN host. */
+export const MKT_RULES: Record<SnapshotMkt, { id: RegExp; host: RegExp; img: RegExp; base: string }> = {
+  trendyol: { id: /^\d{3,20}$/, host: /(^|\.)trendyol\.com$/, img: /(^|\.)dsmcdn\.com$/, base: 'https://www.trendyol.com' },
+  hepsiburada: { id: /^[A-Za-z0-9-]{4,40}$/, host: /(^|\.)hepsiburada\.com$/, img: /(^|\.)hepsiburada\.net$/, base: 'https://www.hepsiburada.com' },
+};
 export const SNAPSHOT_TTL_MS = 24 * 3_600_000;
 export const MAX_SNAPSHOT_ITEMS = 120;
 
@@ -36,6 +42,7 @@ export interface SnapshotItem {
   ratingCount: number | null;
   sponsored: boolean;
   category: string | null;
+  categoryId?: string | null;
 }
 
 export interface MarketSnapshot {
@@ -51,8 +58,8 @@ export function snapshotKey(mkt: SnapshotMkt, q: string): string {
   return `public:${mkt}:search:${sha1(normalizeQuery(q))}`;
 }
 
-const str = (v: unknown, max = 300): string | null => (typeof v === 'string' && v.trim() ? decodeEntities(v.trim()).slice(0, max) : null);
-const num = (v: unknown): number | null => {
+export const str = (v: unknown, max = 300): string | null => (typeof v === 'string' && v.trim() ? decodeEntities(v.trim()).slice(0, max) : null);
+export const num = (v: unknown): number | null => {
   const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN;
   return Number.isFinite(n) && n >= 0 && n < 1e9 ? n : null;
 };
@@ -68,11 +75,11 @@ export function parseCompact(raw: unknown): number | null {
   return Number.isFinite(base) ? Math.round(base * mult) : null;
 }
 
-const safeUrl = (v: unknown, host: RegExp): string | null => {
+export const safeUrl = (v: unknown, host: RegExp, base = 'https://www.trendyol.com'): string | null => {
   const s = str(v, 600);
   if (!s) return null;
   try {
-    const u = new URL(s, 'https://www.trendyol.com');
+    const u = new URL(s, base);
     return u.protocol === 'https:' && host.test(u.hostname) ? u.toString() : null;
   } catch {
     return null;
@@ -85,19 +92,20 @@ export function parseSnapshot(body: any, nowIso = new Date().toISOString()): Mar
   if (!SNAPSHOT_MKTS.includes(body.mkt)) return null;
   const query = str(body.query, 120);
   if (!query) return null;
+  const rule = MKT_RULES[body.mkt as SnapshotMkt];
   const rawItems: any[] = Array.isArray(body.items) ? body.items.slice(0, MAX_SNAPSHOT_ITEMS) : [];
   const items: SnapshotItem[] = [];
   const seen = new Set<string>();
   for (const r of rawItems) {
     const id = str(String(r?.id ?? ''), 30);
-    if (!id || !/^\d{3,20}$/.test(id) || seen.has(id)) continue;
+    if (!id || !rule.id.test(id) || seen.has(id)) continue;
     seen.add(id);
     const orderBadge = str(r?.orderBadge, 20);
     items.push({
       id,
       title: str(r?.title, 300) ?? '',
-      url: safeUrl(r?.url, /(^|\.)trendyol\.com$/),
-      thumbUrl: safeUrl(r?.thumbUrl, /(^|\.)dsmcdn\.com$/),
+      url: safeUrl(r?.url, rule.host, rule.base),
+      thumbUrl: safeUrl(r?.thumbUrl, rule.img, rule.base),
       price: num(r?.price),
       brand: str(r?.brand, 80),
       sellerId: r?.sellerId != null ? str(String(r.sellerId), 20) : null,
@@ -108,6 +116,7 @@ export function parseSnapshot(body: any, nowIso = new Date().toISOString()): Mar
       ratingCount: num(r?.ratingCount),
       sponsored: r?.sponsored === true,
       category: str(r?.category, 120),
+      categoryId: r?.categoryId != null ? str(String(r.categoryId), 30) : null,
     });
   }
   if (items.length < 5) return null;

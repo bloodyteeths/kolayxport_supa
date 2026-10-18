@@ -4,13 +4,15 @@
  * Body: { mkt: 'trendyol', query, total, items: [{ id, title, url, thumbUrl, price, brand, sellerId, favorites,
  * orderBadge, rating, ratingCount, sponsored, category }] } (≤ 120 items). Validated and clamped
  * (lib/research/marketSnapshot `parseSnapshot`), stored as a shared 24 h snapshot for the query; Product finder's
- * Trendyol answer reads it. Session or extension Bearer auth; 20 snapshots/min per user. Never touches a marketplace.
+ * Trendyol answer reads it, and the products feed the shared crowd tables (lib/market/ingest). Session or extension
+ * Bearer auth; 20 snapshots/min per user. Never touches a marketplace. Newer extensions use /api/market/observe.
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 import { userRateLimit, writeShared } from '@/lib/research/etsySearch';
 import { parseSnapshot, snapshotKey, SNAPSHOT_TTL_MS } from '@/lib/research/marketSnapshot';
+import { ingestSearch, recordContribution, recordIngestStat } from '@/lib/market/ingest';
 
 export const config = { api: { bodyParser: { sizeLimit: '512kb' } } };
 
@@ -28,6 +30,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!snap) return res.status(400).json({ error: 'bad_request' });
   try {
     await writeShared(snapshotKey(snap.mkt, snap.query), snap, SNAPSHOT_TTL_MS, snap.capturedAt);
+    // Extension 9.11 sends search pages here: they feed the shared crowd tables too (no userId on the rows).
+    const r = await ingestSearch(snap);
+    await Promise.all([
+      recordContribution(user.id, snap.mkt, r.products),
+      recordIngestStat(snap.mkt, 'search', String(req.headers['x-extension-version'] ?? 'unknown'), true),
+    ]);
   } catch (err) {
     logger.warn('[research/snapshot] write failed', { userId: user.id, error: (err as Error)?.message });
     return res.status(500).json({ error: 'write_failed' });

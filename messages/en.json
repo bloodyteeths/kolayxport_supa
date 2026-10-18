@@ -17024,5 +17024,19 @@
       "months": "months",
       "weight": "Weight"
     }
+  },
+  "trendyolCargo": {
+    "printLabel": "Print cargo label",
+    "zplLabel": "Trendyol label (ZPL)",
+    "carrier": "Cargo: {name}",
+    "labelFailed": "Couldn't create the cargo label: {reason}",
+    "reportPicking": "Mark as preparing on Trendyol",
+    "reportInvoiced": "Mark as invoiced",
+    "invoiceNumber": "Invoice number",
+    "invoicePlaceholder": "Invoice no. (e.g. EME2026000012)",
+    "invoiceRequired": "Enter the invoice number first",
+    "pickingDone": "Trendyol: package is preparing (Picking)",
+    "invoicedDone": "Trendyol: package is invoiced",
+    "statusFailed": "Trendyol didn't accept the status: {reason}"
   }
 }

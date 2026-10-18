@@ -1,0 +1,16 @@
+{
+  "trendyolCargo": {
+    "printLabel": "Kargo etiketini yazdır",
+    "zplLabel": "Trendyol etiketi (ZPL)",
+    "carrier": "Kargo: {name}",
+    "labelFailed": "Kargo etiketi oluşturulamadı: {reason}",
+    "reportPicking": "Trendyol'a hazırlanıyor bildir",
+    "reportInvoiced": "Faturalandı bildir",
+    "invoiceNumber": "Fatura numarası",
+    "invoicePlaceholder": "Fatura no (ör. EME2026000012)",
+    "invoiceRequired": "Önce fatura numarasını girin",
+    "pickingDone": "Trendyol: paket hazırlanıyor (Picking)",
+    "invoicedDone": "Trendyol: paket faturalandı",
+    "statusFailed": "Trendyol durumu kabul etmedi: {reason}"
+  }
+}

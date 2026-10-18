@@ -417,6 +417,8 @@ export interface OrderRow {
   marketplaceCargoNumber: string | null;
   /** Hepsiburada orders: package state for the "Pack & print label" action (HB-contracted cargo). */
   hepsiburada?: { packageNumber: string | null; cargoCompany: string | null; canPack: boolean } | null;
+  /** Trendyol orders: cargo label + package status actions (lib/trendyol/cargoInfo.ts). */
+  trendyol?: { cargoNumber: string | null; carrier: string | null; commonLabel: boolean; nextStatus: 'Picking' | 'Invoiced' | null } | null;
   trackingSubmission: TrackingSubmissionSummary | null;
   carrierCost: CarrierCost | null;
 

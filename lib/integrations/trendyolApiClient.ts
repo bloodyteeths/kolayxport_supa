@@ -209,6 +209,37 @@ export class TrendyolApiClient {
     return this.request('GET', `/order/sellers/${this.supplierId}/common-label/query?id=${encodeURIComponent(trackingNumber)}`);
   }
 
+  /**
+   * Common label ("ortak barkod", Trendyol Express / Aras on Trendyol-paid cargo): request the label for a cargo
+   * number, then read it with getCommonLabel. Only ZPL exists. 200 has no body; 404 = shipment not in the process.
+   */
+  async createCommonLabel(cargoTrackingNumber: string, opts: { boxQuantity?: number; volumetricHeight?: number } = {}): Promise<any> {
+    return this.request('POST', `/sellers/${this.supplierId}/common-label/${encodeURIComponent(cargoTrackingNumber)}`, {
+      format: 'ZPL',
+      ...(opts.boxQuantity ? { boxQuantity: opts.boxQuantity } : {}),
+      ...(opts.volumetricHeight ? { volumetricHeight: opts.volumetricHeight } : {}),
+    });
+  }
+
+  /** `{ data: [{ label: '^XA…^XZ', format: 'ZPL' }] }`, one entry per parcel. */
+  async getCommonLabel(cargoTrackingNumber: string): Promise<{ data?: Array<{ label?: string; format?: string }> }> {
+    return this.request('GET', `/sellers/${this.supplierId}/common-label/${encodeURIComponent(cargoTrackingNumber)}`);
+  }
+
+  /** Package status the seller must report: 'Picking' first, then 'Invoiced' (with invoiceNumber). */
+  async updatePackageStatus(
+    shipmentPackageId: string,
+    lines: Array<{ lineId: number | string; quantity: number }>,
+    status: 'Picking' | 'Invoiced',
+    invoiceNumber?: string,
+  ): Promise<any> {
+    return this.request('PUT', `/order/sellers/${this.supplierId}/shipment-packages/${encodeURIComponent(shipmentPackageId)}`, {
+      lines: lines.map((l) => ({ lineId: Number(l.lineId), quantity: l.quantity })),
+      params: status === 'Invoiced' && invoiceNumber ? { invoiceNumber } : {},
+      status,
+    });
+  }
+
   // ================================================================
   // INVOICE
   // ================================================================

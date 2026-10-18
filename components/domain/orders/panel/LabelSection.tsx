@@ -22,6 +22,7 @@ import { useFormatters } from '@/lib/format';
 import { marketplaceSelectKey } from '@/lib/shipping/trackingCarriers';
 import type { OrderRow, TrackingSubmissionSummary } from '@/lib/orders/types';
 import { HepsiburadaLabelActions } from './HepsiburadaLabelActions';
+import { TrendyolCargoActions } from './TrendyolCargoActions';
 
 export interface LabelSectionProps {
   row: OrderRow;
@@ -132,6 +133,7 @@ export function LabelSection({ row, onAddTracking }: LabelSectionProps) {
         </Box>
       )}
       {row.hepsiburada && !label && <HepsiburadaLabelActions row={row} />}
+      {row.trendyol?.cargoNumber && !label && <TrendyolCargoActions row={row} />}
     </SidePanelSection>
   );
 }

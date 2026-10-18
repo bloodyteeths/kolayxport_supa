@@ -73,6 +73,8 @@ export type LegacyItem = {
   /** Quantity available (Quantity − QuantitySold). */
   quantity: number;
   hasVariations: boolean;
+  /** The listing's video (Item.VideoDetails.VideoID), when it has one. */
+  videoId?: string | null;
 };
 
 /** GetItem XML → the fields KolayXport edits. Pure, exported for tests. */
@@ -89,6 +91,7 @@ export function parseLegacyItem(xml: string, itemId: string): LegacyItem {
     price: priceM ? { value: priceM[2].trim(), currency: priceM[1] } : null,
     quantity: Math.max(0, (Number.isFinite(qty) ? qty : 0) - (Number.isFinite(sold) ? sold : 0)),
     hasVariations: /<Variations>/.test(item),
+    videoId: tag(tag(item, 'VideoDetails') ?? '', 'VideoID')?.trim() || undefined,
   };
 }
 
@@ -175,8 +178,25 @@ export async function reviseLegacyItem(token: string, item: LegacyItem, changes:
   return sent;
 }
 
+/** ReviseFixedPriceItem body that attaches a Media API video (LIVE) to a legacy listing. Pure, exported for tests. */
+export function legacyVideoXml(itemId: string, videoId: string): string {
+  return `<Item><ItemID>${escapeXml(itemId)}</ItemID><VideoDetails><VideoID>${escapeXml(videoId)}</VideoID></VideoDetails></Item>`;
+}
+
+/**
+ * ReviseFixedPriceItem body that removes the listing's video. The Trading API removes a field only through
+ * DeletedField (https://developer.ebay.com/devzone/xml/Docs/Reference/eBay/types/VideoDetailsType.html). Pure.
+ */
+export function legacyVideoRemoveXml(itemId: string): string {
+  return `<Item><ItemID>${escapeXml(itemId)}</ItemID></Item><DeletedField>Item.VideoDetails.VideoID</DeletedField>`;
+}
+
 /** Attaches an eBay Media API video (LIVE) to a legacy listing: ReviseFixedPriceItem → Item.VideoDetails.VideoID. */
 export async function setLegacyItemVideo(token: string, itemId: string, videoId: string): Promise<void> {
-  assertOk(await trading(token, 'ReviseFixedPriceItem',
-    `<Item><ItemID>${escapeXml(itemId)}</ItemID><VideoDetails><VideoID>${escapeXml(videoId)}</VideoID></VideoDetails></Item>`));
+  assertOk(await trading(token, 'ReviseFixedPriceItem', legacyVideoXml(itemId, videoId)));
+}
+
+/** Removes the video of a legacy listing (ReviseFixedPriceItem + DeletedField Item.VideoDetails.VideoID). */
+export async function removeLegacyItemVideo(token: string, itemId: string): Promise<void> {
+  assertOk(await trading(token, 'ReviseFixedPriceItem', legacyVideoRemoveXml(itemId)));
 }

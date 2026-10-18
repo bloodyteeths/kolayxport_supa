@@ -1367,12 +1367,17 @@ export const ebayAdapter: ListingEditorAdapter<EbayEditorFields> = {
       }
     }
     // Never forced: a conflict comes back as `{ status: 'conflict' }` and goes through Review differences.
-    const result = (await syncEbayDraft(draft.id)) as { status?: string; created?: boolean; sku?: unknown };
+    const result = (await syncEbayDraft(draft.id)) as { status?: string; created?: boolean; sku?: unknown; warnings?: unknown };
     if (result?.status === 'conflict') {
       throw new EbayDraftClientError(409, { ...result, error: 'Changed on eBay since the draft started' });
     }
     // The editor's route id for eBay is the SKU; only a create reports it (the page then leaves `new`).
-    return { listingId: result?.created && result.sku != null ? String(result.sku) : null, warnings: [] };
+    // A video eBay is still processing (or rejected) comes back as a warning (root key `ebay.draftSync.video*`):
+    // the rest of the listing was sent and the draft keeps the video for the next send.
+    const warnings = Array.isArray(result?.warnings)
+      ? (result.warnings as Array<{ key?: unknown }>).filter((w) => typeof w?.key === 'string').map((w) => ({ key: String(w.key) }))
+      : [];
+    return { listingId: result?.created && result.sku != null ? String(result.sku) : null, warnings };
   },
   validate: validateEbayEditorFields,
   errorInfo: ebayErrorInfo,

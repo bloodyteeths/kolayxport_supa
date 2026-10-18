@@ -22,7 +22,7 @@ import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { AI_MAX_REFERENCE_IMAGES } from '@/lib/ai/referenceImages';
 // Embedded mode (listing editor M6, Group C): DS strip + photo panel. The picture list stays a controlled field.
-import { ImageGrid, moveItem } from '@/components/ds/inputs/ImageGrid';
+import { ImageGrid, moveItem, type StripVideo } from '@/components/ds/inputs/ImageGrid';
 import { PhotoPanel } from '@/components/domain/listing-editor/sections/PhotoPanel';
 import { IMAGE_TYPES, summarizeEbayPhotos, type PhotosSummary } from '@/components/domain/listing-editor/sections/photosModel';
 
@@ -45,6 +45,12 @@ interface ImageManagerProps {
   readOnly?: boolean;
   /** Embedded: text of the inline dropzone when there are no photos. */
   emptyMessage?: React.ReactNode;
+  /** Embedded: the listing video as the strip's trailing tile (components/ebay/VideoUploader). */
+  video?: StripVideo | null;
+  onOpenVideo?: () => void;
+  /** Embedded: shows the "Add video" tile when there is no video. */
+  onAddVideo?: () => void;
+  onUndoDeleteVideo?: () => void;
 }
 
 /** Ref handle of the embedded eBay ImageManager (registered by PhotosSection as `photos:images`). */
@@ -73,6 +79,7 @@ const MAX_SIZE = 12 * 1024 * 1024; // 12MB
 
 const ImageManager = forwardRef<EbayImageManagerHandle, ImageManagerProps>(function ImageManager({
   images, onImagesChanged, maxImages = 24, productTitle, embedded = false, baseline, onSummary, readOnly = false, emptyMessage,
+  video, onOpenVideo, onAddVideo, onUndoDeleteVideo,
 }, ref) {
   const t = useTranslations('ebay.imageManager');
   const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null);
@@ -620,6 +627,10 @@ const ImageManager = forwardRef<EbayImageManagerHandle, ImageManagerProps>(funct
           accept={IMAGE_TYPES.join(',')}
           disabled={readOnly || uploading}
           emptyMessage={emptyMessage ?? tLe('photos.noPhotos', { marketplace: 'eBay' })}
+          video={video}
+          onOpenVideo={onOpenVideo}
+          onAddVideo={readOnly ? undefined : onAddVideo}
+          onUndoDeleteVideo={readOnly ? undefined : onUndoDeleteVideo}
         />
         {uploading ? (
           <Box role="status" sx={{ fontSize: 12, lineHeight: '16px', color: 'text.secondary' }}>{t('uploadingProgress', { progress: uploadProgress })}</Box>

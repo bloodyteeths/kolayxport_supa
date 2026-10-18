@@ -6708,7 +6708,13 @@
       "priceInvalid": "eBay fiyatı kabul etmedi. Fiyatı kontrol edin.",
       "quantityInvalid": "eBay stok adedini kabul etmedi. Stoğu kontrol edin.",
       "legacyUnsupportedFields": "Bu ilan eBay'de oluşturulmuş; KolayXport'tan yalnızca başlık, açıklama, fiyat ve stok değiştirilebilir. Diğer değişiklikleri eBay'de yapın.",
-      "legacyVariationsPriceStock": "Bu ilanın varyasyonları var; fiyat ve stok her varyasyon için eBay'de ayarlanır. Başlık ve açıklama değişiklikleri gönderilebilir."
+      "legacyVariationsPriceStock": "Bu ilanın varyasyonları var; fiyat ve stok her varyasyon için eBay'de ayarlanır. Başlık ve açıklama değişiklikleri gönderilebilir.",
+      "videoProcessing": "İlan gönderildi. eBay videoyu hâlâ işliyor: eklemek için birkaç dakika sonra tekrar gönderin.",
+      "videoRejected": "İlan gönderildi ama eBay videoyu kabul etmedi. Değiştirin veya kaldırın.",
+      "videoReconnect": "Video göndermek için Ayarlar → Bağlantılar'dan eBay'i yeniden bağlayın. eBay'de hiçbir şey değiştirilmedi.",
+      "videoTooLarge": "eBay videoları en fazla 150 MB olabilir.",
+      "videoFileMissing": "Video dosyası bulunamadı. Videoyu tekrar ekleyin.",
+      "videoType": "MP4 veya MOV video kullanın."
     },
     "validation": {
       "variantSkuDuplicate": "Her varyasyonun SKU kodu farklı olmalı",
@@ -14601,7 +14607,15 @@
       "unsupported": "MP4, WebM veya MOV dosyası kullanın",
       "tooLarge": "Videolar en fazla 100 MB olabilir",
       "pendingRemoveViaDiscard": "Bu yeni video yalnızca taslağınızda. Kaldırmak için değişiklikleri atın",
-      "confirmRemoveTitle": "Video kaldırılsın mı?"
+      "confirmRemoveTitle": "Video kaldırılsın mı?",
+      "ebayUnsupported": "MP4 veya MOV video kullanın",
+      "ebayTooLarge": "eBay videoları en fazla 150 MB olabilir",
+      "ebayStaged": "Video eklendi. Değişiklikleri gönderdiğinizde eBay'e gider.",
+      "ebayStageFailed": "Video eklenemedi. Tekrar deneyin.",
+      "ebayUploading": "Video ekleniyor…",
+      "ebayProcessing": "eBay bu videoyu hâlâ işliyor. İlana eklemek için birkaç dakika sonra tekrar gönderin.",
+      "ebayRejected": "eBay bu videoyu kabul etmedi. Değiştirin veya kaldırın.",
+      "ebayReconnect": "Video eklemek için Ayarlar → Bağlantılar'dan eBay'i yeniden bağlayın."
     },
     "variations": {
       "ebayReadOnlyHint": "Varyasyon başına fiyat ve stok henüz buradan gönderilemiyor. eBay'de değiştirin",
@@ -16765,7 +16779,9 @@
       "from": "baş (sn)",
       "to": "son (sn)",
       "trimApply": "Uygula",
-      "useEtsy": "Etsy ilanına ekle"
+      "useEtsy": "Etsy ilanına ekle",
+      "useEbay": "eBay ilanına ekle",
+      "useEbayHint": "Video ilana değişiklik olarak eklenir. Değişiklikleri gönderdiğinizde eBay'e gider."
     },
     "delete": "Sil",
     "deleteTitle": "Bu video silinsin mi?",

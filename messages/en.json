@@ -6708,7 +6708,13 @@
       "priceInvalid": "eBay did not accept the price. Check the price.",
       "quantityInvalid": "eBay did not accept the quantity. Check the stock.",
       "legacyUnsupportedFields": "This listing was created on eBay; KolayXport can change only its title, description, price and stock. Make other changes on eBay.",
-      "legacyVariationsPriceStock": "This listing has variations; price and stock are set per variation on eBay. Title and description changes can be sent."
+      "legacyVariationsPriceStock": "This listing has variations; price and stock are set per variation on eBay. Title and description changes can be sent.",
+      "videoProcessing": "The listing was sent. eBay is still processing the video: send again in a few minutes to add it.",
+      "videoRejected": "The listing was sent, but eBay did not accept the video. Replace it or remove it.",
+      "videoReconnect": "To send videos, reconnect eBay in Settings → Connections. Nothing was changed on eBay.",
+      "videoTooLarge": "eBay videos can be up to 150 MB.",
+      "videoFileMissing": "The video file is missing. Add the video again.",
+      "videoType": "Use an MP4 or MOV video."
     },
     "validation": {
       "variantSkuDuplicate": "Each variation needs a different SKU",
@@ -14601,7 +14607,15 @@
       "unsupported": "Use an MP4, WebM or MOV file",
       "tooLarge": "Videos can be up to 100 MB",
       "pendingRemoveViaDiscard": "This new video is only in your draft. Discard changes to remove it",
-      "confirmRemoveTitle": "Remove the video?"
+      "confirmRemoveTitle": "Remove the video?",
+      "ebayUnsupported": "Use an MP4 or MOV video",
+      "ebayTooLarge": "eBay videos can be up to 150 MB",
+      "ebayStaged": "Video added. It goes to eBay when you send the changes.",
+      "ebayStageFailed": "Couldn't add the video. Try again.",
+      "ebayUploading": "Adding the video…",
+      "ebayProcessing": "eBay is still processing this video. Send again in a few minutes to add it to the listing.",
+      "ebayRejected": "eBay did not accept this video. Replace it or remove it.",
+      "ebayReconnect": "To add videos, reconnect eBay in Settings → Connections."
     },
     "variations": {
       "ebayReadOnlyHint": "Price and stock per variation can't be sent from here yet. Change them on eBay",
@@ -16765,7 +16779,9 @@
       "from": "start (s)",
       "to": "end (s)",
       "trimApply": "Apply",
-      "useEtsy": "Add to the Etsy listing"
+      "useEtsy": "Add to the Etsy listing",
+      "useEbay": "Add to the eBay listing",
+      "useEbayHint": "The video is added to the listing as a change. It goes to eBay when you send the changes."
     },
     "delete": "Delete",
     "deleteTitle": "Delete this video?",

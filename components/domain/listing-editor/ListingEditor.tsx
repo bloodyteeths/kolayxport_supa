@@ -150,8 +150,11 @@ const MP_NAME: Record<EditorMarketplace, string> = { etsy: 'Etsy', ebay: 'eBay',
 /** The CatalogDraft marketplaces (marketplace-editors §1): no preview, no profiles, one create primary. */
 const isCatalogMarketplace = (m: EditorMarketplace): m is 'trendyol' | 'wix' | 'shopify' => m === 'trendyol' || m === 'wix' || m === 'shopify';
 
-/** Sections a listing created on eBay can change from KolayXport (lib/ebay/legacyTrading). */
-const LEGACY_EBAY_SECTIONS = new Set<string>(['title', 'price']);
+/**
+ * Sections a listing created on eBay can change from KolayXport (lib/ebay/legacyTrading). Photos: only the video
+ * (ReviseFixedPriceItem VideoDetails); EbayPhotos keeps the pictures read-only itself.
+ */
+const LEGACY_EBAY_SECTIONS = new Set<string>(['title', 'price', 'photos']);
 
 /** Conflict causes that only restate the conflict banner's title (not shown under it). */
 const GENERIC_CONFLICT_KEYS = new Set([

@@ -100,6 +100,13 @@ const EXPLICIT: Record<string, FailureFix> = {
   'etsy.draftSync.mediaUrlRejected': open('photos', 'photos'),
   'etsy.draftSync.invalidMedia': open('photos', 'photos'),
   'etsy.draftSync.copyImagesFailed': open('photos', 'photos'),
+  // eBay listing video (Media API): the rest of the listing was sent; only the video is left.
+  'ebay.draftSync.videoProcessing': { kind: 'resend', later: true },
+  'ebay.draftSync.videoReconnect': { kind: 'reconnect' },
+  'ebay.draftSync.videoRejected': open('photos', 'photos'),
+  'ebay.draftSync.videoTooLarge': open('photos', 'photos'),
+  'ebay.draftSync.videoFileMissing': open('photos', 'photos'),
+  'ebay.draftSync.videoType': open('photos', 'photos'),
   'ebay.draftSync.missingAspects': open('specifics', 'specifics'),
   'ebay.draftSync.missingAspectsShort': open('specifics', 'specifics'),
   'ebay.draftSync.locationRequired': open('shipping', 'shipping'),

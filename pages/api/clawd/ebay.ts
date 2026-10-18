@@ -628,6 +628,8 @@ async function ebayHandler(
               if (item.status) data.offers[0].status = item.status === 'Active' ? 'ACTIVE' : 'ENDED';
             }
             data.hasVariations = item.hasVariations;
+            // The listing's video (VideoDetails.VideoID) in the Inventory API shape the editor reads.
+            if (item.videoId) data.product = { ...(data.product || {}), videoIds: [item.videoId] };
           } catch (err: any) {
             logger.warn('Legacy GetItem overlay failed', { sku, legacyId, error: err?.message });
           }

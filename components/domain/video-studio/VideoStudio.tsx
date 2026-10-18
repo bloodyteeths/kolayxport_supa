@@ -133,6 +133,17 @@ async function fileToBase64(file: File): Promise<string> {
 
 const qaScore = (j: Job) => (j.qa?.status === 'done' ? (j.qa.match ?? 0) * 2 + (j.qa.realism ?? 0) : -1);
 
+/** `?ret=` of an editor deep link: only a same-origin listing-editor path is kept. Exported for tests. */
+export function safeEditorReturn(v: unknown): string | null {
+  return typeof v === 'string' && /^\/app\/ebay-listings\/[^/\\]/.test(v) && !v.includes('//') ? v : null;
+}
+
+/** Where "Add to the eBay listing" goes: the editor it came from (create draft or edit), with ?aiVideo=<job>. */
+export function ebayVideoReturnHref(returnTo: string | null, sku: string, jobId: string): string {
+  const base = returnTo ?? `/app/ebay-listings/${encodeURIComponent(sku)}`;
+  return `${base}${base.includes('?') ? '&' : '?'}aiVideo=${encodeURIComponent(jobId)}#photos`;
+}
+
 export function VideoStudio() {
   const t = useTranslations('videoStudio');
   const tc = useTranslations('credits');
@@ -214,10 +225,14 @@ export function VideoStudio() {
   }, []);
   const setScene = (v: VideoDirection['scene']) => setDir((d) => ({ ...d, scene: v, mode: v === 'keep' ? 'image' : 'scene' }));
 
-  // Deep link from a listing editor: ?mp=etsy&listing=123&store=456&title=…
+  // eBay editor deep link: where "Add to the eBay listing" returns (same-origin editor path only).
+  const [returnTo, setReturnTo] = useState<string | null>(null);
+
+  // Deep link from a listing editor: ?mp=etsy&listing=123&store=456&title=… (eBay adds &ret=<editor path>)
   useEffect(() => {
     if (!router.isReady) return;
     const q = router.query;
+    setReturnTo(safeEditorReturn(q.ret));
     const m = MARKETPLACES.find((x) => x === q.mp);
     if (m && typeof q.listing === 'string') {
       setMp(m);
@@ -507,6 +522,9 @@ export function VideoStudio() {
     const [m, id, st] = (j.listingRef ?? '').split(':');
     if (m === 'etsy' && id) {
       void router.push(`/app/etsy-listings/${encodeURIComponent(id)}${st ? `?shop=${encodeURIComponent(st)}&` : '?'}aiVideo=${encodeURIComponent(j.id)}#photos`);
+    } else if (m === 'ebay' && id) {
+      // Staged like a picked file: the eBay editor adds it to the listing's draft; it reaches eBay with "Send changes".
+      void router.push(ebayVideoReturnHref(returnTo, id, j.id));
     }
   };
 
@@ -542,7 +560,8 @@ export function VideoStudio() {
   const library = jobs.filter((j) => (libFilter === 'favorite' ? j.favorite : libFilter === 'listing' ? listing && j.listingRef?.startsWith(`${listing.mp}:${listing.id}`) : true));
   const listingMp = (cur?.listingRef ?? '').split(':')[0];
   const etsyListing = listingMp === 'etsy';
-  const directMp = ['ebay', 'shopify', 'wix'].includes(listingMp) ? listingMp : null;
+  const ebayListing = listingMp === 'ebay';
+  const directMp = ['shopify', 'wix'].includes(listingMp) ? listingMp : null;
   const manualMp = curTarget === 'amazon' || listingMp === 'trendyol' || (!listingMp && curTarget === 'trendyol') ? (curTarget === 'amazon' ? 'amazon' : 'trendyol') : null;
   const sent = directMp ? cur?.published?.[directMp] ?? null : null;
   const qa = cur?.qa ?? null;
@@ -911,6 +930,11 @@ export function VideoStudio() {
                 </Box>
                 {etsyListing ? (
                   <Button variant="primary" onClick={() => useOnListing(cur)}>{t('action.useEtsy')}</Button>
+                ) : ebayListing ? (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <Button variant="primary" onClick={() => useOnListing(cur)} data-testid="video-use-ebay">{t('action.useEbay')}</Button>
+                    <Box sx={{ fontSize: 12, color: n[600] }}>{t('action.useEbayHint')}</Box>
+                  </Box>
                 ) : directMp ? (
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <Button variant="primary" onClick={() => void publish(cur, directMp)} disabled={Boolean(busy) || sent?.status === 'sending'} loading={busy === 'publish'}>

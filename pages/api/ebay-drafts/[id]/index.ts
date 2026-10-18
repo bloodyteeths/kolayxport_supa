@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { getAuthUserOrApiKey } from '@/lib/auth';
-import { cancelDraftIfEmpty, discardDraft, removeQueuedActions, toSerializable } from '@/lib/ebay/draftService';
+import { cancelDraftIfEmpty, discardDraft, removeDraftMediaRows, removeQueuedActions, toSerializable } from '@/lib/ebay/draftService';
 import { ebayDraftErrorResponse, isEbayDraftError } from '@/lib/ebay/draftErrors';
 import { logger } from '@/lib/logger';
 import { ScheduleError, scheduleErrorResponse, setDraftScheduledSendAt } from '@/lib/drafts/scheduledSend';
@@ -32,6 +32,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const types = (req.body.removeQueuedActions as unknown[]).filter((t): t is string => typeof t === 'string');
       const draft = await removeQueuedActions(id, user.id, types);
       return res.status(200).json({ draft: toSerializable(draft) });
+    }
+
+    // PATCH { removeMediaIds: string[] } (parity with Etsy): un-stages EbayDraftMedia rows of this draft (a staged
+    // video upload or removal) and deletes their staged files. Ids not on the draft are ignored. Never syncs.
+    if (req.method === 'PATCH' && req.body && req.body.removeMediaIds !== undefined) {
+      const ids = req.body.removeMediaIds;
+      if (!Array.isArray(ids) || ids.length === 0 || ids.length > 100 || ids.some((m: unknown) => typeof m !== 'string' || !m)) {
+        return res.status(400).json({ error: 'removeMediaIds must be a non-empty array (max 100) of media ids', code: 'BAD_REQUEST' });
+      }
+      const draft = await removeDraftMediaRows(id, user.id, ids as string[]);
+      return res.status(200).json({ draft: toSerializable(draft ? withLegacyLastSyncError(draft as any) : draft) });
     }
 
     // PATCH { scheduledSendAt: string|null } (additive, listings-grid §9.4):

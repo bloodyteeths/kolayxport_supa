@@ -222,6 +222,48 @@ export function applyMediaOps(imageUrls: string[], media: MediaOpLike[]): { imag
 }
 
 // ---------------------------------------------------------------------------
+// Video (one per listing: Inventory API product.videoIds / group videoIds, Trading VideoDetails.VideoID)
+// ---------------------------------------------------------------------------
+
+export interface VideoMediaLike {
+  id?: string;
+  kind: string;
+  operation: string;
+  localPath?: string | null;
+  payload?: any;
+}
+
+/** Media rows that are photos (video rows never touch product.imageUrls). */
+export function imageMediaOnly<T extends { kind?: string | null }>(media: T[]): T[] {
+  return media.filter((m) => m.kind !== 'video');
+}
+
+export type EbayVideoIntent<T extends VideoMediaLike = VideoMediaLike> =
+  | { type: 'set'; row: T }
+  | { type: 'remove'; row: T }
+  | null;
+
+/**
+ * What the staged video rows ask for. The newest staged upload wins (it replaces the listing's video: eBay shows
+ * one); with no upload, a staged delete removes the video. Rows are in staging order (createdAt asc). Pure.
+ */
+export function videoIntent<T extends VideoMediaLike>(media: T[]): EbayVideoIntent<T> {
+  const videos = media.filter((m) => m.kind === 'video');
+  const uploads = videos.filter((m) => m.operation === 'upload');
+  if (uploads.length) return { type: 'set', row: uploads[uploads.length - 1] };
+  const del = videos.find((m) => m.operation === 'delete');
+  return del ? { type: 'remove', row: del } : null;
+}
+
+/** A product / group body with its video set (`[videoId]`) or removed (null). Pure. */
+export function withVideo<T extends JsonMap>(body: T, videoId: string | null): T {
+  const next: JsonMap = { ...(body || {}) };
+  if (videoId) next.videoIds = [videoId];
+  else delete next.videoIds;
+  return next as T;
+}
+
+// ---------------------------------------------------------------------------
 // F1: create plan
 // ---------------------------------------------------------------------------
 
@@ -281,12 +323,16 @@ export function buildCreatePlan(input: {
   variationPatch: unknown;
   media: MediaOpLike[];
   marketplaceId?: string;
+  /** A LIVE eBay video to attach (product.videoIds, or the group's videoIds for variations). */
+  videoId?: string | null;
 }): EbayCreatePlan {
   const marketplaceId = input.marketplaceId || DEFAULT_MARKETPLACE;
   const inventory: JsonMap = mergeJson(input.action.payload?.inventory || {}, input.inventoryPatch || {}) || {};
   const offerIn: JsonMap = mergeJson(input.action.payload?.offer || {}, input.offerPatch || {}) || {};
   const product: JsonMap = { ...(inventory.product || {}) };
-  product.imageUrls = applyMediaOps(Array.isArray(product.imageUrls) ? product.imageUrls : [], input.media).imageUrls;
+  product.imageUrls = applyMediaOps(Array.isArray(product.imageUrls) ? product.imageUrls : [], imageMediaOnly(input.media as Array<MediaOpLike & { kind?: string }>)).imageUrls;
+  if (input.videoId) product.videoIds = [input.videoId];
+  else delete product.videoIds;
 
   const title = typeof product.title === 'string' ? product.title.trim() : '';
   // The editor's description field holds plain text (AI / typed) or HTML: eBay gets HTML (descriptionToEbayHtml).
@@ -372,6 +418,7 @@ export function buildCreatePlan(input: {
         imageUrls: product.imageUrls,
         aspects: sanitizeAspects(Object.fromEntries(Object.entries(common).filter(([k]) => !varNames.includes(k)))) || {},
         variantSKUs: newSkus,
+        ...(input.videoId ? { videoIds: [input.videoId] } : {}),
         variesBy: {
           aspectsImageVariesBy: v.imageVaryingAspect ? [v.imageVaryingAspect] : [],
           specifications: (v.specifications || []).map((s) => ({ name: s.name, values: s.values })),

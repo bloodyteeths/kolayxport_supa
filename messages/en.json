@@ -17065,6 +17065,7 @@
     "printedAt": "Label printed · {date}",
     "bulk": {
       "button": "Trendyol labels ({count})",
+      "buttonShort": "Trendyol ({count})",
       "printing": "Preparing labels…",
       "menuLabel": "Trendyol label format",
       "pdf": "PDF · every carrier",

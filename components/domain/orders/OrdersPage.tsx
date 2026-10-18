@@ -397,9 +397,9 @@ export function OrdersPage({ now }: OrdersPageProps = {}) {
 
   // "Trendyol labels (N)": every unshipped, not yet printed Trendyol order in one file (TrendyolBulkLabels.tsx).
   const trendyolBulk = useTrendyolBulkLabels({ enabled: connections.has('trendyol') === true, onPrinted: refreshAll });
-  // Phones: with Trendyol labels to print, the header's sticky primary moves into our own bar, the two buttons
-  // stacked full width above the tab bar (two long labels never fit side by side at 375px). A selection's bulk
-  // bar owns the bottom while it is open.
+  // Phones: with Trendyol labels to print, the header's sticky primary moves into our own bar: one thin row above
+  // the tab bar, "Trendyol (N)" and "Create N labels" half width each. A selection's bulk bar owns the bottom
+  // while it is open.
   const trendyolMobileBar = mobile && trendyolBulk.count > 0 && selectedIds.length === 0;
 
   // ⌘K: saved views as "Go to …" (header actions register themselves through PageHeader).
@@ -510,14 +510,16 @@ export function OrdersPage({ now }: OrdersPageProps = {}) {
             <Box
               sx={{
                 display: 'flex',
-                flexDirection: 'column',
                 gap: '8px',
-                '& > *': { width: '100%', display: 'flex' },
+                '& > *': { flex: '1 1 0', minWidth: 0, display: 'flex' },
                 '& [data-testid="orders-trendyol-labels"] > button:first-of-type': { flex: 1, minWidth: 0 },
+                // Thinner than the bar's 48px default: two half-width buttons on one 40px row.
+                '&& .MuiButtonBase-root': { minHeight: 40, height: 40 },
+                '& .MuiButton-root': { px: '10px', overflow: 'hidden', textOverflow: 'ellipsis' },
               }}
             >
-              {trendyolBulk.render({ size: 'xl', variant: headerPrimary ? 'secondary' : 'primary' })}
-              {headerPrimary ? <ActionButton action={headerPrimary} variant="primary" size="xl" fullWidth /> : null}
+              {trendyolBulk.render({ size: 'md', variant: headerPrimary ? 'secondary' : 'primary', compact: true })}
+              {headerPrimary ? <ActionButton action={headerPrimary} variant="primary" size="md" fullWidth /> : null}
             </Box>
           }
           data-testid="orders-mobile-labels-bar"
@@ -614,7 +616,6 @@ export function OrdersPage({ now }: OrdersPageProps = {}) {
         data-testid="orders-table"
       />
       {/* Page leaves room for one 48px sticky row; the stacked Trendyol + Create bar has a second one. */}
-      {trendyolMobileBar && headerPrimary ? <Box aria-hidden sx={{ height: 56 }} data-testid="orders-mobile-labels-spacer" /> : null}
 
       {/* One SidePanel at a time (orders §1.1). */}
       <OrderPanel

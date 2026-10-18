@@ -57,7 +57,8 @@ export type TrendyolBulkLabels = {
   /** Printable now (unshipped, unprinted, with a cargo number); 0 hides the button. */
   count: number;
   /** The SplitButton, or null when there is nothing to print. */
-  render(opts: { size: 'sm' | 'xl'; variant?: 'primary' | 'secondary' }): React.ReactNode;
+  /** `compact`: the short "Trendyol (N)" label for the phone bar, where it shares one row with Create labels. */
+  render(opts: { size: 'sm' | 'md' | 'xl'; variant?: 'primary' | 'secondary'; compact?: boolean }): React.ReactNode;
 };
 
 export function useTrendyolBulkLabels({ enabled, onPrinted }: { enabled: boolean; onPrinted?: () => void }): TrendyolBulkLabels {
@@ -108,7 +109,7 @@ export function useTrendyolBulkLabels({ enabled, onPrinted }: { enabled: boolean
     }
   };
 
-  const render: TrendyolBulkLabels['render'] = ({ size, variant = 'secondary' }) => {
+  const render: TrendyolBulkLabels['render'] = ({ size, variant = 'secondary', compact = false }) => {
     if (count <= 0) return null;
     const pdf = { id: 'trendyolLabelsPdf', label: t('pdf'), icon: icons.print, onClick: () => void run('pdf') };
     const zpl = { id: 'trendyolLabelsZpl', label: t('zpl'), icon: icons.download, onClick: () => void run('zpl') };
@@ -118,7 +119,7 @@ export function useTrendyolBulkLabels({ enabled, onPrinted }: { enabled: boolean
         size={size}
         primary={{
           id: 'trendyolLabels',
-          label: t('button', { count }),
+          label: compact ? t('buttonShort', { count }) : t('button', { count }),
           icon: icons.print,
           onClick: () => void run('pdf'),
           loading: busy !== null,
@@ -130,7 +131,7 @@ export function useTrendyolBulkLabels({ enabled, onPrinted }: { enabled: boolean
       />
     );
     // Phones: no hover tooltip (a long-press would only get in the way).
-    if (size === 'xl') return button;
+    if (size !== 'sm') return button;
     return (
       <Tooltip title={t('tooltip', { max: BULK_LABELS_MAX })}>
         <span style={{ display: 'inline-flex', minWidth: 0 }}>{button}</span>

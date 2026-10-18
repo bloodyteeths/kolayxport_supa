@@ -17065,6 +17065,7 @@
     "printedAt": "Etiket yazdırıldı · {date}",
     "bulk": {
       "button": "Trendyol etiketleri ({count})",
+      "buttonShort": "Trendyol ({count})",
       "printing": "Etiketler hazırlanıyor…",
       "menuLabel": "Trendyol etiketi biçimi",
       "pdf": "PDF · tüm kargo firmaları",

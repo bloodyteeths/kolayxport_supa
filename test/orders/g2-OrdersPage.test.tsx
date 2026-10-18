@@ -415,7 +415,7 @@ describe('Trendyol bulk labels', () => {
     expect(screen.queryByTestId('orders-trendyol-labels')).toBeNull();
   });
 
-  it('phone (TR): both buttons stacked in one sticky bar; the header no longer renders its own', async () => {
+  it('phone (TR): both buttons on one row of one sticky bar (short Trendyol label); the header no longer renders its own', async () => {
     setViewport('mobile');
     withTrendyolCount(18);
     list.rows = ROWS;
@@ -426,7 +426,7 @@ describe('Trendyol bulk labels', () => {
     expect(bars).toHaveLength(1);
     expect(screen.queryByTestId('sticky-action-bar')).toBeNull();
     const labelable = ROWS.filter((r) => r.canLabel).length;
-    expect(within(bars[0]).getByRole('button', { name: 'Trendyol etiketleri (18)' })).toBeTruthy();
+    expect(within(bars[0]).getByRole('button', { name: 'Trendyol (18)' })).toBeTruthy();
     expect(within(bars[0]).getByRole('button', { name: `${labelable} etiket oluştur` })).toBeTruthy();
   });
 });

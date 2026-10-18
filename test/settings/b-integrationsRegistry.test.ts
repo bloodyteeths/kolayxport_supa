@@ -35,6 +35,7 @@ describe('integration registry (settings §5.2, §17 integrationsRegistry.test)'
     const map = Object.fromEntries(CREDENTIAL_PROVIDERS.map((s) => [s.id, s.fields!.map((f) => `${f.name}${f.secret ? '*' : ''}`)]));
     expect(map).toEqual({
       trendyol: ['trendyolApiKey*', 'trendyolApiSecret*', 'trendyolSupplierId'],
+      hepsiburada: ['hepsiburadaMerchantId', 'hepsiburadaApiKey*'],
       veeqo: ['veeqoApiKey*'],
       shippo: ['shippoToken*'],
       fedex: ['fedexApiKey*', 'fedexApiSecret*', 'fedexAccountNumber'],
@@ -70,6 +71,10 @@ describe('validateCredentials', () => {
   });
   it('a masked secret counts as filled', () => {
     expect(validateCredentials('trendyol', { trendyolApiKey: '••••1234', trendyolApiSecret: '••••abcd', trendyolSupplierId: '123' })).toEqual({});
+  });
+  it('Hepsiburada Mağaza ID must be a GUID', () => {
+    expect(validateCredentials('hepsiburada', { hepsiburadaMerchantId: '069f1e61-8b6f-40c5-952c-f19d84872c36', hepsiburadaApiKey: 'k' })).toEqual({});
+    expect(validateCredentials('hepsiburada', { hepsiburadaMerchantId: '12345', hepsiburadaApiKey: 'k' })).toEqual({ hepsiburadaMerchantId: { code: 'uuid' } });
   });
   it('supplier ID is digits only', () => {
     expect(validateCredentials('trendyol', { trendyolApiKey: 'a', trendyolApiSecret: 'b', trendyolSupplierId: '12a' })).toEqual({

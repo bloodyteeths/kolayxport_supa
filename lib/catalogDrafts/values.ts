@@ -56,6 +56,9 @@ export type CanonicalValues = {
   weightUnit?: string | null;
   seo?: ShopifySeo;
   variants?: CanonicalVariant[];
+  /** Hepsiburada listing: days to cargo, max units per order. */
+  dispatchTime?: number | null;
+  maxPurchasableQuantity?: number | null;
   /** Display only (diff panel): current media/images of Wix/Shopify products. Never compared. */
   mediaItems?: { id: string; url: string | null; alt?: string | null; position?: number }[];
   [key: string]: unknown;
@@ -121,6 +124,19 @@ export function trendyolValuesFromApi(p: any): CanonicalValues {
     brandId: int(p?.brandId),
     categoryId: int(p?.pimCategoryId ?? p?.categoryId),
     cargoCompanyId: int(p?.cargoCompanyId),
+  };
+}
+
+/** Values of a `HepsiburadaListing` cache row (listing-level values only; content lives in HB's catalog). */
+export function hepsiburadaValuesFromCache(row: any): CanonicalValues {
+  return {
+    title: str(row?.title),
+    price: num(row?.price),
+    quantity: int(row?.availableStock),
+    dispatchTime: int(row?.dispatchTime),
+    maxPurchasableQuantity: int(row?.maximumPurchasableQuantity),
+    variantCount: 1,
+    trackInventory: !row?.isFulfilledByHB,
   };
 }
 

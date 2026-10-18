@@ -76,6 +76,7 @@ export default async function handler(
     const source = await (async () => {
       if (marketplace.includes('etsy')) return 'etsy';
       if (marketplace.includes('trendyol')) return 'trendyol';
+      if (marketplace.includes('hepsiburada')) return 'hepsiburada';
       if (marketplace.includes('wix')) return 'wix';
       if (marketplace.includes('ebay')) return 'ebay';
       if (marketplace.includes('amazon')) return 'amazon';
@@ -335,6 +336,22 @@ export default async function handler(
         return res.status(200).json({
           success: true,
           message: `Tracking saved locally. Wix push failed: ${err.message?.slice(0, 200)}`,
+        });
+      }
+    } else if (source === 'hepsiburada') {
+      // Own-cargo packages only (HB-contracted cargo is tracked by HB itself): report the package in transit.
+      // Local-first like Wix; never fall through to Veeqo.
+      try {
+        const { loadHepsiburadaClient } = await import('@/lib/hepsiburada/server');
+        const { markInTransit } = await import('@/lib/hepsiburada/fulfilment');
+        const loaded = await loadHepsiburadaClient(user.id);
+        if (!loaded.ok) throw new Error(`Hepsiburada ${loaded.reason}`);
+        await markInTransit(loaded.client, user.id, orderId as string, { trackingNumber, carrier: getCarrierName(carrierId) });
+      } catch (err: any) {
+        await saveTrackingLocally(orderId as string, trackingNumber, carrierId, notifyCustomer, updateRemoteOrder, user.id, 'failed', err.message?.slice(0, 200));
+        return res.status(200).json({
+          success: true,
+          message: `Tracking saved locally. Hepsiburada push failed: ${err.message?.slice(0, 200)}`,
         });
       }
     } else {

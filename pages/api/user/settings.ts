@@ -171,6 +171,12 @@ export default async function handler(
             const prev = await prisma.credential.findUnique({ where: { userId: authUser.id }, select: { trendyolSupplierId: true } });
             trendyolResaved = String(prev?.trendyolSupplierId ?? '').trim() !== String(integrationSettings.trendyolSupplierId).trim();
           }
+          // Same for Hepsiburada: a new servis anahtarı or a different Mağaza ID is a reconnect.
+          let hepsiburadaResaved = filled(integrationSettings.hepsiburadaApiKey);
+          if (!hepsiburadaResaved && filled(integrationSettings.hepsiburadaMerchantId)) {
+            const prev = await prisma.credential.findUnique({ where: { userId: authUser.id }, select: { hepsiburadaMerchantId: true } });
+            hepsiburadaResaved = String(prev?.hepsiburadaMerchantId ?? '').trim() !== String(integrationSettings.hepsiburadaMerchantId).trim();
+          }
 
           // Encrypt sensitive credential fields before storing
           const encrypted = encryptCredentials(integrationSettings);
@@ -185,6 +191,8 @@ export default async function handler(
               trendyolApiKey: encrypted.trendyolApiKey,
               trendyolApiSecret: encrypted.trendyolApiSecret,
               trendyolSupplierId: integrationSettings.trendyolSupplierId,
+              hepsiburadaApiKey: encrypted.hepsiburadaApiKey,
+              hepsiburadaMerchantId: typeof integrationSettings.hepsiburadaMerchantId === 'string' ? integrationSettings.hepsiburadaMerchantId.trim() || null : integrationSettings.hepsiburadaMerchantId,
               fedexApiKey: encrypted.fedexApiKey,
               fedexApiSecret: encrypted.fedexApiSecret,
               fedexAccountNumber: integrationSettings.fedexAccountNumber,
@@ -208,6 +216,8 @@ export default async function handler(
               trendyolApiKey: encrypted.trendyolApiKey,
               trendyolApiSecret: encrypted.trendyolApiSecret,
               trendyolSupplierId: integrationSettings.trendyolSupplierId,
+              hepsiburadaApiKey: encrypted.hepsiburadaApiKey,
+              hepsiburadaMerchantId: typeof integrationSettings.hepsiburadaMerchantId === 'string' ? integrationSettings.hepsiburadaMerchantId.trim() || null : integrationSettings.hepsiburadaMerchantId,
               fedexApiKey: encrypted.fedexApiKey,
               fedexApiSecret: encrypted.fedexApiSecret,
               fedexAccountNumber: integrationSettings.fedexAccountNumber,
@@ -228,6 +238,7 @@ export default async function handler(
           });
           console.log('Integration settings saved successfully');
           if (trendyolResaved) await clearConnectionAuthState(authUser.id, 'trendyol');
+          if (hepsiburadaResaved) await clearConnectionAuthState(authUser.id, 'hepsiburada');
         } catch (error) {
           console.error('Error saving integration settings:', error);
           throw error;

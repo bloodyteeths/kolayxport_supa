@@ -30,7 +30,8 @@ export type IntegrationPanel = 'etsy' | 'amazon' | 'shopify' | 'credentials' | n
 export type CredentialLabelKey =
   | 'apiKey' | 'apiSecret' | 'supplierId' | 'token' | 'accountNumber'
   | 'mngCustomerNumber' | 'mngPassword'
-  | 'clientId' | 'clientSecret' | 'username' | 'password' | 'companyId';
+  | 'clientId' | 'clientSecret' | 'username' | 'password' | 'companyId'
+  | 'merchantId' | 'serviceKey';
 
 export interface CredentialFieldSpec {
   /** The `integrationSettings` key sent in the PATCH body. */
@@ -40,8 +41,8 @@ export interface CredentialFieldSpec {
   secret?: boolean;
   /** Every field listed here is required by the server's completeness check. */
   required: boolean;
-  /** `digits`: only 0-9 (Trendyol supplier ID). */
-  pattern?: 'digits';
+  /** `digits`: only 0-9 (Trendyol supplier ID). `uuid`: a GUID (Hepsiburada Mağaza ID). */
+  pattern?: 'digits' | 'uuid';
   /** Trim whitespace before saving (account numbers, ids). */
   trim?: boolean;
   /** FormField width (DS §3.7). */
@@ -125,7 +126,16 @@ export const INTEGRATIONS: readonly IntegrationSpec[] = [
       f('trendyolSupplierId', 'supplierId', { pattern: 'digits', trim: true, width: 'short', hint: true }),
     ],
   },
-  { id: 'hepsiburada', name: 'Hepsiburada', logo: 'hepsiburada', group: 'marketplaces', kind: 'readonly', panel: null, guideHref: GUIDE },
+  {
+    // Self-serve once enabled for the user (connectionView falls back to "set up by support" while the flag is off).
+    // The merchant adds our integrator in HB panel → Entegratör bilgileri and copies the Mağaza ID + its servis anahtarı.
+    id: 'hepsiburada', name: 'Hepsiburada', logo: 'hepsiburada', group: 'marketplaces', kind: 'credentials', panel: 'credentials',
+    guideHref: `${GUIDE}#hepsiburada-guide`, inCredentialsList: true,
+    fields: [
+      f('hepsiburadaMerchantId', 'merchantId', { pattern: 'uuid', trim: true, width: 'medium', hint: true }),
+      f('hepsiburadaApiKey', 'serviceKey', { secret: true, hint: true }),
+    ],
+  },
   {
     id: 'veeqo', name: 'Veeqo', logo: 'veeqo', group: 'marketplaces', kind: 'credentials', panel: 'credentials',
     guideHref: GUIDE, inCredentialsList: true,
@@ -214,7 +224,8 @@ const filled = (v: unknown): boolean => typeof v === 'string' && v.trim().length
 
 export type CredentialError =
   | { code: 'requiredWith'; field: string }
-  | { code: 'digits' };
+  | { code: 'digits' }
+  | { code: 'uuid' };
 
 /**
  * Inline validation (§5.2): any field filled → every required field must be filled (mirrors the server's
@@ -234,6 +245,10 @@ export function validateCredentials(id: string, values: CredentialValues): Recor
     }
     if (x.pattern === 'digits' && filled(v) && !isMaskedValue(v) && !/^\d+$/.test(String(v).trim())) {
       out[x.name] = { code: 'digits' };
+    }
+    if (x.pattern === 'uuid' && filled(v) && !isMaskedValue(v)
+      && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v).trim())) {
+      out[x.name] = { code: 'uuid' };
     }
   }
   return out;

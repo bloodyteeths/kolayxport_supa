@@ -1,0 +1,19 @@
+{
+  "messages": {
+    "composer": {
+      "placeholderHepsiburada": "Müşteriye cevabınızı yazın",
+      "errors": {
+        "alreadyAnsweredHepsiburada": "Bu soru Hepsiburada'da zaten yanıtlanmış"
+      }
+    },
+    "thread": {
+      "viewOnHepsiburada": "Hepsiburada'da görüntüle",
+      "answerBy": "{date} tarihine kadar yanıtlayın (Hepsiburada yanıtlanmayan soruları bir iş günü sonra kapatır).",
+      "answeredHepsiburada": "{date} tarihinde Hepsiburada'da yanıtlandı.",
+      "answeredHepsiburadaNoDate": "Hepsiburada'da yanıtlandı."
+    },
+    "context": {
+      "questionOrder": "Sipariş"
+    }
+  }
+}

@@ -10,7 +10,7 @@ import type { ListingMarketplace, ListingStatusKey, SyncStatusKey } from '@/lib/
 export type { ListingMarketplace, ListingStatusKey };
 
 /** The five marketplaces in nav order. */
-export const LISTING_MARKETPLACES = ['etsy', 'ebay', 'trendyol', 'wix', 'shopify'] as const satisfies readonly ListingMarketplace[];
+export const LISTING_MARKETPLACES = ['etsy', 'ebay', 'trendyol', 'wix', 'shopify', 'hepsiburada'] as const satisfies readonly ListingMarketplace[];
 
 export function isListingMarketplace(v: unknown): v is ListingMarketplace {
   return typeof v === 'string' && (LISTING_MARKETPLACES as readonly string[]).includes(v);

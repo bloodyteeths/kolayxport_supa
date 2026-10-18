@@ -4,7 +4,8 @@
  *  - a label: carrier logo + name, tracking number (copy), created date, tracking push result;
  *  - a failed label attempt: "Label failed: {reason}";
  *  - nothing: "No label yet" + [Add tracking number] (not for manual orders: no push target).
- * Trendyol's pre-assigned cargo number is shown as such, never as a label.
+ * Trendyol's / Hepsiburada's pre-assigned cargo number is shown as such, never as a label; Hepsiburada orders also
+ * get "Pack & print label" (HepsiburadaLabelActions).
  */
 import React from 'react';
 import { Box, Typography } from '@mui/material';
@@ -20,6 +21,7 @@ import { logoDisplayName } from '@/lib/ds/logos';
 import { useFormatters } from '@/lib/format';
 import { marketplaceSelectKey } from '@/lib/shipping/trackingCarriers';
 import type { OrderRow, TrackingSubmissionSummary } from '@/lib/orders/types';
+import { HepsiburadaLabelActions } from './HepsiburadaLabelActions';
 
 export interface LabelSectionProps {
   row: OrderRow;
@@ -125,10 +127,11 @@ export function LabelSection({ row, onAddTracking }: LabelSectionProps) {
       </Box>
       {row.marketplaceCargoNumber && !label && (
         <Box sx={{ mt: '8px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }} data-testid="label-cargo-number">
-          <Typography variant="caption" component="span" sx={{ color: n[500] }}>{t('row.trendyolCargo')}</Typography>
+          <Typography variant="caption" component="span" sx={{ color: n[500] }}>{row.hepsiburada ? t('row.hepsiburadaCargo') : t('row.trendyolCargo')}</Typography>
           <CopyText value={row.marketplaceCargoNumber} mono />
         </Box>
       )}
+      {row.hepsiburada && !label && <HepsiburadaLabelActions row={row} />}
     </SidePanelSection>
   );
 }

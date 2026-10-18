@@ -6,10 +6,11 @@ import { ebayBulkConfig } from './ebay';
 import { trendyolBulkConfig } from './trendyol';
 import { wixBulkConfig } from './wix';
 import { shopifyBulkConfig } from './shopify';
+import { hepsiburadaBulkConfig } from './hepsiburada';
 
 export type { BulkConfig, BulkField, BulkColumnKey, BulkTransportKind } from './types';
 export { BULK_FIELDS, isBulkField } from './types';
-export { etsyBulkConfig, ebayBulkConfig, trendyolBulkConfig, wixBulkConfig, shopifyBulkConfig };
+export { etsyBulkConfig, ebayBulkConfig, trendyolBulkConfig, wixBulkConfig, shopifyBulkConfig, hepsiburadaBulkConfig };
 
 export const BULK_CONFIGS: Record<ListingMarketplace, BulkConfig> = {
   etsy: etsyBulkConfig,
@@ -17,6 +18,7 @@ export const BULK_CONFIGS: Record<ListingMarketplace, BulkConfig> = {
   trendyol: trendyolBulkConfig,
   wix: wixBulkConfig,
   shopify: shopifyBulkConfig,
+  hepsiburada: hepsiburadaBulkConfig,
 };
 
 export function bulkConfig(marketplace: ListingMarketplace): BulkConfig {

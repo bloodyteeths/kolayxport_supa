@@ -57,6 +57,7 @@ export type NavItemId =
   | 'listings-trendyol'
   | 'listings-wix'
   | 'listings-shopify'
+  | 'listings-hepsiburada'
   | 'stock-sync'
   | 'connect-store'
   | 'research'
@@ -70,7 +71,7 @@ export type NavItemId =
 export type NavBadgeSource =
   /** count = orders to ship; tone danger when any is overdue. */
   | 'ordersToShip'
-  /** count = unread messages (Wix + Trendyol). */
+  /** count = unread messages (Wix + Trendyol + Hepsiburada). */
   | 'messagesUnread'
   /** dot warning when the row's marketplace needs reconnecting; dot attention when it has unsent drafts. */
   | 'marketplace'
@@ -84,7 +85,8 @@ export type NavBadgeSource =
  * or when the caller reports stock sync is configured.
  */
 export type NavRequires =
-  | { kind: 'providers'; providers: readonly MarketplaceKey[] }
+  /** `knownOnly`: hidden while connections are unknown (rows for integrations most accounts cannot connect yet). */
+  | { kind: 'providers'; providers: readonly MarketplaceKey[]; knownOnly?: boolean }
   | { kind: 'connectCta' }
   | { kind: 'stockSync' };
 
@@ -139,7 +141,7 @@ export type NavExtraDestination = {
 };
 
 const marketplaceRow = (
-  brand: 'etsy' | 'ebay' | 'trendyol' | 'wix' | 'shopify',
+  brand: 'etsy' | 'ebay' | 'trendyol' | 'wix' | 'shopify' | 'hepsiburada',
   href: string,
   extra: Partial<NavItemConfig> = {},
 ): NavItemConfig => ({
@@ -180,7 +182,7 @@ export const NAV_CONFIG: readonly NavGroupConfig[] = [
         labelKey: 'nav.items.messages',
         href: '/app/mesajlar',
         icon: 'message',
-        requires: { kind: 'providers', providers: ['wix', 'trendyol'] },
+        requires: { kind: 'providers', providers: ['wix', 'trendyol', 'hepsiburada'] },
         badge: 'messagesUnread',
         gKey: 'm',
         match: ['/app/mesajlar', '/app/mesajlar/*'],
@@ -197,6 +199,8 @@ export const NAV_CONFIG: readonly NavGroupConfig[] = [
       marketplaceRow('trendyol', '/app/trendyol-urunler'),
       marketplaceRow('wix', '/app/wix-urunler'),
       marketplaceRow('shopify', '/app/shopify-urunler'),
+      // Shown once Hepsiburada is connected (connecting needs MARKETPLACE_HEPSIBURADA for the account).
+      marketplaceRow('hepsiburada', '/app/hepsiburada-urunler', { requires: { kind: 'providers', providers: ['hepsiburada'], knownOnly: true } }),
       {
         id: 'stock-sync',
         labelKey: 'nav.items.stockSync',

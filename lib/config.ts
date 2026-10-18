@@ -62,6 +62,17 @@ export function isTrendyolEnabled(userId?: string): boolean {
   return userId ? ALLOW_TRENDYOL_USERS.includes(userId) : false;
 }
 
+// Hepsiburada Marketplace Integration. Per-user creds (merchantId + servis anahtarı) live in Credential;
+// the integrator name HB registered for KolayXport is platform config (sent as User-Agent on every call).
+export const MARKETPLACE_HEPSIBURADA = process.env.MARKETPLACE_HEPSIBURADA === 'true';
+export const ALLOW_HEPSIBURADA_USERS = process.env.ALLOW_HEPSIBURADA_USERS?.split(',').map(id => id.trim()).filter(Boolean) || [];
+
+export function isHepsiburadaEnabled(userId?: string): boolean {
+  if (!MARKETPLACE_HEPSIBURADA) return false;
+  if (ALLOW_HEPSIBURADA_USERS.length === 0) return true;
+  return userId ? ALLOW_HEPSIBURADA_USERS.includes(userId) : false;
+}
+
 // Wix Marketplace Integration
 export const MARKETPLACE_WIX = process.env.MARKETPLACE_WIX === 'true';
 export const ALLOW_WIX_USERS = process.env.ALLOW_WIX_USERS?.split(',').map(id => id.trim()) || [];

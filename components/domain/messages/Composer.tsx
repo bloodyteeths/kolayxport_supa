@@ -27,6 +27,7 @@ import { useFormatters } from '@/lib/format';
 import { insertAtCaret, type FillContext } from '@/lib/messages/fillVariables';
 import type { DraftMissing } from '@/lib/messages/draftReply';
 import { composerAcceptsText } from '@/lib/messages/threadState';
+import { isQuestionPlatform } from '@/lib/messages/platforms';
 import type { MessagePlatform } from '@/types/messages';
 import { SavedRepliesPicker } from './SavedRepliesPicker';
 import { maxLengthFor, type AiDraftResult, type ComposerError, type UseThreadResult } from './useThread';
@@ -46,7 +47,7 @@ export interface ComposerProps {
 type T = ReturnType<typeof useTranslations>;
 
 export function platformLabel(p: MessagePlatform): string {
-  return logoDisplayName(p) ?? (p === 'wix' ? 'Wix' : 'Trendyol');
+  return logoDisplayName(p) ?? (p === 'wix' ? 'Wix' : p === 'hepsiburada' ? 'Hepsiburada' : 'Trendyol');
 }
 
 /** Inline error copy under the field (`messages.composer.errors.*`). Wix length errors say "Replies". */
@@ -61,7 +62,7 @@ export function composerErrorText(err: ComposerError, t: T, platform: MessagePla
     case 'unfilled':
       return t('errors.unfilled', { tokens: err.tokens.join(', ') });
     case 'alreadyAnswered':
-      return t('errors.alreadyAnswered');
+      return platform === 'hepsiburada' ? t('errors.alreadyAnsweredHepsiburada') : t('errors.alreadyAnswered');
     case 'auth':
       return t('errors.auth', { name: platformLabel(err.platform) });
     default:
@@ -93,6 +94,9 @@ export function Composer({ thread, fillContext, layout = 'pane', onManageSavedRe
   const { conversation: c, mode } = thread;
   const sheet = layout === 'sheet';
   const isTrendyol = c.platform === 'trendyol';
+  const isHepsiburada = c.platform === 'hepsiburada';
+  // Q&A platforms (Trendyol, Hepsiburada): "answer" wording and a length counter.
+  const isQuestion = isQuestionPlatform(c.platform);
 
   const localRef = useRef<HTMLTextAreaElement | null>(null);
   const setRefs = (el: HTMLTextAreaElement | null) => {
@@ -126,7 +130,9 @@ export function Composer({ thread, fillContext, layout = 'pane', onManageSavedRe
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }} data-testid="composer-answered">
           <DoneIcon size={iconSize.control} strokeWidth={ICON_STROKE} color={tone.success.fg} aria-hidden />
           <Caption color={n[600]}>
-            {mode.answeredAt ? tThread('answered', { date: f.date(mode.answeredAt, 'datetime') }) : tThread('answeredNoDate')}
+            {isHepsiburada
+              ? (mode.answeredAt ? tThread('answeredHepsiburada', { date: f.date(mode.answeredAt, 'datetime') }) : tThread('answeredHepsiburadaNoDate'))
+              : (mode.answeredAt ? tThread('answered', { date: f.date(mode.answeredAt, 'datetime') }) : tThread('answeredNoDate'))}
           </Caption>
         </Box>
       );
@@ -143,7 +149,7 @@ export function Composer({ thread, fillContext, layout = 'pane', onManageSavedRe
           <Caption color={n[600]}>{tThread('cannotAnswer')}</Caption>
           {c.productInfo?.webUrl && (
             <Button variant="ghost" size="sm" icon={icons.externalLink} href={c.productInfo.webUrl} external>
-              {tThread('viewOnTrendyol')}
+              {isHepsiburada ? tThread('viewOnHepsiburada') : tThread('viewOnTrendyol')}
             </Button>
           )}
         </Box>
@@ -158,10 +164,14 @@ export function Composer({ thread, fillContext, layout = 'pane', onManageSavedRe
 
   // ── composer ─────────────────────────────────────────────────────────────────────────────────────
   const max = maxLengthFor(c.platform);
-  const label = isTrendyol ? t('labelAnswer') : t('labelReply');
+  const label = isQuestion ? t('labelAnswer') : t('labelReply');
   const name = c.customerName?.trim() || tThread('customer');
-  const placeholder = isTrendyol ? t('placeholderTrendyol') : t('placeholderWix', { name: name.split(/\s+/)[0] });
-  const sendLabel = isTrendyol ? t('sendAnswer') : t('sendReply');
+  const placeholder = isTrendyol
+    ? t('placeholderTrendyol')
+    : isHepsiburada
+      ? t('placeholderHepsiburada')
+      : t('placeholderWix', { name: name.split(/\s+/)[0] });
+  const sendLabel = isQuestion ? t('sendAnswer') : t('sendReply');
   const errorText = thread.sendError ? composerErrorText(thread.sendError, t, c.platform) : null;
   const aiLoading = thread.ai.status === 'loading';
   const hasText = thread.text.trim().length > 0;
@@ -251,11 +261,17 @@ export function Composer({ thread, fillContext, layout = 'pane', onManageSavedRe
         />
       )}
 
+      {isHepsiburada && c.expiresAt && (
+        <Caption color={n[600]} testId="composer-deadline">
+          {tThread('answerBy', { date: f.date(c.expiresAt, 'datetime') })}
+        </Caption>
+      )}
+
       <FormField
         label={label}
         hideLabel={sheet}
         error={errorText}
-        counter={isTrendyol ? { value: thread.text.trim().length, max } : undefined}
+        counter={isQuestion ? { value: thread.text.trim().length, max } : undefined}
       >
         <TextArea
           value={thread.text}
@@ -284,7 +300,7 @@ export function Composer({ thread, fillContext, layout = 'pane', onManageSavedRe
       )}
       {thread.sendError?.kind === 'auth' && (
         <Box>
-          <Button variant="ghost" size="sm" href={thread.sendError.platform === 'trendyol' ? '/ayarlar?tab=apiKeys' : '/ayarlar?tab=connections'} data-testid="composer-reconnect">
+          <Button variant="ghost" size="sm" href={thread.sendError.platform === 'wix' ? '/ayarlar?tab=connections' : '/ayarlar?tab=apiKeys'} data-testid="composer-reconnect">
             {t('reconnect', { name: platformLabel(thread.sendError.platform) })}
           </Button>
         </Box>

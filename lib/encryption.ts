@@ -73,6 +73,7 @@ const CREDENTIAL_FIELDS = [
   'veeqoApiKey', 'shippoToken',
   'fedexApiKey', 'fedexApiSecret',
   'trendyolApiKey', 'trendyolApiSecret',
+  'hepsiburadaApiKey',
   'upsApiKey', 'upsApiSecret',
   'mngPassword', 'mngCustomerNumber', 'mngAppKey', 'mngAppSecret',
   'parasutClientId', 'parasutClientSecret', 'parasutUsername', 'parasutPassword',

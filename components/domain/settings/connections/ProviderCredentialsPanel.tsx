@@ -89,6 +89,8 @@ export function ProviderCredentialsPanel({
   const [showAll, setShowAll] = useState(false);
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<SaveFailure>(null);
+  /** Hepsiburada only: the live check after save failed (creds are saved; HB refused them or our integrator). */
+  const [verifyError, setVerifyError] = useState<string | null>(null);
   const [retryingLoad, setRetryingLoad] = useState(false);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const seededFor = useRef<string | null>(null);
@@ -116,6 +118,7 @@ export function ProviderCredentialsPanel({
     const e = visibleErrors[x.name];
     if (!e) return null;
     if (e.code === 'digits') return t('credentials.digitsOnly');
+    if (e.code === 'uuid') return t('credentials.uuidFormat');
     return t('credentials.requiredWith', { field: labelOf(x) });
   };
 
@@ -137,6 +140,15 @@ export function ProviderCredentialsPanel({
     setFailure(null);
     try {
       await store.save(credentialPatch(providerId, draft));
+      setVerifyError(null);
+      if (providerId === 'hepsiburada' && Object.values(draft).some(filled)) {
+        const check = await verifyHepsiburada();
+        if (!check.ok) {
+          await onSaved?.();
+          setVerifyError(t(`credentials.hepsiburadaVerify.${check.reason}` as 'credentials.hepsiburadaVerify.failed'));
+          return;
+        }
+      }
       toast.success(t('credentials.saved', { provider: spec.name }));
       await onSaved?.();
       onClose();
@@ -180,6 +192,8 @@ export function ProviderCredentialsPanel({
           nextPlan: tb(`planName.${limit.nextPlan}` as 'planName.pro'), nextLimit: limit.nextLimit,
         })}
     </Banner>
+  ) : verifyError ? (
+    <Banner tone="danger" title={t('credentials.hepsiburadaVerify.title')} data-testid="credentials-verify-failed">{verifyError}</Banner>
   ) : failure === 'failed' ? (
     <Banner tone="danger" title={t('credentials.saveFailed')} data-testid="credentials-save-failed" />
   ) : showAll && errorCount > 0 ? (
@@ -264,3 +278,20 @@ export function ProviderCredentialsPanel({
 }
 
 export default ProviderCredentialsPanel;
+
+const filled = (v: unknown): boolean => typeof v === 'string' && v.trim().length > 0;
+
+type HbVerifyReason = 'credentials' | 'integrator' | 'failed';
+
+/** Live check of the saved Hepsiburada credentials (`POST /api/hepsiburada/test-connection`). */
+async function verifyHepsiburada(): Promise<{ ok: true } | { ok: false; reason: HbVerifyReason }> {
+  try {
+    const res = await fetch('/api/hepsiburada/test-connection', { method: 'POST', credentials: 'same-origin' });
+    const body = await res.json().catch(() => ({}));
+    if (res.ok && body?.ok) return { ok: true };
+    const reason: HbVerifyReason = body?.reason === 'credentials' || body?.reason === 'integrator' ? body.reason : 'failed';
+    return { ok: false, reason };
+  } catch {
+    return { ok: false, reason: 'failed' };
+  }
+}

@@ -25,6 +25,8 @@ export interface ThreadStateInput {
  * - `in_review`      Trendyol WAITING_FOR_APPROVE → pill + caption, no composer
  * - `rejected`       Trendyol REJECTED → danger banner + composer prefilled with the rejected text
  * - `cannot_answer`  Trendyol REPORTED / unknown → note + "View on Trendyol", no composer
+ * Hepsiburada: WaitingForAnswer → `answer`; Answered → `answered`; Rejected (the seller reported the question) /
+ * AutoClosed (deadline passed) / unknown → `cannot_answer`. HB has no in-review or rejected-answer state.
  */
 export type ComposerMode =
   | { kind: 'reply' }
@@ -54,8 +56,19 @@ function isTrendyol(platform: string): boolean {
   return normalizeRaw(platform) === 'trendyol';
 }
 
+function isHepsiburada(platform: string): boolean {
+  return normalizeRaw(platform) === 'hepsiburada';
+}
+
 /** Which composer region the thread renders. */
 export function composerMode(c: ThreadStateInput, opts: ThreadStateOptions = {}): ComposerMode {
+  if (isHepsiburada(c.platform)) {
+    if (opts.locallyAnsweredAt) return { kind: 'answered', answeredAt: opts.locallyAnsweredAt };
+    const raw = String(c.platformStatus ?? '').trim().toLowerCase();
+    if (c.needsReply || raw === 'waitingforanswer') return { kind: 'answer' };
+    if (raw === 'answered') return { kind: 'answered', answeredAt: c.answeredAt ?? null };
+    return { kind: 'cannot_answer', rawStatus: String(c.platformStatus ?? '').trim() };
+  }
   if (!isTrendyol(c.platform)) return { kind: 'reply' };
   if (opts.locallyAnsweredAt) return { kind: 'answered', answeredAt: opts.locallyAnsweredAt };
 

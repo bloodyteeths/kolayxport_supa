@@ -29,6 +29,109 @@ export function isTransactionCategory(v: unknown): v is TransactionCategory {
 }
 
 /**
+ * Hepsiburada accounting record types (`/transactions` `transactionType`, PascalCase English) whose category the
+ * generic substring rules below get wrong. Exact match, checked first. Hepsiburada amounts are stored signed by
+ * `isIncome` (income +, expense −), so the sign-aware buckets (commission, fees, discount) handle refunds.
+ * Cargo refunds / compensation are credits, so they go to `fees` (sign-aware) rather than `shipping` (which
+ * counts |amount| as a cost). `Return` / `Commission` / `Stoppage` already classify correctly and are not listed.
+ */
+export const HEPSIBURADA_TYPE_CATEGORY: Readonly<Record<string, TransactionCategory>> = {
+  // Sales
+  EInvoiceSales: 'revenue',
+  EInvoiceSalesRefund: 'return',
+  BnplOrder: 'revenue',
+  RevenueIncome: 'revenue',
+  RevenueExpense: 'return',
+  BnplRefund: 'return',
+  PriceDifferenceRefund: 'fees',
+  PriceDifferenceExpense: 'fees',
+  // Commission
+  CommissionRefund: 'commission',
+  CommissionCorrection: 'commission',
+  OverseasCommissionRefund: 'commission',
+  CommissionInvoiceRefund: 'commission_invoice',
+  // Payment processing / platform fees (sign-aware)
+  PaymentServiceCostReflection: 'fees',
+  PaymentServiceCostReflectionRefund: 'fees',
+  ProcessingFeeExpense: 'fees',
+  ProcessingFeeExpenseRefund: 'fees',
+  BnplProcessingFee: 'fees',
+  BnplProcessingFeeRefund: 'fees',
+  DeliveryProcessingFee: 'fees',
+  DeliveryProcessingFeeRefund: 'fees',
+  ReturnDeliveryProcessingFee: 'fees',
+  ReturnProcessingFeeExpense: 'fees',
+  InternationalOperationFee: 'fees',
+  InternationalOperationFeeRefund: 'fees',
+  HepsiGlobalTransferExpense: 'fees',
+  HepsiGlobalTransferIncome: 'fees',
+  LineItemTransferExpense: 'fees',
+  LineItemTransferIncome: 'fees',
+  LateInterestExpense: 'fees',
+  SfsInterest: 'fees',
+  StudioExpense: 'fees',
+  FaturaLab: 'fees',
+  FigoPara: 'fees',
+  RefusedInvoiceExpense: 'fees',
+  RefusedInvoiceExpenseRefund: 'fees',
+  InvoiceReversalExpense: 'fees',
+  InvoiceReversalIncome: 'fees',
+  ProductsReportedByService: 'fees',
+  MpOutletProductExpense: 'fees',
+  MpScrapExpense: 'fees',
+  MpScrapIncome: 'fees',
+  MpCompensationIncome: 'fees',
+  RoadAssistanceExpense: 'fees',
+  RoadAssistanceExpenseRefund: 'fees',
+  TransportExpense: 'fees',
+  TransportExpenseRefund: 'fees',
+  CustomerSatisfaction: 'fees',
+  CustomerSatisfactionRefund: 'fees',
+  InboundCustomerSatisfaction: 'fees',
+  InboundCustomerSatisfactionRefund: 'fees',
+  OutboundCustomerSatisfaction: 'fees',
+  OutboundCustomerSatisfactionRefund: 'fees',
+  BalanceCorrection: 'fees',
+  Chargeout: 'fees',
+  GoldLaborStoppage: 'fees',
+  GoldLaborStoppageRefund: 'fees',
+  StoppageRefund: 'fees',
+  // Shipping costs (expense) vs cargo credits (sign-aware fees)
+  ShipmentCostSharingExpense: 'shipping',
+  DropShipmentCostSharingExpense: 'shipping',
+  ReturnShipmentCostSharingExpense: 'shipping',
+  OneClickReturnShipmentCostSharingExpense: 'shipping',
+  CargoMargin: 'shipping',
+  ShipmentCostSharingIncome: 'fees',
+  DropShipmentCostSharingIncome: 'fees',
+  CargoCostRefund: 'fees',
+  CargoCompensationIncome: 'fees',
+  CargoCompensationIncomeRefund: 'fees',
+  CargoCompensationExpenseRefund: 'fees',
+  CargoCompensationSellerSatisfactionIncome: 'fees',
+  CargoLimitExcessCompensationIncome: 'fees',
+  // Marketing / ads
+  MarketingExpense: 'adspend',
+  MarketingExpenseRefund: 'adspend',
+  AdSharingExpense: 'adspend',
+  AdSharingExpenseRefund: 'adspend',
+  FacebookAdExpense: 'adspend',
+  SponsorshipFee: 'adspend',
+  AdBalanceTopUpFromAllowance: 'adspend',
+  AdBalanceTopUpFromAllowanceRefund: 'adspend',
+  MarketingSupportParticipation: 'discount',
+  MarketingSupportParticipationRefund: 'discount',
+  CampaignDiscount: 'discount',
+  CampaignDiscountRefund: 'discount',
+  HepsiGlobalCampaignDiscount: 'discount',
+  // Bank payouts / pass-through
+  Payment: 'disbursement',
+  TotalPayment: 'disbursement',
+  Deposit: 'disbursement',
+  VAT: 'passthrough',
+};
+
+/**
  * Classify a raw marketplace transaction type into a financial category.
  */
 export function classifyTransactionType(type: string): TransactionCategory {
@@ -36,6 +139,9 @@ export function classifyTransactionType(type: string): TransactionCategory {
   const t = (type || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   // Also check original for exact Turkish matches
   const orig = (type || '').trim();
+
+  const hb = Object.prototype.hasOwnProperty.call(HEPSIBURADA_TYPE_CATEGORY, orig) ? HEPSIBURADA_TYPE_CATEGORY[orig] : undefined;
+  if (hb) return hb;
 
   // Order matters — more specific patterns first
 

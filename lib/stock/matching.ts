@@ -120,7 +120,7 @@ export function buildMatchSuggestions(
   }
 
   // Title-token suggestions for Etsy offerings without a SKU.
-  const titleTargets = open.filter((c) => (c.channel === 'trendyol' || c.channel === 'shopify') && c.title);
+  const titleTargets = open.filter((c) => (c.channel === 'trendyol' || c.channel === 'shopify' || c.channel === 'hepsiburada') && c.title);
   const titles: TitleSuggestion[] = [];
   for (const c of noSku) {
     if (c.channel !== 'etsy' || !c.title) continue;

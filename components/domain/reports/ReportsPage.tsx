@@ -182,13 +182,13 @@ export function useReportRange(now?: Date): ReportRange {
 
 // ── finance marketplace scope (Profit, Payouts, Transactions; §1 scope rule, §4.3) ─────────────────────
 
-export const FINANCE_MARKETPLACES = ['etsy', 'ebay', 'amazon', 'trendyol'] as const;
+export const FINANCE_MARKETPLACES = ['etsy', 'ebay', 'amazon', 'trendyol', 'hepsiburada'] as const;
 export type FinanceMarketplace = (typeof FINANCE_MARKETPLACES)[number];
-export const FINANCE_MARKETPLACE_NAME: Record<FinanceMarketplace, string> = { etsy: 'Etsy', ebay: 'eBay', amazon: 'Amazon', trendyol: 'Trendyol' };
+export const FINANCE_MARKETPLACE_NAME: Record<FinanceMarketplace, string> = { etsy: 'Etsy', ebay: 'eBay', amazon: 'Amazon', trendyol: 'Trendyol', hepsiburada: 'Hepsiburada' };
 
 const MP_SCHEMA = { mp: urlField.string(undefined, { maxLength: 32 }) };
 
-/** Pure: URL `mp` when it is a finance marketplace, else the first connected one (Etsy → eBay → Amazon → Trendyol), else Etsy. */
+/** Pure: URL `mp` when it is a finance marketplace, else the first connected one (Etsy → eBay → Amazon → Trendyol → Hepsiburada), else Etsy. */
 export function resolveFinanceMarketplace(
   urlMp: string | null | undefined,
   connected: Partial<Record<FinanceMarketplace, boolean | undefined>>,
@@ -196,7 +196,7 @@ export function resolveFinanceMarketplace(
   const v = (urlMp ?? '').toLowerCase();
   if ((FINANCE_MARKETPLACES as readonly string[]).includes(v)) return { mp: v as FinanceMarketplace, supported: true };
   const first = FINANCE_MARKETPLACES.find((m) => connected[m]);
-  // A deep link to Wix/Shopify/Hepsiburada is "not supported" (§3), not silently another marketplace.
+  // A deep link to Wix/Shopify is "not supported" (§3), not silently another marketplace.
   return { mp: first ?? 'etsy', supported: !v };
 }
 

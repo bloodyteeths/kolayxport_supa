@@ -200,7 +200,9 @@ function ThreadPaneInner({
     { id: 'markUnread', label: t('markUnread'), onClick: () => void thread.markUnread() },
   ];
   if (!isWix && c.productInfo?.webUrl) {
-    overflow.push({ id: 'viewOnTrendyol', label: t('viewOnTrendyol'), icon: icons.externalLink, href: c.productInfo.webUrl });
+    overflow.push(c.platform === 'hepsiburada'
+      ? { id: 'viewOnHepsiburada', label: t('viewOnHepsiburada'), icon: icons.externalLink, href: c.productInfo.webUrl }
+      : { id: 'viewOnTrendyol', label: t('viewOnTrendyol'), icon: icons.externalLink, href: c.productInfo.webUrl });
   }
   if (isWix && newest?.kxOrderId) {
     overflow.push({ id: 'openOrder', label: tContext('openOrder'), href: orderHref(newest.kxOrderId) });

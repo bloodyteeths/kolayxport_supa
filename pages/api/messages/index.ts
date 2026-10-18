@@ -6,16 +6,20 @@ import { getAuthUser } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { createWixClient } from '@/lib/integrations/wixClient';
 import { createTrendyolClient } from '@/lib/integrations/trendyolApiClient';
-import { isWixEnabled, isTrendyolEnabled } from '@/lib/config';
+import { isWixEnabled, isTrendyolEnabled, isHepsiburadaEnabled } from '@/lib/config';
+import { createHepsiburadaClient } from '@/lib/hepsiburada/client';
 import { logger } from '@/lib/logger';
 import { createInboxStore, enrichWixContacts } from '@/lib/messages/inboxCache';
-import { decodeCursor, encodeCursor, nextTrendyolPage, type InboxCursor } from '@/lib/messages/cursor';
+import { decodeCursor, encodeCursor, nextHepsiburadaPage, nextTrendyolPage, type InboxCursor } from '@/lib/messages/cursor';
+import { MESSAGE_PLATFORMS, replyLimits } from '@/lib/messages/platforms';
 import {
   classifyPlatformError,
   classifyReplyError,
   compareConversations,
   joinLocalOrders,
+  hepsiburadaStatusForFilter,
   matchesFilter,
+  normalizeHepsiburadaQuestion,
   normalizeTrendyolQuestion,
   normalizeWixMessage,
   normalizeWixOrder,
@@ -31,9 +35,8 @@ import {
 import {
   LIST_SIZE_DEFAULT,
   LIST_SIZE_MAX,
+  HEPSIBURADA_STATUS_CODE,
   ORDER_CONTEXT_LIMIT,
-  TRENDYOL_ANSWER_MAX,
-  TRENDYOL_ANSWER_MIN,
   TRENDYOL_STATUS,
   WIX_REPLY_MAX,
 } from '@/lib/messages/limits';
@@ -49,7 +52,7 @@ import type {
 /** Process-wide store (DB once BR-4 is deployed, memory until then). Exported for tests. */
 export const inboxStore = createInboxStore(prisma, logger);
 
-const PLATFORMS: readonly MessagePlatform[] = ['wix', 'trendyol'];
+const PLATFORMS: readonly MessagePlatform[] = MESSAGE_PLATFORMS;
 
 function str(v: string | string[] | undefined): string {
   return Array.isArray(v) ? v[0] ?? '' : v ?? '';
@@ -71,6 +74,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const hasWix = !!(isWixEnabled(user.id) && (wixSite || credential?.wixInstanceId));
     const hasTrendyol = !!(isTrendyolEnabled(user.id) && credential?.trendyolSupplierId);
+    // Hepsiburada: flag + Mağaza ID + servis anahtarı (+ our integrator name on the server); otherwise skipped silently.
+    const hbClient = isHepsiburadaEnabled(user.id) ? createHepsiburadaClient(credential) : null;
+    const hasHepsiburada = !!hbClient;
 
     const userId = user.id;
 
@@ -92,7 +98,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // ── COUNTS (badge: needs-reply totals) ──────────────
     if (action === 'counts') {
-      const counts: MessageCountsResponse = { wix: 0, trendyol: 0, total: 0 };
+      const counts: MessageCountsResponse & { hepsiburada: number } = { wix: 0, trendyol: 0, hepsiburada: 0, total: 0 };
       const promises: Promise<void>[] = [];
 
       if (hasTrendyol && credential) {
@@ -114,6 +120,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         })());
       }
 
+      if (hasHepsiburada) {
+        promises.push((async () => {
+          try {
+            const c = await hbClient!.questionCounts();
+            if (typeof c?.waitingForAnswer === 'number') {
+              counts.hepsiburada = c.waitingForAnswer;
+            } else {
+              const page = await hbClient!.listQuestions({ status: String(HEPSIBURADA_STATUS_CODE.waiting), page: 1, size: 1 });
+              counts.hepsiburada = page?.totalItemCount || 0;
+            }
+          } catch (e: any) {
+            logger.warn(`[MESSAGES] Hepsiburada count failed: ${e?.status || ''} ${e?.message || e}`.trim());
+          }
+        })());
+      }
+
       // Wix: read the inbox cache (filled by `list`), never the Wix API on a badge poll (§9).
       if (hasWix) {
         promises.push((async () => {
@@ -126,7 +148,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       await Promise.allSettled(promises);
-      counts.total = counts.wix + counts.trendyol;
+      counts.total = counts.wix + counts.trendyol + counts.hepsiburada;
       return res.status(200).json(counts);
     }
 
@@ -142,18 +164,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!decoded) return res.status(400).json({ error: 'Invalid cursor', code: 'badCursor' });
         cursor = decoded;
       } else {
-        // Legacy `page` (Trendyol page number) still works; Wix starts at its first contacts page.
-        cursor = { t: Math.max(0, parseInt(str(req.query.page), 10) || 0), w: '' };
+        // Legacy `page` (Trendyol page number, 0-based) still works; Wix starts at its first contacts page and
+        // Hepsiburada (1-based) follows the same page number.
+        const legacyPage = Math.max(0, parseInt(str(req.query.page), 10) || 0);
+        cursor = { t: legacyPage, w: '', h: legacyPage + 1 };
       }
 
       const wantTrendyol = hasTrendyol && !!credential && (platform === 'all' || platform === 'trendyol');
       const wantWix = hasWix && (platform === 'all' || platform === 'wix');
+      const wantHepsiburada = hasHepsiburada && (platform === 'all' || platform === 'hepsiburada');
 
       const conversations: UnifiedConversation[] = [];
       const errors: string[] = [];
       const platformErrors: PlatformError[] = [];
       const enabledPlatforms: MessagePlatform[] = [];
-      const next: InboxCursor = { t: null, w: null };
+      const next: InboxCursor = { t: null, w: null, h: null };
       const promises: Promise<void>[] = [];
 
       if (wantTrendyol) {
@@ -192,6 +217,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               // Transient failure: keep this page in the cursor so "Load more" retries it instead of
               // treating Trendyol as exhausted. Auth/permission errors end pagination (retrying can't help).
               if (code === 'rateLimited' || code === 'unavailable') next.t = page;
+            }
+          })());
+        }
+      }
+
+      if (wantHepsiburada) {
+        enabledPlatforms.push('hepsiburada');
+        const page = cursor.h ?? null;
+        if (page !== null) {
+          promises.push((async () => {
+            try {
+              const code = hepsiburadaStatusForFilter(filter);
+              const data = await hbClient!.listQuestions({ status: code === undefined ? undefined : String(code), page, size });
+              const items: any[] = Array.isArray(data?.data) ? data.data : [];
+              next.h = nextHepsiburadaPage(page, data?.totalPageCount, items.length, size);
+              const idOf = (q: any) => String(q?.issueNumber ?? q?.number ?? q?.id ?? '');
+              const valid = items.filter((q) => idOf(q));
+              const readRows = await inboxStore.findByExternalIds(userId, 'hepsiburada', valid.map(idOf));
+              const lastSeen = new Map(readRows.map((r) => [r.externalId, r.lastSeenAt]));
+              conversations.push(...valid.map((q) => normalizeHepsiburadaQuestion(q, lastSeen.get(idOf(q)) ?? null)));
+            } catch (e: any) {
+              const msg = errDetail(e);
+              logger.warn(`[MESSAGES] Hepsiburada list failed: ${e?.status || ''} ${msg}`.trim());
+              const detail = `Hepsiburada: ${e?.status || ''} ${msg}`.trim();
+              const code = classifyPlatformError(e);
+              errors.push(detail);
+              platformErrors.push({ platform: 'hepsiburada', code, detail });
+              if (code === 'rateLimited' || code === 'unavailable') next.h = page;
             }
           })());
         }
@@ -283,6 +336,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(200).json(normalizeTrendyolQuestion(question, row?.lastSeenAt ?? null));
       }
 
+      if (platform === 'hepsiburada') {
+        if (!hbClient) return res.status(400).json({ error: 'Hepsiburada credentials not configured' });
+        let issue: any;
+        try {
+          issue = await hbClient.getQuestion(conversationId);
+        } catch (e: any) {
+          if (e?.status === 404) return res.status(404).json({ error: 'Question not found' });
+          throw e;
+        }
+        if (!issue) return res.status(404).json({ error: 'Question not found' });
+        const [row] = await inboxStore.findByExternalIds(userId, 'hepsiburada', [conversationId]);
+        return res.status(200).json(normalizeHepsiburadaQuestion(issue, row?.lastSeenAt ?? null));
+      }
+
       if (platform === 'wix') {
         const client = buildWixClient();
         if (!client) return res.status(400).json({ error: 'Wix credentials not configured' });
@@ -321,15 +388,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!platform || !text.trim()) {
         return res.status(400).json({ error: 'platform and text are required' });
       }
-      if (platform !== 'trendyol' && platform !== 'wix') return res.status(400).json({ error: 'Invalid platform' });
+      if (!PLATFORMS.includes(platform)) return res.status(400).json({ error: 'Invalid platform' });
 
       const invalid = validateReplyText(platform, text) || (platform === 'wix' && text.length > WIX_REPLY_MAX ? 'tooLong' : null);
       if (invalid) {
+        const limits = replyLimits(platform);
         return res.status(400).json({
           error: invalid === 'tooShort' ? 'Answer is too short' : 'Answer is too long',
           code: invalid,
-          min: platform === 'trendyol' ? TRENDYOL_ANSWER_MIN : 1,
-          max: platform === 'trendyol' ? TRENDYOL_ANSWER_MAX : WIX_REPLY_MAX,
+          min: limits.min,
+          max: limits.max,
         });
       }
 
@@ -344,6 +412,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             needsReply: false, lastFromCustomer: false, lastMessageAt: now, lastSeenAt: now,
           }).catch(() => undefined);
           return res.status(200).json(data);
+        }
+
+        if (platform === 'hepsiburada') {
+          if (!questionId) return res.status(400).json({ error: 'questionId is required for Hepsiburada' });
+          if (!hbClient) return res.status(400).json({ error: 'Hepsiburada credentials not configured', code: 'auth' });
+          const data = await hbClient.answerQuestion(String(questionId), text);
+          await inboxStore.upsert(userId, 'hepsiburada', String(questionId), {
+            needsReply: false, lastFromCustomer: false, lastMessageAt: now, lastSeenAt: now,
+          }).catch(() => undefined);
+          return res.status(200).json(data ?? { success: true });
         }
 
         if (!conversationId) return res.status(400).json({ error: 'conversationId is required for Wix' });

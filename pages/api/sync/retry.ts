@@ -9,7 +9,8 @@ import { SyncType } from '../../../lib/types';
 
 // Functions imported from auto-sync-all-users.js (or similar refactored location)
 // These functions are expected to handle their own startSync, updateSyncProgress, completeSync calls.
-const { syncVeeqoRecentOrders, syncShippoRecentOrders, syncTrendyolRecentOrders, syncHepsiburadaRecentOrders } = require('../../../scripts/auto-sync-all-users.js');
+const { syncVeeqoRecentOrders, syncShippoRecentOrders, syncTrendyolRecentOrders } = require('../../../scripts/auto-sync-all-users.js');
+import { syncHepsiburadaRecentOrdersForUser } from '@/lib/hepsiburada/orderSync';
 
 // Import the function that /api/orders/sync uses for its logic
 // This might be fetchVeeqoOrders directly or a wrapper from veeqoService or similar
@@ -53,7 +54,7 @@ async function triggerSpecificSync(user, userSettings, syncTypeString: string, n
       break;
     case 'hepsiburada':
       if (!userSettings.hepsiburadaApiKey || !userSettings.hepsiburadaMerchantId) throw new Error('Hepsiburada settings not configured for user.');
-      await syncHepsiburadaRecentOrders(user, userSettings);
+      await syncHepsiburadaRecentOrdersForUser(user.id);
       break;
     case 'recent': // This is the generic type from the button on settings page
       logger.info(`[Retry:${newSyncId}] Retrying generic 'recent' sync. Will attempt all configured recent syncs.`);
@@ -72,7 +73,7 @@ async function triggerSpecificSync(user, userSettings, syncTypeString: string, n
         anIntegrationWasAttempted = true;
       }
       if (userSettings.hepsiburadaApiKey && userSettings.hepsiburadaMerchantId) {
-        await syncHepsiburadaRecentOrders(user, userSettings);
+        await syncHepsiburadaRecentOrdersForUser(user.id);
         anIntegrationWasAttempted = true;
       }
       if (!anIntegrationWasAttempted) {

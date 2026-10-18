@@ -64,7 +64,7 @@ export function toSavedReply(row: SavedReplyRow): SavedReply {
     id: row.id,
     title: row.title,
     body: row.body,
-    platform: row.platform === 'wix' || row.platform === 'trendyol' ? (row.platform as SavedReplyPlatform) : null,
+    platform: row.platform === 'wix' || row.platform === 'trendyol' || row.platform === 'hepsiburada' ? (row.platform as SavedReplyPlatform) : null,
     usageCount: row.usageCount ?? 0,
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(row.updatedAt).toISOString(),

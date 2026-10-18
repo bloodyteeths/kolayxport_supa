@@ -1466,7 +1466,16 @@
         "clientSecret": "İstemci gizli anahtarı",
         "username": "Kullanıcı adı",
         "password": "Şifre",
-        "companyId": "Firma ID"
+        "companyId": "Firma ID",
+        "merchantId": "Mağaza ID",
+        "serviceKey": "Servis anahtarı"
+      },
+      "uuidFormat": "Mağaza ID'yi Hepsiburada panelinde göründüğü gibi yapıştırın (ör. 069f1e61-8b6f-…)",
+      "hepsiburadaVerify": {
+        "title": "Hepsiburada bu bilgileri kabul etmedi",
+        "credentials": "Mağaza ID ve servis anahtarını kontrol edin. Hepsiburada panelinde Entegratör bilgileri'ni açın, KolayXport'u entegratör olarak ekleyin ve KolayXport için gösterilen servis anahtarını kopyalayın.",
+        "integrator": "Hepsiburada entegrasyonu bizim tarafımızda henüz yapılandırılmadı. Bilgileriniz kaydedildi; destekle iletişime geçin.",
+        "failed": "Bağlantıyı kontrol etmek için Hepsiburada'ya ulaşamadık. Bilgileriniz kaydedildi; birkaç dakika sonra tekrar deneyin."
       }
     },
     "connections": {
@@ -8965,7 +8974,11 @@
       "inReview": "Yanıtınız Trendyol onayını bekliyor.",
       "rejected": "Trendyol yanıtınızı reddetti: {reason}. Yeniden yanıt verebilirsiniz.",
       "rejectedNoReason": "Trendyol yanıtınızı reddetti. Yeniden yanıt verebilirsiniz.",
-      "cannotAnswer": "Bu soru buradan yanıtlanamaz."
+      "cannotAnswer": "Bu soru buradan yanıtlanamaz.",
+      "viewOnHepsiburada": "Hepsiburada'da görüntüle",
+      "answerBy": "{date} tarihine kadar yanıtlayın (Hepsiburada yanıtlanmayan soruları bir iş günü sonra kapatır).",
+      "answeredHepsiburada": "{date} tarihinde Hepsiburada'da yanıtlandı.",
+      "answeredHepsiburadaNoDate": "Hepsiburada'da yanıtlandı."
     },
     "empty": {
       "connect": {
@@ -9009,7 +9022,8 @@
         "unfilled": "Göndermeden önce {tokens} alanını doldurun",
         "alreadyAnswered": "Bu soru Trendyol'da zaten yanıtlanmış",
         "auth": "{name} bağlantısının süresi doldu. Metniniz korundu.",
-        "generic": "Gönderilemedi. Metniniz korundu."
+        "generic": "Gönderilemedi. Metniniz korundu.",
+        "alreadyAnsweredHepsiburada": "Bu soru Hepsiburada'da zaten yanıtlanmış"
       },
       "labelReply": "Yanıt",
       "labelAnswer": "Cevap",
@@ -9025,7 +9039,8 @@
         "title": "Gönderilmemiş yanıtınız silinsin mi?",
         "confirm": "Sil",
         "keep": "Düzenlemeye devam et"
-      }
+      },
+      "placeholderHepsiburada": "Müşteriye cevabınızı yazın"
     },
     "ai": {
       "draft": "AI ile taslak yaz",
@@ -9065,7 +9080,8 @@
       "openListing": "İlanı aç",
       "notInCatalog": "Bu ürün henüz KolayXport'ta yok. Fiyat ve stok için Trendyol ürünlerini yenileyin.",
       "productError": "Ürün bilgileri yüklenemedi",
-      "otherQuestions": "Bu ürünle ilgili {count} soru daha"
+      "otherQuestions": "Bu ürünle ilgili {count} soru daha",
+      "questionOrder": "Sipariş"
     }
   },
   "errors": {
@@ -12906,7 +12922,8 @@
       "fbaNoLabel": "Bu siparişi Amazon gönderir. Etiket gerekmez.",
       "upgradePaid": "Alıcı {upgrade} kargo için ödeme yaptı",
       "trendyolCargo": "Trendyol kargo numarası",
-      "orderedChip": "Sipariş"
+      "orderedChip": "Sipariş",
+      "hepsiburadaCargo": "Hepsiburada kargo barkodu"
     },
     "problem": {
       "addressIncomplete": "Adres eksik: {fields} yok",
@@ -13602,7 +13619,9 @@
         "seo": "Diğer değişiklikler gönderildi ancak arama motoru görünümü güncellenemedi. Tamamlamak için yeniden dene",
         "variants": "Diğer değişiklikler gönderildi ancak bazı varyantlar güncellenemedi. Tamamlamak için yeniden dene",
         "price": "Diğer değişiklikler gönderildi ancak fiyat güncellenemedi. Tamamlamak için yeniden dene"
-      }
+      },
+      "hbFulfilledStock": "Bu ilanın stoğunu Hepsiburada yönetiyor (Hepsiburada depodan gönderim)",
+      "hbRejectedReason": "Hepsiburada bu değişikliği kabul etmedi: {reason}"
     },
     "send": {
       "confirmExcluded": "{count} değişiklik {to} gönderilsin mi? Sizi bekleyenler: {waiting}.",
@@ -15999,7 +16018,8 @@
       "balanceNote": {
         "etsy": "Etsy API’si tutulan bakiye (reserve) miktarını ve serbest bırakılma tarihlerini paylaşmaz; bu yüzden gösterilemiyor. “Güncel bakiye” henüz bankaya geçmemiş toplam tutardır.",
         "amazon": "Bu tutar, henüz ödenmemiş açık mutabakat döneminin toplamıdır (yaklaşık). Amazon API’si gerçek zamanlı bakiye veya rezerve tutulan tutarı paylaşmaz.",
-        "trendyol": "Trendyol API’si güncel bakiye vermez. Bu tutar, vadesi henüz gelmemiş (bankaya aktarılmayı bekleyen) hakedişlerin tahmini toplamıdır."
+        "trendyol": "Trendyol API’si güncel bakiye vermez. Bu tutar, vadesi henüz gelmemiş (bankaya aktarılmayı bekleyen) hakedişlerin tahmini toplamıdır.",
+        "hepsiburada": "Hepsiburada API’si anlık bakiye vermiyor. Bu, senkronlanan dönemde henüz ödenmemiş (“ödenecek” durumundaki) kayıtların tahmini toplamıdır."
       },
       "chart": {
         "title": "Zaman içinde ödemeler"
@@ -16898,6 +16918,97 @@
       "never": "Bağlantıyı istediğiniz an Ayarlar → Yapay zekâ bölümünden kaldırabilirsiniz.",
       "deny": "Vazgeç",
       "allow": "İzin ver"
+    }
+  },
+  "hepsiburada": {
+    "orders": {
+      "printLabel": "Kargo etiketini yazdır",
+      "packAndPrint": "Paketle ve etiketi yazdır",
+      "cargoCompany": "Kargo: {name}",
+      "labelFailed": "Hepsiburada etiketi alınamadı: {reason}"
+    },
+    "listing": {
+      "back": "Hepsiburada ürünleri",
+      "notFound": "Bu ilan Hepsiburada listenizde yok. Ürünleri yenileyip tekrar deneyin.",
+      "loadFailed": "İlan yüklenemedi",
+      "reload": "Önbellekten yenile",
+      "send": "Hepsiburada'ya gönder",
+      "saveDraft": "Taslak olarak kaydet",
+      "discard": "Değişiklikleri at",
+      "noChanges": "Kaydedilecek değişiklik yok",
+      "activate": "Satışa aç",
+      "deactivate": "Satıştan kaldır",
+      "activated": "İlan yeniden satışta",
+      "deactivated": "İlan satıştan kaldırıldı",
+      "toggleFailed": "İlan değiştirilemedi: {reason}",
+      "saved": "Taslak kaydedildi. Göndermeden Hepsiburada'da hiçbir şey değişmez.",
+      "saveFailed": "Taslak kaydedilemedi: {reason}",
+      "sent": "Hepsiburada'ya gönderildi",
+      "sentPending": "Gönderildi. Hepsiburada güncellemeyi işliyor; genellikle birkaç dakika sürer.",
+      "nothingToSend": "Gönderilecek bir şey yok: değerler Hepsiburada ile aynı",
+      "sendFailed": "Hepsiburada değişikliği kabul etmedi",
+      "sendFailedKey": "Hepsiburada değişikliği kabul etmedi. Değerleri kontrol edip tekrar deneyin.",
+      "restricted": "Hepsiburada bu ilanı kısıtladı",
+      "restrictedNoReason": "Hepsiburada bir neden belirtmedi. İlanı Hepsiburada panelinizden kontrol edin.",
+      "lastSendFailed": "Son gönderim başarısız oldu. Değerleri düzeltip tekrar gönderin.",
+      "syncing": "Hepsiburada son güncellemenizi işliyor",
+      "sectionProduct": "Ürün",
+      "sectionSale": "Fiyat ve stok",
+      "hbSku": "Hepsiburada SKU",
+      "merchantSku": "Stok kodunuz",
+      "barcode": "Barkod",
+      "contentNote": "Başlık, fotoğraflar ve özellikler Hepsiburada kataloğunda yönetilir.",
+      "price": "Fiyat",
+      "stock": "Stok",
+      "fulfilledByHb": "Bu stoğu Hepsiburada deposu yönetiyor",
+      "dispatchTime": "Kargoya veriliş süresi",
+      "dispatchTimeHelp": "Paketi kargo firmasına teslim etmeniz gereken gün sayısı",
+      "days": "gün",
+      "maxPerOrder": "Sipariş başına en fazla",
+      "draftNote": "Bu değerler taslak. Hepsiburada'yı güncellemek için gönderin."
+    },
+    "create": {
+      "title": "Yeni Hepsiburada ürünü",
+      "back": "Hepsiburada ürünleri",
+      "mode": "Ekleme yöntemi",
+      "modeImport": "Yeni ürün",
+      "modeFast": "Hepsiburada'da zaten var",
+      "modeImportHelp": "Ürünü Hepsiburada kataloğunda oluşturur. Hepsiburada önce inceler; onaylanınca ürünleriniz arasında görünür.",
+      "modeFastHelp": "Ürün bu barkodla Hepsiburada'da zaten var. Yalnızca fiyat ve stoğunuzu eklersiniz; inceleme gerekmez.",
+      "submit": "İncelemeye gönder",
+      "submitFast": "Ürünü listele",
+      "fillRequired": "Zorunlu alanları doldurun",
+      "submitFailed": "Ürün gönderilemedi: {reason}",
+      "fieldInvalid": "Bu alanı kontrol edin",
+      "importPending": "Hepsiburada ürünü inceliyor",
+      "importDone": "Hepsiburada ürünü kabul etti. Bir sonraki yenilemeden sonra ürünleriniz arasında görünecek.",
+      "importFailed": "Hepsiburada ürünü reddetti",
+      "fastSent": "Hepsiburada'ya gönderildi",
+      "fastDone": "Listelendi. Bir sonraki yenilemeden sonra ürünleriniz arasında görünecek.",
+      "sectionCategory": "Kategori",
+      "category": "Kategori",
+      "categoryHelp": "En uygun alt kategoriyi seçin",
+      "categoryPlaceholder": "Kategori ara…",
+      "noCategories": "Eşleşen kategori yok",
+      "attributesLoading": "Kategori özellikleri yükleniyor…",
+      "attributesFailed": "Kategori özellikleri yüklenemedi: {reason}",
+      "choose": "Seçin",
+      "sectionProduct": "Ürün",
+      "merchantSku": "Stok kodunuz",
+      "merchantSkuHelp": "Kendi stok kodunuz; mağazanızda benzersiz olmalı",
+      "barcode": "Barkod",
+      "productTitle": "Ürün adı",
+      "description": "Açıklama",
+      "brand": "Marka",
+      "images": "Fotoğraf bağlantıları",
+      "imagesHelp": "En fazla 5 https bağlantısı, her satıra bir tane. İlki ana fotoğraftır.",
+      "sectionSale": "Fiyat ve stok",
+      "price": "Fiyat",
+      "stock": "Stok",
+      "vatRate": "KDV oranı",
+      "warranty": "Garanti",
+      "months": "ay",
+      "weight": "Ağırlık"
     }
   }
 }

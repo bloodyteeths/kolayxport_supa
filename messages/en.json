@@ -1548,7 +1548,16 @@
         "clientSecret": "Client secret",
         "username": "Username",
         "password": "Password",
-        "companyId": "Company ID"
+        "companyId": "Company ID",
+        "merchantId": "Store ID (Mağaza ID)",
+        "serviceKey": "Service key (Servis Anahtarı)"
+      },
+      "uuidFormat": "Paste the Store ID exactly as shown in the Hepsiburada panel (e.g. 069f1e61-8b6f-…)",
+      "hepsiburadaVerify": {
+        "title": "Hepsiburada didn't accept these details",
+        "credentials": "Check the Store ID and service key. In the Hepsiburada panel, open Entegratör bilgileri, add KolayXport as an integrator, then copy the service key it shows for KolayXport.",
+        "integrator": "The Hepsiburada integration isn't configured on our side yet. Your details are saved; contact support.",
+        "failed": "We couldn't reach Hepsiburada to check the connection. Your details are saved; try again in a few minutes."
       }
     },
     "connections": {
@@ -8965,7 +8974,11 @@
       "inReview": "Your answer is waiting for Trendyol's approval.",
       "rejected": "Trendyol rejected your answer: {reason}. You can answer again.",
       "rejectedNoReason": "Trendyol rejected your answer. You can answer again.",
-      "cannotAnswer": "This question can't be answered here."
+      "cannotAnswer": "This question can't be answered here.",
+      "viewOnHepsiburada": "View on Hepsiburada",
+      "answerBy": "Answer by {date} (Hepsiburada closes unanswered questions after one business day).",
+      "answeredHepsiburada": "Answered {date} on Hepsiburada.",
+      "answeredHepsiburadaNoDate": "Answered on Hepsiburada."
     },
     "empty": {
       "connect": {
@@ -9009,7 +9022,8 @@
         "unfilled": "Replace {tokens} before sending",
         "alreadyAnswered": "This question already has an answer on Trendyol",
         "auth": "{name} connection expired. Your text is kept.",
-        "generic": "Couldn't send. Your text is kept."
+        "generic": "Couldn't send. Your text is kept.",
+        "alreadyAnsweredHepsiburada": "This question already has an answer on Hepsiburada"
       },
       "labelReply": "Reply",
       "labelAnswer": "Answer",
@@ -9025,7 +9039,8 @@
         "title": "Discard your unsent reply?",
         "confirm": "Discard",
         "keep": "Keep editing"
-      }
+      },
+      "placeholderHepsiburada": "Write your answer to the customer"
     },
     "ai": {
       "draft": "Draft with AI",
@@ -9065,7 +9080,8 @@
       "openListing": "Open listing",
       "notInCatalog": "This product isn't in KolayXport yet. Refresh Trendyol products to see price and stock.",
       "productError": "Couldn't load product details",
-      "otherQuestions": "{count, plural, one {# other question about this product} other {# other questions about this product}}"
+      "otherQuestions": "{count, plural, one {# other question about this product} other {# other questions about this product}}",
+      "questionOrder": "Order"
     }
   },
   "errors": {
@@ -12906,7 +12922,8 @@
       "fbaNoLabel": "Amazon ships this order. No label needed.",
       "upgradePaid": "Buyer paid for {upgrade} shipping",
       "trendyolCargo": "Trendyol cargo number",
-      "orderedChip": "Ordered"
+      "orderedChip": "Ordered",
+      "hepsiburadaCargo": "Hepsiburada cargo barcode"
     },
     "problem": {
       "addressIncomplete": "Address incomplete: {fields} missing",
@@ -13602,7 +13619,9 @@
         "seo": "The other changes were sent, but the search engine listing couldn't be updated. Retry to finish",
         "variants": "The other changes were sent, but some variants couldn't be updated. Retry to finish",
         "price": "The other changes were sent, but the price couldn't be updated. Retry to finish"
-      }
+      },
+      "hbFulfilledStock": "Hepsiburada manages the stock of this listing (fulfilled by Hepsiburada)",
+      "hbRejectedReason": "Hepsiburada rejected this change: {reason}"
     },
     "send": {
       "confirmExcluded": "Send {count, plural, one {# change} other {# changes}} to {to}? Waiting for you: {waiting}.",
@@ -15999,7 +16018,8 @@
       "balanceNote": {
         "etsy": "Etsy’s API does not expose reserve (held) amounts or release dates, so they can’t be shown. “Current balance” is the total not yet disbursed to your bank.",
         "amazon": "This is the total of the open, not-yet-paid settlement period (approximate). Amazon’s API does not expose a real-time balance or reserve amount.",
-        "trendyol": "Trendyol’s API does not expose a live balance. This is the estimated total of matured-but-not-yet-paid earnings (pending payout)."
+        "trendyol": "Trendyol’s API does not expose a live balance. This is the estimated total of matured-but-not-yet-paid earnings (pending payout).",
+        "hepsiburada": "Hepsiburada’s API does not expose a live balance. This is the estimated total of records not yet paid out (status “will be paid”) in the synced period."
       },
       "chart": {
         "title": "Payouts over time"
@@ -16898,6 +16918,97 @@
       "never": "You can remove the connection any time in Settings → AI.",
       "deny": "Cancel",
       "allow": "Allow"
+    }
+  },
+  "hepsiburada": {
+    "orders": {
+      "printLabel": "Print cargo label",
+      "packAndPrint": "Pack & print label",
+      "cargoCompany": "Cargo: {name}",
+      "labelFailed": "Couldn't get the Hepsiburada label: {reason}"
+    },
+    "listing": {
+      "back": "Hepsiburada listings",
+      "notFound": "This listing isn't in your Hepsiburada list. Refresh listings and try again.",
+      "loadFailed": "Couldn't load the listing",
+      "reload": "Reload from cache",
+      "send": "Send to Hepsiburada",
+      "saveDraft": "Save as draft",
+      "discard": "Discard changes",
+      "noChanges": "No changes to save",
+      "activate": "Put on sale",
+      "deactivate": "Take off sale",
+      "activated": "Listing is on sale again",
+      "deactivated": "Listing taken off sale",
+      "toggleFailed": "Couldn't change the listing: {reason}",
+      "saved": "Draft saved. Nothing changes on Hepsiburada until you send it.",
+      "saveFailed": "Couldn't save the draft: {reason}",
+      "sent": "Sent to Hepsiburada",
+      "sentPending": "Sent. Hepsiburada is processing the update; it usually takes a few minutes.",
+      "nothingToSend": "Nothing to send: the values already match Hepsiburada",
+      "sendFailed": "Hepsiburada didn't accept the change",
+      "sendFailedKey": "Hepsiburada didn't accept the change. Check the values and try again.",
+      "restricted": "Hepsiburada restricted this listing",
+      "restrictedNoReason": "Hepsiburada didn't give a reason. Check the listing in your Hepsiburada panel.",
+      "lastSendFailed": "The last send failed. Fix the values and send again.",
+      "syncing": "Hepsiburada is processing your last update",
+      "sectionProduct": "Product",
+      "sectionSale": "Price and stock",
+      "hbSku": "Hepsiburada SKU",
+      "merchantSku": "Your SKU",
+      "barcode": "Barcode",
+      "contentNote": "Title, photos and attributes are managed in Hepsiburada's catalog.",
+      "price": "Price",
+      "stock": "Stock",
+      "fulfilledByHb": "Hepsiburada's warehouse manages this stock",
+      "dispatchTime": "Dispatch time",
+      "dispatchTimeHelp": "Days until you hand the package to the cargo company",
+      "days": "days",
+      "maxPerOrder": "Max per order",
+      "draftNote": "These values are a draft. Send them to update Hepsiburada."
+    },
+    "create": {
+      "title": "New Hepsiburada product",
+      "back": "Hepsiburada listings",
+      "mode": "How to add",
+      "modeImport": "New product",
+      "modeFast": "Already on Hepsiburada",
+      "modeImportHelp": "Creates the product in Hepsiburada's catalog. Hepsiburada reviews it first; it appears in your listings once approved.",
+      "modeFastHelp": "The product already exists on Hepsiburada with this barcode. You only add your price and stock; no review needed.",
+      "submit": "Send for review",
+      "submitFast": "List the product",
+      "fillRequired": "Fill in the required fields",
+      "submitFailed": "Couldn't send the product: {reason}",
+      "fieldInvalid": "Check this field",
+      "importPending": "Hepsiburada is reviewing the product",
+      "importDone": "Hepsiburada accepted the product. It will appear in your listings after the next refresh.",
+      "importFailed": "Hepsiburada rejected the product",
+      "fastSent": "Sent to Hepsiburada",
+      "fastDone": "Listed. It will appear in your listings after the next refresh.",
+      "sectionCategory": "Category",
+      "category": "Category",
+      "categoryHelp": "Pick the most specific category",
+      "categoryPlaceholder": "Search categories…",
+      "noCategories": "No matching category",
+      "attributesLoading": "Loading category attributes…",
+      "attributesFailed": "Couldn't load category attributes: {reason}",
+      "choose": "Choose",
+      "sectionProduct": "Product",
+      "merchantSku": "Your SKU",
+      "merchantSkuHelp": "Your own stock code; it must be unique in your store",
+      "barcode": "Barcode",
+      "productTitle": "Product name",
+      "description": "Description",
+      "brand": "Brand",
+      "images": "Photo links",
+      "imagesHelp": "Up to 5 https links, one per line. The first is the main photo.",
+      "sectionSale": "Price and stock",
+      "price": "Price",
+      "stock": "Stock",
+      "vatRate": "VAT rate",
+      "warranty": "Warranty",
+      "months": "months",
+      "weight": "Weight"
     }
   }
 }

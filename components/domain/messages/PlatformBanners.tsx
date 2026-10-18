@@ -12,7 +12,7 @@ import type { MessagePlatform, PlatformError, PlatformErrorCode } from '@/types/
 export const SETTINGS_CONNECTIONS_HREF = '/ayarlar?tab=connections';
 export const SETTINGS_API_KEYS_HREF = '/ayarlar?tab=apiKeys';
 
-/** Where the seller fixes a connection: Wix is an OAuth connection, Trendyol an API key. */
+/** Where the seller fixes a connection: Wix is an OAuth connection, Trendyol / Hepsiburada API keys. */
 export function settingsHrefFor(platform: MessagePlatform): string {
   return platform === 'wix' ? SETTINGS_CONNECTIONS_HREF : SETTINGS_API_KEYS_HREF;
 }

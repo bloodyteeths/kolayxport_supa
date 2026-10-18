@@ -51,3 +51,28 @@ export const ORDER_CONTEXT_LIMIT = 5;
 
 /** In-memory store bound per user while the `InboxThread` table is not deployed (BR-4 guard). */
 export const MEMORY_STORE_MAX_ROWS_PER_USER = 1000;
+
+/**
+ * Hepsiburada "Satıcıya Sor" question statuses. Responses carry the name; the list `status=` query takes the
+ * numeric code (OpenAPI `IssueEsStatus`: 1 WaitingForAnswer, 2 Answered, 3 Rejected — the seller reported the
+ * question, 4 AutoClosed — unanswered past the deadline, 7 contacted). Only WaitingForAnswer needs a reply;
+ * unlike Trendyol, HB "Rejected" is not a rejected answer.
+ */
+export const HEPSIBURADA_STATUS = {
+  waiting: 'WaitingForAnswer',
+  answered: 'Answered',
+  rejected: 'Rejected',
+  autoClosed: 'AutoClosed',
+} as const;
+
+export const HEPSIBURADA_STATUS_CODE = {
+  waiting: 1,
+  answered: 2,
+  rejected: 3,
+  autoClosed: 4,
+  contacted: 7,
+} as const;
+
+/** HB answer: multipart `Answer`, max 2000 characters (Satıcıya Sor docs). */
+export const HEPSIBURADA_ANSWER_MIN = 1;
+export const HEPSIBURADA_ANSWER_MAX = 2000;

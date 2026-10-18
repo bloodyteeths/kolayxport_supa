@@ -176,6 +176,7 @@ const SCHEDULE_ENDPOINT: Record<ScheduleMarketplace, string> = {
   trendyol: '/api/catalog-drafts',
   wix: '/api/catalog-drafts',
   shopify: '/api/catalog-drafts',
+  hepsiburada: '/api/catalog-drafts',
 };
 
 /**

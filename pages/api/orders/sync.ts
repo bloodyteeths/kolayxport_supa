@@ -4,12 +4,13 @@ import { logger } from '@/lib/logger';
 import { syncAllOrders } from '@/lib/orderSync';
 import { getAuthUser } from '@/lib/auth';
 import { decryptIfNeeded } from '@/lib/crypto/credentials';
-import { isTrendyolEnabled, isWixEnabled, isShopifyEnabled } from '@/lib/config';
+import { isTrendyolEnabled, isWixEnabled, isShopifyEnabled, isHepsiburadaEnabled } from '@/lib/config';
 import { withUsageLimiter } from '@/lib/middleware/withUsageLimiter';
 import { syncWixRecentOrdersForUser } from '@/lib/sync/wix';
 import { syncShopifyRecentOrdersForUser } from '@/lib/sync/shopify';
 // Import Trendyol sync function from auto-sync script
 import { syncTrendyolRecentOrdersForUser } from '@/lib/sync/trendyol';
+import { syncHepsiburadaRecentOrdersForUser } from '@/lib/hepsiburada/orderSync';
 
 async function handler(
   req: NextApiRequest,
@@ -44,6 +45,7 @@ async function handler(
     const hasVeeqo = !!finalVeeqoApiKey;
     const hasShippo = !!finalShippoToken;
     const hasTrendyol = !!(finalTrendyolApiKey && finalTrendyolApiSecret && finalTrendyolSupplierId) && isTrendyolEnabled(userId);
+    const hasHepsiburada = !!(userSettings?.hepsiburadaMerchantId && userSettings?.hepsiburadaApiKey) && isHepsiburadaEnabled(userId);
     // Check both WixSite table and Credential table for Wix credentials
     const wixSite = await prisma.wixSite.findFirst({ where: { userId, isActive: true } });
     const hasWix = !!(wixSite || (userSettings?.wixInstanceId && userSettings?.wixSiteId)) && isWixEnabled(userId);
@@ -54,7 +56,7 @@ async function handler(
       : 0;
     const hasShopify = shopifyShopCount > 0;
 
-    if (!hasVeeqo && !hasShippo && !hasTrendyol && !hasWix && !hasShopify) {
+    if (!hasVeeqo && !hasShippo && !hasTrendyol && !hasHepsiburada && !hasWix && !hasShopify) {
       logger.error('No integration credentials found', undefined, { userId, operation: 'order-sync' });
       return res.status(400).json({ error: 'No integration credentials found. Please check your settings.' });
     }
@@ -128,6 +130,26 @@ async function handler(
                   failedOrders: 1,
                   errors: [{ orderId: 'trendyol_sync', error: error.message }]
                 };
+              }
+            })()
+          );
+        }
+
+        if (hasHepsiburada) {
+          syncPromises.push(
+            (async () => {
+              try {
+                const m = await syncHepsiburadaRecentOrdersForUser(userId);
+                return {
+                  newOrders: 0,
+                  updatedOrders: Number(m?.successfulOrders ?? 0) || 0,
+                  skippedOrders: 0,
+                  failedOrders: Number(m?.failedOrders ?? 0) || 0,
+                  errors: [],
+                };
+              } catch (error: any) {
+                logger.error(`[Fast Sync] Hepsiburada sync failed for user ${userId}:`, error);
+                return { newOrders: 0, updatedOrders: 0, skippedOrders: 0, failedOrders: 1, errors: [{ orderId: 'hepsiburada_sync', error: error.message }] };
               }
             })()
           );

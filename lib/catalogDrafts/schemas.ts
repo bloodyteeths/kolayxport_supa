@@ -22,7 +22,7 @@
 // Marketplaces and statuses
 // ---------------------------------------------------------------------------
 
-export const CATALOG_MARKETPLACES = ['trendyol', 'wix', 'shopify'] as const;
+export const CATALOG_MARKETPLACES = ['trendyol', 'wix', 'shopify', 'hepsiburada'] as const;
 export type CatalogMarketplace = (typeof CATALOG_MARKETPLACES)[number];
 
 export function isCatalogMarketplace(v: unknown): v is CatalogMarketplace {
@@ -117,6 +117,11 @@ export type CatalogFieldPatch = {
   weightUnit?: ShopifyWeightUnit;
   seo?: ShopifySeo;
   variants?: ShopifyVariantEdit[];
+  // Hepsiburada (listing-level: price/stock/dispatch go through the async inventory upload)
+  /** Days to hand the package to cargo (Kargoya veriliş süresi). */
+  dispatchTime?: number;
+  /** Max units per order. */
+  maxPurchasableQuantity?: number;
 };
 export type CatalogFieldKey = keyof CatalogFieldPatch;
 
@@ -131,6 +136,9 @@ export const ALLOWED_FIELDS: Record<CatalogMarketplace, CatalogFieldKey[]> = {
     'title', 'price', 'quantity', 'tags', 'status', 'description', 'vendor', 'productType', 'compareAtPrice', 'sku',
     'weight', 'weightUnit', 'seo', 'variants', 'images',
   ],
+  // Hepsiburada listings: content lives in HB's catalog (changed through a review ticket), so v1 stages only the
+  // listing values the inventory upload takes.
+  hepsiburada: ['price', 'quantity', 'dispatchTime', 'maxPurchasableQuantity'],
 };
 
 /** Input aliases → canonical key. */
@@ -138,6 +146,7 @@ export const FIELD_ALIASES: Record<CatalogMarketplace, Record<string, CatalogFie
   trendyol: { salePrice: 'price' },
   wix: { name: 'title' },
   shopify: { body_html: 'description', product_type: 'productType', compare_at_price: 'compareAtPrice' },
+  hepsiburada: { availableStock: 'quantity', maximumPurchasableQuantity: 'maxPurchasableQuantity' },
 };
 
 /** Canonical key for an input key (alias resolved), or the key itself. */
@@ -180,6 +189,8 @@ export const ALLOWED_ACTIONS: Record<CatalogMarketplace, CatalogQueuedActionType
   trendyol: ['archive', 'unarchive', 'create'],
   wix: ['delete', 'create'],
   shopify: ['delete', 'create'],
+  // Products are created through HB's catalog import (pages/app/hepsiburada-urunler/new.tsx), not a staged draft.
+  hepsiburada: [],
 };
 
 /** Trendyol create-only values (marketplace-editors §5.1, §6.1). Completeness is checked at send. */
@@ -329,8 +340,8 @@ export function isCatalogDraftError(err: unknown): err is CatalogDraftError {
 // Limits
 // ---------------------------------------------------------------------------
 
-export const TITLE_MAX: Record<CatalogMarketplace, number> = { trendyol: 100, wix: 80, shopify: 255 };
-export const DESCRIPTION_MAX: Record<CatalogMarketplace, number> = { trendyol: 30_000, wix: 8_000, shopify: 100_000 };
+export const TITLE_MAX: Record<CatalogMarketplace, number> = { trendyol: 100, wix: 80, shopify: 255, hepsiburada: 200 };
+export const DESCRIPTION_MAX: Record<CatalogMarketplace, number> = { trendyol: 30_000, wix: 8_000, shopify: 100_000, hepsiburada: 65_000 };
 export const LIMITS = {
   trendyolImages: 8,
   trendyolAttributes: 100,
@@ -733,6 +744,18 @@ export function validateFieldPatch(
       case 'productType': set.productType = parseText('productType', raw, LIMITS.shopifyText, { allowEmpty: true }); break;
       case 'seo': set.seo = parseSeo(raw); break;
       case 'variants': set.variants = parseVariants(raw); break;
+      case 'dispatchTime': {
+        const n = toNumber(raw);
+        if (!Number.isInteger(n) || n < 0 || n > 30) throw new CatalogDraftError('INVALID_INPUT', 'Invalid dispatch time', { field: 'dispatchTime' });
+        set.dispatchTime = n;
+        break;
+      }
+      case 'maxPurchasableQuantity': {
+        const n = toNumber(raw);
+        if (!Number.isInteger(n) || n < 1 || n > 10_000) throw new CatalogDraftError('INVALID_INPUT', 'Invalid max purchasable quantity', { field: 'maxPurchasableQuantity' });
+        set.maxPurchasableQuantity = n;
+        break;
+      }
     }
     const i = remove.indexOf(k);
     if (i >= 0) remove.splice(i, 1);
@@ -751,6 +774,7 @@ export function validateCreatePayload(marketplace: CatalogMarketplace, raw: unkn
     trendyol: ['barcode', 'productMainId', 'brandId', 'categoryId', 'cargoCompanyId', 'shipmentAddressId', 'returningAddressId'],
     wix: ['productType'],
     shopify: [],
+    hepsiburada: [],
   };
   for (const [key, v] of Object.entries(raw)) {
     if (!allowed[marketplace].includes(key)) throw new CatalogDraftError('FIELD_NOT_SUPPORTED', `Create field "${key}" is not supported`, { field: key });
@@ -824,7 +848,7 @@ export function mergeQueuedActions(existing: CatalogQueuedAction[], incoming: Ca
 // ---------------------------------------------------------------------------
 
 const MONEY_KEYS = new Set(['price', 'listPrice', 'compareAtPrice']);
-const INT_KEYS = new Set(['quantity', 'vatRate']);
+const INT_KEYS = new Set(['quantity', 'vatRate', 'dispatchTime', 'maxPurchasableQuantity']);
 const SET_KEYS = new Set(['tags', 'collectionIds']);
 
 /** Stable comparable form of a value for one key (null = empty / unknown). */

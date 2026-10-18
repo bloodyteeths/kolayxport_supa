@@ -16,13 +16,14 @@ import { ebayAdapter } from '@/lib/listings/adapters/ebay';
 import { trendyolAdapter } from '@/lib/listings/adapters/trendyol';
 import { wixAdapter } from '@/lib/listings/adapters/wix';
 import { shopifyAdapter } from '@/lib/listings/adapters/shopify';
+import { hepsiburadaAdapter } from '@/lib/listings/adapters/hepsiburada';
 import { classifyOrderStatus } from '@/lib/orders/orderStatus';
 import { sanitizeEtsyBatchFields } from '@/lib/bulk/batchStage';
 import { assertShopOwnership, getEtsyAccessToken, upsertDraftPatch as stageEtsy } from '@/lib/etsy/draftService';
 import { upsertDraftPatch as stageEbay } from '@/lib/ebay/draftService';
 import { mcpBaseUrl, type McpAuth, type McpScope } from './tokens';
 
-const ADAPTERS: Record<ListingMarketplace, ListingsAdapter> = { etsy: etsyAdapter, ebay: ebayAdapter, trendyol: trendyolAdapter, wix: wixAdapter, shopify: shopifyAdapter };
+const ADAPTERS: Record<ListingMarketplace, ListingsAdapter> = { etsy: etsyAdapter, ebay: ebayAdapter, trendyol: trendyolAdapter, wix: wixAdapter, shopify: shopifyAdapter, hepsiburada: hepsiburadaAdapter };
 const MARKETPLACES = Object.keys(ADAPTERS) as ListingMarketplace[];
 
 export class ToolError extends Error {

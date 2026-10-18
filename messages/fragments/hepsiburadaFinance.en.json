@@ -1,0 +1,9 @@
+{
+  "reports": {
+    "payouts": {
+      "balanceNote": {
+        "hepsiburada": "Hepsiburada’s API does not expose a live balance. This is the estimated total of records not yet paid out (status “will be paid”) in the synced period."
+      }
+    }
+  }
+}

@@ -2,8 +2,8 @@
 // `pages/api/messages/saved-replies.ts`, `lib/hooks/useSavedReplies.ts` and the saved-reply components.
 // Pure and client-safe (no Prisma import), so the browser bundle can use the same validation as the server.
 
-export type SavedReplyPlatform = 'wix' | 'trendyol';
-export const SAVED_REPLY_PLATFORMS: readonly SavedReplyPlatform[] = ['wix', 'trendyol'];
+export type SavedReplyPlatform = 'wix' | 'trendyol' | 'hepsiburada';
+export const SAVED_REPLY_PLATFORMS: readonly SavedReplyPlatform[] = ['wix', 'trendyol', 'hepsiburada'];
 
 /** Wire shape of one saved reply (GET list, POST/PATCH result). Dates are ISO strings. */
 export interface SavedReply {
@@ -57,7 +57,7 @@ export interface SavedReplyInput {
 export type ValidationResult<T> = { ok: true; value: T } | { ok: false; error: SavedReplyErrorBody };
 
 export function isSavedReplyPlatform(v: unknown): v is SavedReplyPlatform {
-  return v === 'wix' || v === 'trendyol';
+  return v === 'wix' || v === 'trendyol' || v === 'hepsiburada';
 }
 
 function checkTitle(raw: unknown): ValidationResult<string> {

@@ -611,7 +611,8 @@ export function toOrderRow(order: ApiOrder, ctx: ToOrderRowsContext = {}): Order
 
   const customer = pick(order.customerName);
   const buyerName = shipTo.name || (customer && !NAME_HIDDEN.test(customer) ? customer : '');
-  const cargo = isTrendyol && raw.cargoTrackingNumber != null && String(raw.cargoTrackingNumber).trim() ? String(raw.cargoTrackingNumber).trim() : null;
+  const isHepsiburada = store.marketplace === 'hepsiburada';
+  const cargo = (isTrendyol || isHepsiburada) && raw.cargoTrackingNumber != null && String(raw.cargoTrackingNumber).trim() ? String(raw.cargoTrackingNumber).trim() : null;
   const tracking = summarizeTracking(order, isEtsyStore);
 
   return {
@@ -639,6 +640,11 @@ export function toOrderRow(order: ApiOrder, ctx: ToOrderRowsContext = {}): Order
     label: hasLabel ? getLatestLabel(order) : null,
     labelFailure: failure,
     marketplaceCargoNumber: cargo,
+    hepsiburada: isHepsiburada ? {
+      packageNumber: raw.packageNumber ? String(raw.packageNumber) : null,
+      cargoCompany: raw.cargoProviderName ? String(raw.cargoProviderName) : null,
+      canPack: Array.isArray(raw.hbLines) && raw.hbLines.some((l: any) => l?.state === 'open' && !l?.packageNumber),
+    } : null,
     trackingSubmission: tracking,
     carrierCost,
     isFBA,

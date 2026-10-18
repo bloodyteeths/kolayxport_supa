@@ -1,0 +1,19 @@
+{
+  "messages": {
+    "composer": {
+      "placeholderHepsiburada": "Write your answer to the customer",
+      "errors": {
+        "alreadyAnsweredHepsiburada": "This question already has an answer on Hepsiburada"
+      }
+    },
+    "thread": {
+      "viewOnHepsiburada": "View on Hepsiburada",
+      "answerBy": "Answer by {date} (Hepsiburada closes unanswered questions after one business day).",
+      "answeredHepsiburada": "Answered {date} on Hepsiburada.",
+      "answeredHepsiburadaNoDate": "Answered on Hepsiburada."
+    },
+    "context": {
+      "questionOrder": "Order"
+    }
+  }
+}

@@ -1,6 +1,6 @@
 // POST /api/messages/draft-reply — messages spec §6.3 (group G2). "Draft with AI" for the inbox composer.
 //
-// Request  { platform: 'wix' | 'trendyol', id: string }   (id = Wix conversationId | Trendyol questionId)
+// Request  { platform: 'wix' | 'trendyol' | 'hepsiburada', id: string }   (id = Wix conversationId | Trendyol questionId | Hepsiburada issue number)
 // 200      { reply: string, missing: ('tracking'|'order'|'stock'|'delivery'|'size'|'policy')[] }
 // 400 { code: 'badRequest' | 'credentials' }   401 { code: 'unauthorized' }   405 { code: 'methodNotAllowed' }
 // 404 { code: 'notFound' }   409 { code: 'alreadyAnswered' | 'notAnswerable' }   429 { code: 'rateLimited' }
@@ -15,9 +15,11 @@ import { getAuthUser } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { createWixClient } from '@/lib/integrations/wixClient';
 import { createTrendyolClient } from '@/lib/integrations/trendyolApiClient';
-import { isWixEnabled, isTrendyolEnabled } from '@/lib/config';
+import { isWixEnabled, isTrendyolEnabled, isHepsiburadaEnabled } from '@/lib/config';
+import { createHepsiburadaClient } from '@/lib/hepsiburada/client';
 import { logger } from '@/lib/logger';
 import {
+  buildHepsiburadaDraftContext,
   buildTrendyolDraftContext,
   buildWixDraftContext,
   draftFromContext,
@@ -25,6 +27,7 @@ import {
   takeDraftRateLimit,
   type DraftContext,
   type DraftDb,
+  type DraftPlatform,
   type DraftReplyErrorCode,
 } from '@/lib/messages/draftReply';
 
@@ -35,8 +38,10 @@ function fail(res: NextApiResponse, status: number, code: DraftReplyErrorCode) {
 }
 
 /** Shared AI client (lib/ai): the seller's preferences for this marketplace, follow-up ("make it shorter"), usage log. */
-async function geminiGenerate(prompt: string, ctx: { userId: string; platform: 'wix' | 'trendyol'; refine: AiRefine | null }): Promise<string> {
-  const response = await getAiModel({ feature: `messages.draft_reply.${ctx.platform}`, userId: ctx.userId, marketplace: ctx.platform, refine: ctx.refine, temperature: 0.4 }).generateContent(prompt);
+async function geminiGenerate(prompt: string, ctx: { userId: string; platform: DraftPlatform; refine: AiRefine | null }): Promise<string> {
+  // AI preferences have no Hepsiburada key yet (lib/ai/preferences.ts): its drafts use the seller's "all" preferences.
+  const marketplace = ctx.platform === 'hepsiburada' ? 'all' : ctx.platform;
+  const response = await getAiModel({ feature: `messages.draft_reply.${ctx.platform}`, userId: ctx.userId, marketplace, refine: ctx.refine, temperature: 0.4 }).generateContent(prompt);
   return response.response.text();
 }
 
@@ -52,7 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const platform = req.body?.platform;
     const id = typeof req.body?.id === 'string' ? req.body.id.trim() : '';
-    if ((platform !== 'wix' && platform !== 'trendyol') || !id || id.length > 200) return fail(res, 400, 'badRequest');
+    if ((platform !== 'wix' && platform !== 'trendyol' && platform !== 'hepsiburada') || !id || id.length > 200) return fail(res, 400, 'badRequest');
 
     if (!takeDraftRateLimit(user.id)) return fail(res, 429, 'rateLimited');
     if (!process.env.GEMINI_API_KEY) return fail(res, 503, 'aiNotConfigured');
@@ -71,6 +76,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ctx = await buildTrendyolDraftContext({
           userId, questionId: id, trendyol: createTrendyolClient(credential), db, shopName: null,
         });
+      } else if (platform === 'hepsiburada') {
+        const hb = isHepsiburadaEnabled(userId) ? createHepsiburadaClient(credential) : null;
+        if (!hb) return fail(res, 400, 'credentials');
+        ctx = await buildHepsiburadaDraftContext({ userId, issueNumber: id, hepsiburada: hb, db, shopName: null });
       } else {
         const wixSite = await prisma.wixSite.findFirst({ where: { userId, isActive: true } });
         const wixCred = wixSite

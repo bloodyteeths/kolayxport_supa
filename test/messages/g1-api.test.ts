@@ -5,7 +5,7 @@ const orderFindMany = vi.fn();
 const productFindFirst = vi.fn();
 vi.mock('@/lib/auth', () => ({ getAuthUser: (...a: any[]) => authUser(...a) }));
 vi.mock('@/lib/logger', () => ({ logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() } }));
-vi.mock('@/lib/config', () => ({ isWixEnabled: () => true, isTrendyolEnabled: () => true }));
+vi.mock('@/lib/config', () => ({ isWixEnabled: () => true, isTrendyolEnabled: () => true, isHepsiburadaEnabled: () => false }));
 vi.mock('@/lib/prisma', () => ({
   default: {
     credential: { findUnique: async () => ({ trendyolSupplierId: 'S1', wixInstanceId: 'I1', wixSiteId: 'W1' }), update: async () => ({}) },
@@ -59,7 +59,7 @@ describe('GET list', () => {
     expect(res.body.conversations.map((c: any) => `${c.platform}:${c.id}`)).toEqual(['wix:conv-c1', 'trendyol:1', 'trendyol:3']);
     const [w] = res.body.conversations;
     expect(w).toMatchObject({ needsReply: true, unread: true, lastMessageText: 'When will it ship?', lastMessageAt: '2026-10-15T09:56:00.000Z', customerName: 'Mehmet', contactId: 'c1' });
-    expect(decodeCursor(res.body.nextCursor)).toEqual({ t: 1, w: 'wix-next' });
+    expect(decodeCursor(res.body.nextCursor)).toEqual({ t: 1, w: 'wix-next', h: null });
     expect(res.body).toMatchObject({ enabledPlatforms: ['trendyol', 'wix'], platformErrors: [], readStateStore: 'memory', unansweredCount: 3, pageSize: 30 });
     expect(typeof res.body.fetchedAt).toBe('string');
     expect(trendyol.getQuestions).toHaveBeenCalledWith({ status: 'WAITING_FOR_ANSWER', page: 0, size: 30 });
@@ -77,7 +77,7 @@ describe('GET list', () => {
   it('markSeen clears unread, seen:false restores it; Wix counts come from the cache', async () => {
     await call('GET', { action: 'list', view: 'all' });
     const counts = await call('GET', { action: 'counts' });
-    expect(counts.body).toEqual({ wix: 1, trendyol: 7, total: 8 });
+    expect(counts.body).toEqual({ wix: 1, trendyol: 7, hepsiburada: 0, total: 8 });
     expect(wix.queryContacts).toHaveBeenCalledTimes(1); // counts made no Wix call
 
     const seen = await call('POST', { action: 'markSeen' }, { platform: 'wix', id: 'conv-c1' });
@@ -107,7 +107,7 @@ describe('GET list', () => {
     wix.queryContacts.mockRejectedValueOnce(new Error('Wix API 429: slow down'));
     const res = await call('GET', { action: 'list', view: 'all', cursor: encodeCursor({ t: 2, w: 'wix-p2' })! });
     expect(res.body.platformErrors.map((e: any) => `${e.platform}:${e.code}`).sort()).toEqual(['trendyol:unavailable', 'wix:rateLimited']);
-    expect(decodeCursor(res.body.nextCursor)).toEqual({ t: 2, w: 'wix-p2' });
+    expect(decodeCursor(res.body.nextCursor)).toEqual({ t: 2, w: 'wix-p2', h: null });
 
     // Auth / permission errors end pagination for that source.
     wix.queryContacts.mockRejectedValueOnce(new Error('Wix API 403: forbidden'));
@@ -138,7 +138,7 @@ describe('GET counts', () => {
   it('Trendyol badge counts waiting questions plus rejected answers, like the Needs reply view', async () => {
     trendyol.getQuestions.mockImplementation(async ({ status }: any) => ({ content: [], totalElements: status === 'REJECTED' ? 2 : 7 }));
     const res = await call('GET', { action: 'counts' });
-    expect(res.body).toEqual({ wix: 0, trendyol: 9, total: 9 });
+    expect(res.body).toEqual({ wix: 0, trendyol: 9, hepsiburada: 0, total: 9 });
   });
 
   it('a failing rejected count does not drop the waiting count', async () => {

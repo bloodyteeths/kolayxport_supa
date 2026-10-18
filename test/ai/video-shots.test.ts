@@ -42,7 +42,7 @@ describe('each product gets its own prompt', () => {
     const p = directVideo(dir('book', 'orbit'));
     expect(p).toMatch(/readable/);
     expect(p).toMatch(/pages are never flipped/);
-    expect(p).toMatch(/about 15 degrees/); // a small arc keeps the cover toward the camera
+    expect(p).toMatch(/about 10 degrees/); // a small arc keeps the cover toward the camera
     expect(negativePrompt(dir('book', 'orbit'))).toMatch(/flipping pages/);
     expect(p).toMatch(/gold foil title on the cover/);
   });
@@ -66,7 +66,7 @@ describe('each product gets its own prompt', () => {
 describe('people: hands, mouths, faces', () => {
   it('a model wearing it keeps the hands still; a person holding a book holds it steadily', () => {
     const worn = directVideo(dir('dress', 'hero'));
-    expect(worn).toMatch(/hands stay relaxed and still/);
+    expect(worn).toMatch(/hands and fingers stay completely still exactly where they are in the first frame/);
     expect(worn).toMatch(/lips together/);
     expect(worn).not.toMatch(/spontaneous .*hand movements/);
     const held = directVideo(dir('book', 'withPerson'));
@@ -111,5 +111,22 @@ describe('the AI director\'s prompt is checked before Veo gets it', () => {
     // A product that is a phone accessory keeps its own words when nobody is in the frame.
     expect(sanitizeWrittenPrompt('The clear phone case lies on a desk.', false)).toMatch(/phone case/);
     expect(cleanNegatives(['blurry text', 'A long sentence. With stops.', 'woman', 'warped edges'], true)).toEqual(['blurry text', 'person', 'warped edges']);
+  });
+});
+
+describe('quality check', () => {
+  it('the stricter of two looks wins', async () => {
+    const { stricterQa } = await import('@/lib/ai/videoProduct');
+    const q = stricterQa([
+      { status: 'done', match: 10, realism: 10, diffs: [], issues: [] },
+      { status: 'done', match: 7, realism: 4, diffs: [], issues: [{ text: 'scribbled text', fix: 'The camera stays still', at: 2.5 }] },
+    ]);
+    expect([q.match, q.realism]).toEqual([7, 4]);
+    expect(q.issues?.[0].text).toBe('scribbled text');
+    expect(stricterQa([{ status: 'failed' }, { status: 'done', match: 9, realism: 9 }]).match).toBe(9);
+    expect(stricterQa([{ status: 'failed' }]).status).toBe('failed');
+    // A low score with nothing listed does not count against a reasoned one.
+    const r = stricterQa([{ status: 'done', match: 7, realism: 7, diffs: [], issues: [] }, { status: 'done', match: 10, realism: 9, diffs: [], issues: [] }]);
+    expect([r.match, r.realism]).toEqual([10, 9]);
   });
 });

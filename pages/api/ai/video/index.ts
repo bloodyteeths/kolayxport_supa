@@ -27,7 +27,7 @@ import { normalizeProfile } from '@/lib/ai/videoShots';
 import { fitToAspect, loadSource, loadSources, saveSourceImage, videoDuration } from '@/lib/ai/videoSources';
 import { interpretNotes } from '@/lib/ai/videoNotes';
 import { writeVideoPrompt } from '@/lib/ai/videoPromptWriter';
-import { checkVideo, extendFrame, generateKeyframe, keyframePrompt, matchSubjectScale, MAX_PRODUCT_REFS, type VideoQa } from '@/lib/ai/videoProduct';
+import { checkVideo, extendFrame, generateCheckedKeyframe, keyframePrompt, matchSubjectScale, MAX_PRODUCT_REFS, type VideoQa } from '@/lib/ai/videoProduct';
 import { extendCredits, imageCredits, videoCredits } from '@/lib/billing/aiCredits';
 import { isAiBudgetError, isNoCreditsError, refundCredits, spendCredits } from '@/lib/billing/aiCreditsServer';
 
@@ -74,9 +74,11 @@ async function failJob(job: Job, errorKey: string, detail: string): Promise<Job>
 }
 
 /** Below these the best variant is fixed automatically, once (founder: "the video editor should do all that itself"). */
-// Founder 2026-10-18: "videos need to reach 10/10 for any marketplace". Below 8 the free automatic retry runs.
-const AUTO_FIX_MATCH = 8;
-const AUTO_FIX_REALISM = 8;
+// Founder 2026-10-18: "for everything we need min 9/10". Takes vary a lot (the same settings scored 10/10 and 7/4 on
+// the bench), so below 9 the free automatic retry makes two more takes with the check's directions and the best wins.
+const AUTO_FIX_MATCH = 9;
+const AUTO_FIX_REALISM = 9;
+const AUTO_FIX_VARIANTS = 2;
 const qaScore = (q: VideoQa) => (q.match ?? 0) * 2 + (q.realism ?? 0);
 
 /**
@@ -130,9 +132,9 @@ async function runQa(jobIds: string[]) {
     // never showed): the fix is a safer shot — the product still, the camera slowly moving in — from the real start.
     const safer = (best.qa.match ?? 10) <= 4;
     const body = safer
-      ? { parentId: best.job.id, instruction: 'Keep the product perfectly still and exactly as in the photos; only the camera moves', variants: 1, dropEnd: true,
+      ? { parentId: best.job.id, instruction: 'Keep the product perfectly still and exactly as in the photos; only the camera moves', variants: AUTO_FIX_VARIANTS, dropEnd: true,
           direction: { ...(best.job.direction as object), preset: 'hero', shotText: undefined, showsBack: false } }
-      : fixes.length ? { parentId: best.job.id, instruction: fixes.join('. ').slice(0, 400), variants: 1 } : null;
+      : fixes.length ? { parentId: best.job.id, instruction: fixes.join('. ').slice(0, 400), variants: AUTO_FIX_VARIANTS } : null;
     if (body) {
       const r = await launchTake(main.userId, body, d.locale === 'en' ? 'en' : 'tr', { free: true, autoFixOf: main.groupId ?? main.id })
         .catch((err) => { logger.warn('AI video auto-fix failed to start', { jobId: main.id, error: err?.message }); return null; });
@@ -237,14 +239,15 @@ async function prepareAndStart(l: Launch) {
     let start = l.start;
     let startRef = job.sourceUrl;
     if (l.aiStart) {
-      start = await generateKeyframe({ userId: job.userId, refs: l.products, prompt: keyframePrompt(d, { which: 'start', refCount: l.products.length, hasStart: false }), aspectRatio: l.aspectRatio });
+      // Checked against the photos and redrawn when the product changed (lib/ai/videoProduct verifyKeyframe).
+      start = await generateCheckedKeyframe({ userId: job.userId, refs: l.products, prompt: keyframePrompt(d, { which: 'start', refCount: l.products.length, hasStart: false }), aspectRatio: l.aspectRatio }, l.products);
       startRef = await saveSourceImage(job.userId, Buffer.from(start.data, 'base64'), extOf(start));
     }
     if (!start) throw Object.assign(new Error('no start frame'), { key: 'imageRequired' });
     let end = l.end;
     let endRef = job.endUrl;
     if (l.aiEnd) {
-      end = await generateKeyframe({ userId: job.userId, refs: l.products, first: start, prompt: keyframePrompt(d, { which: 'end', refCount: l.products.length, hasStart: true }), aspectRatio: l.aspectRatio });
+      end = await generateCheckedKeyframe({ userId: job.userId, refs: l.products, first: start, prompt: keyframePrompt(d, { which: 'end', refCount: l.products.length, hasStart: true }), aspectRatio: l.aspectRatio }, l.products);
       endRef = await saveSourceImage(job.userId, Buffer.from(end.data, 'base64'), extOf(end));
     }
     // Anchor frames shaped like the video (no black bars for Veo to animate; the photo's own scene continues into the

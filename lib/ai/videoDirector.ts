@@ -141,9 +141,11 @@ const PRESET_ACTION: Record<VideoPreset, { person: string; product: string }> = 
 const LOOK: Record<VideoDirection['look'], { intro: string; finish: string }> = {
   // Never the words "phone" / "smartphone": Veo then draws a camera-app screen (icons, shutter button) around the
   // shot — seen on production 2026-10-17. Describe how real handheld footage looks instead.
+  // Not "filmed by the shop owner" / "hand-held" when nobody is in the shot: on the bench (2026-10-18) those words
+  // brought a hand into the frame that picked up a sneaker, and feet stepping into it (realism 3/10).
   phone: {
-    intro: 'Real, unedited handheld footage filmed by the shop owner — it must look exactly like a real video, not like AI. The image fills the whole frame.',
-    finish: 'Natural exposure and true-to-life colours, slight natural hand-held camera movement, real lens depth of field, natural motion blur on fast movement.',
+    intro: 'Real, unedited footage of a real moment — it must look exactly like a real video, not like AI. The image fills the whole frame.',
+    finish: 'Natural exposure and true-to-life colours, a calm, steady camera with only the faintest natural sway, real lens depth of field, natural motion blur on fast movement.',
   },
   studio: {
     intro: 'A real product video filmed by a professional photographer in a photo studio — real footage, not CGI or AI. The image fills the whole frame.',
@@ -327,7 +329,11 @@ export function negativePrompt(d: Partial<VideoDirection> & Pick<VideoDirection,
   base.push(...plan.avoid);
   if (profile.text) base.push('scrambled text', 'changed letters', 'flipping pages', 'opening the book');
   // No person in the shot: no hands reaching in to hold the product (seen on an eBay statue video).
-  if (!plan.person && !full.person) base.push('hands', 'fingers', 'people');
+  if (!plan.person && !full.person) {
+    base.push('hands', 'fingers', 'people');
+    // A worn product with nobody in the photos: Veo put feet stepping into a pair of sneakers (bench, 2026-10-18).
+    if (profile.use === 'worn') base.push('feet', 'legs', 'someone putting it on', 'body parts');
+  }
   if (plan.person || full.person) {
     base.push('plastic look', 'waxy look', 'airbrushed look', 'beauty filter', 'uncanny face', 'dead eyes', 'frozen expression', 'distorted face',
       'open mouth', 'visible teeth', 'talking', 'laughing', 'face in side profile', 'hand gestures', 'waving', 'reaching', 'clasped fingers',

@@ -549,7 +549,11 @@ export function VideoStudio() {
   const fixes = qa?.status === 'done' ? [...(qa.diffs ?? []), ...(qa.issues ?? [])].map((x) => x.fix).filter(Boolean) : [];
   // The automatic fix the server started after a failed check (stored on the take's first variant).
   const groupMain = cur ? jobs.find((j) => j.id === cur.groupId) ?? cur : null;
-  const autoFixJob = groupMain?.qa?.autoFix ? jobs.find((j) => j.id === groupMain.qa!.autoFix) ?? null : null;
+  const autoFixMain = groupMain?.qa?.autoFix ? jobs.find((j) => j.id === groupMain.qa!.autoFix) ?? null : null;
+  // The automatic retry makes two takes: the better one counts.
+  const autoFixGroup = autoFixMain ? jobs.filter((j) => (j.groupId ?? j.id) === (autoFixMain.groupId ?? autoFixMain.id)) : [];
+  const autoFixJob = autoFixGroup.length ? autoFixGroup.reduce((b, j) => (qaScore(j) > qaScore(b) ? j : b), autoFixMain!) : autoFixMain;
+  const autoFixChecked = autoFixGroup.length > 0 && autoFixGroup.every((j) => j.status === 'failed' || j.qa?.status === 'done' || j.qa?.status === 'failed');
   const autoFixDone = useRef<Set<string>>(new Set());
   // When every variant of a take is checked, show the best one (unless the seller picked a variant).
   const pickedVariant = useRef<Set<string>>(new Set());
@@ -563,7 +567,7 @@ export function VideoStudio() {
   // The fixed version is shown only when its check says it is better than the take's best variant.
   const takeBest = groupMain ? jobs.filter((j) => j.groupId === groupMain.groupId).reduce((b, j) => Math.max(b, qaScore(j)), -1) : -1;
   const fixBetter = Boolean(autoFixJob && autoFixJob.qa?.status === 'done' && qaScore(autoFixJob) > takeBest);
-  const fixWorse = Boolean(autoFixJob && (autoFixJob.qa?.status === 'done' || autoFixJob.qa?.status === 'failed') && !fixBetter);
+  const fixWorse = Boolean(autoFixJob && autoFixChecked && !fixBetter);
   useEffect(() => {
     if (!autoFixJob || !fixBetter || autoFixDone.current.has(autoFixJob.id)) return;
     autoFixDone.current.add(autoFixJob.id);

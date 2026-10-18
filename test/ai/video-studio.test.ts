@@ -14,7 +14,7 @@ describe('video director', () => {
     expect(p).toMatch(/never a frozen, blank or doll-like face/);
     expect(p).toMatch(/exactly the one in the photos in every frame/);
     expect(p).toMatch(/never slow motion/);
-    expect(p).toMatch(/handheld footage/);
+    expect(p).toMatch(/Real, unedited footage/);
     expect(p).not.toMatch(/phone/i);
     expect(negativePrompt({ person: false })).toMatch(/camera app interface/);
     expect(p).toMatch(/unretouched look with real texture and colour, natural hair, no beauty filter/);

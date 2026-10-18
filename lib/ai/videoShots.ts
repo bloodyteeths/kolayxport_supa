@@ -137,8 +137,8 @@ export function shotPlan(key: ShotKey, p: ProductProfile, ctx: { person: boolean
       return {
         action: own ?? `${cap(name)} stays perfectly still${inFrame ? ' and the model holds a calm pose' : ''} while the camera travels slowly in a gentle arc around it at the same height and distance.`,
         camera: p.text
-          ? 'A small, slow sideways arc of about 15 degrees, so the printed side keeps facing the camera; the background shifts naturally behind (parallax).'
-          : 'A slow sideways arc of about 25 degrees at a steady speed; the background shifts naturally behind the subject (parallax).',
+          ? 'A small, very slow sideways arc of about 10 degrees, so the printed side keeps facing the camera and every letter stays still; the background shifts naturally behind (parallax).'
+          : 'A very slow sideways arc of about 20 degrees at a steady speed, never further; the background shifts naturally behind the subject (parallax).',
         framing: [whole, distance(p)].filter(Boolean).join(' '),
         avoid: [...noSpin, 'background warping'], hands, person: inFrame,
       };
@@ -169,7 +169,7 @@ export function shotPlan(key: ShotKey, p: ProductProfile, ctx: { person: boolean
           : held
             ? `${cap(name)} lies on a table in a real everyday setting, among a few fitting everyday items that never cover it.`
             : `${cap(name)} stands in its natural place in a real home, with soft daylight changing gently over it.`),
-        camera: 'A slow, gentle camera drift, like a real handheld lifestyle shot, with no sudden moves.',
+        camera: 'A slow push-in with a slight sideways drift, so the background shifts naturally behind the product (parallax); no sudden moves.',
         framing: [`${cap(name)} stays the clear subject, fully visible and in focus.`, distance(p)].filter(Boolean).join(' '),
         avoid: ['clutter covering the product', 'other products that look like it', ...noSpin], hands: inFrame && worn ? 'still' : 'none', person: inFrame && worn,
       };
@@ -187,7 +187,8 @@ export function shotPlan(key: ShotKey, p: ProductProfile, ctx: { person: boolean
     case 'reveal':
       return {
         action: own ?? `The camera holds still while soft light glides slowly across ${name}, bringing out ${p.shiny ? 'its shine and finish' : p.physics === 'fabric' ? 'its texture and colour' : 'its shape, texture and colour'}.`,
-        camera: 'The camera stays perfectly still on a tripod; only the light moves.',
+        // Light alone looked like a filter over a still photo (bench: match 10, realism 5): a slight real move too.
+        camera: 'An almost still camera with a very slight, slow push-in, so the depth of the scene reads as real; the light does the rest.',
         framing: [whole, distance(p)].filter(Boolean).join(' '),
         avoid: ['flashing light', 'strobe', 'lens flare', 'colour shift', ...noSpin], hands: inFrame ? (worn ? 'still' : 'holding') : 'none', person: inFrame,
       };
@@ -208,7 +209,8 @@ export function personLine(hands: ShotPlan['hands'], expression: string): string
   const face = `${expression} with the lips together, natural slow blinking, the face toward the camera (turning at most slightly, never to a side profile)`;
   const handLine = hands === 'holding'
     ? 'The hands hold the product steadily and calmly the whole time, the fingers relaxed and still around it; no gestures, no waving, no reaching, never touching the face or hair.'
-    : 'The hands stay relaxed and still the whole time, resting at the sides; no hand gestures, no waving, no reaching, no touching the face or hair, fingers never clasped together.';
+    // Keep the first frame's pose: asking a photographed person to move their hands made Veo redraw them (bench 2026-10-18).
+    : 'The hands and fingers stay completely still exactly where they are in the first frame the whole time; no hand gestures, no waving, no reaching, no touching the face or hair.';
   return `The person behaves like a real model at a photo shoot: ${face}, a relaxed posture with small natural weight shifts. ${handLine} `
     // Never "skin" / "body" words: Google refuses them next to a child model (lib/ai/videoDirector neutralPeople).
     + 'A natural, unretouched look with real texture and colour, natural hair, no beauty filter; never a frozen, blank or doll-like face.';

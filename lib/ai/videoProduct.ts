@@ -46,9 +46,14 @@ export function keyframePrompt(d: VideoDirection, opts: { which: 'start' | 'end'
   const parts = [
     opts.which === 'end' && opts.hasStart
       ? `Image 1 is the first frame of a video. Create the LAST frame of the same continuous shot a few seconds later: the same ${d.person ? 'person, ' : ''}place, light and camera distance. ${endPoseFor(d)}`
-      : `Create the first frame of a real product video: ${d.addPerson ? 'a real, natural-looking adult naturally wearing, holding or using exactly this product in the setting; the product is the focus and fully recognisable' : d.person ? 'the same person from the photos wearing or holding exactly this product, natural and relaxed, the whole product in frame' : 'the product fully in frame'}.`,
+      : `Create the first frame of a real product video: ${d.addPerson ? 'a real, natural-looking adult naturally wearing, holding or using exactly this product in the setting; the product is the focus and fully recognisable, upright and facing the camera (any printed text level and readable)' : d.person ? 'the same person from the photos wearing or holding exactly this product, natural and relaxed, the whole product in frame' : 'the product fully in frame'}.`,
+    // The first frame decides the hands for the whole video: an AI-made frame with interlaced fingers and an open
+    // mouth stayed broken in every take (bench 2026-10-18).
+    d.person || d.addPerson ? 'The person\'s lips are closed in a soft smile; the hands are simple and relaxed — holding the product by its edges with the fingers together and mostly behind it, or hanging at the sides — never interlaced, clasped or spread.' : '',
     `${productImgs} are real photos of the product${d.product ? ` (${d.person ? neutralPeople(d.product) : d.product})` : ''} from different angles.`,
     lockSentence(d.person, d.productKind, d.addPerson === true),
+    // The image model invented a subtitle and an author name on a book cover (bench 2026-10-18).
+    d.profile?.printed?.length ? `The only words on the product are exactly: ${d.profile.printed.map((x) => `"${x}"`).join(', ')} — no other text, subtitle, author or label is added.` : 'No words, labels or text are added to the product.',
     d.person ? personSentence(d) : '',
     opts.which === 'start' || !opts.hasStart ? sceneSentence(d) : '',
     d.format === '1:1' || d.format === '4:5'
@@ -109,6 +114,38 @@ export async function extendFrame(userId: string, padded: VideoMedia, aspect: st
   } catch {
     return null;
   }
+}
+
+/**
+ * Is the AI-made frame still exactly the seller's product? A frame that changed it (an invented subtitle on a book
+ * cover, a different bow) breaks every video made from it, so it is checked before Veo and redrawn when wrong.
+ */
+export async function verifyKeyframe(userId: string, frame: VideoMedia, photos: VideoMedia[]): Promise<{ ok: boolean; problems: string[] }> {
+  try {
+    const small = await Promise.all([shrink(frame, 1024), ...photos.slice(0, 4).map((m) => shrink(m, 768))]);
+    const raw = await aiJson<any>({ tier: 'fast', feature: 'video.keyframeCheck', userId, temperature: 0 }, [
+      { text: 'PRODUCT PHOTOS (real):' }, ...small.slice(1).map((m) => ({ inlineData: { mimeType: m.mimeType, data: m.data } })),
+      { text: 'NEW FRAME:' }, { inlineData: { mimeType: small[0].mimeType, data: small[0].data } },
+      { text: 'Is the product in the NEW FRAME exactly the product in the photos (same design, colours, parts, details and printed words — nothing added, removed or changed)? A different pose, angle, setting or person is fine. Also flag hands with interlaced, clasped or broken fingers, and open mouths. Return JSON {"same": boolean, "problems": [short English strings, what is wrong]}' },
+    ]);
+    const problems = (Array.isArray(raw?.problems) ? raw.problems : []).map((x: unknown) => txt(x, 160)).filter(Boolean).slice(0, 5);
+    return { ok: raw?.same === true && !problems.length, problems };
+  } catch {
+    return { ok: true, problems: [] };
+  }
+}
+
+/** A keyframe that passed verifyKeyframe (redrawn up to `tries` times with what was wrong); the last one otherwise. */
+export async function generateCheckedKeyframe(input: Parameters<typeof generateKeyframe>[0], photos: VideoMedia[], tries = 3): Promise<VideoMedia> {
+  let prompt = input.prompt;
+  let frame: VideoMedia | null = null;
+  for (let i = 0; i < tries; i++) {
+    frame = await generateKeyframe({ ...input, prompt });
+    const check = await verifyKeyframe(input.userId, frame, photos);
+    if (check.ok) return frame;
+    prompt = `${input.prompt} The previous attempt was wrong — avoid exactly this: ${check.problems.join('; ')}.`;
+  }
+  return frame!;
 }
 
 export type VideoQa = {
@@ -201,15 +238,17 @@ export async function checkVideo(input: { userId: string; file: string; refs: Vi
   const parts: any[] = [
     { text: `PRODUCT PHOTOS (real): ${photos.length} images.` },
     ...photos.map((m) => ({ inlineData: { mimeType: m.mimeType, data: m.data } })),
-    ...(withVideo ? [{ text: `THE VIDEO (${duration.toFixed(1)} s, AI-generated):` }, { inlineData: { mimeType: 'video/mp4', data: video!.toString('base64') } }] : []),
+    // Judged blind ("AI-generated" in the question pulled a flawless video down to 7/10): only visible defects count.
+    ...(withVideo ? [{ text: `THE VIDEO (${duration.toFixed(1)} s):` }, { inlineData: { mimeType: 'video/mp4', data: video!.toString('base64') } }] : []),
     { text: `VIDEO FRAMES (sharp stills, in time order): ${frames.length} images.` },
     ...frames.flatMap((f) => [{ text: `t=${f.t}s` }, { inlineData: { mimeType: f.m.mimeType, data: f.m.data } }]),
     {
       text: [
-        'You check AI product videos for an online shop before a buyer sees them. Compare the product in the video and every frame with the PRODUCT PHOTOS, image against image, like a careful buyer; watch the motion too.',
+        'You check product videos for an online shop before a buyer sees them. Compare the product in the video and every frame with the PRODUCT PHOTOS, image against image, like a careful buyer; watch the motion too. Judge only what you can see.',
         'The photos show the product from different angles, poses and crops (front, back, side, close-up): never count a different pose, angle, crop, camera distance or framing as a difference. Judge only the product\'s own design. Motion blur in a frame of a moving shot is normal.',
-        'productMatch 0–10: 10 = the same design in every frame (shape, cut, colours, pattern, prints and text, parts, ornaments — roughly the same number, size and placement —, materials). 8–9: only tiny differences a buyer would not notice. 6–7: a difference a buyer could notice. 4–5: clearly changed details. 0–3: a different product.',
-        'realism 0–10, judged as a shopper watching on a phone: 10 = nobody could tell it is not a real filmed video. Lower it for distorted faces, eyes, teeth or hands, plastic skin, melting or morphing, flicker, impossible physics, slow-motion drift, on-screen interfaces, black bars, blurred borders.',
+        'Scores are defect-based: start at 10 and take points off only for the problems you list (every point below 10 must match a listed problem; no problems listed = 10).',
+        'productMatch: 10 = the same design in every frame (shape, cut, colours, pattern, prints and text, parts, ornaments — roughly the same number, size and placement —, materials). 9 = one tiny difference only seen frame by frame. 8 = a small difference a careful buyer could notice. 6–7 = a noticeable difference. 4–5 = clearly changed details. 0–3 = a different product.',
+        'realism, judged as a shopper watching on a phone: 10 = no visible flaw. 9 = one tiny flaw only seen frame by frame. 8 = one small flaw a careful viewer could notice. 6–7 = a noticeable flaw. 4–5 = an obvious flaw (distorted hands, face, eyes or teeth, plastic skin, melting or morphing, flicker, impossible physics, slow-motion drift, on-screen interfaces, black bars, blurred borders) or several noticeable ones. 0–3 = clearly fake.',
         look ? `Look hardest at: ${look}.` : '',
         `diffs: up to 4 concrete differences from the photos (most visible first). issues: up to 4 things that look artificial. Each item: "text" = short, specific, in ${lang}, for the seller; "at" = the second (number) where it shows most; "fix" = one short English direction for the NEXT take that prevents it, phrased as what should happen on camera (e.g. "The hands rest still at the sides", "The camera stays farther back so the bow is never redrawn", "The book stays closed with its cover toward the camera") — never just "fix X".`,
         'clean: the longest stretch {"from","to"} in seconds where no frame shows any of the problems you listed (the whole video if there are none).',
@@ -217,8 +256,28 @@ export async function checkVideo(input: { userId: string; file: string; refs: Vi
       ].filter(Boolean).join('\n'),
     },
   ];
-  const raw = await aiJson({ tier: 'deep', feature: 'video.qa', userId: input.userId, temperature: 0.2 }, parts);
-  return normalizeQa(raw, duration);
+  // Two independent looks, the stricter one wins: a single look sometimes missed a defect (scribbled small text scored
+  // 10/10 once and 7/4 twice on the same video, bench 2026-10-18).
+  const looks = await Promise.all([0, 1].map(() => aiJson({ tier: 'deep', feature: 'video.qa', userId: input.userId, temperature: 0.3 }, parts)
+    .then((raw) => normalizeQa(raw, duration)).catch((): VideoQa => ({ status: 'failed' }))));
+  return stricterQa(looks);
+}
+
+/** The stricter of several quality looks (lower match + realism), with its notes. Pure, exported for tests. */
+export function stricterQa(looks: VideoQa[]): VideoQa {
+  const done = looks.filter((q) => q.status === 'done');
+  if (!done.length) return { status: 'failed' };
+  // A score below 9 counts only with a reason: every point off must be a listed problem (a look gave a flawless
+  // book video 7/7 with nothing listed, bench 2026-10-18). Without any reasoned look the plain minimum stands.
+  // (A problem may be listed under either list: scrambled text is both a change and an artefact.)
+  const reasoned = (q: VideoQa, dim: 'match' | 'realism') => (q[dim] ?? 10) >= 9 || Boolean(q.diffs?.length || q.issues?.length);
+  const pick = (dim: 'match' | 'realism') => {
+    const ok = done.filter((q) => reasoned(q, dim));
+    return Math.min(...(ok.length ? ok : done).map((q) => q[dim] ?? 10));
+  };
+  const total = (q: VideoQa) => (q.match ?? 10) + (q.realism ?? 10);
+  const worst = done.filter((q) => (q.diffs?.length || q.issues?.length)).reduce<VideoQa | null>((a, b) => (!a || total(b) < total(a) ? b : a), null) ?? done[0];
+  return { ...worst, match: pick('match'), realism: pick('realism') };
 }
 
 type Box = [number, number, number, number]; // ymin, xmin, ymax, xmax (0–1000)

@@ -28,6 +28,10 @@ export function sanitizeWrittenPrompt(text: string, person: boolean): string {
     .replace(/\b(filmed|shot|recorded|captured)\s+(on|with)\s+(an?\s+)?(smart)?phone(\s+camera)?\b/gi, 'filmed handheld')
     .replace(/\b(smart)?phone\s+(video|footage|camera|recording)\b/gi, 'handheld footage')
     .replace(/\b(camera app|viewfinder|record button|on-screen (ui|interface|buttons?))\b/gi, '');
+  if (!person) {
+    // Nobody in the shot: words that imply a person filming bring hands into the frame (bench 2026-10-18).
+    t = t.replace(/\b(hand[\s-]?held)\b/gi, 'steady').replace(/\s*(filmed|shot)\s+by\s+(the|a)\s+shop\s+owner\b/gi, '').replace(/\bshop owner\b/gi, 'shop');
+  }
   if (person) {
     t = neutralPeople(t)
       .replace(/\b(wo)?men\b|\b(wo)?man\b|\bladies\b|\blady\b/gi, 'person')
@@ -80,9 +84,11 @@ export async function writeVideoPrompt(userId: string, input: {
     '- The product is exactly the one in the images in every frame: name its key visible details and say they keep their exact shape, size, number, colour and place; quote any printed words and say they stay letter for letter, sharp and readable. Never describe a change to the product.',
     '- Real footage at real-time speed, never slow motion; real weight and physics for its material; nothing morphs, melts, flickers, appears or disappears. Camera moves small and slow; the whole product stays in frame unless the shot is a detail shot of a part a photo shows.',
     '- Never turn an object to sides the photos do not show; never open, flip pages, unwrap or take the product apart.',
+    '- Anything that would need someone to do it (lighting a candle, pouring, opening, switching on, arranging) is already done before the shot starts — e.g. "the candle is already burning"; nothing and nobody does it on camera.',
+    '- Some gentle, real motion must be visible (a slow camera move with natural parallax, light or shadows shifting, a flame, leaves or fabric stirring slightly): a frozen image looks fake. Small printed text gets the smallest, slowest moves.',
     person
-      ? `- The person: call them only "the model" or "the person" — no age, gender or body words (no girl, woman, child, skin, body). ${EXPRESSION_TEXT(d)} with lips together, natural slow blinking, the face toward the camera (never a side profile), ${plan.hands === 'holding' ? 'the hands hold the product steadily with relaxed, still fingers' : 'the hands rest relaxed and still'}; no gestures, no waving, no reaching, no touching the face or hair; never a close-up of the face or hands.`
-      : '- No people, hands or fingers appear.',
+      ? `- The person: call them only "the model" or "the person" — no age, gender or body words (no girl, woman, child, skin, body). ${EXPRESSION_TEXT(d)} with lips together, natural slow blinking, the face toward the camera (never a side profile). The person keeps the pose of the first frame: the hands and fingers stay completely still exactly where they are in the first frame (redrawn hands are what breaks), ${plan.hands === 'holding' ? 'holding the product steadily' : 'never moving to the hips, the face or the hair'}; no gestures, no waving, no reaching; only blinking and tiny natural movements. Never a close-up of the face or hands.`
+      : `- Nobody is in the shot: no people, hands, fingers${profile.use === 'worn' ? ', feet or legs' : ''} ever enter the frame; the product is never touched, picked up or moved. Never use the words "handheld" or "shop owner".`,
     '- Never write the words "phone" or "smartphone" about the camera or the footage (the model then draws a camera-app screen); if the product is a phone or phone accessory, call it "the mobile phone" with its screen dark.',
     '- No captions, subtitles, added text, logos or watermarks.',
     'Write 100–170 words, present tense, in this order: look, subject and setting as seen in the first frame, the action, the camera, framing, light, how it ends. Concrete and visual; no lists, no headings.',

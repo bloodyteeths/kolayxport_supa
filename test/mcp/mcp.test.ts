@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { describe, expect, it } from 'vitest';
 import { normalizeScopes, pkceOk, redirectUriAllowed } from '@/lib/mcp/tokens';
-import { MCP_TOOLS, toolsFor } from '@/lib/mcp/tools';
+import { MCP_TOOLS, countryOf, toolsFor } from '@/lib/mcp/tools';
 
 describe('MCP credentials', () => {
   it('PKCE S256: only the verifier that made the challenge passes', () => {
@@ -38,5 +38,15 @@ describe('MCP tools', () => {
   });
   it('only the draft tool writes, and it is marked so', () => {
     expect(MCP_TOOLS.filter((t) => !t.readOnly).map((t) => t.name)).toEqual(['stage_listing_changes']);
+  });
+});
+
+describe('order privacy', () => {
+  it('only the country leaves, from JSON or JSON-text addresses; free text is never parsed', () => {
+    const addr = JSON.stringify({ name: 'Jane Doe', street1: '1 Main St', city: 'Austin', country: 'US', phone: '555' });
+    expect(countryOf(addr, 'amazon')).toBe('US');
+    expect(countryOf({ countryCode: 'DE', name: 'x' }, 'etsy')).toBe('DE');
+    expect(countryOf('Ayşe Yılmaz, Kadıköy İstanbul', 'Trendyol')).toBe('TR');
+    expect(countryOf('Jane Doe, 1 Main St, Austin', 'ebay')).toBeNull();
   });
 });

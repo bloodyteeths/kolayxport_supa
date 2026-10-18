@@ -62,11 +62,39 @@ function marketplaceArg(v: unknown, required = false): ListingMarketplace | null
   return null;
 }
 
-/** Only the buyer's country leaves (no name, street, city, e-mail or phone). */
-function countryOf(addr: unknown): string | null {
-  const a = (addr && typeof addr === 'object' ? addr : {}) as Record<string, unknown>;
-  const c = a.countryCode ?? a.country_code ?? a.country ?? a.countryName;
+/** Only the buyer's country leaves (no name, street, city, e-mail or phone). Addresses are stored as JSON or as JSON
+ * text; Trendyol / Hepsiburada ship inside Turkey. Pure, exported for tests. */
+export function countryOf(addr: unknown, marketplace?: string | null): string | null {
+  const mp = String(marketplace || '').toLowerCase();
+  if (mp === 'trendyol' || mp === 'hepsiburada') return 'TR';
+  let a: unknown = addr;
+  if (typeof a === 'string' && a.trim().startsWith('{')) {
+    try { a = JSON.parse(a); } catch { return null; }
+  }
+  if (!a || typeof a !== 'object') return null; // free-text addresses: never parsed (they are personal data)
+  const o = a as Record<string, unknown>;
+  const c = o.countryCode ?? o.country_code ?? o.country ?? o.countryName;
   return typeof c === 'string' && c.trim() ? c.trim().slice(0, 40) : null;
+}
+
+/** Orders keep the marketplace as synced (an Etsy order may carry the shop name): one name per marketplace. */
+async function marketplaceNamer(userId: string): Promise<(raw: string) => { marketplace: string; store?: string }> {
+  const shops = await prisma.etsyShop.findMany({ where: { userId }, select: { shopName: true } });
+  const etsy = new Set(shops.map((x) => (x.shopName || '').toLowerCase()).filter(Boolean));
+  const known = new Set(['etsy', 'ebay', 'amazon', 'trendyol', 'shopify', 'wix', 'hepsiburada']);
+  return (raw) => {
+    const low = String(raw || '').toLowerCase();
+    if (known.has(low)) return { marketplace: low };
+    if (etsy.has(low)) return { marketplace: 'etsy', store: raw };
+    return { marketplace: low || 'other', ...(raw ? { store: raw } : {}) };
+  };
+}
+
+/** `marketplace` filter for orders, matching Etsy orders filed under the shop name too. */
+async function orderMarketplaceWhere(userId: string, mp: string): Promise<Record<string, unknown>> {
+  if (mp.toLowerCase() !== 'etsy') return { marketplace: { equals: mp, mode: 'insensitive' } };
+  const shops = (await prisma.etsyShop.findMany({ where: { userId }, select: { shopName: true } })).map((x) => x.shopName).filter((x): x is string => Boolean(x));
+  return { OR: [{ marketplace: { equals: 'etsy', mode: 'insensitive' } }, ...shops.map((n) => ({ marketplace: { equals: n, mode: 'insensitive' } }))] };
 }
 
 const ORDER_SELECT = {
@@ -76,13 +104,13 @@ const ORDER_SELECT = {
   items: { select: { productName: true, sku: true, variantInfo: true, quantity: true, unitPrice: true } },
 } as const;
 
-function viewOrder(o: any) {
+function viewOrder(o: any, name: (raw: string) => { marketplace: string; store?: string }) {
   const state = classifyOrderStatus(o.status, o.externalStatus, o.deliveredAt);
   return {
-    id: o.id, orderNumber: o.orderNumber, marketplace: o.marketplace, state, marketplaceStatus: o.status ?? null,
+    id: o.id, orderNumber: o.orderNumber, ...name(o.marketplace), state, marketplaceStatus: o.status ?? null,
     orderedAt: (o.uiOrderDate ?? o.createdAt)?.toISOString?.() ?? null, shipBy: o.shipByAt?.toISOString?.() ?? null,
     shippedAt: o.shippedAt?.toISOString?.() ?? null, trackingNumber: o.trackingNumber ?? null,
-    total: money(o.totalPrice), currency: o.currency ?? null, shipToCountry: countryOf(o.shippingAddress),
+    total: money(o.totalPrice), currency: o.currency ?? null, shipToCountry: countryOf(o.shippingAddress, o.marketplace),
     items: (o.items ?? []).map((i: any) => ({ name: i.productName ?? null, sku: i.sku ?? null, variant: i.variantInfo ?? null, quantity: i.quantity, unitPrice: money(i.unitPrice) })),
   };
 }
@@ -117,8 +145,9 @@ const getStoreOverview: McpTool = {
     ]);
     const week = sinceDays(7).getTime();
     const waiting = open.filter((o) => classifyOrderStatus(o.status, o.externalStatus, o.deliveredAt) === 'open');
+    const name = await marketplaceNamer(userId);
     const byMarketplace: Record<string, number> = {};
-    for (const o of orders30) byMarketplace[o.marketplace] = (byMarketplace[o.marketplace] ?? 0) + 1;
+    for (const o of orders30) { const m = name(o.marketplace).marketplace; byMarketplace[m] = (byMarketplace[m] ?? 0) + 1; }
     return {
       listings: { etsy, ebay, trendyol, wix, shopify },
       orders: {
@@ -153,10 +182,11 @@ const listOrders: McpTool = {
     const limit = int(a.limit, 25, 1, 100);
     const where: Record<string, unknown> = { userId: auth.userId, createdAt: { gte: sinceDays(int(a.days, 30, 1, 365)) } };
     const mp = str(a.marketplace, 40);
-    if (mp) where.marketplace = { equals: mp, mode: 'insensitive' };
+    if (mp) Object.assign(where, await orderMarketplaceWhere(auth.userId, mp));
     if (state === 'open') Object.assign(where, { shippedAt: null, cancelledAt: null });
     const rows = await prisma.order.findMany({ where, orderBy: { createdAt: 'desc' }, take: state === 'all' ? limit : Math.min(400, limit * 4), select: ORDER_SELECT });
-    const orders = rows.map(viewOrder).filter((o) => state === 'all' || o.state === state).slice(0, limit);
+    const name = await marketplaceNamer(auth.userId);
+    const orders = rows.map((o) => viewOrder(o, name)).filter((o) => state === 'all' || o.state === state).slice(0, limit);
     return { count: orders.length, orders };
   },
 };
@@ -173,7 +203,7 @@ const getOrder: McpTool = {
     if (!id && !orderNumber) throw new ToolError('Give id or orderNumber');
     const o = await prisma.order.findFirst({ where: { userId: auth.userId, ...(id ? { id } : { orderNumber }) }, select: ORDER_SELECT });
     if (!o) throw new ToolError('Order not found');
-    return viewOrder(o);
+    return viewOrder(o, await marketplaceNamer(auth.userId));
   },
 };
 
@@ -229,6 +259,16 @@ async function listingDetail(userId: string, marketplace: ListingMarketplace, id
     const l = await prisma.wixProduct.findFirst({ where: { userId, wixProductId: id } });
     if (!l) return null;
     return { id, title: l.title, description: l.description, price: { amount: money(l.price), discounted: money(l.discountPrice), currency: l.currency }, quantity: l.quantity, inStock: l.inStock, visible: l.visible, sku: l.sku };
+  }
+  if (marketplace === 'hepsiburada') {
+    // Title, description and images belong to Hepsiburada's catalog (read-only here).
+    const l = await prisma.hepsiburadaListing.findFirst({ where: { userId, OR: [{ hbSku: id }, { merchantSku: id }] } });
+    if (!l) return null;
+    return {
+      id: l.hbSku, merchantSku: l.merchantSku, title: l.title, brand: l.brand, barcode: l.barcode, category: l.categoryName,
+      price: { amount: money(l.price), currency: 'TRY' }, quantity: l.availableStock, dispatchTimeDays: l.dispatchTime,
+      salable: l.isSalable, suspended: l.isSuspended, locked: l.isLocked, fulfilledByHepsiburada: l.isFulfilledByHB,
+    };
   }
   const l = await prisma.shopifyProduct.findFirst({ where: { userId, shopifyProductId: id } });
   if (!l) return null;
@@ -290,11 +330,12 @@ const salesSummary: McpTool = {
       where: { userId: auth.userId, createdAt: { gte: sinceDays(days) }, cancelledAt: null },
       select: { marketplace: true, currency: true, totalPrice: true, status: true, externalStatus: true, deliveredAt: true, items: { select: { productName: true, sku: true, quantity: true } } },
     });
+    const name = await marketplaceNamer(auth.userId);
     const live = rows.filter((o) => classifyOrderStatus(o.status, o.externalStatus, o.deliveredAt) !== 'cancelled');
     const totals: Record<string, { orders: number; value: Record<string, number> }> = {};
     const items = new Map<string, { name: string; sku: string | null; quantity: number }>();
     for (const o of live) {
-      const t = (totals[o.marketplace] ??= { orders: 0, value: {} });
+      const t = (totals[name(o.marketplace).marketplace] ??= { orders: 0, value: {} });
       t.orders += 1;
       const cur = o.currency || '?';
       t.value[cur] = Math.round(((t.value[cur] ?? 0) + (Number(o.totalPrice) || 0)) * 100) / 100;

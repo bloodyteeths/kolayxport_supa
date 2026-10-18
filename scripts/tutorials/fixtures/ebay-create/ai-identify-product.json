@@ -1,16 +1,17 @@
 {
-  "seed": "handmade Turkish ceramic bowl blue tulip floral Iznik style pottery",
-  "productName": "Ceramic decorative bowl",
+  "seed": "ceramic bowl blue and white floral tulip painted design",
+  "productName": "Ceramic bowl",
   "keywords": [
-    "turkish bowl",
-    "iznik pottery",
     "ceramic bowl",
-    "hand painted",
-    "tulip pattern",
+    "painted bowl",
     "floral bowl",
+    "tulip pattern",
+    "blue and white",
+    "serving bowl",
     "decorative bowl",
-    "turkish pottery"
+    "pottery"
   ],
-  "suggestedCondition": "LIKE_NEW",
+  "wearVisible": false,
+  "suggestedCondition": "NEW",
   "notes": ""
 }

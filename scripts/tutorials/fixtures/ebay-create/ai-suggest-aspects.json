@@ -1,8 +1,5 @@
 {
   "aspects": {
-    "Brand": [
-      "Handmade"
-    ],
     "Material": [
       "Ceramic"
     ],
@@ -18,11 +15,8 @@
     "Pattern": [
       "Floral"
     ],
-    "Product Line": [
-      "Iznik"
-    ],
     "Production Style": [
-      "Art Pottery"
+      "Iznik"
     ],
     "Production Technique": [
       "Pottery"
@@ -33,14 +27,8 @@
     "Origin": [
       "Turkish"
     ],
-    "Shape": [
-      "Round"
-    ],
     "Theme": [
       "Floral"
-    ],
-    "Vintage": [
-      "No"
     ],
     "Handmade": [
       "Yes"

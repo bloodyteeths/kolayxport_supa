@@ -1,8 +1,8 @@
 {
-  "suggestedPrice": 29.99,
+  "suggestedPrice": 24.99,
   "priceRange": {
-    "min": 19.99,
-    "max": 45
+    "min": 18,
+    "max": 32
   },
-  "reasoning": "Both the market average and median prices sit directly at $29.99 across 89 competing listings. With a low demand score (10/100), competitive pricing is essential. Smaller bowls typically sell around $19.99, while larger 10-12 inch bowls reach $45.00 to $69.00. Assuming a standard mid-size bowl, $29.99 positions the listing right at market equilibrium. Offering free shipping is strongly advised, as roughly 80% of competitors provide it."
+  "reasoning": "The market average and median for Iznik ceramic bowls are both $27.97 across 160 listings. While the item is listed in 'New' condition (which represents about 29% of listings), the demand score is relatively low at 11/100. Single decorative bowls typically sell between $10 and $40 depending on size and detail, while sets achieve higher values ($49–$55). Pricing competitively at $24.99 places the item just below the median to stimulate buyer interest and account for the high percentage (74.4%) of competitors offering free shipping."
 }

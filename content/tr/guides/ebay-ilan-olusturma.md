@@ -13,7 +13,7 @@ inventoryRefs:
   - staged-drafts-send
 draft: false
 order: 15
-duration: PT1M47S
+duration: PT1M48S
 video:
   file: ebay-ilan-olusturma
   youtubeId: ''
@@ -21,30 +21,32 @@ steps:
   - name: Ürün fotoğrafınızı ekleyin
     text: 'eBay › Yeni ilan sayfasında önce ürün fotoğrafınızı ekleyin. İlk fotoğraf, ilanın ana fotoğrafı olur.'
     image: media/guides/ebay-ilan-olusturma/01.webp
+  - name: Ürününüzü bir cümleyle yazın
+    text: >-
+      Hızlı başlayın kartına ürününüzü bir cümleyle yazın. Fotoğrafta görünmeyen bilgileri, örneğin el yapımı olduğunu
+      ve nereden geldiğini, buraya yazın; yapay zekâ yalnızca gördüğünü ve sizin yazdığınızı kullanır.
+    image: media/guides/ebay-ilan-olusturma/02.webp
   - name: Fotoğraflardan doldurun
     text: >-
-      Hızlı başlayın kartında Fotoğraflardan doldur'a tıklayın. Yapay zekâ fotoğrafınıza bakıp ürünü tanır; başlığı,
-      kategoriyi, ürün özelliklerini, fiyatı ve açıklamayı hazırlar.
-    image: media/guides/ebay-ilan-olusturma/02.webp
+      Sonra Fotoğraflardan doldur'a tıklayın. Yapay zekâ fotoğrafınıza bakıp ürünü tanır; başlığı, kategoriyi, ürün
+      özelliklerini, fiyatı ve açıklamayı hazırlar.
+    image: media/guides/ebay-ilan-olusturma/03.webp
   - name: Başlığa bakın
     text: 'Başlık, alıcıların eBay''de aradığı kelimelerle İngilizce yazılır ve eBay''in seksen karakter sınırına sığar.'
-    image: media/guides/ebay-ilan-olusturma/03.webp
+    image: media/guides/ebay-ilan-olusturma/04.webp
   - name: Kategori ve ürün özellikleri
     text: >-
       Kategori, eBay'in kendi kategori önerilerinden seçilir. Ürün özellikleri de o kategorinin eBay'de istediği
       alanlara göre doldurulur.
-    image: media/guides/ebay-ilan-olusturma/04.webp
+    image: media/guides/ebay-ilan-olusturma/05.webp
   - name: Fiyat önerisine bakın
     text: 'Fiyat önerisi, eBay''deki benzer ilanların fiyatlarına bakılarak verilir. Son kararı siz verirsiniz.'
-    image: media/guides/ebay-ilan-olusturma/05.webp
+    image: media/guides/ebay-ilan-olusturma/06.webp
   - name: Açıklamayı okuyun
     text: Açıklamayı okuyun. Ürününüze uymayan bir şey varsa öneriyi kullandıktan sonra düzeltebilirsiniz.
-    image: media/guides/ebay-ilan-olusturma/06.webp
+    image: media/guides/ebay-ilan-olusturma/07.webp
   - name: Hepsini kullanın
     text: Beğendiyseniz Hepsini kullan'a tıklayın. Öneriler alanlara yerleşir; her alanı siz onaylarsınız.
-    image: media/guides/ebay-ilan-olusturma/07.webp
-  - name: Durumu kontrol edin
-    text: Ürünün durumunu mutlaka kontrol edin. Yapay zekâ fotoğraftan Sıfır Gibi dedi; ürününüz yeniyse Yeni seçin.
     image: media/guides/ebay-ilan-olusturma/08.webp
   - name: Ek fotoğraf oluşturun
     text: >-

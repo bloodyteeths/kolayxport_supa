@@ -1,247 +1,151 @@
 {
-  "query": "handmade Turkish ceramic bowl blue tulip floral Iznik style ",
+  "query": "handmade turkish iznik ceramic bowl",
   "marketplace": "EBAY_US",
-  "totalResults": 89,
-  "medianPrice": 29.99,
-  "avgPrice": 29.99,
+  "totalResults": 160,
+  "medianPrice": 27.97,
+  "avgPrice": 27.97,
   "priceStats": {
-    "n": 89,
-    "total": 89,
-    "trimmed": 0,
-    "median": 29.99,
-    "p25": 21,
-    "p75": 49.99,
-    "min": 9.07,
-    "max": 104.97,
+    "n": 153,
+    "total": 160,
+    "trimmed": 7,
+    "median": 27.97,
+    "p25": 19.95,
+    "p75": 45.47,
+    "min": 4.5,
+    "max": 139.99,
     "currency": "USD",
-    "sampled": 89,
+    "sampled": 160,
     "excludedNoFx": 0,
     "excludedImplausible": 0,
     "quality": "ok"
   },
   "priceSpread": {
-    "min": 9.07,
-    "max": 104.97
+    "min": 4.5,
+    "max": 139.99
   },
   "priceDistribution": [
     {
-      "range": "9-19 USD",
-      "count": 17,
-      "min": 9.07,
-      "max": 19.07
+      "range": "5-19 USD",
+      "count": 34,
+      "min": 4.5,
+      "max": 18.5
     },
     {
-      "range": "19-29 USD",
-      "count": 27,
-      "min": 19.07,
-      "max": 29.07
+      "range": "19-33 USD",
+      "count": 59,
+      "min": 18.5,
+      "max": 32.5
     },
     {
-      "range": "29-39 USD",
-      "count": 8,
-      "min": 29.07,
-      "max": 39.07
+      "range": "33-47 USD",
+      "count": 22,
+      "min": 32.5,
+      "max": 46.5
     },
     {
-      "range": "39-49 USD",
-      "count": 14,
-      "min": 39.07,
-      "max": 49.07
-    },
-    {
-      "range": "49-59 USD",
-      "count": 5,
-      "min": 49.07,
-      "max": 59.07
-    },
-    {
-      "range": "59-69 USD",
+      "range": "47-61 USD",
       "count": 13,
-      "min": 59.07,
-      "max": 69.07
+      "min": 46.5,
+      "max": 60.5
     },
     {
-      "range": "69-79 USD",
-      "count": 1,
-      "min": 69.07,
-      "max": 79.07
+      "range": "61-75 USD",
+      "count": 12,
+      "min": 60.5,
+      "max": 74.5
     },
     {
-      "range": "79-89 USD",
+      "range": "75-89 USD",
+      "count": 6,
+      "min": 74.5,
+      "max": 88.5
+    },
+    {
+      "range": "89-103 USD",
+      "count": 4,
+      "min": 88.5,
+      "max": 102.5
+    },
+    {
+      "range": "103-117 USD",
+      "count": 2,
+      "min": 102.5,
+      "max": 116.5
+    },
+    {
+      "range": "117-131 USD",
       "count": 0,
-      "min": 79.07,
-      "max": 89.07
+      "min": 116.5,
+      "max": 130.5
     },
     {
-      "range": "89-99 USD",
-      "count": 2,
-      "min": 89.07,
-      "max": 99.07
-    },
-    {
-      "range": "99-109 USD",
-      "count": 2,
-      "min": 99.07,
-      "max": 109.07
+      "range": "131-145 USD",
+      "count": 1,
+      "min": 130.5,
+      "max": 144.5
     }
   ],
-  "uniqueSellers": 48,
-  "sellerConcentration": 47.2,
+  "uniqueSellers": 109,
+  "sellerConcentration": 30,
   "topSellers": [
     {
       "username": "anatoliancarpetsandartifacts",
-      "listings": 38
+      "listings": 42
     },
     {
       "username": "mygiftfactory",
-      "listings": 2
-    },
-    {
-      "username": "voosmom",
-      "listings": 2
+      "listings": 3
     },
     {
       "username": "vip-bazar",
-      "listings": 2
+      "listings": 3
+    },
+    {
+      "username": "voosmom",
+      "listings": 3
     },
     {
       "username": "austexjim",
+      "listings": 3
+    },
+    {
+      "username": "cheffin7291",
       "listings": 2
     },
     {
-      "username": "trishm51419",
-      "listings": 1
+      "username": "daphneelise",
+      "listings": 2
     },
     {
-      "username": "shopann7",
-      "listings": 1
-    },
-    {
-      "username": "geniegirl95",
-      "listings": 1
-    },
-    {
-      "username": "fashionfinds25",
+      "username": "2cuddlebugs24",
       "listings": 1
     },
     {
       "username": "na-36943",
       "listings": 1
+    },
+    {
+      "username": "ede-brit",
+      "listings": 1
     }
   ],
-  "freeShippingPct": 79.8,
+  "freeShippingPct": 74.4,
   "conditionBreakdown": {
-    "Unspecified": 10,
-    "Used": 38,
-    "New": 34,
-    "New other (see details)": 6,
+    "New": 46,
+    "Used": 88,
+    "Unspecified": 15,
+    "New other (see details)": 10,
     "Good": 1
   },
   "aspectDistributions": {},
   "topProducts": [
     {
-      "legacyItemId": "120795085831",
-      "title": "Purple Tulip & Floral Handmade 10\" Turkish Dark & Light Blue Iznik Ceramic Bowl ",
-      "price": 64.95,
+      "legacyItemId": "407295514888",
+      "title": "Turkish Handmade Iznik Ceramic Bowl, Floral Pattern, Finger Bowl, 3.25\"",
+      "price": 6,
       "soldQuantity": 0,
       "remainingQuantity": 1,
-      "seller": "anatoliancarpetsandartifacts"
-    },
-    {
-      "legacyItemId": "377516740147",
-      "title": "Vintage Turkish Iznik Style Ceramic Bowl Blue Raised Floral Pottery 3.25\"",
-      "price": 19.99,
-      "soldQuantity": 0,
-      "remainingQuantity": 1,
-      "seller": "trishm51419"
-    },
-    {
-      "legacyItemId": "126047803421",
-      "title": "Turkish 10\"x3 1/2\" Handmade Iznik Tulip & Floral Pattern Ceramic Bowl",
-      "price": 45.47,
-      "soldQuantity": 0,
-      "remainingQuantity": 1,
-      "seller": "anatoliancarpetsandartifacts"
-    },
-    {
-      "legacyItemId": "124086307694",
-      "title": "Turkish Blue & Red 12\"x4\" Handmade Iznik Floral Pattern Ceramic Bowl",
-      "price": 62.97,
-      "soldQuantity": 0,
-      "remainingQuantity": 1,
-      "seller": "anatoliancarpetsandartifacts"
-    },
-    {
-      "legacyItemId": "398316357799",
-      "title": "Handmade 12\"x4\" Turkish Blue Iznik Carnation & Floral Motif Ceramic Bowl Signed",
-      "price": 69,
-      "soldQuantity": 0,
-      "remainingQuantity": 1,
-      "seller": "shopann7"
-    },
-    {
-      "legacyItemId": "127964996376",
-      "title": "Turkish Iznik Tulip & Floral Pattern 12\" (30cm) Hand-painted Ceramic Bowl",
-      "price": 59.47,
-      "soldQuantity": 0,
-      "remainingQuantity": 1,
-      "seller": "anatoliancarpetsandartifacts"
-    },
-    {
-      "legacyItemId": "385886534905",
-      "title": "Turkish Blue 10\"x3 1/2\" Handmade Iznik Tulip & Floral Pattern Ceramic Bowl",
-      "price": 45.47,
-      "soldQuantity": 0,
-      "remainingQuantity": 1,
-      "seller": "anatoliancarpetsandartifacts"
-    },
-    {
-      "legacyItemId": "188843552294",
-      "title": "Turkish Hand Painted vibrant Blue/Red Tulip Design Ceramic Plate Iznik Style.",
-      "price": 55,
-      "soldQuantity": 0,
-      "remainingQuantity": 1,
-      "seller": "geniegirl95"
-    },
-    {
-      "legacyItemId": "383022848638",
-      "title": "Set of 3 Turkish 6\"x2\" Handmade Iznik Red Tulip & Cintemani Pattern Ceramic Bowl",
-      "price": 41.97,
-      "soldQuantity": 0,
-      "remainingQuantity": 1,
-      "seller": "anatoliancarpetsandartifacts"
-    },
-    {
-      "legacyItemId": "800776159023",
-      "title": "Turkish Hand Painted Ceramic Floral Bowl Purple Blue Iznik Style Artisan Pottery",
-      "price": 19,
-      "soldQuantity": 0,
-      "remainingQuantity": 1,
-      "seller": "fashionfinds25"
-    },
-    {
-      "legacyItemId": "382760058292",
-      "title": "Green & Orange 12\"x4\" Handmade Turkish Iznik Tulip & Floral Pattern Ceramic Bowl",
-      "price": 62.97,
-      "soldQuantity": 0,
-      "remainingQuantity": 1,
-      "seller": "anatoliancarpetsandartifacts"
-    },
-    {
-      "legacyItemId": "124785840783",
-      "title": "Turkish Defective 6\"x2 1/4\" Handmade Iznik Floral Pattern Ceramic Bowl Set of 2",
-      "price": 11.16,
-      "soldQuantity": 0,
-      "remainingQuantity": 1,
-      "seller": "anatoliancarpetsandartifacts"
-    },
-    {
-      "legacyItemId": "386150156351",
-      "title": "Blue Turkish 10\"x3 1/2\" Handmade Iznik Textured Floral Pattern Ceramic Bowl",
-      "price": 45.47,
-      "soldQuantity": 0,
-      "remainingQuantity": 1,
-      "seller": "anatoliancarpetsandartifacts"
+      "seller": "2cuddlebugs24"
     },
     {
       "legacyItemId": "137840876971",
@@ -260,28 +164,52 @@
       "seller": "ede-brit"
     },
     {
-      "legacyItemId": "168799898105",
-      "title": "Handmade Ceramic Pinch Bowls Set of 3 Floral Hand Painted Oval Turkish Trinket",
-      "price": 28.09,
-      "soldQuantity": 0,
-      "remainingQuantity": 1,
-      "seller": "piece-of-scrap"
+      "legacyItemId": "227529890892",
+      "title": "Handmade Turkish Ceramic Condiments Bowl Set Of 6, Housewarming Gifts",
+      "price": 49,
+      "soldQuantity": 1,
+      "remainingQuantity": 99,
+      "seller": "mygiftfactory"
     },
     {
-      "legacyItemId": "124275645018",
-      "title": "6\"x2 1/4\" Turkish Handmade Iznik Floral Pattern Ceramic Bowl Set of 2",
-      "price": 26.95,
+      "legacyItemId": "366247448984",
+      "title": "Handmade Turkish Iznik Style Ceramic Bowl Raised Relief Hand Painted Pottery Red",
+      "price": 10.95,
       "soldQuantity": 0,
-      "remainingQuantity": 3,
+      "remainingQuantity": 1,
+      "seller": "hiddennestgoods"
+    },
+    {
+      "legacyItemId": "377516740147",
+      "title": "Vintage Turkish Iznik Style Ceramic Bowl Blue Raised Floral Pottery 3.25\"",
+      "price": 19.99,
+      "soldQuantity": 0,
+      "remainingQuantity": 1,
+      "seller": "trishm51419"
+    },
+    {
+      "legacyItemId": "398316357799",
+      "title": "Handmade 12\"x4\" Turkish Blue Iznik Carnation & Floral Motif Ceramic Bowl Signed",
+      "price": 69,
+      "soldQuantity": 0,
+      "remainingQuantity": 1,
+      "seller": "shopann7"
+    },
+    {
+      "legacyItemId": "120795085831",
+      "title": "Purple Tulip & Floral Handmade 10\" Turkish Dark & Light Blue Iznik Ceramic Bowl ",
+      "price": 64.95,
+      "soldQuantity": 0,
+      "remainingQuantity": 1,
       "seller": "anatoliancarpetsandartifacts"
     },
     {
-      "legacyItemId": "327018361232",
-      "title": "Turkish Blue & Orange 6\"x2 1/4\" Handmade Iznik Floral Pattern Ceramic Bowl",
-      "price": 20.99,
+      "legacyItemId": "407297075362",
+      "title": "VTG Hand-Crafted Turkish Art Pottery Bowl/Trinket Textured-Relief Iznik Region",
+      "price": 12.25,
       "soldQuantity": 0,
       "remainingQuantity": 1,
-      "seller": "tiffndsshop"
+      "seller": "patina_finds_with_soul"
     },
     {
       "legacyItemId": "900008322305",
@@ -292,18 +220,90 @@
       "seller": "jdg-collection"
     },
     {
-      "legacyItemId": "383731447663",
-      "title": "Turkish 6\", 5\" & 3\" Handmade Iznik Floral Pattern Ceramic Bowl Set",
-      "price": 26.57,
+      "legacyItemId": "366623724049",
+      "title": "Turkish Handmade Mall 3\" Bowl Multi Raised Floral Ceramic Turkey Iznik Painted",
+      "price": 11,
+      "soldQuantity": 0,
+      "remainingQuantity": 1,
+      "seller": "coolvintageatx"
+    },
+    {
+      "legacyItemId": "124086307694",
+      "title": "Turkish Blue & Red 12\"x4\" Handmade Iznik Floral Pattern Ceramic Bowl",
+      "price": 62.97,
+      "soldQuantity": 0,
+      "remainingQuantity": 1,
+      "seller": "anatoliancarpetsandartifacts"
+    },
+    {
+      "legacyItemId": "206518085879",
+      "title": "Turkish Iznik Ceramic Bowl 6\" Blue Floral Carnation Pottery Turkey Türkiye",
+      "price": 28,
+      "soldQuantity": 0,
+      "remainingQuantity": 1,
+      "seller": "thrifterjunkervintagehunter"
+    },
+    {
+      "legacyItemId": "168799898105",
+      "title": "Handmade Ceramic Pinch Bowls Set of 3 Floral Hand Painted Oval Turkish Trinket",
+      "price": 28.09,
+      "soldQuantity": 0,
+      "remainingQuantity": 1,
+      "seller": "piece-of-scrap"
+    },
+    {
+      "legacyItemId": "237129629659",
+      "title": "Pair of Nakhas Hand-Painted Turkish Ceramic Bowls – Iznik Floral Design 5\"",
+      "price": 32.95,
+      "soldQuantity": 0,
+      "remainingQuantity": 1,
+      "seller": "thenephalim"
+    },
+    {
+      "legacyItemId": "383850974334",
+      "title": "Handmade 12\"x7\" Turkish Iznik Red Floral Pattern Ceramic Cini Bowl w/ Lid",
+      "price": 174.97,
+      "soldQuantity": 0,
+      "remainingQuantity": 1,
+      "seller": "anatoliancarpetsandartifacts"
+    },
+    {
+      "legacyItemId": "336819681720",
+      "title": "Handpainted Turkish Iznik Art Pottery Bowl Floral Colorful Ceramic 6” x 2”",
+      "price": 22,
+      "soldQuantity": 0,
+      "remainingQuantity": 1,
+      "seller": "cheffin7291"
+    },
+    {
+      "legacyItemId": "124231150647",
+      "title": "Handmade Yellow & Green 8\" x 3\" Turkish Iznik Raised Floral Ceramic Bowl",
+      "price": 27.97,
+      "soldQuantity": 0,
+      "remainingQuantity": 1,
+      "seller": "anatoliancarpetsandartifacts"
+    },
+    {
+      "legacyItemId": "297250566609",
+      "title": "Iznik Pottery Turkish Bowls",
+      "price": 35,
+      "soldQuantity": 0,
+      "remainingQuantity": 1,
+      "seller": "kitkatbiz"
+    },
+    {
+      "legacyItemId": "383016176124",
+      "title": "12\"x4\" Turkish Handmade Iznik Raised Detailed Floral Pattern Ceramic Bowl ",
+      "price": 104.97,
       "soldQuantity": 0,
       "remainingQuantity": 1,
       "seller": "anatoliancarpetsandartifacts"
     }
   ],
-  "demandScore": 10,
-  "competitionScore": 18,
-  "opportunityScore": 39,
-  "sellThroughRate": 0,
-  "avgSoldPerItem": 0,
-  "listingsPerSeller": 1.9
+  "demandScore": 11,
+  "competitionScore": 13,
+  "opportunityScore": 41,
+  "sellThroughRate": 0.6,
+  "avgSoldPerItem": 0.1,
+  "listingsPerSeller": 1.5
 }

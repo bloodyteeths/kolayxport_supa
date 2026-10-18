@@ -22,7 +22,9 @@
 - { url: "**/api/clawd/ebay?**", method: GET, query: { action: category_suggestions }, fixture: category-suggestions.json, capture: true }
 - { url: "**/api/clawd/ebay?**", method: GET, query: { action: item_aspects }, fixture: item-aspects.json, capture: true }
 - { url: "**/api/clawd/ebay?**", method: GET, query: { action: item_conditions }, fixture: item-conditions.json, capture: true }
-- { url: "**/api/ai/generate-image**", method: POST, fixture: generate-image.json, capture: true }
+# The AI photo (captured 2026-10-18 with the uploaded photo as reference) is replayed as is, also in capture mode;
+# add `capture: true` here to make a new one.
+- { url: "**/api/ai/generate-image**", method: POST, fixture: generate-image.json }
 # Synthetic seller data (user-token reads).
 - { url: "**/api/clawd/ebay?**", method: GET, query: { action: fulfillment_policies }, fixture: fulfillment-policies.json }
 - { url: "**/api/clawd/ebay?**", method: GET, query: { action: return_policies }, fixture: return-policies.json }

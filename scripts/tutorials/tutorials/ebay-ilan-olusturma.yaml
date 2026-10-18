@@ -20,8 +20,13 @@ steps:
       - waitFor: { selector: "[data-testid=le-section-photos] img" }
       - waitFor: { text: "Fotoğraflardan doldur" }
     zoom: { testid: le-section-photos, scale: 1.3 }
+  - title: "Ürününüzü bir cümleyle yazın"
+    say: "Hızlı başlayın kartına ürününüzü bir cümleyle yazın. Fotoğrafta görünmeyen bilgileri, örneğin el yapımı olduğunu ve nereden geldiğini, buraya yazın; yapay zekâ yalnızca gördüğünü ve sizin yazdığınızı kullanır."
+    do:
+      - fill: { selector: "[data-testid=le-ai-fill-seed] input, input[data-testid=le-ai-fill-seed]", value: "Handmade Turkish Iznik ceramic bowl" }
+    zoom: { testid: le-ai-fill-card, scale: 1.3 }
   - title: "Fotoğraflardan doldurun"
-    say: "Hızlı başlayın kartında Fotoğraflardan doldur'a tıklayın. Yapay zekâ fotoğrafınıza bakıp ürünü tanır; başlığı, kategoriyi, ürün özelliklerini, fiyatı ve açıklamayı hazırlar."
+    say: "Sonra Fotoğraflardan doldur'a tıklayın. Yapay zekâ fotoğrafınıza bakıp ürünü tanır; başlığı, kategoriyi, ürün özelliklerini, fiyatı ve açıklamayı hazırlar."
     do:
       - click: { testid: le-ai-fill-run }
       - waitFor: { testid: le-ai-fill-use-all }
@@ -55,13 +60,6 @@ steps:
       - wait: 800
       - scrollTo: { testid: le-section-title }
     zoom: { testid: le-section-title, scale: 1.25 }
-  - title: "Durumu kontrol edin"
-    say: "Ürünün durumunu mutlaka kontrol edin. Yapay zekâ fotoğraftan Sıfır Gibi dedi; ürününüz yeniyse Yeni seçin."
-    do:
-      - scrollTo: { selector: "#le-field-condition" }
-      - click: { selector: "#le-field-condition [role=combobox]" }
-      - click: { role: option, name: "Yeni", exact: true }
-    zoom: { selector: "#le-field-condition", scale: 1.4 }
   - title: "Ek fotoğraf oluşturun"
     say: "Fotoğraf oluştur'a tıklayın, sahneyi yazın ve eklediğiniz fotoğrafı referans seçin. Yapay zekâ ürününüzü bu fotoğraftan örnek alır."
     do:

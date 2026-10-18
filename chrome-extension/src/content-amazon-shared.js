@@ -10,68 +10,15 @@ const KX_AMZ_PREFIX = 'kx-amz-research';
 const KX_AMZ_API_BASE = 'https://kolayxport.com';
 
 // ---------------------------------------------------------------------------
-// Inline CSS
+// Styles: the shared UI module (lib/ui.js, "Blade" brand) — the same ink top bar, card
+// strips and white panel as on Etsy and eBay. All three live in the page DOM here, so the
+// CSS goes into <head> once, every rule scoped under .kx-ui.
 // ---------------------------------------------------------------------------
-const KX_AMZ_INLINE_CSS = `
-.kx-data-row {
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  padding: 4px 8px; font-size: 11px; font-weight: 600;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #fff8e1; border-top: 1px solid #ffe0b2; color: #555;
-  line-height: 1.4;
-}
-.kx-data-row .kx-sep { color: #ccc; font-weight: 400; }
-.kx-data-row .kx-best { color: #b8860b; }
-.kx-data-row .kx-green { color: #2e7d32; }
-.kx-data-row .kx-orange { color: #e65100; }
-.kx-data-row .kx-red { color: #c62828; }
-.kx-data-row .kx-muted, .kx-stats-bar .kx-muted { color: #999; font-weight: 400; }
-.kx-data-row .kx-tag {
-  background: #eee; color: #666; border-radius: 3px; padding: 0 4px; font-size: 10px; font-weight: 700;
-}
-.kx-stats-bar .kx-stats-note { margin-top: 4px; font-size: 11px; color: #888; }
-.kx-amz-badge {
-  display: inline-flex; align-items: center; gap: 3px;
-  background: linear-gradient(135deg, #FF9900 0%, #FF6600 100%);
-  color: #fff; padding: 2px 6px; border-radius: 4px;
-  font-size: 10px; font-weight: 800; letter-spacing: 0.5px;
-}
-.kx-stats-bar {
-  background: #fff8e1; border: 1px solid #ffe0b2; border-radius: 8px;
-  padding: 10px 14px; margin: 10px 0; font-size: 12px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  color: #444; line-height: 1.6;
-}
-.kx-stats-bar .kx-stats-header {
-  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
-  font-weight: 700; font-size: 13px; color: #333;
-}
-.kx-stats-bar .kx-stats-logo {
-  background: linear-gradient(135deg, #FF9900 0%, #FF6600 100%);
-  color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;
-}
-.kx-stats-bar .kx-stats-row {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-}
-.kx-stats-bar .kx-sep { color: #ccc; }
-.kx-stats-bar .kx-green { color: #2e7d32; }
-.kx-stats-bar .kx-orange { color: #e65100; }
-.kx-stats-bar .kx-red { color: #c62828; }
-.kx-ai-btn {
-  background: linear-gradient(135deg, #FF9900 0%, #FF6600 100%);
-  color: #fff; border: none; border-radius: 4px;
-  padding: 4px 10px; font-size: 11px; font-weight: 700; cursor: pointer;
-  transition: opacity 0.2s;
-}
-.kx-ai-btn:hover { opacity: 0.85; }
-`;
+function amzUI() { return window.__KX_UI || null; }
 
 function injectAmazonCSS() {
-  if (document.getElementById('kx-amz-inline-css')) return;
-  const style = document.createElement('style');
-  style.id = 'kx-amz-inline-css';
-  style.textContent = KX_AMZ_INLINE_CSS;
-  document.head.appendChild(style);
+  const U = amzUI();
+  if (U) U.ensureStyles(document);
 }
 
 // ---------------------------------------------------------------------------
@@ -473,8 +420,8 @@ const KX_AMZ_I18N = {
     amazonFig: 'Amazon: {label} satış/ay',
     amazonFigTip: 'Amazon\'un ilanda gösterdiği kendi verisi: "geçen ay {label} satın alındı". Kesin sayı değil, alt sınırdır.',
     revFloorTip: 'Amazon\'un alt sınırı × güncel fiyat. {label} adetten fazla satıldıysa gerçek gelir daha yüksektir.',
-    estUnits: 'tahmini ~{n}/ay',
-    estRev: 'tahmini ~{money}/ay',
+    estUnits: "≈{n} satış/ay",
+    estRev: "≈{money}/ay",
     estTip: 'Ölçüm değil, tahmin: {cat} kategorisinde BSR #{bsr} (resmi Amazon verisi), {curve} BSR→satış eğrisiyle hesaplandı. Olası aralık {band}/ay.',
     itsCategory: 'kendi',
     uncalibrated: ' Model amazon.com verisiyle kalibre edildi; bu pazaryerinde muhtemelen olduğundan yüksek gösterir.',
@@ -504,14 +451,14 @@ const KX_AMZ_I18N = {
     snapshot: 'Amazon Pazar Özeti · bu sayfada {organic} sonuç + {ads} reklam{total}',
     snapshotTotal: ' (toplam {total})',
     adWordOne: 'reklam', adWordMany: 'reklam',
-    medianPrice: 'Medyan fiyat',
-    range: 'Aralık',
-    medianRatings: 'Medyan değerlendirme',
+    medianPrice: "Tipik fiyat",
+    range: "Fiyat aralığı",
+    medianRatings: "Tipik yorum sayısı",
     medianRatingsTip: 'Bu sayfadaki organik (reklamsız) sonuçların medyan değerlendirme sayısı',
-    top10Median: 'İlk 10 medyanı',
+    top10Median: "İlk 10 ürünün yorum sayısı",
     top10MedianTip: 'İlk 10 organik sonucun medyan değerlendirme sayısı',
-    avgRating: 'Ort. puan',
-    ads: 'Reklam',
+    avgRating: "Ortalama puan",
+    ads: "Reklamlı sonuç",
     competition: 'Rekabet',
     deepAi: 'Detaylı AI Analizi',
     boughtNote: 'Amazon "geçen ay satın alındı": {n} üründen {k} tanesinde var; toplamda en az {units} adet/ay (Amazon\'un alt sınırları, tahmin değil).',
@@ -539,6 +486,28 @@ const KX_AMZ_I18N = {
     feeNote: 'Komisyon oranları kategoriye göre değişir (yaklaşık %8–17). FBA gönderim ücretleri boyut ve ağırlığa bağlıdır ve dahil değildir.',
     aiAnalysis: 'AI Analizi',
     marketResearch: 'Pazar Araştırması',
+    onPage: "Bu sayfada",
+    onPageVal: "{organic} sonuç + {ads} reklam",
+    est: "tahmini",
+    plainOnPage: "Bu sayfadaki reklamsız sonuçlar ve reklamlar. Amazon'un toplam sonuç sayısı \"Daha fazla\" bölümünde.",
+    plainTypicalPrice: "Ortadaki fiyat: ürünlerin yarısı daha ucuz, yarısı daha pahalı.",
+    plainRange: "Bu sayfadaki en düşük ve en yüksek fiyat.",
+    plainReviews: "Reklamsız sonuçların ortadaki yorum sayısı. Yüksekse yerleşik rakipler güçlüdür.",
+    plainTop10: "İlk 10 reklamsız ürünün ortadaki yorum sayısı: üst sıralardakilerin ne kadar yerleşik olduğunu gösterir.",
+    plainCompetition: "Sonuç sayısı, yorum sayıları ve reklam yoğunluğundan hesaplanan 0–100 skor. Skor yükseldikçe pazar zorlaşır.",
+    plainRating: "Bu sayfadaki ürünlerin yıldız puanlarının ortalaması.",
+    plainAds: "Bu sayfadaki sponsorlu (reklamlı) sonuçlar / tüm sonuçlar.",
+    plainAmazonFig: "Amazon'un ilanda gösterdiği \"geçen ay satın alındı\" rakamı. Kesin sayı değil, alt sınırdır.",
+    plainEstimate: "En Çok Satanlar sıralamasından (BSR) tahmin edildi. Gerçek satış farklı olabilir.",
+    plainNoSales: "Bu ürün için güvenilir satış verisi yok, bu yüzden tahmin yürütmüyoruz.",
+    plainRevFloor: "Amazon'un alt sınırı × güncel fiyat. Gerçek gelir daha yüksek olabilir.",
+    plainEstRev: "Tahmini satış × güncel fiyat.",
+    plainFee: "Amazon satış komisyonu çoğu kategoride ~%15. FBA ve kargo ücretleri dahil değil.",
+    cardRatingsNote: "{n} değerlendirme.",
+    cardRatingNote: "Puan: ★ {r}.",
+    cardBsrNote: "BSR #{n}.",
+    cardOffersNote: "{n} teklif.",
+    cardAsinNote: "ASIN: {asin}.",
   },
   en: {
     perMonth: '/mo',
@@ -552,8 +521,8 @@ const KX_AMZ_I18N = {
     amazonFig: 'Amazon: {label} bought/mo',
     amazonFigTip: 'Amazon\'s own figure, shown on the listing: \'{label} bought in past month\'. It is a floor, not an exact count.',
     revFloorTip: 'Amazon\'s floor × current price. Real revenue is higher if more than {label} were sold.',
-    estUnits: 'est. ~{n}/mo',
-    estRev: 'est. ~{money}/mo',
+    estUnits: "≈{n} sales/mo",
+    estRev: "≈{money}/mo",
     estTip: 'Estimate, not measured: Best Seller Rank #{bsr} in {cat} (official Amazon data) run through a {curve} BSR-to-sales curve. Likely range {band}/mo.',
     itsCategory: 'its category',
     uncalibrated: ' Model is calibrated on amazon.com and likely overstates this marketplace.',
@@ -580,14 +549,14 @@ const KX_AMZ_I18N = {
     snapshot: 'Amazon Market Snapshot · {organic} results + {ads} {adWord} on this page{total}',
     snapshotTotal: ' (of {total})',
     adWordOne: 'ad', adWordMany: 'ads',
-    medianPrice: 'Median price',
-    range: 'Range',
-    medianRatings: 'Median ratings',
+    medianPrice: "Typical price",
+    range: "Price range",
+    medianRatings: "Typical review count",
     medianRatingsTip: 'Median rating count of organic (non-ad) results on this page',
-    top10Median: 'Top-10 median',
+    top10Median: "Top-10 review count",
     top10MedianTip: 'Median rating count of the first 10 organic results',
-    avgRating: 'Avg rating',
-    ads: 'Ads',
+    avgRating: "Average rating",
+    ads: "Ads",
     competition: 'Competition',
     deepAi: 'Deep AI Analysis',
     boughtNote: 'Amazon "bought in past month": {k} of {n} products show it, together at least {units} units/mo (Amazon\'s floors, not estimates).',
@@ -615,6 +584,28 @@ const KX_AMZ_I18N = {
     feeNote: 'Referral rates vary by category (about 8–17%). FBA fulfilment fees depend on size and weight and are not included.',
     aiAnalysis: 'AI Analysis',
     marketResearch: 'Market Research',
+    onPage: "On this page",
+    onPageVal: "{organic} results + {ads} {adWord}",
+    est: "estimate",
+    plainOnPage: "Organic results and ads on this page. Amazon's total result count is under \"More\".",
+    plainTypicalPrice: "The middle price: half of the products cost less, half cost more.",
+    plainRange: "The lowest and highest price on this page.",
+    plainReviews: "Review count of the middle organic result. When it is high, established competitors are strong.",
+    plainTop10: "Review count of the middle product in the top 10 organic results: how established the leaders are.",
+    plainCompetition: "A 0–100 score from the result count, review counts and ad density. The higher the score, the tougher the market.",
+    plainRating: "Average star rating of the products on this page.",
+    plainAds: "Sponsored results / all results on this page.",
+    plainAmazonFig: "Amazon's own \"bought in past month\" figure shown on the listing. A floor, not an exact count.",
+    plainEstimate: "Estimated from the Best Seller Rank (BSR). Real sales can differ.",
+    plainNoSales: "No reliable sales data for this product, so we don't guess.",
+    plainRevFloor: "Amazon's floor × current price. Real revenue can be higher.",
+    plainEstRev: "Estimated sales × current price.",
+    plainFee: "Amazon's referral fee is ~15% in most categories. FBA and shipping fees are not included.",
+    cardRatingsNote: "{n} ratings.",
+    cardRatingNote: "Rating: ★ {r}.",
+    cardBsrNote: "BSR #{n}.",
+    cardOffersNote: "{n} offers.",
+    cardAsinNote: "ASIN: {asin}.",
   },
 };
 
@@ -684,6 +675,7 @@ window.__kxAmzShared = {
   formatRating: amzFormatRating,
   math: kxAmzMath,
   injectAmazonCSS,
+  get UI() { return amzUI(); },
   extractAsinFromUrl,
   extractAsinFromElement,
   extractSearchCards,

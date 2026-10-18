@@ -29,6 +29,7 @@ function boot(url: string, html: string, onApi: ApiHandler, lang: 'tr' | 'en' | 
   };
   w.__KX_CACHE = { getOrFetch: (_k: string, _t: string, fetcher: () => Promise<unknown>) => fetcher() };
   w.eval(src('lib/lang.js'));
+  w.eval(src('lib/ui.js'));
   w.eval(src('lib/ebayMath.js'));
   w.eval(src('content-ebay-shared.js'));
   return { dom, calls, run: (f: string) => w.eval(src(f)) };
@@ -61,21 +62,23 @@ describe('eBay search overlay (new markup + API fixture)', () => {
     const text = await waitFor(() => barText(dom));
 
     expect(calls[0]).toMatchObject({ action: 'search_enrich', params: { query: 'turkish cotton towel', marketplace: 'EBAY_US' } });
-    expect(text).toContain('Results 9,500+');
-    expect(text).toContain('Median Price $25.99');
-    expect(text).toContain('$18.00 – $31.50');
-    expect(text).toContain('Sellers 4 distinct / 5 listings');
+    expect(text).toContain('Results9,500+');
+    expect(text).toContain('Typical price$25.99');
+    expect(text).toContain('Most prices$18.00 – $31.50');
+    expect(text).toContain('Different sellers4 of 5 listings');
+    expect(text).toContain('Listings with sales');
     expect(text).toContain('Source: eBay API, top 5 best-match listings');
-    expect(text).toMatch(/Competition \(est\.\) (Low|Medium|High)/);
+    expect(text).toMatch(/Competition ?est\.(Low|Medium|High)/);
+    expect(text).toMatch(/(High|Medium|Low) competition: /); // one-line verdict
     expect(text).not.toContain('$0.00');
 
     const rows = Array.from(dom.window.document.querySelectorAll('.kx-data-row')).map((r) => (r.textContent || '').replace(/\s+/g, ' '));
     // Card 1: 120 sold (API), listed 2026-04-18 → est/mo; $25.99 = median
     expect(rows[0]).toContain('120 sold');
-    expect(rows[0]).toMatch(/≈[\d.]+\/mo \(est\.\)/);
-    expect(rows[0]).toContain('·0% vs median');
-    // Card 2 is a price range → no vs-median badge
-    expect(rows[1]).not.toContain('vs median');
+    expect(rows[0]).toMatch(/≈[\d.,]+ sales\/mo est\./);
+    expect(rows[0]).toContain('at the typical price');
+    // Card 2 is a price range → no vs-typical badge
+    expect(rows[1]).not.toContain('typical price');
     // Ghost card got nothing
     const ghost = dom.window.document.querySelector('li[data-listingid="123456"] .kx-data-row');
     expect(ghost).toBeNull();
@@ -86,7 +89,7 @@ describe('eBay search overlay (new markup + API fixture)', () => {
     run('content-ebay-search.js');
     const text = await waitFor(() => barText(dom));
     expect(text).toContain('Source: 5 listings on this page');
-    expect(text).toContain('Median Price $25.99');
+    expect(text).toContain('Typical price$25.99');
     const host = dom.window.document.getElementById('kx-ebay-search-overlay');
     expect(host?.shadowRoot?.querySelector('img')).toBeNull();
   });
@@ -96,7 +99,7 @@ describe('eBay search overlay (new markup + API fixture)', () => {
     run('content-ebay-search.js');
     const text = await waitFor(() => barText(dom));
     expect(calls).toHaveLength(0); // filtered page → no API call
-    expect(text).toContain('Results 9,500+'); // numbers follow the overlay language (English here), not the marketplace
+    expect(text).toContain('Results9,500+'); // numbers follow the overlay language (English here), not the marketplace
     expect(text).toContain('not enough data'); // 3 cards < 5
   });
 });
@@ -125,9 +128,9 @@ describe('eBay listing overlay', () => {
     });
     const text = (el.textContent || '').replace(/\s+/g, ' ');
     expect(text).toContain('SEO: 65/100');
-    expect(text).toContain('Price: +21% vs median ($25.99)');
+    expect(text).toContain('Price: 21% above typical price ($25.99)');
     expect(text).toContain('120 sold');
-    expect(text).toContain('Stock sell-through: 80% (30 available, est.)');
+    expect(text).toContain('Share of stock sold: 80% (30 available, est.)');
     expect(text).toContain('towelhaus 99.6% positive (5,210 feedback)');
     expect(text).toContain('9,012 similar listings');
     expect(text).toContain('Title contains only 3 of the 20 most common keywords.');
@@ -140,19 +143,20 @@ describe('eBay overlays in Turkish (default, nothing stored)', () => {
     const { dom, run } = boot('https://www.ebay.com/sch/i.html?_nkw=turkish+cotton+towel', fixture('ebay-search-new.html'), () => api, null);
     run('content-ebay-search.js');
     const text = await waitFor(() => barText(dom));
-    expect(text).toContain('Sonuç 9.500+');
-    expect(text).toContain('Medyan Fiyat $25,99');
-    expect(text).toContain('$18,00 – $31,50');
-    expect(text).toContain('Satıcı 4 farklı / 5 ilan');
+    expect(text).toContain('Sonuç9.500+');
+    expect(text).toContain('Tipik fiyat$25,99');
+    expect(text).toContain('Fiyatların çoğu$18,00 – $31,50');
+    expect(text).toContain('Farklı satıcı4 / 5 ilan');
+    expect(text).toContain('Satış yapan ilan'); // in the "Daha fazla" row
     expect(text).toContain('Kaynak: eBay API, en iyi eşleşen 5 ilan');
-    expect(text).toMatch(/Rekabet \(tahmini\) (Düşük|Orta|Yüksek)/);
-    expect(text).toContain('Tam Analiz');
+    expect(text).toMatch(/Rekabet ?tahmini(Düşük|Orta|Yüksek)/);
+    expect(text).toContain('Tam analiz');
     expect(text).not.toMatch(/Results|Median|Sellers|Competition/);
 
     const rows = Array.from(dom.window.document.querySelectorAll('.kx-data-row')).map((r) => (r.textContent || '').replace(/\s+/g, ' '));
     expect(rows[0]).toContain('120 satıldı');
-    expect(rows[0]).toMatch(/≈[\d.]+\/ay \(tahmini\)/);
-    expect(rows[0]).toContain('%0 medyana göre');
+    expect(rows[0]).toMatch(/≈[\d.,]+ satış\/ay tahmini/);
+    expect(rows[0]).toContain('tipik fiyatta');
   });
 
   it('item panel in Turkish', async () => {
@@ -176,9 +180,9 @@ describe('eBay overlays in Turkish (default, nothing stored)', () => {
       return e && e.dataset.kxState === 'full' ? e : null;
     });
     const text = (el.textContent || '').replace(/\s+/g, ' ');
-    expect(text).toContain('Fiyat: +%21 medyana göre ($25,99)');
+    expect(text).toContain('Fiyat: tipik fiyattan %21 pahalı ($25,99)');
     expect(text).toContain('120 satıldı');
-    expect(text).toContain('Stok satış oranı: %80 (30 mevcut, tahmini)');
+    expect(text).toContain('Stoğun satılan kısmı: %80 (30 mevcut, tahmini)');
     expect(text).toContain('towelhaus %99,6 olumlu (5.210 değerlendirme)');
     expect(text).toContain('9.012 benzer ilan');
     expect(text).toContain('Başlık en sık 20 anahtar kelimeden yalnızca 3 tanesini içeriyor.');

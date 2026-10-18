@@ -48,6 +48,7 @@ function boot(url: string, html: string, scripts: string[], onMsg: (m: Msg) => u
   w.open = (u: string) => { opened.push(u); return null; };
   w.__KX_CACHE = { getOrFetch: (_k: string, _t: string, fetcher: () => Promise<unknown>) => fetcher() };
   w.eval(src('lib/lang.js'));
+  w.eval(src('lib/ui.js'));
   w.eval(src('lib/limitCard.js'));
   for (const s of scripts) w.eval(src(s));
   return { dom, w, calls, opened, doc: w.document as Document };

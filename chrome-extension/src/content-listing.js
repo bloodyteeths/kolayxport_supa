@@ -190,9 +190,8 @@
         if (!isCurrent()) return;
         // Daily research limit / busy / signed out (401 → sign-up card): one card instead of the numbers.
         if (S.showLimitCard(statsBar, err, 'etsy_listing', true)) return;
-        statsBar.textContent = '';
         const msg = err && err.status === 401 ? S.t('signInRequired') : (err && err.message) || S.t('loadFailed');
-        statsBar.appendChild(header(msg));
+        S.UI.panel(statsBar, { title: msg });
       }
     }
 
@@ -227,20 +226,9 @@
       return n;
     }
 
-    function header(text, extra) {
-      const h = node('div', 'kx-stats-header');
-      h.appendChild(node('span', 'kx-stats-logo', 'KX'));
-      if (text) h.appendChild(node('span', null, text));
-      if (extra) extra.forEach(e => h.appendChild(e));
-      return h;
-    }
-
-    function metric(label, value, color, title) {
-      const m = node('span', 'kx-metric');
-      if (title) m.title = title;
-      m.appendChild(node('span', 'kx-metric-label', label));
-      m.appendChild(node('span', null, value, `font-weight:700;${color ? 'color:' + color + ';' : ''}`));
-      return m;
+    /** Panel metric tile. `tone`: 'green' | 'orange' | 'red' (always next to a number or word). */
+    function metric(label, value, tone, info, key) {
+      return S.UI.metric(document, { label, value, tone, info, key });
     }
 
     function fmtSales(n) {
@@ -284,62 +272,68 @@
       top.appendChild(v);
       top.appendChild(S.skel());
       box.appendChild(top);
-      const how = node('div', 'kx-sales-how');
+      const how = node('div', 'kx-sales-plain');
       how.appendChild(S.skel('x'));
       box.appendChild(how);
       box.appendChild(node('div', 'kx-sales-meta', S.t('loading')));
       return box;
     }
 
-    function renderSalesBlock(data) {
+    /** The formula behind a sales figure, with the real inputs (shown in the "i"). */
+    function salesHow(data) {
       const sales = data.sales || {};
-      const box = node('div', 'kx-sales');
-      const top = node('div', 'kx-sales-top');
-
       const kind = sales.kind || 'insufficient';
-      const badgeCls = kind === 'measured' ? 'kx-badge kx-badge-measured' : kind === 'estimated' ? 'kx-badge kx-badge-estimated' : 'kx-badge kx-badge-none';
-      const badgeText = kind === 'measured' ? S.t('badgeMeasured') : kind === 'estimated' ? S.t('badgeEstimated') : S.t('badgeInsufficient');
-
-      if (sales.monthlySales !== null && sales.monthlySales !== undefined) {
-        top.appendChild(node('span', 'kx-sales-value', (kind === 'estimated' ? '~' : '') + fmtSales(sales.monthlySales) + ' ' + S.t('salesPerMonth')));
-      } else if (sales.monthlySalesUpperBound !== null && sales.monthlySalesUpperBound !== undefined) {
-        top.appendChild(node('span', 'kx-sales-value', S.t('lessThan') + ' ' + fmtSales(sales.monthlySalesUpperBound) + ' ' + S.t('salesPerMonth')));
-      }
-      top.appendChild(node('span', badgeCls, badgeText));
-      if (sales.confidence) {
-        const c = sales.confidence === 'high' ? 'confHigh' : sales.confidence === 'medium' ? 'confMedium' : 'confLow';
-        top.appendChild(node('span', 'kx-badge kx-badge-conf', S.t(c)));
-      }
-      if (sales.monthlyRevenue !== null && sales.monthlyRevenue !== undefined) {
-        const rev = node('span', 'kx-sales-rev', '≈ ' + fmtMoney(sales.monthlyRevenue, sales.currency) + ' ' + S.t('revenueApprox'));
-        if (sales.priceUsed) {
-          const p = S.formatMoney(sales.priceUsed, sales.currency, 2);
-          rev.title = (sales.priceSource === 'page' ? S.t('revTipPage', { sales: fmtSales(sales.monthlySales), price: p })
-            : S.t('revTipList', { sales: fmtSales(sales.monthlySales), price: p }));
-          rev.textContent += ' · ' + (sales.priceSource === 'page' ? S.t('revenueFromPage', { price: p }) : S.t('revenueFromList', { price: p }));
-        }
-        top.appendChild(rev);
-      }
-      box.appendChild(top);
-
-      // How it was computed — the actual inputs
       const i = sales.inputs || {};
-      let how = '';
       if (kind === 'measured') {
-        how = S.t(i.shareSource === 'lifetime_reviews' ? 'howMeasuredLifetime' : 'howMeasured', {
+        return S.t(i.shareSource === 'lifetime_reviews' ? 'howMeasuredLifetime' : 'howMeasured', {
           delta: S.formatNum(i.shopSoldDelta), days: i.spanDays, perDay: i.shopSoldPerDay,
           share: i.share, mine: i.shareListingReviews, total: i.shareShopReviews, window: Math.round(i.shareWindowDays || 0),
         });
-      } else if (kind === 'estimated') {
-        how = S.t(sales.monthlySales !== null && sales.monthlySales !== undefined ? 'howEstimated' : 'howEstimatedNone', {
+      }
+      if (kind === 'estimated') {
+        return S.t(sales.monthlySales !== null && sales.monthlySales !== undefined ? 'howEstimated' : 'howEstimatedNone', {
           recent: i.recentListingReviews, window: i.windowDays, ratio: i.salesPerReview,
           sold: S.formatNum(i.shopSold), reviews: S.formatNum(i.shopReviewCount),
           upper: fmtSales(sales.monthlySalesUpperBound),
         });
-      } else {
-        how = S.t('howInsufficient');
       }
-      box.appendChild(node('div', 'kx-sales-how', how));
+      return S.t('howInsufficient');
+    }
+
+    function renderSalesBlock(data) {
+      const U = S.UI;
+      const sales = data.sales || {};
+      const box = node('div', 'kx-sales');
+      const top = node('div', 'kx-sales-top');
+      const kind = sales.kind || 'insufficient';
+      const how = salesHow(data);
+      const src = kind === 'measured' ? ['etsyApi', 'kx'] : ['etsyApi'];
+
+      const fig = S.salesFigure(sales);
+      if (fig) top.appendChild(node('span', 'kx-sales-value', fig));
+      top.appendChild(U.conf(document, kind, sales.confidence));
+      top.appendChild(U.info(document, { label: S.t('salesMo'), plain: S.salesPlain(sales), formula: how, source: src, confidence: sales.confidence || null }));
+      box.appendChild(top);
+
+      if (sales.monthlyRevenue !== null && sales.monthlyRevenue !== undefined) {
+        const rev = node('div', 'kx-sales-rev', '≈ ' + fmtMoney(sales.monthlyRevenue, sales.currency) + ' ' + S.t('revenueApprox'));
+        let revTip = '';
+        if (sales.priceUsed) {
+          const p = S.formatMoney(sales.priceUsed, sales.currency, 2);
+          revTip = sales.priceSource === 'page' ? S.t('revTipPage', { sales: fmtSales(sales.monthlySales), price: p })
+            : S.t('revTipList', { sales: fmtSales(sales.monthlySales), price: p });
+          rev.textContent += ' · ' + (sales.priceSource === 'page' ? S.t('revenueFromPage', { price: p }) : S.t('revenueFromList', { price: p }));
+        }
+        rev.appendChild(document.createTextNode(' '));
+        rev.appendChild(U.info(document, {
+          label: S.t('revenueMo'), plain: S.t('plainRevenue'), formula: revTip,
+          source: sales.priceSource === 'page' ? ['etsyApi', 'etsyPage'] : ['etsyApi'], confidence: sales.confidence || null,
+        }));
+        box.appendChild(rev);
+      }
+
+      // Plain-language line on the face; the formula with the real inputs is in the "i".
+      box.appendChild(node('div', 'kx-sales-plain', S.salesPlain(sales)));
 
       // Shop velocity measured but couldn't attribute — still a real number worth showing
       if (kind !== 'measured' && data.shopVelocity && data.shopVelocity.kind === 'measured') {
@@ -363,6 +357,7 @@
      * One renderer for every stage. `stage`: 'loading' (no API data yet: page values +
      * placeholders), 'core' (listing facts; sales / shop / SEO still loading), 'full'.
      * Slots keep their place and size from stage to stage, so values fill in without a jump.
+     * The collapse caret's state is shared by all panels and remembered (lib/ui.js).
      */
     function renderStatsBar(el, data, page, ui, stage) {
       const d = data || {};
@@ -370,16 +365,9 @@
       const shop = d.shop;
       const hasFull = stage === 'full';
       const hasListing = !!data && !!d.listing;
-      el.textContent = '';
-      el.lang = S.lang;
+      const body = S.UI.panel(el, { title: S.t('listingInsights') });
       el.dataset.kxState = stage;
 
-      const collapseBtn = node('button', 'kx-collapse-btn', ui.collapsed ? '▼' : '▲');
-      collapseBtn.type = 'button';
-      el.appendChild(header(null, [collapseBtn]));
-
-      const body = node('div');
-      if (ui.collapsed) body.style.display = 'none';
       body.appendChild(hasFull ? renderSalesBlock(d) : salesSkeleton());
 
       // Real Etsy page signals (what Etsy itself shows to shoppers right now)
@@ -389,42 +377,53 @@
       if (page.isBestseller) signals.push(S.t('bestsellerBadge'));
       if (page.isStarSeller) signals.push(S.t('starSeller'));
       if (signals.length) {
-        const row = node('div', 'kx-stats-row', null, 'margin-bottom:6px;font-size:11px;font-weight:700;');
+        const row = node('div', 'kx-stats-row');
         signals.forEach((s, idx) => {
           if (idx) row.appendChild(node('span', 'kx-sep', '·'));
           row.appendChild(node('span', 'kx-signal', s));
         });
         row.appendChild(node('span', 'kx-sep', '·'));
-        row.appendChild(node('span', null, S.t('sourcePage'), 'color:#999;font-weight:500;'));
+        row.appendChild(node('span', 'kx-muted', S.t('sourcePage')));
         body.appendChild(row);
       }
 
-      // Facts (Etsy API) — no formulas here. A placeholder while a value is still loading.
+      // Facts (Etsy API). A placeholder while a value is still loading.
       const grid = node('div', 'kx-metrics-grid');
       const later = (label) => metricSkel(label);
       // Price shown on the page (instant); the API list price only when the page has none.
-      if (page.pagePrice) grid.appendChild(metric(S.t('price'), S.formatMoney(page.pagePrice, page.pageCurrency, 2), null, S.t('sourcePage')));
-      else if (hasListing && L.price) grid.appendChild(metric(S.t('price'), S.formatMoney(L.price, L.currency, 2), null, S.t('sourceApi')));
+      if (page.pagePrice) {
+        grid.appendChild(metric(S.t('price'), S.formatMoney(page.pagePrice, page.pageCurrency, 2), null,
+          { plain: S.t('plainPagePrice'), source: ['etsyPage'], confidence: 'exact' }, 'price'));
+      } else if (hasListing && L.price) {
+        grid.appendChild(metric(S.t('price'), S.formatMoney(L.price, L.currency, 2), null,
+          { plain: S.t('plainListPrice'), source: ['etsyApi'], confidence: 'exact' }, 'price'));
+      }
       if (hasFull) {
         const seo = d.seoScore?.total ?? 0;
-        grid.appendChild(metric('SEO', seo + '/100', seo >= 70 ? '#4caf50' : seo >= 40 ? '#ff9800' : '#f44336'));
-        if (L.reviewCount !== null && L.reviewCount !== undefined) grid.appendChild(metric(S.t('itemReviews'), S.formatNum(L.reviewCount), null, S.t('itemReviewsTip')));
+        grid.appendChild(metric('SEO', seo + '/100', seo >= 70 ? 'green' : seo >= 40 ? 'orange' : 'red',
+          { plain: S.t('plainSeo'), source: ['kx'], confidence: 'medium' }, 'seo'));
+        if (L.reviewCount !== null && L.reviewCount !== undefined) {
+          grid.appendChild(metric(S.t('itemReviews'), S.formatNum(L.reviewCount), null,
+            { plain: S.t('itemReviewsTip'), source: ['etsyApi'], confidence: 'exact' }, 'reviews'));
+        }
       } else {
         grid.appendChild(later('SEO'));
         grid.appendChild(later(S.t('itemReviews')));
       }
       if (hasListing) {
-        if (L.favorites !== null && L.favorites !== undefined) grid.appendChild(metric(S.t('favorites'), S.formatNum(L.favorites)));
-        if (L.views) grid.appendChild(metric(S.t('views'), S.formatNum(L.views)));
+        if (L.favorites !== null && L.favorites !== undefined) grid.appendChild(metric(S.t('favorites'), S.formatNum(L.favorites), null, null, 'favorites'));
+        if (L.views) grid.appendChild(metric(S.t('views'), S.formatNum(L.views), null, null, 'views'));
         if (L.ageDays !== null && L.ageDays !== undefined) {
-          grid.appendChild(metric(S.t('age'), L.ageDays >= 60 ? Math.round(L.ageDays / 30) + ' ' + S.t('months') : L.ageDays + ' ' + S.t('days')));
+          grid.appendChild(metric(S.t('age'), L.ageDays >= 60 ? Math.round(L.ageDays / 30) + ' ' + S.t('months') : L.ageDays + ' ' + S.t('days'), null, null, 'age'));
         }
         if (L.quantity) {
           // Seller-entered quantity, frequently a placeholder — never presented as real stock.
-          grid.appendChild(metric(S.t('qtySeller'), String(L.quantity), L.quantity <= 3 ? '#c62828' : null, S.t('qtyTip')));
+          grid.appendChild(metric(S.t('qtySeller'), String(L.quantity), L.quantity <= 3 ? 'red' : null,
+            { plain: S.t('qtyTip'), source: ['etsyApi'], confidence: 'low' }, 'quantity'));
         }
         const tagCount = L.tagCount || 0;
-        grid.appendChild(metric(S.t('tags'), tagCount + '/13', tagCount >= 13 ? '#2e7d32' : tagCount >= 10 ? '#e65100' : '#c62828'));
+        grid.appendChild(metric(S.t('tags'), tagCount + '/13', tagCount >= 13 ? 'green' : tagCount >= 10 ? 'orange' : 'red',
+          { plain: S.t('plainTags'), source: ['etsyApi'], confidence: 'exact' }, 'tags'));
       } else {
         grid.appendChild(later(S.t('favorites')));
         grid.appendChild(later(S.t('age')));
@@ -432,9 +431,12 @@
       }
       if (hasFull) {
         if (shop) {
-          if (shop.soldCount !== null && shop.soldCount !== undefined) grid.appendChild(metric(S.t('shopSalesLifetime'), S.formatNum(shop.soldCount)));
-          if (shop.salesPerReview) grid.appendChild(metric(S.t('salesPerReview'), S.formatDec(shop.salesPerReview)));
-          if (shop.rating) grid.appendChild(metric(S.t('rating'), Number(shop.rating).toLocaleString(S.locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '★'));
+          if (shop.soldCount !== null && shop.soldCount !== undefined) grid.appendChild(metric(S.t('shopSalesLifetime'), S.formatNum(shop.soldCount), null, null, 'shopSales'));
+          if (shop.salesPerReview) {
+            grid.appendChild(metric(S.t('salesPerReview'), S.formatDec(shop.salesPerReview), null,
+              { plain: S.t('plainSalesPerReview'), source: ['etsyApi'], confidence: 'high' }, 'spr'));
+          }
+          if (shop.rating) grid.appendChild(metric(S.t('rating'), Number(shop.rating).toLocaleString(S.locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '★', null, null, 'rating'));
         }
       } else {
         grid.appendChild(later(S.t('shopSalesLifetime')));
@@ -446,31 +448,18 @@
       const dl = hasFull ? d.listingDeltas : null;
       if (dl && (dl.favorites !== null || dl.reviews !== null)) {
         body.appendChild(node('div', 'kx-sales-meta',
-          S.t('listingDeltas', { days: dl.spanDays, favs: signed(dl.favorites), reviews: signed(dl.reviews) }) + ' (' + S.t('sourceApi') + ')',
-          'margin-top:6px;'));
+          S.t('listingDeltas', { days: dl.spanDays, favs: signed(dl.favorites), reviews: signed(dl.reviews) }) + ' (' + S.t('sourceApi') + ')'));
       }
 
       if (hasListing && Array.isArray(L.tags) && L.tags.length) {
-        const tags = node('div', null, null, 'margin-top:6px;');
+        const tags = node('div', 'kx-tags');
         L.tags.forEach(tg => tags.appendChild(node('span', 'kx-tag-pill', tg)));
         body.appendChild(tags);
       }
-
-      el.appendChild(body);
-      collapseBtn.addEventListener('click', () => {
-        ui.collapsed = !ui.collapsed;
-        body.style.display = ui.collapsed ? 'none' : '';
-        collapseBtn.textContent = ui.collapsed ? '▼' : '▲';
-      });
     }
 
     function metricSkel(label) {
-      const m = node('span', 'kx-metric');
-      m.appendChild(node('span', 'kx-metric-label', label));
-      const v = node('span', null, null, 'font-weight:700;');
-      v.appendChild(S.skel());
-      m.appendChild(v);
-      return m;
+      return S.UI.metric(document, { label, value: S.skel() });
     }
   }
 })();

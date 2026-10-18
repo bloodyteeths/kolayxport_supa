@@ -10,78 +10,19 @@ const KX_EBAY_PREFIX = 'kx-ebay-research';
 const EBAY_API_BASE = 'https://kolayxport.com';
 
 // ---------------------------------------------------------------------------
-// Inline CSS (reuse from Etsy shared if already injected)
+// Styles: the shared UI module (lib/ui.js, "Blade" brand). Card strips and the item panel
+// live in the page DOM (CSS once in <head>, scoped under .kx-ui); the top bar lives in a
+// shadow root with its own copy.
 // ---------------------------------------------------------------------------
-const KX_EBAY_INLINE_CSS = `
-.kx-data-row {
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  padding: 4px 8px; font-size: 11px; font-weight: 600;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #f5f5fa; border-top: 1px solid #e8e8ee; color: #555;
-  line-height: 1.4;
-}
-.kx-data-row .kx-sep { color: #ccc; font-weight: 400; }
-.kx-data-row .kx-best { color: #b8860b; }
-.kx-data-row .kx-green { color: #2e7d32; }
-.kx-data-row .kx-orange { color: #e65100; }
-.kx-data-row .kx-red { color: #c62828; }
-.kx-stats-bar {
-  background: #f5f5fa; border: 1px solid #e0e0e8; border-radius: 8px;
-  padding: 10px 14px; margin: 10px 0; font-size: 12px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  color: #444; line-height: 1.6;
-}
-.kx-stats-bar .kx-stats-header {
-  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
-  font-weight: 700; font-size: 13px; color: #333;
-}
-.kx-stats-bar .kx-stats-logo {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;
-}
-.kx-stats-bar .kx-stats-row {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-}
-.kx-stats-bar .kx-sep { color: #ccc; }
-.kx-stats-bar .kx-best { color: #b8860b; font-weight: 700; }
-.kx-stats-bar .kx-green { color: #2e7d32; }
-.kx-stats-bar .kx-orange { color: #e65100; }
-.kx-stats-bar .kx-red { color: #c62828; }
-.kx-stats-bar .kx-seo-bar {
-  display: inline-flex; align-items: center; gap: 4px;
-}
-.kx-stats-bar .kx-seo-track {
-  width: 60px; height: 6px; background: #e0e0e0; border-radius: 3px; overflow: hidden;
-  display: inline-block; vertical-align: middle;
-}
-.kx-stats-bar .kx-seo-fill {
-  height: 100%; border-radius: 3px;
-}
-.kx-stats-bar .kx-collapse-btn {
-  background: none; border: none; cursor: pointer; font-size: 11px; color: #667eea;
-  font-weight: 600; padding: 0; margin-left: auto;
-}
-/* Placeholders for values still loading: same line box as the text that replaces them (no jump). */
-@keyframes kx-shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
-.kx-skel {
-  display: inline-block; vertical-align: middle; height: 0.9em; min-width: 3.2em; border-radius: 4px;
-  background: linear-gradient(90deg, #e4e4ec 25%, #f3f3f8 50%, #e4e4ec 75%); background-size: 200% 100%;
-  animation: kx-shimmer 1.2s ease-in-out infinite;
-}
-.kx-skel-wide { min-width: 7em; }
-@media (prefers-reduced-motion: reduce) { .kx-skel { animation: none; } }
-`;
+function ebayUI() { return window.__KX_UI || null; }
 
 function injectEbayInlineCSS() {
-  if (document.getElementById('kx-ebay-inline-css')) return;
-  const style = document.createElement('style');
-  style.id = 'kx-ebay-inline-css';
-  style.textContent = KX_EBAY_INLINE_CSS;
-  document.head.appendChild(style);
+  const U = ebayUI();
+  if (U) U.ensureStyles(document);
 }
 
 // ---------------------------------------------------------------------------
-// Shadow DOM Container (for summary bar)
+// Shadow DOM Container (top bar)
 // ---------------------------------------------------------------------------
 function createEbayOverlayContainer(id, position = 'top') {
   const existing = document.getElementById(id);
@@ -89,58 +30,11 @@ function createEbayOverlayContainer(id, position = 'top') {
 
   const host = document.createElement('div');
   host.id = id;
-  host.style.cssText = 'all: initial; position: relative; z-index: 9999;';
+  // all: initial isolates the host; the font is set on .kx-ui inside (never the serif default).
+  host.style.cssText = 'all: initial; display: block; position: relative; z-index: 9999;';
   const shadow = host.attachShadow({ mode: 'open' });
-
-  const style = document.createElement('style');
-  style.textContent = `
-    :host { all: initial; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    .kx-bar {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: #fff; padding: 8px 16px; display: flex; align-items: center; gap: 12px;
-      font-size: 13px; flex-wrap: wrap; border-radius: 8px; margin: 8px;
-      box-shadow: 0 2px 12px rgba(102,126,234,0.3);
-    }
-    .kx-bar-item { display: flex; align-items: center; gap: 4px; }
-    .kx-bar-label { opacity: 0.8; font-size: 11px; }
-    .kx-bar-value { font-weight: 700; font-size: 14px; }
-    .kx-bar-divider { width: 1px; height: 20px; background: rgba(255,255,255,0.3); }
-    .kx-btn {
-      display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px;
-      border-radius: 6px; border: none; cursor: pointer; font-size: 12px; font-weight: 600;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff;
-      transition: opacity 0.2s;
-    }
-    .kx-btn:hover { opacity: 0.9; }
-    .kx-btn-sm { padding: 3px 8px; font-size: 11px; }
-    .kx-panel {
-      position: fixed; top: 80px; right: 0; width: 320px; max-height: calc(100vh - 100px);
-      background: #fff; border-left: 1px solid #e0e0e0; box-shadow: -4px 0 20px rgba(0,0,0,0.1);
-      overflow-y: auto; z-index: 10000; font-size: 13px;
-    }
-    .kx-panel-header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: #fff; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;
-      position: sticky; top: 0; z-index: 1;
-    }
-    .kx-panel-body { padding: 12px 16px; }
-    .kx-panel-section { margin-bottom: 12px; }
-    .kx-panel-section-title { font-weight: 700; font-size: 12px; color: #667eea; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .kx-metric { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #f0f0f0; }
-    .kx-metric-label { color: #666; font-size: 12px; }
-    .kx-metric-value { font-weight: 700; font-size: 13px; }
-    .kx-loading { text-align: center; padding: 20px; color: #999; }
-    @keyframes kx-shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
-    .kx-skel {
-      display: inline-block; vertical-align: middle; height: 0.95em; min-width: 3.2em; border-radius: 4px;
-      background: linear-gradient(90deg, rgba(255,255,255,0.16) 25%, rgba(255,255,255,0.36) 50%, rgba(255,255,255,0.16) 75%);
-      background-size: 200% 100%; animation: kx-shimmer 1.2s ease-in-out infinite;
-    }
-    .kx-skel-wide { min-width: 6.5em; }
-    @media (prefers-reduced-motion: reduce) { .kx-skel { animation: none; } }
-  `;
-  shadow.appendChild(style);
+  const U = ebayUI();
+  if (U) U.ensureStyles(shadow);
 
   if (position === 'top') {
     document.body.prepend(host);
@@ -231,21 +125,21 @@ const _ebayI18n = {
   tr: {
     loading: 'KolayXport yükleniyor...',
     loadFailed: 'Veri yüklenemedi',
-    result: 'Sonuç', avgPrice: 'Medyan Fiyat', range: 'Tipik (P25–P75)',
-    sellers: 'Satıcı', competition: 'Rekabet',
+    result: 'Sonuç', avgPrice: "Tipik fiyat", range: "Fiyatların çoğu",
+    sellers: "Farklı satıcı", competition: "Rekabet",
     compLow: 'Düşük', compMed: 'Orta', compHigh: 'Yüksek', compUnknown: 'Veri yetersiz',
-    distinctOf: 'farklı / {n} ilan', sold: 'satıldı', estTag: 'tahmini',
-    soldDepth: 'Satış derinliği', withSales: '{k}/{n} ilanda satış var',
+    distinctOf: "/ {n} ilan", sold: 'satıldı', estTag: 'tahmini',
+    soldDepth: "Satış yapan ilan", withSales: "{n} ilandan {k}{of} satış yapmış",
     srcApi: 'Kaynak: eBay API, en iyi eşleşen {n} ilan', srcPage: 'Kaynak: bu sayfadaki {n} ilan',
     notEnough: 'yetersiz veri', unusual: 'olağandışı',
-    topBySold: 'satışa göre ilk %{p}', sellThrough: 'Stok satış oranı',
+    topBySold: 'satışa göre ilk %{p}', sellThrough: "Stoğun satılan kısmı",
     available: 'mevcut', feedback: 'değerlendirme', competingListings: 'benzer ilan',
     vsMedian: 'medyana göre', pctVsMedian: '{sign}%{n} medyana göre',
     titleCoverage: 'Başlık anahtar kelime kapsamı: rakiplerin en sık 20 anahtar kelimesinden kaçı başlığınızda geçiyor',
     tipShorter: 'Başlığınız ({mine} karakter) rakiplerinkinden kısa (tipik: {typical}).',
     tipFewKeywords: 'Başlık en sık 20 anahtar kelimeden yalnızca {count} tanesini içeriyor.',
     tipTopKeywords: 'En sık anahtar kelimeler: {keywords}',
-    fullAnalysis: 'Tam Analiz', perMonth: '/ay', vsAvg: '% ort.',
+    fullAnalysis: "Tam analiz", perMonth: '/ay', vsAvg: '% ort.',
     compScore: 'skor {score}/100', pct: '%{n}', factorResults: 'sonuç', factorSold: 'satış', factorSellers: 'satıcı', factorPrice: 'fiyat',
     bestSeller: 'En Çok Satan', seo: 'SEO', price: 'Fiyat',
     positive: 'olumlu', products: 'ilan',
@@ -255,25 +149,43 @@ const _ebayI18n = {
     demandModerate: '📊 Orta', demandLow: '📉 Düşük',
     convRate: 'Dönüşüm', lowStock: '🔥 Az Stok',
     estMktRevenue: 'Tahmini Pazar Geliri',
+    perMonthSales: " satış/ay",
+    itemInsights: "İlan analizi",
+    plainResults: "eBay'in bu arama için gösterdiği sonuç sayısı.",
+    plainTypicalPrice: "Ortadaki fiyat: ilanların yarısı daha ucuz, yarısı daha pahalı.",
+    plainRange: "İlanların ortadaki yarısı bu fiyat aralığında; en ucuz ve en pahalı çeyrek hariç.",
+    formulaRange: "P25–P75 (25. ile 75. yüzdelik arası).",
+    plainSellers: "Örnekteki ilanlarda kaç farklı satıcı olduğu. Az satıcı, pazarın birkaç satıcıda toplandığını gösterir.",
+    plainSold: "Örnekteki ilanlardan kaçında satış göründüğü: talebin kabaca bir işareti.",
+    plainCompetition: "Sonuç sayısı, satış, satıcı ve fiyat dağılımından hesaplanan 0–100 skor. Skor yükseldikçe pazar zorlaşır.",
+    plainMonthly: "Toplam satılan adet ÷ ilanın yayında olduğu ay sayısı. Kaba bir ortalama; son aylar farklı olabilir.",
+    plainVsTypical: "Bu ilanın fiyatı, aynı aramadaki ilanların tipik fiyatıyla karşılaştırıldı.",
+    plainSeo: "Rakiplerin başlıklarında en sık geçen 20 anahtar kelimeden kaçının sizin başlığınızda olduğu (0–100).",
+    plainSellThrough: "Satılan ÷ (satılan + kalan stok), eBay'in kendi tahmini adetleriyle.",
+    plainBest: "Bu aramada satış sayısına göre ilk %10 içinde.",
+    formulaMonthly: "{sold} satış ÷ {months} ay.",
+    cardSoldNote: "Toplam satılan: {n}.",
+    cardBestNote: "Satışa göre ilk %{p}.",
+    tipsTitle: "Başlık önerileri",
   },
   en: {
     loading: 'KolayXport loading...',
     loadFailed: 'Failed to load data',
-    result: 'Results', avgPrice: 'Median Price', range: 'Typical (P25–P75)',
-    sellers: 'Sellers', competition: 'Competition',
+    result: 'Results', avgPrice: "Typical price", range: "Most prices",
+    sellers: "Different sellers", competition: "Competition",
     compLow: 'Low', compMed: 'Medium', compHigh: 'High', compUnknown: 'Not enough data',
-    distinctOf: 'distinct / {n} listings', sold: 'sold', estTag: 'est.',
-    soldDepth: 'Sold depth', withSales: '{k}/{n} listings show sales',
+    distinctOf: "of {n} listings", sold: 'sold', estTag: 'est.',
+    soldDepth: "Listings with sales", withSales: "{k} of {n} listings have sales",
     srcApi: 'Source: eBay API, top {n} best-match listings', srcPage: 'Source: {n} listings on this page',
     notEnough: 'not enough data', unusual: 'unusual range',
-    topBySold: 'top {p}% by sold', sellThrough: 'Stock sell-through',
+    topBySold: 'top {p}% by sold', sellThrough: "Share of stock sold",
     available: 'available', feedback: 'feedback', competingListings: 'similar listings',
     vsMedian: 'vs median', pctVsMedian: '{sign}{n}% vs median',
     titleCoverage: 'Title keyword coverage: how many of the 20 most common competitor keywords your title contains',
     tipShorter: 'Your title ({mine} chars) is shorter than competitors (typical {typical}).',
     tipFewKeywords: 'Title contains only {count} of the 20 most common keywords.',
     tipTopKeywords: 'Most common keywords: {keywords}',
-    fullAnalysis: 'Full Analysis', perMonth: '/mo', vsAvg: '% avg.',
+    fullAnalysis: "Full analysis", perMonth: '/mo', vsAvg: '% avg.',
     compScore: 'score {score}/100', pct: '{n}%', factorResults: 'results', factorSold: 'sold', factorSellers: 'sellers', factorPrice: 'price',
     bestSeller: 'Best Seller', seo: 'SEO', price: 'Price',
     positive: 'positive', products: 'products',
@@ -283,6 +195,24 @@ const _ebayI18n = {
     demandModerate: '📊 Moderate', demandLow: '📉 Low',
     convRate: 'Conv. Rate', lowStock: '🔥 Low Stock',
     estMktRevenue: 'Est. Market Revenue',
+    perMonthSales: " sales/mo",
+    itemInsights: "Item insights",
+    plainResults: "How many results eBay shows for this search.",
+    plainTypicalPrice: "The middle price: half of the listings cost less, half cost more.",
+    plainRange: "The middle half of the listings is priced in this range; the cheapest and priciest quarters are left out.",
+    formulaRange: "P25–P75 (25th to 75th percentile).",
+    plainSellers: "How many different sellers are in the sample. Few sellers means a few sellers hold the market.",
+    plainSold: "How many sampled listings show sales: a rough sign of demand.",
+    plainCompetition: "A 0–100 score from the result count, sales, sellers and price spread. The higher the score, the tougher the market.",
+    plainMonthly: "Total sold ÷ months the listing has been live. A rough average; recent months can differ.",
+    plainVsTypical: "This listing's price compared with the typical price of listings in the same search.",
+    plainSeo: "How many of the 20 keywords competitors use most are in your title (0–100).",
+    plainSellThrough: "Sold ÷ (sold + remaining stock), from eBay's own estimated quantities.",
+    plainBest: "In the top 10% by sales in this search.",
+    formulaMonthly: "{sold} sold ÷ {months} months.",
+    cardSoldNote: "Total sold: {n}.",
+    cardBestNote: "Top {p}% by sold.",
+    tipsTitle: "Title tips",
   },
 };
 
@@ -481,4 +411,5 @@ window.__KX_EBAY_SHARED = {
   isOverlayEnabled: ebayIsOverlayEnabled,
   getPageType: getEbayPageType,
   t: ebayT,
+  get UI() { return ebayUI(); },
 };

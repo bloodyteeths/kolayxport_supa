@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "KolayXport — Etsy, eBay & Amazon Research Tool",
-  "version": "9.9.0",
+  "version": "9.10.0",
   "description": "Research overlays for Etsy, eBay & Amazon (tracked sales, SEO, competition) plus Etsy order sync and tracking entry for KolayXport.",
   "author": "Kolayxport",
   "icons": {
@@ -40,6 +40,7 @@
       "js": [
         "src/cache.js",
         "src/lib/lang.js",
+        "src/lib/ui.js",
         "src/lib/perf.js",
         "src/lib/limitCard.js",
         "src/lib/etsyMath.js",
@@ -93,6 +94,7 @@
       "js": [
         "src/cache.js",
         "src/lib/lang.js",
+        "src/lib/ui.js",
         "src/lib/perf.js",
         "src/lib/limitCard.js",
         "src/lib/ebayMath.js",
@@ -113,6 +115,7 @@
       "js": [
         "src/cache.js",
         "src/lib/lang.js",
+        "src/lib/ui.js",
         "src/lib/perf.js",
         "src/lib/limitCard.js",
         "src/lib/amazonMath.js",
@@ -134,6 +137,26 @@
       ],
       "matches": [
         "https://www.etsy.com/*"
+      ]
+    },
+    {
+      "resources": [
+        "fonts/jakarta-700-800.woff2",
+        "fonts/instrument-sans-400-600.woff2"
+      ],
+      "matches": [
+        "https://www.etsy.com/*",
+        "https://www.ebay.com/*",
+        "https://www.ebay.co.uk/*",
+        "https://www.ebay.de/*",
+        "https://www.ebay.fr/*",
+        "https://www.ebay.it/*",
+        "https://www.ebay.es/*",
+        "https://www.ebay.com.au/*",
+        "https://www.amazon.com/*",
+        "https://www.amazon.com.tr/*",
+        "https://www.amazon.de/*",
+        "https://www.amazon.co.uk/*"
       ]
     }
   ],

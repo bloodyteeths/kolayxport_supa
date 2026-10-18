@@ -76,8 +76,8 @@ async function waitFor<T>(fn: () => T | null | undefined | false, ms = 4000): Pr
 }
 const norm = (s: string | null | undefined) => (s || '').replace(/\s+/g, ' ').trim();
 const shadowBar = (doc: Document, id: string, sel: string) => doc.getElementById(id)?.shadowRoot?.querySelector(sel) as HTMLElement | null;
-const ETSY = ['lib/lang.js', 'lib/perf.js', 'lib/limitCard.js', 'lib/etsyMath.js', 'content-shared.js'];
-const EBAY = ['lib/lang.js', 'lib/perf.js', 'lib/ebayMath.js', 'content-ebay-shared.js'];
+const ETSY = ['lib/lang.js', 'lib/ui.js', 'lib/perf.js', 'lib/limitCard.js', 'lib/etsyMath.js', 'content-shared.js'];
+const EBAY = ['lib/lang.js', 'lib/ui.js', 'lib/perf.js', 'lib/ebayMath.js', 'content-ebay-shared.js'];
 
 // ---------------------------------------------------------------------------
 // Etsy search
@@ -102,14 +102,14 @@ describe('Etsy search: page values first, API in parallel', () => {
     expect(bar.dataset.kxState).toBe('partial');
     const t = norm(bar.textContent);
     expect(t).toContain('Results1.2K'); // what Etsy prints on the page
-    expect(t).toContain('Median Price$35.00'); // 6 organic cards, the ad excluded
-    expect(t).toContain('$22.50 – $47.50');
-    expect(t).toContain('Ads (page)1');
+    expect(t).toContain('Typical price$35.00'); // 6 organic cards, the ad excluded
+    expect(t).toContain('Most prices$22.50 – $47.50');
+    expect(t).toContain('Ads on page1');
     expect(bar.querySelectorAll('.kx-skel').length).toBeGreaterThanOrEqual(3); // fav, shops, competition
     const row = doc.querySelector('[data-listing-id="201"] .kx-data-row') as HTMLElement;
     expect(row.dataset.kxSkeleton).toBe('1');
     expect(row.querySelectorAll('.kx-skel').length).toBeGreaterThan(0);
-    expect(norm(row.textContent)).toContain('−71% vs median'); // page-only, instant
+    expect(norm(row.textContent)).toContain('71% below typical price'); // page-only, instant
     // Summary and card stats were requested together (parallel), neither has answered.
     expect(calls.map((c) => c.action).sort()).toEqual(['listings_batch', 'search_enrich']);
 
@@ -121,7 +121,7 @@ describe('Etsy search: page values first, API in parallel', () => {
     }]));
     resolve('listings_batch', { listings, pendingIds: [] });
     await waitFor(() => !doc.querySelector('.kx-data-row[data-kx-skeleton]'));
-    expect(norm(doc.querySelector('[data-listing-id="201"] .kx-data-row')!.textContent)).toContain('~4.5/mo');
+    expect(norm(doc.querySelector('[data-listing-id="201"] .kx-data-row')!.textContent)).toContain('≈4.5 sales/mo');
     expect(doc.querySelectorAll('[data-listing-id="201"] .kx-data-row')).toHaveLength(1);
     expect(shadowBar(doc, 'kx-search-overlay', '.kx-bar')!.dataset.kxState).toBe('partial');
 
@@ -133,10 +133,11 @@ describe('Etsy search: page values first, API in parallel', () => {
     });
     expect(full.querySelectorAll('.kx-skel')).toHaveLength(0);
     const ft = norm(full.textContent);
-    expect(ft).toContain('Shops (top 100)40');
+    expect(ft).toContain('Different shops40');
     expect(ft).toContain('CompetitionMedium');
+    expect(ft).toContain('Medium competition: room for a strong listing');
     expect(ft).toContain('Results1.2K');
-    expect(ft).toContain('Median Fav100'); // page cards' API favourites (>= 5)
+    expect(ft).toContain('Typical favorites100'); // page cards' API favourites (>= 5)
   });
 
   it('Turkish first paint, perf marks behind kx_debug', async () => {
@@ -145,8 +146,8 @@ describe('Etsy search: page values first, API in parallel', () => {
     await waitFor(() => w.__KX_PERF.log.some((e: any) => e.label === 'first_paint'));
     const t = norm(bar.textContent);
     expect(t).toContain('Sonuç1,2K');
-    expect(t).toContain('Medyan Fiyat$35,00');
-    expect(t).toContain('Reklam (sayfa)1');
+    expect(t).toContain('Tipik fiyat$35,00');
+    expect(t).toContain('Reklamlı ilan1');
     expect(t).not.toMatch(/Results|Median|Competition/);
     expect(w.__KX_PERF.log.map((e: any) => `${e.surface}:${e.label}`)).toEqual(expect.arrayContaining(['etsy_search:start', 'etsy_search:first_paint']));
   });
@@ -194,7 +195,7 @@ describe('Etsy listing panel: page signals first, core then full', () => {
     await waitFor(() => el.dataset.kxState === 'core');
     const tc = norm(el.textContent);
     expect(tc).toContain('Favorites5.6K');
-    expect(tc).toContain('views800'); // existing label (lower-case)
+    expect(tc).toContain('Views800');
     expect(tc).toContain('Tags13/13');
     expect(tc).toContain('linen dress');
     expect(tc).not.toContain('sales/mo');
@@ -203,10 +204,10 @@ describe('Etsy listing panel: page signals first, core then full', () => {
     resolve('lstats:full', fullListing);
     await waitFor(() => el.dataset.kxState === 'full');
     const tf = norm(el.textContent);
-    expect(tf).toContain('~4.5 sales/mo');
+    expect(tf).toContain('≈4.5 sales/mo');
     expect(tf).toContain('SEO72/100');
-    expect(tf).toContain('Item Reviews1.2K');
-    expect(tf).toContain('Shop Sales15.0K');
+    expect(tf).toContain('Listing reviews1.2K');
+    expect(tf).toContain('Shop total sales15.0K');
     expect(el.querySelectorAll('.kx-skel')).toHaveLength(0);
     expect(doc.querySelectorAll('#kx-listing-stats')).toHaveLength(1);
   });
@@ -236,7 +237,7 @@ describe('Etsy shop bar: name + page sales first, shop stats and grid rows in pa
     expect(bar.dataset.kxState).toBe('partial');
     const t = norm(bar.textContent);
     expect(t).toContain('LinenHaus');
-    expect(t).toContain('Total Sales5.7K');
+    expect(t).toContain('Total sales5.7K');
     expect(bar.querySelectorAll('.kx-skel').length).toBeGreaterThanOrEqual(4);
     expect(calls.map((c) => c.action).sort()).toEqual(['listings_batch', 'shop_enrich']);
     expect(doc.querySelectorAll('.kx-data-row[data-kx-skeleton]')).toHaveLength(2);
@@ -247,8 +248,8 @@ describe('Etsy shop bar: name + page sales first, shop stats and grid rows in pa
       avgPrice: 29.99, topListings: [], lowStockCount: 0,
     });
     await waitFor(() => bar.dataset.kxState === 'full');
-    expect(norm(bar.textContent)).toContain('Measured · high conf.');
-    expect(norm(bar.textContent)).toContain('Total Sales15.0K');
+    expect(norm(bar.textContent)).toContain('measured, high confidence');
+    expect(norm(bar.textContent)).toContain('Total sales15.0K');
     resolve('listings_batch', { listings: { 301: { listingId: '301', favorites: 9, sales: { kind: 'insufficient' } }, 302: { listingId: '302', favorites: 9, sales: { kind: 'insufficient' } } }, pendingIds: [] });
     await waitFor(() => doc.querySelectorAll('.kx-data-row[data-kx-skeleton]').length === 0 && doc.querySelectorAll('.kx-data-row').length === 2);
   });
@@ -267,7 +268,7 @@ describe('eBay search: page values first, sold lookups for the first viewport on
     await waitFor(() => calls.length === 1);
 
     expect(bar.dataset.kxState).toBe('partial');
-    expect(norm(bar.textContent)).toContain('Results 9,500+');
+    expect(norm(bar.textContent)).toContain('Results9,500+');
     expect(bar.querySelectorAll('.kx-skel').length).toBeGreaterThan(0);
     const rowOf = (id: string) => doc.querySelector(`li[data-listingid="${id}"] .kx-data-row`);
     expect(norm(rowOf('256789012345')!.textContent)).toContain('65+ sold'); // the card's own text, instant

@@ -11,123 +11,19 @@ const KX_PREFIX = 'kx-research';
 const API_BASE = 'https://kolayxport.com';
 
 // ---------------------------------------------------------------------------
-// Inline CSS (injected into page DOM for data rows & stats bars)
+// Styles: one shared UI module (lib/ui.js, "Blade" brand) for every overlay.
+// Card strips and panels live in the page DOM, so the CSS goes into <head> once, every
+// rule scoped under .kx-ui; the top bars live in shadow roots and get their own copy.
 // ---------------------------------------------------------------------------
-const KX_INLINE_CSS = `
-.kx-data-row {
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  padding: 4px 8px; font-size: 11px; font-weight: 600;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #f5f5fa; border-top: 1px solid #e8e8ee; color: #555;
-  line-height: 1.4;
-}
-.kx-data-row .kx-sep { color: #ccc; font-weight: 400; }
-.kx-data-row .kx-best { color: #b8860b; }
-.kx-data-row .kx-green { color: #2e7d32; }
-.kx-data-row .kx-orange { color: #e65100; }
-.kx-data-row .kx-red { color: #c62828; }
-.kx-data-row .kx-mini-badge {
-  display: inline-block; padding: 0 5px; border-radius: 8px; font-size: 9px; font-weight: 800;
-  text-transform: uppercase; letter-spacing: 0.3px; line-height: 1.6;
-}
-.kx-data-row .kx-mini-measured { background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; }
-.kx-data-row .kx-mini-estimated { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
-.kx-data-row .kx-mini-none { background: #eee; color: #777; border: 1px solid #ddd; }
-.kx-stats-bar {
-  background: #f5f5fa; border: 1px solid #e0e0e8; border-radius: 8px;
-  padding: 10px 14px; margin: 10px 0; font-size: 12px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  color: #444; line-height: 1.6;
-}
-.kx-stats-bar .kx-stats-header {
-  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
-  font-weight: 700; font-size: 13px; color: #333;
-}
-.kx-stats-bar .kx-stats-logo {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;
-}
-.kx-stats-bar .kx-stats-row {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-}
-.kx-stats-bar .kx-sep { color: #ccc; }
-.kx-stats-bar .kx-best { color: #b8860b; font-weight: 700; }
-.kx-stats-bar .kx-green { color: #2e7d32; }
-.kx-stats-bar .kx-orange { color: #e65100; }
-.kx-stats-bar .kx-red { color: #c62828; }
-.kx-stats-bar .kx-seo-bar {
-  display: inline-flex; align-items: center; gap: 4px;
-}
-.kx-stats-bar .kx-seo-track {
-  width: 60px; height: 6px; background: #e0e0e0; border-radius: 3px; overflow: hidden;
-  display: inline-block; vertical-align: middle;
-}
-.kx-stats-bar .kx-seo-fill {
-  height: 100%; border-radius: 3px;
-}
-.kx-stats-bar .kx-tag-pill {
-  display: inline-block; padding: 1px 6px; margin: 1px; border-radius: 10px;
-  font-size: 10px; background: #eee; color: #555;
-}
-.kx-stats-bar .kx-collapse-btn {
-  background: none; border: none; cursor: pointer; font-size: 11px; color: #667eea;
-  font-weight: 600; padding: 0; margin-left: auto;
-}
-.kx-stats-bar .kx-metrics-grid {
-  display: flex; flex-wrap: wrap; gap: 2px;
-}
-.kx-stats-bar .kx-metric {
-  display: inline-flex; flex-direction: column; align-items: center;
-  padding: 4px 10px; background: #fff; border-radius: 6px;
-  border: 1px solid #e8e8ee; min-width: 54px;
-}
-.kx-stats-bar .kx-metric-label {
-  font-size: 9px; color: #888; font-weight: 600; text-transform: uppercase;
-  letter-spacing: 0.3px; line-height: 1;
-}
-.kx-stats-bar .kx-metric > span:last-child {
-  font-size: 13px; line-height: 1.3;
-}
-.kx-stats-bar .kx-sales {
-  background: #fff; border: 1px solid #e8e8ee; border-radius: 6px; padding: 8px 10px; margin-bottom: 6px;
-}
-.kx-stats-bar .kx-sales-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.kx-stats-bar .kx-sales-value { font-size: 16px; font-weight: 800; color: #222; }
-.kx-stats-bar .kx-sales-rev { font-size: 12px; font-weight: 700; color: #1565c0; }
-.kx-stats-bar .kx-badge {
-  display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 10px; font-weight: 800;
-  letter-spacing: 0.3px; text-transform: uppercase; line-height: 1.6;
-}
-.kx-stats-bar .kx-badge-measured { background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; }
-.kx-stats-bar .kx-badge-estimated { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
-.kx-stats-bar .kx-badge-none { background: #eee; color: #666; border: 1px solid #ddd; }
-.kx-stats-bar .kx-badge-conf { background: #f3f3f8; color: #555; border: 1px solid #e0e0e8; text-transform: none; font-weight: 600; }
-.kx-stats-bar .kx-sales-how { font-size: 11px; color: #666; margin-top: 4px; line-height: 1.45; }
-.kx-stats-bar .kx-sales-meta { font-size: 10px; color: #999; margin-top: 3px; }
-.kx-stats-bar .kx-signal { color: #1b5e20; }
-/* Placeholders for values still loading: same line box as the text that replaces them (no jump). */
-@keyframes kx-shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
-.kx-skel {
-  display: inline-block; vertical-align: middle; height: 0.9em; min-width: 3.2em; border-radius: 4px;
-  background: linear-gradient(90deg, #e4e4ec 25%, #f3f3f8 50%, #e4e4ec 75%); background-size: 200% 100%;
-  animation: kx-shimmer 1.2s ease-in-out infinite;
-}
-.kx-skel-wide { min-width: 7em; }
-.kx-skel-xwide { min-width: 16em; max-width: 100%; }
-.kx-stats-bar .kx-metric .kx-skel { margin-top: 3px; }
-@media (prefers-reduced-motion: reduce) { .kx-skel { animation: none; } }
-`;
+function _ui() { return window.__KX_UI || null; }
 
 function injectInlineCSS() {
-  if (document.getElementById('kx-inline-css')) return;
-  const style = document.createElement('style');
-  style.id = 'kx-inline-css';
-  style.textContent = KX_INLINE_CSS;
-  document.head.appendChild(style);
+  const U = _ui();
+  if (U) U.ensureStyles(document);
 }
 
 // ---------------------------------------------------------------------------
-// Shadow DOM Container (for summary bar only)
+// Shadow DOM Container (top bars)
 // ---------------------------------------------------------------------------
 function createOverlayContainer(id, position = 'top') {
   const existing = document.getElementById(id);
@@ -135,63 +31,12 @@ function createOverlayContainer(id, position = 'top') {
 
   const host = document.createElement('div');
   host.id = id;
-  host.style.cssText = 'all: initial; position: relative; z-index: 9999;';
+  // all: initial isolates the host from page styles; the font is set on .kx-ui inside
+  // (an inherited font from this host would be the browser default, a serif).
+  host.style.cssText = 'all: initial; display: block; position: relative; z-index: 9999;';
   const shadow = host.attachShadow({ mode: 'open' });
-
-  const style = document.createElement('style');
-  style.textContent = `
-    :host { all: initial; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    .kx-bar {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: #fff; padding: 8px 16px; display: flex; align-items: center; gap: 12px;
-      font-size: 13px; flex-wrap: wrap; border-radius: 8px; margin: 8px;
-      box-shadow: 0 2px 12px rgba(102,126,234,0.3);
-    }
-    .kx-bar-item { display: flex; align-items: center; gap: 4px; }
-    .kx-bar-label { opacity: 0.8; font-size: 11px; }
-    .kx-bar-value { font-weight: 700; font-size: 14px; }
-    .kx-bar-divider { width: 1px; height: 20px; background: rgba(255,255,255,0.3); }
-    .kx-btn {
-      display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px;
-      border-radius: 6px; border: none; cursor: pointer; font-size: 12px; font-weight: 600;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff;
-      transition: opacity 0.2s;
-    }
-    .kx-btn:hover { opacity: 0.9; }
-    .kx-btn-sm { padding: 3px 8px; font-size: 11px; }
-    .kx-panel {
-      position: fixed; top: 80px; right: 0; width: 320px; max-height: calc(100vh - 100px);
-      background: #fff; border-left: 1px solid #e0e0e0; box-shadow: -4px 0 20px rgba(0,0,0,0.1);
-      overflow-y: auto; z-index: 10000; font-size: 13px;
-    }
-    .kx-panel-header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: #fff; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;
-      position: sticky; top: 0; z-index: 1;
-    }
-    .kx-panel-body { padding: 12px 16px; }
-    .kx-panel-section { margin-bottom: 12px; }
-    .kx-panel-section-title { font-weight: 700; font-size: 12px; color: #667eea; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .kx-metric { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #f0f0f0; }
-    .kx-metric-label { color: #666; font-size: 12px; }
-    .kx-metric-value { font-weight: 700; font-size: 13px; }
-    .kx-loading { text-align: center; padding: 20px; color: #999; }
-    .kx-shop-bar {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: #fff; padding: 10px 20px; display: flex; align-items: center; gap: 16px;
-      font-size: 13px; flex-wrap: wrap; margin: 0; border-radius: 0;
-    }
-    @keyframes kx-shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
-    .kx-skel {
-      display: inline-block; vertical-align: middle; height: 0.95em; min-width: 3.2em; border-radius: 4px;
-      background: linear-gradient(90deg, rgba(255,255,255,0.16) 25%, rgba(255,255,255,0.36) 50%, rgba(255,255,255,0.16) 75%);
-      background-size: 200% 100%; animation: kx-shimmer 1.2s ease-in-out infinite;
-    }
-    .kx-skel-wide { min-width: 6.5em; }
-    @media (prefers-reduced-motion: reduce) { .kx-skel { animation: none; } }
-  `;
-  shadow.appendChild(style);
+  const U = _ui();
+  if (U) U.ensureStyles(shadow);
 
   if (position === 'top') {
     document.body.prepend(host);
@@ -427,33 +272,33 @@ const _i18n = {
   tr: {
     loading: 'KolayXport yükleniyor...',
     loadFailed: 'Veri yüklenemedi',
-    result: 'Sonuç',
+    result: "Sonuç",
     avgPrice: 'Ort. Fiyat',
     range: 'Aralık',
     avgFav: 'Ort. Favori',
     shops: 'Mağaza',
     sellers: 'Satıcı',
-    competition: 'Rekabet',
+    competition: "Rekabet",
     compLow: 'Düşük',
     compMed: 'Orta',
     compHigh: 'Yüksek',
-    fullAnalysis: 'Tam Analiz',
+    fullAnalysis: "Tam analiz",
     perMonth: '/ay',
     bestSeller: 'En Çok Satan',
     seo: 'SEO',
     sales: 'satış',
-    views: 'görüntülenme',
+    views: "Görüntülenme",
     months: 'ay',
-    tags: 'Etiketler',
+    tags: "Etiketler",
     missing: 'eksik',
     shop: 'Mağaza',
     price: 'Fiyat',
     positive: 'olumlu',
     products: 'ilan',
-    topSales: 'Toplam Satış',
-    rating: 'Puan',
-    reviews: 'Yorum',
-    activeListings: 'Aktif İlan',
+    topSales: "Toplam satış",
+    rating: "Puan",
+    reviews: "Yorum",
+    activeListings: "Aktif ilan",
     bestSellers: 'En Çok Satanlar',
     shopAnalysisLoading: 'KolayXport mağaza analizi yükleniyor...',
     shopIdNotFound: 'Mağaza ID bulunamadı',
@@ -472,12 +317,12 @@ const _i18n = {
     fromFavs: 'favorilerden',
     lowStock: '🔥 Az Stok',
     estMktRevenue: 'Tahmini Pazar Geliri',
-    shopAge: 'Mağaza Yaşı',
+    shopAge: "Mağaza yaşı",
     years: 'yıl',
     estShopRevenue: 'Tahmini Aylık Gelir',
     estShopSales: 'Tahmini Aylık Satış',
     hotListings: 'Sıcak İlanlar',
-    lowStockItems: 'Az Stok',
+    lowStockItems: "Az stoklu ilan",
     avgConversion: 'Ort. Dönüşüm',
     revenuePerListing: 'İlan Başına Gelir',
     salesPerMonth: 'satış/ay',
@@ -487,7 +332,7 @@ const _i18n = {
     confHigh: 'Güven: yüksek',
     confMedium: 'Güven: orta',
     confLow: 'Güven: düşük',
-    revenueApprox: 'gelir/ay (tahmini)',
+    revenueApprox: "gelir/ay",
     lessThan: '<',
     howMeasured: 'Mağaza satışları {days} günde +{delta} arttı (Etsy API, {perDay}/gün). Mağazanın son {window} gündeki yorumlarının %{share} kadarı bu ilana ait ({mine}/{total}).',
     howMeasuredLifetime: 'Mağaza satışları {days} günde +{delta} arttı (Etsy API, {perDay}/gün). İlanın payı, tüm zamanların yorumlarından: %{share} ({mine}/{total}).',
@@ -507,11 +352,11 @@ const _i18n = {
     inCarts: 'Sepette: {n}',
     bestsellerBadge: 'Etsy Çok Satan',
     starSeller: 'Yıldız Satıcı',
-    favorites: 'Favori',
-    age: 'Yaş',
+    favorites: "Favori",
+    age: "İlan yaşı",
     stock: 'Stok',
-    shopSalesLifetime: 'Mağaza Satışı',
-    salesPerReview: 'Satış/Yorum',
+    shopSalesLifetime: "Mağazanın toplam satışı",
+    salesPerReview: "Her yoruma düşen satış",
     signInRequired: 'Gerçek satış verileri için kolayxport.com\'da oturum açın.',
     sourceApi: 'Etsy API',
     sourcePage: 'Etsy sayfası',
@@ -526,13 +371,13 @@ const _i18n = {
     shopHowEstimated: 'Son {window} günde {recent} mağaza yorumu × satış/yorum oranı {ratio}. Gelir = satış × medyan liste fiyatı {avg} (kaba tahmin).',
     priceTipShop: 'Mağazanın ilk 100 aktif ilanının medyan LİSTE fiyatı (Etsy API, indirim öncesi; mağaza para birimi).',
     topRecent: 'En çok yorum alan (son dönem)',
-    medianPrice: 'Medyan Fiyat',
-    medianListPrice: 'Medyan Liste Fiyatı',
-    typicalRange: 'Tipik (P25–P75)',
-    medianFav: 'Medyan Favori',
-    shopsTop100: 'Mağaza (ilk 100)',
+    medianPrice: "Tipik fiyat",
+    medianListPrice: "Tipik liste fiyatı",
+    typicalRange: "Fiyatların çoğu",
+    medianFav: "Tipik favori",
+    shopsTop100: "Farklı mağaza",
     vsMedian: 'medyana göre',
-    vsMedianTip: 'Bu ilanın fiyatı {price}; bu sayfadaki {n} ilanın medyan fiyatı {median} (reklamlar hariç).',
+    vsMedianTip: "Bu ilanın fiyatı {price}; bu sayfadaki {n} ilanın tipik (medyan) fiyatı {median} (reklamlar hariç).",
     priceTipPage: 'Bu sayfadaki {n} ilanın gösterilen fiyatlarının medyanı (indirimli fiyat, reklamlar hariç). Ham aralık: {rawMin} – {rawMax}. Etsy API örneği (ilk 100, indirimsiz liste fiyatı): medyan {apiMedian}.',
     priceTipApi: 'Etsy API anahtar kelime örneği (ilk {n} ilan, dijital ürünler hariç). Bunlar indirimsiz LİSTE fiyatlarıdır; Etsy sayfasında görünen indirimli fiyatlardan yüksek olabilir. Ham aralık: {rawMin} – {rawMax}.',
     favTipPage: 'Bu sayfadaki {n} ilanın favori sayılarının medyanı (Etsy API, reklamlar hariç).',
@@ -542,49 +387,78 @@ const _i18n = {
     revTipList: 'Gelir = {sales} satış/ay × Etsy liste fiyatı {price} (kartta fiyat okunamadı; indirim öncesi fiyat olabilir).',
     revenueFromPage: 'sayfadaki fiyat {price} ile',
     revenueFromList: 'Etsy liste fiyatı {price} ile (indirim öncesi olabilir)',
-    qtySeller: 'Adet (satıcı)',
+    qtySeller: "Stok (satıcının girdiği)",
     qtyTip: 'Satıcının girdiği stok adedi. Etsy satıcıları bunu çoğu zaman 999 gibi yer tutucu bir değer olarak girer; gerçek stok değildir.',
-    itemReviews: 'İlan Yorumu',
+    itemReviews: "İlan yorumu",
     itemReviewsTip: 'Yalnızca bu ilanın yorumları (mağazanın tüm yorumları değil).',
     confShortHigh: 'yüksek güven',
     confShortMedium: 'orta güven',
     confShortLow: 'düşük güven',
-    medianListPriceShop: 'Medyan Liste Fiyatı',
+    medianListPriceShop: "Tipik liste fiyatı",
     notAvailable: 'Yok',
-    adsOnPage: 'Reklam (sayfa)',
+    adsOnPage: "Reklamlı ilan",
     adsTip: 'Bu sayfadaki {n} ilandan reklamlı olanlar. Fiyat medyanına dahil edilmez.',
     resultTipPage: 'Etsy sayfasında gösterilen sonuç sayısı. Etsy API: {api}.',
+    perMonthSales: " satış/ay",
+    listingInsights: "İlan analizi",
+    plainSalesMeasured: "Mağazanın gerçek satış sayacındaki artıştan ölçüldü; bu ilana, mağaza yorumlarındaki payı kadar satış ayrıldı.",
+    plainSalesEstimated: "Bu ilanın son yorumları, mağazanın her yoruma düşen satışıyla çarpıldı. Gerçek satış farklı olabilir.",
+    plainSalesUpper: "Son dönemde bu ilana yorum gelmedi; aylık satış muhtemelen bu değerin altında.",
+    plainSalesNone: "Hesaplamak için yeterli gerçek veri yok, bu yüzden tahmin göstermiyoruz.",
+    plainRevenue: "Aylık satış × fiyat. Satıcı indirimleri, komisyon ve kargo düşülmez.",
+    plainResults: "Etsy'nin bu arama için gösterdiği ilan sayısı.",
+    plainTypicalPrice: "Ortadaki fiyat: ilanların yarısı daha ucuz, yarısı daha pahalı.",
+    plainRange: "İlanların ortadaki yarısı bu fiyat aralığında; en ucuz ve en pahalı çeyrek hariç.",
+    formulaRange: "P25–P75 (25. ile 75. yüzdelik arası).",
+    plainFav: "Ortadaki ilanın favori sayısı: alıcı ilgisinin kabaca bir ölçüsü.",
+    plainShops: "Bu aramanın ilk sonuçlarında kaç farklı mağaza olduğu. Mağaza sayısı arttıkça rakip de artar.",
+    plainCompetition: "Farklı mağaza sayısından hesaplanır: 50'den fazlası yüksek, 20'den fazlası orta, daha azı düşük rekabet.",
+    plainAds: "Bu sayfadaki reklamlı (sponsorlu) ilanlar. Tipik fiyata dahil edilmez.",
+    etsySourceNote: "Kaynak: bu sayfadaki {page} ilan (fiyat, reklam) + Etsy API ({api} ilanlık örnek: favori, mağaza).",
+    plainShopSalesMeasured: "Mağazanın gerçek satış sayacındaki artıştan ölçüldü.",
+    plainShopSalesEstimated: "Mağazanın son yorumları × her yoruma düşen satış. Gerçek satış farklı olabilir.",
+    plainShopRevenue: "Aylık satış × mağazanın tipik liste fiyatı. Kaba bir hesap; indirimler ve ücretler hariç.",
+    plainShopPrice: "Mağazanın ilanlarındaki ortadaki liste fiyatı.",
+    plainSalesPerReview: "Mağazanın toplam satışı ÷ toplam yorumu. Satış tahminlerimiz bu oranı kullanır.",
+    plainSeo: "Başlık, etiket ve açıklamanın Etsy aramasına ne kadar uygun olduğu (0–100).",
+    plainPagePrice: "Bu sayfada gösterilen fiyat (indirim varsa indirimli fiyat).",
+    plainTags: "Etsy en fazla 13 etiket kabul eder; 13'ünü de kullanmak aramada daha çok yerde görünmenizi sağlar.",
+    plainVsTypical: "Bu ilanın fiyatı, bu sayfadaki ilanların tipik fiyatıyla karşılaştırıldı.",
+    cardFavs: "Favori: {n}.",
+    cardLowStock: "Az stok: satıcı {n} adet girmiş.",
+    topListingsLabel: "En çok yorum alan ilanlar",
+    plainListPrice: "Etsy'deki liste fiyatı; indirim öncesi fiyat olabilir.",
   },
   en: {
     loading: 'KolayXport loading...',
     loadFailed: 'Failed to load data',
-    result: 'Results',
+    result: "Results",
     avgPrice: 'Avg Price',
     range: 'Range',
     avgFav: 'Avg Fav',
     shops: 'Shops',
     sellers: 'Sellers',
-    competition: 'Competition',
+    competition: "Competition",
     compLow: 'Low',
     compMed: 'Medium',
     compHigh: 'High',
-    fullAnalysis: 'Full Analysis',
+    fullAnalysis: "Full analysis",
     perMonth: '/mo',
     bestSeller: 'Best Seller',
     seo: 'SEO',
     sales: 'sales',
-    views: 'views',
+    views: "Views",
     months: 'mo',
-    tags: 'Tags',
+    tags: "Tags",
     missing: 'missing',
     shop: 'Shop',
     price: 'Price',
     positive: 'positive',
     products: 'products',
-    topSales: 'Total Sales',
-    rating: 'Rating',
-    reviews: 'Reviews',
-    activeListings: 'Active Listings',
+    topSales: "Total sales",
+    rating: "Rating",
+    reviews: "Reviews",
+    activeListings: "Active listings",
     bestSellers: 'Best Sellers',
     shopAnalysisLoading: 'KolayXport shop analysis loading...',
     shopIdNotFound: 'Shop ID not found',
@@ -603,12 +477,12 @@ const _i18n = {
     fromFavs: 'from favs',
     lowStock: '🔥 Low Stock',
     estMktRevenue: 'Est. Market Revenue',
-    shopAge: 'Shop Age',
+    shopAge: "Shop age",
     years: 'yr',
     estShopRevenue: 'Est. Monthly Revenue',
     estShopSales: 'Est. Monthly Sales',
     hotListings: 'Hot Listings',
-    lowStockItems: 'Low Stock',
+    lowStockItems: "Low-stock listings",
     avgConversion: 'Avg Conversion',
     revenuePerListing: 'Rev/Listing',
     salesPerMonth: 'sales/mo',
@@ -618,7 +492,7 @@ const _i18n = {
     confHigh: 'Confidence: high',
     confMedium: 'Confidence: medium',
     confLow: 'Confidence: low',
-    revenueApprox: 'revenue/mo (approx.)',
+    revenueApprox: "revenue/mo",
     lessThan: '<',
     howMeasured: 'Shop sold +{delta} in {days} days (Etsy API, {perDay}/day). This listing has {share}% of the shop\'s reviews in the last {window} days ({mine} of {total}).',
     howMeasuredLifetime: 'Shop sold +{delta} in {days} days (Etsy API, {perDay}/day). Listing share from lifetime reviews: {share}% ({mine} of {total}).',
@@ -638,11 +512,11 @@ const _i18n = {
     inCarts: 'In carts: {n}',
     bestsellerBadge: 'Etsy Bestseller',
     starSeller: 'Star Seller',
-    favorites: 'Favorites',
-    age: 'Age',
+    favorites: "Favorites",
+    age: "Listing age",
     stock: 'Stock',
-    shopSalesLifetime: 'Shop Sales',
-    salesPerReview: 'Sales/Review',
+    shopSalesLifetime: "Shop total sales",
+    salesPerReview: "Sales per review",
     signInRequired: 'Sign in at kolayxport.com to see real sales data.',
     sourceApi: 'Etsy API',
     sourcePage: 'Etsy page',
@@ -657,13 +531,13 @@ const _i18n = {
     shopHowEstimated: '{recent} shop reviews in the last {window} days × sales-per-review ratio {ratio}. Revenue = sales × median list price {avg} (rough).',
     priceTipShop: 'Median LIST price of the shop\'s top 100 active listings (Etsy API, before discounts; shop currency).',
     topRecent: 'Most reviewed (recent)',
-    medianPrice: 'Median Price',
-    medianListPrice: 'Median List Price',
-    typicalRange: 'Typical (P25–P75)',
-    medianFav: 'Median Fav',
-    shopsTop100: 'Shops (top 100)',
+    medianPrice: "Typical price",
+    medianListPrice: "Typical list price",
+    typicalRange: "Most prices",
+    medianFav: "Typical favorites",
+    shopsTop100: "Different shops",
     vsMedian: 'vs median',
-    vsMedianTip: 'This listing costs {price}; the median of the {n} listings on this page is {median} (ads excluded).',
+    vsMedianTip: "This listing costs {price}; the typical (median) price of the {n} listings on this page is {median} (ads excluded).",
     priceTipPage: 'Median of the prices shown for the {n} listings on this page (sale prices, ads excluded). Raw range: {rawMin} – {rawMax}. Etsy API sample (top 100, pre-discount list prices): median {apiMedian}.',
     priceTipApi: 'Etsy API keyword sample (top {n} listings, digital downloads excluded). These are pre-discount LIST prices and can be higher than the sale prices Etsy shows. Raw range: {rawMin} – {rawMax}.',
     favTipPage: 'Median favorites of the {n} listings on this page (Etsy API, ads excluded).',
@@ -673,18 +547,47 @@ const _i18n = {
     revTipList: 'Revenue = {sales} sales/mo × Etsy list price {price} (card price not readable; may be before a seller discount).',
     revenueFromPage: 'at the page price {price}',
     revenueFromList: 'at the Etsy list price {price} (may be before a discount)',
-    qtySeller: 'Qty (seller-set)',
+    qtySeller: "Stock (seller-entered)",
     qtyTip: 'Quantity the seller entered. Sellers often set a placeholder like 999; this is not real stock.',
-    itemReviews: 'Item Reviews',
+    itemReviews: "Listing reviews",
     itemReviewsTip: 'Reviews of this listing only (not the whole shop).',
     confShortHigh: 'high conf.',
     confShortMedium: 'medium conf.',
     confShortLow: 'low conf.',
-    medianListPriceShop: 'Median List Price',
+    medianListPriceShop: "Typical list price",
     notAvailable: 'N/A',
-    adsOnPage: 'Ads (page)',
+    adsOnPage: "Ads on page",
     adsTip: 'Promoted listings among the {n} cards on this page. Excluded from the price median.',
     resultTipPage: 'Result count shown on the Etsy page. Etsy API: {api}.',
+    perMonthSales: " sales/mo",
+    listingInsights: "Listing insights",
+    plainSalesMeasured: "Measured from the rise in the shop's real sales counter; this listing gets the share of sales that matches its share of the shop's reviews.",
+    plainSalesEstimated: "This listing's recent reviews multiplied by the shop's sales per review. Real sales can differ.",
+    plainSalesUpper: "No recent reviews on this listing; monthly sales are likely below this.",
+    plainSalesNone: "Not enough real data to calculate, so we don't show a guess.",
+    plainRevenue: "Monthly sales × price. Seller discounts, fees and shipping are not deducted.",
+    plainResults: "How many listings Etsy shows for this search.",
+    plainTypicalPrice: "The middle price: half of the listings cost less, half cost more.",
+    plainRange: "The middle half of the listings is priced in this range; the cheapest and priciest quarters are left out.",
+    formulaRange: "P25–P75 (25th to 75th percentile).",
+    plainFav: "Favorites of the middle listing: a rough sign of shopper interest.",
+    plainShops: "How many different shops appear in the top results. More shops means more competitors.",
+    plainCompetition: "Based on the number of different shops: over 50 is high, over 20 medium, fewer is low competition.",
+    plainAds: "Promoted (sponsored) listings on this page. Not included in the typical price.",
+    etsySourceNote: "Source: {page} listings on this page (prices, ads) + Etsy API ({api}-listing sample: favorites, shops).",
+    plainShopSalesMeasured: "Measured from the rise in the shop's real sales counter.",
+    plainShopSalesEstimated: "The shop's recent reviews × sales per review. Real sales can differ.",
+    plainShopRevenue: "Monthly sales × the shop's typical list price. A rough figure; discounts and fees are not deducted.",
+    plainShopPrice: "The middle list price of the shop's listings.",
+    plainSalesPerReview: "The shop's total sales ÷ total reviews. Our sales estimates use this ratio.",
+    plainSeo: "How well the title, tags and description fit Etsy search (0–100).",
+    plainPagePrice: "The price shown on this page (the sale price when on sale).",
+    plainTags: "Etsy allows up to 13 tags; using all 13 lets the listing show up in more searches.",
+    plainVsTypical: "This listing's price compared with the typical price of the listings on this page.",
+    cardFavs: "Favorites: {n}.",
+    cardLowStock: "Low stock: the seller entered {n}.",
+    topListingsLabel: "Most-reviewed listings",
+    plainListPrice: "The Etsy list price; it can be the price before a discount.",
   },
 };
 
@@ -781,69 +684,101 @@ function cardTooltip(sales) {
   }
 }
 
+/** Plain-language line for a sales figure (the "i" explanation, first sentence). */
+function salesPlain(sales) {
+  const kind = sales && sales.kind;
+  if (kind === 'measured') return t('plainSalesMeasured');
+  if (kind === 'estimated') {
+    return sales.monthlySales !== null && sales.monthlySales !== undefined ? t('plainSalesEstimated') : t('plainSalesUpper');
+  }
+  return t('plainSalesNone');
+}
+
+/** "≈4,5 satış/ay" (estimate), "12 satış/ay" (measured), "<1 satış/ay" (upper bound), or null. */
+function salesFigure(sales) {
+  if (!sales) return null;
+  if (sales.monthlySales !== null && sales.monthlySales !== undefined) {
+    return (sales.kind === 'estimated' ? '≈' : '') + formatSales(sales.monthlySales) + t('perMonthSales');
+  }
+  if (sales.monthlySalesUpperBound !== null && sales.monthlySalesUpperBound !== undefined) {
+    return '<' + formatSales(sales.monthlySalesUpperBound) + t('perMonthSales');
+  }
+  return null;
+}
+
 /**
- * Inline row under a listing card. `stats` is a CardStats from listings_batch.
+ * Card strip under a listing card. `stats` is a CardStats from listings_batch.
  * ctx = { display: { [id]: { price: {amount, currency}|null, isAd } }, market: pageMarketSummary() }
+ * At most three things on its face: sales (+ "tahmini, orta güven"), revenue, price vs the
+ * typical price on this page. Everything else (inputs, favourites, low stock) is in the "i".
  */
 function buildCardRow(stats, ctx) {
   const M = window.__KX_MATH;
+  const U = _ui();
   const row = el('div', 'kx-data-row');
-  row.lang = _langNow(); // uppercase badges need lang="tr" for İ
+  if (U) U.strip(row);
+  row.lang = _langNow();
   row.dataset.kxListing = stats.listingId;
   const sales = stats.sales || { kind: 'insufficient' };
   const tips = [cardTooltip(sales)];
+  const extras = [];
   const sep = () => row.appendChild(el('span', 'kx-sep', '·'));
   const disp = (ctx && ctx.display && ctx.display[stats.listingId]) || {};
+  if (U) row.appendChild(U.mark(document, false));
 
   if (sales.kind === 'pending') {
     // Shop data still loading server-side: a placeholder, or a dash once we stopped re-polling.
     row.appendChild(ctx && ctx.final ? el('span', null, '—') : skel());
-  } else if (sales.monthlySales !== null && sales.monthlySales !== undefined) {
-    row.appendChild(el('span', salesColor(sales.monthlySales), (sales.kind === 'estimated' ? '~' : '') + formatSales(sales.monthlySales) + t('perMonth'), 'font-weight:700;'));
-  } else if (sales.monthlySalesUpperBound !== null && sales.monthlySalesUpperBound !== undefined) {
-    row.appendChild(el('span', 'kx-orange', '<' + formatSales(sales.monthlySalesUpperBound) + t('perMonth'), 'font-weight:700;'));
   } else {
-    row.appendChild(el('span', null, '—'));
-  }
-  if (sales.kind !== 'pending') {
-    const cls = sales.kind === 'measured' ? 'kx-mini-measured' : sales.kind === 'estimated' ? 'kx-mini-estimated' : 'kx-mini-none';
-    let label = sales.kind === 'measured' ? t('badgeMeasured') : sales.kind === 'estimated' ? t('badgeEstimated') : t('badgeInsufficient');
-    if (sales.confidence) label += ' · ' + confShort(sales.confidence);
-    row.appendChild(el('span', 'kx-mini-badge ' + cls, label));
+    row.appendChild(el('span', 'kx-strong', salesFigure(sales) || '—'));
+    if (U) row.appendChild(U.conf(document, sales.kind || 'insufficient', sales.confidence));
   }
 
-  // Revenue = shown sales x the price shown on this card (fallback: API list price).
+  // Line 2: revenue · price vs typical (no separator at the start of a line).
   const rev = M ? M.cardRevenue(stats, disp.price) : null;
+  const vs = vsMedianSpan(disp, ctx);
+  const line2 = !!((rev && rev.amount) || vs);
+  if (U && line2) row.appendChild(U.lineBreak(document));
+  let first2 = true;
+  const sep2 = () => { if (!first2) sep(); first2 = false; };
+
+  // Revenue = shown sales x the price shown on this card (fallback: API list price).
   if (rev && rev.amount) {
-    sep();
-    row.appendChild(el('span', 'kx-green', '≈' + formatMoney(rev.amount, rev.currency) + t('perMonth')));
+    sep2();
+    row.appendChild(el('span', null, '≈' + formatMoney(rev.amount, rev.currency) + t('perMonth')));
     tips.push(t(rev.source === 'page' ? 'revTipPage' : 'revTipList', {
       sales: formatSales(sales.monthlySales), price: formatMoney(rev.unitPrice, rev.currency, 2),
     }));
   }
-  if (stats.favorites !== null && stats.favorites !== undefined) {
-    sep();
-    row.appendChild(el('span', null, '♥ ' + formatNum(stats.favorites)));
-  }
-  if (M && M.quantitySignal(stats.quantity) === 'low') {
-    sep();
-    row.appendChild(el('span', 'kx-red', t('lowStock'), 'font-weight:700;'));
-  }
+  if (stats.favorites !== null && stats.favorites !== undefined) extras.push(t('cardFavs', { n: formatNum(stats.favorites) }));
+  if (M && M.quantitySignal(stats.quantity) === 'low') extras.push(t('cardLowStock', { n: stats.quantity }));
 
-  const vs = vsMedianSpan(disp, ctx);
-  if (vs) { sep(); row.appendChild(vs); }
+  if (vs) { sep2(); row.appendChild(vs); }
   row.title = tips.join('\n');
+  if (U && sales.kind !== 'pending') {
+    row.appendChild(U.info(document, {
+      label: t('salesMo'),
+      plain: salesPlain(sales),
+      formula: tips.concat(extras).join(' '),
+      source: rev && rev.source === 'page' ? ['etsyApi', 'etsyPage'] : ['etsyApi'],
+      confidence: sales.confidence || null,
+    }));
+  }
   return row;
 }
 
-/** Price vs the median of the cards on this page, both as displayed (same currency). Page-only. */
+/** Price vs the typical (median) price of the cards on this page, same currency. Page-only. */
 function vsMedianSpan(disp, ctx) {
   const M = window.__KX_MATH;
+  const U = _ui();
   const market = ctx && ctx.market;
   if (!M || !market || !market.price || market.price.n < 5 || !disp || !disp.price || disp.isAd) return null;
   const diff = M.priceVsMedian(disp.price.amount, market.price.median, disp.price.currency, market.currency);
   if (!diff) return null;
-  const span = el('span', null, diff.text + ' ' + t('vsMedian'), 'color:#666;');
+  const vs = U ? U.vsTypical(diff.pct) : null;
+  const span = el('span', vs && vs.tone === 'good' ? 'kx-green' : vs && vs.tone === 'warn' ? 'kx-orange' : null,
+    vs ? vs.text : diff.text + ' ' + t('vsMedian'));
+  span.dataset.kxVs = String(diff.pct);
   span.title = t('vsMedianTip', {
     price: formatMoney(disp.price.amount, disp.price.currency, 2),
     median: formatMoney(market.price.median, market.currency, 2),
@@ -853,23 +788,23 @@ function vsMedianSpan(disp, ctx) {
 }
 
 /**
- * Instant row before the API answers: placeholders for sales + badge + favourites, and the
- * page-only "vs median" right away. Replaced in place by buildCardRow (same line height).
+ * Instant row before the API answers: placeholders for sales + tag, and the page-only
+ * "vs typical price" right away. Replaced in place by buildCardRow (same line height).
  */
 function buildSkeletonRow(listingId, ctx) {
+  const U = _ui();
   const row = el('div', 'kx-data-row');
+  if (U) { U.strip(row); row.appendChild(U.mark(document, false)); }
   row.lang = _langNow();
   row.dataset.kxListing = listingId;
   row.dataset.kxSkeleton = '1';
   row.title = t('cardTipPending');
   row.appendChild(skel());
   row.appendChild(skel(true));
-  row.appendChild(el('span', 'kx-sep', '·'));
-  row.appendChild(skel());
   const disp = (ctx && ctx.display && ctx.display[listingId]) || {};
   const vs = vsMedianSpan(disp, ctx);
   if (vs) {
-    row.appendChild(el('span', 'kx-sep', '·'));
+    if (U) row.appendChild(U.lineBreak(document)); else row.appendChild(el('span', 'kx-sep', '·'));
     row.appendChild(vs);
   }
   return row;
@@ -1105,7 +1040,8 @@ window.__KX_SHARED = {
   apiCall,
   listingStatsCall,
   showLimitCard,
-  el, formatMoney, formatSales, formatDec, confShort,
+  el, formatMoney, formatSales, formatDec, confShort, salesPlain, salesFigure,
+  get UI() { return _ui(); },
   buildCardRow, buildSkeletonRow, renderCardRows, clearSkeletonRows, loadCardStats, pageListingIds, findListingCard,
   collectPageCards, pageMarket, readCardPrice, isAdCard,
   skel, perf, perfStart, findShortPageText, readPageResultCount,

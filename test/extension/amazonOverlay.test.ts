@@ -30,6 +30,7 @@ function boot(url: string, html: string, onMsg: Handler, lang: 'tr' | 'en' | nul
   };
   w.open = () => null;
   w.eval(src('lib/lang.js'));
+  w.eval(src('lib/ui.js'));
   w.eval(src('lib/amazonMath.js'));
   w.eval(src('content-amazon-shared.js'));
   return { dom, w, calls, run: (f: string) => w.eval(src(f)) };
@@ -86,7 +87,8 @@ describe('Amazon search overlay', () => {
     const bar = await waitFor(() => doc.getElementById('kx-amz-research-summary'));
     expect(bar.textContent).toContain('5 results + 1 ad on this page');
     expect(bar.textContent).toContain('of over 3,000');
-    expect(bar.textContent).toContain('Ads: 1/6');
+    expect(bar.textContent).toContain('Ads1/6');
+    expect(bar.textContent).toContain('On this page5 results + 1 ad');
 
     const rowOf = (asin: string) => doc.querySelector(`[data-asin="${asin}"] .kx-amz-research-row`)?.textContent || '';
     expect(rowOf('B0ORGANIC1')).toContain('Amazon: 100+ bought/mo');
@@ -94,9 +96,13 @@ describe('Amazon search overlay', () => {
     expect(rowOf('B0SPONSOR1')).toContain('Ad');
 
     // SP-API answer arrives → card 3 switches from "no data" to a labelled estimate.
-    await waitFor(() => rowOf('B0ORGANIC2').includes('est. ~'));
-    expect(rowOf('B0ORGANIC2')).toContain('BSR #1,234');
-    expect(rowOf('B0ORGANIC2')).toContain('3 offers');
+    await waitFor(() => rowOf('B0ORGANIC2').includes('≈'));
+    expect(rowOf('B0ORGANIC2')).toMatch(/≈[\d.,K]+ sales\/mo/);
+    expect(rowOf('B0ORGANIC2')).toContain('estimate');
+    // Rank, offers and ASIN are in the "i", not on the strip (max three figures on its face).
+    const info2 = () => (doc.querySelector('[data-asin="B0ORGANIC2"] .kx-amz-research-row .kx-info') as HTMLElement).dataset.kxFormula || '';
+    expect(info2()).toContain('BSR #1,234.');
+    expect(info2()).toContain('3 offers.');
     expect(rowOf('B0ORGANIC5')).toContain('sales: no data');
     expect(calls[0].type).toBe('kx_amazon_enrich');
     expect(calls[0].params.asins).not.toContain('B0SPONSOR1');
@@ -158,20 +164,23 @@ describe('Amazon overlays in Turkish (default, nothing stored)', () => {
     const bar = await waitFor(() => doc.getElementById('kx-amz-research-summary'));
     const text = (bar.textContent || '').replace(/\s+/g, ' ');
     expect(text).toContain('Amazon Pazar Özeti · bu sayfada 5 sonuç + 1 reklam (toplam 3.000+)');
-    expect(text).toContain('Medyan fiyat:');
-    expect(text).toContain('Reklam: 1/6');
-    expect(text).toMatch(/Rekabet: (Düşük|Orta|Yüksek|Veri yetersiz)/);
+    expect(text).toContain('Tipik fiyat$');
+    expect(text).toContain('Reklamlı sonuç1/6');
+    expect(text).toMatch(/Rekabet(Düşük|Orta|Yüksek|Veri yetersiz)/);
     expect(text).toContain('Detaylı AI Analizi');
     expect(text).toMatch(/\$\d+,\d{2}/); // "$24,99": dollar kept, Turkish decimal comma
-    expect(text).not.toMatch(/Median price|Competition|Ads:|results \+/);
+    expect(text).not.toMatch(/Typical price|Competition|Ads|results \+/);
 
     const rowOf = (asin: string) => doc.querySelector(`[data-asin="${asin}"] .kx-amz-research-row`)?.textContent || '';
     expect(rowOf('B0ORGANIC1')).toContain('Amazon: 100+ satış/ay');
     expect(rowOf('B0ORGANIC1')).toContain('≥$2,5K/ay');
     expect(rowOf('B0SPONSOR1')).toContain('Reklam');
-    await waitFor(() => rowOf('B0ORGANIC2').includes('tahmini ~'));
-    expect(rowOf('B0ORGANIC2')).toContain('BSR #1.234');
-    expect(rowOf('B0ORGANIC2')).toContain('3 teklif');
+    await waitFor(() => rowOf('B0ORGANIC2').includes('≈'));
+    expect(rowOf('B0ORGANIC2')).toContain('satış/ay');
+    expect(rowOf('B0ORGANIC2')).toContain('tahmini');
+    const info2 = (doc.querySelector('[data-asin="B0ORGANIC2"] .kx-amz-research-row .kx-info') as HTMLElement).dataset.kxFormula || '';
+    expect(info2).toContain('BSR #1.234.');
+    expect(info2).toContain('3 teklif.');
     expect(rowOf('B0ORGANIC5')).toContain('satış: veri yok');
     await waitFor(() => (doc.getElementById('kx-amz-research-summary')?.textContent || '').includes('1 ürün için resmi Amazon verisi (SP-API)'));
   });

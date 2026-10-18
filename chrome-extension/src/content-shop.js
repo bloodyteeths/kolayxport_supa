@@ -79,12 +79,12 @@
       const shopTask = C.getOrFetch(`shop2:${shopName.toLowerCase()}`, 'lstats', () => S.apiCall('shop_enrich', { shopId: shopName }))
         .then(data => {
           if (!isCurrent() || limited) return;
-          if (!data?.shop) { bar.textContent = ''; return; }
+          if (!data?.shop) { bar.textContent = ''; bar.className = 'kx-shop-bar'; return; }
           renderShopBar(bar, data);
           S.perf('etsy_shop', 'shop');
         }, err => {
           if (showLimit(err) || !isCurrent()) return;
-          setMessage(bar, '⚠ ' + ((err && err.message) || S.t('loadFailed')), 0.7);
+          setMessage(bar, '⚠ ' + ((err && err.message) || S.t('loadFailed')));
         });
 
       // Per-listing rows on the shop grid, in parallel with the bar (all one shop → one shop fetch
@@ -99,60 +99,36 @@
       if (isCurrent() && !limited) S.perf('etsy_shop', 'full');
     }
 
+    const chip = (o) => S.UI.chip(document, o);
+    const shopLink = (name) => ({ href: S.API_BASE + '/app/research/shops?mkt=etsy&q=' + encodeURIComponent(name || ''), text: S.t('fullAnalysis') });
+
     /** Same slots as renderShopBar, with placeholders for what only the API knows. */
     function renderSkeletonBar(bar, shopName, pageSales) {
-      bar.textContent = '';
-      bar.dataset.kxState = 'partial';
-      const title = S.el('div', null, null, 'display:flex;align-items:center;gap:4px;font-weight:700;');
-      title.appendChild(S.el('span', null, 'KX', 'font-size:10px;background:rgba(255,255,255,0.2);padding:2px 6px;border-radius:4px;'));
-      title.appendChild(S.el('span', null, shopName || ''));
-      bar.appendChild(title);
-      bar.appendChild(S.el('div', 'kx-bar-divider'));
-      const slot = (label, value, wide) => {
-        const w = S.el('div', 'kx-bar-item');
-        w.appendChild(S.el('span', 'kx-bar-label', label));
-        const v = S.el('span', 'kx-bar-value');
-        if (value !== null && value !== undefined) v.textContent = value; else v.appendChild(S.skel(wide));
-        w.appendChild(v);
-        return w;
-      };
-      bar.appendChild(slot(S.t('salesMo'), null, true));
-      bar.appendChild(slot(S.t('revenueMo')));
-      bar.appendChild(S.el('div', 'kx-bar-divider'));
-      bar.appendChild(slot(S.t('topSales'), pageSales !== null && pageSales !== undefined ? S.formatNum(pageSales) : null));
-      bar.appendChild(slot(S.t('rating')));
-      bar.appendChild(slot(S.t('reviews')));
-      bar.appendChild(S.el('div', 'kx-bar-divider'));
-      bar.appendChild(slot(S.t('activeListings')));
-      bar.appendChild(slot(S.t('medianListPriceShop'), null, true));
+      const sk = (wide) => S.skel(wide);
+      S.UI.topBar(bar, {
+        title: shopName || '',
+        state: 'partial',
+        chips: [
+          chip({ key: 'sales', label: S.t('salesMo'), value: sk(true) }),
+          chip({ key: 'revenue', label: S.t('revenueMo'), value: sk() }),
+          chip({ key: 'total', label: S.t('topSales'), value: pageSales !== null && pageSales !== undefined ? S.formatNum(pageSales) : sk() }),
+          chip({ key: 'rating', label: S.t('rating'), value: sk() }),
+          chip({ key: 'price', label: S.t('medianListPriceShop'), value: sk(true) }),
+        ],
+        more: [
+          chip({ key: 'reviews', label: S.t('reviews'), value: sk() }),
+          chip({ key: 'listings', label: S.t('activeListings'), value: sk() }),
+        ],
+        link: shopLink(shopName),
+      });
     }
 
-    function setMessage(bar, text, opacity) {
-      bar.textContent = '';
-      bar.appendChild(S.el('span', null, text, 'opacity:' + opacity));
-    }
-
-    function item(label, value, valueStyle, title) {
-      const wrap = S.el('div', 'kx-bar-item');
-      if (title) wrap.title = title;
-      wrap.appendChild(S.el('span', 'kx-bar-label', label));
-      wrap.appendChild(S.el('span', 'kx-bar-value', value, valueStyle));
-      return wrap;
-    }
-
-    function badge(kind, confidence) {
-      const styles = {
-        measured: 'background:#e8f5e9;color:#1b5e20;',
-        estimated: 'background:#fff3e0;color:#e65100;',
-        insufficient: 'background:#eee;color:#666;',
-      };
-      let label = kind === 'measured' ? S.t('badgeMeasured') : kind === 'estimated' ? S.t('badgeEstimated') : S.t('badgeInsufficient');
-      if (confidence && kind !== 'insufficient') label += ' · ' + S.confShort(confidence);
-      return S.el('span', null, label,
-        (styles[kind] || styles.insufficient) + 'font-size:9px;font-weight:800;text-transform:uppercase;padding:1px 6px;border-radius:8px;margin-left:4px;');
+    function setMessage(bar, text) {
+      S.UI.barMessage(bar, text);
     }
 
     function renderShopBar(bar, data) {
+      const U = S.UI;
       const { shop, sales, avgPrice, topListings, lowStockCount } = data;
       const cur = shop.currency || 'USD';
       const i = sales?.inputs || {};
@@ -161,59 +137,50 @@
         : sales?.kind === 'estimated'
           ? S.t('shopHowEstimated', { recent: i.recentShopReviews, window: i.windowDays, ratio: i.salesPerReview, avg: S.formatMoney(i.avgPrice, cur, 2) })
           : S.t('howInsufficient');
-      const conf = sales?.confidence ? ' · ' + S.t(sales.confidence === 'high' ? 'confHigh' : sales.confidence === 'medium' ? 'confMedium' : 'confLow') : '';
+      const plain = sales?.kind === 'measured' ? S.t('plainShopSalesMeasured') : sales?.kind === 'estimated' ? S.t('plainShopSalesEstimated') : S.t('plainSalesNone');
+      const kind = sales?.kind || 'insufficient';
+      const src = kind === 'measured' ? ['etsyApi', 'kx'] : ['etsyApi'];
 
-      bar.textContent = '';
-      bar.dataset.kxState = 'full';
-      const title = S.el('div', null, null, 'display:flex;align-items:center;gap:4px;font-weight:700;');
-      title.appendChild(S.el('span', null, 'KX', 'font-size:10px;background:rgba(255,255,255,0.2);padding:2px 6px;border-radius:4px;'));
-      title.appendChild(S.el('span', null, shop.shop_name || ''));
-      bar.appendChild(title);
-      bar.appendChild(S.el('div', 'kx-bar-divider'));
-
-      const salesItem = S.el('div', 'kx-bar-item');
-      salesItem.title = how + conf;
-      salesItem.appendChild(S.el('span', 'kx-bar-label', S.t('salesMo')));
-      const val = sales?.monthlySales !== null && sales?.monthlySales !== undefined
-        ? (sales.kind === 'estimated' ? '~' : '') + S.formatSales(sales.monthlySales)
+      const chips = [];
+      const more = [];
+      const salesVal = sales?.monthlySales !== null && sales?.monthlySales !== undefined
+        ? (kind === 'estimated' ? '≈' : '') + S.formatSales(sales.monthlySales)
         : '—';
-      salesItem.appendChild(S.el('span', 'kx-bar-value', val, 'font-size:15px;'));
-      salesItem.appendChild(badge(sales?.kind || 'insufficient', sales?.confidence));
-      bar.appendChild(salesItem);
+      chips.push(chip({ key: 'sales', label: S.t('salesMo'), value: [salesVal, U.conf(document, kind, sales?.confidence)],
+        info: { plain, formula: how, source: src, confidence: sales?.confidence || null } }));
       if (sales?.monthlyRevenue) {
-        bar.appendChild(item(S.t('revenueMo'), '≈' + S.formatMoney(sales.monthlyRevenue, cur), 'color:#a5d6a7;', how));
+        chips.push(chip({ key: 'revenue', label: S.t('revenueMo'), value: '≈' + S.formatMoney(sales.monthlyRevenue, cur),
+          info: { plain: S.t('plainShopRevenue'), formula: how, source: src, confidence: sales.confidence === 'high' ? 'medium' : 'low' } }));
       }
-      bar.appendChild(S.el('div', 'kx-bar-divider'));
-      if (shop.num_sales !== null && shop.num_sales !== undefined) bar.appendChild(item(S.t('topSales'), S.formatNum(shop.num_sales)));
-      bar.appendChild(item(S.t('rating'), shop.rating ? Number(shop.rating).toLocaleString(S.locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' ★' : S.t('notAvailable')));
-      if (shop.review_count !== null && shop.review_count !== undefined) bar.appendChild(item(S.t('reviews'), S.formatNum(shop.review_count)));
-      if (shop.salesPerReview) bar.appendChild(item(S.t('salesPerReview'), S.formatDec(shop.salesPerReview)));
-      bar.appendChild(S.el('div', 'kx-bar-divider'));
-      if (shop.listing_count !== null && shop.listing_count !== undefined) bar.appendChild(item(S.t('activeListings'), S.formatNum(shop.listing_count)));
-      if (avgPrice) bar.appendChild(item(S.t('medianListPriceShop'), S.formatMoney(avgPrice, cur, 2), null, S.t('priceTipShop')));
-      if (shop.shopAgeYears !== null && shop.shopAgeYears !== undefined) bar.appendChild(item(S.t('shopAge'), shop.shopAgeYears + ' ' + S.t('years')));
-      if (lowStockCount > 0) bar.appendChild(item(S.t('lowStockItems'), String(lowStockCount), 'color:#ffcdd2;'));
+      if (shop.num_sales !== null && shop.num_sales !== undefined) chips.push(chip({ key: 'total', label: S.t('topSales'), value: S.formatNum(shop.num_sales) }));
+      chips.push(chip({ key: 'rating', label: S.t('rating'), value: shop.rating ? Number(shop.rating).toLocaleString(S.locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' ★' : S.t('notAvailable') }));
+      if (avgPrice) {
+        chips.push(chip({ key: 'price', label: S.t('medianListPriceShop'), value: S.formatMoney(avgPrice, cur, 2),
+          info: { plain: S.t('plainShopPrice'), formula: S.t('priceTipShop'), source: ['etsyApi'], confidence: 'medium' } }));
+      }
+
+      if (shop.review_count !== null && shop.review_count !== undefined) more.push(chip({ key: 'reviews', label: S.t('reviews'), value: S.formatNum(shop.review_count) }));
+      if (shop.salesPerReview) {
+        more.push(chip({ key: 'spr', label: S.t('salesPerReview'), value: S.formatDec(shop.salesPerReview),
+          info: { plain: S.t('plainSalesPerReview'), source: ['etsyApi'], confidence: 'high' } }));
+      }
+      if (shop.listing_count !== null && shop.listing_count !== undefined) more.push(chip({ key: 'listings', label: S.t('activeListings'), value: S.formatNum(shop.listing_count) }));
+      if (shop.shopAgeYears !== null && shop.shopAgeYears !== undefined) more.push(chip({ key: 'age', label: S.t('shopAge'), value: shop.shopAgeYears + ' ' + S.t('years') }));
+      if (lowStockCount > 0) more.push(chip({ key: 'lowstock', label: S.t('lowStockItems'), value: String(lowStockCount), tone: 'red' }));
 
       if (Array.isArray(topListings) && topListings.length) {
-        bar.appendChild(S.el('div', 'kx-bar-divider'));
-        const top = S.el('div', 'kx-bar-item', null, 'flex-direction:column;align-items:flex-start;max-width:320px;');
-        top.appendChild(S.el('span', 'kx-bar-label', S.t('topRecent')));
+        const top = U.note(document, null);
+        top.appendChild(S.el('div', null, S.t('topListingsLabel'), 'font-weight:600;color:#fff;margin-bottom:2px;'));
         topListings.slice(0, 3).forEach(l => {
-          const a = S.el('a', null, null, 'color:#fff;font-size:11px;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px;display:block;');
+          const a = S.el('a', null, null, 'color:#8FA8FF;text-decoration:none;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;');
           a.href = 'https://www.etsy.com/listing/' + encodeURIComponent(l.listing_id);
-          a.textContent = (l.title ? l.title.slice(0, 50) : '#' + l.listing_id) + ' (' + l.recentReviews + ' ★)';
+          a.textContent = (l.title ? l.title.slice(0, 70) : '#' + l.listing_id) + ' (' + l.recentReviews + ' ★)';
           top.appendChild(a);
         });
-        bar.appendChild(top);
+        more.push(top);
       }
 
-      const right = S.el('div', null, null, 'margin-left:auto;');
-      const link = S.el('a', 'kx-btn kx-btn-sm', S.t('fullAnalysis'), 'background:rgba(255,255,255,0.2);text-decoration:none;color:#fff;');
-      link.href = S.API_BASE + '/app/research/shops?mkt=etsy&q=' + encodeURIComponent(shop.shop_name || '');
-      link.target = '_blank';
-      link.rel = 'noopener';
-      right.appendChild(link);
-      bar.appendChild(right);
+      U.topBar(bar, { title: shop.shop_name || '', state: 'full', chips, more, link: shopLink(shop.shop_name) });
     }
   }
 })();

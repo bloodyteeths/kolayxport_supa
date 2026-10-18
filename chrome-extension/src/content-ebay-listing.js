@@ -72,7 +72,7 @@
 
       // Instant: page sold count / price, placeholders for the API slots.
       const st = {
-        item: null, seo: null, best: null, ui: { collapsed: false },
+        item: null, seo: null, best: null,
         loading: { item: true, seo: !!title, best: false },
       };
       const searchWords = (title || '').split(/\s+/).slice(0, 4).join(' ');
@@ -141,11 +141,15 @@
       return map[rec.key] ? S.t(map[rec.key], rec.params || {}) : '';
     }
 
-    /** One renderer for every stage; st.loading.{item,seo,best} → placeholders in those slots. */
+    /**
+     * One renderer for every stage; st.loading.{item,seo,best} → placeholders in those slots.
+     * Panel header: SEO, price vs typical, best seller. Body: sales, stock, competition,
+     * seller, title tips. The collapse caret's state is shared and remembered (lib/ui.js).
+     */
     function renderStatsBar(el, st, pageData) {
+      const U = S.UI;
       const bestSeller = st.best;
       const loading = st.loading;
-      el.dataset.kxState = loading.item || loading.seo || loading.best ? 'partial' : 'full';
       // get_item_details returns the raw Browse API item.
       const item = st.item || {};
       const seo = st.seo || {};
@@ -155,7 +159,7 @@
       const seoScore = Number.isFinite(seo.seoScore) ? seo.seoScore : null;
       const seoColor = S.scoreClass(seoScore || 0);
       const seoPct = Math.min(seoScore || 0, 100);
-      const seoFillColor = seoScore >= 70 ? '#4caf50' : seoScore >= 40 ? '#ff9800' : '#f44336';
+      const seoFillColor = seoScore >= 70 ? '#16a34a' : seoScore >= 40 ? '#d97706' : '#dc2626';
 
       // Browse API price is { value: "25.99", currency: "USD" }.
       const itemPrice = item.price ? parseFloat(item.price.value) : (pageData && pageData.price);
@@ -171,60 +175,65 @@
 
       const sellerPct = seller.feedbackPercentage != null ? parseFloat(seller.feedbackPercentage) : null;
       const sellerScore = Number.isFinite(seller.feedbackScore) ? seller.feedbackScore : null;
+      const psConf = ps && ps.n >= 20 ? 'high' : ps && ps.n >= 8 ? 'medium' : 'low';
 
-      // Header
-      let headerParts = `<span class="kx-stats-logo">KX</span>`;
-
+      // Header: SEO, price vs typical, best seller
+      let headerParts = '';
       if (seoScore == null && loading.seo) {
         headerParts += `<span class="kx-seo-bar">${esc(S.t('seo'))}: ${S.skel(true)}</span>`;
       }
       if (seoScore != null) {
         headerParts += `
-          <span class="kx-seo-bar" title="${esc(S.t('titleCoverage'))}">
+          <span class="kx-seo-bar">
             ${esc(S.t('seo'))}:
-            <span class="kx-seo-track"><span class="kx-seo-fill" style="width:${seoPct}%;background:${seoFillColor};"></span></span>
+            <span class="kx-seo-track" aria-hidden="true"><span class="kx-seo-fill" style="width:${seoPct}%;background:${seoFillColor};"></span></span>
             <span class="${seoColor}" style="font-weight:700;">${seoScore}/100</span>
+            ${U.infoHtml({ label: S.t('seo'), plain: S.t('plainSeo'), formula: S.t('titleCoverage'), source: ['ebayApi', 'kx'], confidence: 'medium' })}
           </span>
         `;
       }
 
       if (itemPrice && median) {
-        const priceDiff = S.priceVsMedian(itemPrice, median);
-        if (priceDiff) {
-          headerParts += `<span>${esc(S.t('price'))}: <span class="${priceDiff.cssClass}">${esc(priceDiff.text)}</span> (${esc(S.formatPrice(median, ps.currency))})</span>`;
+        const vs = U.vsTypical(M.pctVsMedian(itemPrice, median));
+        if (vs) {
+          const cls = vs.tone === 'good' ? 'kx-green' : vs.tone === 'warn' ? 'kx-orange' : '';
+          headerParts += `<span>${esc(S.t('price'))}: <span class="${cls}" data-kx-vs="${esc(vs.pct)}">${esc(vs.text)}</span> (${esc(S.formatPrice(median, ps.currency))})` +
+            U.infoHtml({ label: S.t('price'), plain: S.t('plainVsTypical'), formula: S.t('srcApi', { n: ps.n || 0 }), source: ['ebayApi'], confidence: psConf }) + '</span>';
         }
       }
 
       if (bestSeller && bestSeller.isBestSeller) {
         headerParts += `<span class="kx-best">★ ${esc(S.t('topBySold', { p: bestSeller.percentile }))}</span>`;
       }
-
       if (loading.best) headerParts += S.skel();
 
-      headerParts += `<button class="kx-collapse-btn" data-kx-collapse>${st.ui.collapsed ? '▼' : '▲'}</button>`;
-
-      // Stats line
+      // Body lines
       const statParts = [];
-
       if (soldCount != null) {
-        let txt = `${S.formatInt(soldCount)}${soldPlus ? '+' : ''} ${S.t('sold')}`;
+        let txt = `<span class="kx-strong">${esc(S.formatInt(soldCount))}${soldPlus ? '+' : ''} ${esc(S.t('sold'))}</span>`;
         const perMo = M.estMonthlySales(soldCount, item.itemCreationDate);
-        if (perMo != null) txt += ` · ≈${S.formatInt(perMo)}${S.t('perMonth')} (${S.t('estTag')})`;
-        statParts.push(`<span>${esc(txt)}</span>`);
-        const st = M.sellThrough(apiSold, apiRemaining);
-        if (st != null) {
-          statParts.push(`<span>${esc(S.t('sellThrough'))}: ${esc(S.t('pct', { n: Math.round(st * 100) }))} (${esc(S.formatInt(apiRemaining))} ${esc(S.t('available'))}, ${esc(S.t('estTag'))})</span>`);
+        if (perMo != null) {
+          const months = (Date.now() - Date.parse(item.itemCreationDate)) / 86400000 / 30.44;
+          txt += ` · ≈${esc(S.formatInt(perMo))}${esc(S.t('perMonthSales'))} <span class="kx-est" data-kx-est="1">${esc(S.t('estTag'))}</span>` +
+            U.infoHtml({ label: S.t('sold'), plain: S.t('plainMonthly'), formula: S.t('formulaMonthly', { sold: S.formatInt(soldCount), months: S.formatInt(Math.round(months * 10) / 10) }), source: ['ebayApi'], confidence: 'low' });
+        }
+        statParts.push(`<span>${txt}</span>`);
+        const sth = M.sellThrough(apiSold, apiRemaining);
+        if (sth != null) {
+          statParts.push(`<span>${esc(S.t('sellThrough'))}: ${esc(S.t('pct', { n: Math.round(sth * 100) }))} (${esc(S.formatInt(apiRemaining))} ${esc(S.t('available'))}, ${esc(S.t('estTag'))})` +
+            U.infoHtml({ label: S.t('sellThrough'), plain: S.t('plainSellThrough'), source: ['ebayApi'], confidence: 'low' }) + '</span>');
         }
       }
 
       if (soldCount == null && loading.item) statParts.push(S.skel(true));
 
       if (loading.seo) {
-        statParts.push(`<span>${esc(S.t('competition'))} (${esc(S.t('estTag'))}): ${S.skel(true)}</span>`);
+        statParts.push(`<span>${esc(S.t('competition'))}: ${S.skel(true)}</span>`);
       } else if (Number.isFinite(seo.totalCompetitors) && seo.totalCompetitors > 0) {
         const comp = M.computeCompetition({ resultCount: seo.totalCompetitors, price: ps });
-        const compClass = comp.level === 'low' ? 'kx-green' : comp.level === 'medium' ? 'kx-orange' : comp.level === 'high' ? 'kx-red' : '';
-        statParts.push(`<span>${esc(S.t('competition'))} (${esc(S.t('estTag'))}): <span class="${compClass}">${esc(S.competitionLabel(comp.level))}</span> (${esc(S.formatInt(seo.totalCompetitors))} ${esc(S.t('competingListings'))})</span>`);
+        const tone = U.competitionTone(comp.level);
+        statParts.push(`<span>${esc(S.t('competition'))}: <span class="kx-pill kx-tone-${tone}"><span class="kx-dot" aria-hidden="true"></span><span>${esc(S.competitionLabel(comp.level))}</span></span> <span class="kx-est" data-kx-est="1">${esc(S.t('estTag'))}</span> (${esc(S.formatInt(seo.totalCompetitors))} ${esc(S.t('competingListings'))})` +
+          U.infoHtml({ label: S.t('competition'), plain: S.t('plainCompetition'), formula: comp.score == null ? '' : S.t('compScore', { score: comp.score }), source: ['ebayApi'], confidence: 'low' }) + '</span>');
       }
 
       if (loading.item) {
@@ -234,30 +243,22 @@
       }
 
       // SEO tips
-      let tipsHtml = '';
       const tips = (seo.recommendations || []).map(tipText).filter(Boolean);
-      if (tips.length > 0) {
-        tipsHtml = `<div data-kx-details style="margin-top:4px;font-size:11px;color:#666;">
-          ${tips.slice(0, 3).map(tip => `<div>• ${esc(tip)}</div>`).join('')}
-        </div>`;
-      }
 
-      el.innerHTML = `
-        <div class="kx-stats-header">${headerParts}</div>
-        ${statParts.length > 0 ? `<div class="kx-stats-row" data-kx-details>${statParts.join('<span class="kx-sep">·</span>')}</div>` : ''}
-        ${tipsHtml}
-      `;
+      const extra = document.createElement('span');
+      extra.innerHTML = headerParts;
+      const body = U.panel(el, { title: S.t('itemInsights'), extra: Array.from(extra.childNodes) });
+      el.dataset.kxState = loading.item || loading.seo || loading.best ? 'partial' : 'full';
 
-      const detailEls = el.querySelectorAll('[data-kx-details]');
-      if (st.ui.collapsed) detailEls.forEach(d => { d.style.display = 'none'; });
-      const collapseBtn = el.querySelector('[data-kx-collapse]');
-      if (collapseBtn) {
-        collapseBtn.addEventListener('click', () => {
-          st.ui.collapsed = !st.ui.collapsed;
-          el.querySelectorAll('[data-kx-details]').forEach(d => { d.style.display = st.ui.collapsed ? 'none' : ''; });
-          collapseBtn.textContent = st.ui.collapsed ? '▼' : '▲';
-        });
+      let bodyHtml = '';
+      if (statParts.length) {
+        bodyHtml += `<div class="kx-lines" data-kx-details>${statParts.map(p => `<div>${p}</div>`).join('')}</div>`;
       }
+      if (tips.length) {
+        bodyHtml += `<div class="kx-box" data-kx-details><div class="kx-section-label">${esc(S.t('tipsTitle'))}</div><ul class="kx-list">` +
+          tips.slice(0, 3).map(tip => `<li>${esc(tip)}</li>`).join('') + '</ul></div>';
+      }
+      body.innerHTML = bodyHtml;
     }
   }
 })();

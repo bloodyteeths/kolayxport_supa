@@ -32,7 +32,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
   const user = await getAuthUser(req, res);
   if (!user) return res.status(401).json({ error: 'login_required' });
-  const state = typeof src.state === 'string' ? src.state.slice(0, 500) : undefined;
+  // `state` goes back to the client exactly as sent: ChatGPT's is a long encoded JSON value and cutting it (it was
+  // sliced to 500) broke its OAuth completion. Oversized values are refused instead of truncated.
+  const state = typeof src.state === 'string' ? src.state : undefined;
+  if (state && state.length > 8192) return res.status(400).json({ error: 'invalid_request', error_description: 'state too long' });
   if (src.approve !== true) return res.status(200).json({ redirect: withParams(redirectUri, { error: 'access_denied', state }) });
   const challenge = String(src.code_challenge || '');
   if (!/^[A-Za-z0-9_-]{43,128}$/.test(challenge) || (src.code_challenge_method && src.code_challenge_method !== 'S256')) {

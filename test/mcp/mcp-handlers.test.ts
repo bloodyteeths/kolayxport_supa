@@ -77,6 +77,14 @@ describe('consent API: orders:buyer only when ticked', () => {
     const bad = await run(authorize, { method: 'GET', query: { client_id: 'kxc_1', redirect_uri: 'https://evil.example/cb' } });
     expect(bad.statusCode).toBe(400);
   });
+  it('a long state (ChatGPT sends encoded JSON) comes back unchanged; an oversized one is refused', async () => {
+    const longState = Buffer.from(JSON.stringify({ connector: 'kolayxport', nonce: 'n'.repeat(600), redirect: 'https://chatgpt.com/x' })).toString('base64url');
+    expect(longState.length).toBeGreaterThan(500);
+    const ok = new URL((await consent({ scope: 'read', state: longState })).body.redirect);
+    expect(ok.searchParams.get('state')).toBe(longState);
+    const tooLong = await consent({ scope: 'read', state: 'x'.repeat(8193) });
+    expect(tooLong.statusCode).toBe(400);
+  });
   it('metadata advertises S256 and the iss parameter', async () => {
     const r = await run(metadata, { method: 'GET' });
     expect(r.body.code_challenge_methods_supported).toEqual(['S256']);

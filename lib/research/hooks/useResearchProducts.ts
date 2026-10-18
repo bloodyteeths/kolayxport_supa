@@ -30,8 +30,8 @@ import type {
 } from '@/lib/research/types';
 
 /** Same values as the server (`pages/api/research/products.ts` SORTS). */
-export type ProductSort = 'relevance' | 'price.asc' | 'price.desc' | 'favorites' | 'newest';
-export const PRODUCT_SORTS: readonly ProductSort[] = ['relevance', 'price.asc', 'price.desc', 'favorites', 'newest'];
+export type ProductSort = 'sales' | 'relevance' | 'price.asc' | 'price.desc' | 'favorites' | 'newest';
+export const PRODUCT_SORTS: readonly ProductSort[] = ['sales', 'relevance', 'price.asc', 'price.desc', 'favorites', 'newest'];
 
 export type ProductsParams = {
   q: string;

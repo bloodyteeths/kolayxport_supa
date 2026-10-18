@@ -18,6 +18,7 @@ import { NeedsWorkCard } from './NeedsWorkCard';
 import { SeasonsCard } from './SeasonsCard';
 import { RecentCard } from './RecentCard';
 import { QuestionChips } from './QuestionChips';
+import { NichesCard } from './NichesCard';
 import { readRecentSearches, rememberSearch, toolOfHref, type RecentSearch } from './recentSearches';
 import { routeResearchSearch, type QuestionKey } from './routeSearch';
 import { useResearchHome } from './useResearchHome';
@@ -136,6 +137,12 @@ export function ResearchHome({ now }: ResearchHomeProps = {}) {
         </Box>
         <QuestionChips onPick={onQuestion} disabled={routing} />
       </Box>
+
+      {mkt === 'etsy' ? (
+        <Box sx={{ mb: '24px' }}>
+          <NichesCard />
+        </Box>
+      ) : null}
 
       <Box
         sx={{

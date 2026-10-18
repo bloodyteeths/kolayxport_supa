@@ -11559,7 +11559,8 @@
       "price_asc": "En düşük fiyat",
       "price_desc": "En yüksek fiyat",
       "favorites": "En çok favori",
-      "newest": "En yeni"
+      "newest": "En yeni",
+      "sales": "En çok satan"
     },
     "top": {
       "title": "Öne çıkan ilanlar ({count})",
@@ -12077,6 +12078,15 @@
       "needsExtension": "KolayXport Chrome eklentisi gerekir (sürüm 9.11 veya üstü).",
       "waiting": "Trendyol sekmesi açıldı. Sayfa yüklenince sonuçlar burada görünecek…",
       "priceGap": "Fiyat farkı: Trendyol → yurt dışı"
+    },
+    "niches": {
+      "title": "Bugün güçlü nişler",
+      "description": "Her gün yeniden ölçülen Etsy nişleri: aylık satış, ciro, tipik fiyat ve rekabet. Birine tıklayın, cevap hemen açılır.",
+      "sales": "{count} satış/ay",
+      "revenue": "{amount}/ay",
+      "price": "Tipik fiyat {amount}",
+      "competitors": "{count} rakip ilan",
+      "basis": "İlk 48 ilanın {counted} tanesinden, {measured} ölçüldü"
     }
   },
   "ds": {

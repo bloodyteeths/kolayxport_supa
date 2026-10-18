@@ -122,6 +122,19 @@ export function TopListingsTable({ rows, mkt, total, source, sort, onSortChange,
 
   const sortOptions = PRODUCT_SORTS.map((s) => ({ value: s, label: t(`sort.${s.replace('.', '_')}`) }));
 
+  // "Best sellers": once the sales are in, rows go by monthly sales (an upper bound counts for half of itself,
+  // below any real number of the same size), then favorites. Re-sorted once, after loading, so rows don't jump.
+  const shownRows = React.useMemo(() => {
+    if (sort !== 'sales' || !sales || salesLoading) return rows;
+    const val = (r: TopListing) => {
+      const s = sales[r.id];
+      if (s?.monthlySales != null) return s.monthlySales;
+      if (s?.monthlySalesUpperBound != null) return s.monthlySalesUpperBound * 0.5;
+      return -1;
+    };
+    return [...rows].sort((a, b) => val(b) - val(a) || (b.favorites ?? 0) - (a.favorites ?? 0));
+  }, [rows, sort, sales, salesLoading]);
+
   return (
     <Box component="section" aria-labelledby="research-top-title" sx={{ mb: '24px' }} data-testid="research-top">
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '12px', mb: '8px', flexWrap: 'wrap' }}>
@@ -141,7 +154,7 @@ export function TopListingsTable({ rows, mkt, total, source, sort, onSortChange,
         />
       </Box>
       <DataTable
-        rows={rows}
+        rows={shownRows}
         columns={columns}
         getRowId={(r) => r.id}
         state={loading ? 'loading' : rows.length ? 'ready' : 'empty'}

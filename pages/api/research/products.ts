@@ -33,7 +33,7 @@ import {
 
 export const MAX_COMPARE = 3;
 export const MAX_QUERY_LEN = 120;
-const SORTS = ['relevance', 'price.asc', 'price.desc', 'favorites', 'newest'] as const;
+const SORTS = ['sales', 'relevance', 'price.asc', 'price.desc', 'favorites', 'newest'] as const;
 type TopSort = (typeof SORTS)[number];
 
 const ok = (value: number): Guarded<number> => ({ value, kind: 'measured', guard: { ok: true } });
@@ -41,6 +41,9 @@ const no = (reasonKey: string): Guarded<number> => ({ value: null, kind: 'measur
 
 export function sortTop(top: TopListing[], sort: TopSort): TopListing[] {
   if (sort === 'relevance') return top;
+  // Best sellers first: sales arrive later on the page (/api/research/sales), which re-sorts by them; until then
+  // favorites are the best proxy the search itself has.
+  if (sort === 'sales') sort = 'favorites';
   const s = [...top];
   const price = (t: TopListing) => t.priceConverted?.amount ?? t.price?.amount ?? null;
   const cmp = (a: number | null, b: number | null, dir: 1 | -1) => (a == null ? 1 : b == null ? -1 : (a - b) * dir);
@@ -290,7 +293,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const country = /^[A-Z]{2}$/.test(countryRaw) ? countryRaw : 'US';
   const taxRaw = Number(firstParam(req.query.taxonomyId));
   const taxonomyId = Number.isInteger(taxRaw) && taxRaw > 0 ? taxRaw : null;
-  const sortRaw = firstParam(req.query.sort) ?? 'relevance';
+  const sortRaw = firstParam(req.query.sort) ?? 'sales';
   const sort: TopSort = (SORTS as readonly string[]).includes(sortRaw) ? (sortRaw as TopSort) : 'relevance';
   const fmt = formattersFor(requestLocale(req));
 

@@ -32,7 +32,7 @@
       results: 'Sonuç', typical: 'Tipik fiyat', range: 'Fiyat aralığı', ads: 'Reklam', top5: 'İlk 5 satıcı payı',
       pageSales: 'Sayfa satışı/gün', pageRevenue: 'Sayfa cirosu/gün', measuredOf: '{n}/{m} ürün ölçüldü',
       perDay: '{n} satış/gün', revDay: '{v}/gün', ratingsMonth: '+{n} değerlendirme/ay', firstSeen: 'Ölçülüyor: satış hızı birkaç saat/gün içinde',
-      orders: '{n} sipariş', fav: '♥ {n}', analyse: 'KolayXport’ta analiz et', storeTitle: '{name} mağazası',
+      orders: '{n} sipariş', lifetimeLine: '~{n} toplam satış', fav: '♥ {n}', analyse: 'KolayXport’ta analiz et', storeTitle: '{name} mağazası',
       salesDay: 'Satış/gün', revenueDay: 'Ciro/gün', ratingGrowth: 'Değerlendirme artışı', baskets: 'Sepette', favorites: 'Favori',
       views24: 'Görüntülenme (24 saat)', sellers: 'Satıcı sayısı', lifetime: 'Toplam satış', priceChange: 'Fiyat değişimi',
       buybox: 'Satıcılar ve fiyatlar', buyboxHolder: 'Buybox', buyboxOpen: 'Tüm satıcıları görmek için “Tüm satıcıları göster”e tıklayın.',
@@ -51,7 +51,7 @@
       results: 'Results', typical: 'Typical price', range: 'Price range', ads: 'Ads', top5: 'Top-5 seller share',
       pageSales: 'Page sales/day', pageRevenue: 'Page revenue/day', measuredOf: '{n}/{m} products measured',
       perDay: '{n} sales/day', revDay: '{v}/day', ratingsMonth: '+{n} ratings/month', firstSeen: 'Measuring: sales speed within hours/days',
-      orders: '{n} orders', fav: '♥ {n}', analyse: 'Analyse in KolayXport', storeTitle: '{name} store',
+      orders: '{n} orders', lifetimeLine: '~{n} sales in total', fav: '♥ {n}', analyse: 'Analyse in KolayXport', storeTitle: '{name} store',
       salesDay: 'Sales/day', revenueDay: 'Revenue/day', ratingGrowth: 'Rating growth', baskets: 'In baskets', favorites: 'Favorites',
       views24: 'Views (24 h)', sellers: 'Sellers', lifetime: 'Lifetime sales', priceChange: 'Price change',
       buybox: 'Sellers and prices', buyboxHolder: 'Buybox', buyboxOpen: 'Click “Show all sellers” to read every seller.',
@@ -127,6 +127,9 @@
       if (s.revenuePerDay != null) parts.push(t('revDay', { v: tl(s.revenuePerDay) }));
     } else if (!gated && s && s.ratingsPer30d != null) {
       parts.push(t('ratingsMonth', { n: num(s.ratingsPer30d, 1) }));
+    } else if (!gated && s && s.lifetimeSales != null) {
+      // Not enough readings for a speed yet: the estimated total (ratings × orders per rating) is still a number.
+      parts.push(t('lifetimeLine', { n: short(s.lifetimeSales) }));
     } else if (!gated && card) {
       parts.push(t('firstSeen'));
     }

@@ -1,0 +1,16 @@
+{
+  "research": {
+    "niches": {
+      "title": "Bugün güçlü nişler",
+      "description": "Her gün yeniden ölçülen Etsy nişleri: aylık satış, ciro, tipik fiyat ve rekabet. Birine tıklayın, cevap hemen açılır.",
+      "sales": "{count} satış/ay",
+      "revenue": "{amount}/ay",
+      "price": "Tipik fiyat {amount}",
+      "competitors": "{count} rakip ilan",
+      "basis": "İlk 48 ilanın {counted} tanesinden, {measured} ölçüldü"
+    },
+    "sort": {
+      "sales": "En çok satan"
+    }
+  }
+}

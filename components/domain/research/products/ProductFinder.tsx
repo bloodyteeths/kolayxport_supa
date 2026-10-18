@@ -76,7 +76,7 @@ export const PRODUCTS_SCHEMA = {
   q: urlField.string(undefined, { maxLength: 200 }),
   country: urlField.enum(COUNTRIES, 'US'),
   compare: urlField.string(undefined, { maxLength: 640 }),
-  sort: urlField.enum(PRODUCT_SORTS, 'relevance'),
+  sort: urlField.enum(PRODUCT_SORTS, 'sales'),
   /** Set by the search router for a pasted Etsy listing / eBay item link (detectQuery.routeForQuery). */
   compareListing: urlField.string(undefined, { maxLength: 40 }),
   compareItem: urlField.string(undefined, { maxLength: 40 }),

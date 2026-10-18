@@ -11559,7 +11559,8 @@
       "price_asc": "Lowest price",
       "price_desc": "Highest price",
       "favorites": "Most favorites",
-      "newest": "Newest"
+      "newest": "Newest",
+      "sales": "Best sellers"
     },
     "top": {
       "title": "Top listings ({count})",
@@ -12077,6 +12078,15 @@
       "needsExtension": "Needs the KolayXport Chrome extension (version 9.11 or later).",
       "waiting": "Trendyol tab opened. Results will appear here once the page loads…",
       "priceGap": "Price gap: Trendyol → abroad"
+    },
+    "niches": {
+      "title": "Strong niches today",
+      "description": "Etsy niches measured again every day: monthly sales, revenue, typical price and competition. Click one for the full answer.",
+      "sales": "{count} sales/mo",
+      "revenue": "{amount}/mo",
+      "price": "Typical price {amount}",
+      "competitors": "{count} competing listings",
+      "basis": "From {counted} of the top 48 listings, {measured} measured"
     }
   },
   "ds": {

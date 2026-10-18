@@ -45,9 +45,25 @@ export async function requireHepsiburada(
 
 /** HB error → JSON response, keeping HB's status where it is a client error. */
 export function sendHbError(res: NextApiResponse, err: unknown) {
+  // Upload limits (lib/hepsiburada/uploads.ts): tell the client to retry later rather than report a failure.
+  if ((err as any)?.name === 'HbUploadLimitError') {
+    res.setHeader('Retry-After', '60');
+    return res.status(429).json({ error: (err as Error).message, code: (err as any).code });
+  }
   if (isHbError(err)) {
     const status = err.status >= 400 && err.status < 500 ? err.status : 502;
     return res.status(status).json({ error: hbErrorMessage(err), hbStatus: err.status, details: err.body });
   }
   return res.status(500).json({ error: hbErrorMessage(err) });
+}
+
+/**
+ * HB activates a new integrator authorization (panel → Entegratör bilgileri) within about 2 hours, so a 401 in that
+ * window is expected, not bad credentials (developer portal FAQ 1/5). Measured from the last credential save.
+ */
+export const HB_AUTHORIZATION_GRACE_MS = 2 * 60 * 60 * 1000;
+
+export async function inAuthorizationGrace(userId: string, now = Date.now()): Promise<boolean> {
+  const row = await prisma.credential.findUnique({ where: { userId }, select: { updatedAt: true } });
+  return !!row?.updatedAt && now - row.updatedAt.getTime() < HB_AUTHORIZATION_GRACE_MS;
 }

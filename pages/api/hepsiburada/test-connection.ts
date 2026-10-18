@@ -2,6 +2,7 @@
  * POST /api/hepsiburada/test-connection — live check of the user's saved Hepsiburada credentials.
  *
  * Reads one listing row. 200 `{ ok: true }`, or 200 `{ ok: false, reason }`:
+ *   pending     — HB answered 401/403 within 2 h of saving: a new integrator authorization takes up to 2 h to activate
  *   credentials — HB answered 401/403: wrong Mağaza ID / servis anahtarı, or our integrator is not added in the panel
  *   integrator  — our integrator name is not configured on this server
  *   failed      — anything else (network, 5xx)
@@ -12,7 +13,7 @@ import { getAuthUser } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 import { isAuthFailure, recordAuthFailure, recordAuthSuccess } from '@/lib/integrations/authFailures';
 import { hbErrorMessage } from '@/lib/hepsiburada/client';
-import { loadHepsiburadaClient } from '@/lib/hepsiburada/server';
+import { inAuthorizationGrace, loadHepsiburadaClient } from '@/lib/hepsiburada/server';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -33,6 +34,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } catch (err) {
     logger.warn('[HEPSIBURADA] test-connection failed', { userId: user.id, error: hbErrorMessage(err) });
     if (isAuthFailure(err)) {
+      // Fresh authorization: don't count it toward "reconnect"; tell the seller to wait.
+      if (await inAuthorizationGrace(user.id)) return res.status(200).json({ ok: false, reason: 'pending', error: hbErrorMessage(err) });
       await recordAuthFailure(user.id, 'hepsiburada', loaded.merchantId, err);
       return res.status(200).json({ ok: false, reason: 'credentials', error: hbErrorMessage(err) });
     }

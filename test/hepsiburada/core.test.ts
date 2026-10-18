@@ -189,3 +189,18 @@ describe('interpretUpload', () => {
     expect(interpretUpload({ status: 'Failed', errors: [{ message: 'bad' }] })).toEqual({ state: 'failed', error: 'bad' });
   });
 });
+
+describe('upload limits', () => {
+  it('maps HB limit errors to retryable 429 HbUploadLimitError', async () => {
+    const { asUploadLimitError, HbUploadLimitError } = await import('@/lib/hepsiburada/uploads');
+    const { isRetryableHttp } = await import('@/lib/stock/adapters/types');
+    const busy = asUploadLimitError({ status: 400, body: { message: 'There are too many ongoing/waiting inventory uploads at the moment. Please try again later' }, endpoint: 'x' });
+    expect(busy).toBeInstanceOf(HbUploadLimitError);
+    expect((busy as any).code).toBe('hb_uploads_in_flight');
+    expect(isRetryableHttp(busy)).toBe(true);
+    const daily = asUploadLimitError({ status: 400, body: { errors: ['Merchant exceeds his inventory upload limit'] }, endpoint: 'x' });
+    expect((daily as any).code).toBe('hb_daily_upload_limit');
+    const other = { status: 400, body: { message: 'bad sku' }, endpoint: 'x' };
+    expect(asUploadLimitError(other)).toBe(other);
+  });
+});

@@ -14,7 +14,7 @@ import { logger } from '@/lib/logger';
 import { upsertMarketplaceOrder, publishOrderWrites, type LiveWrite } from '@/lib/orders/marketplaceOrderWrite';
 import { startSync, updateSyncProgress, completeSync, cleanupStaleSyncs } from '@/lib/sync-status';
 import { isAuthFailure, isConnectionBlocked, recordAuthFailure, recordAuthSuccess } from '@/lib/integrations/authFailures';
-import { loadHepsiburadaClient } from './server';
+import { inAuthorizationGrace, loadHepsiburadaClient } from './server';
 import { hbErrorMessage, type HepsiburadaClient } from './client';
 import { HbOrderBook, toUIOrder, HB_MARKETPLACE, HB_SOURCE } from './orderMapper';
 
@@ -138,7 +138,8 @@ export async function syncHepsiburadaRecentOrdersForUser(userId: string): Promis
       await recordAuthSuccess(userId, 'hepsiburada', merchantId);
     } catch (err) {
       if (isAuthFailure(err)) {
-        await recordAuthFailure(userId, 'hepsiburada', merchantId, err);
+        // Within 2 h of saving, a 401 is HB still activating the authorization: not a strike toward "reconnect".
+        if (!(await inAuthorizationGrace(userId))) await recordAuthFailure(userId, 'hepsiburada', merchantId, err);
         throw Object.assign(new Error(`Hepsiburada rejected the credentials: ${hbErrorMessage(err).slice(0, 200)}`), { authFailure: true });
       }
       throw err;

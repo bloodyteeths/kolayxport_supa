@@ -9,7 +9,7 @@ import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { Prisma } from '@prisma/client';
 import { isAuthFailure, isConnectionBlocked, recordAuthFailure, recordAuthSuccess } from '@/lib/integrations/authFailures';
-import { loadHepsiburadaClient } from './server';
+import { inAuthorizationGrace, loadHepsiburadaClient } from './server';
 import { hbErrorMessage, type HepsiburadaClient } from './client';
 import type { Listing } from './generated/listing';
 import type { IntegratorProductInformation } from './generated/catalog';
@@ -106,7 +106,8 @@ export async function syncHepsiburadaListingsForUser(userId: string, opts: { sig
     listings = await fetchAllListings(client, opts.signal);
     await recordAuthSuccess(userId, 'hepsiburada', merchantId);
   } catch (err) {
-    if (isAuthFailure(err)) await recordAuthFailure(userId, 'hepsiburada', merchantId, err);
+    // Within 2 h of saving, a 401 is HB still activating the authorization: not a strike toward "reconnect".
+    if (isAuthFailure(err) && !(await inAuthorizationGrace(userId))) await recordAuthFailure(userId, 'hepsiburada', merchantId, err);
     throw err;
   }
   // Content is best-effort: price/stock still sync when the catalog service is down.

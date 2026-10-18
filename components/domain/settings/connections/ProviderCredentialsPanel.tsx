@@ -281,7 +281,7 @@ export default ProviderCredentialsPanel;
 
 const filled = (v: unknown): boolean => typeof v === 'string' && v.trim().length > 0;
 
-type HbVerifyReason = 'credentials' | 'integrator' | 'failed';
+type HbVerifyReason = 'credentials' | 'integrator' | 'pending' | 'failed';
 
 /** Live check of the saved Hepsiburada credentials (`POST /api/hepsiburada/test-connection`). */
 async function verifyHepsiburada(): Promise<{ ok: true } | { ok: false; reason: HbVerifyReason }> {
@@ -289,7 +289,7 @@ async function verifyHepsiburada(): Promise<{ ok: true } | { ok: false; reason: 
     const res = await fetch('/api/hepsiburada/test-connection', { method: 'POST', credentials: 'same-origin' });
     const body = await res.json().catch(() => ({}));
     if (res.ok && body?.ok) return { ok: true };
-    const reason: HbVerifyReason = body?.reason === 'credentials' || body?.reason === 'integrator' ? body.reason : 'failed';
+    const reason: HbVerifyReason = ['credentials', 'integrator', 'pending'].includes(body?.reason) ? body.reason : 'failed';
     return { ok: false, reason };
   } catch {
     return { ok: false, reason: 'failed' };

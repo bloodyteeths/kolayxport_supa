@@ -54,6 +54,8 @@ export interface OrderRow {
 }
 
 export interface ShipperProfileData {
+  /** Sandbox accounts only (lib/fedex/fedexSandbox.ts); production when absent. */
+  fedexBaseUrl?: string;
   fedexApiKey: string;
   fedexApiSecret: string;
   fedexAccountNumber: string;

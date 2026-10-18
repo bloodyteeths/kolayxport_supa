@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import { decryptIfNeeded } from '@/lib/crypto/credentials';
+import { fedexSandboxFor } from '@/lib/fedex/fedexSandbox';
 import prisma from '../../../../lib/prisma';
 import { createFedexShipment } from '../../../../lib/fedex/fedex.service';
 import { OrderRow, ShipperProfileData, FedexShipmentResult, OrderRowItem } from '../../../../lib/fedex/fedex.types';
@@ -195,10 +196,12 @@ async function handler(
       logger.warn(`[API generate-label] Shipper profile not found for user ${authUser.id}. Order ${orderId}.`);
       return res.status(400).json({ error: 'Shipper profile not found. Please complete your shipper details in Ayarlar.' });
     }
-    if (!orderRecord.user.integrationSettings ||
+    // Designated test accounts (Shopify review) ship through the FedEx sandbox with platform test keys.
+    const fedexSandbox = fedexSandboxFor(orderRecord.user.email);
+    if (!fedexSandbox && (!orderRecord.user.integrationSettings ||
         !orderRecord.user.integrationSettings.fedexApiKey ||
         !orderRecord.user.integrationSettings.fedexApiSecret ||
-        !orderRecord.user.integrationSettings.fedexAccountNumber) {
+        !orderRecord.user.integrationSettings.fedexAccountNumber)) {
       logger.warn(`[API generate-label] FedEx integration settings missing for user ${authUser.id}. Order ${orderId}.`);
       return res.status(400).json({ error: 'FedEx API credentials not configured in Ayarlar.' });
     }
@@ -207,7 +210,7 @@ async function handler(
     const shipperProfileDb = userDb.shipperProfile;
     const integrationSettingsDb = userDb.integrationSettings;
 
-    if (!integrationSettingsDb) {
+    if (!integrationSettingsDb && !fedexSandbox) {
       logger.error(`[API generate-label] Critical: integrationSettingsDb is null for user ${authUser.id}. This should have been caught by earlier checks. Order ${orderId}.`);
       return res.status(500).json({ error: 'Integration settings are missing. Please contact support.' });
     }
@@ -217,16 +220,17 @@ async function handler(
     }
 
     // --- Construct ShipperProfileData ---
-    if (!integrationSettingsDb.fedexApiKey || !integrationSettingsDb.fedexApiSecret || !integrationSettingsDb.fedexAccountNumber) {
+    if (!fedexSandbox && (!integrationSettingsDb?.fedexApiKey || !integrationSettingsDb?.fedexApiSecret || !integrationSettingsDb?.fedexAccountNumber)) {
       logger.error(`[API generate-label] Critical: FedEx API credentials missing or null in DB for user ${authUser.id}. Order ${orderId}.`);
       return res.status(500).json({ error: 'FedEx API credentials are not correctly configured. Please contact support.' });
     }
 
     const shipperData: ShipperProfileData = {
       // Stored encrypted at rest; plaintext passes through unchanged.
-      fedexApiKey: decryptIfNeeded(integrationSettingsDb.fedexApiKey) as string,
-      fedexApiSecret: decryptIfNeeded(integrationSettingsDb.fedexApiSecret) as string,
-      fedexAccountNumber: decryptIfNeeded(integrationSettingsDb.fedexAccountNumber) as string,
+      fedexBaseUrl: fedexSandbox?.baseUrl,
+      fedexApiKey: fedexSandbox ? fedexSandbox.apiKey : (decryptIfNeeded(integrationSettingsDb!.fedexApiKey) as string),
+      fedexApiSecret: fedexSandbox ? fedexSandbox.apiSecret : (decryptIfNeeded(integrationSettingsDb!.fedexApiSecret) as string),
+      fedexAccountNumber: fedexSandbox ? fedexSandbox.accountNumber : (decryptIfNeeded(integrationSettingsDb!.fedexAccountNumber) as string),
       shipperName: shipperProfileDb.shipperName || '',
       shipperPersonName: shipperProfileDb.shipperPersonName || '',
       shipperPhoneNumber: shipperProfileDb.shipperPhoneNumber || '',

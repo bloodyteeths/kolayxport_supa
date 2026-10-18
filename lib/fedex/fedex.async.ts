@@ -43,7 +43,8 @@ export class FedexAsyncError extends Error {
 export async function retrieveAsyncShipment(
   jobId: string,
   accountNumber: string,
-  accessToken: string
+  accessToken: string,
+  baseUrl: string = 'https://apis.fedex.com'
 ): Promise<FedexShipResponse> {
   const maxAttempts = 5;
   let attempt = 0;
@@ -52,7 +53,7 @@ export async function retrieveAsyncShipment(
   while (attempt < maxAttempts) {
     try {
       const response = await axios.get(
-        `https://apis.fedex.com/ship/v1/async/shipments?jobId=${jobId}&accountNumber=${accountNumber}`,
+        `${baseUrl}/ship/v1/async/shipments?jobId=${jobId}&accountNumber=${accountNumber}`,
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,

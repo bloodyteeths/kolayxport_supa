@@ -89,8 +89,37 @@ chrome.runtime.onInstalled.addListener(async () => {
   chrome.storage.local.remove(['kx_logs', 'kx_api_key']);
   clearToken();
   await checkAuthentication({ force: true });
-  chrome.contextMenus.create({ id: 'syncNow', title: 'Sync Etsy Orders Now', contexts: ['action'] });
+  // removeAll first: on reload/update the old menu still exists ("duplicate id syncNow").
+  const createMenu = () => chrome.contextMenus.create({ id: 'syncNow', title: 'Sync Etsy Orders Now', contexts: ['action'] });
+  if (chrome.contextMenus.removeAll) chrome.contextMenus.removeAll(createMenu); else createMenu();
+  await syncMarketScripts();
 });
+
+// ---------------------------------------------------------------------------
+// Trendyol / Hepsiburada overlays: optional host permissions, granted in the popup together with the consent to
+// share what those pages show. The content scripts are registered only for the granted sites.
+// ---------------------------------------------------------------------------
+const MARKET_ORIGINS = ['https://www.trendyol.com/*', 'https://www.hepsiburada.com/*'];
+const MARKET_JS = ['src/lib/lang.js', 'src/lib/ui.js', 'src/lib/marketReader.js', 'src/content-market.js'];
+
+async function syncMarketScripts() {
+  if (!chrome.permissions || !chrome.scripting) return;
+  try {
+    const granted = await chrome.permissions.getAll();
+    const matches = MARKET_ORIGINS.filter((o) => (granted.origins || []).includes(o));
+    const existing = await chrome.scripting.getRegisteredContentScripts({ ids: ['kx-market'] });
+    if (existing.length) await chrome.scripting.unregisterContentScripts({ ids: ['kx-market'] });
+    if (!matches.length) return;
+    await chrome.scripting.registerContentScripts([{ id: 'kx-market', matches, js: MARKET_JS, runAt: 'document_idle', persistAcrossSessions: true }]);
+  } catch (e) {
+    console.warn('[kx] market scripts', e && e.message);
+  }
+}
+if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { syncMarketScripts(); });
+if (chrome.permissions && chrome.permissions.onAdded) {
+  chrome.permissions.onAdded.addListener(() => { syncMarketScripts(); });
+  chrome.permissions.onRemoved.addListener(() => { syncMarketScripts(); });
+}
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   handleMessage(request, sender, sendResponse);
@@ -236,10 +265,22 @@ async function handleMessage(request, sender, sendResponse) {
       return;
     }
 
-    // --- Trendyol / marketplace search snapshot (the page the seller is browsing; Trendyol blocks servers) ---
-    if (request.type === 'kx_market_snapshot') {
-      const r = await apiFetch('/api/research/snapshot', { method: 'POST', body: request.params || {} });
-      sendResponse(r.ok ? r.data : { error: errorOf(r, 'snapshot_failed'), status: r.status });
+    // --- Trendyol / Hepsiburada: a page the seller viewed (shared, anonymous) and the numbers over time ---
+    if (request.type === 'kx_market_observe') {
+      const share = await new Promise((res) => chrome.storage.local.get('kx_market_share', (r) => res(r.kx_market_share !== false)));
+      if (!share) { sendResponse({ skipped: 'sharing_off' }); return; }
+      const r = await apiFetch('/api/market/observe', { method: 'POST', body: request.params || {} });
+      sendResponse(r.ok ? r.data : { error: errorOf(r, 'observe_failed'), status: r.status });
+      return;
+    }
+    if (request.type === 'kx_market_read') {
+      const r = await apiFetch('/api/market/read', { method: 'POST', body: request.params || {} });
+      sendResponse(r.ok ? r.data : { error: errorOf(r, 'read_failed'), status: r.status });
+      return;
+    }
+    if (request.type === 'kx_market_sync_scripts') {
+      await syncMarketScripts();
+      sendResponse({ ok: true });
       return;
     }
 

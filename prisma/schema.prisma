@@ -1644,6 +1644,8 @@ model TrendyolProduct {
   stockCode     String?
   productMainId String?
   trendyolId    String? // Trendyol's internal product ID
+  /// Public product id (trendyol.com/...-p-<id>): links the store's own orders to crowd market data (calibration).
+  productContentId String?
 
   // Content
   title        String

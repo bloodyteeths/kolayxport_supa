@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "KolayXport — Etsy, eBay, Amazon & Trendyol Research Tool",
-  "version": "9.11.0",
-  "description": "Research overlays for Etsy, eBay, Amazon & Trendyol (tracked sales, SEO, competition) plus Etsy order sync and tracking entry for KolayXport.",
+  "name": "KolayXport — Etsy, eBay, Amazon, Trendyol & Hepsiburada Research",
+  "version": "9.12.0",
+  "description": "Sales, revenue, buybox and SEO for Etsy, eBay, Amazon, Trendyol & Hepsiburada, plus Etsy order sync for KolayXport.",
   "author": "Kolayxport",
   "icons": {
     "16": "icons/icon-16.png",
@@ -14,7 +14,8 @@
     "storage",
     "cookies",
     "contextMenus",
-    "alarms"
+    "alarms",
+    "scripting"
   ],
   "host_permissions": [
     "https://kolayxport.com/*",
@@ -30,8 +31,7 @@
     "https://www.amazon.com/*",
     "https://www.amazon.com.tr/*",
     "https://www.amazon.de/*",
-    "https://www.amazon.co.uk/*",
-    "https://www.trendyol.com/*"
+    "https://www.amazon.co.uk/*"
   ],
   "content_scripts": [
     {
@@ -126,17 +126,6 @@
       ],
       "run_at": "document_idle",
       "all_frames": false
-    },
-    {
-      "matches": [
-        "https://www.trendyol.com/sr*"
-      ],
-      "js": [
-        "src/lib/lang.js",
-        "src/content-trendyol-search.js"
-      ],
-      "run_at": "document_idle",
-      "all_frames": false
     }
   ],
   "background": {
@@ -148,7 +137,9 @@
         "icons/icon-16.png"
       ],
       "matches": [
-        "https://www.etsy.com/*"
+        "https://www.etsy.com/*",
+        "https://www.trendyol.com/*",
+        "https://www.hepsiburada.com/*"
       ]
     },
     {
@@ -168,7 +159,9 @@
         "https://www.amazon.com/*",
         "https://www.amazon.com.tr/*",
         "https://www.amazon.de/*",
-        "https://www.amazon.co.uk/*"
+        "https://www.amazon.co.uk/*",
+        "https://www.trendyol.com/*",
+        "https://www.hepsiburada.com/*"
       ]
     }
   ],
@@ -190,5 +183,9 @@
     ],
     "ids": []
   },
-  "minimum_chrome_version": "88"
+  "minimum_chrome_version": "88",
+  "optional_host_permissions": [
+    "https://www.trendyol.com/*",
+    "https://www.hepsiburada.com/*"
+  ]
 }

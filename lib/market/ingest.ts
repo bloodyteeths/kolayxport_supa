@@ -34,6 +34,7 @@ export interface ProductPage {
   reviewCount: number | null;
   favorites: number | null;
   basketCount: number | null;
+  /** Trendyol "Son 24 saatte N kişi görüntüledi": views in the last 24 hours. */
   viewCount: number | null;
   orderBadge: string | null;
   ordersAtLeast: number | null;
@@ -213,15 +214,19 @@ export async function ingestProduct(pp: ProductPage, now = new Date()): Promise<
   if (p) await prisma.marketProduct.update({ where: { id: p.id }, data });
   else await prisma.marketProduct.create({ data: { mkt: pp.mkt, productId: pp.id, firstSeenAt: now, ...data } });
 
-  // A product page beats a search card read in the same hour: replace it.
+  // A product page beats a search card read in the same hour; what only the card showed (e.g. the order badge) stays.
   const where = { mkt_productId_hourBucket: { mkt: pp.mkt, productId: pp.id, hourBucket: hourBucket(now) } };
+  const o = await prisma.marketProductObservation.findUnique({ where });
   const obs = {
-    observedAt: now, source: 'product', price: it.price, originalPrice: it.originalPrice, rating: it.rating,
-    ratingCount: it.ratingCount, reviewCount: it.reviewCount, favorites: it.favorites, basketCount: it.basketCount,
-    viewCount: it.viewCount, orderBadge: it.orderBadge, ordersAtLeast: it.ordersAtLeast, otherSellerCount: it.otherSellerCount,
-    buyboxSellerId: it.sellerId, offers: it.offers.length ? (it.offers as unknown as object) : undefined,
+    observedAt: now, source: 'product', price: keep(it.price, o?.price), originalPrice: keep(it.originalPrice, o?.originalPrice),
+    rating: keep(it.rating, o?.rating), ratingCount: keep(it.ratingCount, o?.ratingCount), reviewCount: keep(it.reviewCount, o?.reviewCount),
+    favorites: keep(it.favorites, o?.favorites), basketCount: keep(it.basketCount, o?.basketCount), viewCount: keep(it.viewCount, o?.viewCount),
+    orderBadge: keep(it.orderBadge, o?.orderBadge), ordersAtLeast: keep(it.ordersAtLeast, o?.ordersAtLeast),
+    otherSellerCount: keep(it.otherSellerCount, o?.otherSellerCount), buyboxSellerId: keep(it.sellerId, o?.buyboxSellerId),
+    offers: it.offers.length ? (it.offers as unknown as object) : undefined,
   };
-  await prisma.marketProductObservation.upsert({ where, update: obs, create: { mkt: pp.mkt, productId: pp.id, hourBucket: hourBucket(now), ...obs } });
+  if (o) await prisma.marketProductObservation.update({ where: { id: o.id }, data: obs });
+  else await prisma.marketProductObservation.create({ data: { mkt: pp.mkt, productId: pp.id, hourBucket: hourBucket(now), ...obs } });
 
   if (it.sellerId) await upsertSeller({ mkt: pp.mkt, sellerId: it.sellerId, name: it.sellerName, score: it.sellerScore, followers: null, productCount: null }, now);
   for (const o of it.offers) {

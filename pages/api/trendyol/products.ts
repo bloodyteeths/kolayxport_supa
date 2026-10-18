@@ -105,6 +105,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               stockCode: p.stockCode || null,
               productMainId: p.productMainId || null,
               trendyolId: p.id ? String(p.id) : null,
+              productContentId: p.productContentId != null ? String(p.productContentId) : null,
               title: p.title || '',
               description: p.description || null,
               brandId: p.brandId || null,
@@ -131,6 +132,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               syncedAt: new Date(),
             },
             update: {
+              ...(p.productContentId != null ? { productContentId: String(p.productContentId) } : {}),
               title: p.title || '',
               description: p.description || null,
               brandId: p.brandId || null,
@@ -211,6 +213,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               stockCode: p.stockCode || null,
               productMainId: p.productMainId || null,
               trendyolId: p.id ? String(p.id) : null,
+              productContentId: p.productContentId != null ? String(p.productContentId) : null,
               title: p.title || '',
               description: p.description || null,
               brandId: p.brandId || null,

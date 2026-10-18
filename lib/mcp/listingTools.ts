@@ -217,7 +217,7 @@ const researchKeywords: McpTool = {
 const stageListingChanges: McpTool = {
   name: 'stage_listing_changes',
   title: 'Stage listing changes',
-  description: 'Prepares changes to an existing listing as a KolayXport draft — title, description, tags (Etsy, Shopify), price, quantity — on etsy, ebay, trendyol, wix, shopify (hepsiburada: price and quantity only). Staged draft only: nothing changes on the marketplace until the seller reviews and sends it in KolayXport (reviewUrl). Calling it again for the same listing updates the same draft.',
+  description: 'Prepares changes to an existing listing as a KolayXport draft — title, description, tags (Etsy, Shopify), price, quantity — on etsy, ebay, trendyol, wix, shopify (hepsiburada: price and quantity only). Staged draft only: nothing changes on the marketplace until the seller reviews and sends it in KolayXport (reviewUrl). It never deletes anything and never changes the live listing: it only sets the given fields in the draft (other staged fields are kept), and the seller can edit or discard the draft before sending.',
   scope: 'write', readOnly: false, idempotent: true,
   inputSchema: {
     type: 'object', required: ['marketplace', 'id'],

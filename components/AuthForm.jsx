@@ -243,11 +243,13 @@ export default function AuthForm() {
         )}
       </form>
 
-      <div className="my-4 flex items-center">
-        <hr className="flex-1 border-gray-300" />
-        <span className="px-3 text-gray-500 text-sm">{t('or')}</span>
-        <hr className="flex-1 border-gray-300" />
-      </div>
+      {appleEnabled || !iosApp ? (
+        <div className="my-4 flex items-center">
+          <hr className="flex-1 border-gray-300" />
+          <span className="px-3 text-gray-500 text-sm">{t('or')}</span>
+          <hr className="flex-1 border-gray-300" />
+        </div>
+      ) : null}
 
       {appleEnabled ? (
         <button

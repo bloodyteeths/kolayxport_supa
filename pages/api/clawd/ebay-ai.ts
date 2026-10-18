@@ -5,7 +5,10 @@ import { getAuthUser } from '../../../lib/auth';
 import { getAiModel, parseAiJson, refineFromBody } from '../../../lib/ai/gemini';
 import { aiContext, withAiContext } from '../../../lib/ai/context';
 import { hasValidInternalApiKeyHeader } from '../../../lib/security/internalApiKey';
-import { conditionLine, generateDescriptionPrompt, identifyProductPrompt, optimizeTitlePrompt } from '../../../lib/ebay/aiPrompts';
+import {
+  conditionLine, dropPlaceholderAspects, generateDescriptionPrompt, identifyProductPrompt, optimizeTitlePrompt, sellerFactsLine, suggestAspectsPrompt,
+  type AspectRule,
+} from '../../../lib/ebay/aiPrompts';
 
 export const config = { maxDuration: 120 };
 
@@ -100,6 +103,8 @@ interface OptimizeTitleInput {
   categoryName?: string;
   keywords?: string[];
   marketResearch?: MarketResearch;
+  /** The seller's own words (given facts the title may use). */
+  sellerFacts?: string;
 }
 
 interface OptimizeTitleOutput {
@@ -109,7 +114,7 @@ interface OptimizeTitleOutput {
 }
 
 async function handleOptimizeTitle(body: OptimizeTitleInput): Promise<OptimizeTitleOutput> {
-  const { title, categoryName, keywords, marketResearch } = body;
+  const { title, categoryName, keywords, marketResearch, sellerFacts } = body;
 
   if (!title || typeof title !== 'string') {
     throw new InputError('title is required and must be a string');
@@ -119,6 +124,7 @@ async function handleOptimizeTitle(body: OptimizeTitleInput): Promise<OptimizeTi
 
   const userMsg = [
     `Current title: "${title}"`,
+    sellerFactsLine(sellerFacts),
     categoryName ? `Category: ${categoryName}` : '',
     keywords?.length ? `Additional keywords to consider: ${keywords.join(', ')}` : '',
     marketResearch ? '\n' + formatMarketContext(marketResearch) : '',
@@ -140,6 +146,8 @@ interface GenerateDescriptionInput {
   marketResearch?: MarketResearch;
   /** 'text': plain paragraphs + "• " bullets (the listing editor's description field); HTML otherwise. */
   format?: 'html' | 'text';
+  /** The seller's own words (given facts the description may use). */
+  sellerFacts?: string;
 }
 
 interface GenerateDescriptionOutput {
@@ -166,6 +174,7 @@ async function handleGenerateDescription(
 
   const userMsg = [
     `Title: "${title}"`,
+    sellerFactsLine(body.sellerFacts),
     conditionLine(condition),
     price ? `Price: $${price}` : '',
     aspectLines ? `Item Specifics:\n${aspectLines}` : '',
@@ -384,6 +393,20 @@ interface SuggestAspectsInput {
   currentAspects?: Record<string, string[]>;
   categoryName?: string;
   marketResearch?: Record<string, unknown>;
+  /** The seller's own words (given facts, e.g. "Turkish" → Country/Region of Manufacture). */
+  sellerFacts?: string;
+  /** item_aspects metadata: required flag + eBay's value list (a placeholder survives only if required AND listed). */
+  aspectRules?: AspectRule[];
+}
+
+/** Request `aspectRules` → clean rules (names / values as strings, at most 60). */
+function toAspectRules(raw: unknown): AspectRule[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, 60).flatMap((r) => {
+    if (!r || typeof r !== 'object' || typeof (r as any).name !== 'string') return [];
+    const values = Array.isArray((r as any).values) ? (r as any).values.filter((v: unknown): v is string => typeof v === 'string').slice(0, 200) : undefined;
+    return [{ name: (r as any).name, required: (r as any).required === true, values }];
+  });
 }
 
 interface SuggestAspectsOutput {
@@ -391,34 +414,19 @@ interface SuggestAspectsOutput {
 }
 
 async function handleSuggestAspects(body: SuggestAspectsInput): Promise<SuggestAspectsOutput> {
-  const { title, aspectNames, currentAspects, categoryName, marketResearch } = body;
+  const { title, aspectNames, currentAspects, categoryName, marketResearch, sellerFacts } = body;
   if (!title) throw new InputError('title is required');
   if (!aspectNames || aspectNames.length === 0) throw new InputError('aspectNames is required');
 
-  const marketContext = marketResearch ? formatMarketContext(marketResearch) : '';
+  const rules = toAspectRules(body.aspectRules);
+  const systemPrompt = suggestAspectsPrompt({ marketContext: marketResearch ? formatMarketContext(marketResearch) : '', rules });
 
-  const systemPrompt = `You are an eBay product data specialist. Given a product title and a list of item specific field names, suggest the most accurate and appropriate values for each field.
-
-Rules:
-- CRITICAL: Most eBay aspects accept only ONE value. Always return exactly one value per aspect (e.g., ["Blue"]), never multiple.
-- Only return multiple values for aspects that explicitly allow it (like "Features" or "Compatible Brand").
-- For "Country/Region of Manufacture" or similar: use the most likely country (e.g., "China", "United States", "Turkey")
-- For "Brand": if identifiable from the title, use it. Otherwise use "Unbranded"
-- For "Type", "Style", "Material", "Color", "Size": pick the single best value from the title context
-- Only fill aspects where you can make a reasonable guess — skip ones you're unsure about
-- Values must be in English (eBay standard)
-- HARD LIMIT: each value must be 65 characters or fewer. eBay rejects the whole
-  listing at publish time otherwise. Use the short catalogue term ("Die-cast metal",
-  "Marble"), never a descriptive sentence.
-- If current values already exist, keep them unless you have a better suggestion
-
-${marketContext}
-
-Respond with ONLY valid JSON: { "aspects": { "AspectName": ["value"], ... } }`;
-
-  const userMsg = `Product: "${title}"${categoryName ? ` | Category: ${categoryName}` : ''}
-Aspects to fill: ${aspectNames.join(', ')}
-${currentAspects && Object.keys(currentAspects).length > 0 ? `Current values: ${JSON.stringify(currentAspects)}` : ''}`;
+  const userMsg = [
+    `Product: "${title}"${categoryName ? ` | Category: ${categoryName}` : ''}`,
+    sellerFactsLine(sellerFacts),
+    `Aspects to fill: ${aspectNames.join(', ')}`,
+    currentAspects && Object.keys(currentAspects).length > 0 ? `Current values: ${JSON.stringify(currentAspects)}` : '',
+  ].filter(Boolean).join('\n');
 
   const result = await askClaude<SuggestAspectsOutput>(systemPrompt, userMsg, 1024);
 
@@ -432,7 +440,8 @@ ${currentAspects && Object.keys(currentAspects).length > 0 ? `Current values: ${
       .filter((v) => v.length <= 65);
     if (kept.length > 0) aspects[name] = kept;
   }
-  return { aspects };
+  // "Unknown" / "N/A" / "Unbranded" … are not facts: dropped unless the category requires that exact listed value.
+  return { aspects: dropPlaceholderAspects(aspects, rules) };
 }
 
 // ---------------------------------------------------------------------------

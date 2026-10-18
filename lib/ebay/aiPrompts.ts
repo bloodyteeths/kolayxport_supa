@@ -8,7 +8,7 @@
 
 /** Shared rule: only state what the photos, the seller or the given data say. */
 export const GROUNDING_RULES = `Facts rule (strict):
-- Only state attributes that are visible in the photos or given in the input (the seller's title, item specifics, condition or notes).
+- Only state attributes that are visible in the photos or given in the input (the seller's title, the seller's facts, item specifics, condition or notes).
 - Never invent materials, techniques, finishes, textures, dimensions, sizes, weights, capacities, age, origin, brand, maker, signatures, certifications or features.
 - Competitor titles and market research show which words buyers search for; they are NOT facts about this item. Use a competitor's attribute only if the input also states it for this item.
 - When unsure whether something applies, leave it out.`;
@@ -44,7 +44,7 @@ Rules for eBay title optimization:
 - Include brand, model, size, color, condition when the input states them
 - Use spaces, not special characters, to separate keywords
 - Do NOT use all caps for entire title
-- The optimized title may only use attributes from the current title, the category and the given keywords. Rephrase and reorder; never add a new material, technique, size or feature.
+- The optimized title may only use attributes from the current title, the seller's facts, the category and the given keywords. Put the seller's facts in the title when they are strong search terms (origin, style, handmade, brand). Rephrase and reorder; never add a new material, technique, size or feature.
 - Suggestions may tell the seller what to ADD if it is true (e.g. "add the size if you know it"); never present a guessed attribute as fact.
 
 ${GROUNDING_RULES}
@@ -112,4 +112,85 @@ Rules:
 
 Respond with ONLY valid JSON:
 { "seed": "...", "productName": "...", "keywords": ["..."], "wearVisible": false, "suggestedCondition": "NEW", "notes": "" }`;
+}
+
+/** Longest seller-facts text a prompt takes (the "What are you selling?" field is 120 characters). */
+export const SELLER_FACTS_MAX = 300;
+
+/**
+ * The seller's own words ("What are you selling?") as given facts. GROUNDING_RULES allows what the input states, so
+ * "handmade Turkish Iznik bowl" may put Iznik / Turkish / Handmade in the title and Turkey in Country of Manufacture.
+ * Empty when the seller typed nothing.
+ */
+export function sellerFactsLine(facts: unknown): string {
+  if (typeof facts !== 'string') return '';
+  const s = facts.replace(/\s+/g, ' ').trim().slice(0, SELLER_FACTS_MAX);
+  return s ? `Seller's facts (stated by the seller, true for this item, may be used): ${s}` : '';
+}
+
+/** Aspects that are facts about where / by whom / of what an item is made: never guessed. */
+export const FACT_ONLY_ASPECTS = [
+  'Brand', 'Country/Region of Manufacture', 'Country of Origin', 'Origin', 'Region of Origin', 'Product Line', 'Maker',
+  'Artist', 'Designer', 'Manufacturer', 'Model', 'MPN', 'Material', 'Materials', 'Dimensions', 'Item Length', 'Item Width',
+  'Item Height', 'Item Diameter', 'Item Weight', 'Size', 'Capacity', 'Year Manufactured', 'Age', 'Signed', 'Technique',
+];
+
+/** Values that only say "we don't know": never written unless the category requires one and eBay lists exactly it. */
+const PLACEHOLDER_RE = /^(unknown|n\/?a|not applicable|does not apply|none|not specified|unspecified|unbranded|no brand|generic|other|-+|\?+)$/i;
+
+export function isPlaceholderAspectValue(value: unknown): boolean {
+  return typeof value === 'string' && PLACEHOLDER_RE.test(value.trim());
+}
+
+/** eBay aspect metadata the AI fill knows (item_aspects): required flag and, for closed lists, the allowed values. */
+export interface AspectRule {
+  name: string;
+  required?: boolean;
+  values?: readonly string[];
+}
+
+/**
+ * Drops placeholder values ("Unknown", "N/A", "Does not apply", "Unbranded" …). One survives only when the aspect is
+ * required for the category and eBay's own value list contains exactly that value (e.g. Brand: Unbranded where the
+ * category demands a brand). An aspect left with no values is removed: empty is valid while editing, and the send
+ * check names required aspects that are still empty. Pure.
+ */
+export function dropPlaceholderAspects(aspects: Record<string, string[]>, rules?: readonly AspectRule[] | null): Record<string, string[]> {
+  const byName = new Map((rules ?? []).map((r) => [r.name.toLowerCase(), r]));
+  const out: Record<string, string[]> = {};
+  for (const [name, values] of Object.entries(aspects)) {
+    const rule = byName.get(name.toLowerCase());
+    const kept = values.filter((v) => {
+      if (!isPlaceholderAspectValue(v)) return true;
+      return Boolean(rule?.required && rule.values?.some((x) => x.trim().toLowerCase() === v.trim().toLowerCase()));
+    });
+    if (kept.length) out[name] = kept;
+  }
+  return out;
+}
+
+export function suggestAspectsPrompt(opts: { marketContext?: string; rules?: readonly AspectRule[] | null }): string {
+  const allowedPlaceholders = (opts.rules ?? [])
+    .filter((r) => r.required && r.values?.some((v) => isPlaceholderAspectValue(v)))
+    .map((r) => `${r.name}: ${r.values!.filter((v) => isPlaceholderAspectValue(v)).join(' / ')}`);
+  return `You are an eBay product data specialist. Given a product title, the seller's facts and a list of item specific field names, fill in the values this item's input supports.
+
+Rules:
+- CRITICAL: Most eBay aspects accept only ONE value. Always return exactly one value per aspect (e.g., ["Blue"]), never multiple.
+- Only return multiple values for aspects that explicitly allow it (like "Features" or "Compatible Brand").
+- Fill an aspect only when the value is visible on the item (e.g. a readable brand or label) or stated in the title or the seller's facts. Otherwise leave the aspect OUT of the answer — an empty aspect is fine, the seller fills it.
+- These aspects are facts and are NEVER guessed: ${FACT_ONLY_ASPECTS.join(', ')}. Leave them out unless the title or the seller's facts state them (e.g. "Turkish" → Country/Region of Manufacture: Turkey; "ceramic" → Material: Ceramic).
+- Never answer with a placeholder such as "Unknown", "N/A", "Does not apply", "Not specified", "None" or "Unbranded"; leave the aspect out instead.${allowedPlaceholders.length ? `\n- Exception, only because the category requires these and eBay lists the value: ${allowedPlaceholders.join('; ')} — use it only when the item really has no such value.` : ''}
+- A pattern or motif (e.g. "Tulip") is not a product line; "Product Line" is a brand's named range.
+- Values must be in English (eBay standard)
+- HARD LIMIT: each value must be 65 characters or fewer. eBay rejects the whole
+  listing at publish time otherwise. Use the short catalogue term ("Die-cast metal",
+  "Marble"), never a descriptive sentence.
+- If current values already exist, keep them unless the input clearly says otherwise
+
+${GROUNDING_RULES}
+
+${opts.marketContext ?? ''}
+
+Respond with ONLY valid JSON: { "aspects": { "AspectName": ["value"], ... } }`;
 }

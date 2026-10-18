@@ -18,7 +18,8 @@ import {
 import { GROUNDING_RULES, conditionLine, generateDescriptionPrompt, identifyProductPrompt, optimizeTitlePrompt } from '@/lib/ebay/aiPrompts';
 import { buildCreatePlan, withHtmlDescriptions } from '@/lib/ebay/draftPlan';
 import { legacyChanges } from '@/lib/ebay/legacyTrading';
-import { sanitizeDescription } from '@/components/domain/listing-editor/useListingAI';
+import { fillResearchQuery, sanitizeDescription } from '@/components/domain/listing-editor/useListingAI';
+import { dropPlaceholderAspects, isPlaceholderAspectValue, sellerFactsLine, suggestAspectsPrompt } from '@/lib/ebay/aiPrompts';
 import { clearEbayCategoryLabels, ebayCategoryLabel, rememberEbayCategoryLabel, rememberEbayCategoryLabels } from '@/components/domain/listing-editor/ebayCategoryLabels';
 import { ebayPreviewModel } from '@/components/domain/listing-editor/sections/EbayFieldSections';
 import { blankEbayFields } from '@/components/domain/listing-editor/adapters/ebay';
@@ -197,5 +198,49 @@ describe('eBay description: plain text in the field, HTML to eBay', () => {
   it('the rail preview shows what eBay gets', () => {
     const view = { fields: { ...blankEbayFields(), description: 'Line one\n\n• Blue' }, facts: {}, meta: { currency: 'USD' } } as unknown as ListingView<FieldMap>;
     expect(ebayPreviewModel(view, null).description).toBe('<p>Line one</p>\n<ul><li>Blue</li></ul>');
+  });
+});
+
+// ── Follow-up: item specifics never guess, seller facts are given facts, short research query ───────────────
+
+describe('item specifics: no guessing, no placeholders', () => {
+  it('the aspects prompt carries the grounding rule and no "most likely country"', () => {
+    const p = suggestAspectsPrompt({});
+    expect(p).toContain(GROUNDING_RULES);
+    expect(p).not.toMatch(/most likely country/i);
+    const never = p.split('\n').find((l) => l.includes('NEVER guessed')) ?? '';
+    for (const a of ['Origin', 'Country/Region of Manufacture', 'Brand', 'Product Line', 'Maker', 'Material', 'Dimensions']) expect(never).toContain(a);
+    expect(p).toMatch(/A pattern or motif \(e\.g\. "Tulip"\) is not a product line/);
+  });
+
+  it('placeholder values are dropped unless required and listed by eBay', () => {
+    for (const v of ['Unknown', 'N/A', 'n/a', 'Does not apply', 'Unbranded', 'Not specified', 'None']) expect(isPlaceholderAspectValue(v)).toBe(true);
+    expect(isPlaceholderAspectValue('Turkey')).toBe(false);
+    const ai = { Origin: ['Unknown'], 'Country of Origin': ['China'], Brand: ['Unbranded'], Color: ['Blue', 'N/A'] };
+    expect(dropPlaceholderAspects(ai)).toEqual({ 'Country of Origin': ['China'], Color: ['Blue'] });
+    expect(dropPlaceholderAspects(ai, [{ name: 'brand', required: true, values: ['Unbranded'] }])).toEqual({ 'Country of Origin': ['China'], Brand: ['Unbranded'], Color: ['Blue'] });
+    // Listed but not required, or required but not listed: still dropped.
+    expect(dropPlaceholderAspects({ Brand: ['Unbranded'] }, [{ name: 'Brand', required: false, values: ['Unbranded'] }])).toEqual({});
+    expect(dropPlaceholderAspects({ Brand: ['Unbranded'] }, [{ name: 'Brand', required: true, values: [] }])).toEqual({});
+  });
+
+  it("seller facts line: trimmed, empty when nothing was typed", () => {
+    expect(sellerFactsLine('  handmade  Turkish Iznik bowl ')).toBe("Seller's facts (stated by the seller, true for this item, may be used): handmade Turkish Iznik bowl");
+    expect(sellerFactsLine('')).toBe('');
+    expect(sellerFactsLine(undefined)).toBe('');
+  });
+});
+
+describe('Start faster research query (eBay)', () => {
+  it("seller words first, then the product type; short and keyword-like", () => {
+    expect(fillResearchQuery({ sellerText: 'handmade Turkish Iznik bowl', productName: IDENTIFY.productName, seed: IDENTIFY.seed })).toBe('handmade turkish iznik bowl ceramic');
+    expect(fillResearchQuery({ sellerText: 'Iznik', productName: 'Ceramic decorative bowl', seed: IDENTIFY.seed })).toBe('iznik bowl ceramic');
+  });
+  it('without seller words: the product type, else the start of the photo phrase (never the long visual phrase)', () => {
+    expect(fillResearchQuery({ sellerText: '', productName: IDENTIFY.productName, seed: IDENTIFY.seed })).toBe('ceramic bowl');
+    expect(fillResearchQuery({ productName: '', seed: IDENTIFY.seed })).toBe('handmade turkish ceramic bowl blue');
+    const q = fillResearchQuery({ sellerText: 'a very long description of a hand painted Turkish ceramic serving bowl with tulips', productName: 'Bowl', seed: '' });
+    expect(q.split(' ').length).toBeLessThanOrEqual(6);
+    expect(q.length).toBeLessThanOrEqual(60);
   });
 });

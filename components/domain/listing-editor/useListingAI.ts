@@ -42,6 +42,7 @@ import type { FieldSuggestionProps } from '@/components/ds/inputs/FieldSuggestio
 import type { FieldAiState, MarketBand } from './sections/sectionTypes';
 import { ebayHtmlToText, normalizeCondition, resolveAiCondition } from '@/lib/ebay/payloadRules';
 import { rememberEbayCategoryLabel } from './ebayCategoryLabels';
+import { dropPlaceholderAspects, type AspectRule } from '@/lib/ebay/aiPrompts';
 import { track } from '@/lib/tracking/events';
 import { decodeAspects } from './adapters/ebay';
 import {
@@ -551,6 +552,43 @@ export function researchQuery(title: string): string {
   return decodeEntities(title).split(',')[0].trim().slice(0, 60);
 }
 
+const QUERY_STOPWORDS = new Set(['a', 'an', 'the', 'and', 'or', 'with', 'for', 'of', 'in', 'on', 'to', 'by', 'from', 'style', 'styled', 'type', 'item', 'product', 'new', 'used', 'decorative']);
+const QUERY_WORDS_MAX = 6;
+
+/**
+ * Start faster research query from the seller's words + the identified product type, keyword-like and short. The
+ * photo read's long visual phrase ("handmade Turkish ceramic bowl blue tulip floral Iznik style pottery") found 8
+ * comparable listings where the seller's words had found 89. Seller words first (their facts), then product-type
+ * words they did not say; at most 6 words. Without seller words: the product type, else the start of the photo
+ * phrase. Pure, exported for tests.
+ */
+export function fillResearchQuery(o: { sellerText?: string | null; productName?: string | null; seed?: string | null }): string {
+  const words = (s: string | null | undefined) => decodeEntities(s ?? '').toLowerCase().replace(/[^\p{L}\p{N}\s'-]+/gu, ' ').split(/\s+/).filter((w) => w && !QUERY_STOPWORDS.has(w));
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const add = (list: string[]) => {
+    for (const w of list) {
+      const key = w.replace(/s$/, '');
+      if (seen.has(key) || out.length >= QUERY_WORDS_MAX) continue;
+      seen.add(key);
+      out.push(w);
+    }
+  };
+  const seller = words(o.sellerText);
+  const type = words(o.productName);
+  if (seller.length) {
+    add(seller);
+    // The product noun (last word of the type: "bowl") matters most; then the rest of the type.
+    add(type.slice(-1));
+    add(type);
+  } else if (type.length) {
+    add(type);
+  } else {
+    add(words(o.seed).slice(0, 5));
+  }
+  return out.join(' ').slice(0, 60).trim();
+}
+
 /** `search_market` JSON → research context (median-based; `avg` is never read, P6). */
 export function researchFromEtsySearch(data: unknown, query: string): AiResearchPrefill | null {
   if (!data || typeof data !== 'object') return null;
@@ -1006,7 +1044,7 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
   }, []);
 
   // ── Title ──────────────────────────────────────────────────────────────────────────────────────────────
-  const titleFrom = useCallback(async (seedTitle: string, r: AiResearchPrefill | null): Promise<{ value: string; rationale?: string }> => {
+  const titleFrom = useCallback(async (seedTitle: string, r: AiResearchPrefill | null, sellerFacts?: string): Promise<{ value: string; rationale?: string }> => {
     const input = opts.current.input;
     if (marketplace === 'trendyol') {
       const data = await trendyolAi('optimize_title', {
@@ -1036,6 +1074,8 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
       title: seedTitle,
       categoryName: input.categoryName ?? undefined,
       marketResearch: ebayResearch.current ?? undefined,
+      // Start faster: the seller's typed words, given facts the title may use (Iznik, Turkish, Handmade).
+      sellerFacts: sellerFacts || undefined,
     });
     return { value: sanitizeTitle('ebay', data.optimizedTitle) };
   }, [marketplace, etsyAi, ebayAi, trendyolAi, locale]);
@@ -1059,7 +1099,7 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
   }), [run, supports, set, t, ensureResearch, titleFrom, basisFor, failure]);
 
   // ── Description ────────────────────────────────────────────────────────────────────────────────────────
-  const descriptionFrom = useCallback(async (title: string, r: AiResearchPrefill | null, sourceDescription?: string, condition?: string | null): Promise<string> => {
+  const descriptionFrom = useCallback(async (title: string, r: AiResearchPrefill | null, sourceDescription?: string, extra?: { condition?: string | null; sellerFacts?: string }): Promise<string> => {
     const input = opts.current.input;
     if (marketplace === 'trendyol') {
       const existing = decodeEntities((sourceDescription ?? input.description ?? '').replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
@@ -1087,10 +1127,11 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
       title,
       aspects: input.aspects && Object.keys(input.aspects).length ? input.aspects : undefined,
       // The fill's proposed condition when it has one (the field still holds the blank listing's default).
-      condition: (condition ?? input.condition) || undefined,
+      condition: (extra?.condition ?? input.condition) || undefined,
       price: input.price ?? undefined,
       marketResearch: ebayResearch.current ?? undefined,
       format: 'text',
+      sellerFacts: extra?.sellerFacts || undefined,
     });
     return sanitizeDescription('ebay', data.description);
   }, [marketplace, etsyAi, ebayAi, trendyolAi]);
@@ -1146,7 +1187,7 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
   }), [run, marketplace, set, t, ensureResearch, tagsFrom, basisFor, failure]);
 
   // ── Item specifics (eBay) ──────────────────────────────────────────────────────────────────────────────
-  const specificsFrom = useCallback(async (title: string, names: string[], categoryName: string | undefined): Promise<Record<string, string[]>> => {
+  const specificsFrom = useCallback(async (title: string, names: string[], categoryName: string | undefined, extra?: { sellerFacts?: string; rules?: AspectRule[] }): Promise<Record<string, string[]>> => {
     const o = opts.current;
     const current = mergeAspects(o.getField?.(o.fieldKeys?.specifics ?? 'aspects'), o.input.aspects, null);
     const data = await ebayAi('suggest_aspects', {
@@ -1155,8 +1196,11 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
       currentAspects: current,
       categoryName,
       marketResearch: ebayResearch.current ?? undefined,
+      sellerFacts: extra?.sellerFacts || undefined,
+      aspectRules: extra?.rules?.length ? extra.rules : undefined,
     });
-    return sanitizeAspects(data.aspects, names);
+    // "Unknown" / "N/A" / "Unbranded" are not facts (the server drops them too): kept only when required + listed.
+    return dropPlaceholderAspects(sanitizeAspects(data.aspects, names), extra?.rules);
   }, [ebayAi]);
 
   const fillSpecifics = useCallback((aspectNames: string[]) => run('specifics', async (isCurrent) => {
@@ -1314,6 +1358,9 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
       let seed = decodeEntities((o.seed ?? '').trim()).slice(0, 200);
       // The seller's own words (a typed "used" keeps a used condition); the photo read replaces `seed` below.
       const sellerText = seed;
+      // Given facts for the title / item specifics / description prompts (GROUNDING_RULES lets them be used).
+      const sellerFacts = sellerText.length >= 3 ? sellerText : undefined;
+      let productName = '';
       let photoCondition: { suggested: string; wearVisible: boolean } | null = null;
       let condition: string | null = null;
       let limited = false;
@@ -1336,6 +1383,7 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
             const data = r.data as Record<string, unknown>;
             const found = coerceAiString(data.seed).slice(0, 200);
             if (found) seed = found;
+            productName = coerceAiString(data.productName).slice(0, 80);
             // eBay condition: NEW unless the photos clearly show wear or the seller says used; checked against the
             // category's allowed conditions once the category is known (resolveAiCondition, below).
             if (marketplace === 'ebay' && found) {
@@ -1359,7 +1407,9 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
       let r: AiResearchPrefill | null = null;
       if (marketplace !== 'trendyol') {
         mark('research', 'running');
-        r = await ensureResearch(seed);
+        // eBay: a short keyword query from the seller's words + the product type (the long photo phrase found few
+        // comparable listings). Etsy keeps the seed.
+        r = await ensureResearch(marketplace === 'ebay' ? (fillResearchQuery({ sellerText, productName, seed }) || seed) : seed);
         mark('research', r ? 'done' : 'error');
       }
       const basis = basisFor(r);
@@ -1369,7 +1419,7 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
       claim('title');
       put('title', { status: 'loading' });
       try {
-        const { value, rationale } = await titleFrom(seed, r);
+        const { value, rationale } = await titleFrom(seed, r, marketplace === 'ebay' ? sellerFacts : undefined);
         if (value) workingTitle = value;
         put('title', value ? { status: 'ready', value, rationale, basis } : { status: 'error', error: true });
         mark('title', value ? 'done' : 'error');
@@ -1424,14 +1474,21 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
           const qs = new URLSearchParams({ action: 'item_aspects', category_id: category.id });
           const res = await http(`/api/clawd/ebay?${qs.toString()}`);
           const all = (res.ok && res.data && typeof res.data === 'object' ? (res.data as { aspects?: unknown[] }).aspects : []) ?? [];
-          const metas = all as Array<{ localizedAspectName?: string; aspectConstraint?: { aspectRequired?: boolean } }>;
+          const metas = all as Array<{ localizedAspectName?: string; aspectConstraint?: { aspectRequired?: boolean }; aspectValues?: Array<{ localizedValue?: string }> }>;
           const names = [
             ...metas.filter((a) => a?.aspectConstraint?.aspectRequired),
             ...metas.filter((a) => !a?.aspectConstraint?.aspectRequired),
           ].map((a) => a?.localizedAspectName).filter((n): n is string => typeof n === 'string' && !!n).slice(0, 15);
           if (!names.length) throw new Error('no aspects');
           put('specifics', { status: 'loading' });
-          const value = await specificsFrom(workingTitle, names, category.name);
+          const rules: AspectRule[] = metas
+            .filter((a) => typeof a?.localizedAspectName === 'string' && names.includes(a.localizedAspectName))
+            .map((a) => ({
+              name: a.localizedAspectName as string,
+              required: a.aspectConstraint?.aspectRequired === true,
+              values: (a.aspectValues ?? []).map((v) => v?.localizedValue).filter((v): v is string => typeof v === 'string').slice(0, 200),
+            }));
+          const value = await specificsFrom(workingTitle, names, category.name, { sellerFacts, rules });
           put('specifics', Object.keys(value).length ? { status: 'ready', value } : { status: 'error', error: true });
           mark('specifics', Object.keys(value).length ? 'done' : 'error');
         } catch (err) {
@@ -1459,7 +1516,7 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
       put('description', { status: 'loading' });
       let description = '';
       try {
-        description = await descriptionFrom(workingTitle, r, marketplace === 'trendyol' ? o.sourceDescription : undefined, condition);
+        description = await descriptionFrom(workingTitle, r, marketplace === 'trendyol' ? o.sourceDescription : undefined, { condition, sellerFacts: marketplace === 'ebay' ? sellerFacts : undefined });
         put('description', description ? { status: 'ready', value: description, basis } : { status: 'error', error: true });
         mark('description', description ? 'done' : 'error');
       } catch (err) {

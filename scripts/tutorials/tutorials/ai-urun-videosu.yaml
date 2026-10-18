@@ -1,0 +1,70 @@
+slug: ai-urun-videosu
+order: 13
+title: "AI ile ürün videosu oluşturun"
+description: "Video stüdyosunda ilanınızın fotoğrafından yapay zekâyla ürün videosu oluşturun, değişiklik isteyin ve videoyu Etsy ilan taslağına ekleyin."
+keyword: "yapay zeka ile ürün videosu"
+inventoryRefs: [ai-video-studio, etsy-listing-editor, staged-drafts-send]
+tags: [etsy, ürün videosu, yapay zeka video, ai video, etsy video]
+startUrl: /app/labels
+ready: { testid: nav-item-video-studio }
+reseed: true            # "Etsy ilanına ekle" stages the video in the demo listing's draft
+mocks:
+  - use: video-studio
+  - use: etsy-editor
+steps:
+  - say: "Merhaba! Bu videoda ilanınızdaki bir ürün fotoğrafından yapay zekâyla ürün videosu oluşturacağız."
+  - title: "Video stüdyosunu açın"
+    say: "Sol menüden Video stüdyosu'na tıklayın."
+    do:
+      - click: { testid: nav-item-video-studio }
+      - waitFor: { text: "1. Nerede kullanacaksınız?" }
+  - title: "Videonun nerede kullanılacağını seçin"
+    say: "Önce videoyu nerede kullanacağınızı seçin. Etsy seçiliyken süre, biçim ve ses Etsy kurallarına göre kendiliğinden ayarlanır."
+    do:
+      - hover: { role: radio, name: "Etsy", exact: true }
+    zoom: { text: "Etsy: 5–15 sn", scale: 1.5 }
+  - title: "Ürün fotoğrafını seçin"
+    say: "Sonra ilanınızı arayıp seçin. İlanın fotoğrafları gelir; video, ürünün en net göründüğü fotoğraftan başlar."
+    do:
+      - fill: { placeholder: "Etsy ilanlarınızda arayın", value: "Iznik" }
+      - click: { selector: "button:has-text('Handmade Iznik Ceramic Bowl')" }
+      - waitFor: { text: "otomatik seçildi" }
+    zoom: { text: "Başlangıç karesi", scale: 1.6 }
+  - title: "Sahneyi seçin"
+    say: "Yapay zekâ fotoğrafa bakıp ürününüze uygun çekimler önerir. Öneriyi kullanabilir ya da ortamı ve ek yönlendirmeyi kendiniz yazabilirsiniz."
+    do:
+      - click: { selector: "button[aria-pressed]:has-text('Yavaş Yakınlaşma')" }
+    zoom: { selector: "button[aria-pressed]:has-text('Yavaş Yakınlaşma')", scale: 1.7 }
+  - title: "Videoyu oluşturun"
+    say: "Oluştur düğmesine tıklayın. Bu işlem AI kredisi kullanır. Video bir iki dakikada hazırlanır; sayfadan çıksanız da hazırlanmaya devam eder."
+    do:
+      - click: { role: button, name: "seçenek oluştur" }
+      - waitFor: { text: "Video hazırlanıyor…" }
+      # the step lasts until the (replayed) job is done, so the next line starts on the finished video
+      - waitFor: { selector: "video[src*='/api/ai/video/file']" }
+  - title: "Önizlemeyi izleyin"
+    say: "Video hazır olunca burada oynar. Etsy için kare, sessiz ve sekiz saniye olarak hazırlanır."
+    do:
+      - scrollTo: { selector: "video[src*='/api/ai/video/file']", block: start }
+      - hover: { selector: "video[src*='/api/ai/video/file']" }
+    zoom: { selector: "video[src*='/api/ai/video/file']", scale: 1.25 }
+  - title: "Kalite kontrolüne bakın"
+    say: "Altında kalite kontrolü var. Videoyu fotoğraflarınızla karşılaştırır, puan verir ve farkları tek tek yazar."
+    do:
+      - hover: { testid: video-qa }
+    zoom: { testid: video-qa, scale: 1.4 }
+  - title: "Değişiklik isteyin"
+    say: "Bir fark varsa Bunları düzelt'e dokunun ya da ne değişsin istiyorsanız kutuya yazın. Yeni sürüm düğmesi videonun yeni bir sürümünü hazırlar."
+    do:
+      - hover: { role: button, name: "Bunları düzelt" }
+      - fill: { placeholder: "ör. kamera biraz daha uzaktan", value: "Kase sabit kalsın, sadece kamera yaklaşsın" }
+      - hover: { role: button, name: "Yeni sürüm" }
+    zoom: { text: "Değiştirmek istediğiniz bir şey var mı?", scale: 1.5 }
+  - title: "Etsy ilanınıza ekleyin"
+    say: "Beğendiğinizde Etsy ilanına ekle'ye tıklayın. Video ilanın taslağına eklenir; siz Etsy'ye gönder demeden Etsy'ye gitmez."
+    do:
+      - click: { role: button, name: "Etsy ilanına ekle" }
+      - waitFor: { text: "Fotoğraflar ve video", exact: true }
+      - waitFor: { text: "Video ilana eklendi" }
+    zoom: { text: "henüz gönderilmedi", scale: 1.4 }
+  - say: "Takıldığınız yerde Yardım sayfasından bize yazabilirsiniz. KolayXport'u 14 gün ücretsiz deneyebilirsiniz."

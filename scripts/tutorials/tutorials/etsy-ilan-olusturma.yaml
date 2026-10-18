@@ -1,0 +1,82 @@
+slug: etsy-ilan-olusturma
+order: 14
+title: "Etsy'de yapay zekâyla yeni ilan oluşturun"
+description: "Fotoğrafınızı ekleyin; başlığı, etiketleri, açıklamayı ve ek ürün fotoğrafını yapay zekâyla hazırlayın, ilanı taslak olarak kaydedin."
+keyword: "etsy ilan nasıl oluşturulur"
+inventoryRefs: [etsy-listing-editor, ai-listing-copy, ai-image-gen, staged-drafts-send]
+tags: [etsy, etsy ilan oluşturma, yapay zeka, etsy başlık, etsy etiket]
+startUrl: /app/etsy-listings/new
+ready: { testid: le-title-input }
+reseed: true            # the new listing is saved as a local draft
+mocks:
+  - use: etsy-create
+  - use: etsy-editor
+steps:
+  - say: "Merhaba! Bu videoda Etsy'de yeni bir ilanı yapay zekâ yardımıyla baştan oluşturacağız."
+  - title: "Ürün fotoğrafınızı ekleyin"
+    say: "Etsy › Yeni ilan sayfasında önce ürün fotoğrafınızı ekleyin. İlk fotoğraf, ilanın ana fotoğrafı olur."
+    do:
+      - hover: { role: button, name: "Fotoğraf seçin" }
+      - upload: { selector: "input[type=file][accept*='image'] >> nth=0", file: public/demo/iznik-bowl-photo.jpg }
+      - waitFor: { selector: "[data-testid=le-section-photos] img" }
+    zoom: { testid: le-section-photos, scale: 1.3 }
+  - title: "Başlık önerisi alın"
+    say: "Başlığa ürününüzü birkaç kelimeyle yazın ve Başlık öner'e tıklayın. Yapay zekâ, Etsy'de alıcıların aradığı İngilizce bir başlık yazar."
+    do:
+      - fill: { selector: "[data-testid=le-title-input] textarea:not([aria-hidden]), [data-testid=le-title-input] input", value: "Iznik ceramic bowl, blue tulip" }
+      - click: { role: button, name: "Başlık öner" }
+      - waitFor: { selector: "[data-testid=le-title-suggestion] button:has-text('Kullan')" }
+    zoom: { testid: le-title-suggestion, scale: 1.3 }
+  - title: "Başlığı kullanın"
+    say: "Öneriyi okuyun; beğendiyseniz Kullan'a tıklayın. Kelimelerin baş harfi büyük, ayraç olarak yalnızca virgül var."
+    do:
+      - click: { selector: "[data-testid=le-title-suggestion] button:has-text('Kullan')" }
+    zoom: { testid: le-title-input, scale: 1.4 }
+  - title: "Etiket fikri alın"
+    say: "Etiketler bölümünde Etiket fikri al'a tıklayın. Gelen etiketlerin her biri en fazla yirmi karakter. Tek tek ekleyebilir ya da hepsini birden ekleyebilirsiniz."
+    do:
+      - click: { role: button, name: "Etiket fikri al" }
+      - waitFor: { text: "hepsini ekle" }
+      - click: { text: "hepsini ekle" }
+    zoom: { testid: le-section-tags, scale: 1.25 }
+  - title: "Açıklamayı yazdırın"
+    say: "Açıklama yaz'a tıklayın. Gelen metni okuyun, ürününüze uymayan bir şey varsa düzeltin, sonra kullanın."
+    do:
+      - click: { role: button, name: "Açıklama yaz" }
+      - waitFor: { selector: "[data-testid=le-description-suggestion] button:has-text('Kullan')" }
+      - scrollTo: { testid: le-description-suggestion }
+      - click: { selector: "[data-testid=le-description-suggestion] button:has-text('Kullan')" }
+  - title: "Ek fotoğraf oluşturun"
+    say: "Fotoğraf oluştur'a tıklayın, sahneyi yazın ve Bilgisayardan Yükle ile ürün fotoğrafınızı referans olarak ekleyin. Yapay zekâ ürününüzü bu fotoğraftan örnek alır."
+    do:
+      - scrollTo: { testid: le-section-photos }
+      - click: { role: button, name: "Fotoğraf oluştur" }
+      - waitFor: { role: dialog }
+      - fill: { placeholder: "örnek: Professional", value: "The same bowl filled with fresh figs on a rustic dining table, soft daylight" }
+      - hover: { text: "Bilgisayardan Yükle" }
+      - upload: { selector: "[role=dialog] input[type=file]", file: public/demo/iznik-bowl-photo.jpg }
+      - wait: 800
+      - click: { role: button, name: "Görsel Oluştur" }
+      - waitFor: { role: button, name: "Kabul Et ve Yükle" }
+      - scrollTo: { role: button, name: "Kabul Et ve Yükle" }
+    zoom: { selector: "[role=dialog] img >> nth=-1", scale: 1.25 }
+  - title: "Fotoğrafı ilana ekleyin"
+    say: "Beğendiğinizde Kabul Et ve Yükle deyin; fotoğraf ilanın taslağına eklenir."
+    do:
+      - click: { role: button, name: "Kabul Et ve Yükle" }
+      - waitFor: { selector: "[data-testid=le-section-photos] img >> nth=1" }
+    zoom: { testid: le-section-photos, scale: 1.3 }
+  - title: "Fiyat, stok ve kargoyu kontrol edin"
+    say: "Fiyatı ve stok adedini girin, kargo profilinizi seçin."
+    do:
+      - fill: { selector: "[data-testid=le-price-input] input, input[data-testid=le-price-input]", value: "48" }
+      - fill: { selector: "[data-testid=le-quantity-input] input, input[data-testid=le-quantity-input]", value: "10" }
+      - click: { selector: "#le-field-shipping_profile_id" }
+      - click: { role: option, name: "Worldwide from Istanbul" }
+    zoom: { testid: le-section-shipping, scale: 1.25 }
+  - title: "Taslak olarak saklayın"
+    say: "İlanınız KolayXport'ta taslak olarak kaydedilir. Siz Etsy'de yayınla demeden Etsy'ye hiçbir şey gitmez."
+    do:
+      - hover: { testid: le-primary }
+    zoom: { testid: le-footer, scale: 1.4 }
+  - say: "Takıldığınız yerde Yardım sayfasından bize yazabilirsiniz. KolayXport'u 14 gün ücretsiz deneyebilirsiniz."

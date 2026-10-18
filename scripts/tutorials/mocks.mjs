@@ -24,6 +24,18 @@ const SAFETY_RULES = [
   { url: '**/api/etgb/**', method: 'POST', json: { ok: true, skipped: true } },
   { url: '**/api/labels/**', method: 'POST', json: { ok: false, error: 'disabled while recording' }, status: 409 },
   { url: '**/api/messages?**', method: 'POST', json: { ok: true } },
+  // Etsy / eBay writes through the low-level executors (create, publish, revise, upload, delete): never while
+  // recording. Reads are GETs (tutorial mocks answer them first); the AI routes are separate (/api/ai/*,
+  // /api/clawd/ebay-ai).
+  { url: '**/api/clawd/etsy**', method: 'POST', json: { error: 'disabled while recording' }, status: 409 },
+  { url: '**/api/clawd/etsy**', method: 'PUT', json: { error: 'disabled while recording' }, status: 409 },
+  { url: '**/api/clawd/etsy**', method: 'DELETE', json: { error: 'disabled while recording' }, status: 409 },
+  { url: '**/api/clawd/etsy**', query: { action: 'create_draft_listing' }, json: { error: 'disabled while recording' }, status: 409 },
+  { url: '**/api/clawd/ebay?**', method: 'POST', json: { error: 'disabled while recording' }, status: 409 },
+  { url: '**/api/clawd/ebay', method: 'POST', json: { error: 'disabled while recording' }, status: 409 },
+  { url: '**/api/ebay/**', method: 'POST', json: { error: 'disabled while recording' }, status: 409 },
+  // Video Studio: sending a video to an eBay / Shopify / Wix listing.
+  { url: '**/api/ai/video/publish**', method: 'POST', json: { code: 'disabled while recording' }, status: 409 },
 ];
 
 /** Hosts the page may load from while recording. Every other non-local host is aborted. */
@@ -75,6 +87,11 @@ export function expand(value, now = Date.now()) {
 //   - merge:    let the request reach our server, then deep-merge this object into its JSON response
 //               (e.g. switch on a setting the seeded demo account has off, without writing to the DB)
 //   - passthrough: let the request go to the server unchanged
+//   - capture:  with `fixture`: normally replays the fixture; with TUTORIAL_CAPTURE=1 the request goes to OUR local
+//               server once (the real code path, e.g. a real AI answer) and its JSON answer is saved as that
+//               fixture ("{{base}}" put back for the app URL). Record once, replay in every recording.
+//   - sequence: a list of fixture files answered in turn, the last one repeating (e.g. a job that is "running"
+//               on the first poll and "done" from the second on)
 //   - { use: <set> } loads scripts/tutorials/fixtures/<set>/mocks.yaml (a list of rules; fixture paths there
 //     are relative to that folder)
 // Rules are tried in order; the first match wins. No match → the request continues to the server.
@@ -90,7 +107,11 @@ export function resolveRules(list = [], base = FIXTURES) {
       continue;
     }
     if (!r?.url) throw new Error(`mock rule needs url: ${JSON.stringify(r)}`);
-    out.push({ ...r, ...(r.fixture ? { fixture: path.resolve(base, r.fixture) } : {}) });
+    out.push({
+      ...r,
+      ...(r.fixture ? { fixture: path.resolve(base, r.fixture) } : {}),
+      ...(Array.isArray(r.sequence) ? { sequence: r.sequence.map((f) => path.resolve(base, f)), served: 0 } : {}),
+    });
   }
   return out;
 }
@@ -120,6 +141,18 @@ function deepMerge(base, patch) {
 async function answer(route, rule) {
   const status = rule.status || 200;
   if (rule.passthrough) return route.fallback();
+  if (rule.capture && process.env.TUTORIAL_CAPTURE && rule.fixture) {
+    const res = await route.fetch({ timeout: 300000 });
+    const text = await res.text();
+    let body;
+    try { body = JSON.parse(text); } catch { return route.fulfill({ response: res, body: text }); }
+    if (res.ok()) {
+      fs.mkdirSync(path.dirname(rule.fixture), { recursive: true });
+      fs.writeFileSync(rule.fixture, JSON.stringify(body, null, 2).split(CONFIG.baseUrl).join('{{base}}') + '\n');
+      console.log(`  captured ${path.relative(ROOT, rule.fixture)}`);
+    } else console.log(`  capture: ${route.request().url()} answered ${res.status()} (not saved)`);
+    return route.fulfill({ response: res, body: text });
+  }
   if (rule.merge) {
     const res = await route.fetch();
     let body;
@@ -132,7 +165,9 @@ async function answer(route, rule) {
     if (!fs.existsSync(p)) return route.fulfill({ status: 404, body: '' });
     return route.fulfill({ status, contentType: rule.contentType || 'image/jpeg', body: fs.readFileSync(p) });
   }
-  const data = rule.fixture ? JSON.parse(fs.readFileSync(rule.fixture, 'utf8')) : rule.json ?? {};
+  const seqFile = rule.sequence ? rule.sequence[Math.min(rule.served++, rule.sequence.length - 1)] : null;
+  const fixture = seqFile || rule.fixture;
+  const data = fixture ? JSON.parse(fs.readFileSync(fixture, 'utf8')) : rule.json ?? {};
   return route.fulfill({ status, contentType: rule.contentType || 'application/json', body: JSON.stringify(expand(data)) });
 }
 

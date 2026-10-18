@@ -1,0 +1,10 @@
+# New Etsy listing (/app/etsy-listings/new) with the editor's AI buttons — "etsy-ilan-olusturma" tutorial.
+# Every AI answer here is a REAL answer of our own server (the same /api/ai/* code the app runs, billed Gemini key),
+# captured once:  TUTORIAL_CAPTURE=1 TUTORIAL_DRY=1 DEMO_PASSWORD=… node scripts/tutorials/record.mjs etsy-ilan-olusturma
+# and replayed in every recording. Use with `etsy-editor` (shop sections, shipping profiles, taxonomy, market search).
+# Nothing reaches Etsy: the safety rules in mocks.mjs refuse every Etsy write and every draft send.
+- { url: "**/api/ai/etsy**", body: { action: optimize_title }, fixture: ai-optimize-title.json, capture: true }
+- { url: "**/api/ai/etsy**", body: { action: suggest_tags }, fixture: ai-suggest-tags.json, capture: true }
+- { url: "**/api/ai/etsy**", body: { action: generate_description }, fixture: ai-generate-description.json, capture: true }
+- { url: "**/api/ai/etsy**", body: { action: generate_alt_text }, fixture: ai-generate-alt-text.json, capture: true }
+- { url: "**/api/ai/generate-image**", method: POST, fixture: generate-image.json, capture: true }

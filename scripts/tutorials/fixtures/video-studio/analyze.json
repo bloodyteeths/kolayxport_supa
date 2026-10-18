@@ -1,0 +1,86 @@
+{
+  "photos": [
+    {
+      "ref": "{{base}}/demo/iznik-bowl-photo.jpg",
+      "view": "front",
+      "fullBody": true,
+      "person": false,
+      "quality": 9
+    }
+  ],
+  "start": "{{base}}/demo/iznik-bowl-photo.jpg",
+  "end": null,
+  "product": {
+    "kind": "object",
+    "category": "ceramic serving bowl",
+    "profile": {
+      "name": "Iznik Ceramic Serving Bowl",
+      "use": "placed",
+      "physics": "rigid",
+      "shiny": true,
+      "size": "medium",
+      "details": [
+        "white ceramic glazed base",
+        "cobalt blue and turquoise tulip motifs",
+        "stylized floral patterns inside and outside",
+        "blue rim border line"
+      ],
+      "actions": {
+        "detail": "Camera glides closely over the glossy hand-painted tulip motif inside the bowl.",
+        "lifestyle": "The bowl rests on a rustic wooden dining table near soft window light.",
+        "withPerson": "A person holds the bowl steadily with two hands above a kitchen counter.",
+        "reveal": "Warm sunlight shifts across the glossy ceramic glaze, highlighting the cobalt pattern."
+      }
+    }
+  },
+  "shots": [
+    {
+      "label": "Yavaş Yakınlaşma",
+      "hint": "Kaseye doğru yumuşak yaklaşma hareketi",
+      "action": "Camera pushes in slowly toward the front of the ceramic bowl on the wooden table.",
+      "showsBack": false
+    },
+    {
+      "label": "Hafif Yay Hareketi",
+      "hint": "Kase etrafında hafif kavisli çekim",
+      "action": "Camera executes a gentle thirty-degree arc around the bowl, revealing inner and outer motifs.",
+      "showsBack": false
+    },
+    {
+      "label": "Yükselen Açı",
+      "hint": "Aşağıdan yukarıya doğru süzülüş",
+      "action": "Camera rises slowly from rim level to reveal the painted floral designs inside the bowl.",
+      "showsBack": false
+    },
+    {
+      "label": "Detay Süzülüşü",
+      "hint": "Lale desenleri üzerinde makro kaydırma",
+      "action": "A slow macro camera glide tracks across the vibrant blue tulip artwork on the glossy glaze.",
+      "showsBack": false
+    },
+    {
+      "label": "Işık Yansıması",
+      "hint": "Sır yüzeyinde yumuşak ışık geçişi",
+      "action": "Soft ambient light glides over the polished ceramic rim and internal patterns.",
+      "showsBack": false
+    }
+  ],
+  "scenes": [
+    {
+      "label": "Ahşap Yemek Masası",
+      "prompt": "Sunlit minimalist dining room with a natural light oak table."
+    },
+    {
+      "label": "Aydınlık Mutfak Tezgahı",
+      "prompt": "Bright modern kitchen with a neutral marble countertop and soft morning light."
+    },
+    {
+      "label": "Pencere Kenarı",
+      "prompt": "A warm wooden windowsill next to sheer curtains diffusing soft daylight."
+    },
+    {
+      "label": "Rustik Konsol",
+      "prompt": "Warm bohemian living room with a vintage wooden credenza in soft golden hour light."
+    }
+  ]
+}

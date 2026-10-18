@@ -1,0 +1,151 @@
+{
+  "listing_id": 1790001234,
+  "shop_id": 48291736,
+  "title": "Handmade Iznik Ceramic Bowl, Cobalt Blue Tulip Pattern, Turkish Pottery Serving Bowl, 8 Inch",
+  "description": "Hand painted in our Istanbul workshop using the 500-year-old Iznik tulip motif. Each bowl is wheel-thrown, painted by hand and fired twice, so no two are exactly alike.\n\nSize: 20 cm (8 in) diameter, 8 cm tall\nFood safe, lead free glaze. Hand wash recommended.\n\nShips from Istanbul in 1-3 business days, gift wrapped on request.",
+  "tags": [
+    "housewarming gift",
+    "gift for mom",
+    "kitchen decor",
+    "boho kitchen",
+    "fruit centerpiece",
+    "salad server",
+    "anatolian art",
+    "ottoman design",
+    "bridal shower",
+    "hostess present",
+    "unique dinnerware",
+    "istanbul souvenir",
+    "mothers day"
+  ],
+  "materials": [
+    "ceramic",
+    "glaze",
+    "clay"
+  ],
+  "price": {
+    "amount": 4800,
+    "divisor": 100,
+    "currency_code": "USD"
+  },
+  "views": 2310,
+  "num_favorers": 412,
+  "quantity": 14,
+  "state": "active",
+  "url": "https://www.etsy.com/listing/1790001234",
+  "taxonomy_id": 1052,
+  "shop_section_id": 51001,
+  "shipping_profile_id": 61001,
+  "return_policy_id": 71001,
+  "readiness_state_id": 81001,
+  "processing_min": 1,
+  "processing_max": 3,
+  "who_made": "i_did",
+  "when_made": "made_to_order",
+  "is_supply": false,
+  "item_weight": 650,
+  "item_weight_unit": "g",
+  "item_length": 20,
+  "item_width": 20,
+  "item_height": 8,
+  "item_dimensions_unit": "cm",
+  "is_personalizable": false,
+  "personalization_is_required": false,
+  "personalization_instructions": null,
+  "personalization_char_count_max": null,
+  "has_variations": false,
+  "updated_timestamp": "{{unix-ago:3d}}",
+  "created_timestamp": "{{unix-ago:210d}}",
+  "images": [
+    {
+      "listing_image_id": 6100000000,
+      "rank": 1,
+      "url_75x75": "{{base}}/demo/iznik-bowl-photo.jpg",
+      "url_170x135": "{{base}}/demo/iznik-bowl-photo.jpg",
+      "url_570xN": "{{base}}/demo/iznik-bowl-photo.jpg",
+      "url_fullxfull": "{{base}}/demo/iznik-bowl-photo.jpg",
+      "alt_text": "Hand painted Iznik ceramic bowl with blue tulip and carnation pattern on an oak table"
+    },
+    {
+      "listing_image_id": 6100000001,
+      "rank": 2,
+      "url_75x75": "{{base}}/demo/iznik-plate-tulip.jpg",
+      "url_170x135": "{{base}}/demo/iznik-plate-tulip.jpg",
+      "url_570xN": "{{base}}/demo/iznik-plate-tulip.jpg",
+      "url_fullxfull": "{{base}}/demo/iznik-plate-tulip.jpg",
+      "alt_text": "Matching Iznik tulip plate from the same set"
+    },
+    {
+      "listing_image_id": 6100000002,
+      "rank": 3,
+      "url_75x75": "{{base}}/demo/iznik-bowl-turquoise.jpg",
+      "url_170x135": "{{base}}/demo/iznik-bowl-turquoise.jpg",
+      "url_570xN": "{{base}}/demo/iznik-bowl-turquoise.jpg",
+      "url_fullxfull": "{{base}}/demo/iznik-bowl-turquoise.jpg",
+      "alt_text": "Turquoise colour option of the Iznik bowl"
+    },
+    {
+      "listing_image_id": 6100000003,
+      "rank": 4,
+      "url_75x75": "{{base}}/demo/iznik-plate-green.jpg",
+      "url_170x135": "{{base}}/demo/iznik-plate-green.jpg",
+      "url_570xN": "{{base}}/demo/iznik-plate-green.jpg",
+      "url_fullxfull": "{{base}}/demo/iznik-plate-green.jpg",
+      "alt_text": "Green floral Iznik plate"
+    },
+    {
+      "listing_image_id": 6100000004,
+      "rank": 5,
+      "url_75x75": "{{base}}/demo/iznik-bowl-blue.jpg",
+      "url_170x135": "{{base}}/demo/iznik-bowl-blue.jpg",
+      "url_570xN": "{{base}}/demo/iznik-bowl-blue.jpg",
+      "url_fullxfull": "{{base}}/demo/iznik-bowl-blue.jpg",
+      "alt_text": "Iznik bowl styled with fruit on a linen table"
+    },
+    {
+      "listing_image_id": 6100000005,
+      "rank": 6,
+      "url_75x75": "{{base}}/demo/iznik-plate-tulip.jpg",
+      "url_170x135": "{{base}}/demo/iznik-plate-tulip.jpg",
+      "url_570xN": "{{base}}/demo/iznik-plate-tulip.jpg",
+      "url_fullxfull": "{{base}}/demo/iznik-plate-tulip.jpg",
+      "alt_text": "Tulip plate hanging on a wall"
+    },
+    {
+      "listing_image_id": 6100000006,
+      "rank": 7,
+      "url_75x75": "{{base}}/demo/iznik-bowl-turquoise.jpg",
+      "url_170x135": "{{base}}/demo/iznik-bowl-turquoise.jpg",
+      "url_570xN": "{{base}}/demo/iznik-bowl-turquoise.jpg",
+      "url_fullxfull": "{{base}}/demo/iznik-bowl-turquoise.jpg",
+      "alt_text": "Turquoise bowl next to a coffee cup for scale"
+    },
+    {
+      "listing_image_id": 6100000007,
+      "rank": 8,
+      "url_75x75": "{{base}}/demo/iznik-plate-green.jpg",
+      "url_170x135": "{{base}}/demo/iznik-plate-green.jpg",
+      "url_570xN": "{{base}}/demo/iznik-plate-green.jpg",
+      "url_fullxfull": "{{base}}/demo/iznik-plate-green.jpg",
+      "alt_text": "Close-up of hand painted brush strokes"
+    },
+    {
+      "listing_image_id": 6100000008,
+      "rank": 9,
+      "url_75x75": "{{base}}/demo/iznik-bowl-blue.jpg",
+      "url_170x135": "{{base}}/demo/iznik-bowl-blue.jpg",
+      "url_570xN": "{{base}}/demo/iznik-bowl-blue.jpg",
+      "url_fullxfull": "{{base}}/demo/iznik-bowl-blue.jpg",
+      "alt_text": "Gift box with tissue paper"
+    },
+    {
+      "listing_image_id": 6100000009,
+      "rank": 10,
+      "url_75x75": "{{base}}/demo/iznik-plate-tulip.jpg",
+      "url_170x135": "{{base}}/demo/iznik-plate-tulip.jpg",
+      "url_570xN": "{{base}}/demo/iznik-plate-tulip.jpg",
+      "url_fullxfull": "{{base}}/demo/iznik-plate-tulip.jpg",
+      "alt_text": "Bowl and plate set on a dining table"
+    }
+  ]
+}

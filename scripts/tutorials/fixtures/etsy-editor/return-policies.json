@@ -7,5 +7,13 @@
       "accepts_exchanges": true,
       "return_deadline": 30
     }
+  ],
+  "return_policies": [
+    {
+      "return_policy_id": 71001,
+      "accepts_returns": true,
+      "accepts_exchanges": true,
+      "return_deadline": 30
+    }
   ]
 }

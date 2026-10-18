@@ -90,6 +90,7 @@ steps:
 - `check`: a selector; for row checkboxes that only show on hover (moves there, clicks without waiting).
 - `scrollTo`: a selector (plus optional `block: start|center`); scrolls it into view without clicking.
 - `fill`: a selector plus `value` (typed visibly).
+- `upload`: a file input selector plus `file` (path from the repo root), e.g. a demo product photo.
 - `press: Enter` / `press: Escape`
 - `scroll: 600`
 - `blur: true` (drop the focus ring)
@@ -118,7 +119,9 @@ mocks:
 
 A rule has a `url` (Playwright glob, or a regex in code) and optional `method`, `query` (every listed query param
 must match) and `body` (top-level JSON fields of the request body must match). It answers with one of:
-`fixture` (JSON file under `fixtures/`, or relative to the set's folder), `json` (inline), `file`
+`fixture` (JSON file under `fixtures/`, or relative to the set's folder), `sequence` (a list of fixture files
+answered in turn, the last one repeating; e.g. a job polled as running, then done), `capture: true` next to `fixture`
+(record the real answer of our own local server once with `TUTORIAL_CAPTURE=1`, replay it afterwards), `json` (inline), `file`
 (serve a local file, `{path}` = request path), `empty: true` (e.g. 204), `merge` (let the request reach our
 server and deep-merge this object into its JSON answer; e.g. `etgb-on` switches ETGB on in the settings answer
 without writing to the database) or `passthrough: true`. Rules are tried in order; first match wins; no match
@@ -133,11 +136,13 @@ lets the request through. Fixture strings may use `{{base}}` (app URL), `{{now}}
 | `inbox` | Conversation list, threads, order context and the AI reply draft. |
 | `etgb-on` | ETGB switched on with a made-up broker address. |
 | `demo-cdn` | Price-gap product images on the fake `demo-cdn.kolayxport.test` host. |
+| `etsy-create` | New Etsy listing: real AI answers (title, tags, description, AI photo) captured once from our own server with `TUTORIAL_CAPTURE=1 TUTORIAL_DRY=1 node scripts/tutorials/record.mjs etsy-ilan-olusturma`, replayed afterwards (`capture: true` rules). |
+| `video-studio` | Video Studio: listing photo, photo analysis, the job (preparing → running → done + quality check) and the mp4. A **real** Video Studio result made once with `npx tsx scripts/tutorials/make-video-fixture.ts` (Veo via `lib/ai/video`, billed `GEMINI_API_KEY`; `generation.json` records model, prompt and QA). Follow-ups, edits and publishing are refused while recording. |
 
 **Safety net (always on):** every request to a host other than the app, `localhost` and Google Fonts is aborted
 (marketplaces, carriers, analytics); the recorder prints the blocked hosts. Live pulls and sends are stubbed too:
-order sync, finance refresh, price-gap refresh, draft sends to any marketplace, ETGB sends, label purchases and
-message replies. Fixture data must stay synthetic.
+order sync, finance refresh, price-gap refresh, draft sends to any marketplace, ETGB sends, label purchases,
+message replies, every Etsy / eBay write through `/api/clawd/etsy` and `/api/clawd/ebay`, and Video Studio publishing. Fixture data must stay synthetic.
 
 **Narration rules:**
 - Short spoken Turkish sentences, addressing the viewer as "siz".

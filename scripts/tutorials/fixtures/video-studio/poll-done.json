@@ -1,0 +1,87 @@
+{
+  "jobs": [
+    {
+      "id": "vtutorialsample0000000001",
+      "parentId": null,
+      "groupId": "vtutorialsample0000000001",
+      "variantIndex": 0,
+      "status": "done",
+      "mode": "image",
+      "instruction": null,
+      "aspectRatio": "1:1",
+      "durationSec": 8,
+      "resolution": "1080p",
+      "quality": "fast",
+      "seed": null,
+      "model": "veo-3.1-fast-generate-preview",
+      "provider": "gemini",
+      "errorKey": null,
+      "favorite": false,
+      "listingRef": "etsy:1790001234:48291736",
+      "title": "Handmade Iznik Ceramic Bowl, Cobalt Blue Tulip Pattern, Turkish Pottery Serving Bowl, 8 Inch",
+      "direction": {
+        "mode": "image",
+        "preset": "custom",
+        "look": "phone",
+        "camera": "auto",
+        "motion": "subtle",
+        "person": false,
+        "expression": "natural",
+        "scene": "keep",
+        "light": "daylight",
+        "audio": "none",
+        "grain": true,
+        "shotText": "Camera pushes in slowly toward the front of the ceramic bowl on the wooden table.",
+        "productKind": "object",
+        "profile": {
+          "name": "Iznik Ceramic Serving Bowl",
+          "use": "placed",
+          "physics": "rigid",
+          "shiny": true,
+          "size": "medium",
+          "details": [
+            "white ceramic glazed base",
+            "cobalt blue and turquoise tulip motifs",
+            "stylized floral patterns inside and outside",
+            "blue rim border line"
+          ],
+          "actions": {
+            "detail": "Camera glides closely over the glossy hand-painted tulip motif inside the bowl.",
+            "lifestyle": "The bowl rests on a rustic wooden dining table near soft window light.",
+            "withPerson": "A person holds the bowl steadily with two hands above a kitchen counter.",
+            "reveal": "Warm sunlight shifts across the glossy ceramic glaze, highlighting the cobalt pattern."
+          }
+        },
+        "product": "Handmade Iznik Ceramic Bowl, Cobalt Blue Tulip Pattern, Turkish Pottery Serving Bowl, 8 Inch",
+        "target": "etsy",
+        "format": "1:1",
+        "locale": "tr",
+        "genAspect": "9:16",
+        "variants": 1,
+        "lock": true
+      },
+      "sourceUrl": "{{base}}/demo/iznik-bowl-photo.jpg",
+      "endUrl": null,
+      "referenceUrls": [
+        "{{base}}/demo/iznik-bowl-photo.jpg"
+      ],
+      "credits": 96,
+      "qa": {
+        "status": "done",
+        "match": 10,
+        "realism": 7,
+        "diffs": [],
+        "issues": [
+          {
+            "text": "Kamera yakınlaşırken kase üzerindeki yansımalar ve perspektif sabit kalıyor.",
+            "fix": "The camera physically moves through 3D space so reflections and perspective shift naturally.",
+            "at": 4
+          }
+        ]
+      },
+      "published": null,
+      "createdAt": "{{ago:14s}}",
+      "url": "/api/ai/video/file?id=vtutorialsample0000000001"
+    }
+  ]
+}

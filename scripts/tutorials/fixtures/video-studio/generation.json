@@ -1,0 +1,132 @@
+{
+  "madeAt": "2026-10-18T10:31:43.815Z",
+  "photo": "public/demo/iznik-bowl-photo.jpg",
+  "title": "Handmade Iznik Ceramic Bowl, Cobalt Blue Tulip Pattern, Turkish Pottery Serving Bowl, 8 Inch",
+  "provider": "gemini",
+  "model": "veo-3.1-fast-generate-preview",
+  "aspectRatio": "9:16",
+  "format": "1:1",
+  "durationSec": 8,
+  "resolution": "1080p",
+  "quality": "fast",
+  "shot": {
+    "label": "Yavaş Yakınlaşma",
+    "hint": "Kaseye doğru yumuşak yaklaşma hareketi",
+    "action": "Camera pushes in slowly toward the front of the ceramic bowl on the wooden table.",
+    "showsBack": false
+  },
+  "credits": 96,
+  "seconds": 453,
+  "chosen": "vtutorialsample0000000002",
+  "takes": [
+    {
+      "id": "vtutorialsample0000000001",
+      "instruction": null,
+      "promptBy": "ai",
+      "reading": "A white ceramic bowl decorated with traditional dark blue, turquoise, and red Iznik-style floral patterns, sitting on a wooden table.",
+      "prompt": "Real, unedited footage. Natural exposure, true-to-life colours, a calm, steady camera with faint natural sway, real lens depth of field. A white ceramic bowl sits on a light wooden table near a window. The bowl features intricate dark blue painted tulips and carnations, accented with turquoise leaves and red dots. A blue line circles the rim, decorated with smaller blue flowers. The rigid, glossy ceramic reflects soft natural light. The background shows a softly blurred white wall and window frame. The camera pushes in slowly toward the front of the bowl. The gentle movement creates subtle natural parallax. Light shifts slightly across the glossy surface as the camera moves. The entire bowl stays in frame for the whole shot, maintaining its exact shape, size, and detailed floral patterns without morphing. No hands or people enter the frame. The shot ends focused on the bowl. No added captions, subtitles, logos or watermarks (keep the product's own text and logos as in the photos).",
+      "negativePrompt": "CGI, 3D render, animation, cartoon, illustration, painting, AI-generated look, video game, slow motion, floaty or dreamlike motion, morphing, warping, melting, flickering details, changing the product, changing the pattern or colours, added or missing details, extra accessories, oversaturated colours, glow, haze, blurry, low quality, added captions, subtitles, watermark, added logos, phone screen, camera app interface, on-screen buttons or icons, screen recording, black bars, letterbox, border, picture frame, hands, fingers, people, morphing patterns, melting ceramic, changing colors, extreme close up, fast camera movement, text, logos, unnatural lighting, camera rotating, bowl moving",
+      "qa": {
+        "status": "done",
+        "match": 6,
+        "realism": 5,
+        "diffs": [
+          {
+            "text": "Kase deseni, küçük çiçekler ve karanfil motifi değişiyor.",
+            "fix": "The camera films a real bowl with a static pattern.",
+            "at": 7.5
+          }
+        ],
+        "issues": [
+          {
+            "text": "Kase üzerindeki boyalı desenler eriyor ve şekil değiştiriyor.",
+            "fix": "The painted pattern remains completely static.",
+            "at": 6.5
+          }
+        ],
+        "clean": {
+          "from": 0,
+          "to": 3
+        }
+      }
+    },
+    {
+      "id": "vtutorialsample0000000002",
+      "instruction": "The camera films a real bowl with a static pattern.. The painted pattern remains completely static.",
+      "promptBy": "ai",
+      "reading": "A white ceramic bowl decorated with a traditional Iznik-style floral pattern of blue tulips and carnations with red and green accents.",
+      "prompt": "Real, unedited video footage of a white ceramic bowl resting on a light wooden table near a window. The bowl features a painted pattern of dark blue tulips and carnations with red accents and turquoise green stems, bordered by thin blue lines. The bowl is completely rigid, and its painted floral pattern remains perfectly static, sharp, and unchanging; the flowers do not move or morph. The camera pushes in very slowly toward the front of the bowl. The movement is smooth and steady, with a faint natural sway. The entire bowl stays centered in the frame for the whole shot, never getting too close. Natural parallax occurs between the bowl and the blurred beige wall and white window frame in the background. Soft, natural daylight from the left casts gentle, realistic highlights on the shiny ceramic glaze. The shot ends with the bowl still fully visible on the table, the pattern perfectly preserved. No added captions, subtitles, logos or watermarks (keep the product's own text and logos as in the photos).",
+      "negativePrompt": "CGI, 3D render, animation, cartoon, illustration, painting, AI-generated look, video game, slow motion, floaty or dreamlike motion, morphing, warping, melting, flickering details, changing the product, changing the pattern or colours, added or missing details, extra accessories, oversaturated colours, glow, haze, blurry, low quality, added captions, subtitles, watermark, added logos, phone screen, camera app interface, on-screen buttons or icons, screen recording, black bars, letterbox, border, picture frame, hands, fingers, people, morphing pattern, moving flowers, changing design, unnatural camera movement, extreme close-up, text, watermarks, melting ceramic, changing colors",
+      "qa": {
+        "status": "done",
+        "match": 10,
+        "realism": 7,
+        "diffs": [],
+        "issues": [
+          {
+            "text": "Kamera yakınlaşırken kase üzerindeki yansımalar ve perspektif sabit kalıyor.",
+            "fix": "The camera physically moves through 3D space so reflections and perspective shift naturally.",
+            "at": 4
+          }
+        ]
+      }
+    }
+  ],
+  "direction": {
+    "mode": "image",
+    "preset": "custom",
+    "look": "phone",
+    "camera": "auto",
+    "motion": "subtle",
+    "person": false,
+    "expression": "natural",
+    "scene": "keep",
+    "light": "daylight",
+    "audio": "none",
+    "grain": true,
+    "shotText": "Camera pushes in slowly toward the front of the ceramic bowl on the wooden table.",
+    "productKind": "object",
+    "profile": {
+      "name": "Iznik Ceramic Serving Bowl",
+      "use": "placed",
+      "physics": "rigid",
+      "shiny": true,
+      "size": "medium",
+      "details": [
+        "white ceramic glazed base",
+        "cobalt blue and turquoise tulip motifs",
+        "stylized floral patterns inside and outside",
+        "blue rim border line"
+      ],
+      "actions": {
+        "detail": "Camera glides closely over the glossy hand-painted tulip motif inside the bowl.",
+        "lifestyle": "The bowl rests on a rustic wooden dining table near soft window light.",
+        "withPerson": "A person holds the bowl steadily with two hands above a kitchen counter.",
+        "reveal": "Warm sunlight shifts across the glossy ceramic glaze, highlighting the cobalt pattern."
+      }
+    },
+    "product": "Handmade Iznik Ceramic Bowl, Cobalt Blue Tulip Pattern, Turkish Pottery Serving Bowl, 8 Inch",
+    "target": "etsy",
+    "format": "1:1",
+    "locale": "tr",
+    "genAspect": "9:16",
+    "variants": 1,
+    "lock": true,
+    "autoFixOf": "vtutorialsample0000000001",
+    "promptBy": "ai",
+    "reading": "A white ceramic bowl decorated with a traditional Iznik-style floral pattern of blue tulips and carnations with red and green accents."
+  },
+  "qa": {
+    "status": "done",
+    "match": 10,
+    "realism": 7,
+    "diffs": [],
+    "issues": [
+      {
+        "text": "Kamera yakınlaşırken kase üzerindeki yansımalar ve perspektif sabit kalıyor.",
+        "fix": "The camera physically moves through 3D space so reflections and perspective shift naturally.",
+        "at": 4
+      }
+    ]
+  }
+}

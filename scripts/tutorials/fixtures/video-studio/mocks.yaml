@@ -1,0 +1,15 @@
+# Video Studio (/app/video-studio) for the "ai-urun-videosu" tutorial. Nothing here calls Google or a marketplace.
+# The video and the analysis are a REAL Video Studio result, made once by scripts/tutorials/make-video-fixture.ts
+# (Veo through lib/ai/video, the AI director prompt, the quality check); generation.json records how.
+# The listing's photo: the demo listing 1790001234 (Iznik bowl) with its photoreal photo public/demo/iznik-bowl-photo.jpg
+# (the editor's listing answer shows the same photo first, listing-photo.json).
+- { url: "**/api/clawd/etsy**", query: { action: listing }, fixture: listing-photo.json }
+- { url: "**/api/ai/video/listing-photos?**", fixture: listing-photos.json }
+- { url: "**/api/ai/video/analyze", method: POST, fixture: analyze.json }
+# "Oluştur": the job starts ("preparing"); the studio then polls ?ids=… every 6 s: running → done (+ quality check).
+- { url: "**/api/ai/video", method: POST, fixture: job-start.json }
+- { url: "**/api/ai/video", method: GET, json: { jobs: [] } }
+- { url: "**/api/ai/video?**", method: GET, sequence: [poll-running.json, poll-done.json] }
+- { url: "**/api/ai/video/file?**", file: scripts/tutorials/fixtures/video-studio/sample.mp4, contentType: video/mp4 }
+# Anything else (follow-ups, edits, uploads): never reaches the server while recording.
+- { url: "**/api/ai/video/**", json: { code: "disabled while recording" }, status: 409 }

@@ -119,6 +119,8 @@ async function act(page, a) {
       const l = await locate(page, arg); await moveTo(page, l); await l.click();
       await l.fill(''); await page.keyboard.type(String(arg.value ?? ''), { delay: 45 }); break;
     }
+    // A file chooser: `upload: { selector: "input[type=file] >> nth=0", file: public/demo/x.jpg }` (path from the repo root).
+    case 'upload': { const l = await locate(page, arg); await l.setInputFiles(path.join(process.cwd(), String(arg.file))); break; }
     case 'press': await page.keyboard.press(String(arg)); break;
     case 'scroll': await page.mouse.wheel(0, Number(arg)); await page.waitForTimeout(500); break;
     case 'wait': await page.waitForTimeout(Number(arg)); break;

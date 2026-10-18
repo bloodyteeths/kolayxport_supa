@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { directVideo, negativePrompt, neutralPeople, normalizeDirection, DEFAULT_DIRECTION } from '@/lib/ai/videoDirector';
+import { directVideo, negativePrompt, neutralPeople, normalizeDirection, DEFAULT_DIRECTION, UNIVERSAL_PRESETS } from '@/lib/ai/videoDirector';
 import { VIDEO_TARGET_PROFILES, generationAspect, videoReadiness } from '@/lib/ai/videoTargets';
 import { ffmpegArgs, finishArgs, veoConstraints, veoRequest } from '@/lib/ai/video';
 import { keyframePrompt, matchWindow, normalizePhotoAnalysis, normalizeQa } from '@/lib/ai/videoProduct';
@@ -45,12 +45,21 @@ describe('video director', () => {
     const safe = directVideo({ ...DEFAULT_DIRECTION, person: true, notes: 'kız gülsün' }, ['the girl smiles'], { safe: true });
     expect(safe).not.toMatch(/girl|kız|Change 1/);
   });
+  it('built-in shots are universal; "with a person" on product-only photos adds a person by AI', () => {
+    expect(UNIVERSAL_PRESETS).not.toContain('walk');
+    expect(UNIVERSAL_PRESETS).not.toContain('twirl');
+    const p = directVideo({ ...DEFAULT_DIRECTION, preset: 'withPerson', person: true, addPerson: true, productKind: 'object', product: 'iPhone 15 case' });
+    expect(p).toMatch(/real person naturally wears, holds or uses the product/);
+    expect(p).not.toMatch(/Keep the same model/);
+    const k = keyframePrompt({ ...DEFAULT_DIRECTION, preset: 'withPerson', person: true, addPerson: true }, { which: 'start', refCount: 2, hasStart: false });
+    expect(k).toMatch(/natural-looking adult naturally wearing, holding or using exactly this product/);
+  });
   it('studio and cinematic looks change the intro', () => {
     expect(directVideo({ ...DEFAULT_DIRECTION, look: 'studio' })).toMatch(/professional photographer/);
     expect(directVideo({ ...DEFAULT_DIRECTION, look: 'cinematic' })).toMatch(/cinema camera/);
   });
   it('unknown client values fall back to defaults; old modes map to today\'s', () => {
-    expect(normalizeDirection({ preset: 'x', camera: 'drone', target: 'etsy', format: '1:1' })).toMatchObject({ preset: 'turntable', camera: 'auto', target: 'etsy', format: '1:1', look: 'phone', grain: true });
+    expect(normalizeDirection({ preset: 'x', camera: 'drone', target: 'etsy', format: '1:1' })).toMatchObject({ preset: 'hero', camera: 'auto', target: 'etsy', format: '1:1', look: 'phone', grain: true });
     expect(normalizeDirection({ mode: 'reference' }).mode).toBe('scene');
     expect(normalizeDirection({ mode: 'interpolate' }).mode).toBe('image');
   });

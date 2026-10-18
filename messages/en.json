@@ -16527,12 +16527,13 @@
       "title": "Shot type",
       "backWarning": "This shot shows the back. Set a back photo as the end frame or turn on \"Lock the product\"; otherwise the AI guesses the back.",
       "suggested": "For your product",
-      "thinking": "Preparing shots that suit your product…"
+      "thinking": "Preparing shots that suit your product…",
+      "addPerson": "No person in your photos: the AI builds the first frame from your photos with a real-looking person using your product (+15 credits)."
     },
     "preset": {
       "turntable": {
         "label": "360° turn",
-        "hint": "Best with photos of every side"
+        "hint": "The product turns (best with photos of every side)"
       },
       "hero": {
         "label": "Hero shot",
@@ -16544,7 +16545,7 @@
       },
       "lifestyle": {
         "label": "In use",
-        "hint": "A real, natural moment"
+        "hint": "In its natural place, a real moment"
       },
       "flatlay": {
         "label": "Top-down",
@@ -16573,6 +16574,18 @@
       "custom": {
         "label": "Free",
         "hint": "Following your notes"
+      },
+      "orbit": {
+        "label": "Orbit",
+        "hint": "The product stays still, the camera circles gently"
+      },
+      "withPerson": {
+        "label": "With a person",
+        "hint": "Someone wears, holds or uses it"
+      },
+      "reveal": {
+        "label": "Light sweep",
+        "hint": "Light glides across the product"
       }
     },
     "director": {

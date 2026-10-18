@@ -62,7 +62,9 @@ async function planInfo(userId: string): Promise<Info> {
   // Set SHOPIFY_CREDIT_PURCHASES=1 only after switching the app to manual pricing.
   const shopifyBuys = process.env.SHOPIFY_API_KEY && process.env.SHOPIFY_CREDIT_PURCHASES === '1';
   const channel: CreditBalance['channel'] = a.shopify ? (shopifyBuys ? 'shopify' : null) : 'stripe';
-  return { plan: a.ent.plan, allowance, channel, neutral: a.neutral };
+  // Prices / costs are hidden only for Shopify-connected accounts (App Store 1.2.1). Enterprise has no Stripe upsell
+  // either (isNeutralBilling) but its seller still needs to see what a video costs from their 10,000 credits.
+  return { plan: a.ent.plan, allowance, channel, neutral: a.shopify };
 }
 
 async function lock(tx: Tx, userId: string) {

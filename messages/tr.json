@@ -16527,12 +16527,13 @@
       "title": "Çekim türü",
       "backWarning": "Bu çekimde ürünün arkası görünür. Arka fotoğrafını bitiş karesi yapın veya \"Ürünü kilitle\"yi açın; yoksa yapay zekâ arkayı tahmin eder.",
       "suggested": "Ürününüz için",
-      "thinking": "Ürününüze uygun çekimler hazırlanıyor…"
+      "thinking": "Ürününüze uygun çekimler hazırlanıyor…",
+      "addPerson": "Fotoğraflarınızda kişi yok: yapay zekâ, ürününüzü kullanan gerçekçi bir kişiyle ilk kareyi fotoğraflarınızdan kurar (+15 kredi)."
     },
     "preset": {
       "turntable": {
         "label": "360° tur",
-        "hint": "Her yanının fotoğrafı varsa en iyisi"
+        "hint": "Ürün döner (her yanının fotoğrafı varsa en iyisi)"
       },
       "hero": {
         "label": "Vitrin çekimi",
@@ -16543,8 +16544,8 @@
         "hint": "Malzeme ve işçilik yakından"
       },
       "lifestyle": {
-        "label": "Kullanımda",
-        "hint": "Gerçek bir anda, doğal"
+        "label": "Kullanım ortamında",
+        "hint": "Doğal yerinde, gerçek bir anda"
       },
       "flatlay": {
         "label": "Üstten çekim",
@@ -16573,6 +16574,18 @@
       "custom": {
         "label": "Serbest",
         "hint": "Ek yönlendirmenize göre"
+      },
+      "orbit": {
+        "label": "Etrafında dolaşma",
+        "hint": "Ürün sabit, kamera hafifçe etrafında döner"
+      },
+      "withPerson": {
+        "label": "Bir kişiyle",
+        "hint": "Biri ürünü giyer, tutar veya kullanır"
+      },
+      "reveal": {
+        "label": "Işık geçişi",
+        "hint": "Işık ürünün üzerinden süzülür"
       }
     },
     "director": {

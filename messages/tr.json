@@ -17040,6 +17040,7 @@
     "invoiceRequired": "Önce fatura numarasını girin",
     "pickingDone": "Trendyol: paket hazırlanıyor (Picking)",
     "invoicedDone": "Trendyol: paket faturalandı",
-    "statusFailed": "Trendyol durumu kabul etmedi: {reason}"
+    "statusFailed": "Trendyol durumu kabul etmedi: {reason}",
+    "zplNotAllowed": "Trendyol mağazanız için ortak barkod hizmetini açmamış. Trendyol kategori sorumlunuzdan açmasını isteyin. O zamana kadar “Kargo etiketini yazdır” ile yazdırın: barkodu Trendyol kargo numaranızdır."
   }
 }

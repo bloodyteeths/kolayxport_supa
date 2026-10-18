@@ -137,9 +137,10 @@
   }
 
   function cardAnchors() {
-    return MKT === 'trendyol'
-      ? document.querySelectorAll('a.product-card, a[data-testid="product-card"]')
-      : document.querySelectorAll('li[class*="productListContent"] a[href*="-p-"], a[data-test-id="product-card-name"], a[href*="-p-HB"], a[href*="-pm-HB"]');
+    if (MKT === 'trendyol') return document.querySelectorAll('a.product-card, a[data-testid="product-card"]');
+    // Hepsiburada cards have several links (image, name): one per card, the card link.
+    var links = document.querySelectorAll('a[class*="productCardLink"]');
+    return links.length ? links : document.querySelectorAll('li[class*="productListContent"] article a[href*="-pm-"], li[class*="productListContent"] article a[href*="-p-"]');
   }
   function idOfAnchor(a) {
     var href = a.getAttribute('href') || '';
@@ -149,14 +150,19 @@
 
   function renderStrips(items, cards, gated) {
     var byId = {};
-    items.forEach(function (i) { byId[i.id] = i; });
+    items.forEach(function (i) { byId[i.id] = i; if (i.altId) byId[i.altId] = i; });
     var cById = {};
     (cards || []).forEach(function (c) { cById[c.id] = c; });
+    var seenCard = {};
     var anchors = cardAnchors();
     for (var i = 0; i < anchors.length; i++) {
       var a = anchors[i];
       var id = idOfAnchor(a);
       if (!id || !byId[id]) continue;
+      var item = byId[id];
+      if (seenCard[item.id]) continue;
+      seenCard[item.id] = 1;
+      id = item.id;
       var row = a.querySelector('.kx-mkt-strip');
       if (!row) { row = el('div', 'kx-mkt-strip'); a.appendChild(row); }
       U.strip(row);

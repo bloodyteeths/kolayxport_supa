@@ -120,6 +120,27 @@ describe('Hepsiburada readers', () => {
   });
 });
 
+describe('Hepsiburada search (window.MORIA.PRODUCTLIST state)', () => {
+  it('reads total, page and products; product id from cards, variant sku as alias; promoted = ad', () => {
+    const products = Array.from({ length: 6 }, (_, i) => ({
+      productId: `HBC00006${i}VEAV`, brand: 'Ospina', customerReviewCount: 4 + i, customerReviewScore: 5,
+      mainCategory: { id: 60004982, name: 'Takı Kutusu' },
+      variantList: [{ sku: `HBCV00006${i}VEAW`, name: `Ospina Takı Kutusu ${i}`, url: `/ospina-taki-kutusu-pm-HBC00006${i}VEAV`, isPromoted: i === 2,
+        images: [{ link: 'https://productimages.hepsiburada.net/s/1/{size}/a.jpg' }],
+        listing: { priceInfo: { price: 1599 + i, originalPrice: 1699 }, merchantName: 'TEKNOMARİNE', merchantId: '8cfa6b0f-1' } }],
+    }));
+    const state = { data: { products, totalProductCount: 5283, currentPage: 1, pageSize: 36 } };
+    const script = `window.MORIA = window.MORIA || {};\n  window.MORIA.PRODUCTLIST = Object.assign(window.MORIA.PRODUCTLIST || {}, {\n    'abc': {\n      'STATE': ${JSON.stringify(state)}\n    }\n  });`;
+    const doc = docOf('https://www.hepsiburada.com/ara?q=ah%C5%9Fap+tak%C4%B1+kutusu', `<script>${script}</script>`);
+    const s = R.hepsiburadaSearch(doc, doc.location.href);
+    expect(s).toMatchObject({ mkt: 'hepsiburada', query: 'ahşap takı kutusu', total: 5283, page: 1 });
+    expect(s.items).toHaveLength(6);
+    expect(s.items[0]).toMatchObject({ id: 'HBC000060VEAV', altId: 'HBCV000060VEAW', price: 1599, sellerId: '8cfa6b0f-1', ratingCount: 4, rating: 5, sponsored: false, categoryId: '60004982' });
+    expect(s.items[2].sponsored).toBe(true);
+    expect(s.items[0].thumbUrl).toContain('/300/');
+  });
+});
+
 describe('Trendyol overlay (content-market.js)', () => {
   function boot(url: string, html: string, onMsg: (m: { type: string; params: any }) => unknown) {
     const dom = new JSDOM(`<!doctype html><html><head></head><body>${html}</body></html>`, { url, runScripts: 'outside-only' });

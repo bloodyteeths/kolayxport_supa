@@ -314,12 +314,12 @@
   function hepsiburadaProduct(doc, url) {
     var R = hbRedux(doc);
     var p = R && R.productState && R.productState.product;
-    if (!p || !p.sku) return null;
+    if (!p || !(p.productId || p.sku)) return null;
     var reviews = p.reviews || {};
     var merchant = p.merchant || {};
     var offers = [];
     if (merchant.id || p.merchantId) {
-      offers.push({ sellerId: String(merchant.id || p.merchantId), name: merchant.name || p.merchantName || null, price: hbPrice(p), score: typeof merchant.lifetimeRating === 'number' ? merchant.lifetimeRating : null, buybox: true });
+      offers.push({ sellerId: String(merchant.id || p.merchantId), name: merchant.name || p.merchantName || null, price: hbPrice(p), score: (merchant.lifetimeRating > 0 ? merchant.lifetimeRating : null), buybox: true });
     }
     var listings = Array.isArray(p.listings) ? p.listings : Array.isArray(R.productState.allListings) ? R.productState.allListings : [];
     listings.forEach(function (l) {
@@ -336,7 +336,7 @@
     return {
       mkt: 'hepsiburada', pageType: 'product', parserVersion: VERSION,
       product: {
-        id: String(p.sku),
+        id: String(p.productId || p.sku),
         title: p.name || '',
         brand: p.brand || null,
         url: url.split('?')[0],
@@ -347,44 +347,74 @@
         reviewCount: null,
         sellerId: merchant.id || p.merchantId ? String(merchant.id || p.merchantId) : null,
         sellerName: merchant.name || p.merchantName || null,
-        sellerScore: typeof merchant.lifetimeRating === 'number' ? merchant.lifetimeRating : null,
+        sellerScore: (merchant.lifetimeRating > 0 ? merchant.lifetimeRating : null),
         otherSellerCount: listings.length ? listings.length : (p.hasMoreListings === false ? 0 : null),
         offers: offers,
       },
-      store: merchant.id ? { sellerId: String(merchant.id), name: merchant.name || null, score: typeof merchant.lifetimeRating === 'number' ? merchant.lifetimeRating : null, followers: null } : null,
+      store: merchant.id ? { sellerId: String(merchant.id), name: merchant.name || null, score: (merchant.lifetimeRating > 0 ? merchant.lifetimeRating : null), followers: null } : null,
     };
   }
 
-  /** Search / category page. Field names follow the reduxStore searchState; unknown shapes yield no items. */
+  /** The JSON object starting at the first "{" after `from` (string-aware brace matching). */
+  function balancedJson(s, from) {
+    var i = s.indexOf('{', from);
+    if (i < 0) return null;
+    var depth = 0, inStr = false, esc = false;
+    for (var j = i; j < s.length; j++) {
+      var c = s[j];
+      if (inStr) { if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') inStr = false; continue; }
+      if (c === '"') inStr = true;
+      else if (c === '{') depth++;
+      else if (c === '}') { depth--; if (depth === 0) { try { return JSON.parse(s.slice(i, j + 1)); } catch (_) { return null; } } }
+    }
+    return null;
+  }
+
+  /** Hepsiburada search state: `window.MORIA.PRODUCTLIST = Object.assign(…, { '<id>': { 'STATE': {json} } })`. */
+  function hbProductList(doc) {
+    var scripts = doc.querySelectorAll('script');
+    for (var i = 0; i < scripts.length; i++) {
+      var txt = scripts[i].textContent || '';
+      if (txt.indexOf('window.MORIA.PRODUCTLIST') === -1) continue;
+      var at = txt.indexOf("'STATE':");
+      if (at === -1) at = txt.indexOf('"STATE":');
+      var o = at === -1 ? null : balancedJson(txt, at);
+      if (o && o.data && Array.isArray(o.data.products)) return o.data;
+    }
+    return null;
+  }
+
+  /** Search / category page (MORIA.PRODUCTLIST state, read 2026-10-18). */
   function hepsiburadaSearch(doc, url) {
-    var R = hbRedux(doc);
-    var ss = R && R.searchState;
+    var D = hbProductList(doc);
     var u = new URL(url);
     var q = (u.searchParams.get('q') || '').trim();
-    var arr = ss && Array.isArray(ss.searchProductArray) ? ss.searchProductArray : [];
     var items = [];
     var seen = {};
-    arr.forEach(function (p) {
-      var v = first(p && p.variantList) || p || {};
-      var sku = v.sku || p.sku || v.productId || p.productId;
+    (D ? D.products : []).forEach(function (p) {
+      var v = first(p && p.variantList) || {};
+      // Cards link the product id (…-pm-HBC…); a product page URL may carry the variant sku (…-p-HBCV…).
+      var sku = p.productId || v.sku;
       if (!sku || seen[sku]) return;
       seen[sku] = 1;
-      var listing = v.listing || first(v.listings) || {};
-      var rev = v.customerReviewCount != null ? v.customerReviewCount : p.customerReviewCount;
-      var score = v.customerReviewRating != null ? v.customerReviewRating : p.customerReviewRating;
-      var img = first(v.images) || first(p.images);
+      var l = v.listing || {};
+      var pi = l.priceInfo || {};
+      var img = first(v.images);
+      var link = img && typeof img === 'object' ? img.link : typeof img === 'string' ? img : null;
       items.push({
         id: String(sku),
-        title: v.name || p.name || '',
-        url: v.url || p.url ? absUrl(v.url || p.url, HB_BASE) : null,
-        thumbUrl: img && typeof img === 'object' ? (img.link || img.url || '').replace('{size}', '300') || null : (typeof img === 'string' ? img : null),
-        price: hbPrice(listing) != null ? hbPrice(listing) : hbPrice(v),
-        brand: v.brand || p.brand || null,
-        sellerId: listing.merchantId ? String(listing.merchantId) : null,
-        rating: typeof score === 'number' ? score : null,
-        ratingCount: typeof rev === 'number' ? rev : null,
-        sponsored: !!(p.isAdProduct || v.isAdProduct || p.isSponsored),
-        category: null,
+        altId: v.sku && v.sku !== sku ? String(v.sku) : null,
+        title: v.name || '',
+        url: v.url ? absUrl(v.url, HB_BASE) : null,
+        thumbUrl: link ? String(link).replace('{size}', '300') : null,
+        price: typeof pi.price === 'number' ? pi.price : null,
+        brand: p.brand || null,
+        sellerId: l.merchantId ? String(l.merchantId) : (v.merchantId ? String(v.merchantId) : null),
+        rating: typeof p.customerReviewScore === 'number' ? p.customerReviewScore : null,
+        ratingCount: typeof p.customerReviewCount === 'number' ? p.customerReviewCount : null,
+        sponsored: !!(v.isPromoted || (v.adInfo && Object.keys(v.adInfo).length)),
+        category: p.mainCategory && p.mainCategory.name ? p.mainCategory.name : null,
+        categoryId: p.mainCategory && p.mainCategory.id != null ? String(p.mainCategory.id) : null,
       });
     });
     var cm = u.pathname.match(/-c-(\d+)$/);
@@ -392,8 +422,8 @@
       mkt: 'hepsiburada', pageType: 'search', parserVersion: VERSION,
       query: q || null,
       categoryId: q ? null : (cm ? 'c' + cm[1] : u.pathname.slice(0, 30)),
-      page: Math.max(1, Number(u.searchParams.get('sayfa')) || 1),
-      total: ss && typeof ss.totalSearchProductCount === 'number' ? ss.totalSearchProductCount : null,
+      page: D && typeof D.currentPage === 'number' ? D.currentPage : Math.max(1, Number(u.searchParams.get('sayfa')) || 1),
+      total: D && typeof D.totalProductCount === 'number' ? D.totalProductCount : null,
       items: items,
     };
   }

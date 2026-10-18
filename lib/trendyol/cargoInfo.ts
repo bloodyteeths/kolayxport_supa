@@ -21,7 +21,9 @@ export function trendyolCargoInfo(raw: Record<string, any> | null | undefined): 
   const r = raw || {};
   const cargoNumber = r.cargoTrackingNumber != null && String(r.cargoTrackingNumber).trim() ? String(r.cargoTrackingNumber).trim() : null;
   const carrier = typeof r.cargoProviderName === 'string' && r.cargoProviderName.trim() ? r.cargoProviderName.trim() : null;
-  const packageStatus = String(r.shipmentPackageStatus || r.status || '') || null;
+  // `status` is the package status of Trendyol's flow (Created → Picking → Invoiced → Shipped). `shipmentPackageStatus`
+  // is a separate shipping field ("ReadyToShip" while the package is still Created), so it is only a fallback.
+  const packageStatus = String(r.status || r.shipmentPackageStatus || '') || null;
   // whoPays 1 = Trendyol-paid cargo (the common-label process); absent → let Trendyol decide (404 falls back to PDF).
   const trendyolPays = r.whoPays === undefined || r.whoPays === null || Number(r.whoPays) === 1;
   const s = (packageStatus || '').toLowerCase();

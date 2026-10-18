@@ -1,0 +1,28 @@
+{
+  "tr": {
+    "name": "KolayXport",
+    "subtitle": "Etsy, eBay siparişi ve kargo",
+    "promotionalText": "Yurt dışına satış yapan satıcılar için siparişler, ilanlar, kargo etiketleri ve yapay zekâ araçları tek uygulamada.",
+    "keywords": "etsy,ebay,amazon,trendyol,sipariş,kargo,etiket,etgb,ilan,satıcı,ihracat,stok,shopify,yapay zeka",
+    "description": "KolayXport, yurt dışına satış yapan satıcılar için siparişleri, ilanları ve kargoyu tek bir panelde toplar. Etsy, eBay, Amazon, Trendyol, Shopify ve Wix mağazalarınızı bağlayın; işinizi telefonunuzdan takip edin.\n\nSİPARİŞLER\n• Tüm pazaryerlerinden gelen siparişleri tek listede görün\n• Gönderilmeyi bekleyenleri, gecikenleri ve iadeleri hemen fark edin\n• Alıcı, ürün ve kargo bilgilerine tek dokunuşla ulaşın\n\nKARGO ETİKETİ VE ETGB\n• FedEx, UPS ve diğer anlaşmalı firmalarla etiket oluşturun\n• Takip numaralarını pazaryerine gönderin\n• Gümrük beyanı (ETGB) bilgilerini siparişten hazırlayın\n\nİLAN YÖNETİMİ\n• Etsy ve eBay ilanlarınızı düzenleyin: başlık, açıklama, etiket, fiyat, stok, varyasyon ve fotoğraflar\n• Değişiklikler önce taslak olarak kaydedilir, siz onaylayınca pazaryerine gönderilir\n• Toplu düzenleme ile çok sayıda ilanı birlikte güncelleyin\n\nYAPAY ZEKÂ YARDIMI\n• Başlık, etiket ve açıklama önerileri\n• Ürün fotoğraflarınızdan yeni görseller ve tanıtım videoları\n• Müşteri mesajlarına yanıt taslakları\nYapay zekâ çıktıları her zaman öneridir; siz onaylamadan hiçbir şey yayına girmez.\n\nARAŞTIRMA VE RAPORLAR\n• Anahtar kelime ve ürün araştırması\n• Pazaryeri bazında satış, kâr ve masraf raporları\n• Stok senkronu ile aynı ürünün farklı mağazalardaki stoğunu eşitleyin\n\nMESAJLAR\n• Wix ve Trendyol müşteri mesajlarını sipariş bilgisiyle birlikte tek kutuda yanıtlayın\n\nKolayXport hesabınızla giriş yapın veya uygulamadan yeni hesap oluşturun. Türkçe ve İngilizce kullanılabilir.\n\nDestek: destek@kolayxport.com",
+    "whatsNew": "KolayXport iPhone uygulamasının ilk sürümü."
+  },
+  "en": {
+    "name": "KolayXport",
+    "subtitle": "Etsy & eBay orders, shipping",
+    "promotionalText": "Orders, listings, shipping labels and AI tools for sellers who sell across borders, in one app.",
+    "keywords": "etsy,ebay,amazon,seller,orders,shipping,labels,listings,inventory,shopify,ecommerce,ai,export",
+    "description": "KolayXport brings orders, listings and shipping together in one place for sellers who sell across borders. Connect your Etsy, eBay, Amazon, Trendyol, Shopify and Wix stores and run your business from your phone.\n\nORDERS\n• See orders from every marketplace in one list\n• Spot what needs shipping, what is late and what came back\n• Buyer, item and shipping details one tap away\n\nSHIPPING LABELS\n• Create labels with FedEx, UPS and other connected carriers\n• Send tracking numbers back to the marketplace\n• Prepare Turkish e-export customs (ETGB) details from the order\n\nLISTINGS\n• Edit your Etsy and eBay listings: title, description, tags, price, stock, variations and photos\n• Changes are saved as drafts first and only go to the marketplace when you approve them\n• Bulk edit many listings at once\n\nAI ASSISTANCE\n• Title, tag and description suggestions\n• New product images and short promo videos from your own photos\n• Reply drafts for customer messages\nAI output is always a suggestion; nothing goes live until you approve it.\n\nRESEARCH AND REPORTS\n• Keyword and product research\n• Sales, profit and cost reports per marketplace\n• Stock sync keeps the same product's stock in line across your stores\n\nMESSAGES\n• Answer Wix and Trendyol customer messages in one inbox, with the order beside them\n\nSign in with your KolayXport account or create a new one in the app. Available in English and Turkish.\n\nSupport: destek@kolayxport.com",
+    "whatsNew": "First release of the KolayXport iPhone app."
+  },
+  "urls": {
+    "support": "https://kolayxport.com/iletisim",
+    "marketing": "https://kolayxport.com",
+    "privacy": "https://kolayxport.com/gizlilik-politikasi"
+  },
+  "category": {
+    "primary": "Business",
+    "secondary": "Productivity"
+  },
+  "ageRating": "4+"
+}

@@ -36,6 +36,11 @@ import { scoreTrendyolProduct, trendyolChecks, trendyolRequiredMissing } from '@
 import { TITLE_MAX } from '@/lib/catalogDrafts/schemas';
 import { mergeMessages } from './h-messages';
 import { M6BE_EN, M6BE_TR } from './m6b-e-messages';
+// AI credit costs are hidden for Shopify-connected accounts (useAiCostsVisible reads the credit balance). Shown here,
+// without the balance request, unless a test switches them off.
+const aiCosts = vi.hoisted(() => ({ visible: true }));
+vi.mock('@/components/domain/credits/useCredits', async (orig) => ({ ...(await orig<Record<string, unknown>>()), useAiCostsVisible: () => aiCosts.visible }));
+
 
 type Locale = 'en' | 'tr';
 const MESSAGES = { en: mergeMessages(en, M6BE_EN), tr: mergeMessages(tr, M6BE_TR) };

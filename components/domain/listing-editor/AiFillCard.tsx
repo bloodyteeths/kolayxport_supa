@@ -24,6 +24,7 @@ import { FieldSuggestion } from '@/components/ds/inputs/FieldSuggestion';
 import { useFormatters } from '@/lib/format';
 import { icons } from '@/lib/ds/icons';
 import { neutral, accent, tone, radius } from '@/lib/ds/tokens';
+import { useAiCostsVisible } from '@/components/domain/credits/useCredits';
 import { FILL_KEYS, FILL_LABEL_KEY, fillCredits, ownImageUrls, type AiCategory, type AiPriceBand, type FillKey, type UseListingAI } from './useListingAI';
 
 export const SEED_MAX = 120;
@@ -65,7 +66,9 @@ export function AiFillCard({ ai, photoUrls, onApplyProfile, onCopyExisting, inli
   const seedOk = seed.trim().length >= 3;
   const canRun = canReadPhotos || seedOk;
   const mp = isEbay ? 'eBay' : 'Etsy';
-  const costLabel = t('ai.cost', { count: fillCredits(ai.marketplace, canReadPhotos) });
+  // No credit costs for Shopify-connected accounts (App Store 1.2.1).
+  const showCosts = useAiCostsVisible();
+  const costLabel = showCosts ? t('ai.cost', { count: fillCredits(ai.marketplace, canReadPhotos) }) : '';
   const shownHere: readonly FillKey[] = inlineKeys ?? (isEbay ? FILL_KEYS : []);
 
   /** Display value of a proposal (the field gets the raw value on Use). */
@@ -152,12 +155,12 @@ export function AiFillCard({ ai, photoUrls, onApplyProfile, onCopyExisting, inli
           loadingLabel={t('ai.writing')}
           disabled={!canRun || btn.disabled}
           disabledReason={btn.disabled ? btn.disabledReason : readsPhotos ? t('start.needSeedOrPhoto') : t('start.needSeed')}
-          aria-label={`${canReadPhotos ? t('ai.fillFromPhotos') : t('ai.fillWithAi')} · ${costLabel}`}
+          aria-label={[canReadPhotos ? t('ai.fillFromPhotos') : t('ai.fillWithAi'), costLabel].filter(Boolean).join(' · ')}
           data-testid="le-ai-fill-run"
         >
           {canReadPhotos ? t('ai.fillFromPhotos') : t('ai.fillWithAi')}
         </Button>
-        <Box component="span" sx={{ fontSize: 12, lineHeight: '16px', color: neutral[500] }} data-testid="le-ai-fill-cost">{costLabel}</Box>
+        {costLabel ? <Box component="span" sx={{ fontSize: 12, lineHeight: '16px', color: neutral[500] }} data-testid="le-ai-fill-cost">{costLabel}</Box> : null}
         {ready > 0 && !running ? (
           <Button variant="secondary" size="md" onClick={() => ai.applyAll()} data-testid="le-ai-fill-use-all">
             {t('ai.useAllCount', { count: ready })}

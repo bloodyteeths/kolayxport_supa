@@ -23,6 +23,11 @@ import { ProfilesModal, PROFILE_STORAGE_KEY } from '@/components/domain/listing-
 import { ScheduleModal } from '@/components/domain/listing-editor/ScheduleModal';
 import { H_EN, H_TR, mergeMessages } from './h-messages';
 import { ETSY_PORT_EN, ETSY_PORT_TR } from '../listings/etsy-port-messages';
+// AI credit costs are hidden for Shopify-connected accounts (useAiCostsVisible reads the credit balance). Shown here,
+// without the balance request, unless a test switches them off.
+const aiCosts = vi.hoisted(() => ({ visible: true }));
+vi.mock('@/components/domain/credits/useCredits', async (orig) => ({ ...(await orig<Record<string, unknown>>()), useAiCostsVisible: () => aiCosts.visible }));
+
 
 type Locale = 'en' | 'tr';
 // + the listings-etsy port keys (profile delete) until messages/*.json are merged.
@@ -303,6 +308,16 @@ function EbayFillHarness({ setField }: { setField: (k: string, v: unknown) => vo
 }
 
 describe.each<Locale>(['en', 'tr'])('AiFillCard eBay (%s)', (locale) => {
+  it('Shopify-connected accounts see no credit cost (App Store 1.2.1)', () => {
+    aiCosts.visible = false;
+    try {
+      wrap(<EbayFillHarness setField={vi.fn()} />, locale);
+      expect(screen.queryByTestId('le-ai-fill-cost')).toBeNull();
+      expect(screen.getByTestId('le-ai-fill-run').getAttribute('aria-label') ?? '').not.toMatch(/credit|kredi/i);
+    } finally {
+      aiCosts.visible = true;
+    }
+  });
   it('shows every proposal (no eBay section renders the frame\'s) and the real cost before Use all', async () => {
     route = (c) => {
       if (c.url.startsWith('/api/clawd/ebay-research')) return { json: {} };

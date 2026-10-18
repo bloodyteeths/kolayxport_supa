@@ -21,6 +21,7 @@
 // lib/etsy/seoRules; HTML entities are decoded on the way in (decodeEntities) so "one&#39;s" never reaches a field
 // and is never sent back. Listing content stays English (P5); only the one-line rationale follows the UI locale
 // (the Etsy title API writes its explanation in Turkish, so it is shown only in TR).
+import { useAiCostsVisible } from '@/components/domain/credits/useCredits';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import {
@@ -847,6 +848,8 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
   const t = useTranslations();
   const locale = useLocale();
   const toast = useToast();
+  // No "· N kredi" on AI buttons for Shopify-connected accounts (App Store 1.2.1).
+  const showCosts = useAiCostsVisible();
 
   const opts = useRef(options);
   opts.current = options;
@@ -1771,7 +1774,7 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
       rationale: p.rationale,
       loading: p.status === 'loading',
       error: p.status === 'error' ? p.error ?? true : undefined,
-      credits: creditsFor(key),
+      credits: showCosts ? creditsFor(key) : undefined,
       useLabel: o?.useLabel,
       onUse: () => {
         if (o?.onUse) {
@@ -1788,7 +1791,7 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
       ...(p.limited || key === 'price' || key === 'category' || key === 'condition' ? {} : { onRefine: (i: string) => refine(key, i), refineChips: refineChipsFor(key) }),
       'data-testid': `ai-suggestion-${key.replace(':', '-')}`,
     };
-  }, [proposals, marketplace, dismiss, apply, acceptAllAttributes, retryFor, refine, refineChipsFor]);
+  }, [proposals, marketplace, dismiss, apply, acceptAllAttributes, retryFor, refine, refineChipsFor, showCosts]);
 
   const tagSuggestionProps = useCallback(() => {
     const p = proposals.tags;
@@ -1804,10 +1807,10 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
       loadingLabel: t('listingEditor.ai.writing'),
       disabled: limitReached,
       disabledReason: limitedReason,
-      costLabel: t('listingEditor.ai.cost', { count: creditsFor(key, { marketplace }) }),
+      costLabel: showCosts ? t('listingEditor.ai.cost', { count: creditsFor(key, { marketplace }) }) : '',
       supported: aiSupports(marketplace, key === 'fill' ? 'fill' : key),
     };
-  }, [isBusy, limitReached, t, marketplace]);
+  }, [isBusy, limitReached, t, marketplace, showCosts]);
 
   const fieldState = useCallback(<V,>(key: 'title' | 'description' | 'tags'): FieldAiState<V> => {
     const p = proposals[key];
@@ -1822,10 +1825,10 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
       basis: p?.basis,
       rationale: p?.rationale,
       dismiss: () => dismiss(key),
-      credits: creditsFor(key),
+      credits: showCosts ? creditsFor(key) : undefined,
       ...(limited ? {} : { refine: (i: string) => refine(key, i), refineChips: refineChipsFor(key) }),
     };
-  }, [proposals, suggestTitle, writeDescription, getTagIdeas, dismiss, limitReached]);
+  }, [proposals, suggestTitle, writeDescription, getTagIdeas, dismiss, limitReached, showCosts]);
 
   const priceSectionProps = useCallback(() => {
     const p = proposals.price;
@@ -1854,9 +1857,9 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
       basis: p?.basis,
       rationale: p?.rationale,
       dismiss: () => dismiss('attributes'),
-      credits: creditsFor('attributes'),
+      credits: showCosts ? creditsFor('attributes') : undefined,
     };
-  }, [proposals, limitReached, currentAttributes, supports, suggestAttributes, dismiss]);
+  }, [proposals, limitReached, currentAttributes, supports, suggestAttributes, dismiss, showCosts]);
 
   const get = useCallback(<T,>(key: AiKey): AiProposal<T> => (proposals[key] as AiProposal<T> | undefined) ?? { status: 'idle' }, [proposals]);
 

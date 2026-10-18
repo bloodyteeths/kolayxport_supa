@@ -28,6 +28,11 @@ import { FormatProvider } from '@/lib/format';
 import { m1dMessages } from '../ds/m1d-render';
 import { m7aEn } from '../ds/m7a-messages';
 import { D_EN, D_TR, flatKeys, mergeMessages } from './d-messages';
+// AI credit costs are hidden for Shopify-connected accounts (useAiCostsVisible reads the credit balance). Shown here,
+// without the balance request, unless a test switches them off.
+const aiCosts = vi.hoisted(() => ({ visible: true }));
+vi.mock('@/components/domain/credits/useCredits', async (orig) => ({ ...(await orig<Record<string, unknown>>()), useAiCostsVisible: () => aiCosts.visible }));
+
 
 type Locale = 'en' | 'tr';
 const MESSAGES = { en: mergeMessages(en, D_EN), tr: mergeMessages(tr, D_TR) };

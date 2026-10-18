@@ -804,7 +804,7 @@ export function BulkEditPage({ marketplace, transport: injectedTransport, stagin
       const n = selectedRows.length;
       actions.push({
         id: 'improveWithAi',
-        label: `${ai.actionLabel} · ${ai.costLabel(n)}`,
+        label: [ai.actionLabel, ai.costLabel(n)].filter(Boolean).join(' · '),
         icon: icons.ai,
         disabled: ai.limited || ai.running,
         disabledReason: ai.limited ? ai.limitLabel ?? undefined : undefined,

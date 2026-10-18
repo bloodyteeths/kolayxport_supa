@@ -17,7 +17,16 @@ import { logger } from '../logger';
 
 const EBAY_MIN_INTERVAL_MS = 140; // ~7 QPS — eBay Browse app token ceiling; retries cover any 429 bursts
 let queueTail: Promise<unknown> = Promise.resolve();
-let lastCallAt = 0;
+/** Earliest start time of the next eBay request (shared by queued and concurrent calls). */
+let nextSlotAt = 0;
+
+/** Reserve the next start slot (one every EBAY_MIN_INTERVAL_MS) and wait for it. */
+async function waitForSlot(): Promise<void> {
+  const now = Date.now();
+  const at = Math.max(now, nextSlotAt);
+  nextSlotAt = at + EBAY_MIN_INTERVAL_MS;
+  if (at > now) await new Promise(r => setTimeout(r, at - now));
+}
 
 interface CallOptions {
   token: string;
@@ -25,6 +34,12 @@ interface CallOptions {
   options?: RequestInit;
   /** Max retry attempts for 429/5xx. Default 4. */
   maxRetries?: number;
+  /**
+   * Read-only calls that may overlap (e.g. the research overlay's per-item lookups): they skip
+   * the FIFO queue but still take a paced start slot, so the global start rate stays the same.
+   * Default false: the call waits for every earlier queued call to finish (writes keep their order).
+   */
+  concurrent?: boolean;
 }
 
 /**
@@ -69,13 +84,9 @@ function summarizeEbayError(body: string): string {
 
 export async function callEbayRateLimited<T = any>(
   url: string,
-  { token, marketplaceId, options = {}, maxRetries = 4 }: CallOptions
+  { token, marketplaceId, options = {}, maxRetries = 4, concurrent = false }: CallOptions
 ): Promise<T> {
   const run = async (): Promise<T> => {
-    // Global pacing
-    const waitMs = Math.max(0, lastCallAt + EBAY_MIN_INTERVAL_MS - Date.now());
-    if (waitMs > 0) await new Promise(r => setTimeout(r, waitMs));
-    lastCallAt = Date.now();
 
     const headers: Record<string, string> = {
       'Authorization': `Bearer ${token}`,
@@ -89,6 +100,8 @@ export async function callEbayRateLimited<T = any>(
 
     let lastErr: Error | null = null;
     for (let attempt = 0; attempt < maxRetries; attempt++) {
+      // Global pacing: one request start per slot, retries included.
+      await waitForSlot();
       const response = await fetch(url, { ...options, headers });
 
       if (response.ok) {
@@ -106,9 +119,10 @@ export async function callEbayRateLimited<T = any>(
         lastErr = err;
         const backoffMs = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s, 8s
         logger.warn(`[ebay] ${response.status} — retry in ${backoffMs}ms (attempt ${attempt + 1}/${maxRetries}) url=${url.substring(0, 120)}`);
+        // A 429 holds every caller (queued or concurrent) back for the backoff, like the old
+        // fully serial queue did; the retry then takes the next free slot.
+        if (response.status === 429) nextSlotAt = Math.max(nextSlotAt, Date.now() + backoffMs);
         await new Promise(r => setTimeout(r, backoffMs));
-        // Re-pace after sleep so other queued calls don't immediately retry hot
-        lastCallAt = Date.now();
         continue;
       }
 
@@ -117,6 +131,7 @@ export async function callEbayRateLimited<T = any>(
     throw lastErr || new Error('eBay API: exhausted retries');
   };
 
+  if (concurrent) return run();
   const next = queueTail.then(run, run);
   queueTail = next.catch(() => {});
   return next;

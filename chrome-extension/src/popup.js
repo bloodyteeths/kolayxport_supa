@@ -1,5 +1,5 @@
 /**
- * KolayXport Extension Popup v8.0 — Minimal, i18n
+ * KolayXport Extension Popup v9.10 — "Blade" brand, i18n
  */
 
 const $ = (id) => document.getElementById(id);
@@ -118,6 +118,8 @@ function refreshTexts() {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
+  // Shared overlay UI styles (lib/ui.js): the limit card and any .kx-ui element look the same as on the pages.
+  if (window.__KX_UI) window.__KX_UI.ensureStyles(document);
   const L = window.__KX_LANG;
   if (L && L.ready) await L.ready;
   applyI18n();
@@ -151,10 +153,17 @@ async function renderResearchQuota() {
     if (!q || typeof q.limit !== 'number') return;
     const expired = q.resetAt && Date.parse(q.resetAt) <= Date.now();
     $('researchCard').style.display = '';
+    const meter = $('researchMeter');
     if (q.limit > 0) {
-      $('researchUsage').textContent = t('researchUsage', expired ? 0 : Math.min(q.used, q.limit), q.limit);
+      const used = expired ? 0 : Math.min(q.used, q.limit);
+      $('researchUsage').textContent = t('researchUsage', used, q.limit);
+      if (meter) {
+        meter.style.width = Math.round((used / q.limit) * 100) + '%';
+        meter.classList.toggle('full', used >= q.limit);
+      }
     } else {
       $('researchUsage').style.display = 'none';
+      if (meter && meter.parentElement) meter.parentElement.style.display = 'none';
     }
     const box = $('researchLimit');
     if (q.reason && !expired && window.__KX_LIMIT) {
@@ -231,8 +240,8 @@ async function checkPendingTracking() {
     if (response?.success && response.count > 0) {
       $('trackingCard').style.display = '';
       $('pendingCount').textContent = String(response.count);
-      $('pendingCount').style.background = '#ff9800';
-      $('pendingCount').style.color = '#fff';
+      $('pendingCount').style.background = 'rgba(217,119,6,.12)';
+      $('pendingCount').style.color = '#b45309';
       $('pendingCount').style.padding = '2px 8px';
       $('pendingCount').style.borderRadius = '10px';
       $('pendingCount').style.fontSize = '12px';
@@ -253,8 +262,8 @@ function renderAddressPending(state) {
   if (!state || !state.count) {
     $('addressPendingLabel').textContent = t('addressesComplete');
     $('addressPendingCount').textContent = '✓';
-    $('addressPendingCount').style.background = '#4caf50';
-    $('addressPendingCount').style.color = '#fff';
+    $('addressPendingCount').style.background = 'rgba(22,163,74,.10)';
+    $('addressPendingCount').style.color = '#15803d';
     $('addressPendingCount').style.padding = '2px 8px';
     $('addressPendingCount').style.borderRadius = '10px';
     $('openNextAddress').style.display = 'none';
@@ -264,8 +273,8 @@ function renderAddressPending(state) {
   $('openNextAddress').style.display = '';
   $('addressPendingLabel').textContent = t('addressPending', state.count);
   $('addressPendingCount').textContent = String(state.count);
-  $('addressPendingCount').style.background = '#f44336';
-  $('addressPendingCount').style.color = '#fff';
+  $('addressPendingCount').style.background = 'rgba(220,38,38,.09)';
+  $('addressPendingCount').style.color = '#b91c1c';
   $('addressPendingCount').style.padding = '2px 8px';
   $('addressPendingCount').style.borderRadius = '10px';
   $('addressPendingCount').style.fontSize = '12px';

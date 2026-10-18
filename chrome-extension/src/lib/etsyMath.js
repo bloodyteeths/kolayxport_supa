@@ -220,7 +220,19 @@
     return n <= 3 ? 'low' : 'seller_set';
   }
 
+  /**
+   * A whole count as Etsy prints it ("1,234", "1.234", "12 345", "1,000+") -> 1234.
+   * Counts never have decimals, so every separator is a thousands separator.
+   */
+  function parseCount(raw) {
+    const digits = String(raw === null || raw === undefined ? '' : raw).replace(/[^\d]/g, '');
+    if (!digits || digits.length > 12) return null;
+    const n = parseInt(digits, 10);
+    return Number.isFinite(n) ? n : null;
+  }
+
   return {
+    parseCount,
     currencyFromSymbol, parseAmount, parseDisplayedPrice, pickCardPriceFromText,
     quantile, summarize, pageMarketSummary, priceVsMedian,
     shownSales, revenue, cardRevenue, quantitySignal,

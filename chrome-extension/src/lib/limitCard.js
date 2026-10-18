@@ -15,6 +15,8 @@
   'use strict';
 
   var UPGRADE_URL = 'https://kolayxport.com/plan';
+  // Brand text font (lib/ui.js registers it); system UI fonts until then. Never a serif.
+  var FONT = "'KX Instrument','Instrument Sans',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
   var SIGNUP_URL = 'https://kolayxport.com/login?utm_source=extension&utm_medium=limit';
   var REASONS = { user_daily: 1, global_brake: 1, signed_out: 1 };
 
@@ -115,14 +117,21 @@
     var reason = (info && info.reason) || 'user_daily';
     var card = node(doc, 'div', null,
       'all:initial;display:flex;align-items:center;gap:12px;flex-wrap:wrap;box-sizing:border-box;width:100%;' +
-      'background:#fff;color:#222;border:1px solid #e0d7f5;border-left:4px solid #764ba2;border-radius:8px;' +
-      'padding:10px 14px;font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;');
+      'background:#fff;color:#0B1220;border:1px solid rgba(11,18,32,.12);border-left:4px solid #2F5BFF;border-radius:12px;' +
+      'padding:10px 14px;font:13px/1.45 ' + FONT + ';');
     card.className = 'kx-limit-card';
     card.setAttribute('data-kx-limit', reason);
     card.setAttribute('role', 'status');
 
-    card.appendChild(node(doc, 'span', 'KX',
-      'font-size:10px;font-weight:800;background:#764ba2;color:#fff;padding:2px 6px;border-radius:4px;'));
+    var UI = typeof window !== 'undefined' && window.__KX_UI;
+    if (UI && UI.mark) {
+      var m = UI.mark(doc, false);
+      m.style.cssText = 'display:inline-flex;flex:0 0 auto;width:22px;height:20px;line-height:0;';
+      card.appendChild(m);
+    } else {
+      card.appendChild(node(doc, 'span', 'KX',
+        'font-size:10px;font-weight:800;background:#0B1220;color:#fff;padding:2px 6px;border-radius:4px;'));
+    }
 
     var text = node(doc, 'div', null, 'display:flex;flex-direction:column;flex:1 1 220px;min-width:0;');
     var title;
@@ -141,11 +150,11 @@
       // upgradeUrl: null = no upgrade offer (Shopify-connected accounts): neutral "resets tomorrow" only.
       button = info && info.upgradeUrl === null ? null : t('upgrade');
     }
-    var titleEl = node(doc, 'span', title, 'font-weight:700;color:#222;');
+    var titleEl = node(doc, 'span', title, 'font-weight:700;color:#0B1220;');
     titleEl.className = 'kx-limit-title';
     text.appendChild(titleEl);
     if (sub) {
-      var subEl = node(doc, 'span', sub, 'font-size:12px;color:#666;');
+      var subEl = node(doc, 'span', sub, 'font-size:12px;color:#3A465A;');
       subEl.className = 'kx-limit-sub';
       text.appendChild(subEl);
     }
@@ -153,10 +162,13 @@
 
     if (button) {
       var btn = node(doc, 'button', button,
-        'all:initial;cursor:pointer;font:600 12px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;' +
-        'color:#fff;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:7px 14px;border-radius:6px;');
+        'all:initial;cursor:pointer;font:600 12px ' + FONT + ';' +
+        'color:#fff;background:#2F5BFF;padding:7px 14px;border-radius:999px;');
       btn.className = 'kx-limit-upgrade';
       btn.type = 'button';
+      // all:initial drops the browser focus ring: draw our own for keyboard users.
+      btn.addEventListener('focus', function () { btn.style.outline = '2px solid #0B1220'; btn.style.outlineOffset = '2px'; });
+      btn.addEventListener('blur', function () { btn.style.outline = 'none'; });
       var url = safeUrl(info);
       btn.addEventListener('click', function (e) {
         if (e) { e.preventDefault(); e.stopPropagation(); }
@@ -173,6 +185,8 @@
     if (!container) return null;
     var card = buildCard(info, Object.assign({ document: container.ownerDocument || document }, opts || {}));
     container.textContent = '';
+    // Lets a dark top bar (lib/ui.js) drop its own background behind the white card.
+    try { container.setAttribute('data-kx-limited', (info && info.reason) || 'user_daily'); } catch (_) { /* ignore */ }
     container.appendChild(card);
     return card;
   }

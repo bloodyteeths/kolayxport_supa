@@ -4,19 +4,26 @@
  */
 
 
-// Safe wrapper for chrome.runtime.sendMessage — handles "context invalidated"
+// Safe wrapper for chrome.runtime.sendMessage. After the extension is reloaded or updated, tabs that were
+// already open keep running this old script with no extension behind it ("context invalidated"). That is
+// expected, so it stops quietly instead of logging: Chrome lists every console warning as an extension error.
+var kxContextGone = false;
+function contextAlive() {
+  try { return !kxContextGone && !!(chrome.runtime && chrome.runtime.id); } catch (_) { return false; }
+}
+function retire() {
+  kxContextGone = true;
+  document.removeEventListener('visibilitychange', onVisible);
+}
 function safeSendMessage(msg) {
+  if (!contextAlive()) { retire(); return Promise.resolve(null); }
   try {
-    if (!chrome.runtime?.id) {
-      console.warn('[KX] Extension context invalidated, cannot send message');
-      return Promise.resolve(null);
-    }
-    return chrome.runtime.sendMessage(msg).catch(function(e) {
-      console.warn('[KX] sendMessage failed:', e.message);
+    return chrome.runtime.sendMessage(msg).catch(function () {
+      if (!contextAlive()) retire();
       return null;
     });
-  } catch (e) {
-    console.warn('[KX] sendMessage error:', e.message);
+  } catch (_) {
+    retire();
     return Promise.resolve(null);
   }
 }
@@ -35,6 +42,7 @@ function pageLocale() {
 // and hand it to the background worker. Resolves to { token, expiresIn, expiresAt, user } or null.
 // user.locale = the account language (server), else the app's UI language on this browser.
 async function fetchAuthToken() {
+  if (!contextAlive()) return null;
   try {
     var response = await fetch('/api/auth/extension', {
       method: 'GET',
@@ -60,7 +68,7 @@ async function fetchAuthToken() {
     }
     return null;
   } catch (error) {
-    console.warn('[KX] Failed to fetch auth token');
+    // Network hiccup or signed out: the next visit or focus retries.
     return null;
   }
 }
@@ -86,8 +94,7 @@ safeSendMessage({ action: 'contentScriptReady', url: window.location.href });
 fetchAuthToken();
 
 // Re-fetch token when page gains focus (user might have just logged in)
-document.addEventListener('visibilitychange', function() {
-  if (document.visibilityState === 'visible') {
-    fetchAuthToken();
-  }
-});
+function onVisible() {
+  if (document.visibilityState === 'visible' && contextAlive()) fetchAuthToken();
+}
+document.addEventListener('visibilitychange', onVisible);

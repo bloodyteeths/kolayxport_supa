@@ -45,9 +45,10 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Per-card row
+  // Per-card strip (same component as Etsy / eBay). At most three figures on its face:
+  // sales, revenue, ratings. Rating, BSR, offers and the ASIN are in the "i".
   // ---------------------------------------------------------------------------
-  function salesHtml(data, mkt, sp) {
+  function salesParts(data, mkt, sp) {
     const fig = M.pickSalesFigure({
       bought: data.bought,
       price: data.price,
@@ -56,40 +57,44 @@
       marketplace: mkt,
     });
     if (fig.kind === 'amazon') {
-      const rev = fig.revenueFloor
-        ? `<span class="kx-sep">|</span><span class="kx-green" title="${esc(t('revFloorTip', { label: fig.label }))}">≥${esc(money(fig.revenueFloor, data.currency, true))}${esc(t('perMonth'))}</span>`
-        : '';
-      return `<span class="kx-green" title="${esc(t('amazonFigTip', { label: fig.label }))}">${esc(t('amazonFig', { label: fig.label }))}</span>${rev}`;
+      const html = [`<span class="kx-green kx-strong">${esc(t('amazonFig', { label: fig.label }))}</span>`];
+      if (fig.revenueFloor) html.push(`<span>≥${esc(money(fig.revenueFloor, data.currency, true))}${esc(t('perMonth'))}</span>`);
+      const formula = [t('amazonFigTip', { label: fig.label }), fig.revenueFloor ? t('revFloorTip', { label: fig.label }) : ''].filter(Boolean).join(' ');
+      return { html, plain: t('plainAmazonFig'), formula, source: ['amazonFigure', 'amazonPage'], confidence: 'high' };
     }
     if (fig.kind === 'estimate') {
       const band = `${compact(fig.low)}–${compact(fig.high)}`;
       const cal = fig.calibrated ? '' : t('uncalibrated');
       const tip = t('estTip', { bsr: int(fig.bsr), cat: sp.bsrCategory || t('itsCategory'), curve: fig.curve, band }) + cal;
-      const rev = fig.revenue
-        ? `<span class="kx-sep">|</span><span class="kx-orange" title="${esc(tip)}">${esc(t('estRev', { money: money(fig.revenue, data.currency, true) }))}</span>`
-        : '';
-      return `<span class="kx-orange" title="${esc(tip)}">${esc(t('estUnits', { n: compact(fig.units) }))}</span>${rev}`;
+      const html = [`<span class="kx-strong">${esc(t('estUnits', { n: compact(fig.units) }))}</span> <span class="kx-est" data-kx-est="1">${esc(t('est'))}</span>`];
+      if (fig.revenue) html.push(`<span>${esc(t('estRev', { money: money(fig.revenue, data.currency, true) }))}</span>`);
+      return { html, plain: t('plainEstimate'), formula: tip, source: ['amazonApi', 'model'], confidence: 'low' };
     }
-    return `<span class="kx-muted" title="${esc(t('noSalesTip'))}">${esc(t('noSales'))}</span>`;
+    return { html: [`<span class="kx-muted">${esc(t('noSales'))}</span>`], plain: t('plainNoSales'), formula: t('noSalesTip'), source: ['amazonPage'], confidence: null };
   }
 
   function renderCardRow(card, data, mkt) {
+    const U = shared.UI;
     const sp = spItem(data.asin);
     const sig = `${shared.lang}|${data.asin}|${sp ? 1 : 0}|${data.reviews}|${data.price}|${data.bought ? data.bought.min : ''}`;
     let row = card.querySelector(`.${KX_AMZ_PREFIX}-row`);
     if (row && row.getAttribute('data-kx-sig') === sig) return;
 
-    const parts = [
-      '<span class="kx-amz-badge">KX</span>',
-      data.sponsored ? `<span class="kx-tag" title="${esc(t('adTip'))}">${esc(t('ad'))}</span>` : '',
-      salesHtml(data, mkt, sp),
-      data.reviews != null ? `<span class="kx-sep">|</span><span>${esc(t('ratings', { n: compact(data.reviews) }))}</span>` : '',
-      data.rating != null ? `<span class="kx-sep">|</span><span>★ ${esc(shared.formatRating(data.rating))}</span>` : '',
-      sp && sp.bsr ? `<span class="kx-sep">|</span><span title="${esc(t('bsrTip'))}">BSR #${esc(int(sp.bsr))}</span>` : '',
-      sp && sp.offerCountAny != null ? `<span class="kx-sep">|</span><span title="${esc(t('offersTip'))}">${esc(t('offers', { n: int(sp.offerCountAny) }))}</span>` : '',
-      `<span class="kx-sep">|</span><span class="kx-muted">${esc(data.asin)}</span>`,
-      `<button class="kx-ai-btn" data-asin="${esc(data.asin)}" title="${esc(t('aiTip'))}">AI</button>`,
-    ];
+    const sales = salesParts(data, mkt, sp);
+    const items = sales.html.slice(0, 2);
+    if (data.reviews != null) items.push(`<span>${esc(t('ratings', { n: compact(data.reviews) }))}</span>`);
+    const notes = [sales.formula];
+    if (data.reviews != null) notes.push(t('cardRatingsNote', { n: int(data.reviews) }));
+    if (data.rating != null) notes.push(t('cardRatingNote', { r: shared.formatRating(data.rating) }));
+    if (sp && sp.bsr) notes.push(t('cardBsrNote', { n: int(sp.bsr) }));
+    if (sp && sp.offerCountAny != null) notes.push(t('cardOffersNote', { n: int(sp.offerCountAny) }));
+    notes.push(t('cardAsinNote', { asin: data.asin }));
+
+    const html = U.markHtml(false) +
+      (data.sponsored ? `<span class="kx-tag" title="${esc(t('adTip'))}">${esc(t('ad'))}</span>` : '') +
+      items.slice(0, 3).join('<span class="kx-sep">·</span>') +
+      U.infoHtml({ label: t('sales'), plain: sales.plain, formula: notes.filter(Boolean).join(' '), source: sales.source, confidence: sales.confidence }) +
+      `<button type="button" class="kx-ai-btn" data-asin="${esc(data.asin)}" title="${esc(t('aiTip'))}">AI</button>`;
 
     if (!row) {
       row = document.createElement('div');
@@ -97,8 +102,10 @@
       const insertTarget = card.querySelector('.a-section.a-spacing-small') || card;
       insertTarget.appendChild(row);
     }
+    U.strip(row);
+    row.lang = shared.lang;
     row.setAttribute('data-kx-sig', sig);
-    row.innerHTML = parts.join('');
+    row.innerHTML = html;
     row.querySelector('.kx-ai-btn')?.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -107,9 +114,12 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Summary bar
+  // Summary bar: the same ink top bar as Etsy / eBay.
+  // Compact: on this page, typical price, price range, typical review count, competition.
+  // "More": top-10 review count, average rating, ads, snapshot, "bought" note, source note.
   // ---------------------------------------------------------------------------
   function renderSummaryBar(parsed) {
+    const U = shared.UI;
     const resultsContainer = document.querySelector('.s-main-slot') ||
       document.querySelector('[data-component-type="s-search-result"]')?.parentElement;
     if (!resultsContainer) return;
@@ -124,7 +134,7 @@
     if (spApi && spApi.reason === 'research_limit' && spApi.limit) {
       const card = existing || document.createElement('div');
       card.id = `${KX_AMZ_PREFIX}-summary`;
-      card.className = 'kx-stats-bar';
+      card.className = 'kx-stats-bar kx-ui kx-topbar';
       shared.showLimitCard(card, spApi, 'amazon_search');
       if (!existing) resultsContainer.parentElement?.insertBefore(card, resultsContainer);
       return;
@@ -156,7 +166,6 @@
       offerCounts,
     });
     const s = comp.signals;
-    const compColor = comp.level === 'Low' ? 'kx-green' : comp.level === 'Medium' ? 'kx-orange' : comp.level === 'High' ? 'kx-red' : 'kx-muted';
     const pct = (v) => (v == null ? '—' : (shared.lang === 'tr' ? `%${Math.round(v * 100)}` : `${Math.round(v * 100)}%`));
     const totalText = total ? (total.isLowerBound ? t('overN', { n: int(total.total) }) : int(total.total)) : null;
     const compTip = [
@@ -172,56 +181,64 @@
     const boughtFloor = withBadge.reduce((sum, p) => sum + p.bought.min, 0);
 
     let sourceNote = t('sourcePage');
+    const pageSrc = ['amazonPage'];
     if (spApi && spApi.available) {
       const n = Object.keys(spApi.items || {}).length;
       sourceNote += t(n === 1 ? 'sourceSpOne' : 'sourceSp', { n });
     } else if (spApi && !spApi.available) {
       sourceNote += t('sourceOff', { reason: spReasonText(spApi.reason) });
     }
-
-    const bar = existing || document.createElement('div');
-    bar.id = `${KX_AMZ_PREFIX}-summary`;
-    bar.className = 'kx-stats-bar';
     const snapshot = t('snapshot', {
       organic: parsed.length - sponsoredCount,
       ads: sponsoredCount,
       adWord: t(sponsoredCount === 1 ? 'adWordOne' : 'adWordMany'),
       total: totalText ? t('snapshotTotal', { total: totalText }) : '',
     });
-    bar.lang = shared.lang;
-    bar.innerHTML = `
-      <div class="kx-stats-header">
-        <span class="kx-stats-logo">KolayXport</span>
-        ${esc(snapshot)}
-      </div>
-      <div class="kx-stats-row">
-        <span>${esc(t('medianPrice'))}: <strong>${esc(money(M.median(prices), currency))}</strong></span>
-        <span class="kx-sep">|</span>
-        <span>${esc(t('range'))}: <strong>${prices.length ? esc(money(Math.min(...prices), currency)) + ' – ' + esc(money(Math.max(...prices), currency)) : '—'}</strong></span>
-        <span class="kx-sep">|</span>
-        <span title="${esc(t('medianRatingsTip'))}">${esc(t('medianRatings'))}: <strong>${s.pageMedianReviews != null ? esc(compact(s.pageMedianReviews)) : '—'}</strong></span>
-        <span class="kx-sep">|</span>
-        <span title="${esc(t('top10MedianTip'))}">${esc(t('top10Median'))}: <strong>${s.top10MedianReviews != null ? esc(compact(s.top10MedianReviews)) : '—'}</strong></span>
-        <span class="kx-sep">|</span>
-        <span>${esc(t('avgRating'))}: <strong>${ratings.length ? '★ ' + esc(shared.formatRating(M.mean(ratings))) : '—'}</strong></span>
-        <span class="kx-sep">|</span>
-        <span>${esc(t('ads'))}: <strong>${sponsoredCount}/${parsed.length}</strong></span>
-        <span class="kx-sep">|</span>
-        <span title="${esc(compTip)}">${esc(t('competition'))}: <strong class="${compColor}">${esc(shared.compLabel(comp.level))}</strong></span>
-        <span class="kx-sep">|</span>
-        <button class="kx-ai-btn kx-deep-ai">${esc(t('deepAi'))}</button>
-      </div>
-      <div class="kx-stats-note">
-        ${esc(withBadge.length
-          ? t('boughtNote', { k: withBadge.length, n: unique.length, units: compact(boughtFloor) })
-          : t('boughtNone'))}
-        · ${esc(sourceNote)}
-      </div>
-    `;
-    bar.querySelector('.kx-deep-ai')?.addEventListener('click', () => {
-      const q = new URLSearchParams(window.location.search).get('k') || '';
-      window.open('https://kolayxport.com/app/research/keywords?mkt=amazon&q=' + encodeURIComponent(q), '_blank');
+    const nConf = organic.length >= 15 ? 'high' : organic.length >= 6 ? 'medium' : 'low';
+
+    const bar = existing || document.createElement('div');
+    bar.id = `${KX_AMZ_PREFIX}-summary`;
+    bar.className = 'kx-stats-bar';
+    const chip = (o) => U.chip(document, o);
+    const lvl = String(comp.level || '').toLowerCase();
+    const chips = [
+      chip({ key: 'onpage', label: t('onPage'), value: t('onPageVal', { organic: parsed.length - sponsoredCount, ads: sponsoredCount, adWord: t(sponsoredCount === 1 ? 'adWordOne' : 'adWordMany') }),
+        info: { plain: t('plainOnPage'), formula: snapshot, source: pageSrc, confidence: 'exact' } }),
+      chip({ key: 'price', label: t('medianPrice'), value: money(M.median(prices), currency),
+        info: prices.length ? { plain: t('plainTypicalPrice'), source: pageSrc, confidence: prices.length >= 10 ? 'high' : 'medium' } : null }),
+      chip({ key: 'range', label: t('range'), value: prices.length ? money(Math.min(...prices), currency) + ' – ' + money(Math.max(...prices), currency) : '—',
+        info: prices.length ? { plain: t('plainRange'), source: pageSrc, confidence: 'exact' } : null }),
+      chip({ key: 'reviews', label: t('medianRatings'), value: s.pageMedianReviews != null ? compact(s.pageMedianReviews) : '—',
+        info: { plain: t('plainReviews'), formula: t('medianRatingsTip'), source: pageSrc, confidence: nConf } }),
+      chip({ key: 'competition', label: t('competition'), value: U.pill(document, shared.compLabel(comp.level), U.competitionTone(lvl)),
+        info: { plain: t('plainCompetition'), formula: compTip, source: spApi && spApi.available ? ['amazonPage', 'amazonApi'] : pageSrc, confidence: nConf === 'high' ? 'medium' : 'low' } }),
+    ];
+    const more = [
+      chip({ key: 'top10', label: t('top10Median'), value: s.top10MedianReviews != null ? compact(s.top10MedianReviews) : '—',
+        info: { plain: t('plainTop10'), formula: t('top10MedianTip'), source: pageSrc, confidence: nConf } }),
+      chip({ key: 'rating', label: t('avgRating'), value: ratings.length ? '★ ' + shared.formatRating(M.mean(ratings)) : '—',
+        info: ratings.length ? { plain: t('plainRating'), source: pageSrc, confidence: 'exact' } : null }),
+      chip({ key: 'ads', label: t('ads'), value: `${sponsoredCount}/${parsed.length}`,
+        info: { plain: t('plainAds'), source: pageSrc, confidence: 'exact' } }),
+      U.note(document, snapshot),
+      U.note(document, withBadge.length
+        ? t('boughtNote', { k: withBadge.length, n: unique.length, units: compact(boughtFloor) })
+        : t('boughtNone')),
+      U.note(document, sourceNote),
+    ];
+    // Only a positive demand signal: a missing "bought" badge does not mean no sales.
+    const share = unique.length >= 5 ? withBadge.length / unique.length : 0;
+    const demand = share >= 0.5 ? share : null;
+    const q = new URLSearchParams(window.location.search).get('k') || '';
+    U.topBar(bar, {
+      title: q ? '"' + q + '"' : 'Amazon',
+      verdict: U.verdict(lvl, demand),
+      chips,
+      more,
+      state: 'full',
+      link: { href: 'https://kolayxport.com/app/research/keywords?mkt=amazon&q=' + encodeURIComponent(q), text: t('deepAi') },
     });
+    bar.querySelector('.kx-cta')?.classList.add('kx-deep-ai');
     if (!existing) resultsContainer.parentElement?.insertBefore(bar, resultsContainer);
   }
 
@@ -241,6 +258,7 @@
     requestSpApiSignals(asins, mkt).then((resp) => {
       if (spApiRequestedFor !== key) return; // navigated away
       spApi = resp || { available: false, reason: 'unavailable' };
+      perfMark('sp_api');
       schedule(0);
     });
   }
@@ -260,7 +278,15 @@
       renderCardRow(card, data, mkt);
     });
     renderSummaryBar(parsed);
+    if (!firstPaintMarked) { firstPaintMarked = true; perfMark('first_paint', { cards: parsed.length }); }
     maybeRequestSpApi(parsed, mkt);
+  }
+
+  // Debug timing marks (lib/perf.js; only with localStorage kx_debug).
+  let firstPaintMarked = false;
+  function perfMark(label, extra) {
+    const P = window.__KX_PERF;
+    if (P) P.mark('amazon_search', label, extra);
   }
 
   // Throttled: a pending run is not pushed back by further mutations
@@ -274,7 +300,7 @@
   // Initial run, once the language is known.
   shared.langReady().then(() => {
     langReady = true;
-    schedule(1000);
+    schedule(250);
   });
 
   // Language changed in the popup: rows and bar carry the language in their signature,
@@ -292,6 +318,9 @@
     spApi = null;
     spApiRequestedFor = null;
     lastBarSignature = '';
+    firstPaintMarked = false;
+    const P = window.__KX_PERF;
+    if (P) P.start('amazon_search');
     document.getElementById(`${KX_AMZ_PREFIX}-summary`)?.remove();
     schedule(1000);
   });

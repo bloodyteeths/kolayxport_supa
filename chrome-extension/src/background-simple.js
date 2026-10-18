@@ -197,9 +197,11 @@ async function handleMessage(request, sender, sendResponse) {
   try {
     // --- Etsy listing stats (measured vs estimated) ---
     if (request.type === 'kx_listing_stats') {
+      // phase 'core': the fast first answer (listing facts), sent alongside the full request.
+      const phase = request.params?.phase === 'core' ? 'core' : undefined;
       const r = await apiFetch('/api/ext/listing-stats', {
         method: 'POST',
-        body: { listingId: request.params?.listingId, page: request.params?.page || {} },
+        body: { listingId: request.params?.listingId, page: request.params?.page || {}, ...(phase ? { phase } : {}) },
         research: { pv: request.pv }
       });
       sendResponse(researchResponse(r));
@@ -243,10 +245,15 @@ async function handleMessage(request, sender, sendResponse) {
       const mkt = /^EBAY_[A-Z]{2}$/.test(params.marketplace || '') ? params.marketplace : 'EBAY_US';
       let path = '';
       switch (request.action) {
-        case 'search_enrich':
+        case 'search_enrich': {
           // sort=bestMatch: same order the shopper sees (was newlyListed by default).
-          path = `/api/clawd/ebay-research?action=product_database&q=${enc(params.query || '')}&limit=50&sort=bestMatch&marketplace_id=${mkt}`;
+          // Sold quantities: only the cards in the first viewport (enrich_ids first, 8 at most).
+          const ids = (Array.isArray(params.enrichIds) ? params.enrichIds : [])
+            .map(String).filter((id) => /^\d{1,20}$/.test(id)).slice(0, 8);
+          path = `/api/clawd/ebay-research?action=product_database&q=${enc(params.query || '')}&limit=50&sort=bestMatch&marketplace_id=${mkt}&enrich=8` +
+            (ids.length ? `&enrich_ids=${ids.join(',')}` : '');
           break;
+        }
         case 'listing_enrich':
           path = `/api/clawd/ebay?action=get_item_details&legacy_item_id=${enc(params.itemId || '')}&marketplace_id=${mkt}`;
           break;

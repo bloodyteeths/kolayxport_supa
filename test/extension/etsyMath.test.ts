@@ -124,3 +124,14 @@ describe('quantity', () => {
     expect(M.quantitySignal(null)).toBeNull();
   });
 });
+
+describe('parseCount (result / sales counts printed on the page)', () => {
+  it('treats every separator as a thousands separator', () => {
+    expect(M.parseCount('1,234')).toBe(1234);
+    expect(M.parseCount('1.234')).toBe(1234);
+    expect(M.parseCount('12 345')).toBe(12345);
+    expect(M.parseCount('1,000+')).toBe(1000);
+    expect(M.parseCount('')).toBeNull();
+    expect(M.parseCount(null)).toBeNull();
+  });
+});

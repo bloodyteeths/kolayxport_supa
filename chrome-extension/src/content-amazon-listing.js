@@ -42,14 +42,8 @@
     return { fee, net: price - fee };
   }
 
-  function stat(value, label, cls, tip) {
-    return `<div title="${esc(tip || '')}">
-      <div style="font-size:18px;font-weight:800" class="${cls || ''}">${value}</div>
-      <div style="font-size:10px;color:#999">${label}</div>
-    </div>`;
-  }
-
   function render(asin) {
+    const U = shared.UI;
     const marketplace = detectAmazonMarketplace();
     const sp = spForAsin.asin === asin ? spForAsin.data : null;
 
@@ -77,11 +71,6 @@
     if (!widget) {
       widget = document.createElement('div');
       widget.id = `${KX_AMZ_PREFIX}-widget`;
-      widget.style.cssText = `
-        background: #fff; border: 2px solid #FF9900; border-radius: 10px;
-        padding: 14px; margin: 10px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        font-size: 12px; color: #333; line-height: 1.6;
-      `;
       if (sidebar) sidebar.insertBefore(widget, sidebar.firstChild);
       else insertTarget.appendChild(widget);
     }
@@ -89,78 +78,125 @@
     // Daily research limit / busy: one card instead of the numbers.
     if (spLimit.asin === asin && spLimit.resp && shared.showLimitCard(widget, spLimit.resp, 'amazon_listing')) return;
 
-    let salesBlock;
+    const body = U.panel(widget, { title: t('productIntel') });
+    const metric = (o) => U.metric(document, o);
+    const div = (cls, text) => {
+      const n = document.createElement('div');
+      if (cls) n.className = cls;
+      if (text != null) n.textContent = text;
+      return n;
+    };
+    const bsrSrc = bsr && bsr.fromApi ? ['amazonApi', 'model'] : ['amazonPage', 'model'];
+
+    // Sales
+    const sales = div('kx-sales');
+    sales.appendChild(div('kx-section-label', t('sales')));
     if (fig.kind === 'amazon') {
-      salesBlock = `<div style="display:flex;gap:14px;margin-top:4px;flex-wrap:wrap">
-          ${stat(esc(fig.label), esc(t('boughtLastMonth')), 'kx-green', t('boughtLastMonthTip'))}
-          ${fig.revenueFloor ? stat('≥' + esc(money(fig.revenueFloor, currency, true)), esc(t('revFloor')), 'kx-green', t('revFloorShortTip')) : ''}
-        </div>
-        ${bsrEst ? `<div style="font-size:10px;color:#999;margin-top:2px">${esc(t('bsrCompare', { units: compact(bsrEst.units), low: compact(bsrEst.low), high: compact(bsrEst.high) }))}</div>` : ''}`;
+      const grid = div('kx-metrics-grid kx-wide');
+      grid.appendChild(metric({ key: 'bought', label: t('boughtLastMonth'), value: fig.label, tone: 'green',
+        info: { plain: t('plainAmazonFig'), formula: t('boughtLastMonthTip'), source: ['amazonFigure'], confidence: 'high' } }));
+      if (fig.revenueFloor) {
+        grid.appendChild(metric({ key: 'revenue', label: t('revFloor'), value: '≥' + money(fig.revenueFloor, currency, true), tone: 'green',
+          info: { plain: t('plainRevFloor'), formula: t('revFloorShortTip'), source: ['amazonFigure', 'amazonPage'], confidence: 'high' } }));
+      }
+      sales.appendChild(grid);
+      if (bsrEst) sales.appendChild(div('kx-sales-meta', t('bsrCompare', { units: compact(bsrEst.units), low: compact(bsrEst.low), high: compact(bsrEst.high) })));
     } else if (fig.kind === 'estimate') {
-      salesBlock = `<div style="display:flex;gap:14px;margin-top:4px;flex-wrap:wrap">
-          ${stat('~' + esc(compact(fig.units)), esc(t('estSales')), 'kx-orange', t('estSalesTip', { low: int(fig.low), high: int(fig.high) }))}
-          ${fig.revenue ? stat('~' + esc(money(fig.revenue, currency, true)), esc(t('estRevenue')), 'kx-orange') : ''}
-        </div>
-        <div style="font-size:10px;color:#999;margin-top:2px">${esc(t('estFromBsr', { curve: fig.curve, low: compact(fig.low), high: compact(fig.high) }) + (fig.calibrated ? '' : t('curveUncalibrated')) + t('noBoughtFigure'))}</div>`;
+      const grid = div('kx-metrics-grid kx-wide');
+      const formula = t('estFromBsr', { curve: fig.curve, low: compact(fig.low), high: compact(fig.high) }) + (fig.calibrated ? '' : t('curveUncalibrated'));
+      grid.appendChild(metric({ key: 'units', label: t('estSales'), value: '≈' + compact(fig.units), est: true,
+        info: { plain: t('plainEstimate'), formula: formula + ' ' + t('estSalesTip', { low: int(fig.low), high: int(fig.high) }), source: bsrSrc, confidence: 'low' } }));
+      if (fig.revenue) {
+        grid.appendChild(metric({ key: 'revenue', label: t('estRevenue'), value: '≈' + money(fig.revenue, currency, true), est: true,
+          info: { plain: t('plainEstRev'), formula, source: bsrSrc.concat('amazonPage'), confidence: 'low' } }));
+      }
+      sales.appendChild(grid);
+      sales.appendChild(div('kx-sales-meta', t('estFromBsr', { curve: fig.curve, low: compact(fig.low), high: compact(fig.high) }) + (fig.calibrated ? '' : t('curveUncalibrated')) + t('noBoughtFigure')));
     } else {
-      salesBlock = `<div style="color:#999">${esc(t('noSalesData'))}</div>`;
+      sales.appendChild(div('kx-sales-plain', t('noSalesData')));
+    }
+    body.appendChild(sales);
+
+    // Best Seller Rank
+    if (bsr) {
+      const row = div('kx-stats-row');
+      const strong = document.createElement('strong');
+      strong.textContent = t('bsrIn', { rank: int(bsr.rank), cat: bsr.category || '—' });
+      row.appendChild(strong);
+      if (bsr.sub && bsr.sub.length) {
+        row.appendChild(div('kx-muted', ' · ' + bsr.sub.slice(0, 2).map((r) => t('subRankIn', { rank: int(r.rank), cat: r.category })).join(' · ')));
+      }
+      if (bsr.fromApi) row.appendChild(div('kx-muted', t('officialData')));
+      body.appendChild(row);
     }
 
-    const bsrLine = bsr
-      ? esc(t('bsrIn', { rank: int(bsr.rank), cat: bsr.category || '—' }))
-      : '';
-    const subRanks = bsr && bsr.sub && bsr.sub.length
-      ? bsr.sub.slice(0, 2).map((r) => esc(t('subRankIn', { rank: int(r.rank), cat: r.category }))).join(' · ')
-      : '';
+    // Rating, ratings, offers
+    if (reviewCount != null || rating != null || (sp && sp.offerCountAny != null)) {
+      const row = div('kx-stats-row');
+      const parts = [];
+      if (rating != null) parts.push('★ ' + shared.formatRating(rating));
+      if (reviewCount != null) parts.push(t('ratings', { n: int(reviewCount) }));
+      parts.forEach((p, i) => {
+        if (i) row.appendChild(div('kx-sep', '|'));
+        row.appendChild(div(null, p));
+      });
+      if (sp && sp.offerCountAny != null) {
+        if (parts.length) row.appendChild(div('kx-sep', '|'));
+        const o = div(null, t('offers', { n: int(sp.offerCountAny) }));
+        o.title = t('offersTip');
+        row.appendChild(o);
+      }
+      Array.prototype.forEach.call(row.children, (c) => { c.style.display = 'inline'; });
+      body.appendChild(row);
+    }
 
-    widget.lang = shared.lang;
-    widget.innerHTML = `
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #f0f0f0">
-        <span class="kx-amz-badge" style="font-size:11px;padding:3px 8px">KolayXport</span>
-        <span style="font-weight:700;font-size:13px">${esc(t('productIntel'))}</span>
-      </div>
+    // Referral fee (rough)
+    if (referral) {
+      const box = div('kx-box');
+      const head = div('kx-section-label', t('feeTitle'));
+      head.appendChild(U.info(document, { label: t('feeTitle'), plain: t('plainFee'), formula: t('feeNote'), source: ['amazonPage'], confidence: 'low' }));
+      head.style.display = 'flex';
+      head.style.alignItems = 'center';
+      head.style.gap = '4px';
+      box.appendChild(head);
+      const line = div(null);
+      line.appendChild(document.createTextNode(t('referral') + ': '));
+      const fee = document.createElement('strong');
+      fee.textContent = money(referral.fee, currency);
+      line.appendChild(fee);
+      line.appendChild(document.createTextNode(' '));
+      const sep = document.createElement('span');
+      sep.className = 'kx-sep';
+      sep.textContent = '|';
+      line.appendChild(sep);
+      line.appendChild(document.createTextNode(' ' + t('afterReferral') + ': '));
+      const net = document.createElement('strong');
+      net.textContent = money(referral.net, currency);
+      line.appendChild(net);
+      box.appendChild(line);
+      box.appendChild(div('kx-sales-meta', t('feeNote')));
+      body.appendChild(box);
+    }
 
-      <div style="margin-bottom:8px">
-        <div style="font-weight:600;color:#666;font-size:11px">${esc(t('sales'))}</div>
-        ${salesBlock}
-      </div>
+    // Actions
+    const actions = div('kx-actions');
+    const ai = document.createElement('button');
+    ai.type = 'button';
+    ai.className = 'kx-cta kx-btn-ai';
+    ai.textContent = t('aiAnalysis');
+    const research = document.createElement('button');
+    research.type = 'button';
+    research.className = 'kx-btn-ghost kx-btn-research';
+    research.textContent = t('marketResearch');
+    actions.appendChild(ai);
+    actions.appendChild(research);
+    body.appendChild(actions);
+    body.appendChild(div('kx-foot', 'ASIN: ' + asin + ' | ' + marketplace));
 
-      ${bsr ? `
-      <div style="margin-bottom:8px;font-size:11px">
-        <strong>${bsrLine}</strong>
-        ${subRanks ? `<span style="color:#999"> · ${subRanks}</span>` : ''}
-        ${bsr.fromApi ? `<span style="color:#999">${esc(t('officialData'))}</span>` : ''}
-      </div>` : ''}
-
-      ${(reviewCount != null || rating != null || (sp && sp.offerCountAny != null)) ? `
-      <div style="display:flex;gap:8px;margin-bottom:8px;font-size:11px;flex-wrap:wrap">
-        ${rating != null ? `<span>★ ${esc(shared.formatRating(rating))}</span>` : ''}
-        ${reviewCount != null ? `<span class="kx-sep">|</span><span>${esc(t('ratings', { n: int(reviewCount) }))}</span>` : ''}
-        ${sp && sp.offerCountAny != null ? `<span class="kx-sep">|</span><span title="${esc(t('offersTip'))}">${esc(t('offers', { n: int(sp.offerCountAny) }))}</span>` : ''}
-      </div>` : ''}
-
-      ${referral ? `
-      <div style="background:#f9f9f9;border-radius:6px;padding:8px;margin-bottom:8px;font-size:11px">
-        <div style="font-weight:600;color:#666;margin-bottom:2px">${esc(t('feeTitle'))}</div>
-        ${esc(t('referral'))}: <strong>${esc(money(referral.fee, currency))}</strong>
-        <span class="kx-sep">|</span> ${esc(t('afterReferral'))}: <strong>${esc(money(referral.net, currency))}</strong>
-        <div style="color:#999;font-size:10px">${esc(t('feeNote'))}</div>
-      </div>` : ''}
-
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="kx-ai-btn kx-btn-ai">${esc(t('aiAnalysis'))}</button>
-        <button class="kx-ai-btn kx-btn-research" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)">${esc(t('marketResearch'))}</button>
-      </div>
-
-      <div style="margin-top:8px;font-size:10px;color:#bbb;text-align:center">
-        ASIN: ${esc(asin)} | ${marketplace}
-      </div>
-    `;
-
-    widget.querySelector('.kx-btn-ai')?.addEventListener('click', () => {
+    ai.addEventListener('click', () => {
       window.open(`https://kolayxport.com/app/research/products?mkt=amazon&q=${encodeURIComponent(asin)}`, '_blank');
     });
-    widget.querySelector('.kx-btn-research')?.addEventListener('click', () => {
+    research.addEventListener('click', () => {
       const q = (document.getElementById('productTitle')?.textContent || document.title.split(':')[0] || asin).trim();
       window.open('https://kolayxport.com/app/research/products?mkt=amazon&q=' + encodeURIComponent(q), '_blank');
     });
@@ -172,6 +208,8 @@
     const isNew = asin !== currentAsin;
     currentAsin = asin;
     render(asin);
+    const P = window.__KX_PERF;
+    if (isNew && P) P.mark('amazon_listing', 'first_paint', { asin });
 
     if (isNew) {
       requestSpApiSignals([asin], detectAmazonMarketplace()).then((resp) => {
@@ -184,6 +222,7 @@
         if (!resp.available || !resp.items || !resp.items[asin]) return;
         spForAsin = { asin, data: resp.items[asin] };
         render(asin);
+        if (P) P.mark('amazon_listing', 'sp_api');
       });
     }
   }
@@ -197,9 +236,9 @@
   shared.langReady().then(() => {
     langReady = true;
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => setTimeout(processListingPage, 500));
+      document.addEventListener('DOMContentLoaded', () => setTimeout(processListingPage, 150));
     } else {
-      setTimeout(processListingPage, 500);
+      setTimeout(processListingPage, 150);
     }
     setTimeout(processListingPage, 2000);
     setTimeout(processListingPage, 4000);

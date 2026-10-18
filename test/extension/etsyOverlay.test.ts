@@ -40,7 +40,7 @@ function boot(url: string, html: string, scripts: string[], onMsg: (m: Msg) => u
     },
   };
   w.__KX_CACHE = { getOrFetch: (_k: string, _t: string, fetcher: () => Promise<unknown>) => fetcher() };
-  for (const s of ['lib/lang.js', 'lib/limitCard.js', 'lib/etsyMath.js', 'content-shared.js', ...scripts]) w.eval(src(s));
+  for (const s of ['lib/lang.js', 'lib/ui.js', 'lib/limitCard.js', 'lib/etsyMath.js', 'content-shared.js', ...scripts]) w.eval(src(s));
   const setLang = (v: string | null) => {
     if (v === null) delete stored.kx_lang; else stored.kx_lang = v;
     listeners.forEach((l) => l({ kx_lang: { newValue: v } }, 'local'));
@@ -60,6 +60,11 @@ async function waitFor<T>(fn: () => T | null | undefined | false, ms = 4000): Pr
 
 const norm = (s: string | null | undefined) => (s || '').replace(/\s+/g, ' ').trim();
 const shadowText = (doc: Document, id: string, sel: string) => norm(doc.getElementById(id)?.shadowRoot?.querySelector(sel)?.textContent);
+/** Text once the API answer filled the bar (the page-only first paint is data-kx-state="partial"). */
+const filledText = (doc: Document, id: string, sel: string) => {
+  const el = doc.getElementById(id)?.shadowRoot?.querySelector(sel) as HTMLElement | null | undefined;
+  return el && el.dataset.kxState === 'full' ? norm(el.textContent) : '';
+};
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -116,21 +121,22 @@ describe('Etsy search bar + card rows', () => {
   it('Turkish by default (nothing stored, Chrome UI in English)', async () => {
     const { doc } = boot('https://www.etsy.com/search?q=linen+dress', SEARCH_HTML, ['content-search.js'], searchApi);
     const text = await waitFor(() => {
-      const t = shadowText(doc, 'kx-search-overlay', '.kx-bar');
+      const t = filledText(doc, 'kx-search-overlay', '.kx-bar');
       return t.includes('Sonuç') && t;
     });
     expect(text).toContain('Sonuç1,2K');
-    expect(text).toContain('Medyan Liste Fiyatı$29,99');
-    expect(text).toContain('Medyan Favori1,5K');
-    expect(text).toContain('Mağaza (ilk 100)40');
+    expect(text).toContain('Tipik liste fiyatı$29,99');
+    expect(text).toContain('Tipik favori1,5K');
+    expect(text).toContain('Farklı mağaza40');
     expect(text).toContain('RekabetOrta');
-    expect(text).toContain('Tam Analiz');
+    expect(text).toContain('Rekabet orta: güçlü bir ilanla yer bulunabilir'); // one-line verdict
+    expect(text).toContain('Tam analiz');
     expect(text).not.toMatch(/Results|Median|Competition|loading/);
 
     const row = await waitFor(() => doc.querySelector('.kx-data-row'));
-    expect(norm(row.textContent)).toContain('~4,5/ay');
-    expect(norm(row.textContent)).toContain('Tahmini · orta güven');
-    expect(norm(row.textContent)).toContain('♥ 2,5K');
+    expect(norm(row.textContent)).toContain('≈4,5 satış/ay');
+    expect(norm(row.textContent)).toContain('tahmini, orta güven');
+    expect((row.querySelector('.kx-info') as HTMLElement).dataset.kxFormula).toContain('Favori: 2,5K.'); // in the "i", not on the strip
     expect(row.getAttribute('lang')).toBe('tr');
     expect((row as HTMLElement).title).toContain('Tahmini: son 90 günde 3 yorum');
   });
@@ -138,36 +144,38 @@ describe('Etsy search bar + card rows', () => {
   it('English when kx_lang = en', async () => {
     const { doc } = boot('https://www.etsy.com/search?q=linen+dress', SEARCH_HTML, ['content-search.js'], searchApi, { kx_lang: 'en' });
     const text = await waitFor(() => {
-      const t = shadowText(doc, 'kx-search-overlay', '.kx-bar');
+      const t = filledText(doc, 'kx-search-overlay', '.kx-bar');
       return t.includes('Results') && t;
     });
     expect(text).toContain('Results1.2K');
-    expect(text).toContain('Median List Price$29.99');
+    expect(text).toContain('Typical list price$29.99');
     expect(text).toContain('CompetitionMedium');
     const row = await waitFor(() => doc.querySelector('.kx-data-row'));
-    expect(norm(row.textContent)).toContain('~4.5/mo');
-    expect(norm(row.textContent)).toContain('Estimate · medium conf.');
+    expect(norm(row.textContent)).toContain('≈4.5 sales/mo');
+    expect(norm(row.textContent)).toContain('estimate, medium confidence');
   });
 
   it('account language English is used when there is no explicit choice; explicit Turkish wins over it', async () => {
     const a = boot('https://www.etsy.com/search?q=linen+dress', SEARCH_HTML, ['content-search.js'], searchApi, { kx_account_lang: 'en' });
-    await waitFor(() => shadowText(a.doc, 'kx-search-overlay', '.kx-bar').includes('Results'));
+    await waitFor(() => filledText(a.doc, 'kx-search-overlay', '.kx-bar').includes('Results'));
     const b = boot('https://www.etsy.com/search?q=linen+dress', SEARCH_HTML, ['content-search.js'], searchApi, { kx_account_lang: 'en', kx_lang: 'tr' });
-    await waitFor(() => shadowText(b.doc, 'kx-search-overlay', '.kx-bar').includes('Sonuç'));
+    await waitFor(() => filledText(b.doc, 'kx-search-overlay', '.kx-bar').includes('Sonuç'));
   });
 
-  it('never shows the wrong language first: the loading text is already Turkish', async () => {
+  it('never shows the wrong language first: the first paint (API pending) is already Turkish', async () => {
     const { doc } = boot('https://www.etsy.com/search?q=linen+dress', SEARCH_HTML, ['content-search.js'], () => new Promise(() => {}) as unknown);
     const text = await waitFor(() => shadowText(doc, 'kx-search-overlay', '.kx-bar'));
-    expect(text).toBe('KolayXport yükleniyor...');
+    expect(text).toContain('Sonuç');
+    expect(text).toContain('Rekabet');
+    expect(text).not.toMatch(/Results|Median|Competition|loading/);
   });
 
   it('re-renders live when the popup switches the language', async () => {
     const { doc, setLang } = boot('https://www.etsy.com/search?q=linen+dress', SEARCH_HTML, ['content-search.js'], searchApi);
-    await waitFor(() => shadowText(doc, 'kx-search-overlay', '.kx-bar').includes('Sonuç'));
+    await waitFor(() => filledText(doc, 'kx-search-overlay', '.kx-bar').includes('Sonuç'));
     await waitFor(() => norm(doc.querySelector('.kx-data-row')?.textContent).includes('/ay'));
     setLang('en');
-    await waitFor(() => shadowText(doc, 'kx-search-overlay', '.kx-bar').includes('Results'));
+    await waitFor(() => filledText(doc, 'kx-search-overlay', '.kx-bar').includes('Results'));
     await waitFor(() => norm(doc.querySelector('.kx-data-row')?.textContent).includes('/mo'));
     expect(doc.querySelectorAll('[data-listing-id="101"] .kx-data-row')).toHaveLength(1); // replaced, not stacked
   });
@@ -181,18 +189,19 @@ describe('Etsy listing panel', () => {
       return e && norm(e.textContent).includes('satış/ay') && e;
     });
     const t = norm(el.textContent);
-    expect(t).toContain('~4,5 satış/ay');
-    expect(t).toContain('Tahmini');
-    expect(t).toContain('Güven: orta');
-    expect(t).toContain('gelir/ay (tahmini)');
-    expect(t).toContain('Bu ilan son 90 günde 3 yorum aldı');
-    expect(t).toContain('İlan Yorumu');
+    expect(t).toContain('≈4,5 satış/ay');
+    expect(t).toContain('tahmini, orta güven');
+    expect(t).toContain('gelir/ay');
+    expect(t).toContain('Bu ilanın son yorumları'); // plain-language line on the face
+    // The formula with the real inputs is in the "i".
+    expect((el.querySelector('.kx-sales .kx-info') as HTMLElement).dataset.kxFormula).toContain('Bu ilan son 90 günde 3 yorum aldı');
+    expect(t).toContain('İlan yorumu');
     expect(t).toContain('1,2K');
     expect(t).toContain('Favori');
-    expect(t).toContain('Adet (satıcı)');
+    expect(t).toContain('Stok (satıcının girdiği)');
     expect(t).toContain('Etiketler');
-    expect(t).toContain('Mağaza Satışı');
-    expect(t).toContain('Satış/Yorum2,5');
+    expect(t).toContain('Mağazanın toplam satışı');
+    expect(t).toContain('Her yoruma düşen satış2,5');
     expect(t).toContain('4,9★');
     expect(el.getAttribute('lang')).toBe('tr');
     expect(t).not.toMatch(/sales\/mo|Estimate|Item Reviews|Favorites/);
@@ -205,10 +214,10 @@ describe('Etsy listing panel', () => {
       return e && norm(e.textContent).includes('sales/mo') && e;
     });
     const t = norm(el.textContent);
-    expect(t).toContain('~4.5 sales/mo');
-    expect(t).toContain('Confidence: medium');
-    expect(t).toContain('Item Reviews');
-    expect(t).toContain('Sales/Review2.5');
+    expect(t).toContain('≈4.5 sales/mo');
+    expect(t).toContain('estimate, medium confidence');
+    expect(t).toContain('Listing reviews');
+    expect(t).toContain('Sales per review2.5');
   });
 });
 
@@ -216,30 +225,30 @@ describe('Etsy shop bar', () => {
   it('Turkish by default', async () => {
     const { doc } = boot('https://www.etsy.com/shop/LinenHaus', '', ['content-shop.js'], shopApi);
     const t = await waitFor(() => {
-      const s = shadowText(doc, 'kx-shop-overlay', '.kx-shop-bar');
+      const s = filledText(doc, 'kx-shop-overlay', '.kx-shop-bar');
       return s.includes('LinenHaus') && s;
     });
     expect(t).toContain('Satış/ay');
-    expect(t).toContain('Ölçüldü · yüksek güven');
+    expect(t).toContain('ölçüldü, yüksek güven');
     expect(t).toContain('Gelir/ay≈$3.600');
-    expect(t).toContain('Toplam Satış15,0K');
+    expect(t).toContain('Toplam satış15,0K');
     expect(t).toContain('Puan4,9 ★');
-    expect(t).toContain('Aktif İlan120');
-    expect(t).toContain('Medyan Liste Fiyatı$29,99');
-    expect(t).toContain('Mağaza Yaşı6 yıl');
+    expect(t).toContain('Aktif ilan120');
+    expect(t).toContain('Tipik liste fiyatı$29,99');
+    expect(t).toContain('Mağaza yaşı6 yıl');
     expect(t).not.toMatch(/Sales\/mo|Rating|Active Listings/);
   });
 
   it('English when kx_lang = en', async () => {
     const { doc } = boot('https://www.etsy.com/shop/LinenHaus', '', ['content-shop.js'], shopApi, { kx_lang: 'en' });
     const t = await waitFor(() => {
-      const s = shadowText(doc, 'kx-shop-overlay', '.kx-shop-bar');
+      const s = filledText(doc, 'kx-shop-overlay', '.kx-shop-bar');
       return s.includes('LinenHaus') && s;
     });
     expect(t).toContain('Sales/mo');
-    expect(t).toContain('Measured · high conf.');
-    expect(t).toContain('Total Sales15.0K');
+    expect(t).toContain('measured, high confidence');
+    expect(t).toContain('Total sales15.0K');
     expect(t).toContain('Rating4.9 ★');
-    expect(t).toContain('Shop Age6 yr');
+    expect(t).toContain('Shop age6 yr');
   });
 });

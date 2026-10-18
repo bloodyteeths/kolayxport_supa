@@ -7,28 +7,28 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div class="container">
-    <header>
-      <img src="../icons/icon-32.png" alt="KolayXport" class="logo">
-      <h1>KolayXport</h1>
-      <span id="authBadge" class="auth-badge checking">●</span>
-    </header>
+  <header class="kx-head">
+    <img src="../icons/kolayxport-logo-dark.svg" alt="KolayXport" class="logo" width="112" height="27">
+    <span id="authBadge" class="auth-badge checking" aria-hidden="true"></span>
+  </header>
 
-    <div class="card">
+  <div class="container">
+    <div class="card status-card">
       <div class="setting-row">
         <span data-i18n="status">Durum</span>
         <span id="authStatus" class="status-badge checking" data-i18n="checking">Kontrol ediliyor...</span>
       </div>
       <div class="setting-row" id="userRow" style="display:none;">
         <span data-i18n="user">Kullanıcı</span>
-        <span id="userEmail" class="text-muted">—</span>
+        <span id="userEmail" class="text-muted user-email">—</span>
       </div>
     </div>
 
     <div class="card" id="researchCard" style="display:none;">
       <h3 class="card-title" data-i18n="researchTitle">Araştırma</h3>
-      <div class="setting-row">
-        <span id="researchUsage" class="text-muted">—</span>
+      <div class="usage">
+        <span id="researchUsage" class="usage-text">—</span>
+        <div class="meter" aria-hidden="true"><span id="researchMeter" class="meter-fill"></span></div>
       </div>
       <div id="researchLimit" style="margin-top:6px;display:none;"></div>
     </div>
@@ -36,8 +36,8 @@
     <div class="card">
       <h3 class="card-title" data-i18n="overlayTitle">Araştırma Panelleri</h3>
       <div class="setting-row">
-        <span data-i18n="allOverlays">Tüm paneller</span>
-        <label class="toggle"><input type="checkbox" id="toggleOverlays" checked><span class="slider"></span></label>
+        <span id="allOverlaysLabel" data-i18n="allOverlays">Tüm paneller</span>
+        <label class="toggle"><input type="checkbox" id="toggleOverlays" checked aria-labelledby="allOverlaysLabel"><span class="slider" aria-hidden="true"></span></label>
       </div>
     </div>
 
@@ -83,18 +83,19 @@
       <button id="openNextAddress" class="btn btn-secondary full-width" style="margin-top:6px;display:none;" data-i18n="openNextOrder">Sıradaki siparişi aç (listede görünmeyenler)</button>
     </div>
 
-    <a href="https://kolayxport.com/app" target="_blank" class="btn btn-primary full-width" style="margin-top:8px;" data-i18n="openApp">
+    <a href="https://kolayxport.com/app" target="_blank" class="btn btn-primary full-width open-app" data-i18n="openApp">
       KolayXport'u Aç
     </a>
 
     <footer>
-      <span class="text-muted" id="versionLabel">v8.0.0</span>
+      <span class="text-muted" id="versionLabel">v9.10.0</span>
       <span class="sep">·</span>
       <a href="https://kolayxport.com/help/chrome-extension" target="_blank" data-i18n="help">Yardım</a>
     </footer>
   </div>
 
   <script src="lib/lang.js"></script>
+  <script src="lib/ui.js"></script>
   <script src="lib/limitCard.js"></script>
   <script src="popup.js"></script>
 </body>

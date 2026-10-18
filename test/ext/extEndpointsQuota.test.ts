@@ -32,6 +32,10 @@ vi.mock('@/lib/etsy/listingStats', () => {
   return {
     EtsyPublicApiError,
     getListingStats: vi.fn(async (id: string, page: any) => ({ listingId: id, pageSignals: page || {}, sales: { monthlySales: 3 } })),
+    getListingCore: vi.fn(async (id: string, page: any, meta: any) => {
+      if (meta) meta.apiCalls = 1;
+      return { listingId: id, phase: 'core', pageSignals: page || {}, listing: { favorites: 5 } };
+    }),
     sanitizePageSignals: (p: any) => ({ pagePrice: p?.pagePrice ?? null, pageCurrency: p?.pageCurrency ?? null, inCarts: p?.inCarts ?? null }),
     getBatchListingStats: vi.fn(async (ids: string[]) => ({ listings: Object.fromEntries(ids.map((i) => [i, { sales: 1 }])), pendingIds: [] })),
     getShopStats: vi.fn(async (id: string) => ({ shop: { shop_name: id } })),
@@ -56,7 +60,7 @@ import researchHandler from '@/pages/api/ext/research';
 import listingStatsHandler from '@/pages/api/ext/listing-stats';
 import amazonHandler from '@/pages/api/ext/amazon-enrich';
 import { etsyFetch } from '@/lib/etsy/http';
-import { getListingStats } from '@/lib/etsy/listingStats';
+import { getListingStats, getListingCore } from '@/lib/etsy/listingStats';
 import { fetchProductSignals } from '@/lib/amazon/spapiSignals';
 
 const today = () => quotaKey(istanbulDay().day);
@@ -76,6 +80,7 @@ beforeEach(() => {
   store.setUser(USER, 'trial', 'trialing', new Date(Date.now() + 5 * 86400e3));
   vi.mocked(etsyFetch).mockClear();
   vi.mocked(getListingStats).mockClear();
+  vi.mocked(getListingCore).mockClear();
   vi.mocked(fetchProductSignals).mockClear();
 });
 
@@ -146,6 +151,35 @@ describe('/api/ext/listing-stats', () => {
     // A different page price is a different result (revenue uses it).
     await listingStatsHandler(post({ listingId: '123456', page: { pagePrice: 15, pageCurrency: 'USD' } }, 'u3'), makeRes());
     expect(getListingStats).toHaveBeenCalledTimes(2);
+  });
+
+  it('phase core + full of one page view (sent in parallel) count as ONE lookup', async () => {
+    const pv = { 'x-kx-page-view': 'pvlisting00001' };
+    const page = { pagePrice: 20, pageCurrency: 'USD' };
+    const rc = makeRes();
+    const rf = makeRes();
+    await Promise.all([
+      listingStatsHandler(post({ listingId: '555555', page, phase: 'core' }, USER, pv), rc),
+      listingStatsHandler(post({ listingId: '555555', page }, USER, pv), rf),
+    ]);
+    expect(rc.state.status).toBe(200);
+    expect(rc.state.body).toMatchObject({ phase: 'core', listing: { favorites: 5 } });
+    expect(rf.state.body.sales).toMatchObject({ monthlySales: 3 });
+    expect(store.count(USER, today())).toBe(1);
+    expect(rc.headers['server-timing']).toMatch(/total;dur=\d+/);
+  });
+
+  it('phase core returns the cached full answer when there is one (no Etsy work, free)', async () => {
+    const page = { pagePrice: 20, pageCurrency: 'USD' };
+    await listingStatsHandler(post({ listingId: '666666', page }), makeRes());
+    store.setUser('u5', 'starter');
+    const r = makeRes();
+    await listingStatsHandler(post({ listingId: '666666', page: { ...page, inCarts: 4 }, phase: 'core' }, 'u5'), r);
+    expect(r.state.status).toBe(200);
+    expect(r.state.body.sales).toMatchObject({ monthlySales: 3 });
+    expect(r.state.body.pageSignals).toMatchObject({ inCarts: 4 });
+    expect(getListingCore).not.toHaveBeenCalled();
+    expect(store.count('u5', today())).toBe(0);
   });
 
   it('over the limit: 429 research_limit', async () => {

@@ -10,6 +10,12 @@
  *   the page when the API is unavailable or the page has filters (sold items,
  *   price range, condition, sort...) that the API call does not apply.
  * - Competition: computeCompetition() over the four inputs above.
+ *
+ * Progressive: the bar and the card rows render at once from the page (result count, displayed
+ * prices, "N sold" on cards, sellers); the API answer then replaces them in place. The server
+ * looks sold quantities up only for the cards in the first viewport (ENRICH_VISIBLE) and answers
+ * within ~4 s; cards whose lookup was still running show a placeholder and are re-polled
+ * (a free shared-cache hit on the server).
  */
 
 (function () {
@@ -28,6 +34,11 @@
     const C = window.__KX_CACHE;
     const M = window.__KX_EBAY_MATH;
     const esc = S.escape;
+    /** Sold-quantity lookups the server makes per search: about the first viewport of cards. */
+    const ENRICH_VISIBLE = 8;
+    const REPOLL_MS = 2500;
+    const REPOLL_ROUNDS = 2;
+    let runToken = 0;
 
     S.isOverlayEnabled().then(enabled => {
       if (!enabled) return;
@@ -47,10 +58,26 @@
       });
     });
 
+    /** Ids of the cards in (or just below) the first viewport, page order, at most `n`. */
+    function firstViewportIds(page, n) {
+      const h = window.innerHeight || 800;
+      const out = [];
+      for (const card of page.items) {
+        if (!card.id || !card.el || out.length >= n) continue;
+        const r = card.el.getBoundingClientRect ? card.el.getBoundingClientRect() : null;
+        if (r && r.top > h * 1.2) continue;
+        out.push(String(card.id));
+      }
+      return out;
+    }
+
     async function processSearchPage() {
       const query = S.SELECTORS.searchQuery();
       if (!query) return;
       const mkt = S.getMarketplace();
+      const myRun = ++runToken;
+      const isCurrent = () => myRun === runToken && S.SELECTORS.searchQuery() === query;
+      S.perfStart('ebay_search');
 
       const shadow = S.createOverlayContainer('kx-ebay-search-overlay', 'top');
 
@@ -60,119 +87,176 @@
         bar.className = 'kx-bar';
         shadow.appendChild(bar);
       }
-      bar.innerHTML = `<span style="opacity:0.8">${esc(S.t('loading'))}</span>`;
 
       const page = M.parseSearchPage(document, { currency: mkt.currency });
       const refinements = M.pageRefinements(location.search);
-
       // API is skipped when the page is filtered: its sample would not match the cards.
+      const callApi = !refinements.length;
+      const enrichIds = callApi ? firstViewportIds(page, ENRICH_VISIBLE) : [];
+
+      // Instant: everything the page itself shows.
+      const state = { loading: callApi, pending: new Set(enrichIds) };
+      const pageSummary = M.buildSearchSummary({ api: null, page, refinements });
+      if (pageSummary.items.length || pageSummary.resultCount) {
+        renderSummaryBar(bar, pageSummary, query, state);
+        injectDataRows(pageSummary, page, state);
+      } else if (callApi) {
+        S.UI.barMessage(bar, S.t('loading'));
+      } else {
+        S.UI.barMessage(bar, S.t('loadFailed'));
+        return;
+      }
+      S.perf('ebay_search', 'first_paint', { cards: page.items.length });
+      if (!callApi) return;
+
+      const key = `ebay_search:v2:${mkt.id}:${query.toLowerCase()}`;
+      const params = { query, marketplace: mkt.id, enrichIds };
       let api = null;
       let apiError = null;
-      if (!refinements.length) {
-        try {
-          api = await C.getOrFetch(
-            `ebay_search:v2:${mkt.id}:${query.toLowerCase()}`,
-            'search',
-            () => S.apiCall('search_enrich', { query, marketplace: mkt.id })
-          );
-        } catch (err) {
-          apiError = err;
-        }
+      try {
+        api = await C.getOrFetch(key, 'search', () => S.apiCall('search_enrich', params));
+      } catch (err) {
+        apiError = err;
       }
+      if (!isCurrent()) return;
 
       // Daily research limit / busy: one card instead of the numbers.
-      if (apiError && S.showLimitCard(bar, apiError, 'ebay_search')) return;
-
-      const summary = M.buildSearchSummary({ api, page, refinements });
-      if (!summary.items.length && !summary.resultCount) {
-        bar.innerHTML = `<span style="opacity:0.7">${esc((apiError && apiError.message) || S.t('loadFailed'))}</span>`;
+      if (apiError && S.showLimitCard(bar, apiError, 'ebay_search')) {
+        stripRowPlaceholders();
         return;
       }
 
-      renderSummaryBar(bar, summary, query);
-      injectDataRows(summary, page);
+      const apply = (data, final) => {
+        const summary = M.buildSearchSummary({ api: data, page, refinements });
+        const pendingIds = data && Array.isArray(data.pendingIds) ? data.pendingIds.map(String) : [];
+        state.loading = false;
+        state.pending = final ? new Set() : new Set(pendingIds);
+        if (!summary.items.length && !summary.resultCount) {
+          S.UI.barMessage(bar, (apiError && apiError.message) || S.t('loadFailed'));
+          return pendingIds;
+        }
+        renderSummaryBar(bar, summary, query, state);
+        injectDataRows(summary, page, state);
+        return pendingIds;
+      };
+
+      let pendingIds = apply(api, false);
+      S.perf('ebay_search', 'api', { pending: pendingIds.length });
+
+      // Sold lookups the server had not finished within its time box: re-poll (shared-cache hit).
+      for (let round = 0; round < REPOLL_ROUNDS && pendingIds.length && api; round++) {
+        await new Promise(r => setTimeout(r, REPOLL_MS));
+        if (!isCurrent()) return;
+        let fresh = null;
+        try { fresh = await S.apiCall('search_enrich', params); } catch (_) { fresh = null; }
+        if (!isCurrent()) return;
+        if (!fresh || !Array.isArray(fresh.items)) break;
+        api = fresh;
+        try { if (C.set) C.set(key, fresh, 'search'); } catch (_) { /* best effort */ }
+        pendingIds = apply(api, false);
+      }
+      if (pendingIds.length) apply(api, true); // give up: unknown, not a placeholder forever
+      S.perf('ebay_search', 'full', { pending: pendingIds.length });
     }
 
-    function renderSummaryBar(bar, summary, query) {
+    function stripRowPlaceholders() {
+      document.querySelectorAll('.kx-data-row [data-kx-skel]').forEach(n => {
+        const row = n.closest('.kx-data-row');
+        n.remove();
+        if (row && !row.textContent.replace(/[·\s]/g, '')) row.remove();
+      });
+    }
+
+    /**
+     * state.loading: the API has not answered yet → placeholders where the page has no answer.
+     * Compact row: results, typical price, most prices, sellers, competition.
+     * "More": listings with sales, source + sample size.
+     */
+    function renderSummaryBar(bar, summary, query, state) {
+      const U = S.UI;
+      const loading = !!(state && state.loading);
+      const chip = (o) => U.chip(document, o);
+      const skelN = (wide) => U.skel(document, wide);
       const p = summary.price;
-      let priceHtml;
-      let rangeHtml;
+      const fromApi = summary.source === 'api';
+      const src = fromApi ? ['ebayApi'] : ['ebayPage'];
+      const sampled = fromApi && p && p.sampled ? p.sampled : summary.items.length;
+      const sourceText = fromApi ? S.t('srcApi', { n: sampled }) : S.t('srcPage', { n: summary.items.length });
+      const sampleConf = sampled >= 20 ? 'high' : sampled >= 8 ? 'medium' : 'low';
+
+      let priceVal;
+      let rangeVal;
       if (!p || p.quality === 'insufficient' || p.median == null) {
-        priceHtml = esc(S.t('notEnough'));
-        rangeHtml = '—';
+        priceVal = loading ? skelN() : S.t('notEnough');
+        rangeVal = loading ? skelN(true) : '—';
       } else if (p.quality === 'implausible') {
-        priceHtml = esc(S.t('unusual'));
-        rangeHtml = `${esc(S.formatPrice(p.p25, p.currency))} – ${esc(S.formatPrice(p.p75, p.currency))}`;
+        priceVal = S.t('unusual');
+        rangeVal = S.formatPrice(p.p25, p.currency) + ' – ' + S.formatPrice(p.p75, p.currency);
       } else {
-        priceHtml = esc(S.formatPrice(p.median, p.currency));
-        rangeHtml = `${esc(S.formatPrice(p.p25, p.currency))} – ${esc(S.formatPrice(p.p75, p.currency))}`;
+        priceVal = S.formatPrice(p.median, p.currency);
+        rangeVal = S.formatPrice(p.p25, p.currency) + ' – ' + S.formatPrice(p.p75, p.currency);
       }
+      const hasPrice = p && p.quality !== 'insufficient' && p.median != null;
 
       const sel = summary.sellers;
-      const sellersHtml = sel.known >= 5
-        ? `${sel.distinct} <span class="kx-bar-label">${esc(S.t('distinctOf', { n: sel.known }))}</span>`
-        : '—';
+      let sellersVal = loading ? skelN(true) : '—';
+      if (sel.known >= 5) {
+        const sub = document.createElement('span');
+        sub.className = 'kx-sub';
+        sub.textContent = ' ' + S.t('distinctOf', { n: sel.known });
+        sellersVal = [String(sel.distinct), sub];
+      }
 
       const sold = summary.sold;
-      const soldHtml = sold.known >= 5
-        ? esc(S.t('withSales', { k: sold.withSales, n: sold.known }))
-        : '—';
+      const soldVal = sold.known >= 5
+        ? S.t('withSales', { k: sold.withSales, n: sold.known, of: U.trOf(sold.withSales) })
+        : loading ? skelN(true) : '—';
 
       const comp = summary.competition;
       const factorKey = { results: 'factorResults', sold: 'factorSold', sellers: 'factorSellers', price: 'factorPrice' };
       const compTitle = comp.score == null ? '' :
         S.t('compScore', { score: comp.score }) + ' · ' +
         comp.used.map(k => `${factorKey[k] ? S.t(factorKey[k]) : k} ${Math.round(comp.factors[k] * 100)}`).join(', ');
+      const compVal = loading && comp.level === 'unknown' ? skelN() : U.pill(document, S.competitionLabel(comp.level), U.competitionTone(comp.level));
 
-      const sampled = summary.source === 'api' && p && p.sampled ? p.sampled : summary.items.length;
-      const sourceText = summary.source === 'api'
-        ? S.t('srcApi', { n: sampled })
-        : S.t('srcPage', { n: summary.items.length });
+      const chips = [
+        chip({ key: 'results', label: S.t('result'), value: S.formatCount(summary.resultCount),
+          info: { plain: S.t('plainResults'), source: summary.resultCountSource === 'api' ? ['ebayApi'] : ['ebayPage'], confidence: 'exact' } }),
+        chip({ key: 'price', label: S.t('avgPrice'), value: priceVal,
+          info: hasPrice ? { plain: S.t('plainTypicalPrice'), formula: sourceText, source: src, confidence: sampleConf } : null }),
+        chip({ key: 'range', label: S.t('range'), value: rangeVal,
+          info: hasPrice ? { plain: S.t('plainRange'), formula: S.t('formulaRange') + ' ' + sourceText, source: src, confidence: sampleConf } : null }),
+        chip({ key: 'sellers', label: S.t('sellers'), value: sellersVal,
+          info: sel.known >= 5 ? { plain: S.t('plainSellers'), formula: sourceText, source: src, confidence: 'exact' } : null }),
+        chip({ key: 'competition', label: S.t('competition'), est: S.t('estTag'), value: compVal,
+          info: comp.score == null ? null : { plain: S.t('plainCompetition'), formula: compTitle, source: src, confidence: sampleConf === 'high' ? 'medium' : 'low' } }),
+      ];
+      const more = [
+        chip({ key: 'sold', label: S.t('soldDepth'), value: soldVal,
+          info: sold.known >= 5 ? { plain: S.t('plainSold'), formula: sourceText, source: src, confidence: sampleConf } : null }),
+        U.note(document, loading ? null : sourceText),
+      ];
+      if (loading) more[1].appendChild(skelN(true));
 
-      bar.innerHTML = `
-        <div style="display:flex;align-items:center;gap:4px;font-weight:700;">
-          <span style="font-size:10px;background:rgba(255,255,255,0.2);padding:2px 6px;border-radius:4px;">KX</span>
-          "${esc(query)}"
-        </div>
-        <div class="kx-bar-divider"></div>
-        <div class="kx-bar-item">
-          <span class="kx-bar-label">${esc(S.t('result'))}</span>
-          <span class="kx-bar-value">${esc(S.formatCount(summary.resultCount))}</span>
-        </div>
-        <div class="kx-bar-divider"></div>
-        <div class="kx-bar-item">
-          <span class="kx-bar-label">${esc(S.t('avgPrice'))}</span>
-          <span class="kx-bar-value">${priceHtml}</span>
-        </div>
-        <div class="kx-bar-item">
-          <span class="kx-bar-label">${esc(S.t('range'))}</span>
-          <span class="kx-bar-value" style="font-size:12px">${rangeHtml}</span>
-        </div>
-        <div class="kx-bar-divider"></div>
-        <div class="kx-bar-item">
-          <span class="kx-bar-label">${esc(S.t('sellers'))}</span>
-          <span class="kx-bar-value">${sellersHtml}</span>
-        </div>
-        <div class="kx-bar-divider"></div>
-        <div class="kx-bar-item">
-          <span class="kx-bar-label">${esc(S.t('soldDepth'))}</span>
-          <span class="kx-bar-value" style="font-size:12px">${soldHtml}</span>
-        </div>
-        <div class="kx-bar-divider"></div>
-        <div class="kx-bar-item" title="${esc(compTitle)}">
-          <span class="kx-bar-label">${esc(S.t('competition'))} (${esc(S.t('estTag'))})</span>
-          <span class="kx-bar-value" style="color:${S.competitionColor(comp.level)}">${esc(S.competitionLabel(comp.level))}</span>
-        </div>
-        <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
-          <span class="kx-bar-label">${esc(sourceText)}</span>
-          <a href="${S.API_BASE}/app/ebay-research" target="_blank" class="kx-btn kx-btn-sm" style="background:rgba(255,255,255,0.2);text-decoration:none;color:#fff;">
-            ${esc(S.t('fullAnalysis'))}
-          </a>
-        </div>
-      `;
+      const demand = sold.known >= 5 ? sold.withSales / sold.known : null;
+      const verdict = U.verdict(comp.level, demand);
+      U.topBar(bar, {
+        title: '"' + query + '"',
+        verdict: verdict || (loading ? skelN(true) : null),
+        chips,
+        more,
+        state: loading ? 'partial' : 'full',
+        link: { href: S.API_BASE + '/app/ebay-research', text: S.t('fullAnalysis') },
+      });
     }
 
-    function injectDataRows(summary, page) {
+    /**
+     * state.pending: card ids whose sold count the API is still looking up (placeholder in the sold slot).
+     * At most three things on the strip: sold count, ≈ sales/month (estimate), price vs typical.
+     */
+    function injectDataRows(summary, page, state) {
+      const U = S.UI;
+      const pendingSold = (state && state.pending) || new Set();
       const p = summary.price;
       const median = p && p.quality !== 'insufficient' && p.quality !== 'implausible' ? p.median : null;
       const medianCurrency = p ? p.currency : null;
@@ -187,35 +271,55 @@
         if (oldRow) oldRow.remove();
         const it = byId[card.id] || card;
         const parts = [];
+        const notes = [];
         const rank = ranks[card.id];
+        let perMo = null;
+        let soldCount = Number.isFinite(it.soldCount) ? it.soldCount : card.soldCount;
 
-        if (rank && rank.isBestSeller) {
-          parts.push(`<span class="kx-best">★ ${esc(S.t('topBySold', { p: rank.percentile }))}</span>`);
-        }
-
-        const soldCount = Number.isFinite(it.soldCount) ? it.soldCount : card.soldCount;
-        if (Number.isFinite(soldCount)) {
+        if (!Number.isFinite(soldCount) && pendingSold.has(String(card.id))) {
+          parts.push(S.skel(true));
+        } else if (Number.isFinite(soldCount)) {
           const plus = it.soldCount === soldCount ? it.soldPlus : card.soldPlus;
-          parts.push(`<span>${esc(S.formatInt(soldCount))}${plus ? '+' : ''} ${esc(S.t('sold'))}</span>`);
-          const perMo = M.estMonthlySales(soldCount, it.createdAt);
+          parts.push(`<span class="kx-strong">${esc(S.formatInt(soldCount))}${plus ? '+' : ''} ${esc(S.t('sold'))}</span>`);
+          perMo = M.estMonthlySales(soldCount, it.createdAt);
           if (perMo != null) {
-            parts.push(`<span class="${S.salesColor(perMo)}">≈${esc(S.formatInt(perMo))}${esc(S.t('perMonth'))} (${esc(S.t('estTag'))})</span>`);
+            parts.push(`<span>≈${esc(S.formatInt(perMo))}${esc(S.t('perMonthSales'))}</span> <span class="kx-est" data-kx-est="1">${esc(S.t('estTag'))}</span>`);
           }
+          notes.push(S.t('cardSoldNote', { n: S.formatInt(soldCount) + (plus ? '+' : '') }));
+        } else {
+          soldCount = null;
         }
 
-        // Compare the card's own price with the median, same currency only, single prices only.
+        // Compare the card's own price with the typical price, same currency only, single prices only.
         const price = card.price != null ? card.price : it.price;
         const cur = card.price != null ? card.currency : it.currency;
         const isRange = card.priceMax != null && card.price != null && card.priceMax !== card.price;
         if (median && price && !isRange && (!medianCurrency || !cur || cur === medianCurrency)) {
-          const diff = S.priceVsMedian(price, median);
-          if (diff) parts.push(`<span class="${diff.cssClass}">${esc(diff.text)}</span>`);
+          const vs = U.vsTypical(M.pctVsMedian(price, median));
+          if (vs) parts.push(`<span class="${vs.tone === 'good' ? 'kx-green' : vs.tone === 'warn' ? 'kx-orange' : ''}" data-kx-vs="${esc(vs.pct)}">${esc(vs.text)}</span>`);
+        }
+
+        if (rank && rank.isBestSeller) {
+          notes.push(S.t('cardBestNote', { p: rank.percentile }));
+          // A free slot (max three on the face): show the best-seller badge.
+          if (parts.length < 3) parts.unshift(`<span class="kx-best">★ ${esc(S.t('topBySold', { p: rank.percentile }))}</span>`);
         }
 
         if (!parts.length) continue;
         const row = document.createElement('div');
         row.className = 'kx-data-row';
-        row.innerHTML = parts.join('<span class="kx-sep">·</span>');
+        U.strip(row);
+        row.lang = S.lang;
+        const info = perMo != null || notes.length
+          ? U.infoHtml({
+            label: S.t('sold'),
+            plain: perMo != null ? S.t('plainMonthly') : S.t('plainSold'),
+            formula: notes.join(' '),
+            source: ['ebayPage', 'ebayApi'],
+            confidence: perMo != null ? 'low' : 'exact',
+          })
+          : '';
+        row.innerHTML = U.markHtml(false) + parts.join('<span class="kx-sep">·</span>') + info;
         card.el.appendChild(row);
       }
     }

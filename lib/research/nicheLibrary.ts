@@ -11,6 +11,7 @@
  * Each niche's summary (score, typical price, competition, sales and revenue per month over the counted listings)
  * is stored in the shared cache and listed on Research Home ("Strong niches today", /api/research/niches).
  */
+import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { etsyBudgetLimited, formattersFor, readShared, sha1, normalizeQuery, writeShared } from './etsySearch';
 import { opportunityOf } from './opportunityScore';
@@ -150,7 +151,14 @@ export function rankNiches(all: NicheSummary[], limit = 12): NicheSummary[] {
     .slice(0, limit);
 }
 
+/** Every stored niche summary (one shared cache row each), so cards appear as soon as a niche is refreshed. */
 export async function readNiches(limit = 12): Promise<{ niches: NicheSummary[]; updatedAt: string | null }> {
-  const hit = await readShared<NicheSummary[]>(NICHE_INDEX_KEY);
-  return { niches: rankNiches(hit?.data ?? [], limit), updatedAt: hit?.fetchedAt ?? null };
+  const rows = await prisma.researchCache.findMany({
+    where: { userId: '__public__', cacheKey: { startsWith: NICHE_PREFIX, not: NICHE_INDEX_KEY } },
+    select: { data: true },
+    take: 500,
+  });
+  const all = rows.map((r) => (r.data as any)?.data as NicheSummary).filter((s) => s && typeof s.q === 'string');
+  const latest = rows.reduce<string | null>((m, r) => { const at = (r.data as any)?.fetchedAt as string | undefined; return at && (!m || at > m) ? at : m; }, null);
+  return { niches: rankNiches(all, limit), updatedAt: latest };
 }

@@ -385,6 +385,48 @@ describe.each<Locale>(['en', 'tr'])('AiFillCard eBay (%s)', (locale) => {
     neverSent();
     clearEbayCategoryLabels();
   });
+
+  it("fill from photos keeps the seller's typed facts: title, item specifics and description get them, research uses a short query", async () => {
+    route = (c) => {
+      if (c.url.includes('identify_product')) return { json: { seed: 'handmade Turkish ceramic bowl blue tulip floral Iznik style pottery', productName: 'Ceramic decorative bowl', keywords: [], suggestedCondition: 'NEW', wearVisible: false, notes: '' } };
+      if (c.url.startsWith('/api/clawd/ebay-research')) return { json: {} };
+      if (c.url.startsWith('/api/clawd/ebay?action=category_suggestions')) return { json: { categorySuggestions: [{ category: { categoryId: '262366', categoryName: 'Bowls' } }] } };
+      if (c.url.startsWith('/api/clawd/ebay?action=item_conditions')) return { json: { itemConditions: [] } };
+      if (c.url.startsWith('/api/clawd/ebay?action=item_aspects')) return { json: { aspects: [
+        { localizedAspectName: 'Brand', aspectConstraint: { aspectRequired: true }, aspectValues: [{ localizedValue: 'Unbranded' }] },
+        { localizedAspectName: 'Country/Region of Manufacture', aspectConstraint: { aspectRequired: false }, aspectValues: [{ localizedValue: 'Turkey' }] },
+        { localizedAspectName: 'Origin', aspectConstraint: { aspectRequired: false } },
+      ] } };
+      if (c.url.includes('optimize_title')) return { json: { optimizedTitle: 'Handmade Turkish Iznik Ceramic Bowl Blue Tulip Floral' } };
+      // The server drops placeholders too; the client guard must hold on its own.
+      if (c.url.includes('suggest_aspects')) return { json: { aspects: { 'Country/Region of Manufacture': ['Turkey'], Origin: ['Unknown'], Brand: ['Unbranded'] } } };
+      if (c.url.includes('suggest_price')) return { json: {} };
+      if (c.url.includes('generate_description')) return { json: { description: 'A handmade Turkish Iznik ceramic bowl, hand painted with blue tulips. New and unused.' } };
+      return undefined;
+    };
+    const setField = vi.fn();
+    wrap(<EbayFillHarness setField={setField} photoUrls={['/api/clawd/serve-image?f=bowl.jpg']} />, locale);
+    fireEvent.change(within(screen.getByTestId('le-ai-fill-seed')).getByRole('textbox'), { target: { value: 'handmade Turkish Iznik bowl' } });
+    fireEvent.click(screen.getByTestId('le-ai-fill-run'));
+    await screen.findByTestId('le-ai-fill-use-all');
+
+    const body = (part: string) => calls.find((c) => c.url.includes(part))?.body as Record<string, unknown>;
+    const facts = 'handmade Turkish Iznik bowl';
+    // The photo read stays the product description; the seller's words travel as given facts.
+    expect(body('optimize_title')).toMatchObject({ title: 'handmade Turkish ceramic bowl blue tulip floral Iznik style pottery', sellerFacts: facts });
+    expect(body('suggest_aspects')).toMatchObject({ sellerFacts: facts, aspectRules: expect.arrayContaining([{ name: 'Brand', required: true, values: ['Unbranded'] }]) });
+    expect(body('generate_description')).toMatchObject({ sellerFacts: facts, condition: 'NEW', format: 'text' });
+    // Research: seller words + product type, not the long visual phrase.
+    const research = calls.find((c) => c.url.startsWith('/api/clawd/ebay-research'))!;
+    expect(new URL(research.url, 'https://x').searchParams.get('q')).toBe('handmade turkish iznik bowl ceramic');
+
+    fireEvent.click(screen.getByTestId('le-ai-fill-use-all'));
+    const aspects = setField.mock.calls.find(([k]) => k === 'aspects')?.[1] as Record<string, string[]>;
+    // "Unknown" dropped; "Unbranded" kept only because Brand is required and eBay lists it.
+    expect(aspects).toEqual({ 'Country/Region of Manufacture': ['Turkey'], Brand: ['Unbranded'] });
+    neverSent();
+    clearEbayCategoryLabels();
+  });
 });
 
 // ── ReviewDifferencesPanel ────────────────────────────────────────────────────────────────────────────────────

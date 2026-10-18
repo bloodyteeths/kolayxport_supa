@@ -103,6 +103,15 @@ export function checkGuards(input: GuardInput): GuardResult {
   const email = normalizeEmail(input.env.REVIEWER_EMAIL);
   if (!email) return { ok: false, reason: 'REVIEWER_EMAIL is not set' };
   if (!EMAIL_RE.test(email)) return { ok: false, reason: `REVIEWER_EMAIL is not a valid e-mail address: ${email}` };
+  // Other review accounts live in production (Shopify App Store: review@, Google Play: play-review@, FedEx sandbox
+  // testers): never touch them, whatever their data looks like. Directory reviewer addresses start with "mcp-review".
+  const protectedEmails = new Set([
+    'review@kolayxport.com',
+    'play-review@kolayxport.com',
+    ...String(input.env.FEDEX_SANDBOX_EMAILS ?? '').split(',').map((e) => normalizeEmail(e)).filter(Boolean),
+  ]);
+  if (protectedEmails.has(email)) return { ok: false, reason: `${email} is a protected review/test account and is never touched by this script` };
+  if (!email.split('@')[0].startsWith('mcp-review')) return { ok: false, reason: `REVIEWER_EMAIL must start with "mcp-review" (e.g. mcp-review@kolayxport.com), got ${email}` };
 
   // The same URL the app's Prisma client uses (lib/prisma.ts), so the account lands in the database the app reads.
   const dbVar = (['DIRECT_URL', 'DATABASE_URL_NOPREP', 'DATABASE_URL'] as const).find((k) => String(input.env[k] ?? '').trim()) ?? null;

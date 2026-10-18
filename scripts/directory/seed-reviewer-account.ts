@@ -6,7 +6,7 @@
  *
  * ── Run ─────────────────────────────────────────────────────────────────────────────────────────────────────
  *   Local throwaway DB (host localhost / 127.0.0.1 / ::1 and database not "kolayxport"):
- *     DATABASE_URL=postgresql://postgres@localhost:5544/kx_gtm_preview REVIEWER_EMAIL=review@kolayxport.test \
+ *     DATABASE_URL=postgresql://postgres@localhost:5544/kx_gtm_preview REVIEWER_EMAIL=mcp-review@kolayxport.test \
  *       REVIEWER_SECRET_OUT=/somewhere/outside/the/repo/reviewer.txt npx tsx scripts/directory/seed-reviewer-account.ts [--dry-run]
  *   Production (from /home/deploy/kolayxport; DATABASE_URL comes from its .env):
  *     REVIEWER_EMAIL=… CONFIRM=seed-reviewer-<REVIEWER_EMAIL> npx tsx scripts/directory/seed-reviewer-account.ts --production --dry-run

@@ -6,13 +6,20 @@ import { checkGuards, confirmTokenFor } from '@/scripts/directory/reviewerGuards
 import { buildReviewerDataset, reservedIdsOf, reservedIdProblems, REVIEWER_NAME } from '@/scripts/directory/reviewerData';
 import { deleteOrder, generatePassword, readOnlyClient, runReviewerSeed, schemaEdges, writeSecretFile } from '@/scripts/directory/reviewerSeed';
 
-const EMAIL = 'review@kolayxport.test';
+const EMAIL = 'mcp-review@kolayxport.test';
 const CWD = '/srv/app';
 const LOCAL_DB = 'postgresql://postgres@localhost:5544/kx_gtm_preview';
 const REMOTE_DB = 'postgresql://u:p@db.example.com:5432/kolayxport';
 const guard = (argv: string[], env: Record<string, string | undefined>) => checkGuards({ argv, env, cwd: CWD });
 
 describe('reviewer seed guards', () => {
+  it('never touches the protected review accounts and only accepts mcp-review addresses', () => {
+    for (const e of ['review@kolayxport.com', 'Play-Review@kolayxport.com', 'fedex-tester@kolayxport.com']) {
+      expect(guard(['--dry-run'], { DATABASE_URL: LOCAL_DB, REVIEWER_EMAIL: e, FEDEX_SANDBOX_EMAILS: 'fedex-tester@kolayxport.com' }).ok).toBe(false);
+    }
+    expect(guard(['--dry-run'], { DATABASE_URL: LOCAL_DB, REVIEWER_EMAIL: 'demo@kolayxport.test' })).toMatchObject({ ok: false, reason: expect.stringContaining('mcp-review') });
+    expect(guard(['--dry-run'], { DATABASE_URL: LOCAL_DB, REVIEWER_EMAIL: 'mcp-review@kolayxport.com' }).ok).toBe(true);
+  });
   it('refuses without REVIEWER_EMAIL', () => {
     expect(guard(['--dry-run'], { DATABASE_URL: LOCAL_DB })).toMatchObject({ ok: false, reason: expect.stringContaining('REVIEWER_EMAIL') });
   });
@@ -39,7 +46,7 @@ describe('reviewer seed guards', () => {
   });
 
   it('allows a local throwaway database without flags', () => {
-    expect(guard(['--dry-run'], { DATABASE_URL: LOCAL_DB, REVIEWER_EMAIL: 'Review@KolayXport.test ' })).toMatchObject({ ok: true, local: true, email: EMAIL, mode: 'seed' });
+    expect(guard(['--dry-run'], { DATABASE_URL: LOCAL_DB, REVIEWER_EMAIL: 'MCP-Review@KolayXport.test ' })).toMatchObject({ ok: true, local: true, email: EMAIL, mode: 'seed' });
     expect(guard(['--remove'], { DATABASE_URL: LOCAL_DB, REVIEWER_EMAIL: EMAIL })).toMatchObject({ ok: true, mode: 'remove' });
   });
 

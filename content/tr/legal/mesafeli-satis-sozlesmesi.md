@@ -22,7 +22,7 @@ inventoryRefs: []
 | Vergi dairesi / no | [TODO(owner): vergi dairesi] / 6222605496 |
 | Telefon | [TODO(owner): telefon] |
 | E-posta | destek@kolayxport.com |
-| KEP adresi | [TODO(owner): KEP adresi] |
+| KEP adresi | modsonsyazilim@hs01.kep.tr |
 
 **ALICI**
 
@@ -75,7 +75,7 @@ Alıcı, sözleşmenin kurulmasından önce [Ön Bilgilendirme Formu](/on-bilgil
 
 7.2. **İstisna:** Yönetmelik md. 15/1-(ğ) (elektronik ortamda anında ifa edilen hizmetler) ve md. 15/1-(h) (cayma süresi sona ermeden önce tüketicinin onayı ile ifasına başlanan hizmetler) uyarınca, Alıcı ödeme adımında işaretlenmemiş olarak sunulan kutucuğu işaretleyerek **Hizmet'in derhal ifasına başlanmasını talep ettiğini ve bu nedenle cayma hakkını kaybedeceğini** açıkça onaylamışsa, ifasına başlanan abonelik dönemi için cayma hakkı kullanılamaz. Bu onay verilmemişse cayma hakkı 7.1. maddeye göre kullanılabilir.
 
-7.3. Cayma bildirimi, süresi içinde destek@kolayxport.com adresine e-postayla, [TODO(owner): KEP adresi] adresine KEP ile veya 1. maddedeki adrese yazılı olarak yapılır.
+7.3. Cayma bildirimi, süresi içinde destek@kolayxport.com adresine e-postayla, modsonsyazilim@hs01.kep.tr adresine KEP ile veya 1. maddedeki adrese yazılı olarak yapılır.
 
 7.4. Satıcı, cayma bildiriminin kendisine ulaştığı tarihten itibaren **14 gün** içinde tahsil edilen toplam bedeli, Alıcı'nın ödemede kullandığı yöntemle ve Alıcı'ya herhangi bir masraf yüklemeden iade eder.
 

@@ -22,7 +22,7 @@ KolayXport has a different role for the **buyer (end-customer) data** that selle
 | Trade registry | Adana Chamber of Commerce, registry no. 100129 |
 | MERSİS no. | [TODO(owner): MERSİS no] |
 | Tax office / no. | [TODO(owner): vergi dairesi] / 6222605496 |
-| Registered e-mail (KEP) | [TODO(owner): KEP adresi] |
+| Registered e-mail (KEP) | modsonsyazilim@hs01.kep.tr |
 | E-mail | destek@kolayxport.com |
 
 ## 2. Categories of personal data we process
@@ -139,7 +139,7 @@ You have the right to:
 To use your rights, send your application in Turkish, in line with the Communiqué on the Procedures and Principles of Application to the Data Controller, by one of these routes:
 
 - **In writing:** a wet-signed letter with proof of identity, delivered by hand or through a notary to "MODSONS YAZILIM E-TİCARET İTHALAT İHRACAT LİMİTED ŞİRKETİ, Beyazevler Mah. 80053 Sok. Tanrıkulu Apt. No:8 İç Kapı No:02, 01170 Çukurova / Adana",
-- **By KEP** to [TODO(owner): KEP adresi],
+- **By KEP** to modsonsyazilim@hs01.kep.tr,
 - **With a secure electronic or mobile signature**, or **from the e-mail address registered in your KolayXport account**, to destek@kolayxport.com.
 
 Your application must include your name, signature (for written applications), Turkish ID number (for foreign nationals: nationality and passport or ID number), address or e-mail for notifications, phone number and a clear description of your request.

@@ -22,7 +22,7 @@ Satıcıların KolayXport'a aktardığı **alıcı (son müşteri) verileri** i�
 | Ticaret sicili | Adana Ticaret Odası, sicil no 100129 |
 | MERSİS no | [TODO(owner): MERSİS no] |
 | Vergi dairesi / no | [TODO(owner): vergi dairesi] / 6222605496 |
-| KEP adresi | [TODO(owner): KEP adresi] |
+| KEP adresi | modsonsyazilim@hs01.kep.tr |
 | E-posta | destek@kolayxport.com |
 
 ## 2. İşlenen kişisel veri kategorileri
@@ -141,7 +141,7 @@ haklarına sahipsiniz.
 Haklarınızı kullanmak için başvurunuzu, Veri Sorumlusuna Başvuru Usul ve Esasları Hakkında Tebliğ'e uygun olarak, Türkçe ve aşağıdaki yollardan biriyle iletebilirsiniz:
 
 - **Yazılı olarak:** ıslak imzalı dilekçeyle, kimliğinizi tevsik eden belgeyle birlikte, "MODSONS YAZILIM E-TİCARET İTHALAT İHRACAT LİMİTED ŞİRKETİ, Beyazevler Mah. 80053 Sok. Tanrıkulu Apt. No:8 İç Kapı No:02, 01170 Çukurova / Adana" adresine elden veya noter aracılığıyla,
-- **KEP ile:** [TODO(owner): KEP adresi] adresine,
+- **KEP ile:** modsonsyazilim@hs01.kep.tr adresine,
 - **Güvenli elektronik imza veya mobil imza ile** ya da **KolayXport hesabınızda kayıtlı e-posta adresinizden** destek@kolayxport.com adresine.
 
 Başvurunuzda ad, soyad, imza (yazılı başvuruda), T.C. kimlik numarası (yabancılar için uyruk ve pasaport/kimlik numarası), tebligata esas adres veya e-posta, telefon ve talep konusunun açıkça yer alması gerekir.

@@ -164,4 +164,4 @@ If any provision of these Terms is found invalid, the others remain valid. Not e
 
 Questions: destek@kolayxport.com
 Address for written notices: MODSONS YAZILIM E-TİCARET İTHALAT İHRACAT LİMİTED ŞİRKETİ, Beyazevler Mah. 80053 Sok. Tanrıkulu Apt. No:8 İç Kapı No:02, 01170 Çukurova / Adana, Türkiye
-KEP: [TODO(owner): KEP adresi]
+KEP: modsonsyazilim@hs01.kep.tr

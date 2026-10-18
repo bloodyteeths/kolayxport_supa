@@ -26,7 +26,7 @@ Bu formdaki tüketici hakları, Hizmet'i **ticari veya mesleki olmayan amaçlarl
 | Vergi dairesi / no | [TODO(owner): vergi dairesi] / 6222605496 |
 | Telefon | [TODO(owner): telefon] |
 | E-posta | destek@kolayxport.com |
-| KEP adresi | [TODO(owner): KEP adresi] |
+| KEP adresi | modsonsyazilim@hs01.kep.tr |
 | ETBİS kaydı | [TODO(owner): ETBİS kayıt numarası/durumu] |
 | Web sitesi | https://kolayxport.com |
 
@@ -66,7 +66,7 @@ Bu onayı vermediğiniz veya cayma hakkının kullanılamayacağı bir durumun b
 
 - E-posta: destek@kolayxport.com (konu: "Cayma bildirimi")
 - Yazılı olarak: Beyazevler Mah. 80053 Sok. Tanrıkulu Apt. No:8 İç Kapı No:02, 01170 Çukurova / Adana
-- KEP: [TODO(owner): KEP adresi]
+- KEP: modsonsyazilim@hs01.kep.tr
 
 Cayma bildiriminizin bize ulaşmasından itibaren **14 gün** içinde, ödediğiniz toplam bedel, ödemede kullandığınız yöntemle ve size herhangi bir masraf yüklenmeksizin iade edilir.
 

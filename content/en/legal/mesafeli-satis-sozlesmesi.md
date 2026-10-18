@@ -24,7 +24,7 @@ The Turkish version of this agreement is the binding text; this English version 
 | Tax office / no. | [TODO(owner): vergi dairesi] / 6222605496 |
 | Phone | [TODO(owner): telefon] |
 | E-mail | destek@kolayxport.com |
-| Registered e-mail (KEP) | [TODO(owner): KEP adresi] |
+| Registered e-mail (KEP) | modsonsyazilim@hs01.kep.tr |
 
 **BUYER**
 
@@ -77,7 +77,7 @@ Before the agreement is formed, the Buyer confirms electronically that they have
 
 7.2. **Exception:** Under Art. 15/1-(ğ) (services performed instantly in electronic form) and Art. 15/1-(h) (services whose performance has started, with the consumer's approval, before the withdrawal period ends) of the Regulation, if the Buyer ticked the unticked box at checkout to confirm explicitly that **they ask for the Service to start immediately and therefore lose the right of withdrawal**, the right of withdrawal cannot be used for the subscription period whose performance has started. If this confirmation was not given, the right of withdrawal can be used under clause 7.1.
 
-7.3. Notice of withdrawal is given within the period by e-mail to destek@kolayxport.com, by KEP to [TODO(owner): KEP adresi], or in writing to the address in clause 1.
+7.3. Notice of withdrawal is given within the period by e-mail to destek@kolayxport.com, by KEP to modsonsyazilim@hs01.kep.tr, or in writing to the address in clause 1.
 
 7.4. The Seller refunds the total amount charged within **14 days** of receiving the notice of withdrawal, using the payment method the Buyer used and at no cost to the Buyer.
 

@@ -59,9 +59,14 @@ describe('AI guards', () => {
     expect(sanitizeDescription('etsy', 'Too short')).toBe('');
   });
 
-  it('eBay description keeps HTML (eBay renders it) but measures the text', () => {
-    const html = `<div><p>${'Solid brass candle holder with a hand polished finish. '.repeat(3)}</p></div>`;
-    expect(sanitizeDescription('ebay', { description: html })).toBe(html);
+  it('eBay description: the plain-text field gets text (HTML from the model is converted), too short is rejected', () => {
+    const line = 'Solid brass candle holder with a hand polished finish. '.repeat(3).trim();
+    const html = `<div style="font-family: Arial"><h2>Brass Candle Holder</h2>\n  <p>${line}</p>\n  <ul>\n    <li><strong>Material:</strong> Brass</li>\n    <li>Pair &amp; set</li>\n  </ul></div>`;
+    const out = sanitizeDescription('ebay', { description: html });
+    expect(out).not.toMatch(/<[a-z/]/i);
+    expect(out).toBe(`Brass Candle Holder\n\n${line}\n\n• Material: Brass\n• Pair & set`);
+    // Plain text from the model (format: 'text') is kept as written.
+    expect(sanitizeDescription('ebay', `${line}\n\n• Brass`)).toBe(`${line}\n\n• Brass`);
     expect(sanitizeDescription('ebay', '<p>tiny</p>')).toBe('');
   });
 

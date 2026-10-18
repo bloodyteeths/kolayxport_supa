@@ -10,6 +10,7 @@ import {
 import type { SelectChangeEvent } from '@mui/material/Select';
 import { useTranslations } from 'next-intl';
 import { FormField, Select as DsSelect, TextArea } from '@/components/ds/inputs';
+import { UNIVERSAL_CONDITIONS } from '@/lib/ebay/payloadRules';
 
 interface ConditionOption {
   conditionId: string;
@@ -77,13 +78,7 @@ export default function ConditionSelector({
    * default to the set that works everywhere and let an explicit category list
    * widen it.
    */
-  const UNIVERSAL_CONDITIONS = [
-    'NEW',
-    'NEW_OTHER',
-    'USED_EXCELLENT',
-    'FOR_PARTS_OR_NOT_WORKING',
-  ];
-
+  // UNIVERSAL_CONDITIONS lives in lib/ebay/payloadRules (the AI fill validates its proposal against the same set).
   const DEFAULT_CONDITIONS = UNIVERSAL_CONDITIONS.map((value) => ({
     value,
     label: t(CONDITION_KEYS[value]),

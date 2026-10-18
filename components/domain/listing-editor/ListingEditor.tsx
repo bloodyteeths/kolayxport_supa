@@ -247,6 +247,8 @@ function aiInputFrom(view: ListingView<FieldMap>) {
     materials: Array.isArray(f.materials) ? (f.materials as readonly string[]) : undefined,
     price: Number.isFinite(price) ? price : null,
     currency: view.meta.currency,
+    // eBay: the AI description states only this condition (none when the marketplace has no condition field).
+    condition: typeof f.condition === 'string' && f.condition ? f.condition : null,
   };
 }
 

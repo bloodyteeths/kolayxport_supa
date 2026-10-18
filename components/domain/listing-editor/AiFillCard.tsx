@@ -45,7 +45,7 @@ export interface AiFillCardProps {
   'data-testid'?: string;
 }
 
-/** Plain one-line preview of eBay HTML descriptions (the field keeps the HTML). */
+/** One-line preview of an eBay description (plain text; HTML a seller typed is stripped for the preview). */
 function previewText(html: string, max = 320): string {
   const s = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
   return s.length > max ? `${s.slice(0, max - 1).trimEnd()}…` : s;

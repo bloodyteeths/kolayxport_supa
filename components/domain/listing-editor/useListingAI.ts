@@ -40,7 +40,8 @@ import { LIMIT_UI_HEADER } from '@/lib/http/limitInterceptor';
 import { useToast } from '@/components/ds/feedback/toast';
 import type { FieldSuggestionProps } from '@/components/ds/inputs/FieldSuggestion';
 import type { FieldAiState, MarketBand } from './sections/sectionTypes';
-import { normalizeCondition } from '@/lib/ebay/payloadRules';
+import { ebayHtmlToText, normalizeCondition, resolveAiCondition } from '@/lib/ebay/payloadRules';
+import { rememberEbayCategoryLabel } from './ebayCategoryLabels';
 import { track } from '@/lib/tracking/events';
 import { decodeAspects } from './adapters/ebay';
 import {
@@ -468,7 +469,7 @@ export function toTrendyolHtml(text: string): string {
 }
 
 /**
- * Etsy descriptions are plain text (entities decoded); eBay descriptions are HTML and kept as returned; Trendyol
+ * Etsy descriptions are plain text (entities decoded); eBay descriptions become plain text for the textarea (HTML is made at send, lib/ebay/payloadRules); Trendyol
  * descriptions are entity-decoded, then turned into allowlisted HTML (`toTrendyolHtml`).
  */
 export function sanitizeDescription(marketplace: AiMarketplace, raw: unknown): string {
@@ -482,8 +483,11 @@ export function sanitizeDescription(marketplace: AiMarketplace, raw: unknown): s
   }
   const arr = Array.isArray(raw) && raw.every((p) => typeof p === 'string') ? (raw as string[]) : null;
   const text = arr ? arr.map((p) => p.trim()).filter(Boolean).join('\n\n') : coerceAiString(raw);
-  const out = marketplace === 'etsy' ? decodeEntities(text).trim() : text.trim();
-  const plain = marketplace === 'etsy' ? out : out.replace(/<[^>]+>/g, ' ');
+  // eBay: the description field is a plain textarea (HTML typed by a seller still works); the AI's text goes in as
+  // paragraphs + "• " bullets and becomes HTML when sent (lib/ebay/payloadRules descriptionToEbayHtml). A model that
+  // answers in HTML anyway is converted, so the field never shows markup.
+  const out = marketplace === 'etsy' ? decodeEntities(text).trim() : ebayHtmlToText(text);
+  const plain = out;
   if (plain.trim().length < DESCRIPTION_MIN || looksGarbled(plain.replace(/\s+/g, ' ').trim())) return '';
   return out;
 }
@@ -1055,7 +1059,7 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
   }), [run, supports, set, t, ensureResearch, titleFrom, basisFor, failure]);
 
   // ── Description ────────────────────────────────────────────────────────────────────────────────────────
-  const descriptionFrom = useCallback(async (title: string, r: AiResearchPrefill | null, sourceDescription?: string): Promise<string> => {
+  const descriptionFrom = useCallback(async (title: string, r: AiResearchPrefill | null, sourceDescription?: string, condition?: string | null): Promise<string> => {
     const input = opts.current.input;
     if (marketplace === 'trendyol') {
       const existing = decodeEntities((sourceDescription ?? input.description ?? '').replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
@@ -1082,9 +1086,11 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
     const data = await ebayAi('generate_description', {
       title,
       aspects: input.aspects && Object.keys(input.aspects).length ? input.aspects : undefined,
-      condition: input.condition ?? undefined,
+      // The fill's proposed condition when it has one (the field still holds the blank listing's default).
+      condition: (condition ?? input.condition) || undefined,
       price: input.price ?? undefined,
       marketResearch: ebayResearch.current ?? undefined,
+      format: 'text',
     });
     return sanitizeDescription('ebay', data.description);
   }, [marketplace, etsyAi, ebayAi, trendyolAi]);
@@ -1306,6 +1312,10 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
     const job = (async () => {
       setFill({ running: true, steps: steps.map((x) => ({ ...x })) });
       let seed = decodeEntities((o.seed ?? '').trim()).slice(0, 200);
+      // The seller's own words (a typed "used" keeps a used condition); the photo read replaces `seed` below.
+      const sellerText = seed;
+      let photoCondition: { suggested: string; wearVisible: boolean } | null = null;
+      let condition: string | null = null;
       let limited = false;
       const onError = (key: AiKey, err: unknown) => {
         const f = failure(err);
@@ -1326,9 +1336,12 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
             const data = r.data as Record<string, unknown>;
             const found = coerceAiString(data.seed).slice(0, 200);
             if (found) seed = found;
-            const cond = coerceAiString(data.suggestedCondition).toUpperCase();
-            // Bare VERY_GOOD / GOOD / ACCEPTABLE are not valid eBay conditions: mapped like every other writer.
-            if (marketplace === 'ebay' && /^(NEW|LIKE_NEW|VERY_GOOD|GOOD|ACCEPTABLE)$/.test(cond)) put('condition', { status: 'ready', value: normalizeCondition(cond) ?? cond });
+            // eBay condition: NEW unless the photos clearly show wear or the seller says used; checked against the
+            // category's allowed conditions once the category is known (resolveAiCondition, below).
+            if (marketplace === 'ebay' && found) {
+              photoCondition = { suggested: coerceAiString(data.suggestedCondition).toUpperCase(), wearVisible: data.wearVisible === true };
+              condition = resolveAiCondition({ ...photoCondition, sellerText });
+            }
             mark('identify', found ? 'done' : 'error');
           } catch (err) {
             mark('identify', 'error');
@@ -1386,6 +1399,24 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
           mark('category', 'error');
         }
 
+        if (photoCondition) {
+          // Only a condition the category accepts (an empty list = eBay names none: the universal set).
+          let allowed: string[] = [];
+          if (category) {
+            try {
+              const res = await http(`/api/clawd/ebay?${new URLSearchParams({ action: 'item_conditions', category_id: category.id }).toString()}`);
+              const list = res.ok && res.data && typeof res.data === 'object' ? (res.data as { itemConditions?: unknown[] }).itemConditions : [];
+              allowed = (Array.isArray(list) ? list : [])
+                .map((c) => normalizeCondition((c as { conditionId?: unknown } | null)?.conditionId))
+                .filter((c): c is string => !!c);
+            } catch {
+              allowed = [];
+            }
+          }
+          condition = resolveAiCondition({ ...photoCondition, sellerText, allowed });
+          put('condition', { status: 'ready', value: condition });
+        }
+
         mark('specifics', 'running');
         claim('specifics');
         try {
@@ -1428,7 +1459,7 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
       put('description', { status: 'loading' });
       let description = '';
       try {
-        description = await descriptionFrom(workingTitle, r, marketplace === 'trendyol' ? o.sourceDescription : undefined);
+        description = await descriptionFrom(workingTitle, r, marketplace === 'trendyol' ? o.sourceDescription : undefined, condition);
         put('description', description ? { status: 'ready', value: description, basis } : { status: 'error', error: true });
         mark('description', description ? 'done' : 'error');
       } catch (err) {
@@ -1598,12 +1629,15 @@ export function useListingAI(options: UseListingAIOptions): UseListingAI {
       toWrite = [...current, ...ideas.slice(0, free)];
     } else if (k === 'specifics') {
       toWrite = mergeAspects(o.getField ? o.getField(key) : undefined, o.input.aspects, value);
-    } else if (k === 'category' && marketplace === 'ebay' && !custom) {
-      // Only the contract's field (categoryId); the name follows from the id. A frame that also wants the name
-      // stored passes `appliers.category`.
+    } else if (k === 'category' && marketplace === 'ebay') {
+      // Only the contract's field (categoryId) is stored; the name the suggestion carried is remembered for the
+      // Details section's category field (ebayCategoryLabels), which otherwise showed "Category #<id>".
       const c = value as AiCategory;
-      if (!c?.id) return null;
-      toWrite = c.id;
+      if (c && typeof c === 'object') rememberEbayCategoryLabel(c.id, c.name);
+      if (!custom) {
+        if (!c?.id) return null;
+        toWrite = c.id;
+      }
     }
     if (custom) custom(toWrite);
     else if (o.setField) o.setField(key, toWrite);

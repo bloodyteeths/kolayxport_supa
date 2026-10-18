@@ -265,6 +265,31 @@ async function ebayHandler(
       }
     }
 
+    // GET ?action=category_info&category_id=XXX — the category's name (the listing editor stores only the id)
+    if (req.method === 'GET' && action === 'category_info') {
+      const categoryId = String(req.query.category_id || '').trim();
+      if (!/^\d{1,12}$/.test(categoryId)) {
+        return res.status(400).json({ error: 'category_id is required' });
+      }
+      const categoryTreeId = (req.query.category_tree_id as string) || '0';
+      const appToken = await getApplicationToken();
+      try {
+        const data = await callEbayAPI(
+          `/commerce/taxonomy/v1/category_tree/${encodeURIComponent(categoryTreeId)}/get_category_subtree?category_id=${encodeURIComponent(categoryId)}`,
+          appToken
+        );
+        const node = data?.categorySubtreeNode;
+        return res.status(200).json({
+          categoryId,
+          categoryName: node?.category?.categoryName || null,
+          leaf: Boolean(node?.leafCategoryTreeNode),
+        });
+      } catch (err: any) {
+        logger.warn(`category_info lookup failed for ${categoryId}: ${err.message}`);
+        return res.status(404).json({ categoryId, categoryName: null });
+      }
+    }
+
     // GET ?action=item_aspects&category_id=XXX&category_tree_id=0
     if (req.method === 'GET' && action === 'item_aspects') {
       const categoryId = req.query.category_id as string;
@@ -2732,6 +2757,7 @@ async function ebayHandler(
         'category_suggestions',
         'item_aspects',
         'item_conditions',
+        'category_info',
         // Policies
         'fulfillment_policies',
         'return_policies',

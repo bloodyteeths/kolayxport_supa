@@ -130,3 +130,11 @@ describe('quality check', () => {
     expect([r.match, r.realism]).toEqual([10, 9]);
   });
 });
+
+describe('custom setting text', () => {
+  it('the checked English setting is used, the raw text is not', () => {
+    const p = directVideo({ ...DEFAULT_DIRECTION, preset: 'hero', person: false, scene: 'custom', sceneText: 'pencere kenarında ahşap masa', sceneTextEn: 'A wooden table by a bright window.' });
+    expect(p).toMatch(/Setting: A wooden table by a bright window\./);
+    expect(p).not.toMatch(/pencere/);
+  });
+});

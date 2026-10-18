@@ -31,6 +31,8 @@ export function ruleNotes(text: string): string {
 /** The seller's words → a checked English direction for this product and shot. */
 export async function interpretNotes(userId: string, input: {
   notes: string; profile?: ProductProfile; product?: string; shot?: string; free?: boolean; person?: boolean; locale: 'tr' | 'en';
+  /** The words describe only the setting ("Custom…" background): the place and the light, nothing else. */
+  setting?: boolean;
 }): Promise<NotesResult | null> {
   const notes = ruleNotes(input.notes);
   const lang = input.locale === 'en' ? 'English' : 'Turkish';
@@ -50,7 +52,9 @@ export async function interpretNotes(userId: string, input: {
       text: [
         `A seller wrote this for a short product video of "${product}"${facts ? ` (${facts})` : ''}${input.shot ? `, shot: "${clean(input.shot, 200)}"` : ''}${input.person ? ', a person wears or holds it in the photos' : ''}:`,
         `"""${notes}"""`,
-        input.free ? 'These words ARE the whole shot (what happens on camera).' : 'These words are extra wishes on top of the chosen shot.',
+        input.setting
+          ? 'These words describe only the SETTING the product is filmed in (the place, the surroundings and the light). Return only that setting, as a real place; nothing about the product, a person or the camera.'
+          : input.free ? 'These words ARE the whole shot (what happens on camera).' : 'These words are extra wishes on top of the chosen shot.',
         'Rewrite it as ONE English direction (at most 50 words) for an image-to-video model that must produce real, believable footage of exactly this product. Keep every wish real footage can show: camera moves, speed, setting, light, mood, framing, what a person does calmly.',
         'Only what the seller asked for: never add actions, turns, camera moves, light or settings they did not mention (the chosen shot and setting cover the rest). Never a close-up of a face or hands.',
         'Call any person only "the model" (wearing it) or "the person" — never guess gender or age, never "woman", "man", "girl", "boy", "child", "her", "his"; use "their".',

@@ -84,7 +84,7 @@ No system can be perfectly secure. As of this date KolayXport **does not hold** 
 ## 7. Retention
 
 - **Account data:** while your account is open. When you delete your account, your data is deleted immediately and leaves the rotating backups within about 3 months at most. Invoices and contract records we must keep by law are kept for the required period (up to 10 years).
-- **Buyer personal data** (name, address, phone, e-mail, notes): kept for at most **90 days** from the order date and then deleted automatically. Order details that contain no personal data (order number, amount, SKU, status) are kept for reporting. [TODO(owner): üretimde PII_PURGE_DRY_RUN=false ayarlandığını ve silme işinin gerçekten çalıştığını teyit edin; Amazon verileri için Amazon'un Veri Koruma Politikası'ndaki daha kısa süreyi (teslimattan sonra 30 gün) karşılayıp karşılamadığımızı kontrol edin]
+- **Buyer personal data** (name, address, phone, e-mail, notes): kept while your account is open so you can manage your orders; deleted immediately when you delete your account.
 - **Access tokens for connected accounts:** while the connection exists; deleted when you disconnect.
 - **Marketplace listing data:** refreshed in line with each marketplace's API terms; Etsy listing data is refreshed at least every 6 hours and other Etsy content at least every 24 hours.
 - **Listing images and videos you uploaded but have not sent yet:** on our server until the draft is sent or cancelled.

@@ -84,7 +84,7 @@ Hiçbir sistem mutlak güvenlik sağlayamaz. KolayXport'un bu tarih itibarıyla 
 ## 7. Saklama süreleri
 
 - **Hesap verileri:** hesabınız açık olduğu sürece. Hesabınızı sildiğinizde verileriniz hemen silinir; dönüşümlü yedeklerden en geç yaklaşık 3 ay içinde çıkar. Yasal saklama yükümlülüğü olan fatura ve sözleşme kayıtları ilgili süre boyunca (10 yıla kadar) saklanır.
-- **Alıcı kişisel verileri** (ad, adres, telefon, e-posta, notlar): sipariş tarihinden itibaren en fazla **90 gün** saklanır, ardından otomatik olarak silinir. Raporlama için kişisel veri içermeyen sipariş bilgileri (sipariş numarası, tutar, ürün kodu, durum) korunur. [TODO(owner): üretimde PII_PURGE_DRY_RUN=false ayarlandığını ve silme işinin gerçekten çalıştığını teyit edin; Amazon verileri için Amazon'un Veri Koruma Politikası'ndaki daha kısa süreyi (teslimattan sonra 30 gün) karşılayıp karşılamadığımızı kontrol edin]
+- **Alıcı kişisel verileri** (ad, adres, telefon, e-posta, notlar): siparişlerinizi yönetebilmeniz için hesabınız açık olduğu sürece saklanır; hesabınızı sildiğinizde hemen silinir.
 - **Bağlı hesap erişim anahtarları:** bağlantı sürdükçe; bağlantıyı kestiğinizde silinir.
 - **Pazaryeri ilan verileri:** pazaryerlerinin API koşullarına uygun olarak yenilenir; Etsy ilan verileri en geç 6 saatte, diğer Etsy içerikleri en geç 24 saatte bir yenilenir.
 - **Yükleyip henüz göndermediğiniz ilan görselleri ve videoları:** taslak gönderilene veya iptal edilene kadar sunucumuzda.

@@ -1819,7 +1819,9 @@
         "permission": "Permission",
         "create": "Create key",
         "once": "Copy this key now: it will not be shown again.",
-        "claudeCode": "For Claude Code:"
+        "claudeCode": "For Claude Code:",
+        "shareBuyer": "Share buyer names and shipping addresses",
+        "shareBuyerHint": "The AI company you connect will see this information. Amazon orders are never shared; e-mail and phone stay hidden."
       },
       "defaultName": "Personal key",
       "scope": {
@@ -1840,7 +1842,11 @@
       "revoked": "Connection removed",
       "revokeFailed": "Could not remove the connection. Try again.",
       "createFailed": "Could not create the key. Try again.",
-      "privacy": "Your buyers' names, addresses, e-mails and phone numbers are never sent to AI apps (orders carry the country only). Connections end by themselves after a year at the latest."
+      "privacy": "Your buyers' e-mails and phone numbers are never sent to AI apps. Names and shipping addresses go only to connections where you turn on sharing (never for Amazon orders); other connections see the country only. Connections end by themselves after a year at the latest.",
+      "buyer": {
+        "on": "buyer names and addresses shared",
+        "off": "country only"
+      }
     },
     "deleteAccount": {
       "title": "Delete account",
@@ -17054,12 +17060,15 @@
       "invalidBody": "Start the connection again from your AI app.",
       "title": "{app} wants to connect to your KolayXport account",
       "subtitle": "If you allow it, this app can answer your questions about your shop.",
+      "redirectHost": "After you answer, you return to {host}",
       "canTitle": "It can see:",
-      "canOrders": "Your orders (no buyer names or addresses, country only)",
+      "canOrders": "Your orders (country only, unless you allow buyer details below)",
       "canListings": "Your listings, prices, stock and listing health",
       "canSales": "Sales summaries and market research",
       "write": "Also let it prepare drafts",
       "writeHint": "Listing text, prices, stock, new listings and photos — nothing changes on a marketplace until you send it in KolayXport. AI-generated photos use your AI credits.",
+      "shareBuyer": "Share buyer names and shipping addresses",
+      "shareBuyerHint": "The AI company you connect will see this information. Amazon orders are never shared; e-mail and phone stay hidden.",
       "never": "You can remove the connection any time in Settings → AI.",
       "deny": "Cancel",
       "allow": "Allow"

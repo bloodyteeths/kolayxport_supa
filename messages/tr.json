@@ -1737,7 +1737,9 @@
         "permission": "İzin",
         "create": "Anahtar oluştur",
         "once": "Bu anahtarı şimdi kopyalayın: bir daha gösterilmez.",
-        "claudeCode": "Claude Code için:"
+        "claudeCode": "Claude Code için:",
+        "shareBuyer": "Alıcı adlarını ve teslimat adreslerini paylaş",
+        "shareBuyerHint": "Bağladığınız yapay zekâ şirketi bu bilgileri görür. Amazon siparişleri hiçbir zaman paylaşılmaz; e-posta ve telefon gizli kalır."
       },
       "defaultName": "Kişisel anahtar",
       "scope": {
@@ -1758,7 +1760,11 @@
       "revoked": "Bağlantı kaldırıldı",
       "revokeFailed": "Bağlantı kaldırılamadı. Tekrar deneyin.",
       "createFailed": "Anahtar oluşturulamadı. Tekrar deneyin.",
-      "privacy": "Alıcılarınızın adı, adresi, e-postası ve telefonu yapay zekâ uygulamalarına hiç gönderilmez (siparişlerde yalnızca ülke). Bağlantılar en geç bir yılda kendiliğinden sona erer."
+      "privacy": "Alıcılarınızın e-postası ve telefonu yapay zekâ uygulamalarına hiç gönderilmez. Ad ve teslimat adresi yalnızca paylaşımı açtığınız bağlantılara gider (Amazon siparişleri hiçbir zaman); diğer bağlantılar yalnızca ülkeyi görür. Bağlantılar en geç bir yılda kendiliğinden sona erer.",
+      "buyer": {
+        "on": "alıcı adı ve adresi paylaşılıyor",
+        "off": "yalnızca ülke"
+      }
     },
     "deleteAccount": {
       "title": "Hesabı sil",
@@ -17054,12 +17060,15 @@
       "invalidBody": "Bağlantıyı yapay zekâ uygulamanızdan yeniden başlatın.",
       "title": "{app} KolayXport hesabınıza bağlanmak istiyor",
       "subtitle": "İzin verirseniz bu uygulama mağazanızla ilgili sorularınızı yanıtlayabilir.",
+      "redirectHost": "Yanıtınızdan sonra {host} adresine dönersiniz",
       "canTitle": "Görebilecekleri:",
-      "canOrders": "Siparişleriniz (alıcının adı ve adresi olmadan, yalnızca ülke)",
+      "canOrders": "Siparişleriniz (aşağıda izin vermediğiniz sürece alıcı adı ve adresi olmadan, yalnızca ülke)",
       "canListings": "İlanlarınız, fiyat, stok ve ilan sağlığı",
       "canSales": "Satış özetleri ve pazar araştırması",
       "write": "Taslak da hazırlayabilsin",
       "writeHint": "İlan metni, fiyat, stok, yeni ilan ve fotoğraf — siz KolayXport'ta gönderene kadar pazaryerinde hiçbir şey değişmez. Yapay zekâ ile görsel üretirse AI kredinizden düşer.",
+      "shareBuyer": "Alıcı adlarını ve teslimat adreslerini paylaş",
+      "shareBuyerHint": "Bağladığınız yapay zekâ şirketi bu bilgileri görür. Amazon siparişleri hiçbir zaman paylaşılmaz; e-posta ve telefon gizli kalır.",
       "never": "Bağlantıyı istediğiniz an Ayarlar → Yapay zekâ bölümünden kaldırabilirsiniz.",
       "deny": "Vazgeç",
       "allow": "İzin ver"

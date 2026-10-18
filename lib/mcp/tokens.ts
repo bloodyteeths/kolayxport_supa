@@ -6,8 +6,13 @@ import crypto from 'crypto';
 import type { NextApiRequest } from 'next';
 import prisma from '@/lib/prisma';
 
-export const MCP_SCOPES = ['read', 'write'] as const;
+/** read / write open tools; `orders:buyer` (opt-in, off by default) adds buyer names + shipping addresses to orders
+ * (never Amazon, never e-mail or phone). It is only ever granted by the seller's own tick (grantScopes), never by
+ * the scopes an app asks for. */
+export const MCP_SCOPES = ['read', 'write', 'orders:buyer'] as const;
 export type McpScope = (typeof MCP_SCOPES)[number];
+export const BUYER_SCOPE: McpScope = 'orders:buyer';
+const TOOL_SCOPES: readonly McpScope[] = ['read', 'write'];
 
 /** OAuth access tokens live 30 days (refresh rotates them); personal keys 1 year unless revoked. */
 export const ACCESS_TTL_DAYS = 30;
@@ -16,11 +21,19 @@ export const PERSONAL_TTL_DAYS = 365;
 export const hashToken = (t: string) => crypto.createHash('sha256').update(t, 'utf8').digest('hex');
 export const randomToken = (prefix: string) => `${prefix}_${crypto.randomBytes(32).toString('base64url')}`;
 
+/** The tool scopes (read / write) in a request; unknown ones — and orders:buyer — are dropped, read by default. */
 export function normalizeScopes(raw: unknown): McpScope[] {
   const list = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(/[\s,]+/) : [];
-  const set = new Set(list.map(String).filter((s): s is McpScope => (MCP_SCOPES as readonly string[]).includes(s)));
+  const set = new Set(list.map(String).filter((s): s is McpScope => (TOOL_SCOPES as readonly string[]).includes(s)));
   if (!set.size) set.add('read');
   return MCP_SCOPES.filter((s) => set.has(s));
+}
+
+/** The scopes a new connection gets: the requested tool scopes, plus orders:buyer ONLY when the seller ticked
+ * "share buyer names and addresses" (`shareBuyer === true`), whatever the app requested. */
+export function grantScopes(requested: unknown, shareBuyer: unknown): McpScope[] {
+  const s = normalizeScopes(requested);
+  return shareBuyer === true ? [...s, BUYER_SCOPE] : s;
 }
 
 export type McpAuth = { userId: string; connectionId: string; scopes: McpScope[]; name: string };
@@ -93,6 +106,25 @@ export function redirectUriAllowed(uri: unknown): uri is string {
   } catch {
     return false;
   }
+}
+
+const LOOPBACK = ['localhost', '127.0.0.1', '[::1]'];
+
+/** Whether `uri` is one of the client's registered redirect URIs. Exact match, except a loopback http URI matches
+ * whatever its port (RFC 8252 §7.3; Claude Code and other desktop apps pick a free port per session). Pure. */
+export function redirectUriRegistered(registered: readonly string[], uri: string): boolean {
+  if (registered.includes(uri)) return true;
+  let u: URL;
+  try { u = new URL(uri); } catch { return false; }
+  if (u.protocol !== 'http:' || !LOOPBACK.includes(u.hostname) || u.hash) return false;
+  return registered.some((r) => {
+    try {
+      const x = new URL(r);
+      return x.protocol === 'http:' && x.hostname === u.hostname && x.pathname === u.pathname && x.search === u.search;
+    } catch {
+      return false;
+    }
+  });
 }
 
 /** Public base URL (issuer / resource). */

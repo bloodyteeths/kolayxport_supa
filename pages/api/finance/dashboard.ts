@@ -283,9 +283,9 @@ function orderMarketplaceOr(marketplace: string, etsyShopNames: readonly string[
   return ors;
 }
 
-type RatesLoader = () => Promise<FxRates>;
+export type RatesLoader = () => Promise<FxRates>;
 
-function lazyRates(): RatesLoader {
+export function lazyRates(): RatesLoader {
   let p: Promise<FxRates> | null = null;
   return () => {
     if (!p) p = getExchangeRates().then((s) => s.rates).catch(() => ({}) as FxRates);
@@ -303,7 +303,7 @@ class HttpError extends Error {
 // Main aggregation
 // ---------------------------------------------------------------------------
 
-interface BuildOptions {
+export interface BuildOptions {
   userId: string;
   marketplace: string;
   startDate: Date;
@@ -316,7 +316,7 @@ interface BuildOptions {
   previous?: { currency: string };
 }
 
-interface BuildResult {
+export interface BuildResult {
   summary: DashboardSummary;
   disbursements: Array<{ date: string; amount: number }>;
   timeSeries: TimeSeriesPoint[];
@@ -340,7 +340,7 @@ interface CostEntry {
   sku: string | null;
 }
 
-async function buildDashboard(opts: BuildOptions): Promise<BuildResult> {
+export async function buildDashboard(opts: BuildOptions): Promise<BuildResult> {
   const { userId, marketplace, startDate, endDate, granularity, tz, etsyShopNames } = opts;
   const mpLower = marketplace.toLowerCase();
 

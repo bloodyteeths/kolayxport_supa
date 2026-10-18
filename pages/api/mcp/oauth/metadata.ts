@@ -16,6 +16,8 @@ export default function handler(_req: NextApiRequest, res: NextApiResponse) {
     grant_types_supported: ['authorization_code', 'refresh_token'],
     code_challenge_methods_supported: ['S256'],
     token_endpoint_auth_methods_supported: ['none'],
+    // RFC 9207: every authorization response (success and error) carries iss = issuer (ChatGPT's stable redirect URI).
+    authorization_response_iss_parameter_supported: true,
     scopes_supported: MCP_SCOPES,
     service_documentation: `${base}/ayarlar?tab=ai`,
   });

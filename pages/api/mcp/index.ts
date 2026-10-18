@@ -5,15 +5,17 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { logger } from '@/lib/logger';
 import { authenticateMcp, mcpBaseUrl, type McpAuth } from '@/lib/mcp/tokens';
-import { MCP_TOOLS, ToolError, toolsFor } from '@/lib/mcp/tools';
+import { ToolError, activeTools, buyerRecordCount, listedTools } from '@/lib/mcp/tools';
 
-const PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
+const PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
 const SERVER_INFO = { name: 'kolayxport', title: 'KolayXport', version: '1.0.0' };
 const INSTRUCTIONS = 'KolayXport is the seller\'s multi-marketplace back office (Etsy, eBay, Amazon, Trendyol, Hepsiburada, Shopify, Wix). '
-  + 'Use get_store_overview first. Orders never include buyer names or addresses. For listing work: audit_listing, then seo_rules + '
-  + 'research_keywords (keywords from real data, never invented), check_listing_text before staging. Every write tool '
-  + '(stage_listing_changes, create_listing_draft, add_listing_photos) only prepares drafts: tell the seller to review and send them in '
-  + 'KolayXport (give the reviewUrl); nothing changes on a marketplace by itself. generate_product_image uses the seller\'s AI credits.';
+  + 'get_store_overview gives the big picture. Orders (list_orders, get_order) carry the ship-to country and the money breakdown the marketplace '
+  + 'reported (subtotal, discounts, shipping, tax, total; per item the price paid and the listing\'s current price); buyer names and addresses only '
+  + 'when the seller allowed them for this connection, never e-mail or phone. sales_summary = order counts and gross order value; finance_summary = '
+  + 'fees, ad spend, refunds, net profit, payouts and the marketplace balance from synced payment records. For listing work: audit_listing, seo_rules, '
+  + 'research_keywords and check_listing_text. The write tools (stage_listing_changes, create_listing_draft, add_listing_photos) only prepare drafts '
+  + 'the seller reviews and sends in KolayXport (reviewUrl); nothing changes on a marketplace by itself. generate_product_image uses the seller\'s AI credits.';
 
 /** Per-connection rate limit: 60 calls a minute (in-process). */
 const calls = new Map<string, number[]>();
@@ -49,15 +51,10 @@ async function handle(msg: Rpc, auth: McpAuth): Promise<object | null> {
     case 'ping':
       return ok(id, {});
     case 'tools/list':
-      return ok(id, {
-        tools: toolsFor(auth.scopes).map((t) => ({
-          name: t.name, title: t.title, description: t.description, inputSchema: t.inputSchema,
-          annotations: { readOnlyHint: t.readOnly, destructiveHint: false, idempotentHint: t.readOnly, openWorldHint: false },
-        })),
-      });
+      return ok(id, { tools: listedTools(auth.scopes) });
     case 'tools/call': {
       const name = String(msg.params?.name || '');
-      const tool = MCP_TOOLS.find((t) => t.name === name);
+      const tool = activeTools().find((t) => t.name === name);
       if (!tool) return fail(id, -32602, `Unknown tool: ${name}`);
       if (!auth.scopes.includes(tool.scope)) {
         return ok(id, { isError: true, content: [{ type: 'text', text: 'This connection is read-only. Reconnect with permission to prepare drafts.' }] });
@@ -66,7 +63,9 @@ async function handle(msg: Rpc, auth: McpAuth): Promise<object | null> {
       const args = msg.params?.arguments && typeof msg.params.arguments === 'object' ? msg.params.arguments : {};
       try {
         const result = await tool.run(auth, args);
-        logger.info('MCP tool call', { userId: auth.userId, connectionId: auth.connectionId, tool: name });
+        // Call log (SyncLog in production): buyer details are flagged by count, never logged themselves.
+        const buyerRecords = buyerRecordCount(result);
+        logger.info('MCP tool call', { userId: auth.userId, connectionId: auth.connectionId, tool: name, ...(buyerRecords ? { buyerDataReturned: true, buyerRecords } : {}) });
         return ok(id, { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result });
       } catch (err: any) {
         const message = err instanceof ToolError ? err.message : 'The tool failed. Try again.';

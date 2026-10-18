@@ -66,8 +66,12 @@ export function nicheKey(q: string): string {
   return `${NICHE_PREFIX}${sha1(normalizeQuery(q))}`;
 }
 
-/** Pure: sales/revenue totals over a batch (only real monthly numbers; upper bounds are not added up). */
-export function totalsOf(listings: Record<string, any>): { sales: number | null; revenue: number | null; counted: number; measured: number } {
+/**
+ * Pure: sales/revenue totals over a batch (only real monthly numbers; upper bounds are not added up). Revenue is in
+ * each listing's own currency (Turkish shops price in TRY), so it is converted with `fx` (1 unit → target) first;
+ * a listing whose currency has no rate is left out of the revenue, never added as if it were the target.
+ */
+export function totalsOf(listings: Record<string, any>, target = 'USD', fx: Record<string, number> = {}): { sales: number | null; revenue: number | null; counted: number; measured: number } {
   let sales = 0;
   let revenue = 0;
   let counted = 0;
@@ -79,7 +83,11 @@ export function totalsOf(listings: Record<string, any>): { sales: number | null;
     counted++;
     sales += m;
     if (s.sales.kind === 'measured') measured++;
-    if (typeof s.sales.monthlyRevenue === 'number') { revenue += s.sales.monthlyRevenue; revCount++; }
+    if (typeof s.sales.monthlyRevenue === 'number') {
+      const cur = String(s.currency || target).toUpperCase();
+      const rate = cur === target ? 1 : fx[cur];
+      if (rate) { revenue += s.sales.monthlyRevenue * rate; revCount++; }
+    }
   }
   return { sales: counted ? Math.round(sales) : null, revenue: revCount ? Math.round(revenue) : null, counted, measured };
 }
@@ -99,7 +107,11 @@ export async function refreshNiche(q: string): Promise<NicheSummary | null> {
     listings = { ...listings, ...res.listings };
     want = res.pendingIds;
   }
-  const tot = totalsOf(listings);
+  const target = result.price?.currency ?? 'USD';
+  const { buildFxTable } = await import('./stats');
+  const { convertCurrency } = await import('@/lib/finance/fx');
+  const fx = await buildFxTable(Object.values(listings).map((l: any) => l?.currency), target, convertCurrency).catch(() => ({}));
+  const tot = totalsOf(listings, target, fx);
   const opp = opportunityOf(result);
   const summary: NicheSummary = {
     q,

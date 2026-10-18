@@ -55,6 +55,7 @@ import { routeResearchSearch, type QuestionKey } from '../home/routeSearch';
 import { ApiSourceNote } from './ApiSourceNote';
 import { EvidenceCard } from './EvidenceCard';
 import { AnswerCard } from './AnswerCard';
+import { marketTotals, useListingSales } from '@/lib/research/hooks/useListingSales';
 import { PriceCard } from './PriceCard';
 import { CompetitionCard } from './CompetitionCard';
 import { DemandCard } from './DemandCard';
@@ -162,6 +163,8 @@ export type ProductFinderProps = {
   amazonEligible?: boolean;
 };
 
+const EMPTY_TOP: TopListing[] = [];
+
 export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {}) {
   const t = useTranslations('research');
   const root = useTranslations();
@@ -215,6 +218,12 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
   const compare = useResearchCompare(!priceGap && comparing && !amazonBlocked ? compareList : [], { mkt, country: url.country });
   const data = result.data;
   const ready = Boolean(data) && (result.region.state === 'ready' || result.region.state === 'stale');
+  // Estimated monthly sales for the top listings (Etsy), loaded after the result so the answer shows first.
+  const salesState = useListingSales(mkt, !priceGap && !comparing && ready && data ? data.top : EMPTY_TOP);
+  const marketSales = React.useMemo(() => {
+    if (!data || mkt !== 'etsy') return undefined;
+    return { ...marketTotals(data.top, salesState.sales), loading: salesState.loading, listed: data.top.length };
+  }, [data, mkt, salesState.sales, salesState.loading]);
 
   // `#price` from the "What price should I charge?" chip: scroll once the card exists.
   React.useEffect(() => {
@@ -531,7 +540,7 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
             <ErrorState variant="stale" staleSince={new Date(r.fetchedAt)} onRetry={result.region.retry} />
           </Box>
         ) : null}
-        <AnswerCard result={r} onUsePrice={stageMkt ? (amount, currency) => setStageMode({ kind: 'price', amount, currency }) : undefined} />
+        <AnswerCard result={r} market={marketSales} onUsePrice={stageMkt ? (amount, currency) => setStageMode({ kind: 'price', amount, currency }) : undefined} />
         <Box sx={{ mb: '16px' }}>
           <Button variant="ghost" size="sm" onClick={() => setDetailsOpen((v) => !v)} aria-expanded={detailsOpen} data-testid="research-details-toggle">
             {detailsOpen ? t('answer.detailsHide') : t('answer.detailsShow')}
@@ -583,6 +592,8 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
           onOpen={setOpenRow}
           onStartFrom={startFrom}
           loading={result.isValidating && !ready}
+          sales={mkt === 'etsy' ? salesState.sales : undefined}
+          salesLoading={salesState.loading}
         />
       </>
     );

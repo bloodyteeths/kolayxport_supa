@@ -60,7 +60,24 @@
         "note": "Puan, bu aramada ölçtüğümüz verilerden hesaplanır; Etsy arama hacmini paylaşmaz, bu yüzden talep tahminidir."
       },
       "detailsShow": "Detayları göster",
-      "detailsHide": "Detayları gizle"
+      "detailsHide": "Detayları gizle",
+      "market": {
+        "label": "İlk {count} ilanın toplam satışı",
+        "sales": "~{count} satış/ay",
+        "revenue": "~{amount} ciro/ay",
+        "basis": "{listed} ilandan {counted} tanesi için sayı var ({measured} ölçüldü, kalanı tahmin). Diğer satıcıların satışları buna dahil değil.",
+        "loading": "Satışlar hesaplanıyor…",
+        "few": "Bu arama için yeterli satış verisi yok. Birkaç gün içinde aynı aramayı tekrar yaparsanız ölçülmüş satışlar görünür."
+      }
+    },
+    "top": {
+      "col": {
+        "sales": "Aylık satış",
+        "revenue": "Aylık ciro"
+      },
+      "salesValue": "~{count}/ay {kind, select, measured {· ölçüldü} other {· tahmin}}",
+      "salesUpTo": "en çok {count}/ay",
+      "salesCard": "Satış: {value}"
     }
   }
 }

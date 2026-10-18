@@ -60,7 +60,24 @@
         "note": "The score comes from what this search measured; Etsy shares no search volume, so demand is an estimate."
       },
       "detailsShow": "Show details",
-      "detailsHide": "Hide details"
+      "detailsHide": "Hide details",
+      "market": {
+        "label": "Total sales of the top {count} listings",
+        "sales": "~{count} sales/mo",
+        "revenue": "~{amount} revenue/mo",
+        "basis": "Numbers for {counted} of {listed} listings ({measured} measured, the rest estimated). Sales by other sellers are not included.",
+        "loading": "Working out sales…",
+        "few": "Not enough sales data for this search yet. Search again in a few days to see measured sales."
+      }
+    },
+    "top": {
+      "col": {
+        "sales": "Monthly sales",
+        "revenue": "Monthly revenue"
+      },
+      "salesValue": "~{count}/mo {kind, select, measured {· measured} other {· estimate}}",
+      "salesUpTo": "up to {count}/mo",
+      "salesCard": "Sales: {value}"
     }
   }
 }

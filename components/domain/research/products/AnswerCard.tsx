@@ -11,6 +11,11 @@ import { useDsFormat } from '@/components/ds/data/fmt';
 import { neutral, radius, tone } from '@/lib/ds/tokens';
 import { opportunityOf, type Level, type OpportunityBand } from '@/lib/research/opportunityScore';
 import type { ProductsResult } from '@/lib/research/types';
+import type { marketTotals } from '@/lib/research/hooks/useListingSales';
+
+/** Market sales from the top listings (Etsy); shown once enough listings have a number. */
+export type MarketSales = ReturnType<typeof marketTotals> & { loading: boolean; listed: number };
+const MIN_COUNTED = 8;
 
 const BAND_TONE: Record<OpportunityBand, keyof typeof tone> = { good: 'success', ok: 'warning', hard: 'danger' };
 const LEVEL_TONE: Record<Level, keyof typeof tone> = { high: 'success', medium: 'warning', low: 'neutral' };
@@ -20,6 +25,7 @@ const COMPETITION_TONE: Record<Level, keyof typeof tone> = { low: 'success', med
 export type AnswerCardProps = {
   result: ProductsResult;
   onUsePrice?: (amount: number, currency: string) => void;
+  market?: MarketSales;
 };
 
 function Tile({ label, value, sub, toneKey, children, testId }: { label: string; value: string; sub?: string | null; toneKey?: keyof typeof tone; children?: React.ReactNode; testId: string }) {
@@ -35,7 +41,7 @@ function Tile({ label, value, sub, toneKey, children, testId }: { label: string;
   );
 }
 
-export function AnswerCard({ result, onUsePrice }: AnswerCardProps) {
+export function AnswerCard({ result, onUsePrice, market }: AnswerCardProps) {
   const t = useTranslations('research.answer');
   const fmt = useDsFormat();
   const [why, setWhy] = React.useState(false);
@@ -85,6 +91,30 @@ export function AnswerCard({ result, onUsePrice }: AnswerCardProps) {
       <Typography component="p" sx={{ m: 0, mt: '12px', fontSize: 15, color: neutral[800], lineHeight: 1.5 }} data-testid="research-answer-verdict">
         {[...reasons, priceHint].filter(Boolean).join(' ')}
       </Typography>
+
+      {market && (market.loading || market.counted > 0) ? (
+        <Box
+          sx={{ mt: '14px', p: '12px 14px', borderRadius: `${radius.md}px`, bgcolor: neutral[0], border: `1px solid ${neutral[200]}` }}
+          data-testid="research-answer-market"
+        >
+          <Typography variant="caption" component="p" sx={{ m: 0, color: neutral[500] }}>{t('market.label', { count: market.listed })}</Typography>
+          {market.counted >= MIN_COUNTED ? (
+            <>
+              <Typography component="p" sx={{ m: 0, mt: '2px', fontSize: 20, fontWeight: 800, color: neutral[900] }}>
+                {t('market.sales', { count: fmt.num(market.monthlySales) })}
+                {market.revenue != null && market.currency ? ` · ${t('market.revenue', { amount: fmt.money(market.revenue, market.currency, { approx: true }) })}` : ''}
+              </Typography>
+              <Typography variant="caption" component="p" sx={{ m: 0, mt: '2px', color: neutral[600] }}>
+                {t('market.basis', { counted: market.counted, listed: market.listed, measured: market.measured })}
+              </Typography>
+            </>
+          ) : (
+            <Typography variant="caption" component="p" sx={{ m: 0, mt: '2px', color: neutral[600] }}>
+              {market.loading ? t('market.loading') : t('market.few')}
+            </Typography>
+          )}
+        </Box>
+      ) : null}
 
       <Box sx={{ mt: '14px', display: 'grid', gap: '10px', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(4, minmax(0, 1fr))' } }}>
         <Tile

@@ -1,67 +1,71 @@
 slug: etsy-ilan-olusturma
 order: 14
 title: "Etsy'de yapay zekâyla yeni ilan oluşturun"
-description: "Fotoğrafınızı ekleyin; başlığı, etiketleri, açıklamayı ve ek ürün fotoğrafını yapay zekâyla hazırlayın, ilanı taslak olarak kaydedin."
+description: "Ürün fotoğrafınızı ekleyin; yapay zekâ fotoğrafa bakıp başlığı, açıklamayı ve etiketleri yazsın, ek fotoğraf oluşturun, ilanı taslak kaydedin."
 keyword: "etsy ilan nasıl oluşturulur"
 inventoryRefs: [etsy-listing-editor, ai-listing-copy, ai-image-gen, staged-drafts-send]
 tags: [etsy, etsy ilan oluşturma, yapay zeka, etsy başlık, etsy etiket]
 startUrl: /app/etsy-listings/new
-ready: { testid: le-title-input }
+ready: { testid: le-ai-fill-run }
 reseed: true            # the new listing is saved as a local draft
 mocks:
   - use: etsy-create
   - use: etsy-editor
 steps:
-  - say: "Merhaba! Bu videoda Etsy'de yeni bir ilanı yapay zekâ yardımıyla baştan oluşturacağız."
+  - say: "Merhaba! Bu videoda Etsy'de yeni bir ilanı, ürün fotoğrafınızdan yola çıkarak yapay zekâyla oluşturacağız."
   - title: "Ürün fotoğrafınızı ekleyin"
     say: "Etsy › Yeni ilan sayfasında önce ürün fotoğrafınızı ekleyin. İlk fotoğraf, ilanın ana fotoğrafı olur."
     do:
       - hover: { role: button, name: "Fotoğraf seçin" }
       - upload: { selector: "input[type=file][accept*='image'] >> nth=0", file: public/demo/iznik-bowl-photo.jpg }
       - waitFor: { selector: "[data-testid=le-section-photos] img" }
+      - waitFor: { text: "Fotoğraflardan doldur" }
     zoom: { testid: le-section-photos, scale: 1.3 }
-  - title: "Başlık önerisi alın"
-    say: "Başlığa ürününüzü birkaç kelimeyle yazın ve Başlık öner'e tıklayın. Yapay zekâ, Etsy'de alıcıların aradığı İngilizce bir başlık yazar."
+  - title: "Fotoğraflardan doldurun"
+    say: "Hızlı başlayın kartında Fotoğraflardan doldur'a tıklayın. Yapay zekâ fotoğrafınıza bakıp ürünü tanır, sonra başlığı, açıklamayı ve etiketleri yazar."
     do:
-      - fill: { selector: "[data-testid=le-title-input] textarea:not([aria-hidden]), [data-testid=le-title-input] input", value: "Iznik ceramic bowl, blue tulip" }
-      - click: { role: button, name: "Başlık öner" }
-      - waitFor: { selector: "[data-testid=le-title-suggestion] button:has-text('Kullan')" }
+      - click: { testid: le-ai-fill-run }
+      - waitFor: { testid: le-ai-fill-progress }
+    zoom: { testid: le-ai-fill-card, scale: 1.35 }
+  - title: "Başlığa bakın"
+    say: "Başlık, alıcıların Etsy'de aradığı kelimelerle İngilizce yazılır: kelimelerin baş harfi büyük, ayraç olarak yalnızca virgül var."
+    do:
+      - waitFor: { testid: le-ai-fill-use-all }
+      - scrollTo: { testid: le-title-suggestion }
     zoom: { testid: le-title-suggestion, scale: 1.3 }
-  - title: "Başlığı kullanın"
-    say: "Öneriyi okuyun; beğendiyseniz Kullan'a tıklayın. Kelimelerin baş harfi büyük, ayraç olarak yalnızca virgül var."
+  - title: "Açıklamayı okuyun"
+    say: "Açıklamayı okuyun. Ürününüze uymayan bir şey varsa öneriyi kullandıktan sonra düzeltebilirsiniz."
     do:
-      - click: { selector: "[data-testid=le-title-suggestion] button:has-text('Kullan')" }
-    zoom: { testid: le-title-input, scale: 1.4 }
-  - title: "Etiket fikri alın"
-    say: "Etiketler bölümünde Etiket fikri al'a tıklayın. Gelen etiketlerin her biri en fazla yirmi karakter. Tek tek ekleyebilir ya da hepsini birden ekleyebilirsiniz."
-    do:
-      - click: { role: button, name: "Etiket fikri al" }
-      - waitFor: { text: "hepsini ekle" }
-      - click: { text: "hepsini ekle" }
-    zoom: { testid: le-section-tags, scale: 1.25 }
-  - title: "Açıklamayı yazdırın"
-    say: "Açıklama yaz'a tıklayın. Gelen metni okuyun, ürününüze uymayan bir şey varsa düzeltin, sonra kullanın."
-    do:
-      - click: { role: button, name: "Açıklama yaz" }
-      - waitFor: { selector: "[data-testid=le-description-suggestion] button:has-text('Kullan')" }
       - scrollTo: { testid: le-description-suggestion }
-      - click: { selector: "[data-testid=le-description-suggestion] button:has-text('Kullan')" }
+    zoom: { testid: le-description-suggestion, scale: 1.2 }
+  - title: "Etiketlere bakın"
+    say: "Etiketler de hazır; her biri en fazla yirmi karakter."
+    do:
+      - scrollTo: { testid: le-section-tags }
+    zoom: { testid: le-section-tags, scale: 1.25 }
+  - title: "Hepsini kullanın"
+    say: "Beğendiyseniz Hepsini kullan'a tıklayın. Öneriler alanlara yerleşir; her alanı siz onaylarsınız."
+    do:
+      - scrollTo: { testid: le-ai-fill-use-all }
+      - click: { testid: le-ai-fill-use-all }
+      - wait: 800
+      - scrollTo: { testid: le-section-title }
+    zoom: { testid: le-section-title, scale: 1.25 }
   - title: "Ek fotoğraf oluşturun"
-    say: "Fotoğraf oluştur'a tıklayın, sahneyi yazın ve Bilgisayardan Yükle ile ürün fotoğrafınızı referans olarak ekleyin. Yapay zekâ ürününüzü bu fotoğraftan örnek alır."
+    say: "Şimdi Fotoğraf oluştur'a tıklayın, sahneyi yazın ve eklediğiniz fotoğrafı referans seçin. Yapay zekâ ürününüzü bu fotoğraftan örnek alır."
     do:
       - scrollTo: { testid: le-section-photos }
       - click: { role: button, name: "Fotoğraf oluştur" }
       - waitFor: { role: dialog }
       - fill: { placeholder: "örnek: Professional", value: "The same bowl filled with fresh figs on a rustic dining table, soft daylight" }
-      - hover: { text: "Bilgisayardan Yükle" }
-      - upload: { selector: "[role=dialog] input[type=file]", file: public/demo/iznik-bowl-photo.jpg }
-      - wait: 800
+      - click: { selector: "[role=dialog] img >> nth=0" }
+      - wait: 500
       - click: { role: button, name: "Görsel Oluştur" }
       - waitFor: { role: button, name: "Kabul Et ve Yükle" }
       - scrollTo: { role: button, name: "Kabul Et ve Yükle" }
     zoom: { selector: "[role=dialog] img >> nth=-1", scale: 1.25 }
   - title: "Fotoğrafı ilana ekleyin"
-    say: "Beğendiğinizde Kabul Et ve Yükle deyin; fotoğraf ilanın taslağına eklenir."
+    say: "Ürün aynı kalır, yalnızca sahne değişir. Beğendiğinizde Kabul Et ve Yükle deyin; fotoğraf ilanın taslağına eklenir."
     do:
       - click: { role: button, name: "Kabul Et ve Yükle" }
       - waitFor: { selector: "[data-testid=le-section-photos] img >> nth=1" }

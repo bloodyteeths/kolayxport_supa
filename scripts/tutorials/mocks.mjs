@@ -148,6 +148,15 @@ async function answer(route, rule) {
     try { body = JSON.parse(text); } catch { return route.fulfill({ response: res, body: text }); }
     if (res.ok()) {
       fs.mkdirSync(path.dirname(rule.fixture), { recursive: true });
+      // Big base64 images (an AI photo) go to a file next to the fixture, referenced as {{base64:…}}.
+      if (body && typeof body === 'object' && !Array.isArray(body)) {
+        for (const [k, v] of Object.entries(body)) {
+          if (typeof v !== 'string' || v.length < 200_000 || !/^(\/9j\/|iVBOR)/.test(v)) continue;
+          const img = rule.fixture.replace(/\.json$/, `.${k}.${v.startsWith('iVBOR') ? 'png' : 'jpg'}`);
+          fs.writeFileSync(img, Buffer.from(v, 'base64'));
+          body[k] = `{{base64:${path.relative(ROOT, img)}}}`;
+        }
+      }
       fs.writeFileSync(rule.fixture, JSON.stringify(body, null, 2).split(CONFIG.baseUrl).join('{{base}}') + '\n');
       console.log(`  captured ${path.relative(ROOT, rule.fixture)}`);
     } else console.log(`  capture: ${route.request().url()} answered ${res.status()} (not saved)`);

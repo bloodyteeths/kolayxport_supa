@@ -10,14 +10,14 @@ describe('video director', () => {
   it('reads as real footage: real-time speed, real skin, phone look; the product is locked to the photos, never described', () => {
     const p = directVideo({ ...DEFAULT_DIRECTION, person: true, expression: 'joyful', product: 'pink flower girl dress' });
     expect(p).toMatch(/pink formal dress/);
-    expect(p).toMatch(/joyful/);
-    expect(p).toMatch(/Never a frozen, blank or doll-like face/);
+    expect(p).toMatch(/bright, happy expression with a closed-lip smile/);
+    expect(p).toMatch(/never a frozen, blank or doll-like face/);
     expect(p).toMatch(/exactly the one in the photos in every frame/);
     expect(p).toMatch(/never slow motion/);
     expect(p).toMatch(/handheld footage/);
     expect(p).not.toMatch(/phone/i);
     expect(negativePrompt({ person: false })).toMatch(/camera app interface/);
-    expect(p).toMatch(/unretouched look with no beauty filter/);
+    expect(p).toMatch(/unretouched look with real texture and colour, natural hair, no beauty filter/);
     const neg = negativePrompt({ person: true });
     expect(neg).toMatch(/frozen expression/);
     expect(neg).toMatch(/slow motion/);
@@ -49,7 +49,8 @@ describe('video director', () => {
     expect(UNIVERSAL_PRESETS).not.toContain('walk');
     expect(UNIVERSAL_PRESETS).not.toContain('twirl');
     const p = directVideo({ ...DEFAULT_DIRECTION, preset: 'withPerson', person: true, addPerson: true, productKind: 'object', product: 'iPhone 15 case' });
-    expect(p).toMatch(/real person naturally wears, holds or uses the product/);
+    expect(p).toMatch(/A real person/);
+    expect(p).toMatch(/holds the iPhone 15 case steadily|holds the product steadily|stands beside/);
     expect(p).not.toMatch(/Keep the same model/);
     const k = keyframePrompt({ ...DEFAULT_DIRECTION, preset: 'withPerson', person: true, addPerson: true }, { which: 'start', refCount: 2, hasStart: false });
     expect(k).toMatch(/natural-looking adult naturally wearing, holding or using exactly this product/);

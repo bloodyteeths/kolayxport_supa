@@ -9,6 +9,7 @@
 //     the seller's photos and video frames (up to 10), then Veo animates between them.
 //  3. Visual check. After generation, frames of the video are compared with the photos by Gemini (image against image),
 //     scored for product match and realism, with what differs and how to fix it.
+import fs from 'fs';
 import { GoogleGenAI } from '@google/genai';
 import { aiJson, isRetryableAiError, logUsage } from './gemini';
 import { modelChain } from './models';
@@ -16,6 +17,7 @@ import { frameAt, shrink, videoDuration } from './videoSources';
 import type { VideoMedia } from './video';
 import type { VideoDirection } from './videoDirector';
 import { lockSentence, neutralPeople, personSentence, sceneSentence } from './videoDirector';
+import { normalizeProfile, type ProductProfile } from './videoShots';
 
 export const MAX_PRODUCT_REFS = 10;
 
@@ -116,64 +118,107 @@ export type VideoQa = {
   /** 0–10: believable as a real filmed video. */
   realism?: number;
   /** What differs from the photos / looks artificial: `text` in the seller's language, `fix` an English instruction. */
-  diffs?: { text: string; fix: string }[];
-  issues?: { text: string; fix: string }[];
+  diffs?: QaNote[];
+  issues?: QaNote[];
+  /** The longest stretch (seconds) with no visible problem — the video can be trimmed to it. */
+  clean?: { from: number; to: number };
+  /** Set when the video was trimmed to its clean stretch automatically (`of` = the untrimmed length). */
+  trimmed?: { from: number; to: number; of: number };
 };
+
+/** `text` in the seller's language; `fix` an English direction for the next take; `at` the second it shows. */
+export type QaNote = { text: string; fix: string; at?: number };
 
 const clampScore = (v: unknown) => {
   const n = Math.round(Number(v));
   return Number.isFinite(n) ? Math.max(0, Math.min(10, n)) : undefined;
 };
 
-function notes(v: unknown, max: number): { text: string; fix: string }[] {
+function notes(v: unknown, max: number, duration?: number): QaNote[] {
   if (!Array.isArray(v)) return [];
   return v
-    .map((x: any) => ({ text: String(x?.text ?? '').trim().slice(0, 160), fix: String(x?.fix ?? '').trim().slice(0, 200) }))
+    .map((x: any) => {
+      const at = Number(x?.at);
+      const ok = Number.isFinite(at) && at >= 0 && (duration === undefined || at <= duration + 0.5);
+      return { text: String(x?.text ?? '').trim().slice(0, 160), fix: String(x?.fix ?? '').trim().slice(0, 200), ...(ok ? { at: Math.round(at * 10) / 10 } : {}) };
+    })
     .filter((x) => x.text && x.fix)
     .slice(0, max);
 }
 
+/** A usable clean stretch inside the video (seconds), or undefined. Pure. */
+function cleanWindow(v: unknown, duration?: number): VideoQa['clean'] {
+  const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+  const from = Number(o.from);
+  const to = Number(o.to);
+  if (!Number.isFinite(from) || !Number.isFinite(to) || from < 0 || to <= from) return undefined;
+  const end = duration === undefined ? to : Math.min(to, duration);
+  if (end - from < 1) return undefined;
+  return { from: Math.round(from * 10) / 10, to: Math.round(end * 10) / 10 };
+}
+
 /** Normalises the model's QA answer (wrong types, out-of-range scores, garbled lists). Pure, exported for tests. */
-export function normalizeQa(raw: unknown): VideoQa {
+export function normalizeQa(raw: unknown, duration?: number): VideoQa {
   // Gemini sometimes wraps the object in an array.
   const one = Array.isArray(raw) ? raw.find((x) => x && typeof x === 'object' && !Array.isArray(x)) : raw;
   const o = (one && typeof one === 'object' && !Array.isArray(one) ? one : {}) as Record<string, unknown>;
   const match = clampScore(o.productMatch ?? o.match);
   const realism = clampScore(o.realism);
   if (match === undefined && realism === undefined) return { status: 'failed' };
-  return { status: 'done', match, realism, diffs: notes(o.diffs, 4), issues: notes(o.issues, 3) };
+  const clean = cleanWindow(o.clean, duration);
+  return { status: 'done', match, realism, diffs: notes(o.diffs, 4, duration), issues: notes(o.issues, 4, duration), ...(clean ? { clean } : {}) };
 }
 
-/** Compares frames of the finished video with the product photos. */
-export async function checkVideo(input: { userId: string; file: string; refs: VideoMedia[]; locale: 'tr' | 'en' }): Promise<VideoQa> {
+/**
+ * Checks a finished video against the product photos, like a careful buyer: the video itself (motion, flicker, hands,
+ * faces) and 8 timed frames (fine product details), with the second each problem shows and the longest clean stretch.
+ * `person` / `profile` tell it what to look at hardest (hands, teeth, eyes; printed text; petals …).
+ */
+export async function checkVideo(input: { userId: string; file: string; refs: VideoMedia[]; locale: 'tr' | 'en'; person?: boolean; profile?: ProductProfile }): Promise<VideoQa> {
   const duration = await videoDuration(input.file);
   if (!duration) return { status: 'failed' };
-  const frames: VideoMedia[] = [];
-  for (const f of [0.12, 0.38, 0.62, 0.9]) {
-    const buf = await frameAt(input.file, duration * f, 1024).catch(() => null);
-    if (buf?.length) frames.push({ data: buf.toString('base64'), mimeType: 'image/jpeg' });
+  const frames: { t: number; m: VideoMedia }[] = [];
+  for (let i = 0; i < 8; i++) {
+    const t = Math.round(((i + 0.5) / 8) * duration * 10) / 10;
+    const buf = await frameAt(input.file, t, 1024).catch(() => null);
+    if (buf?.length) frames.push({ t, m: { data: buf.toString('base64'), mimeType: 'image/jpeg' } });
   }
   const photos = await Promise.all(input.refs.slice(0, 5).map((r) => shrink(r, 1024)));
   if (!frames.length || !photos.length) return { status: 'failed' };
+  const video = await fs.promises.readFile(input.file).catch(() => null);
+  const withVideo = Boolean(video && video.length <= 15 * 1024 * 1024);
   const lang = input.locale === 'tr' ? 'Turkish' : 'English';
+  const p = input.profile;
+  const look = [
+    input.person ? 'hands and fingers (count, shape, fused or bending fingers), teeth and mouths, eyes and blinking, faces turning to profile, skin texture (plastic or waxy), hair' : '',
+    p?.text ? 'printed text, titles and labels (scrambled or changing letters)' : '',
+    p?.physics === 'organic' ? 'petals, leaves and stems (count, shape, appearing or vanishing)' : '',
+    p?.physics === 'fabric' ? 'the fabric\'s pattern and embellishments sliding or redrawing, fabric moving without weight' : '',
+    p?.physics === 'rigid' ? 'the object bending, melting or changing shape' : '',
+    p?.shiny ? 'reflections that do not follow the light' : '',
+    p?.details?.length ? `these details of the product: ${p.details.join('; ')}` : '',
+  ].filter(Boolean).join('; ');
   const parts: any[] = [
     { text: `PRODUCT PHOTOS (real): ${photos.length} images.` },
     ...photos.map((m) => ({ inlineData: { mimeType: m.mimeType, data: m.data } })),
-    { text: `VIDEO FRAMES (AI video, in time order): ${frames.length} images.` },
-    ...frames.map((m) => ({ inlineData: { mimeType: m.mimeType, data: m.data } })),
+    ...(withVideo ? [{ text: `THE VIDEO (${duration.toFixed(1)} s, AI-generated):` }, { inlineData: { mimeType: 'video/mp4', data: video!.toString('base64') } }] : []),
+    { text: `VIDEO FRAMES (sharp stills, in time order): ${frames.length} images.` },
+    ...frames.flatMap((f) => [{ text: `t=${f.t}s` }, { inlineData: { mimeType: f.m.mimeType, data: f.m.data } }]),
     {
       text: [
-        'You check AI product videos for an online shop before a buyer sees them. Compare the product in every VIDEO FRAME with the PRODUCT PHOTOS, image against image, like a careful buyer.',
+        'You check AI product videos for an online shop before a buyer sees them. Compare the product in the video and every frame with the PRODUCT PHOTOS, image against image, like a careful buyer; watch the motion too.',
         'The photos show the product from different angles, poses and crops (front, back, side, close-up): never count a different pose, angle, crop, camera distance or framing as a difference. Judge only the product\'s own design. Motion blur in a frame of a moving shot is normal.',
-        'productMatch 0–10: 10 = the same design in every frame (cut, colours, pattern, lace, embroidery, flowers/appliqués — roughly the same number, size and placement —, sleeves, neckline, length, bows, accessories). 8–9: only tiny differences a buyer would not notice. 6–7: a difference a buyer could notice. 4–5: clearly changed details. 0–3: a different product.',
-        'realism 0–10, judged as a shopper watching on a phone: 10 = nobody could tell it is not a real filmed video. Lower it for distorted faces, eyes or hands, plastic skin, melting or morphing fabric, impossible physics, on-screen interfaces, black bars or borders.',
-        `diffs: up to 4 concrete differences from the photos (most visible first). issues: up to 3 things that look artificial. Each item: "text" = short, specific, in ${lang}, for the seller; "fix" = one short English instruction for the video model to fix it.`,
-        'Only list real problems; empty lists when there are none. Return JSON: {"productMatch": number, "realism": number, "diffs": [{"text","fix"}], "issues": [{"text","fix"}]}',
-      ].join('\n'),
+        'productMatch 0–10: 10 = the same design in every frame (shape, cut, colours, pattern, prints and text, parts, ornaments — roughly the same number, size and placement —, materials). 8–9: only tiny differences a buyer would not notice. 6–7: a difference a buyer could notice. 4–5: clearly changed details. 0–3: a different product.',
+        'realism 0–10, judged as a shopper watching on a phone: 10 = nobody could tell it is not a real filmed video. Lower it for distorted faces, eyes, teeth or hands, plastic skin, melting or morphing, flicker, impossible physics, slow-motion drift, on-screen interfaces, black bars, blurred borders.',
+        look ? `Look hardest at: ${look}.` : '',
+        `diffs: up to 4 concrete differences from the photos (most visible first). issues: up to 4 things that look artificial. Each item: "text" = short, specific, in ${lang}, for the seller; "at" = the second (number) where it shows most; "fix" = one short English direction for the NEXT take that prevents it, phrased as what should happen on camera (e.g. "The hands rest still at the sides", "The camera stays farther back so the bow is never redrawn", "The book stays closed with its cover toward the camera") — never just "fix X".`,
+        'clean: the longest stretch {"from","to"} in seconds where no frame shows any of the problems you listed (the whole video if there are none).',
+        'Only list real problems; empty lists when there are none. Return JSON: {"productMatch": number, "realism": number, "diffs": [{"text","fix","at"}], "issues": [{"text","fix","at"}], "clean": {"from","to"}}',
+      ].filter(Boolean).join('\n'),
     },
   ];
   const raw = await aiJson({ tier: 'deep', feature: 'video.qa', userId: input.userId, temperature: 0.2 }, parts);
-  return normalizeQa(raw);
+  return normalizeQa(raw, duration);
 }
 
 type Box = [number, number, number, number]; // ymin, xmin, ymax, xmax (0–1000)
@@ -240,7 +285,7 @@ export type PhotoAnalysis = {
   start: number | null;
   end: number | null;
   /** What the product is, for the shot list and the lock wording. */
-  product: { kind: 'worn' | 'object'; category: string };
+  product: { kind: 'worn' | 'object'; category: string; profile: ProductProfile };
   /** Shots and settings that suit THIS product (any marketplace, any category). */
   shots: ShotIdea[];
   scenes: SceneIdea[];
@@ -281,7 +326,8 @@ export function normalizePhotoAnalysis(raw: unknown, count: number): PhotoAnalys
     .map((x: any) => ({ label: txt(x?.label, 30), prompt: txt(x?.prompt, 300) }))
     .filter((x: SceneIdea) => x.label && x.prompt)
     .slice(0, 4);
-  return { photos, start, end, product: { kind, category: txt(o?.product?.category, 60) }, shots, scenes };
+  const profile = normalizeProfile(o?.profile ?? {}, kind);
+  return { photos, start, end, product: { kind: profile.use === 'worn' ? 'worn' : kind, category: txt(o?.product?.category, 60), profile }, shots, scenes };
 }
 
 /**
@@ -299,9 +345,15 @@ export async function analyzePhotos(userId: string, refs: VideoMedia[], ctx: { t
         'For each image (in order) return: view = "front" | "back" | "side" | "detail" (a close-up where the whole product is not visible) | "flat" (laid flat or on a hanger) | "other"; fullBody = true when the whole product — and the whole person wearing or holding it, if any — is in the photo; person = true when a person wears or holds it; quality 0–10 (sharp, well lit, usable as a video frame).',
         'Pick start = the number of the best photo to open the video (the whole product, front, sharp) and end = the number of the best back view of the same product, person and setting (null if there is none).',
         'product: kind = "worn" for clothing, shoes, jewellery or accessories worn by a person, otherwise "object"; category = 2–4 English words.',
-        `shots: 5 video shots that suit THIS product and these photos — what a good e-commerce videographer would film for it. AI video invents every side the photos do not show, so: never turn or rotate an object unless the photos show its back and sides; prefer the CAMERA moving around a still product (a slow push-in, a gentle arc of at most 30 degrees, a rising or lowering move), light gliding across it, a macro glide over a key detail, the product in use or in its natural place; for a worn product, the person moving naturally. Physically simple, real-time, the product always recognisable and rigid; keep the whole product in frame (a close-up only of a part a detail photo shows). Order them safest first. Each: label (≤ 4 words, ${lang}), hint (≤ 8 words, ${lang}), action (one English sentence of what happens on camera), showsBack (true only if the shot ends showing the back, which must be in the photos).`,
+        'profile (how a video of THIS product must behave; any product — a dress, a book, a bouquet, a phone case, a candle, a ring, a sofa): '
+          + 'name = 2–6 English words naming the product as the photos show it (no brand guesses); use = "worn" (worn on the body), "held" (normally held in the hands: a book, a bouquet, a phone case, a mug) or "placed" (stands or lies somewhere: decor, furniture, a candle); '
+          + 'physics = "rigid" | "fabric" (clothing, textiles) | "organic" (flowers, plants, food) | "soft" (plush, cushions) | "liquid" (a visible liquid); '
+          + 'text = true when the product shows printed words a buyer reads (a book cover, a label, a print); shiny = true for glass, metal, gems or gloss; size = "tiny" (a ring, earrings) | "small" | "medium" | "large" (furniture); flat = true when it naturally lies flat (a book, a card, folded clothing, jewellery); '
+          + 'details = 3–6 short English phrases of what makes this product recognisable, only what the photos show (colours, parts, ornaments, prints, materials); printed = the exact words printed on the product itself, read from the photos letter for letter (a title, a brand on a label), [] if none; '
+          + 'actions = for "lifestyle", "withPerson", "detail" and "reveal": one English sentence each of how that shot goes for this product — lifestyle: the product in its natural real place (a bouquet in a vase on a dining table, a book on a café table); withPerson: a person naturally wearing, holding or using it, calmly, hands still or holding it steadily, lips closed, never a face close-up; detail: a slow macro glide over its most characteristic detail that a photo shows; reveal: soft light gliding across its material. Nothing ever turns pages, opens packaging or changes the product.',
+        `shots: 5 video shots that suit THIS product and these photos — what a good e-commerce videographer would film for it. AI video invents every side the photos do not show, so: never turn or rotate an object unless the photos show its back and sides; prefer the CAMERA moving around a still product (a slow push-in, a gentle arc of at most 30 degrees, a rising or lowering move), light gliding across it, a macro glide over a key detail, the product in use or in its natural place; for a worn product, the person posing calmly (a gentle weight shift or a slow turn of at most a quarter, hands still, lips closed, no gestures), never a close-up of a face or hands. Physically simple, real-time, the product always recognisable and rigid; keep the whole product in frame (a close-up only of a part a detail photo shows). Order them safest first. Each: label (≤ 4 words, ${lang}), hint (≤ 8 words, ${lang}), action (one English sentence of what happens on camera), showsBack (true only if the shot ends showing the back, which must be in the photos).`,
         `scenes: 4 real settings where this product would naturally be filmed. Each: label (≤ 3 words, ${lang}), prompt (one English sentence describing the place and light).`,
-        'Return JSON: {"photos": [{"view","fullBody","person","quality"}], "start": number, "end": number | null, "product": {"kind","category"}, "shots": [{"label","hint","action","showsBack"}], "scenes": [{"label","prompt"}]}',
+        'Return JSON: {"photos": [{"view","fullBody","person","quality"}], "start": number, "end": number | null, "product": {"kind","category"}, "profile": {"name","use","physics","text","shiny","size","flat","details":[],"printed":[],"actions":{"lifestyle","withPerson","detail","reveal"}}, "shots": [{"label","hint","action","showsBack"}], "scenes": [{"label","prompt"}]}',
       ].join('\n'),
     },
   ]);

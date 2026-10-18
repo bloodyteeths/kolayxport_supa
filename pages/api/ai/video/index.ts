@@ -21,8 +21,12 @@ import { getAuthUser } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 import { logUsage } from '@/lib/ai/gemini';
 import { directVideo, negativePrompt, normalizeDirection, type VideoDirection } from '@/lib/ai/videoDirector';
-import { finishInPlace, originalOf, pollVideo, saveVideo, startVideo, veoConstraints, VIDEO_UPLOAD_ROOT, type VideoMedia } from '@/lib/ai/video';
-import { fitToAspect, loadSource, loadSources, saveSourceImage } from '@/lib/ai/videoSources';
+import { finishInPlace, originalOf, pollVideo, saveVideo, startVideo, trimInPlace, trimWindow, veoConstraints, VIDEO_UPLOAD_ROOT, type VideoMedia } from '@/lib/ai/video';
+import { VIDEO_TARGET_PROFILES } from '@/lib/ai/videoTargets';
+import { normalizeProfile } from '@/lib/ai/videoShots';
+import { fitToAspect, loadSource, loadSources, saveSourceImage, videoDuration } from '@/lib/ai/videoSources';
+import { interpretNotes } from '@/lib/ai/videoNotes';
+import { writeVideoPrompt } from '@/lib/ai/videoPromptWriter';
 import { checkVideo, extendFrame, generateKeyframe, keyframePrompt, matchSubjectScale, MAX_PRODUCT_REFS, type VideoQa } from '@/lib/ai/videoProduct';
 import { extendCredits, imageCredits, videoCredits } from '@/lib/billing/aiCredits';
 import { isAiBudgetError, isNoCreditsError, refundCredits, spendCredits } from '@/lib/billing/aiCreditsServer';
@@ -32,10 +36,19 @@ export const config = { api: { bodyParser: { sizeLimit: '2mb' } } };
 const RUNNING_PER_USER = 4;
 const STALE_MS = 20 * 60 * 1000;
 /** Shot types that turn or move: the end of the video shows what the first frame does not. */
-const TURNING = new Set(['twirl', 'turntable', 'frontBack', 'walk', 'pose', 'lifestyle']);
+// Shots whose end the first frame cannot show (the back): an AI end frame is built from the photos. Not for "the next
+// pose" shots (walk, pose, twirl, lifestyle): an invented end pose differs in small details from the start photo and Veo
+// morphs between the two (those videos scored lowest on production).
+const TURNING = new Set(['turntable', 'frontBack']);
 
 type Job = NonNullable<Awaited<ReturnType<typeof prisma.aiVideoJob.findFirst>>>;
-type Dir = VideoDirection & { genAspect?: '9:16' | '16:9'; variants?: number; locale?: 'tr' | 'en'; autoFixOf?: string; safeRetry?: boolean };
+type Dir = VideoDirection & {
+  genAspect?: '9:16' | '16:9'; variants?: number; locale?: 'tr' | 'en'; autoFixOf?: string; safeRetry?: boolean;
+  /** What was left out of the seller's notes / change request, and why (in their language; lib/ai/videoNotes). */
+  notesDropped?: string[];
+  /** This take's change request as a checked English direction (the seller's words stay in `instruction`). */
+  instructionEn?: string;
+};
 
 const WORDING_REFUSED = /sensitive words|responsible ai|prompt could not be submitted/i;
 
@@ -61,8 +74,9 @@ async function failJob(job: Job, errorKey: string, detail: string): Promise<Job>
 }
 
 /** Below these the best variant is fixed automatically, once (founder: "the video editor should do all that itself"). */
-const AUTO_FIX_MATCH = 7;
-const AUTO_FIX_REALISM = 6;
+// Founder 2026-10-18: "videos need to reach 10/10 for any marketplace". Below 8 the free automatic retry runs.
+const AUTO_FIX_MATCH = 8;
+const AUTO_FIX_REALISM = 8;
 const qaScore = (q: VideoQa) => (q.match ?? 0) * 2 + (q.realism ?? 0);
 
 /**
@@ -78,8 +92,26 @@ async function runQa(jobIds: string[]) {
     try {
       await prisma.aiVideoJob.update({ where: { id }, data: { qa: { status: 'running' } } });
       const refs = await loadSources(job.userId, job.referenceUrls.slice(0, 5));
-      const locale = (job.direction as Dir | null)?.locale === 'en' ? 'en' : 'tr';
-      results.push({ job, qa: refs.length ? await checkVideo({ userId: job.userId, file: job.filePath, refs, locale }) : { status: 'failed' } });
+      const dir = (job.direction ?? {}) as Dir;
+      const locale = dir.locale === 'en' ? 'en' : 'tr';
+      const check = { userId: job.userId, refs, locale, person: dir.person === true || dir.addPerson === true, profile: normalizeProfile(dir.profile, dir.productKind) } as const;
+      let qa: VideoQa = refs.length ? await checkVideo({ ...check, file: job.filePath }) : { status: 'failed' };
+      // The problems sit in a few seconds only: cut them away (the marketplace's minimum length kept) and check again.
+      if (qa.status === 'done' && ((qa.match ?? 10) < 9 || (qa.realism ?? 10) < 9) && job.mode !== 'edit') {
+        const duration = await videoDuration(job.filePath);
+        const minSec = Math.max(4, VIDEO_TARGET_PROFILES[dir.target ?? 'etsy']?.minSec ?? 5);
+        const win = trimWindow(qa.clean, duration, minSec);
+        if (win) {
+          await trimInPlace(job.filePath, win.from, win.to);
+          const again = await checkVideo({ ...check, file: job.filePath });
+          if (again.status === 'done' && qaScore(again) >= qaScore(qa)) qa = { ...again, trimmed: { ...win, of: Math.round(duration * 10) / 10 } };
+          else {
+            // Not better: put the untrimmed video back.
+            await fs.promises.rename(`${job.filePath}.untrimmed.mp4`, job.filePath).catch(() => undefined);
+          }
+        }
+      }
+      results.push({ job, qa });
     } catch (err: any) {
       logger.warn('AI video quality check failed', { jobId: id, error: err?.message });
       results.push({ job, qa: { status: 'failed' } });
@@ -100,7 +132,7 @@ async function runQa(jobIds: string[]) {
     const body = safer
       ? { parentId: best.job.id, instruction: 'Keep the product perfectly still and exactly as in the photos; only the camera moves', variants: 1, dropEnd: true,
           direction: { ...(best.job.direction as object), preset: 'hero', shotText: undefined, showsBack: false } }
-      : fixes.length ? { parentId: best.job.id, instruction: `Fix: ${fixes.join('; ')}`.slice(0, 400), variants: 1 } : null;
+      : fixes.length ? { parentId: best.job.id, instruction: fixes.join('. ').slice(0, 400), variants: 1 } : null;
     if (body) {
       const r = await launchTake(main.userId, body, d.locale === 'en' ? 'en' : 'tr', { free: true, autoFixOf: main.groupId ?? main.id })
         .catch((err) => { logger.warn('AI video auto-fix failed to start', { jobId: main.id, error: err?.message }); return null; });
@@ -175,7 +207,7 @@ async function retrySafe(job: Job): Promise<Job> {
   const aspectRatio: '9:16' | '16:9' = raw.genAspect === '16:9' ? '16:9' : '9:16';
   void prepareAndStart({
     job: fresh, direction: d, prompt, aspectRatio, durationSec: job.durationSec, resolution: job.resolution, quality: job.quality === 'best' ? 'best' : 'fast',
-    variants: Math.max(1, Number(raw.variants ?? 1)), seed: job.seed, start, end, products: [], aiStart: false, aiEnd: false,
+    variants: Math.max(1, Number(raw.variants ?? 1)), seed: job.seed, start, end, products: [], aiStart: false, aiEnd: false, changes: [],
   });
   logger.info('AI video: wording refused by Google, retrying with the safe prompt', { jobId: job.id });
   return fresh;
@@ -184,7 +216,7 @@ async function retrySafe(job: Job): Promise<Job> {
 async function changesOf(userId: string, start: Job | null): Promise<string[]> {
   const out: string[] = [];
   for (let p: Job | null = start, n = 0; p && n < 30; n++) {
-    if (p.instruction && p.mode !== 'edit') out.unshift(p.instruction);
+    if (p.instruction && p.mode !== 'edit') out.unshift((p.direction as Dir | null)?.instructionEn || p.instruction);
     p = p.parentId ? await prisma.aiVideoJob.findFirst({ where: { id: p.parentId, userId } }) : null;
   }
   return out;
@@ -194,6 +226,8 @@ type Launch = {
   job: Job; direction: Dir; prompt: string; aspectRatio: '9:16' | '16:9'; durationSec: number; resolution: string;
   quality: 'fast' | 'best'; variants: number; seed: number | null;
   start: VideoMedia | null; end: VideoMedia | null; products: VideoMedia[]; aiStart: boolean; aiEnd: boolean;
+  /** Follow-ups so far (English), for the AI prompt writer. */
+  changes: string[];
 };
 
 /** Builds the missing keyframes (Nano Banana Pro, from every product photo), then starts Veo. Runs in the background. */
@@ -219,11 +253,28 @@ async function prepareAndStart(l: Launch) {
     const first = await fitToAspect(start, l.aspectRatio, d.format, { extend });
     // …and the end subject the same size and place as the start one (no zoom / "shrinking" at the end).
     const last = end ? await matchSubjectScale(job.userId, first, await fitToAspect(end, l.aspectRatio, d.format, { extend }), l.aspectRatio) : null;
+    // The AI director reads these exact frames and the product photos and writes the prompt for THIS product
+    // (lib/ai/videoPromptWriter); the rule-based prompt stands in when it cannot.
+    let prompt = l.prompt;
+    let negative = negativePrompt(d);
+    // (Not on the safe retry after Google refused the wording: that one is the plainest rule-based prompt.)
+    const written = d.safeRetry ? null : await writeVideoPrompt(job.userId, { first, last, products: l.products, direction: d, changes: l.changes, durationSec: l.durationSec })
+      .catch((e) => { logger.warn('AI video prompt writer failed', { jobId: job.id, error: e?.message }); return null; });
+    if (written) {
+      prompt = written.prompt;
+      negative = Array.from(new Set([...negative.split(', '), ...written.negative])).join(', ');
+    }
     const started = await startVideo({
-      mode: last ? 'interpolate' : 'image', prompt: l.prompt, negativePrompt: negativePrompt(d), image: first, lastFrame: last ?? undefined,
+      mode: last ? 'interpolate' : 'image', prompt, negativePrompt: negative, image: first, lastFrame: last ?? undefined,
       aspectRatio: l.aspectRatio, durationSec: l.durationSec, resolution: l.resolution, quality: l.quality, variants: l.variants, seed: l.seed, audio: d.audio !== 'none',
     });
-    await prisma.aiVideoJob.update({ where: { id: job.id }, data: { status: 'running', operation: started.operation, provider: started.provider, model: started.model, sourceUrl: startRef, endUrl: endRef } });
+    await prisma.aiVideoJob.update({
+      where: { id: job.id },
+      data: {
+        status: 'running', operation: started.operation, provider: started.provider, model: started.model, sourceUrl: startRef, endUrl: endRef, prompt,
+        direction: { ...(d as object), promptBy: written ? 'ai' : 'rules', reading: written?.reading || undefined } as any,
+      },
+    });
   } catch (err: any) {
     logger.warn('AI video start failed', { jobId: job.id, error: err?.message });
     await failJob(job, err?.key ?? (l.aiStart || l.aiEnd ? 'keyframeFailed' : 'videoFailed'), String(err?.message || 'failed'));
@@ -244,6 +295,29 @@ async function launchTake(userId: string, body: any, locale: 'tr' | 'en', opts: 
   if (parent && !instruction && !body.direction) return { status: 400, json: { code: 'instructionRequired' } };
 
   const direction: Dir = { ...normalizeDirection(body.direction ?? parent?.direction ?? {}), locale };
+  // The seller's own words (any language) → a checked English direction for THIS product and shot; what real footage
+  // cannot show, or what would change the product, is left out and shown to the seller (lib/ai/videoNotes).
+  // Automatic fixes are written by us in English already.
+  if (!opts.free) {
+    const parentDir = (parent?.direction ?? null) as Dir | null;
+    const dropped: string[] = [];
+    delete direction.notesEn;
+    if (direction.notes) {
+      if (parentDir?.notes === direction.notes && parentDir?.notesEn) direction.notesEn = parentDir.notesEn;
+      else {
+        const r = await interpretNotes(userId, {
+          notes: direction.notes, profile: direction.profile, product: direction.product, shot: direction.shotText,
+          free: direction.preset === 'custom' && !direction.shotText, person: direction.person, locale,
+        });
+        if (r) { direction.notesEn = r.en || undefined; dropped.push(...r.dropped); }
+      }
+    }
+    if (instruction) {
+      const r = await interpretNotes(userId, { notes: instruction, profile: direction.profile, product: direction.product, shot: direction.shotText, person: direction.person, locale });
+      if (r) { direction.instructionEn = r.en || undefined; dropped.push(...r.dropped); }
+    } else delete direction.instructionEn;
+    direction.notesDropped = dropped.length ? dropped : undefined;
+  }
   const lock = body.lock !== false && (parent ? (parent.direction as any)?.lock !== false : true);
 
   // Frames + product photos. A follow-up re-uses its parent's frames (real photos or the keyframes already built).
@@ -269,7 +343,7 @@ async function launchTake(userId: string, body: any, locale: 'tr' | 'en', opts: 
   // The end the first frame cannot show (the back after a turn, the next pose) is built from the photos.
   const aiEnd = !end && !parent && lock && (TURNING.has(direction.preset) || (direction.preset === 'custom' && direction.showsBack === true)) && products.length > 0;
 
-  const changes = [...(await changesOf(userId, parent)), ...(instruction ? [instruction] : [])];
+  const changes = [...(await changesOf(userId, parent)), ...(instruction ? [direction.instructionEn || instruction] : [])];
   // Veo renders 16:9 / 9:16; the client sends the generation aspect (from the format and the photo orientation).
   const parentGen = (parent?.direction as Dir | null)?.genAspect ?? (parent?.aspectRatio === '16:9' ? '16:9' : parent ? '9:16' : null);
   const aspectRatio: '9:16' | '16:9' = (body.aspectRatio ?? parentGen) === '16:9' ? '16:9' : '9:16';
@@ -305,15 +379,10 @@ async function launchTake(userId: string, body: any, locale: 'tr' | 'en', opts: 
       title: (parent?.title ?? (typeof body.title === 'string' ? body.title.slice(0, 140) : null)) || null,
     },
   });
-  const launch: Launch = { job, direction, prompt, aspectRatio, durationSec, resolution, quality, variants, seed, start, end, products, aiStart, aiEnd };
-  if (aiStart || aiEnd) {
-    void prepareAndStart(launch); // keyframes take ~20–60 s: the client polls 'preparing' → 'running' → 'done'
-    return { status: 200, json: { job: viewJob(job), credits: cost } };
-  }
-  await prepareAndStart(launch);
-  const fresh = (await prisma.aiVideoJob.findFirst({ where: { id } })) ?? job;
-  if (fresh.status === 'failed') return { status: 502, json: { code: 'videoFailed', job: viewJob(fresh) } };
-  return { status: 200, json: { job: viewJob(fresh), credits: cost } };
+  const launch: Launch = { job, direction, prompt, aspectRatio, durationSec, resolution, quality, variants, seed, start, end, products, aiStart, aiEnd, changes };
+  // Keyframes and the AI-written prompt take ~10–60 s: the client polls 'preparing' → 'running' → 'done'.
+  void prepareAndStart(launch);
+  return { status: 200, json: { job: viewJob(job), credits: cost } };
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

@@ -246,6 +246,27 @@ export async function finishInPlace(file: string, f: { mute?: boolean; format?: 
   await fs.promises.rename(tmp, file);
 }
 
+/**
+ * Trims a finished video to [from, to] in place (frame-accurate re-encode); the untrimmed one is kept next to it.
+ * Used to cut away the seconds the quality check found a problem in.
+ */
+export async function trimInPlace(file: string, from: number, to: number): Promise<void> {
+  const tmp = `${file}.trim.mp4`;
+  await run('ffmpeg', ffmpegArgs(file, tmp, { trimStart: from, trimEnd: to }), { timeout: 180_000 });
+  await fs.promises.copyFile(file, `${file}.untrimmed.mp4`);
+  await fs.promises.rename(tmp, file);
+}
+
+/** The trim worth making: the clean stretch, at least `minSec` long and cutting at least 0.7 s. Pure. */
+export function trimWindow(clean: { from: number; to: number } | undefined, duration: number, minSec: number): { from: number; to: number } | null {
+  if (!clean || !duration) return null;
+  const from = Math.max(0, clean.from);
+  const to = Math.min(duration, clean.to);
+  if (to - from < minSec) return null;
+  if (duration - (to - from) < 0.7) return null;
+  return { from: Math.round(from * 10) / 10, to: Math.round(to * 10) / 10 };
+}
+
 /** Where the uncropped Veo original of a cropped video is kept. */
 export function originalOf(file: string): string {
   return `${file}.orig.mp4`;

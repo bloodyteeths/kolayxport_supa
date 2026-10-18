@@ -12,6 +12,8 @@
 // The product is never described in words ("describing a dress is very difficult"): the lock sentence points Veo at the
 // photos, and the frames themselves come from those photos (lib/ai/videoProduct).
 
+import { detailLock, normalizeProfile, personLine, physicsSentence, shotPlan, SHOT_KEYS, type ProductProfile, type ShotKey, type ShotPlan } from './videoShots';
+
 /** 'image': starts on a real photo (+ a real end photo → interpolate). 'scene': AI keyframes from all the photos. */
 export const VIDEO_MODES = ['image', 'scene'] as const;
 export type VideoMode = (typeof VIDEO_MODES)[number];
@@ -59,8 +61,12 @@ export type VideoDirection = {
   productKind?: 'worn' | 'object';
   /** "With a person" on photos without one: AI adds a real-looking person using the product (keyframes). */
   addPerson?: boolean;
-  /** Free text from the seller (any language; Veo understands it). */
+  /** What the photos show about the product (lib/ai/videoShots): each shot's recipe is written for it. */
+  profile?: ProductProfile;
+  /** Free text from the seller (any language). */
   notes?: string;
+  /** The seller's notes as a checked English direction (server, lib/ai/videoNotes) — used instead of `notes`. */
+  notesEn?: string;
   /** Extra things to avoid, on top of the defaults. */
   avoid?: string;
   /** Product context (listing title), e.g. "dusty pink floral flower girl ball gown". */
@@ -166,9 +172,10 @@ const MOTION: Record<VideoDirection['motion'], string> = {
 };
 
 const EXPRESSION: Record<VideoDirection['expression'], string> = {
-  smiling: 'a warm, genuine smile',
-  joyful: 'a joyful, happy expression, laughing naturally',
-  natural: 'a relaxed, natural expression with small genuine smiles',
+  // Always closed lips: open mouths and laughs gave distorted teeth (production QA, 2026-10-18).
+  smiling: 'a warm, genuine closed-lip smile',
+  joyful: 'a bright, happy expression with a closed-lip smile',
+  natural: 'a relaxed, natural expression with a soft closed-lip smile',
   calm: 'a calm, gentle expression',
 };
 
@@ -220,61 +227,93 @@ export function neutralPeople(text: string): string {
 export function lockSentence(person: boolean, kind?: VideoDirection['productKind'], addPerson = false): string {
   // (No "body" / "skin" / "age" words for people: see neutralPeople.)
   const detail = kind === 'worn'
-    ? 'the same cut, colours, fabric, pattern, prints, lace, embroidery and embellishments (same number, size and position), sleeves, neckline, fastenings and length'
+    ? 'the same cut, colours, fabric, pattern, prints and embellishments (same number, size and position), fastenings and length'
     : 'the same shape, proportions, colours, materials, textures, parts, buttons and any printed text or logos';
   return `The product must be exactly the one in the photos in every frame: ${detail}. Never add, remove, move or redesign any detail.`
     + (person && !addPerson ? ' Keep the same model exactly as in the photos: the same face, hair and look.' : '')
     + (addPerson ? ' The person is a natural-looking real adult; the product, not the person, is the subject.' : '');
 }
 
-/** How a real person behaves on camera. Pure. */
-export function personSentence(d: Pick<VideoDirection, 'expression'>): string {
-  return `The model behaves naturally, like a real person being filmed: ${EXPRESSION[d.expression]}, natural blinking, small spontaneous head and hand movements, relaxed posture. A natural, unretouched look with no beauty filter, natural hair, correct hands and fingers. Never a frozen, blank or doll-like face.`;
+/** How the person behaves (hands still, lips closed, face toward the camera; lib/ai/videoShots personLine). Pure. */
+export function personSentence(d: Pick<VideoDirection, 'expression'> & { use?: ProductProfile['use'] }): string {
+  return personLine(d.use && d.use !== 'worn' ? 'holding' : 'still', EXPRESSION[d.expression] ?? EXPRESSION.natural);
 }
+
+/** The look's opening and closing lines, and the audio line (for the AI prompt writer, lib/ai/videoPromptWriter). Pure. */
+export function lookLines(d: Pick<VideoDirection, 'look'>): { intro: string; finish: string } {
+  return LOOK[d.look] ?? LOOK.phone;
+}
+export function audioLine(d: Pick<VideoDirection, 'audio'>): string {
+  return AUDIO[d.audio] ?? '';
+}
+export const EXPRESSION_TEXT = (d: Pick<VideoDirection, 'expression'>): string => EXPRESSION[d.expression] ?? EXPRESSION.natural;
 
 export function sceneSentence(d: Pick<VideoDirection, 'scene' | 'sceneText' | 'light'>): string {
   const scene = d.scene === 'custom' ? (clean(d.sceneText, 300) ? `Setting: ${clean(d.sceneText, 300)}.` : '') : SCENE[d.scene];
   return [scene, LIGHT[d.light]].filter(Boolean).join(' ');
 }
 
+/**
+ * The shot plan for a direction: a built-in shot → its own recipe for this product (lib/ai/videoShots); an AI-suggested
+ * shot or the seller's own ("Free") → their action with the same product rules. Pure.
+ */
+export function planFor(d: VideoDirection, profile: ProductProfile = normalizeProfile(d.profile, d.productKind)): ShotPlan {
+  if ((SHOT_KEYS as readonly string[]).includes(d.preset)) return shotPlan(d.preset as ShotKey, profile, { person: d.person, addPerson: d.addPerson });
+  const who = d.person ? 'person' : 'product';
+  const action = d.preset === 'custom' ? clean(d.shotText, 300) : PRESET_ACTION[d.preset][who];
+  const worn = profile.use === 'worn';
+  return {
+    action,
+    camera: '',
+    framing: `The whole product${d.person && worn ? ' and the model\'s head' : ''} stays in frame for the whole shot: no extreme close-ups${d.person ? ' (never a close-up of the face or the hands)' : ''}, the camera never moves closer than the photos show, and any camera move stays small and slow.`,
+    avoid: [],
+    hands: !d.person ? 'none' : worn ? 'still' : 'holding',
+    person: d.person,
+  };
+}
+
 /** The full English prompt for Veo. `changes` are the follow-ups asked so far (oldest first). Pure. */
 export function directVideo(d: VideoDirection, changes: string[] = [], opts: { safe?: boolean } = {}): string {
-  const who = d.person ? 'person' : 'product';
-  const ppl = (t: string) => (d.person ? neutralPeople(t) : t);
-  const product = ppl(clean(d.product, 160));
+  const profile = normalizeProfile(d.profile, d.productKind);
+  const plan = planFor(d, profile);
+  const ppl = (t: string) => (d.person || plan.person ? neutralPeople(t) : t);
+  const look = LOOK[d.look] ?? LOOK.phone;
+  const lock = lockSentence(d.person && plan.person, profile.use === 'worn' ? 'worn' : 'object', d.addPerson === true);
   if (opts.safe) {
-    // Google refused the wording once: the plainest prompt (no seller text, no AI shot, no person details).
-    const preset = d.preset === 'custom' ? (d.person ? 'pose' : 'hero') : d.preset;
-    return [LOOK[d.look]?.intro ?? LOOK.phone.intro, lockSentence(d.person, d.productKind), PRESET_ACTION[preset][who], MOTION[d.motion],
+    // Google refused the wording once: the plainest prompt (no seller text, no AI text, no person details).
+    const safe = shotPlan((SHOT_KEYS as readonly string[]).includes(d.preset) ? (d.preset as ShotKey) : 'hero', { use: profile.use, physics: profile.physics, text: profile.text }, { person: d.person });
+    return [look.intro, lock, detailLock({ use: profile.use, physics: profile.physics }), safe.action, safe.camera, MOTION[d.motion], physicsSentence({ use: profile.use, physics: profile.physics, text: profile.text }),
       'Everything moves at real-time speed with real weight and physics; nothing morphs, melts or flickers.', sceneSentence(d),
       'No added captions, subtitles, logos or watermarks.'].filter(Boolean).join(' ');
   }
-  const look = LOOK[d.look] ?? LOOK.phone;
+  const name = ppl(clean(profile.name, 80) || clean(d.product, 160));
+  // "Free": the seller's own words are the shot.
+  const notes = ppl(clean(d.notesEn, 600) || clean(d.notes, 800));
+  const free = d.preset === 'custom' && !clean(d.shotText, 300) && notes;
   const parts: string[] = [
     look.intro,
-    product ? `The product: ${product}.` : '',
-    lockSentence(d.person, d.productKind, d.addPerson === true),
-    d.preset === 'custom' && clean(d.shotText, 300) ? ppl(clean(d.shotText, 300)) : PRESET_ACTION[d.preset][who],
-    // A tight zoom past what the photos show makes Veo invent details (seen on a Wix dress: bodice made up, head cut).
-    d.preset === 'detail' ? '' : `The whole product${d.person ? ' and the model\'s head' : ''} stay in frame for the whole shot: no extreme close-ups, the camera never moves closer than the photos show.`,
-    CAMERA[d.camera],
+    name ? `The product: ${name}.` : '',
+    lock,
+    detailLock(profile),
+    free ? notes : ppl(plan.action),
+    d.camera !== 'auto' ? CAMERA[d.camera] : plan.camera,
+    plan.framing,
     MOTION[d.motion],
-    d.person ? personSentence(d) : '',
-    d.person || d.productKind === 'worn' ? '' : 'The product is one solid, rigid object: it never bends, stretches, melts or changes shape, and no part of it appears or disappears; only the camera and the light move unless the shot says it turns.',
+    plan.person ? personLine(plan.hands, EXPRESSION[d.expression] ?? EXPRESSION.natural) : '',
+    physicsSentence(profile),
     'Everything moves at real-time speed, never slow motion, with real weight and physics; light and shadows stay consistent; nothing morphs, melts or flickers.',
     sceneSentence(d),
     look.finish,
   ];
-  const notes = ppl(clean(d.notes, 800));
-  if (notes) parts.push(notes);
+  if (notes && !free) parts.push(notes);
   changes.map((c) => ppl(clean(c, 400))).filter(Boolean).forEach((c, i) => parts.push(`Change ${i + 1}: ${c}.`));
   parts.push('No added captions, subtitles, logos or watermarks (keep the product\'s own text and logos as in the photos).');
   if (AUDIO[d.audio]) parts.push(AUDIO[d.audio]);
   return parts.filter(Boolean).join(' ');
 }
 
-/** What Veo should avoid (defaults + the seller's list). Pure. */
-export function negativePrompt(d: Pick<VideoDirection, 'avoid' | 'person'>): string {
+/** What Veo should avoid (defaults + the shot's own + the seller's list). Pure. */
+export function negativePrompt(d: Partial<VideoDirection> & Pick<VideoDirection, 'person'>): string {
   const base = [
     'CGI', '3D render', 'animation', 'cartoon', 'illustration', 'painting', 'AI-generated look', 'video game',
     'slow motion', 'floaty or dreamlike motion', 'morphing', 'warping', 'melting', 'flickering details',
@@ -282,11 +321,20 @@ export function negativePrompt(d: Pick<VideoDirection, 'avoid' | 'person'>): str
     'oversaturated colours', 'glow', 'haze', 'blurry', 'low quality', 'added captions', 'subtitles', 'watermark', 'added logos',
     'phone screen', 'camera app interface', 'on-screen buttons or icons', 'screen recording', 'black bars', 'letterbox', 'border', 'picture frame',
   ];
-  // No person in the photos: no hands reaching in to hold the product (seen on an eBay statue video).
-  if (!d.person) base.push('hands', 'fingers', 'people');
-  if (d.person) base.push('plastic look', 'airbrushed look', 'beauty filter', 'uncanny face', 'dead eyes', 'frozen expression', 'distorted face', 'deformed hands', 'extra fingers', 'extra limbs');
-  const extra = clean(d.avoid, 300);
-  return [...base, ...(extra ? [extra] : [])].join(', ');
+  const full = { ...DEFAULT_DIRECTION, ...d } as VideoDirection;
+  const profile = normalizeProfile(full.profile, full.productKind);
+  const plan = planFor(full, profile);
+  base.push(...plan.avoid);
+  if (profile.text) base.push('scrambled text', 'changed letters', 'flipping pages', 'opening the book');
+  // No person in the shot: no hands reaching in to hold the product (seen on an eBay statue video).
+  if (!plan.person && !full.person) base.push('hands', 'fingers', 'people');
+  if (plan.person || full.person) {
+    base.push('plastic look', 'waxy look', 'airbrushed look', 'beauty filter', 'uncanny face', 'dead eyes', 'frozen expression', 'distorted face',
+      'open mouth', 'visible teeth', 'talking', 'laughing', 'face in side profile', 'hand gestures', 'waving', 'reaching', 'clasped fingers',
+      'hands near the face', 'deformed hands', 'extra fingers', 'fused fingers', 'extra limbs');
+  }
+  const extra = clean(full.avoid, 300);
+  return Array.from(new Set([...base, ...(extra ? [extra] : [])])).join(', ');
 }
 
 /** Normalises a direction payload from the client (unknown values → defaults; legacy modes → today's). Pure. */
@@ -312,7 +360,9 @@ export function normalizeDirection(v: unknown): VideoDirection {
     showsBack: o.showsBack === true || undefined,
     addPerson: o.addPerson === true || undefined,
     productKind: o.productKind === 'worn' || o.productKind === 'object' ? o.productKind : undefined,
+    profile: o.profile ? normalizeProfile(o.profile, o.productKind === 'worn' ? 'worn' : 'object') : undefined,
     notes: clean(o.notes, 800) || undefined,
+    notesEn: clean(o.notesEn, 600) || undefined,
     avoid: clean(o.avoid, 300) || undefined,
     product: clean(o.product, 160) || undefined,
     target: (['etsy', 'ebay', 'shopify', 'amazon', 'wix', 'trendyol', 'social'] as const).find((x) => x === o.target),

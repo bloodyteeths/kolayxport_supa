@@ -22,6 +22,7 @@ import {
   BASIC_SCENES, DEFAULT_DIRECTION, UNIVERSAL_PRESETS, VIDEO_AUDIO, VIDEO_CAMERAS, VIDEO_EXPRESSIONS, VIDEO_LIGHTS, VIDEO_LOOKS, VIDEO_MOTIONS,
   directVideo, type VideoDirection,
 } from '@/lib/ai/videoDirector';
+import type { ProductProfile } from '@/lib/ai/videoShots';
 import { VIDEO_TARGETS, VIDEO_TARGET_PROFILES, formatForPhoto, generationAspect, videoReadiness, type VideoFormat, type VideoTarget } from '@/lib/ai/videoTargets';
 import { canAfford, extendCredits, imageCredits, videoCredits } from '@/lib/billing/aiCredits';
 import { showCreditsDialog } from '@/lib/billing/creditsDialogStore';
@@ -29,9 +30,10 @@ import { refreshCredits, useCredits } from '@/components/domain/credits/useCredi
 import { LIMIT_UI_HEADER } from '@/lib/http/limitInterceptor';
 
 type Photo = { key: string; ref: string; src: string; landscape?: boolean; ratio?: number; fromVideo?: boolean };
-type Qa = { status: 'running' | 'done' | 'failed'; match?: number; realism?: number; diffs?: { text: string; fix: string }[]; issues?: { text: string; fix: string }[]; autoFix?: string; autoFixMode?: 'fix' | 'safer' };
+type QaNote = { text: string; fix: string; at?: number };
+type Qa = { status: 'running' | 'done' | 'failed'; match?: number; realism?: number; diffs?: QaNote[]; issues?: QaNote[]; autoFix?: string; autoFixMode?: 'fix' | 'safer'; trimmed?: { from: number; to: number; of: number } };
 type PhotoInfo = { view: 'front' | 'back' | 'side' | 'detail' | 'flat' | 'other'; fullBody: boolean; person: boolean };
-type Ideas = { kind: 'worn' | 'object'; shots: { label: string; hint: string; action: string; showsBack: boolean }[]; scenes: { label: string; prompt: string }[] };
+type Ideas = { kind: 'worn' | 'object'; profile?: ProductProfile; shots: { label: string; hint: string; action: string; showsBack: boolean }[]; scenes: { label: string; prompt: string }[] };
 type Job = {
   id: string; parentId: string | null; groupId: string | null; variantIndex: number; status: 'preparing' | 'running' | 'done' | 'failed';
   mode: string; instruction: string | null; aspectRatio: string; durationSec: number; resolution: string; quality: string;
@@ -272,6 +274,8 @@ export function VideoStudio() {
       userPicked.current = false;
       userShot.current = false;
       setIdeas(null);
+      // A new product: the old one's profile must not shape this one's video.
+      setDir((d) => ({ ...d, profile: undefined }));
       setStart(probed[0] ?? null);
       setEnd(null);
       setSlot('end');
@@ -357,12 +361,13 @@ export function VideoStudio() {
         setAuto({ start: d.start ?? null, end: d.end ?? null });
         const kind: 'worn' | 'object' = d.product?.kind === 'worn' ? 'worn' : 'object';
         const shots = Array.isArray(d.shots) ? d.shots : [];
-        setIdeas({ kind, shots, scenes: Array.isArray(d.scenes) ? d.scenes : [] });
+        const profile = d.product?.profile && typeof d.product.profile === 'object' ? (d.product.profile as ProductProfile) : undefined;
+        setIdeas({ kind, profile, shots, scenes: Array.isArray(d.scenes) ? d.scenes : [] });
         const anyPerson = d.photos.some((x: any) => x.person);
         setPhotosPerson(anyPerson);
         const person = userPerson.current ? undefined : anyPerson;
         setDir((dd) => {
-          const next = { ...dd, productKind: kind, ...(person === undefined ? {} : { person }) };
+          const next = { ...dd, productKind: kind, profile, ...(person === undefined ? {} : { person }) };
           // Unless the seller chose a shot, start with the best suggestion for this product.
           if (!userShot.current && shots[0]) return { ...next, preset: 'custom', shotText: shots[0].action, showsBack: Boolean(shots[0].showsBack) };
           return next;
@@ -768,6 +773,7 @@ export function VideoStudio() {
                 {showPrompt ? t('output.hidePrompt') : t('output.showPrompt')}
               </Box>
               {showPrompt ? <Box component="pre" sx={{ m: 0, p: '10px', bgcolor: n[50], borderRadius: '8px', fontSize: 12, lineHeight: '18px', whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: n[700] }}>{promptPreview}</Box> : null}
+              {showPrompt ? <Box sx={{ fontSize: 12, color: n[500] }}>{t('director.promptAiHint')}</Box> : null}
             </Block>
           ) : null}
 
@@ -834,6 +840,9 @@ export function VideoStudio() {
             {cur && cur.status === 'done' && qa ? (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px', p: '10px', borderRadius: '8px', bgcolor: n[50], border: `1px solid ${n[200]}` }} data-testid="video-qa">
                 <Box sx={{ fontSize: 13, fontWeight: 600, color: n[800] }}>{t('qa.title')}</Box>
+                {Array.isArray((cur?.direction as any)?.notesDropped) && (cur?.direction as any).notesDropped.length ? (
+                  <Box sx={{ fontSize: 12, color: n[600] }}><b>{t('notesDropped')}</b>{((cur?.direction as any).notesDropped as string[]).map((x) => <Box key={x}>• {x}</Box>)}</Box>
+                ) : null}
                 {qa.status === 'running' ? <Box sx={{ fontSize: 12, color: n[600] }}>{t('qa.running')}</Box> : null}
                 {qa.status === 'failed' ? <Box sx={{ fontSize: 12, color: n[500] }}>{t('qa.failed')}</Box> : null}
                 {qa.status === 'done' ? (
@@ -842,8 +851,9 @@ export function VideoStudio() {
                       <ScorePill label={t('qa.match')} value={qa.match} />
                       <ScorePill label={t('qa.realism')} value={qa.realism} />
                     </Box>
-                    {qa.diffs?.length ? <Box sx={{ fontSize: 12, color: n[700] }}><b>{t('qa.diffs')}</b>{qa.diffs.map((d) => <Box key={d.text}>• {d.text}</Box>)}</Box> : null}
-                    {qa.issues?.length ? <Box sx={{ fontSize: 12, color: n[700] }}><b>{t('qa.issues')}</b>{qa.issues.map((d) => <Box key={d.text}>• {d.text}</Box>)}</Box> : null}
+                    {qa.trimmed ? <Box sx={{ fontSize: 12, color: n[600] }}>{t('qa.trimmed', { from: qa.trimmed.from, to: qa.trimmed.to, of: qa.trimmed.of })}</Box> : null}
+                    {qa.diffs?.length ? <Box sx={{ fontSize: 12, color: n[700] }}><b>{t('qa.diffs')}</b>{qa.diffs.map((d) => <Box key={d.text}>• {d.text}{d.at !== undefined ? ` (${d.at} s)` : ''}</Box>)}</Box> : null}
+                    {qa.issues?.length ? <Box sx={{ fontSize: 12, color: n[700] }}><b>{t('qa.issues')}</b>{qa.issues.map((d) => <Box key={d.text}>• {d.text}{d.at !== undefined ? ` (${d.at} s)` : ''}</Box>)}</Box> : null}
                     {!qa.diffs?.length && !qa.issues?.length ? <Box sx={{ fontSize: 12, color: tone.success.fg }}>{t('qa.clean')}</Box> : null}
                     {fixes.length ? (
                       <Button variant="secondary" size="sm" onClick={() => void followUp(`Fix: ${fixes.join('; ')}`.slice(0, 400))} disabled={Boolean(busy)} loading={busy === 'followUp'}>

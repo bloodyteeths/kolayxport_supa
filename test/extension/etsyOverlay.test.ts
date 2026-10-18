@@ -60,6 +60,11 @@ async function waitFor<T>(fn: () => T | null | undefined | false, ms = 4000): Pr
 
 const norm = (s: string | null | undefined) => (s || '').replace(/\s+/g, ' ').trim();
 const shadowText = (doc: Document, id: string, sel: string) => norm(doc.getElementById(id)?.shadowRoot?.querySelector(sel)?.textContent);
+/** Text once the API answer filled the bar (the page-only first paint is data-kx-state="partial"). */
+const filledText = (doc: Document, id: string, sel: string) => {
+  const el = doc.getElementById(id)?.shadowRoot?.querySelector(sel) as HTMLElement | null | undefined;
+  return el && el.dataset.kxState === 'full' ? norm(el.textContent) : '';
+};
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -116,7 +121,7 @@ describe('Etsy search bar + card rows', () => {
   it('Turkish by default (nothing stored, Chrome UI in English)', async () => {
     const { doc } = boot('https://www.etsy.com/search?q=linen+dress', SEARCH_HTML, ['content-search.js'], searchApi);
     const text = await waitFor(() => {
-      const t = shadowText(doc, 'kx-search-overlay', '.kx-bar');
+      const t = filledText(doc, 'kx-search-overlay', '.kx-bar');
       return t.includes('Sonuç') && t;
     });
     expect(text).toContain('Sonuç1,2K');
@@ -138,7 +143,7 @@ describe('Etsy search bar + card rows', () => {
   it('English when kx_lang = en', async () => {
     const { doc } = boot('https://www.etsy.com/search?q=linen+dress', SEARCH_HTML, ['content-search.js'], searchApi, { kx_lang: 'en' });
     const text = await waitFor(() => {
-      const t = shadowText(doc, 'kx-search-overlay', '.kx-bar');
+      const t = filledText(doc, 'kx-search-overlay', '.kx-bar');
       return t.includes('Results') && t;
     });
     expect(text).toContain('Results1.2K');
@@ -151,23 +156,25 @@ describe('Etsy search bar + card rows', () => {
 
   it('account language English is used when there is no explicit choice; explicit Turkish wins over it', async () => {
     const a = boot('https://www.etsy.com/search?q=linen+dress', SEARCH_HTML, ['content-search.js'], searchApi, { kx_account_lang: 'en' });
-    await waitFor(() => shadowText(a.doc, 'kx-search-overlay', '.kx-bar').includes('Results'));
+    await waitFor(() => filledText(a.doc, 'kx-search-overlay', '.kx-bar').includes('Results'));
     const b = boot('https://www.etsy.com/search?q=linen+dress', SEARCH_HTML, ['content-search.js'], searchApi, { kx_account_lang: 'en', kx_lang: 'tr' });
-    await waitFor(() => shadowText(b.doc, 'kx-search-overlay', '.kx-bar').includes('Sonuç'));
+    await waitFor(() => filledText(b.doc, 'kx-search-overlay', '.kx-bar').includes('Sonuç'));
   });
 
-  it('never shows the wrong language first: the loading text is already Turkish', async () => {
+  it('never shows the wrong language first: the first paint (API pending) is already Turkish', async () => {
     const { doc } = boot('https://www.etsy.com/search?q=linen+dress', SEARCH_HTML, ['content-search.js'], () => new Promise(() => {}) as unknown);
     const text = await waitFor(() => shadowText(doc, 'kx-search-overlay', '.kx-bar'));
-    expect(text).toBe('KolayXport yükleniyor...');
+    expect(text).toContain('Sonuç');
+    expect(text).toContain('Rekabet');
+    expect(text).not.toMatch(/Results|Median|Competition|loading/);
   });
 
   it('re-renders live when the popup switches the language', async () => {
     const { doc, setLang } = boot('https://www.etsy.com/search?q=linen+dress', SEARCH_HTML, ['content-search.js'], searchApi);
-    await waitFor(() => shadowText(doc, 'kx-search-overlay', '.kx-bar').includes('Sonuç'));
+    await waitFor(() => filledText(doc, 'kx-search-overlay', '.kx-bar').includes('Sonuç'));
     await waitFor(() => norm(doc.querySelector('.kx-data-row')?.textContent).includes('/ay'));
     setLang('en');
-    await waitFor(() => shadowText(doc, 'kx-search-overlay', '.kx-bar').includes('Results'));
+    await waitFor(() => filledText(doc, 'kx-search-overlay', '.kx-bar').includes('Results'));
     await waitFor(() => norm(doc.querySelector('.kx-data-row')?.textContent).includes('/mo'));
     expect(doc.querySelectorAll('[data-listing-id="101"] .kx-data-row')).toHaveLength(1); // replaced, not stacked
   });
@@ -216,7 +223,7 @@ describe('Etsy shop bar', () => {
   it('Turkish by default', async () => {
     const { doc } = boot('https://www.etsy.com/shop/LinenHaus', '', ['content-shop.js'], shopApi);
     const t = await waitFor(() => {
-      const s = shadowText(doc, 'kx-shop-overlay', '.kx-shop-bar');
+      const s = filledText(doc, 'kx-shop-overlay', '.kx-shop-bar');
       return s.includes('LinenHaus') && s;
     });
     expect(t).toContain('Satış/ay');
@@ -233,7 +240,7 @@ describe('Etsy shop bar', () => {
   it('English when kx_lang = en', async () => {
     const { doc } = boot('https://www.etsy.com/shop/LinenHaus', '', ['content-shop.js'], shopApi, { kx_lang: 'en' });
     const t = await waitFor(() => {
-      const s = shadowText(doc, 'kx-shop-overlay', '.kx-shop-bar');
+      const s = filledText(doc, 'kx-shop-overlay', '.kx-shop-bar');
       return s.includes('LinenHaus') && s;
     });
     expect(t).toContain('Sales/mo');

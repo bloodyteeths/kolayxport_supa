@@ -61,6 +61,15 @@ const KX_EBAY_INLINE_CSS = `
   background: none; border: none; cursor: pointer; font-size: 11px; color: #667eea;
   font-weight: 600; padding: 0; margin-left: auto;
 }
+/* Placeholders for values still loading: same line box as the text that replaces them (no jump). */
+@keyframes kx-shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+.kx-skel {
+  display: inline-block; vertical-align: middle; height: 0.9em; min-width: 3.2em; border-radius: 4px;
+  background: linear-gradient(90deg, #e4e4ec 25%, #f3f3f8 50%, #e4e4ec 75%); background-size: 200% 100%;
+  animation: kx-shimmer 1.2s ease-in-out infinite;
+}
+.kx-skel-wide { min-width: 7em; }
+@media (prefers-reduced-motion: reduce) { .kx-skel { animation: none; } }
 `;
 
 function injectEbayInlineCSS() {
@@ -122,6 +131,14 @@ function createEbayOverlayContainer(id, position = 'top') {
     .kx-metric-label { color: #666; font-size: 12px; }
     .kx-metric-value { font-weight: 700; font-size: 13px; }
     .kx-loading { text-align: center; padding: 20px; color: #999; }
+    @keyframes kx-shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+    .kx-skel {
+      display: inline-block; vertical-align: middle; height: 0.95em; min-width: 3.2em; border-radius: 4px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.16) 25%, rgba(255,255,255,0.36) 50%, rgba(255,255,255,0.16) 75%);
+      background-size: 200% 100%; animation: kx-shimmer 1.2s ease-in-out infinite;
+    }
+    .kx-skel-wide { min-width: 6.5em; }
+    @media (prefers-reduced-motion: reduce) { .kx-skel { animation: none; } }
   `;
   shadow.appendChild(style);
 
@@ -273,6 +290,22 @@ function ebayT(key, vars) {
   let s = _ebayI18n[ebayLang()]?.[key] || _ebayI18n.en[key] || key;
   if (vars) for (const [k, v] of Object.entries(vars)) s = s.split('{' + k + '}').join(String(v));
   return s;
+}
+
+/** Shimmer placeholder markup for a value that is still loading (static HTML, no data). */
+function ebaySkel(wide) {
+  return '<span class="kx-skel' + (wide ? ' kx-skel-wide' : '') + '" aria-hidden="true" data-kx-skel="1"></span>';
+}
+
+/** Debug timing marks (lib/perf.js; only with localStorage kx_debug). */
+function ebayPerf(surface, label, extra) {
+  const P = window.__KX_PERF;
+  if (P) P.mark(surface, label, extra);
+}
+
+function ebayPerfStart(surface) {
+  const P = window.__KX_PERF;
+  if (P) P.start(surface);
 }
 
 function ebayEscape(s) {
@@ -439,6 +472,9 @@ window.__KX_EBAY_SHARED = {
   salesColor: ebaySalesColor,
   priceVsMedian: ebayPriceVsMedian,
   escape: ebayEscape,
+  skel: ebaySkel,
+  perf: ebayPerf,
+  perfStart: ebayPerfStart,
   getMarketplace: getEbayMarketplace,
   M: window.__KX_EBAY_MATH,
   demandLabel: ebayDemandLabel,

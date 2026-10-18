@@ -7,6 +7,11 @@
  * shows its inputs, confidence and data age. Real on-page Etsy signals ("N bought
  * in the last 24 hours", "In N carts", Bestseller) are shown as-is.
  * Server: POST /api/ext/listing-stats (via background worker).
+ *
+ * Progressive: the panel renders at once with the page's own signals (price, "bought in 24h",
+ * carts, Bestseller) and placeholders. Two requests run in parallel — `phase: 'core'` (listing
+ * facts: favourites, views, tags, age; one Etsy call) and the full stats (sales estimate, shop,
+ * SEO) — and fill the same slots in place.
  */
 
 (function () {
@@ -91,6 +96,12 @@
 
     signals.isBestseller = /\bbestseller\b|\bçok\s+satan\b/i.test(boxText || pageText.slice(0, 8000));
     signals.isStarSeller = /\bstar\s+seller\b|\byıldız\s+satıcı\b/i.test(boxText || pageText.slice(0, 8000));
+
+    // Shop id the page carries (data-shop-id on the shop/follow widgets). Lets the server start
+    // the shop calls in parallel with the listing call; it verifies against the listing's shop_id.
+    const shopEl = document.querySelector('[data-shop-id]');
+    const shopId = shopEl && shopEl.getAttribute('data-shop-id');
+    if (shopId && /^\d{1,15}$/.test(shopId)) signals.shopIdHint = shopId;
     return signals;
   }
 
@@ -137,25 +148,46 @@
       }
 
       _currentListingId = listingId;
+      S.perfStart('etsy_listing');
       const statsBar = document.createElement('div');
       statsBar.id = 'kx-listing-stats';
       statsBar.className = 'kx-stats-bar';
       statsBar.lang = S.lang; // uppercase labels need lang="tr" for İ
-      statsBar.appendChild(header(S.t('loading')));
       anchor.insertAdjacentElement('afterend', statsBar);
 
+      // Page signals: instant, and always the live ones from this render (not a cached copy).
+      const page = scrapePageSignals();
+      const ui = { collapsed: false };
+      const isCurrent = () => S.SELECTORS.listingId() === listingId && statsBar.isConnected;
+      renderStatsBar(statsBar, null, page, ui, 'loading');
+      S.perf('etsy_listing', 'first_paint');
+
+      const key = `lstats:${listingId}`;
+      let local = null;
+      try { local = C.get ? await C.get(key) : null; } catch (_) { local = null; }
+
+      let full = null;
+      let failed = false;
+      // Fast core answer (listing facts) alongside the full one, unless the full one is cached locally.
+      if (!local) {
+        S.listingStatsCall(listingId, page, 'core').then(core => {
+          if (!core || full || failed || !isCurrent()) return;
+          // An older server, or the full answer already in the shared cache: it IS the full answer.
+          renderStatsBar(statsBar, core, page, ui, core.sales ? 'full' : 'core');
+          S.perf('etsy_listing', 'core');
+        }, () => { /* the full request reports errors */ });
+      }
+
       try {
-        const page = scrapePageSignals();
-        const data = await C.getOrFetch(
-          `lstats:${listingId}`,
-          'lstats',
-          () => S.listingStatsCall(listingId, page)
-        );
-        if (S.SELECTORS.listingId() !== listingId) return; // navigated away
+        const data = await C.getOrFetch(key, 'lstats', () => S.listingStatsCall(listingId, page));
+        if (!isCurrent()) return; // navigated away
         if (!data) { statsBar.remove(); return; }
-        // Page signals are always the live ones from this render, not the cached copy.
-        renderStatsBar(statsBar, data, page);
+        full = data;
+        renderStatsBar(statsBar, data, page, ui, 'full');
+        S.perf('etsy_listing', 'full');
       } catch (err) {
+        failed = true;
+        if (!isCurrent()) return;
         // Daily research limit / busy / signed out (401 → sign-up card): one card instead of the numbers.
         if (S.showLimitCard(statsBar, err, 'etsy_listing', true)) return;
         statsBar.textContent = '';
@@ -243,6 +275,22 @@
       return (n > 0 ? '+' : '') + n;
     }
 
+    /** Placeholder sales block: same boxes and line heights as the real one. */
+    function salesSkeleton() {
+      const box = node('div', 'kx-sales');
+      const top = node('div', 'kx-sales-top');
+      const v = node('span', 'kx-sales-value');
+      v.appendChild(S.skel(true));
+      top.appendChild(v);
+      top.appendChild(S.skel());
+      box.appendChild(top);
+      const how = node('div', 'kx-sales-how');
+      how.appendChild(S.skel('x'));
+      box.appendChild(how);
+      box.appendChild(node('div', 'kx-sales-meta', S.t('loading')));
+      return box;
+    }
+
     function renderSalesBlock(data) {
       const sales = data.sales || {};
       const box = node('div', 'kx-sales');
@@ -311,17 +359,28 @@
       return box;
     }
 
-    function renderStatsBar(el, data, page) {
-      const L = data.listing || {};
-      const shop = data.shop;
+    /**
+     * One renderer for every stage. `stage`: 'loading' (no API data yet: page values +
+     * placeholders), 'core' (listing facts; sales / shop / SEO still loading), 'full'.
+     * Slots keep their place and size from stage to stage, so values fill in without a jump.
+     */
+    function renderStatsBar(el, data, page, ui, stage) {
+      const d = data || {};
+      const L = d.listing || {};
+      const shop = d.shop;
+      const hasFull = stage === 'full';
+      const hasListing = !!data && !!d.listing;
       el.textContent = '';
+      el.lang = S.lang;
+      el.dataset.kxState = stage;
 
-      const collapseBtn = node('button', 'kx-collapse-btn', '▲');
+      const collapseBtn = node('button', 'kx-collapse-btn', ui.collapsed ? '▼' : '▲');
       collapseBtn.type = 'button';
       el.appendChild(header(null, [collapseBtn]));
 
       const body = node('div');
-      body.appendChild(renderSalesBlock(data));
+      if (ui.collapsed) body.style.display = 'none';
+      body.appendChild(hasFull ? renderSalesBlock(d) : salesSkeleton());
 
       // Real Etsy page signals (what Etsy itself shows to shoppers right now)
       const signals = [];
@@ -340,38 +399,58 @@
         body.appendChild(row);
       }
 
-      // Facts (Etsy API) — no formulas here
+      // Facts (Etsy API) — no formulas here. A placeholder while a value is still loading.
       const grid = node('div', 'kx-metrics-grid');
-      const seo = data.seoScore?.total ?? 0;
-      grid.appendChild(metric('SEO', seo + '/100', seo >= 70 ? '#4caf50' : seo >= 40 ? '#ff9800' : '#f44336'));
-      if (L.reviewCount !== null && L.reviewCount !== undefined) grid.appendChild(metric(S.t('itemReviews'), S.formatNum(L.reviewCount), null, S.t('itemReviewsTip')));
-      if (L.favorites !== null && L.favorites !== undefined) grid.appendChild(metric(S.t('favorites'), S.formatNum(L.favorites)));
-      if (L.views) grid.appendChild(metric(S.t('views'), S.formatNum(L.views)));
-      if (L.ageDays !== null && L.ageDays !== undefined) {
-        grid.appendChild(metric(S.t('age'), L.ageDays >= 60 ? Math.round(L.ageDays / 30) + ' ' + S.t('months') : L.ageDays + ' ' + S.t('days')));
+      const later = (label) => metricSkel(label);
+      // Price shown on the page (instant); the API list price only when the page has none.
+      if (page.pagePrice) grid.appendChild(metric(S.t('price'), S.formatMoney(page.pagePrice, page.pageCurrency, 2), null, S.t('sourcePage')));
+      else if (hasListing && L.price) grid.appendChild(metric(S.t('price'), S.formatMoney(L.price, L.currency, 2), null, S.t('sourceApi')));
+      if (hasFull) {
+        const seo = d.seoScore?.total ?? 0;
+        grid.appendChild(metric('SEO', seo + '/100', seo >= 70 ? '#4caf50' : seo >= 40 ? '#ff9800' : '#f44336'));
+        if (L.reviewCount !== null && L.reviewCount !== undefined) grid.appendChild(metric(S.t('itemReviews'), S.formatNum(L.reviewCount), null, S.t('itemReviewsTip')));
+      } else {
+        grid.appendChild(later('SEO'));
+        grid.appendChild(later(S.t('itemReviews')));
       }
-      if (L.quantity) {
-        // Seller-entered quantity, frequently a placeholder — never presented as real stock.
-        grid.appendChild(metric(S.t('qtySeller'), String(L.quantity), L.quantity <= 3 ? '#c62828' : null, S.t('qtyTip')));
+      if (hasListing) {
+        if (L.favorites !== null && L.favorites !== undefined) grid.appendChild(metric(S.t('favorites'), S.formatNum(L.favorites)));
+        if (L.views) grid.appendChild(metric(S.t('views'), S.formatNum(L.views)));
+        if (L.ageDays !== null && L.ageDays !== undefined) {
+          grid.appendChild(metric(S.t('age'), L.ageDays >= 60 ? Math.round(L.ageDays / 30) + ' ' + S.t('months') : L.ageDays + ' ' + S.t('days')));
+        }
+        if (L.quantity) {
+          // Seller-entered quantity, frequently a placeholder — never presented as real stock.
+          grid.appendChild(metric(S.t('qtySeller'), String(L.quantity), L.quantity <= 3 ? '#c62828' : null, S.t('qtyTip')));
+        }
+        const tagCount = L.tagCount || 0;
+        grid.appendChild(metric(S.t('tags'), tagCount + '/13', tagCount >= 13 ? '#2e7d32' : tagCount >= 10 ? '#e65100' : '#c62828'));
+      } else {
+        grid.appendChild(later(S.t('favorites')));
+        grid.appendChild(later(S.t('age')));
+        grid.appendChild(later(S.t('tags')));
       }
-      const tagCount = L.tagCount || 0;
-      grid.appendChild(metric(S.t('tags'), tagCount + '/13', tagCount >= 13 ? '#2e7d32' : tagCount >= 10 ? '#e65100' : '#c62828'));
-      if (shop) {
-        if (shop.soldCount !== null && shop.soldCount !== undefined) grid.appendChild(metric(S.t('shopSalesLifetime'), S.formatNum(shop.soldCount)));
-        if (shop.salesPerReview) grid.appendChild(metric(S.t('salesPerReview'), S.formatDec(shop.salesPerReview)));
-        if (shop.rating) grid.appendChild(metric(S.t('rating'), Number(shop.rating).toLocaleString(S.locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '★'));
+      if (hasFull) {
+        if (shop) {
+          if (shop.soldCount !== null && shop.soldCount !== undefined) grid.appendChild(metric(S.t('shopSalesLifetime'), S.formatNum(shop.soldCount)));
+          if (shop.salesPerReview) grid.appendChild(metric(S.t('salesPerReview'), S.formatDec(shop.salesPerReview)));
+          if (shop.rating) grid.appendChild(metric(S.t('rating'), Number(shop.rating).toLocaleString(S.locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '★'));
+        }
+      } else {
+        grid.appendChild(later(S.t('shopSalesLifetime')));
+        grid.appendChild(later(S.t('rating')));
       }
       body.appendChild(grid);
 
       // Measured listing deltas between snapshots
-      const d = data.listingDeltas;
-      if (d && (d.favorites !== null || d.reviews !== null)) {
+      const dl = hasFull ? d.listingDeltas : null;
+      if (dl && (dl.favorites !== null || dl.reviews !== null)) {
         body.appendChild(node('div', 'kx-sales-meta',
-          S.t('listingDeltas', { days: d.spanDays, favs: signed(d.favorites), reviews: signed(d.reviews) }) + ' (' + S.t('sourceApi') + ')',
+          S.t('listingDeltas', { days: dl.spanDays, favs: signed(dl.favorites), reviews: signed(dl.reviews) }) + ' (' + S.t('sourceApi') + ')',
           'margin-top:6px;'));
       }
 
-      if (Array.isArray(L.tags) && L.tags.length) {
+      if (hasListing && Array.isArray(L.tags) && L.tags.length) {
         const tags = node('div', null, null, 'margin-top:6px;');
         L.tags.forEach(tg => tags.appendChild(node('span', 'kx-tag-pill', tg)));
         body.appendChild(tags);
@@ -379,10 +458,19 @@
 
       el.appendChild(body);
       collapseBtn.addEventListener('click', () => {
-        const hidden = body.style.display === 'none';
-        body.style.display = hidden ? '' : 'none';
-        collapseBtn.textContent = hidden ? '▲' : '▼';
+        ui.collapsed = !ui.collapsed;
+        body.style.display = ui.collapsed ? 'none' : '';
+        collapseBtn.textContent = ui.collapsed ? '▼' : '▲';
       });
+    }
+
+    function metricSkel(label) {
+      const m = node('span', 'kx-metric');
+      m.appendChild(node('span', 'kx-metric-label', label));
+      const v = node('span', null, null, 'font-weight:700;');
+      v.appendChild(S.skel());
+      m.appendChild(v);
+      return m;
     }
   }
 })();

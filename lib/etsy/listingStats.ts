@@ -51,6 +51,29 @@ export interface PageSignals {
   onlyLeft?: number | null;
   pagePrice?: number | null;
   pageCurrency?: string | null;
+  /**
+   * Shop id read from the listing page (untrusted). Only used to start the shop fetch in
+   * parallel with the listing call; the listing's own shop_id is authoritative and a wrong
+   * hint just costs the speculative fetch.
+   */
+  shopIdHint?: string | null;
+}
+
+/**
+ * Per-request bookkeeping: Etsy calls actually made (for the research budget) and
+ * phase timings in ms since the request started (profiling; logged by tests).
+ */
+export interface StatsMeta {
+  apiCalls?: number;
+  timings?: Record<string, number>;
+}
+
+function metaCall(meta: StatsMeta | undefined, n = 1) {
+  if (meta) meta.apiCalls = (meta.apiCalls ?? 0) + n;
+}
+
+function metaMark(meta: StatsMeta | undefined, t0: number, label: string) {
+  if (meta) (meta.timings ??= {})[label] = Date.now() - t0;
 }
 
 interface EtsyBundle {
@@ -118,9 +141,21 @@ function peekShopBundle(shopId: string, maxAgeMs: number): ShopBundle | null {
   return c && Date.now() - c.fetchedAt < maxAgeMs ? c : null;
 }
 
-async function fetchShopBundle(shopId: string, maxAgeMs: number): Promise<ShopBundle> {
+/** In-flight shop fetches: concurrent requests for one shop share the 2 Etsy calls. */
+const shopInflight = new Map<string, Promise<ShopBundle>>();
+
+async function fetchShopBundle(shopId: string, maxAgeMs: number, meta?: StatsMeta): Promise<ShopBundle> {
   const cached = peekShopBundle(shopId, maxAgeMs);
   if (cached) return cached;
+  const inflight = shopInflight.get(shopId);
+  if (inflight) return inflight;
+  metaCall(meta, 2);
+  const p = loadShopBundle(shopId).finally(() => shopInflight.delete(shopId));
+  shopInflight.set(shopId, p);
+  return p;
+}
+
+async function loadShopBundle(shopId: string): Promise<ShopBundle> {
   const [shop, shopReviewsRaw] = await Promise.all([
     etsyGetSafe(`/shops/${shopId}`),
     etsyGetSafe(`/shops/${shopId}/reviews?limit=100`),
@@ -169,18 +204,61 @@ function salesPerReviewOf(shopSold: number | null, shopReviewCount: number | nul
     : null;
 }
 
-async function fetchBundle(listingId: string): Promise<EtsyBundle> {
+/**
+ * The bare listing (GET /listings/:id), shared by the panel's fast "core" request and the full
+ * stats: cached in-process for API_CACHE_TTL_MS and de-duplicated while in flight, so the two
+ * requests of one page view make one Etsy call.
+ */
+const listingCache = new Map<string, { at: number; promise: Promise<any> }>();
+
+function fetchListing(listingId: string, meta?: StatsMeta): Promise<any> {
+  const c = listingCache.get(listingId);
+  if (c && Date.now() - c.at < API_CACHE_TTL_MS) return c.promise;
+  metaCall(meta);
+  const promise = etsyGet(`/listings/${listingId}`);
+  listingCache.set(listingId, { at: Date.now(), promise });
+  promise.catch(() => { if (listingCache.get(listingId)?.promise === promise) listingCache.delete(listingId); });
+  if (listingCache.size > 2000) {
+    const entries = [...listingCache.entries()].sort((a, b) => a[1].at - b[1].at);
+    for (const [k] of entries.slice(0, 500)) listingCache.delete(k);
+  }
+  return promise;
+}
+
+/** Test hook: forget the in-process Etsy caches. */
+export function __clearListingCaches() {
+  apiCache.clear();
+  listingCache.clear();
+  shopCache.clear();
+}
+
+const validShopId = (v: unknown): string | null => (v !== null && v !== undefined && /^\d{1,15}$/.test(String(v)) ? String(v) : null);
+
+/**
+ * All Etsy calls of the listing panel in ONE parallel round: listing, listing reviews, images
+ * and — when the page told us the shop id — shop + shop reviews. Without a (correct) hint the
+ * shop calls start as soon as the listing answers (the only dependency).
+ */
+async function fetchBundle(listingId: string, opts: { shopIdHint?: string | null; meta?: StatsMeta; t0?: number } = {}): Promise<EtsyBundle> {
   const cached = apiCache.get(listingId);
   if (cached && Date.now() - cached.at < API_CACHE_TTL_MS) return cached.bundle;
+  const { meta } = opts;
+  const t0 = opts.t0 ?? Date.now();
+  const timed = <T>(label: string, p: Promise<T>) => p.finally(() => metaMark(meta, t0, label));
 
-  const [listing, listingReviewsRaw, images] = await Promise.all([
-    etsyGet(`/listings/${listingId}`),
-    etsyGetSafe(`/listings/${listingId}/reviews?limit=100`),
-    etsyGetSafe(`/listings/${listingId}/images`),
-  ]);
+  const listingP = timed('etsy_listing', fetchListing(listingId, meta));
+  metaCall(meta, 2);
+  const reviewsP = timed('etsy_listing_reviews', etsyGetSafe(`/listings/${listingId}/reviews?limit=100`));
+  const imagesP = timed('etsy_images', etsyGetSafe(`/listings/${listingId}/images`));
+  const hint = validShopId(opts.shopIdHint);
+  const speculativeShopP = hint ? timed('etsy_shop', fetchShopBundle(hint, API_CACHE_TTL_MS, meta)) : null;
 
-  const shopId = listing?.shop_id ? String(listing.shop_id) : null;
-  const shopBundle = shopId ? await fetchShopBundle(shopId, API_CACHE_TTL_MS) : null;
+  const listing = await listingP;
+  const shopId = validShopId(listing?.shop_id);
+  const shopP = !shopId ? Promise.resolve(null)
+    : shopId === hint && speculativeShopP ? speculativeShopP
+    : timed('etsy_shop', fetchShopBundle(shopId, API_CACHE_TTL_MS, meta));
+  const [listingReviewsRaw, images, shopBundle] = await Promise.all([reviewsP, imagesP, shopP]);
 
   const bundle: EtsyBundle = {
     listing,
@@ -208,6 +286,7 @@ async function fetchBundle(listingId: string): Promise<EtsyBundle> {
 /** Clamp + validate page signals sent by the extension (untrusted input). */
 export function sanitizePageSignals(raw: any): PageSignals {
   if (!raw || typeof raw !== 'object') return {};
+  const hint = raw.shopIdHint;
   const int = (v: any, max: number) => {
     const n = num(v);
     return n !== null && n >= 0 && n <= max ? Math.round(n) : null;
@@ -226,6 +305,7 @@ export function sanitizePageSignals(raw: any): PageSignals {
     onlyLeft: int(raw.onlyLeft, 100000),
     pagePrice: price !== null && price >= 0 && price < 1e7 ? price : null,
     pageCurrency: cur,
+    shopIdHint: (typeof hint === 'string' || typeof hint === 'number') && /^\d{1,15}$/.test(String(hint)) ? String(hint) : null,
   };
 }
 
@@ -355,26 +435,107 @@ export interface ListingStatsResult {
   seoScore: ReturnType<typeof seoScore>;
 }
 
-export async function getListingStats(listingId: string, rawPage: any): Promise<ListingStatsResult> {
-  const page = sanitizePageSignals(rawPage);
-  const b = await fetchBundle(listingId);
-  const now = Date.now();
-  const L = b.listing || {};
-  const S = b.shop;
-  const shopId = L.shop_id ? String(L.shop_id) : '';
-
-  // ---- Listing basics (Etsy API) ----
+/** The listing facts that need only GET /listings/:id (shared by the core and full answers). */
+function listingBasics(L: any, now: number) {
   // `price` is a Money object (amount in minor units / divisor). It is the LIST price:
   // Etsy's public API does not reflect seller sales, so revenue prefers the page price.
   const price = moneyToNumber(L.price);
-  const currency = L.price?.currency_code || null;
-  const rev = pickRevenuePrice(page, price, currency);
+  const currency: string | null = L.price?.currency_code || null;
   const favorites = num(L.num_favorers);
   // Etsy has been phasing `views` out of public responses — treat 0/absent as unknown.
   const views = num(L.views) && Number(L.views) > 0 ? Number(L.views) : null;
   const createdSec = num(L.original_creation_timestamp) ?? num(L.created_timestamp) ?? num(L.creation_timestamp);
   const createdMs = createdSec ? createdSec * 1000 : null;
   const ageDays = createdMs ? Math.max(0, (now - createdMs) / DAY_MS) : null;
+  const tags: string[] = Array.isArray(L.tags) ? L.tags : [];
+  return { price, currency, favorites, views, createdMs, ageDays, tags };
+}
+
+export interface ListingCoreResult {
+  listingId: string;
+  /** Marks the fast answer: listing facts only, no sales / shop / SEO (those come with the full answer). */
+  phase: 'core';
+  fetchedAt: string;
+  listing: {
+    title: string;
+    state: string | null;
+    price: number | null;
+    currency: string | null;
+    favorites: number | null;
+    views: number | null;
+    quantity: number | null;
+    tags: string[];
+    tagCount: number;
+    createdAt: string | null;
+    ageDays: number | null;
+  };
+  pageSignals: PageSignals;
+}
+
+/**
+ * The panel's fast first answer: one Etsy call (GET /listings/:id, de-duplicated with the
+ * full request running alongside it), no DB, no shop data.
+ */
+export async function getListingCore(listingId: string, rawPage: any, meta?: StatsMeta): Promise<ListingCoreResult> {
+  const t0 = Date.now();
+  const page = sanitizePageSignals(rawPage);
+  const L = (await fetchListing(listingId, meta)) || {};
+  metaMark(meta, t0, 'etsy_listing');
+  const now = Date.now();
+  const x = listingBasics(L, now);
+  return {
+    listingId,
+    phase: 'core',
+    fetchedAt: new Date(now).toISOString(),
+    listing: {
+      title: L.title || '',
+      state: L.state || null,
+      price: x.price,
+      currency: x.currency,
+      favorites: x.favorites,
+      views: x.views,
+      quantity: num(L.quantity),
+      tags: x.tags,
+      tagCount: x.tags.length,
+      createdAt: x.createdMs ? new Date(x.createdMs).toISOString() : null,
+      ageDays: x.ageDays !== null ? Math.round(x.ageDays) : null,
+    },
+    pageSignals: page,
+  };
+}
+
+/** Swallow a rejection for now (it is still observed by the later `await`). */
+function settledLater<T>(p: Promise<T>): Promise<T> {
+  p.catch(() => {});
+  return p;
+}
+
+export async function getListingStats(listingId: string, rawPage: any, meta?: StatsMeta): Promise<ListingStatsResult> {
+  const t0 = Date.now();
+  const page = sanitizePageSignals(rawPage);
+  const hint = validShopId(page.shopIdHint);
+
+  // ---- Snapshot history, read in parallel with the Etsy calls (BEFORE writing the current one) ----
+  // The listing's own history needs only its id; the shop baseline starts from the page's shop-id
+  // hint and is redone below if the listing turns out to belong to another shop.
+  const listingDbP = settledLater(Promise.all([
+    findListingBaseline(listingId, t0),
+    prisma.etsyPublicListingSnapshot.count({ where: { listingId } }),
+    prisma.etsyPublicListingSnapshot.findFirst({ where: { listingId }, orderBy: { capturedAt: 'asc' }, select: { capturedAt: true } }),
+    prisma.etsyPublicListingSnapshot.findFirst({ where: { listingId }, orderBy: { capturedAt: 'desc' }, select: { capturedAt: true } }),
+  ]).finally(() => metaMark(meta, t0, 'db_listing_history')));
+  const hintBaselineP = hint ? settledLater(findShopBaseline(hint, t0)) : null;
+
+  const b = await fetchBundle(listingId, { shopIdHint: hint, meta, t0 });
+  metaMark(meta, t0, 'etsy_all');
+  const now = Date.now();
+  const L = b.listing || {};
+  const S = b.shop;
+  const shopId = L.shop_id ? String(L.shop_id) : '';
+
+  // ---- Listing basics (Etsy API) ----
+  const { price, currency, favorites, views, createdMs, ageDays } = listingBasics(L, now);
+  const rev = pickRevenuePrice(page, price, currency);
   const listingReviewCount = b.listingReviews ? b.listingReviews.count : null;
 
   // ---- Shop basics ----
@@ -415,14 +576,12 @@ export async function getListingStats(listingId: string, rawPage: any): Promise<
     };
   }
 
-  // ---- Snapshots: read history BEFORE writing the current one ----
-  const [shopBaseline, listingBaseline, snapshotCount, firstSnap, lastListingSnap] = await Promise.all([
-    shopId ? findShopBaseline(shopId, now) : Promise.resolve(null),
-    findListingBaseline(listingId, now),
-    prisma.etsyPublicListingSnapshot.count({ where: { listingId } }),
-    prisma.etsyPublicListingSnapshot.findFirst({ where: { listingId }, orderBy: { capturedAt: 'asc' }, select: { capturedAt: true } }),
-    prisma.etsyPublicListingSnapshot.findFirst({ where: { listingId }, orderBy: { capturedAt: 'desc' }, select: { capturedAt: true } }),
+  // ---- Snapshots: history was read in parallel with the Etsy calls (before writing the current one) ----
+  const [shopBaseline, [listingBaseline, snapshotCount, firstSnap, lastListingSnap]] = await Promise.all([
+    !shopId ? Promise.resolve(null) : hintBaselineP && shopId === hint ? hintBaselineP : findShopBaseline(shopId, now),
+    listingDbP,
   ]);
+  metaMark(meta, t0, 'db_history');
 
   let recorded = false;
   if (shopId && (!lastListingSnap || now - lastListingSnap.capturedAt.getTime() >= SNAPSHOT_MIN_INTERVAL_MS)) {
@@ -856,7 +1015,9 @@ export async function getBatchListingStats(
   }
   const maxNew = Math.max(0, Math.min(opts.maxNewShops ?? DEFAULT_MAX_NEW_SHOPS, 25));
   const toFetch = uncached.slice(0, maxNew);
-  const fetched = await mapLimit(toFetch, 4, sid => fetchShopBundle(sid, SHOP_CACHE_MAX_AGE_MS));
+  // 8 shops (16 Etsy calls) at a time: the cards fill in one or two round trips instead of three;
+  // etsyFetch's shared token bucket still paces the actual calls.
+  const fetched = await mapLimit(toFetch, 8, sid => fetchShopBundle(sid, SHOP_CACHE_MAX_AGE_MS));
   toFetch.forEach((sid, i) => { if (fetched[i]?.shop) shops.set(sid, fetched[i]); });
 
   // 3) Baselines from snapshots (2 queries for all shops).
@@ -1012,9 +1173,11 @@ export async function getShopStats(shopIdOrName: string): Promise<ShopStatsResul
     shopId = String(match.shop_id);
   }
 
-  const [sb, active] = await Promise.all([
+  // Shop, its active listings and its snapshot baseline in parallel.
+  const [sb, active, shopBaseline] = await Promise.all([
     fetchShopBundle(shopId, API_CACHE_TTL_MS),
     etsyGetSafe(`/shops/${shopId}/listings/active?limit=100&sort_on=score`),
+    findShopBaseline(shopId, Date.now()),
   ]);
   const S = sb.shop;
   if (!S) return null;
@@ -1035,7 +1198,7 @@ export async function getShopStats(shopIdOrName: string): Promise<ShopStatsResul
   const avgPrice = groupMedian(prices) ?? 0;
 
   const rw = shopReviewWindow(sb.shopReviews, now);
-  const mv = measuredShopVelocity(await findShopBaseline(shopId, now), shopSold, now);
+  const mv = measuredShopVelocity(shopBaseline, shopSold, now);
 
   let sales: ShopStatsResult['sales'] = { kind: 'insufficient', confidence: null, monthlySales: null, monthlyRevenue: null, currency, inputs: {} };
   if (mv) {

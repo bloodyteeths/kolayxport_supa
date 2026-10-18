@@ -44,10 +44,12 @@ async function waitFor<T>(fn: () => T | null | undefined, ms = 2000): Promise<T>
   }
 }
 
+/** Bar text once the API answer is in (the page-only first paint is data-kx-state="partial"). */
 const barText = (dom: JSDOM) => {
   const host = dom.window.document.getElementById('kx-ebay-search-overlay');
-  const bar = host?.shadowRoot?.querySelector('.kx-bar');
-  const t = (bar?.textContent || '').replace(/\s+/g, ' ').trim();
+  const bar = host?.shadowRoot?.querySelector('.kx-bar') as HTMLElement | null | undefined;
+  if (!bar || bar.dataset.kxState !== 'full') return '';
+  const t = (bar.textContent || '').replace(/\s+/g, ' ').trim();
   return t.includes('loading') || t.includes('yükleniyor') ? '' : t;
 };
 
@@ -119,7 +121,7 @@ describe('eBay listing overlay', () => {
     run('content-ebay-listing.js');
     const el = await waitFor(() => {
       const e = dom.window.document.getElementById('kx-ebay-listing-stats');
-      return e && !(e.textContent || '').includes('loading') ? e : null;
+      return e && e.dataset.kxState === 'full' ? e : null;
     });
     const text = (el.textContent || '').replace(/\s+/g, ' ');
     expect(text).toContain('SEO: 65/100');
@@ -171,7 +173,7 @@ describe('eBay overlays in Turkish (default, nothing stored)', () => {
     run('content-ebay-listing.js');
     const el = await waitFor(() => {
       const e = dom.window.document.getElementById('kx-ebay-listing-stats');
-      return e && !(e.textContent || '').includes('yükleniyor') ? e : null;
+      return e && e.dataset.kxState === 'full' ? e : null;
     });
     const text = (el.textContent || '').replace(/\s+/g, ' ');
     expect(text).toContain('Fiyat: +%21 medyana göre ($25,99)');

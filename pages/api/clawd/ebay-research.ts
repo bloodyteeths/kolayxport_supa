@@ -10,6 +10,9 @@ import { convertCurrency } from '../../../lib/finance/fx';
 import {
   isExtensionRequest, withResearchQuota, sendResearchOutcome, captureHandler, sharedCacheKey, RESEARCH_TTL,
 } from '../../../lib/ext/researchQuota';
+import {
+  enrichSoldQuantities, mergeCachedItemDetails, EXT_ENRICH_DEFAULT, ENRICH_MAX, EXT_TIME_BOX_MS, ENRICH_CONCURRENCY,
+} from '../../../lib/ebay/soldEnrich';
 
 /**
  * R0 honesty patch: robust price summary for eBay search results in the
@@ -57,13 +60,12 @@ async function callEbayAPI(
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function getItemDetails(legacyItemId: string, appToken: string, marketplaceId?: string) {
-  const item = await callEbayAPI(
-    `/buy/browse/v1/item/get_item_by_legacy_id?legacy_item_id=${legacyItemId}`,
-    appToken,
-    {},
-    marketplaceId
-  );
+async function getItemDetails(legacyItemId: string, appToken: string, marketplaceId?: string, opts: { concurrent?: boolean } = {}) {
+  const url = `${EBAY_API_BASE}/buy/browse/v1/item/get_item_by_legacy_id?legacy_item_id=${legacyItemId}`;
+  // concurrent: read-only lookups overlap (still paced per start) instead of waiting in the FIFO queue.
+  const item = opts.concurrent
+    ? await callEbayRateLimited(url, { token: appToken, marketplaceId, concurrent: true, maxRetries: 2 })
+    : await callEbayAPI(url, appToken, {}, marketplaceId);
   return {
     title: item.title as string,
     price: parseFloat(item.price?.value || '0'),
@@ -101,9 +103,38 @@ function median(arr: number[]): number {
  * go through the research quota (lib/ext/researchQuota.ts): shared cross-user cache, the
  * global eBay brake and the per-plan daily lookups. The web app's research hub (no header)
  * and the internal API-key path keep the unchanged handler below.
- * One search = 1 Browse search + up to 20 item-detail calls.
+ *
+ * Extension product_database = 1 Browse search + sold-quantity lookups for at most
+ * EXT_ENRICH_DEFAULT items (the first viewport; `enrich` / `enrich_ids` query params),
+ * each cached per item for 24 h, time-boxed to EXT_TIME_BOX_MS. Items not ready by then
+ * come back `enrichPending` (+ `pendingIds`); a re-poll is a shared-cache hit that merges
+ * the per-item cache (no eBay call, no lookup charged).
+ * Web product_database: unchanged (20 lookups, waits for all, no per-item cache).
  */
 const EXT_QUOTA_ACTIONS = new Set(['product_database', 'niche_analyze']);
+
+/** Extension-only product_database options, handed to the shared handler next to the request. */
+interface ExtEnrichOptions {
+  max: number;
+  priorityIds: string[];
+  deadline: number;
+  /** Set by the handler: eBay calls this request made (search + item lookups). */
+  apiCalls?: number;
+  /** Set by the handler: ms per phase (Server-Timing). */
+  timings?: Record<string, number>;
+}
+const extEnrich = new WeakMap<NextApiRequest, ExtEnrichOptions>();
+
+function extEnrichOptions(req: NextApiRequest, startedAt: number): ExtEnrichOptions {
+  const rawMax = parseInt(String(req.query.enrich ?? ''), 10);
+  const max = Number.isFinite(rawMax) ? Math.max(0, Math.min(ENRICH_MAX, rawMax)) : EXT_ENRICH_DEFAULT;
+  const priorityIds = String(req.query.enrich_ids ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => /^\d{1,20}$/.test(s))
+    .slice(0, ENRICH_MAX);
+  return { max, priorityIds, deadline: startedAt + EXT_TIME_BOX_MS };
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const action = String(req.query.action || '');
@@ -116,10 +147,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ? sharedCacheKey('ebay', action, site, q.q as string, q.category_id as string, q.min_price as string, q.max_price as string,
         q.condition as string, (q.sort as string) || 'newlyListed', (q.limit as string) || '50', (q.offset as string) || '0')
       : sharedCacheKey('ebay', action, site, q.q as string, q.category_id as string);
+    // `enrich` / `enrich_ids` only choose which items get sold counts first; they are not part
+    // of the cache key (per-item results are shared through the per-item cache instead).
+    const enrichOpts = action === 'product_database' ? extEnrichOptions(req, Date.now()) : null;
+    if (enrichOpts) extEnrich.set(req, enrichOpts);
     const outcome = await withResearchQuota(
-      { req, userId: user.id, marketplace: 'ebay', cacheKey, ttl: RESEARCH_TTL.search, apiCallsEstimate: 21 },
-      () => captureHandler(ebayResearchHandler, req, res),
+      {
+        req, userId: user.id, marketplace: 'ebay', cacheKey, ttl: RESEARCH_TTL.search,
+        // product_database: 1 search + up to `enrich` item lookups (cached items cost nothing);
+        // niche_analyze: 1 search + 20 item lookups.
+        apiCallsEstimate: enrichOpts ? 1 + enrichOpts.max : 21,
+      },
+      async () => {
+        const result = await captureHandler(ebayResearchHandler, req, res);
+        return enrichOpts && Number.isFinite(enrichOpts.apiCalls) ? { ...result, apiCalls: enrichOpts.apiCalls } : result;
+      },
     );
+    // A cached answer can carry items whose lookups finished after it was cached: merge them.
+    if (enrichOpts && outcome.kind === 'ok' && outcome.source === 'shared_cache' && outcome.body && typeof outcome.body === 'object') {
+      outcome.body = await mergeCachedItemDetails(outcome.body, site);
+    }
+    if (enrichOpts) {
+      // DevTools → the service worker's Network panel: where the time went.
+      const t = enrichOpts.timings || {};
+      const parts = Object.entries(t).map(([k, v]) => `${k};dur=${Math.round(v)}`);
+      parts.push(`total;dur=${Date.now() - (enrichOpts.deadline - EXT_TIME_BOX_MS)}`);
+      try { res.setHeader('Server-Timing', parts.join(', ')); } catch { /* headers already sent */ }
+    }
     return sendResearchOutcome(res, outcome);
   }
   return ebayResearchHandler(req, res);
@@ -306,13 +360,15 @@ async function ebayResearchHandler(
           params.set('limit', String(limit));
           params.set('offset', String(offset));
 
+          const pdStartedAt = Date.now();
           const { token: appToken } = await getEbayTokenFor(userId);
-          const searchResult = await callEbayAPI(
-            `/buy/browse/v1/item_summary/search?${params.toString()}`,
-            appToken,
-            {},
-            marketplaceId
+          // Read-only: takes the next paced start slot instead of queueing behind every earlier
+          // eBay call (arbitrage scans, trackers) in the shared FIFO.
+          const searchResult = await callEbayRateLimited(
+            `${EBAY_API_BASE}/buy/browse/v1/item_summary/search?${params.toString()}`,
+            { token: appToken, marketplaceId, concurrent: true }
           );
+          const searchMs = Date.now() - pdStartedAt;
 
           const items = searchResult.itemSummaries || [];
           const totalCount = searchResult.total || 0;
@@ -337,44 +393,34 @@ async function ebayResearchHandler(
             .slice(0, 20)
             .map(([word, count]) => ({ word, count }));
 
-          // Enrich first 20 items with sold quantity
-          const enrichCount = Math.min(items.length, 20);
-          const enrichedItems = await Promise.allSettled(
-            items.slice(0, enrichCount).map(async (item: Record<string, unknown>) => {
-              const legacyId = item.legacyItemId as string | undefined;
-              if (!legacyId) return { ...item, enriched: false };
-              try {
-                const details = await getItemDetails(legacyId, appToken, marketplaceId);
-                return {
-                  ...item,
-                  enriched: true,
-                  estimatedSoldQuantity: details.soldQuantity,
-                  estimatedRemainingQuantity: details.remainingQuantity,
-                };
-              } catch {
-                return { ...item, enriched: false };
-              }
-            })
-          );
-
-          const enrichedResults = enrichedItems.map((r) =>
-            r.status === 'fulfilled' ? r.value : null
-          );
-          // Merge enriched into items
-          const finalItems = items.map(
-            (item: Record<string, unknown>, i: number) =>
-              i < enrichCount && enrichedResults[i]
-                ? enrichedResults[i]
-                : item
-          );
+          // Sold quantities (one get_item call each). Extension: first-viewport items only, per-item
+          // shared cache, time-boxed (see extEnrichOptions). Web: the first 20, waiting for all.
+          const ext = extEnrich.get(req);
+          const enrichment = await enrichSoldQuantities(items, {
+            marketplaceId,
+            max: ext ? ext.max : 20,
+            priorityIds: ext?.priorityIds,
+            concurrency: ENRICH_CONCURRENCY,
+            deadline: ext?.deadline,
+            useCache: !!ext,
+            fetchDetails: async (legacyId) => {
+              const d = await getItemDetails(legacyId, appToken, marketplaceId, { concurrent: true });
+              return { soldQuantity: d.soldQuantity, remainingQuantity: d.remainingQuantity };
+            },
+          });
+          if (ext) {
+            ext.apiCalls = 1 + enrichment.apiCalls;
+            ext.timings = { ebay_search: searchMs, sold_lookups: Date.now() - pdStartedAt - searchMs };
+          }
 
           return res.status(200).json({
-            items: finalItems,
+            items: enrichment.items,
             total: totalCount,
             priceStats,
             topKeywords,
             offset,
             limit,
+            ...(ext ? { pendingIds: enrichment.pendingIds } : {}),
           });
         }
 
@@ -513,7 +559,8 @@ async function ebayResearchHandler(
               const legacyId = item.legacyItemId as string | undefined;
               if (!legacyId) return null;
               try {
-                const details = await getItemDetails(legacyId, appToken, marketplaceId);
+                // Read-only: overlapping lookups (still paced per start by the shared limiter).
+                const details = await getItemDetails(legacyId, appToken, marketplaceId, { concurrent: true });
                 totalEnrichedSold += details.soldQuantity;
                 enrichedCount++;
                 return {

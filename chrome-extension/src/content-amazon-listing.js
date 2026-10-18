@@ -172,6 +172,8 @@
     const isNew = asin !== currentAsin;
     currentAsin = asin;
     render(asin);
+    const P = window.__KX_PERF;
+    if (isNew && P) P.mark('amazon_listing', 'first_paint', { asin });
 
     if (isNew) {
       requestSpApiSignals([asin], detectAmazonMarketplace()).then((resp) => {
@@ -184,6 +186,7 @@
         if (!resp.available || !resp.items || !resp.items[asin]) return;
         spForAsin = { asin, data: resp.items[asin] };
         render(asin);
+        if (P) P.mark('amazon_listing', 'sp_api');
       });
     }
   }
@@ -197,9 +200,9 @@
   shared.langReady().then(() => {
     langReady = true;
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => setTimeout(processListingPage, 500));
+      document.addEventListener('DOMContentLoaded', () => setTimeout(processListingPage, 150));
     } else {
-      setTimeout(processListingPage, 500);
+      setTimeout(processListingPage, 150);
     }
     setTimeout(processListingPage, 2000);
     setTimeout(processListingPage, 4000);

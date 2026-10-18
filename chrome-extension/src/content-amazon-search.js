@@ -241,6 +241,7 @@
     requestSpApiSignals(asins, mkt).then((resp) => {
       if (spApiRequestedFor !== key) return; // navigated away
       spApi = resp || { available: false, reason: 'unavailable' };
+      perfMark('sp_api');
       schedule(0);
     });
   }
@@ -260,7 +261,15 @@
       renderCardRow(card, data, mkt);
     });
     renderSummaryBar(parsed);
+    if (!firstPaintMarked) { firstPaintMarked = true; perfMark('first_paint', { cards: parsed.length }); }
     maybeRequestSpApi(parsed, mkt);
+  }
+
+  // Debug timing marks (lib/perf.js; only with localStorage kx_debug).
+  let firstPaintMarked = false;
+  function perfMark(label, extra) {
+    const P = window.__KX_PERF;
+    if (P) P.mark('amazon_search', label, extra);
   }
 
   // Throttled: a pending run is not pushed back by further mutations
@@ -274,7 +283,7 @@
   // Initial run, once the language is known.
   shared.langReady().then(() => {
     langReady = true;
-    schedule(1000);
+    schedule(250);
   });
 
   // Language changed in the popup: rows and bar carry the language in their signature,
@@ -292,6 +301,9 @@
     spApi = null;
     spApiRequestedFor = null;
     lastBarSignature = '';
+    firstPaintMarked = false;
+    const P = window.__KX_PERF;
+    if (P) P.start('amazon_search');
     document.getElementById(`${KX_AMZ_PREFIX}-summary`)?.remove();
     schedule(1000);
   });

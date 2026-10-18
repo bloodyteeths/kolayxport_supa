@@ -105,6 +105,17 @@ const KX_INLINE_CSS = `
 .kx-stats-bar .kx-sales-how { font-size: 11px; color: #666; margin-top: 4px; line-height: 1.45; }
 .kx-stats-bar .kx-sales-meta { font-size: 10px; color: #999; margin-top: 3px; }
 .kx-stats-bar .kx-signal { color: #1b5e20; }
+/* Placeholders for values still loading: same line box as the text that replaces them (no jump). */
+@keyframes kx-shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+.kx-skel {
+  display: inline-block; vertical-align: middle; height: 0.9em; min-width: 3.2em; border-radius: 4px;
+  background: linear-gradient(90deg, #e4e4ec 25%, #f3f3f8 50%, #e4e4ec 75%); background-size: 200% 100%;
+  animation: kx-shimmer 1.2s ease-in-out infinite;
+}
+.kx-skel-wide { min-width: 7em; }
+.kx-skel-xwide { min-width: 16em; max-width: 100%; }
+.kx-stats-bar .kx-metric .kx-skel { margin-top: 3px; }
+@media (prefers-reduced-motion: reduce) { .kx-skel { animation: none; } }
 `;
 
 function injectInlineCSS() {
@@ -171,6 +182,14 @@ function createOverlayContainer(id, position = 'top') {
       color: #fff; padding: 10px 20px; display: flex; align-items: center; gap: 16px;
       font-size: 13px; flex-wrap: wrap; margin: 0; border-radius: 0;
     }
+    @keyframes kx-shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+    .kx-skel {
+      display: inline-block; vertical-align: middle; height: 0.95em; min-width: 3.2em; border-radius: 4px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.16) 25%, rgba(255,255,255,0.36) 50%, rgba(255,255,255,0.16) 75%);
+      background-size: 200% 100%; animation: kx-shimmer 1.2s ease-in-out infinite;
+    }
+    .kx-skel-wide { min-width: 6.5em; }
+    @media (prefers-reduced-motion: reduce) { .kx-skel { animation: none; } }
   `;
   shadow.appendChild(style);
 
@@ -276,10 +295,11 @@ async function apiCall(action, params = {}) {
   });
 }
 
-async function listingStatsCall(listingId, page) {
+/** `phase: 'core'`: the fast first answer (listing facts only), sent alongside the full one. */
+async function listingStatsCall(listingId, page, phase) {
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage(
-      { type: 'kx_listing_stats', params: { listingId, page }, pv: _kxPv() },
+      { type: 'kx_listing_stats', params: phase ? { listingId, page, phase } : { listingId, page }, pv: _kxPv() },
       (response) => {
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message));
@@ -531,6 +551,9 @@ const _i18n = {
     confShortLow: 'düşük güven',
     medianListPriceShop: 'Medyan Liste Fiyatı',
     notAvailable: 'Yok',
+    adsOnPage: 'Reklam (sayfa)',
+    adsTip: 'Bu sayfadaki {n} ilandan reklamlı olanlar. Fiyat medyanına dahil edilmez.',
+    resultTipPage: 'Etsy sayfasında gösterilen sonuç sayısı. Etsy API: {api}.',
   },
   en: {
     loading: 'KolayXport loading...',
@@ -659,6 +682,9 @@ const _i18n = {
     confShortLow: 'low conf.',
     medianListPriceShop: 'Median List Price',
     notAvailable: 'N/A',
+    adsOnPage: 'Ads (page)',
+    adsTip: 'Promoted listings among the {n} cards on this page. Excluded from the price median.',
+    resultTipPage: 'Result count shown on the Etsy page. Etsy API: {api}.',
   },
 };
 
@@ -692,6 +718,25 @@ function el(tag, cls, text, style) {
   if (text !== undefined && text !== null) n.textContent = String(text);
   if (style) n.style.cssText = style;
   return n;
+}
+
+/** Shimmer placeholder for a value that is still loading (`wide`: true | 'x'). */
+function skel(wide) {
+  const n = el('span', 'kx-skel' + (wide === 'x' ? ' kx-skel-xwide' : wide ? ' kx-skel-wide' : ''));
+  n.setAttribute('aria-hidden', 'true');
+  n.dataset.kxSkel = '1';
+  return n;
+}
+
+/** Debug timing marks (lib/perf.js; only with localStorage kx_debug). */
+function perf(surface, label, extra) {
+  const P = window.__KX_PERF;
+  if (P) P.mark(surface, label, extra);
+}
+
+function perfStart(surface) {
+  const P = window.__KX_PERF;
+  if (P) P.start(surface);
 }
 
 function formatMoney(amount, currency, digits) {
@@ -751,7 +796,8 @@ function buildCardRow(stats, ctx) {
   const disp = (ctx && ctx.display && ctx.display[stats.listingId]) || {};
 
   if (sales.kind === 'pending') {
-    row.appendChild(el('span', null, '…'));
+    // Shop data still loading server-side: a placeholder, or a dash once we stopped re-polling.
+    row.appendChild(ctx && ctx.final ? el('span', null, '—') : skel());
   } else if (sales.monthlySales !== null && sales.monthlySales !== undefined) {
     row.appendChild(el('span', salesColor(sales.monthlySales), (sales.kind === 'estimated' ? '~' : '') + formatSales(sales.monthlySales) + t('perMonth'), 'font-weight:700;'));
   } else if (sales.monthlySalesUpperBound !== null && sales.monthlySalesUpperBound !== undefined) {
@@ -784,22 +830,48 @@ function buildCardRow(stats, ctx) {
     row.appendChild(el('span', 'kx-red', t('lowStock'), 'font-weight:700;'));
   }
 
-  // Price vs the median of the cards on this page, both as displayed (same currency).
-  const market = ctx && ctx.market;
-  if (M && market && market.price && market.price.n >= 5 && disp.price && !disp.isAd) {
-    const diff = M.priceVsMedian(disp.price.amount, market.price.median, disp.price.currency, market.currency);
-    if (diff) {
-      sep();
-      const span = el('span', null, diff.text + ' ' + t('vsMedian'), 'color:#666;');
-      span.title = t('vsMedianTip', {
-        price: formatMoney(disp.price.amount, disp.price.currency, 2),
-        median: formatMoney(market.price.median, market.currency, 2),
-        n: market.price.n,
-      });
-      row.appendChild(span);
-    }
-  }
+  const vs = vsMedianSpan(disp, ctx);
+  if (vs) { sep(); row.appendChild(vs); }
   row.title = tips.join('\n');
+  return row;
+}
+
+/** Price vs the median of the cards on this page, both as displayed (same currency). Page-only. */
+function vsMedianSpan(disp, ctx) {
+  const M = window.__KX_MATH;
+  const market = ctx && ctx.market;
+  if (!M || !market || !market.price || market.price.n < 5 || !disp || !disp.price || disp.isAd) return null;
+  const diff = M.priceVsMedian(disp.price.amount, market.price.median, disp.price.currency, market.currency);
+  if (!diff) return null;
+  const span = el('span', null, diff.text + ' ' + t('vsMedian'), 'color:#666;');
+  span.title = t('vsMedianTip', {
+    price: formatMoney(disp.price.amount, disp.price.currency, 2),
+    median: formatMoney(market.price.median, market.currency, 2),
+    n: market.price.n,
+  });
+  return span;
+}
+
+/**
+ * Instant row before the API answers: placeholders for sales + badge + favourites, and the
+ * page-only "vs median" right away. Replaced in place by buildCardRow (same line height).
+ */
+function buildSkeletonRow(listingId, ctx) {
+  const row = el('div', 'kx-data-row');
+  row.lang = _langNow();
+  row.dataset.kxListing = listingId;
+  row.dataset.kxSkeleton = '1';
+  row.title = t('cardTipPending');
+  row.appendChild(skel());
+  row.appendChild(skel(true));
+  row.appendChild(el('span', 'kx-sep', '·'));
+  row.appendChild(skel());
+  const disp = (ctx && ctx.display && ctx.display[listingId]) || {};
+  const vs = vsMedianSpan(disp, ctx);
+  if (vs) {
+    row.appendChild(el('span', 'kx-sep', '·'));
+    row.appendChild(vs);
+  }
   return row;
 }
 
@@ -892,53 +964,119 @@ function pageMarket(display, statsById) {
   return M.pageMarketSummary(cards);
 }
 
-/** Render/replace the KX row on each visible card for the given stats map. */
-function renderCardRows(statsById, ctx) {
+/**
+ * Render/replace the KX row on each visible card for the given stats map.
+ * `skeletonIds` (optional): ids without stats yet get a placeholder row (never replaces real data).
+ */
+function renderCardRows(statsById, ctx, skeletonIds) {
   const processed = new Set();
+  const wantSkeleton = skeletonIds ? new Set(skeletonIds) : null;
   document.querySelectorAll('a[href*="/listing/"]').forEach(link => {
     const match = link.href.match(/\/listing\/(\d+)/);
     if (!match || processed.has(match[1])) return;
     const stats = statsById[match[1]];
-    if (!stats) return;
+    if (!stats && !(wantSkeleton && wantSkeleton.has(match[1]))) return;
     processed.add(match[1]);
     const card = findListingCard(link);
     if (!card) return;
     const old = card.querySelector('.kx-data-row');
-    const row = buildCardRow(stats, ctx);
+    if (!stats && old && !old.dataset.kxSkeleton) return; // already filled
+    const row = stats ? buildCardRow(stats, ctx) : buildSkeletonRow(match[1], ctx);
     if (old) old.replaceWith(row); else card.appendChild(row);
   });
 }
 
+/** Drop placeholder rows that never got data (request failed / navigated). */
+function clearSkeletonRows() {
+  document.querySelectorAll('.kx-data-row[data-kx-skeleton]').forEach(r => r.remove());
+}
+
+/** First request: roughly the cards in the first viewport, so they fill first. */
+const FIRST_BATCH = 24;
+const BATCH = 48;
+
 /**
- * Fetch per-card stats in batches of 48, then re-poll the ids whose shop data
- * was still 'pending' (the server caps fresh shop fetches per request).
+ * Per-card stats. Placeholder rows appear at once; the batches (first viewport first, then
+ * up to 48 ids each) are requested IN PARALLEL and each fills its cards as it returns. Then
+ * the ids whose shop data was still 'pending' are re-polled (the server caps fresh shop
+ * fetches per request). All requests of one page view count as one lookup (X-KX-Page-View).
+ * A rejected batch (e.g. research limit) rejects the whole call after the others settled.
  */
-async function loadCardStats(ids, ctx, isStillCurrent, onUpdate) {
+async function loadCardStats(ids, ctx, isStillCurrent, onUpdate, perfSurface) {
   const all = {};
   ctx = ctx || {};
+  const surface = perfSurface || 'etsy_cards';
   const refresh = () => {
+    if (!isStillCurrent()) return;
     if (ctx.display) ctx.market = pageMarket(ctx.display, all);
     renderCardRows(all, ctx);
     if (onUpdate) onUpdate(all, ctx);
   };
+  renderCardRows(all, ctx, ids);
+  perf(surface, 'skeleton_rows', { n: ids.length });
+
   const chunks = [];
-  for (let i = 0; i < ids.length; i += 48) chunks.push(ids.slice(i, i + 48));
+  if (ids.length) chunks.push(ids.slice(0, FIRST_BATCH));
+  for (let i = FIRST_BATCH; i < ids.length; i += BATCH) chunks.push(ids.slice(i, i + BATCH));
   let pending = [];
-  for (const chunk of chunks) {
-    if (!isStillCurrent()) return all;
-    const res = await apiCall('listings_batch', { listingIds: chunk });
-    Object.assign(all, res.listings || {});
-    pending = pending.concat(res.pendingIds || []);
-    refresh();
+  let firstError = null;
+  await Promise.all(chunks.map((chunk, idx) =>
+    apiCall('listings_batch', { listingIds: chunk }).then(res => {
+      if (!isStillCurrent()) return;
+      Object.assign(all, res.listings || {});
+      pending = pending.concat(res.pendingIds || []);
+      refresh();
+      perf(surface, 'batch_' + idx, { n: chunk.length, pending: (res.pendingIds || []).length });
+    }, err => { if (!firstError) firstError = err; })
+  ));
+  if (firstError) {
+    if (isStillCurrent()) clearSkeletonRows();
+    throw firstError;
   }
   for (let round = 0; round < 3 && pending.length && isStillCurrent(); round++) {
     await new Promise(r => setTimeout(r, 2500));
-    const res = await apiCall('listings_batch', { listingIds: pending.slice(0, 48) });
+    if (!isStillCurrent()) break;
+    const res = await apiCall('listings_batch', { listingIds: pending.slice(0, BATCH) });
     Object.assign(all, res.listings || {});
-    pending = (res.pendingIds || []).concat(pending.slice(48));
+    pending = (res.pendingIds || []).concat(pending.slice(BATCH));
     refresh();
   }
+  if (isStillCurrent()) {
+    // Stopped re-polling: still-pending cards show a dash instead of a placeholder forever.
+    ctx.final = true;
+    refresh();
+    clearSkeletonRows();
+    perf(surface, 'full', { n: Object.keys(all).length, pending: pending.length });
+  }
   return all;
+}
+
+/**
+ * A short text node on the page matching `re` (e.g. Etsy's "1,234 results" heading or a
+ * shop's "5,678 Sales"). Bounded: only small elements, first 4000 candidates.
+ */
+function findShortPageText(re, root) {
+  const nodes = (root || document).querySelectorAll('h1, h2, h3, span, p, div, a');
+  let seen = 0;
+  for (const n of nodes) {
+    if (++seen > 4000) break;
+    if (n.closest('.kx-data-row, #kx-listing-stats, [id^="kx-"]')) continue;
+    if (n.children.length > 3) continue;
+    const text = (n.textContent || '').replace(/\s+/g, ' ').trim();
+    if (!text || text.length > 60) continue;
+    const m = text.match(re);
+    if (m) return m;
+  }
+  return null;
+}
+
+/** Result count Etsy prints above the results ("1,234 results" / "1.234 sonuç"), or null. */
+function readPageResultCount() {
+  const M = window.__KX_MATH;
+  const m = findShortPageText(/^\(?\s*(\d[\d.,]*)\+?\s+(?:results?|sonuç)\b/i);
+  if (!m || !M) return null;
+  const n = M.parseCount ? M.parseCount(m[1]) : null;
+  return n !== null && n >= 0 ? n : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -968,8 +1106,9 @@ window.__KX_SHARED = {
   listingStatsCall,
   showLimitCard,
   el, formatMoney, formatSales, formatDec, confShort,
-  buildCardRow, renderCardRows, loadCardStats, pageListingIds, findListingCard,
+  buildCardRow, buildSkeletonRow, renderCardRows, clearSkeletonRows, loadCardStats, pageListingIds, findListingCard,
   collectPageCards, pageMarket, readCardPrice, isAdCard,
+  skel, perf, perfStart, findShortPageText, readPageResultCount,
   get lang() { return _langNow(); },
   locale: _locale,
   onLangChange,

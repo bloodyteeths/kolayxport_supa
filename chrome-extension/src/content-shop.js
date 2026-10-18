@@ -2,6 +2,10 @@
  * KolayXport Research — Shop Page Overlay
  * Sticky header bar: measured/estimated shop sales, real shop facts, most-reviewed listings
  * + per-listing measured/estimated rows on the shop's listing grid (DOM-built)
+ *
+ * Progressive: the bar renders at once (shop name, the sales count the page prints) with
+ * placeholders, and the shop stats (shop_enrich) and the grid rows (listings_batch) are
+ * requested in parallel, each filling its slots as it returns.
  */
 
 (function () {
@@ -44,6 +48,7 @@
       if (!shopName) return;
       const myRun = ++runToken;
       const isCurrent = () => myRun === runToken && S.SELECTORS.shopName() === shopName;
+      S.perfStart('etsy_shop');
 
       const shadow = S.createOverlayContainer('kx-shop-overlay', 'top');
       let bar = shadow.querySelector('.kx-shop-bar');
@@ -53,31 +58,73 @@
         shadow.appendChild(bar);
       }
       bar.lang = S.lang;
-      setMessage(bar, S.t('shopAnalysisLoading'), 0.8);
+      // Instant: the shop name and the sales count Etsy prints on the shop page ("5,678 Sales").
+      const salesText = S.findShortPageText(/^(\d[\d.,]*)\s+(?:sales|satış)$/i);
+      const M = window.__KX_MATH;
+      const pageSales = salesText && M && M.parseCount ? M.parseCount(salesText[1]) : null;
+      let displayName = shopName;
+      try { displayName = decodeURIComponent(shopName); } catch (_) { /* keep raw */ }
+      renderSkeletonBar(bar, displayName, pageSales);
+      S.perf('etsy_shop', 'first_paint');
 
-      try {
-        const data = await C.getOrFetch(`shop2:${shopName.toLowerCase()}`, 'lstats', () => S.apiCall('shop_enrich', { shopId: shopName }));
-        if (!isCurrent()) return;
-        if (!data?.shop) { bar.textContent = ''; return; }
-        renderShopBar(bar, data);
-      } catch (err) {
+      let limited = false;
+      const showLimit = (err) => {
+        if (limited || !isCurrent()) return limited;
         // Daily research limit / busy / signed out: one card instead of the numbers.
-        if (S.showLimitCard(bar, err, 'etsy_shop')) return;
-        setMessage(bar, '⚠ ' + ((err && err.message) || S.t('loadFailed')), 0.7);
-      }
+        limited = S.showLimitCard(bar, err, 'etsy_shop');
+        if (limited) S.clearSkeletonRows();
+        return limited;
+      };
 
-      // Per-listing rows on the shop grid (all one shop → one shop fetch server-side)
-      setTimeout(async () => {
-        try {
-          // Cards compare against the median of the prices shown on this shop page.
-          const page = S.collectPageCards();
-          const ids = page.ids.slice(0, 96);
-          if (ids.length && isCurrent()) await S.loadCardStats(ids, { display: page.display }, isCurrent);
-        } catch (err) {
-          // Best-effort, but a research-limit answer replaces the bar.
-          if (isCurrent()) S.showLimitCard(bar, err, 'etsy_shop');
-        }
-      }, 500);
+      const shopTask = C.getOrFetch(`shop2:${shopName.toLowerCase()}`, 'lstats', () => S.apiCall('shop_enrich', { shopId: shopName }))
+        .then(data => {
+          if (!isCurrent() || limited) return;
+          if (!data?.shop) { bar.textContent = ''; return; }
+          renderShopBar(bar, data);
+          S.perf('etsy_shop', 'shop');
+        }, err => {
+          if (showLimit(err) || !isCurrent()) return;
+          setMessage(bar, '⚠ ' + ((err && err.message) || S.t('loadFailed')), 0.7);
+        });
+
+      // Per-listing rows on the shop grid, in parallel with the bar (all one shop → one shop fetch
+      // server-side). Cards compare against the median of the prices shown on this shop page.
+      const page = S.collectPageCards();
+      const ids = page.ids.slice(0, 96);
+      const cardsTask = !ids.length ? Promise.resolve()
+        : S.loadCardStats(ids, { display: page.display, market: S.pageMarket(page.display, {}) }, isCurrent, null, 'etsy_shop_cards')
+          .catch(err => { showLimit(err); }); // best-effort, but a research-limit answer replaces the bar
+
+      await Promise.all([shopTask, cardsTask]);
+      if (isCurrent() && !limited) S.perf('etsy_shop', 'full');
+    }
+
+    /** Same slots as renderShopBar, with placeholders for what only the API knows. */
+    function renderSkeletonBar(bar, shopName, pageSales) {
+      bar.textContent = '';
+      bar.dataset.kxState = 'partial';
+      const title = S.el('div', null, null, 'display:flex;align-items:center;gap:4px;font-weight:700;');
+      title.appendChild(S.el('span', null, 'KX', 'font-size:10px;background:rgba(255,255,255,0.2);padding:2px 6px;border-radius:4px;'));
+      title.appendChild(S.el('span', null, shopName || ''));
+      bar.appendChild(title);
+      bar.appendChild(S.el('div', 'kx-bar-divider'));
+      const slot = (label, value, wide) => {
+        const w = S.el('div', 'kx-bar-item');
+        w.appendChild(S.el('span', 'kx-bar-label', label));
+        const v = S.el('span', 'kx-bar-value');
+        if (value !== null && value !== undefined) v.textContent = value; else v.appendChild(S.skel(wide));
+        w.appendChild(v);
+        return w;
+      };
+      bar.appendChild(slot(S.t('salesMo'), null, true));
+      bar.appendChild(slot(S.t('revenueMo')));
+      bar.appendChild(S.el('div', 'kx-bar-divider'));
+      bar.appendChild(slot(S.t('topSales'), pageSales !== null && pageSales !== undefined ? S.formatNum(pageSales) : null));
+      bar.appendChild(slot(S.t('rating')));
+      bar.appendChild(slot(S.t('reviews')));
+      bar.appendChild(S.el('div', 'kx-bar-divider'));
+      bar.appendChild(slot(S.t('activeListings')));
+      bar.appendChild(slot(S.t('medianListPriceShop'), null, true));
     }
 
     function setMessage(bar, text, opacity) {
@@ -117,6 +164,7 @@
       const conf = sales?.confidence ? ' · ' + S.t(sales.confidence === 'high' ? 'confHigh' : sales.confidence === 'medium' ? 'confMedium' : 'confLow') : '';
 
       bar.textContent = '';
+      bar.dataset.kxState = 'full';
       const title = S.el('div', null, null, 'display:flex;align-items:center;gap:4px;font-weight:700;');
       title.appendChild(S.el('span', null, 'KX', 'font-size:10px;background:rgba(255,255,255,0.2);padding:2px 6px;border-radius:4px;'));
       title.appendChild(S.el('span', null, shop.shop_name || ''));

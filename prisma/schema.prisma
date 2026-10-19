@@ -2820,3 +2820,26 @@ model PartnerPaymentEvent {
 
   @@index([userId, paidAt])
 }
+
+/// Pricing v2 module add-ons per account (docs/gtm/pricing-v2.md §3, lib/billing/modules.ts). One row per module;
+/// `quantity` counts extra stores / +orders units. Granted by an admin today; by Stripe / iyzico / PayTR once P2–P3
+/// exist (provider + externalId then point at the subscription item / order).
+model BillingModule {
+  id               String    @id @default(uuid())
+  userId           String
+  /// financials | arbitrage | bulkPhotoStudio | extraStore | extraOrders
+  module           String
+  quantity         Int       @default(1)
+  /// active | canceled
+  status           String    @default("active")
+  /// admin | stripe | iyzico | paytr
+  provider         String    @default("admin")
+  externalId       String?
+  /// null = no end (admin grant); otherwise the module ends after this time.
+  currentPeriodEnd DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([userId, module])
+  @@index([userId])
+}

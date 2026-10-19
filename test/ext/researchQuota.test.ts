@@ -105,7 +105,11 @@ describe('shared cross-user cache', () => {
 
 describe('per-plan daily lookups', () => {
   it('EXT_RESEARCH_DAILY_LOOKUPS has the founder numbers', () => {
-    expect(EXT_RESEARCH_DAILY_LOOKUPS).toEqual({ trial: 50, starter: 150, growth: 500, pro: 1500, enterprise: 5000, shopify_free: 50 });
+    expect(EXT_RESEARCH_DAILY_LOOKUPS).toEqual({
+      trial: 50, starter: 150, growth: 500, pro: 1500, enterprise: 5000, shopify_free: 50,
+      // Pricing v2 keys follow the matching ladder step.
+      aylik: 150, baslangic_yil: 150, buyume_yil: 500, pro_yil: 1500, kurumsal: 5000,
+    });
   });
 
   it('resolves the plan the same way as the usage limiter', () => {

@@ -20,8 +20,20 @@
 
 /* ------------------------------------------------------------------ keys */
 
-/** Every plan key, current and decided (tiers.md §1 `PlanKey`). */
-export type PlanKey = 'trial' | 'starter' | 'growth' | 'pro' | 'enterprise' | 'shopify_free';
+/** Every plan key, current and decided (tiers.md §1 `PlanKey`), plus the pricing v2 keys (docs/gtm/pricing-v2.md). */
+export type PlanKey = 'trial' | 'starter' | 'growth' | 'pro' | 'enterprise' | 'shopify_free' | V2PlanKey;
+/**
+ * Pricing v2 (Turkey): one monthly plan (`aylik`) + yearly packages + `kurumsal` (quote). Recognised everywhere
+ * (limits, features, entitlement) so an assigned account works; nothing sells them until PRICING_V2 is on
+ * (lib/billing/pricingV2.ts).
+ */
+export type V2PlanKey = 'aylik' | 'baslangic_yil' | 'buyume_yil' | 'pro_yil' | 'kurumsal';
+export const V2_PLAN_KEYS: readonly V2PlanKey[] = ['aylik', 'baslangic_yil', 'buyume_yil', 'pro_yil', 'kurumsal'];
+/** Yearly packages: their order / label meters are yearly buckets (pricing-v2 §3). */
+export const YEARLY_PLAN_KEYS: readonly V2PlanKey[] = ['baslangic_yil', 'buyume_yil', 'pro_yil', 'kurumsal'];
+export function isYearlyPlan(plan: string | null | undefined): boolean {
+  return typeof plan === 'string' && (YEARLY_PLAN_KEYS as readonly string[]).includes(plan);
+}
 /** The two meters the middleware enforces today. */
 export type LimitKind = 'orderSync' | 'label';
 /** tiers.md §1 meters. `orders` replaces today's `orderSync` (API calls) with counted orders (D6). */
@@ -40,13 +52,30 @@ export interface PlanLimits {
  * and `checkPlanLimit` below). The numbers follow DECIDED_PLAN_LIMITS; the order
  * meter counts new orders imported by manual and extension syncs (D6; scheduled syncs are not metered yet, see ENFORCEMENT_GAP).
  */
-export const ENFORCED_PLAN_LIMITS: Readonly<Record<'starter' | 'growth' | 'pro' | 'enterprise' | 'shopify_free', PlanLimits>> = {
+export const ENFORCED_PLAN_LIMITS: Readonly<Record<'starter' | 'growth' | 'pro' | 'enterprise' | 'shopify_free' | V2PlanKey, PlanLimits>> = {
   starter: { orderSync: 500, label: 250 },
   growth: { orderSync: 2000, label: 1000 },
   pro: { orderSync: 6000, label: 3000 },
   enterprise: { orderSync: null, label: null },
   shopify_free: { orderSync: null, label: null },
+  // Pricing v2: Aylık per month; yearly packages per year (pricing-v2 §3). Kurumsal is custom (unlimited here).
+  aylik: { orderSync: 500, label: 250 },
+  baslangic_yil: { orderSync: 6000, label: 3000 },
+  buyume_yil: { orderSync: 24000, label: 12000 },
+  pro_yil: { orderSync: 72000, label: 36000 },
+  kurumsal: { orderSync: null, label: null },
 };
+
+/**
+ * Module add-ons that change meters (pricing-v2 §3 "Modules"). `extraOrders` units add orders (+500 a month on
+ * Aylık, +6.000 a year on a yearly package); labels are not extended. Store / feature modules live in
+ * lib/billing/modules.ts.
+ */
+export interface MeterModules {
+  extraOrders?: number;
+  extraStores?: number;
+}
+export const EXTRA_ORDERS_PER_UNIT = { month: 500, year: 6000 } as const;
 
 /** Applies to trial accounts (plan `trial`/null, status `trialing`) until the trial date plus the grace days. */
 export const ENFORCED_TRIAL_LIMITS: Readonly<PlanLimits> = { orderSync: 150, label: 30 };
@@ -61,8 +90,8 @@ export const ENFORCED_TRIAL_LIMITS: Readonly<PlanLimits> = { orderSync: 150, lab
  */
 export type LimitState = 'shopify_free' | 'trial' | 'active' | 'noSubscription' | 'invalidPlan';
 
-/** Usage window: the trial (one bucket for the whole trial) or the monthly reset period. */
-export type LimitPeriod = 'trial' | 'month' | null;
+/** Usage window: the trial (one bucket for the whole trial), the monthly reset period, or a yearly package's year. */
+export type LimitPeriod = 'trial' | 'month' | 'year' | null;
 
 export interface PlanLimitDecision {
   state: LimitState;
@@ -99,12 +128,32 @@ export function getPlanLimits(
   status: string | null | undefined,
   trialExpiresAt: Date | string | number | null | undefined,
   now: Date = new Date(),
+  modules?: MeterModules | null,
+): PlanLimitDecision {
+  const d = getBasePlanLimits(plan, status, trialExpiresAt, now);
+  const extra = Math.max(0, Math.floor(modules?.extraOrders ?? 0));
+  if (d.state === 'active' && extra > 0 && d.limits.orderSync !== null) {
+    const per = d.period === 'year' ? EXTRA_ORDERS_PER_UNIT.year : EXTRA_ORDERS_PER_UNIT.month;
+    return { ...d, limits: { ...d.limits, orderSync: d.limits.orderSync + extra * per } };
+  }
+  return d;
+}
+
+function activePeriod(plan: string): LimitPeriod {
+  return isYearlyPlan(plan) ? 'year' : 'month';
+}
+
+function getBasePlanLimits(
+  plan: string | null | undefined,
+  status: string | null | undefined,
+  trialExpiresAt: Date | string | number | null | undefined,
+  now: Date,
 ): PlanLimitDecision {
   if (plan === 'shopify_free') {
     return { state: 'shopify_free', plan: 'shopify_free', limits: { orderSync: null, label: null }, period: null };
   }
   if (hasEnforcedPlan(plan) && typeof status === 'string' && PAID_STATUSES.has(status)) {
-    return { state: 'active', plan, limits: { ...ENFORCED_PLAN_LIMITS[plan] }, period: 'month' };
+    return { state: 'active', plan, limits: { ...ENFORCED_PLAN_LIMITS[plan] }, period: activePeriod(plan) };
   }
   const trialEnd = toDate(trialExpiresAt);
   const graceEnd = trialEnd ? trialEnd.getTime() + DECIDED_GRACE_DAYS * 24 * 60 * 60 * 1000 : null;
@@ -117,7 +166,7 @@ export function getPlanLimits(
   if (!hasEnforcedPlan(plan)) {
     return { state: 'invalidPlan', plan: plan ?? null, limits: { orderSync: 0, label: 0 }, period: null };
   }
-  return { state: 'active', plan, limits: { ...ENFORCED_PLAN_LIMITS[plan] }, period: 'month' };
+  return { state: 'active', plan, limits: { ...ENFORCED_PLAN_LIMITS[plan] }, period: activePeriod(plan) };
 }
 
 /** Mirrors `LimitReason` in withUsageLimiter.ts / lib/http/limitInterceptor.ts. */
@@ -182,6 +231,13 @@ export const DECIDED_PLAN_LIMITS: Readonly<Record<PlanKey, DecidedPlan>> = {
   // Shopify merchants: free (App Store 1.2.1). 3 stores = their Shopify store + 2 marketplaces (the listing's multichannel
   // promise); 300 credits so a default first video (192) works.
   shopify_free: { limits: { orders: null, labels: null, connectedStores: 3, aiCredits: 300 }, stripeUpsell: false },
+  // Pricing v2 (pricing-v2 §3; numbers are Atilla's to confirm). orders / labels: per month on Aylık, per year on
+  // the yearly packages. aiCredits stay monthly on every plan.
+  aylik: { limits: { orders: 500, labels: 250, connectedStores: 2, aiCredits: 300 }, stripeUpsell: true },
+  baslangic_yil: { limits: { orders: 6000, labels: 3000, connectedStores: 3, aiCredits: 300 }, stripeUpsell: true },
+  buyume_yil: { limits: { orders: 24000, labels: 12000, connectedStores: 6, aiCredits: 1500 }, stripeUpsell: true },
+  pro_yil: { limits: { orders: 72000, labels: 36000, connectedStores: 12, aiCredits: 3000 }, stripeUpsell: true },
+  kurumsal: { limits: { orders: null, labels: null, connectedStores: null, aiCredits: 10000 }, stripeUpsell: false },
 };
 
 /** tiers.md §1 constants. The trial length is enforced at account creation via `newTrialExpiry`. */
@@ -232,6 +288,11 @@ export const EXT_RESEARCH_DAILY_LOOKUPS: Readonly<Record<PlanKey, number>> = {
   pro: 1500,
   enterprise: 5000,
   shopify_free: 50,
+  aylik: 150,
+  baslangic_yil: 150,
+  buyume_yil: 500,
+  pro_yil: 1500,
+  kurumsal: 5000,
 };
 
 export interface ExtResearchLimit {

@@ -19,6 +19,12 @@ export const PLAN_FEATURES: Readonly<Record<PlanKey, Readonly<Record<Feature, bo
   enterprise: ALL_ON,
   // Shopify-installed merchants are never charged (App Store 1.2.1), so nothing may look locked behind a plan.
   shopify_free: ALL_ON,
+  // Pricing v2: Pro-only features are modules below Pro (lib/billing/modules.ts adds them per account).
+  aylik: ALL_OFF,
+  baslangic_yil: ALL_OFF,
+  buyume_yil: ALL_OFF,
+  pro_yil: ALL_ON,
+  kurumsal: ALL_ON,
 };
 
 /** The cheapest plan that includes every Pro feature. */

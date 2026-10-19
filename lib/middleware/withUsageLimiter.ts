@@ -4,7 +4,8 @@ import { getAuthUser } from '../auth';
 import { logger } from '../logger';
 import { User } from '@prisma/client';
 import { notify, resolveByPrefix, invalidateResolveMemo, notificationKeys, NOTIFICATION_LINKS } from '../notifications';
-import { getPlanLimits, checkPlanLimit } from '../billing/planLimits';
+import { getPlanLimits, checkPlanLimit, isYearlyPlan } from '../billing/planLimits';
+import { loadAccountModules } from '../billing/modules';
 
 interface UserWithSubscription extends User {
   subscriptionPlan: string | null;
@@ -57,7 +58,8 @@ const checkUsage = async (userId: string, limitType: LimitType): Promise<UsageCh
     : true; // No reset date at all — treat as needing reset
 
   if (needsReset) {
-    const nextReset = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    // Yearly packages (pricing v2) count orders / labels per year; everything else per 30 days.
+    const nextReset = new Date(Date.now() + (isYearlyPlan(user.subscriptionPlan) ? 365 : 30) * 24 * 60 * 60 * 1000);
     await prisma.user.update({
       where: { id: userId },
       data: {
@@ -75,7 +77,8 @@ const checkUsage = async (userId: string, limitType: LimitType): Promise<UsageCh
     void resolveByPrefix(userId, 'usage:');
   }
 
-  const decision = getPlanLimits(user.subscriptionPlan, user.subscriptionStatus, user.trialExpiresAt, now);
+  const modules = await loadAccountModules(userId, now);
+  const decision = getPlanLimits(user.subscriptionPlan, user.subscriptionStatus, user.trialExpiresAt, now, modules);
   const used = limitType === 'orderSync' ? user.orderSyncCount : user.labelCount;
   const result = checkPlanLimit(decision, limitType, used);
 
@@ -92,7 +95,7 @@ const checkUsage = async (userId: string, limitType: LimitType): Promise<UsageCh
     ...(decision.plan ? { plan: decision.plan } : {}),
     ...(decision.period === 'trial'
       ? { period: 'trial' }
-      : decision.period === 'month'
+      : decision.period === 'month' || decision.period === 'year'
         ? { period: user.usageResetAt ? new Date(user.usageResetAt).toISOString().slice(0, 10) : 'current' }
         : {}),
   };

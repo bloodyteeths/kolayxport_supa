@@ -13690,7 +13690,12 @@
       "pro": "Pro",
       "enterprise": "Enterprise",
       "shopify_free": "Shopify plan",
-      "none": "No plan"
+      "none": "No plan",
+      "aylik": "Monthly",
+      "baslangic_yil": "Starter yearly",
+      "buyume_yil": "Growth yearly",
+      "pro_yil": "Pro yearly",
+      "kurumsal": "Corporate"
     },
     "plan": {
       "billedMonthly": "Billed monthly in {currency}",

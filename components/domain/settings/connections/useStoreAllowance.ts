@@ -20,5 +20,6 @@ export function useStoreAllowance(): StoreAllowance {
     plan: data.plan,
     used: m?.used,
     limit: m ? m.limit : undefined,
+    extraStores: data.modules?.extraStores ?? 0,
   };
 }

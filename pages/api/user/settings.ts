@@ -4,6 +4,7 @@ import prisma from '../../../lib/prisma';
 import { withPrismaRetry } from '../../../lib/prismaWithRetry';
 import { encryptCredentials, decryptCredentials, maskCredentials, stripMaskedSecrets } from '@/lib/encryption';
 import { getPlanLimits } from '@/lib/billing/planLimits';
+import { loadAccountModules, NO_MODULES } from '@/lib/billing/modules';
 import { parsePreferencesPatch } from '@/lib/settings/accountTimezone';
 import { invalidateNotificationConfig } from '@/lib/notificationCenter/preferences';
 import { clearConnectionAuthState } from '@/lib/integrations/authFailures';
@@ -90,10 +91,15 @@ export default async function handler(
       } catch (prefError: any) {
         console.error('[/api/user/settings] Preferences read failed:', prefError?.message);
       }
+      // Pricing v2 modules (lib/billing/modules.ts): +orders units extend the order limit; feature / store modules
+      // travel to the entitlement. Shopify-installed accounts never get modules (everything is on there).
+      const modules = effectiveBillingProvider === 'shopify_free' ? NO_MODULES : await loadAccountModules(userId);
       const planLimits = getPlanLimits(
         userWithSettings.subscriptionPlan,
         userWithSettings.subscriptionStatus,
         userWithSettings.trialExpiresAt,
+        new Date(),
+        modules,
       );
       res.status(200).json({
         integrationSettings: maskedCreds,
@@ -110,6 +116,7 @@ export default async function handler(
           labelCount: userWithSettings.labelCount,
           limits: planLimits.limits,
           period: planLimits.period,
+          ...(modules.features.length || modules.extraStores || modules.extraOrders ? { modules } : {}),
         },
         ...(preferences ? { preferences } : {}),
       });

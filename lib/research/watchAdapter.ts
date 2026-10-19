@@ -364,6 +364,8 @@ export const DAY_MS = 86_400_000;
 /** D-R1 (BUILD_PLAN §8): Trial 3 · Starter 10 · Growth 25 · Pro 50 · Enterprise ∞ · shopify_free 10. */
 export const RESEARCH_WATCH_LIMITS: Readonly<Record<PlanKey, number | null>> = {
   trial: 3, starter: 10, growth: 25, pro: 50, enterprise: null, shopify_free: 10,
+  // Pricing v2 keys follow the matching ladder step (Aylık / Başlangıç ≈ Starter, Büyüme ≈ Growth, Pro ≈ Pro).
+  aylik: 10, baslangic_yil: 10, buyume_yil: 25, pro_yil: 50, kurumsal: null,
 };
 export const MAX_SNAPSHOT_LISTINGS = 500;
 export const LISTINGS_CACHE_TTL_MS = 10 * DAY_MS;

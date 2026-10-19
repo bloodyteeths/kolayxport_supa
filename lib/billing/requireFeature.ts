@@ -12,6 +12,7 @@
 // `neutral` = use Shopify-safe wording (no plans, no prices).
 import prisma from '@/lib/prisma';
 import { entitlementFromSettings } from './entitlementCore';
+import { loadAccountModules } from './modules';
 import { isNeutralBilling } from './billingState';
 import type { Entitlement, Feature } from './types';
 
@@ -46,7 +47,9 @@ export async function accountEntitlement(userId: string, now: Date = new Date())
   if (!user) return null;
   const activeShopify = await prisma.shopifyShop.count({ where: { userId, isActive: true } });
   const shopify = user.billingProvider === 'shopify_free' || activeShopify > 0;
+  const modules = shopify ? undefined : await loadAccountModules(userId, now);
   const ent = entitlementFromSettings({
+    modules,
     subscriptionPlan: shopify ? 'shopify_free' : user.subscriptionPlan,
     subscriptionStatus: shopify ? 'active' : user.subscriptionStatus,
     billingInterval: user.billingInterval,

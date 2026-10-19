@@ -13690,7 +13690,12 @@
       "pro": "Pro",
       "enterprise": "Enterprise",
       "shopify_free": "Shopify planı",
-      "none": "Plan yok"
+      "none": "Plan yok",
+      "aylik": "Aylık",
+      "baslangic_yil": "Başlangıç yıllık",
+      "buyume_yil": "Büyüme yıllık",
+      "pro_yil": "Pro yıllık",
+      "kurumsal": "Kurumsal"
     },
     "plan": {
       "billedMonthly": "Aylık, {currency} olarak faturalandırılır",

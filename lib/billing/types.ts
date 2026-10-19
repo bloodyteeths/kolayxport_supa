@@ -24,7 +24,10 @@ export const BILLING_STATES: readonly BillingState[] = ['trial', 'grace', 'activ
 export const METER_KEYS: readonly MeterKey[] = ['orders', 'labels', 'connectedStores', 'aiCredits'];
 export const FEATURES: readonly Feature[] = ['arbitrage', 'financials', 'bulkPhotoStudio'];
 export const PAID_PLANS: readonly PaidPlanKey[] = ['starter', 'growth', 'pro'];
-export const PLAN_KEYS: readonly PlanKey[] = ['trial', 'starter', 'growth', 'pro', 'enterprise', 'shopify_free'];
+export const PLAN_KEYS: readonly PlanKey[] = ['trial', 'starter', 'growth', 'pro', 'enterprise', 'shopify_free', 'aylik', 'baslangic_yil', 'buyume_yil', 'pro_yil', 'kurumsal'];
+/** Self-serve subscription plans: today's priced ladder plus the pricing v2 keys (kurumsal behaves like enterprise). */
+export type SubscribedPlanKey = PaidPlanKey | 'aylik' | 'baslangic_yil' | 'buyume_yil' | 'pro_yil';
+export const SUBSCRIBED_PLANS: readonly SubscribedPlanKey[] = ['starter', 'growth', 'pro', 'aylik', 'baslangic_yil', 'buyume_yil', 'pro_yil'];
 
 export interface MeterUsage {
   used: number;
@@ -54,6 +57,8 @@ export interface EntitlementResponse {
 export interface Entitlement extends Omit<EntitlementResponse, 'meters' | 'period'> {
   meters: Partial<Record<MeterKey, MeterUsage>>;
   period: { start: string; end: string } | null;
+  /** Pricing v2 module add-ons (lib/billing/modules.ts); absent on payloads without modules. */
+  modules?: { features: Feature[]; extraStores: number; extraOrders: number };
 }
 
 /** `GET /api/stripe/billing-summary` (settings §2.3 A3). */
@@ -103,6 +108,11 @@ export interface FoundingSpots {
 
 export function isPlanKey(v: unknown): v is PlanKey {
   return typeof v === 'string' && (PLAN_KEYS as readonly string[]).includes(v);
+}
+
+/** Any self-serve subscription plan (legacy ladder or pricing v2). Use isPaidPlan where a ladder price is needed. */
+export function isSubscribedPlan(v: unknown): v is SubscribedPlanKey {
+  return typeof v === 'string' && (SUBSCRIBED_PLANS as readonly string[]).includes(v);
 }
 
 export function isPaidPlan(v: unknown): v is PaidPlanKey {

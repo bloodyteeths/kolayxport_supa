@@ -10,7 +10,7 @@ import type { SubscriptionStatusKey } from '@/lib/ds/status/vocabulary';
 import { DECIDED_GRACE_DAYS } from './planLimits';
 import { PLAN_LADDER, currencyCode, effectivePrice, nextPlanFor } from './price';
 import type { Currency, Entitlement, Interval, MeterKey, PaidPlanKey, PlanKey, PortalFlow, PricedPlanKey } from './types';
-import { isPaidPlan } from './types';
+import { isPaidPlan, isSubscribedPlan } from './types';
 import { isPlayClient } from './playClient';
 
 export const DAY_MS = 86_400_000;
@@ -158,10 +158,10 @@ function graceEnd(e: Entitlement): string | null {
 export function billingView(e: Entitlement | null | undefined, now: Date = new Date()): BillingView {
   if (!e) return emptyView('unknown');
 
-  if (e.state === 'enterprise' || e.plan === 'enterprise') {
+  if (e.state === 'enterprise' || e.plan === 'enterprise' || e.plan === 'kurumsal') {
     return {
       ...emptyView(e.stripeUpsell ? 'stripe' : 'neutral'),
-      planName: 'enterprise',
+      planName: e.plan === 'kurumsal' ? 'kurumsal' : 'enterprise',
       pill: 'active',
       lines: [{ key: 'enterprise' }],
       secondary: href('contactUs', CONTACT_HREF),
@@ -210,7 +210,7 @@ export function billingView(e: Entitlement | null | undefined, now: Date = new D
       };
     case 'past_due_grace':
       return {
-        ...base, planName: isPaidPlan(e.plan) ? e.plan : 'none', pill, lines: paidLines(e),
+        ...base, planName: isSubscribedPlan(e.plan) ? e.plan : 'none', pill, lines: paidLines(e),
         banner: e.graceEndsAt
           ? { tone: 'danger', key: 'pastDue', date: e.graceEndsAt }
           : { tone: 'danger', key: 'pastDueNoDate', date: null },
@@ -219,7 +219,7 @@ export function billingView(e: Entitlement | null | undefined, now: Date = new D
         invoices: 'show', invoicesOpenFirst: true, paymentDetails: true, nearLimit,
       };
     case 'active': {
-      const planName = isPaidPlan(e.plan) ? e.plan : 'none';
+      const planName = isSubscribedPlan(e.plan) ? e.plan : 'none';
       if (e.cancelAtPeriodEnd) {
         return {
           ...base, planName, pill,

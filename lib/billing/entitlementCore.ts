@@ -1,10 +1,11 @@
 // lib/billing/entitlementCore.ts — the pure (React-free) half of useEntitlement: entitlement
 // normalisation and the settings-fallback derivation. Server code (API routes, scheduler jobs)
 // imports from here; importing the hook file pulls client-only React modules into server bundles.
-import { DECIDED_GRACE_DAYS, getPlanLimits } from './planLimits';
+import { DECIDED_GRACE_DAYS, getPlanLimits, isYearlyPlan } from './planLimits';
+import { NO_MODULES, normalizeModules, withModuleFeatures } from './modules';
 import { PLAN_FEATURES } from './featureMap';
 import type { BillingState, Currency, Entitlement, Feature, Interval, MeterKey, MeterUsage, PlanKey } from './types';
-import { FEATURES, METER_KEYS, isBillingState, isPaidPlan, isPlanKey } from './types';
+import { FEATURES, METER_KEYS, isBillingState, isPlanKey, isSubscribedPlan } from './types';
 
 export const ENTITLEMENT_KEY = '/api/billing/entitlement';
 export const SETTINGS_KEY = '/api/user/settings';
@@ -91,7 +92,9 @@ export interface SettingsSubscription {
   orderSyncCount?: number | null;
   labelCount?: number | null;
   limits?: { orderSync: number | null; label: number | null } | null;
-  period?: 'trial' | 'month' | null;
+  period?: 'trial' | 'month' | 'year' | null;
+  /** Pricing v2 modules (server: lib/billing/modules.ts loadAccountModules). */
+  modules?: { features?: unknown; extraStores?: unknown; extraOrders?: unknown } | null;
 }
 
 function iso(t: number | null): string | null {
@@ -109,6 +112,15 @@ function minusOneMonth(t: number): number {
   d.setUTCMonth(d.getUTCMonth() - 1);
   return d.getTime();
 }
+
+function minusOneYear(t: number): number {
+  const d = new Date(t);
+  d.setUTCFullYear(d.getUTCFullYear() - 1);
+  return d.getTime();
+}
+
+/** Contract plans (sales-led, unlimited meters): today's enterprise and pricing v2's kurumsal. */
+const isContractPlan = (p: unknown) => p === 'enterprise' || p === 'kurumsal';
 
 /**
  * Fallback-mode derivation (settings §2.4) from the settings `subscription` block. Pure; null without a
@@ -133,13 +145,13 @@ export function entitlementFromSettings(sub: SettingsSubscription | null | undef
   if (shopify) {
     plan = 'shopify_free';
     state = 'shopify_free';
-  } else if (rawPlan === 'enterprise' && status === 'active') {
-    plan = 'enterprise';
+  } else if (isContractPlan(rawPlan) && status === 'active') {
+    plan = rawPlan as PlanKey;
     state = 'enterprise';
-  } else if (isPaidPlan(rawPlan) && (status === 'active' || status === 'trialing')) {
+  } else if (isSubscribedPlan(rawPlan) && (status === 'active' || status === 'trialing')) {
     plan = rawPlan;
     state = 'active';
-  } else if (isPaidPlan(rawPlan) && status === 'past_due') {
+  } else if (isSubscribedPlan(rawPlan) && status === 'past_due') {
     plan = rawPlan;
     state = 'past_due_grace';
   } else if ((rawPlan === 'trial' || rawPlan === null) && trialEnd !== null && (status === 'trialing' || status === null)) {
@@ -156,9 +168,11 @@ export function entitlementFromSettings(sub: SettingsSubscription | null | undef
   }
 
   // Limits the middleware applies (null = unlimited). The server sends them; older payloads → local table.
+  // Shopify-installed accounts never carry modules (App Store 1.2.1: no plan or add-on surface at all).
+  const modules = shopify ? NO_MODULES : normalizeModules(sub.modules);
   const enforced = sub.limits && typeof sub.limits === 'object'
     ? sub.limits
-    : getPlanLimits(rawPlan, status, sub.trialExpiresAt ?? null, now).limits;
+    : getPlanLimits(rawPlan, status, sub.trialExpiresAt ?? null, now, modules).limits;
   const meters: Partial<Record<MeterKey, MeterUsage>> = shopify || state === 'enterprise'
     ? { orders: { used: count(sub.orderSyncCount), limit: null }, labels: { used: count(sub.labelCount), limit: null } }
     : {
@@ -171,16 +185,18 @@ export function entitlementFromSettings(sub: SettingsSubscription | null | undef
   if (state === 'trial' && trialEnd !== null) {
     period = { start: new Date(trialEnd - 14 * DAY_MS).toISOString(), end: new Date(trialEnd).toISOString() };
   } else if (reset !== null && state !== 'expired') {
-    period = { start: new Date(minusOneMonth(reset)).toISOString(), end: new Date(reset).toISOString() };
+    const start = isYearlyPlan(plan) ? minusOneYear(reset) : minusOneMonth(reset);
+    period = { start: new Date(start).toISOString(), end: new Date(reset).toISOString() };
   }
 
-  const feats = { ...PLAN_FEATURES[plan] };
+  // Module features count only while the account is in good standing (never on Shopify: everything is on there).
+  const feats = state === 'active' || state === 'past_due_grace' ? withModuleFeatures({ ...PLAN_FEATURES[plan] }, modules) : { ...PLAN_FEATURES[plan] };
   if (state === 'expired') for (const f of FEATURES) feats[f] = false;
 
   return {
     plan,
     state,
-    stripeUpsell: !shopify && plan !== 'enterprise',
+    stripeUpsell: !shopify && !isContractPlan(plan),
     interval: interval(sub.billingInterval),
     currency: null,
     foundingMember: false,
@@ -191,6 +207,7 @@ export function entitlementFromSettings(sub: SettingsSubscription | null | undef
     period,
     meters,
     features: feats,
+    ...(modules.features.length || modules.extraStores || modules.extraOrders ? { modules } : {}),
   };
 }
 

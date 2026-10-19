@@ -160,7 +160,8 @@ function sortKeys(o: Record<string, unknown>) {
 
 describe('decided tiers (design/launch/tiers.md §1)', () => {
   it('has Trial, Starter, Growth, Pro, Enterprise and shopify_free with the decided limits', () => {
-    expect(Object.keys(DECIDED_PLAN_LIMITS).sort()).toEqual(['enterprise', 'growth', 'pro', 'shopify_free', 'starter', 'trial']);
+    // + the pricing v2 keys (docs/gtm/pricing-v2.md; test/billing/pricing-v2.test.ts covers their numbers).
+    expect(Object.keys(DECIDED_PLAN_LIMITS).sort()).toEqual(['aylik', 'baslangic_yil', 'buyume_yil', 'enterprise', 'growth', 'kurumsal', 'pro', 'pro_yil', 'shopify_free', 'starter', 'trial']);
     expect(DECIDED_PLAN_LIMITS.trial.limits).toEqual({ orders: 150, labels: 30, connectedStores: 3, aiCredits: 200 });
     expect(DECIDED_PLAN_LIMITS.starter.limits).toEqual({ orders: 500, labels: 250, connectedStores: 2, aiCredits: 300 });
     expect(DECIDED_PLAN_LIMITS.growth.limits).toEqual({ orders: 2000, labels: 1000, connectedStores: 5, aiCredits: 1500 });

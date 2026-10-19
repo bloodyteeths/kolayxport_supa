@@ -233,6 +233,8 @@ export interface StoreAllowance {
   used?: number;
   /** `null` = unlimited; `undefined` = no store meter known (entitlement fallback mode). */
   limit?: number | null;
+  /** Extra-store modules (pricing v2), added to the decided limit in fallback mode. */
+  extraStores?: number;
 }
 
 /** "Stores · 4 of 5 used": only with a real, finite store meter. */
@@ -247,6 +249,9 @@ export function storesFull(a: StoreAllowance): boolean {
 }
 
 const UPGRADE_ORDER: readonly PlanKey[] = ['starter', 'growth', 'pro'];
+/** Pricing v2 accounts move up the yearly packages, never back to the legacy ladder. */
+const V2_UPGRADE_ORDER: readonly PlanKey[] = ['baslangic_yil', 'buyume_yil', 'pro_yil'];
+const V2_KEYS = new Set<string>(['aylik', 'baslangic_yil', 'buyume_yil', 'pro_yil', 'kurumsal']);
 
 export type StoreLimitModel =
   | { neutral: true }
@@ -266,9 +271,10 @@ export function storeLimitModel(a: StoreAllowance): StoreLimitModel {
   const plan = a.plan as PlanKey | undefined;
   if (!plan || !Object.prototype.hasOwnProperty.call(DECIDED_PLAN_LIMITS, plan)) return { neutral: true };
   const decided = DECIDED_PLAN_LIMITS[plan].limits.connectedStores;
-  const limit = typeof a.limit === 'number' ? a.limit : typeof decided === 'number' ? decided : undefined;
+  // Extra-store modules (pricing v2) raise the decided limit; the server meter, when present, already includes them.
+  const limit = typeof a.limit === 'number' ? a.limit : typeof decided === 'number' ? decided + (a.extraStores ?? 0) : undefined;
   if (limit === undefined) return { neutral: true };
-  const next = UPGRADE_ORDER.find((p) => {
+  const next = (V2_KEYS.has(plan) ? V2_UPGRADE_ORDER : UPGRADE_ORDER).find((p) => {
     const l = DECIDED_PLAN_LIMITS[p].limits.connectedStores;
     return typeof l === 'number' && l > limit;
   });

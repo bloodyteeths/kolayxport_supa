@@ -336,11 +336,11 @@ describe('tools/list for the Claude and ChatGPT directories', () => {
       expect(t.description.length).toBeGreaterThan(40);
     }
   });
-  it('write tools are not read-only and say they only stage drafts; reads are read-only', () => {
+  it('write tools are not read-only and say they only stage drafts; reads are read-only; only stage_listing_changes is destructive', () => {
     for (const t of all) {
       const tool = MCP_TOOLS.find((x) => x.name === t.name)!;
       expect(t.annotations.readOnlyHint).toBe(tool.scope === 'read');
-      expect(t.annotations.destructiveHint).toBe(false);
+      expect(t.annotations.destructiveHint).toBe(t.name === 'stage_listing_changes'); // price/quantity drafts: the client asks first
     }
     for (const n of ['stage_listing_changes', 'create_listing_draft', 'add_listing_photos']) expect(all.find((t) => t.name === n)!.description).toMatch(/draft/i);
     expect(all.find((t) => t.name === 'generate_product_image')!.description).toMatch(/\d+ of the seller's KolayXport AI credits per image/);

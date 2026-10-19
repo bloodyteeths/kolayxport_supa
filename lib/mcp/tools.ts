@@ -485,7 +485,7 @@ export function toolsFor(scopes: McpScope[]): McpTool[] {
 export function listedTools(scopes: McpScope[]) {
   return toolsFor(scopes).map((t) => ({
     name: t.name, title: t.title, description: t.description, inputSchema: t.inputSchema,
-    annotations: { title: t.title, readOnlyHint: t.readOnly, destructiveHint: false, idempotentHint: t.idempotent ?? t.readOnly, openWorldHint: t.openWorld ?? false },
+    annotations: { title: t.title, readOnlyHint: t.readOnly, destructiveHint: t.destructive ?? false, idempotentHint: t.idempotent ?? t.readOnly, openWorldHint: t.openWorld ?? false },
     // OpenAI Apps SDK: per-tool auth declaration (every tool needs the seller's OAuth connection).
     securitySchemes: [{ type: 'oauth2', scopes: [t.scope] }],
   }));

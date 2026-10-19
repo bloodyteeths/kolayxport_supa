@@ -1,7 +1,9 @@
 # Referral & signup attribution: build spec
 
-Date: 2026-10-19. For: the dev session the orchestrator assigns. Business terms: [turkey-gameplan.md](turkey-gameplan.md) §4.2 (approved by the orchestrator for Atilla on 2026-10-19).
-Effort: S–M (2–3 dev days). Deploy only through the mybaby-sync-product-50 queue.
+Date: 2026-10-19, Stage B rewritten the same day after Atilla's decisions. For: mybaby-sync-product-d7 (assigned by the orchestrator). Business terms: [turkey-gameplan.md](turkey-gameplan.md) §4.2; pricing: [pricing-v2.md](pricing-v2.md).
+Deploy only through the mybaby-sync-product-50 queue.
+
+**Stage A (§0–2, admin report part of §4) is deployed** (`b6ee9895`, 2026-10-19). Its migration already has the `PartnerCommission` / `PartnerPayout` tables, which stay empty until Stage B. **Stage B (§3–5) replaces the old 30%-for-12-months commission model** with a one-time bounty, a partner dashboard and Stripe Global Payouts. Fields such as `Partner.rate`, `tierRate` and `months` stay as unused defaults or are migrated away in the Stage B migration.
 
 ## 0. Hard constraints (MCP / directory-review freeze)
 
@@ -134,73 +136,114 @@ In `checkout.session.completed`, add a block that leaves the existing logic unch
   - user role is admin
   - user email is in `REVIEW_ACCOUNT_EMAILS` (env, comma-separated; covers review@, play-review@, mcp-review@)
 
-## 3. Commission ledger (Stripe webhook)
+## 3. Stage B: bounty ledger
 
-Add `charge.refunded` to `relevantEvents`. Existing case branches keep their behaviour; the new logic lives in `lib/partners/commissions.ts` and is called at the end of each relevant case inside its own try/catch, so a ledger bug can never break billing.
+Business rules (Atilla, 2026-10-19):
+- **Yearly package:** 25% of the customer's **first yearly payment**, net of KDV, after discounts. The rate is 30% if the partner already had ≥ 10 paying referred customers before this payment.
+- **Aylık (monthly):** a fixed **₺1.500**, earned on the customer's **2nd** successful monthly payment.
+- **Upgrade:** Aylık → yearly within 90 days of the first payment earns the yearly bounty **minus** any Aylık bounty already earned. Never negative.
+- **Exclusions:** modules, AI credit packs and renewals earn nothing. Shopify-billed customers, comped accounts and protected review accounts earn nothing.
+- **Hold:** 30 days after the payment that earned it. A refund within the hold voids the bounty.
 
-- **`invoice.payment_succeeded`** (every `billing_reason`, `amount_paid > 0`): find the user by customer → `UserAcquisition.partnerId`. If there is a partner:
-  - **Window:** the customer's first `PartnerCommission.paidAt` (or this invoice, if it's the first) + `partner.months`. Invoices after the window are ignored.
-  - **Rate:** `tierRate` if the partner already has ≥ `tierThreshold` distinct paying referred users *before* this invoice, else `rate`. This is not retroactive.
-  - **Net:** `amount_paid − sum(total_tax_amounts)`. If the invoice has no tax line while prices are "+KDV", log a warning and use `round(amount_paid / 1.20)`.
-  - **Write:** `stripeObjectId=invoice.id` (unique, so webhook retries are idempotent), `payableAt = paidAt + 30 d`.
-- **AI credit packs** (`checkout.session.completed` with `mode='payment'`): same rules, `kind='credit_pack'`, `stripeObjectId = session.id`.
-- **`charge.refunded`:** find the commission row for the charge's invoice/session.
-  - Write a `kind='refund'` row with negative net/commission proportional to `amount_refunded / amount`, `status='payable'` and `payableAt = now`.
-  - If the original row is still `pending`, mark it `void` instead and skip the negative row when the refund is full.
-- **Daily cron** (`pages/api/cron/partner-commissions.ts`, existing CronLock pattern): `pending` → `payable` when `payableAt <= now`.
+**Payment-provider agnostic.** Payments arrive from Stripe (Aylık, modules, and possibly yearly) and, after pricing v2, from **iyzico or PayTR** (yearly with taksit; pricing-v2 §4 P2). Put the rules in `lib/partners/bounty.ts` with one entry point:
 
-## 4. Partner report and admin
+```ts
+onPaymentSucceeded({ userId, provider: 'stripe'|'iyzico'|'paytr', objectId, paidAt, currency, grossMinor, taxMinor, planKey, interval: 'year'|'month', isFirstPaymentOfPlan })
+onPaymentRefunded({ provider, objectId, refundedMinor, totalMinor })
+```
 
-All endpoints require `role === 'admin'` (same check as `pages/api/admin/*`).
+Each provider's webhook calls these at the end of its handler, inside its own try/catch, so a bounty bug can never break billing.
 
-| Endpoint / script | Does |
+**Ledger rows** (reuse `PartnerCommission`; add `provider String @default("stripe")` and `reason String?` in the Stage B migration):
+- One row per earned bounty. `kind`: `bounty_year` | `bounty_month` | `bounty_upgrade` | `reversal`.
+- `stripeObjectId` holds the provider object id (unique, so retries are idempotent).
+- `netMinor`, `rate`, `commissionMinor` = the bounty amount. `status`: `pending` | `payable` | `paid` | `void`. `payableAt = paidAt + 30 d`.
+
+**Net amount:**
+- Stripe: `amount_paid − sum(total_tax_amounts)`.
+- iyzico/PayTR: the KDV amount from our own order record.
+- If no tax amount is known while prices are "+KDV": log a warning and use `round(gross / 1.20)`.
+
+**Refunds:**
+- Stripe: add `charge.refunded` to `relevantEvents`. iyzico/PayTR: their refund callbacks.
+- Bounty still `pending`: a full refund → `void`. A partial refund → reduce proportionally.
+- Bounty already `paid`: write a `reversal` row (negative), netted against the next payout. Never chase the partner for money.
+
+**Daily cron:** `pages/api/cron/partner-bounties.ts`, existing CronLock pattern. Moves `pending` → `payable` when `payableAt <= now`.
+
+## 4. Partner report, partner dashboard and payouts
+
+### 4.1 Admin (role `admin`; Stage A report exists, extend it)
+
+| Endpoint / page | Does |
 |---|---|
-| `GET/POST/PATCH /api/admin/partners` | List, create, pause or terminate partners. On create with `createPromo: true`, create a Stripe promotion code on coupon `STRIPE_PARTNER_COUPON_ID` (20% off, `duration: repeating`, `duration_in_months: 3`; the founder creates the coupon once) and store its id |
-| `GET /api/admin/partners/report?month=YYYY-MM[&format=csv]` | Per partner: signups (UserAcquisition rows), **activated** (a marketplace connection created ≤ 7 days after signup; the dev picks the source tables: Credential, EtsyShop, eBay/Amazon/Trendyol/Shopify/Wix connection rows), trialing, paying (≥1 paid invoice), net revenue, commission pending / payable / paid. Also totals and an "unattributed" row by `utm_source` |
-| `scripts/partners/monthly-statements.ts --month=YYYY-MM` | Writes one statement per partner (counts and amounts only) and a payout list: partners with payable ≥ ₺1.000 (USD converted at the TCMB rate the founder enters with `--usd-try`). **Dry run by default**, `--write` creates `PartnerPayout` rows |
-| `POST /api/admin/partners/payouts/:id/paid` | Sets `paidAt` + EFT reference and marks the included commission rows `paid` |
-| `pages/app/admin/partners.tsx` | Simple table over the report (desktop only is fine), i18n keys under `admin.partners.*` (TR + EN) |
+| `GET/POST/PATCH /api/admin/partners` | As in Stage A. Promo codes are created on coupon `STRIPE_PARTNER_COUPON_ID`; the discount lives on the coupon (20% once on yearly / repeating 3 months on Aylık; the founder may need two coupons). Add `PARTNER_YEARLY_COUPON_ID` if so, and the matching iyzico/PayTR discount once P2 exists |
+| `GET /api/admin/partners/report?month=YYYY-MM[&format=csv]` | Adds bounties pending / payable / paid per partner |
+| `POST /api/admin/partners/payouts/run?month=YYYY-MM` | **Dry run by default.** Lists payable bounties per partner (sum > 0 after reversals). With `confirm=true` it creates `PartnerPayout` rows and sends them through Stripe Global Payouts (§4.3) |
+| `pages/app/admin/partners.tsx` | Adds the payout run (dry run → confirm) and per-partner payout status |
 
-**Privacy (KVKK):** partners never see who signed up. Statements show counts and money only; no names, e-mails or store names.
+### 4.2 Partner dashboard: `/app/ortaklik` (new)
 
-**Free Growth perk for partners:** the existing admin `PATCH /api/admin/users/[userId]` sets `subscriptionPlan`. Add `comp: true` handling there, or document the manual steps: `plan=growth`, `status=active`, no Stripe customer. A comped account must **not** use a founding spot and must not create commission. Owner: the admin (Atilla, or whoever he gives the admin role) does it on Merisa's request.
+- **Access:** a `User` linked to a `Partner` (add `Partner.userId String? @unique`; the admin links it when creating the partner, using the partner's own KolayXport login, normally the comped Growth account).
+- **Shows:**
+  - The link and code (copy buttons).
+  - Totals: signups, activated, paying; bounties pending / payable / paid.
+  - A referral list with **masked** customers: first letter of the first name + "***" + first letter of the surname, plan and interval, status (deneme / aktif / ödedi / iptal), bounty amount and status, date. **No e-mails, store names or full names.**
+  - Payout history.
+  - A "Banka bilgilerimi gir / güncelle" button → the Stripe-hosted recipient onboarding link (§4.3).
+- **Never shown** to Shopify-connected accounts (neutral-billing check), and not in the nav for non-partners.
+- **KVKK:** add one line to the privacy notice: referred users' masked name, plan and payment status are shown to the referring partner. The gtm-overhaul session owns the legal texts; the lawyer-review flag applies.
+- i18n under `partners.dashboard.*` (TR + EN). Mobile layout = expandable cards (app pattern).
+
+### 4.3 Payouts: Stripe Global Payouts from Tamsar, Inc.
+
+- Tamsar, Inc.'s Stripe account (US) collects in TRY. Global Payouts sends to Turkish recipients in **TRY by wire**. Required data: individual = e-mail + name; company = e-mail, company name, address.
+- **Onboarding:** create a Stripe recipient for the partner (`Partner.stripeRecipientId`, new field) and give the partner a Stripe-hosted link to enter bank details and tax form (W-8BEN / W-8BEN-E). **We never store IBANs.**
+- **Payout run:** one outbound payment per partner per month for the payable sum, `PartnerPayout{ provider:'stripe_global', externalId, amountMinor, currency:'try', paidAt }` (add `provider` + `externalId`). On success, mark the included rows `paid`; on failure, keep them `payable` and show the error in admin.
+- The founder enables Global Payouts once in the Stripe dashboard. Fees are as shown there; check them before the first run.
+- **Fallback** if Global Payouts isn't enabled for the account: the run outputs a CSV for a manual transfer, and an admin marks rows paid with a reference.
+
+### 4.4 Free Growth perk
+
+Unchanged from Stage A: an admin sets the plan via the existing admin user PATCH; it never uses a founding spot and never earns or creates a bounty.
 
 ## 5. Acceptance tests
 
-Vitest unit/API tests (mock Stripe and Prisma as the existing tests do), plus a manual check on prod after the deploy.
+Stage A tests (already covered by `b6ee9895`): cookie capture, first touch, invalid codes, excluded routes, signup/claim, too-old claim, exclusions, unknown code, promo attribution, report without e-mails, comped account, Shopify account.
+
+Stage B tests (Vitest, mocks as in existing tests):
 
 | # | Case | Expected |
 |---|---|---|
-| 1 | GET `/?ref=etsyilegelir` with no cookies | `kx_ref=ETSYILEGELIR\|…`, HttpOnly, Secure, Lax, 90 d |
-| 2 | Same request with an existing `kx_ref=OTHER` | Cookie unchanged (first touch) |
-| 3 | `?ref=<script>` or a 40-char value | No cookie set |
-| 4 | Requests to `/api/auth/*`, `/api/mcp/*`, `/oauth/*`, `/.well-known/*`, `/api/shopify/*`, `/api/integrations/shopify/*`, `/_next/*`, even with `?ref=` | Middleware does nothing: no Set-Cookie, no redirect |
-| 5 | Credentials signup with `kx_ref` for an active partner | `UserAcquisition{via:'signup', partnerId}`; the signup still returns 201 even if `recordAcquisition` throws |
-| 6 | Google sign-in (new user), then `_app` claim | `UserAcquisition{via:'claim'}`; a second claim returns `exists`; cookies cleared |
-| 7 | Claim by a user created 3 days ago | `too_old`, no row |
-| 8 | Ref code == partner's own e-mail account / reviewer e-mail / admin | Row written with `refCode`, `partnerId = null` |
-| 9 | Unknown or paused code | Row with `refCode`, `partnerId = null` |
-| 10 | Checkout with partner promo code, user without partner | `partnerId` set, `via:'promo'`; user with a link partner keeps the original |
-| 11 | `invoice.payment_succeeded` ₺1.798,80 incl. ₺299,80 KDV | Net 149.900 minor, commission 44.970 minor (30%), `payableAt = +30 d`; replaying the same event creates no duplicate |
-| 12 | Invoice 13 months after the first paid invoice | No commission row |
-| 13 | 11th paying customer of a partner with 10 paying | Rate 0.35 for the new invoices; old rows unchanged |
-| 14 | Full refund within 30 days | Original row `void`, nothing payable |
-| 15 | Partial refund after payout | Negative payable row, netted in the next statement |
-| 16 | Credit pack purchase by a referred user | `kind:'credit_pack'` row |
-| 17 | Commission code throws inside the webhook | Billing updates still happen; webhook returns 200; error logged |
-| 18 | Report for a month | Counts match fixtures; CSV has no user e-mails |
-| 19 | Statement script without `--write` | No DB writes |
-| 20 | Comped partner account | No founding spot used, no commission rows |
-| 21 | Shopify-connected account (shopify_free) with a ref cookie | No referral UI shown, no Stripe prices; no commission rows |
+| B1 | Referred user pays the first Büyüme yearly payment: gross ₺65.988 incl. ₺10.998 KDV | `bounty_year`, net 5.499.000 minor, bounty 1.374.750 minor (25%), `payableAt +30 d` |
+| B2 | Same event replayed | No duplicate row |
+| B3 | Partner already has 10 paying referrals; the 11th pays yearly | Rate 0.30 |
+| B4 | Aylık first payment | No bounty |
+| B5 | Aylık second payment | `bounty_month` 150.000 minor |
+| B6 | Aylık customer (bounty earned) switches to yearly 40 days after the first payment | `bounty_upgrade` = yearly bounty − 150.000 |
+| B7 | Same switch 120 days after the first payment | No upgrade bounty |
+| B8 | Yearly renewal one year later | No bounty |
+| B9 | Module or AI credit pack purchase | No bounty |
+| B10 | Full refund 10 days after the yearly payment | Bounty `void` |
+| B11 | Refund after the bounty was paid | `reversal` row, netted in the next payout run; the run never sends a negative amount |
+| B12 | iyzico/PayTR yearly payment (when P2 exists) | Same as B1 through the shared entry point, `provider` set |
+| B13 | Bounty code throws inside a webhook | Billing still updates; webhook returns 200; error logged |
+| B14 | Payout run without `confirm` | No DB writes, no Stripe call |
+| B15 | Payout run with a partner with no recipient onboarding | Partner skipped, listed as "banka bilgisi eksik" |
+| B16 | Partner dashboard for partner A | Shows only A's referrals, masked; no e-mails in the HTML/JSON |
+| B17 | Non-partner opens `/app/ortaklik` | 404/redirect; not in the nav |
+| B18 | Shopify-connected partner account | Dashboard hidden (neutral billing) |
+| B19 | Referred Shopify-billed customer pays | No bounty |
 
-Manual prod check after the deploy (Merisa + dev session):
-1. Open `https://kolayxport.com/?ref=TEST-PARTNER` in a private window and sign up with a test e-mail.
-2. The report shows 1 signup for TEST-PARTNER.
-3. Delete the test user and the TEST-PARTNER row afterwards.
+Manual prod check after Stage B (dev session + Merisa):
+1. Run a payout in dry-run mode.
+2. Do one real ₺1 test payout to a test recipient if Stripe allows it; otherwise check the CSV fallback.
+3. Open a test partner's dashboard on a phone.
 
 ## 6. Rollout
 
-1. Migration + capture (§1–2) first. From that day every signup is attributed, even before any partner exists.
-2. Ledger + report (§3–4) in the same or the next queue slot.
-3. The founder creates the Stripe coupon `STRIPE_PARTNER_COUPON_ID` (20% off, repeating, 3 months) and sets the env value via stdin.
-4. The gtm-overhaul session publishes `/ortaklik` only after 1–3 are live and the founder approved the terms (claims check).
+1. ~~Stage A~~ (deployed 2026-10-19).
+2. Stage B: the bounty ledger + cron on Stripe events first, then the dashboard, then Global Payouts.
+3. The founder creates the partner coupon(s) and sets `STRIPE_PARTNER_COUPON_ID` (and `PARTNER_YEARLY_COUPON_ID` if needed) via stdin, and enables Global Payouts.
+4. The iyzico/PayTR hook goes in when pricing v2 P2 is built.
+5. The gtm-overhaul session publishes `/ortaklik` (terms) only after Stage B is live, the founder has approved the terms (done) and the accountant has confirmed the payout paperwork (pricing-v2 §5).

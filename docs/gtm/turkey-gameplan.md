@@ -13,7 +13,7 @@ Built on the existing research. This plan doesn't redo any of it, it only links 
 | Fact | Value (2026-10-19) | Source |
 |---|---|---|
 | Paying customers | **0** | Founder |
-| Monthly cash cap for Turkey GTM | **₺25.000 (~$500)**, plus commission that is paid only on results | Founder |
+| Monthly cash cap for Turkey GTM | **₺25.000 (~$500)**, plus partner bounties that are paid only on results | Founder |
 | Free tier | **No.** Entry stays the 14-day no-card trial plus the founding offer (40% off for life, first 20 subscribers) | Founder |
 | Phases | Phase 1: referral partners (Facebook group admins, X voices), **no ad spend until 100 users**. Phase 2: Instagram posts, then Meta and Google ads | Founder, via orchestrator |
 | Executors | Merisa and Ekin. Atilla stays out of the day-to-day | Founder, via orchestrator |
@@ -21,7 +21,7 @@ Built on the existing research. This plan doesn't redo any of it, it only links 
 | Tracking | **Not live.** No GTM, GA4 or Meta IDs are in prod, and the cookie banner only has "Kabul et" (the full panel is still being built) | gtm-overhaul session |
 | YouTube | 7 new tutorials, all unlisted; 8 more are blocked by the upload cap on the unverified channel (15 in total) | gtm-overhaul session |
 | Chrome extension | Live on the Chrome Web Store. 9.12.0 (adds Trendyol and Hepsiburada) is in Google review | gtm-overhaul session |
-| Prices | Starter ₺2.499, Growth ₺4.999, Pro ₺7.999 a month; yearly = 2 months free. **Shown as "+KDV"** (B2B norm), with the KDV-inclusive total visible at checkout | competitors.md §4; orchestrator decision 2026-10-19 |
+| Prices | **Pricing v2** ([pricing-v2.md](pricing-v2.md)): yearly packages Başlangıç ₺29.990 / Büyüme ₺54.990 / Pro ₺89.990 / Kurumsal (quote), with taksit via iyzico/PayTR; **one** monthly plan, Aylık ₺2.999, plus modules. Shown "+KDV" (accountant to confirm, pricing-v2 §5). Collected by **Tamsar, Inc.** (US) in TRY | Atilla 2026-10-19 (model; numbers are a proposal) |
 | Referral support in the app | **None.** First-touch UTMs are kept in the browser (`lib/tracking/events.ts`) and sent with the server `sign_up` event, but **not stored on the user**. Stripe Checkout shows a promotion-code field only when the founding coupon doesn't apply (`pages/api/stripe/create-checkout-session.ts:244`) | code |
 | Hepsiburada, Çiçeksepeti | Not live (waiting for integrator approval / replies). **Don't promise them** | feature-inventory N-1, project notes |
 | App-store listings | Shopify, Play Store, Claude and ChatGPT MCP directories are in review. **Freeze applies:** nobody touches MCP/OAuth/review accounts | coordination rules |
@@ -61,21 +61,25 @@ Amazon.com.tr-only sellers aren't a separate push: orders and labels work, but t
 
 ## 2. Offer, pricing and onboarding hook (Turkey, TRY)
 
-**Prices stay as decided:** Starter ₺2.499 / Growth ₺4.999 / Pro ₺7.999 a month, yearly = 2 months free, 14-day trial with no card.
+**Pricing v2 (Atilla, 2026-10-19), full detail in [pricing-v2.md](pricing-v2.md):**
+- **Yearly packages are the main offer:** Başlangıç ₺29.990, Büyüme ₺54.990, Pro ₺89.990, Kurumsal from ₺149.990, all +KDV, with taksit via iyzico/PayTR.
+- **One monthly plan:** Aylık ₺2.999 +KDV. Monthly users add **modules** (finance, arbitrage, photo studio, extra stores/orders, AI credit packs) instead of upgrading.
+- The numbers are a proposal for Atilla to confirm. Until v2 is live, partners and copy quote **no prices**: they link to `/fiyatlandirma`.
 
 | Element | Turkey offer | Why |
 |---|---|---|
-| Entry | **14-day trial, no card** (no free tier, founder decision) | Most Turkish incumbents push annual prepay. Monthly + no card is our trust lever (competitors.md §1) |
-| Urgency (real) | **Founding member: 40% off for life, first 20 subscribers.** Link to the live counter on `/fiyatlandirma`; never state the remaining number | Real scarcity only (README "Real FOMO") |
-| Partner audience offer | While founding spots last, referred users get the founding price like everyone else. **After the 20 are gone:** a partner-specific Stripe promotion code, **20% off the first 3 months** (Merisa's recommendation, Atilla approves once) | The Checkout code field already shows when the founding coupon doesn't apply |
-| Anchor in copy | "Etsy ve eBay için Türk entegratörlerde yıllık ₺89–125 bin; KolayXport'ta aylık, kartsız deneme" (only with the sourced numbers from competitors.md §5, re-checked before use) | The export-tier gap is our price argument. Never compare to BirFatura on price |
+| Entry | **14-day trial, no card** (no free tier, founder decision). At the end of the trial, the default offer is a yearly package with taksit; Aylık is the second option | Turkish sellers are used to yearly packages paid in installments (PraPazar, Sentos, Entegra) |
+| Urgency (real) | **Founding member: 40% off for life, first 20 subscribers**, on any package. Link to the live counter on `/fiyatlandirma`; never state the remaining number | Real scarcity only (README "Real FOMO") |
+| Partner audience offer | While founding spots last, referred users get the founding price like everyone else. **After the 20 are gone:** a partner-specific promo code, **20% off** the first yearly payment or the first 3 months of Aylık | Approved 2026-10-19 |
+| Anchor in copy | "Etsy ve eBay için Türk entegratörlerde yıllık ₺89–125 bin; KolayXport Pro yıllık ₺89.990 ve her şey dahil" (only with the sourced numbers from competitors.md §5, re-checked before use) | We sit at Sentos Platinum's level with far more export tooling. Never compare to BirFatura on price |
 | Onboarding hook (first 10 minutes) | 1) Connect Etsy or eBay. 2) **Listing doctor** on the weakest listing (SEO score + one-click fixes). 3) The Chrome extension on their own Etsy search page | "First listing optimized" is the AI value moment (README §6). The extension is live, so it can be shown now |
-| What we never offer | Revenue/sales guarantees, "Etsy partner/onaylı", HB/N11, automatic ETGB declaration, AI credit counts without checking the current metering | feature-inventory §4 |
+| What we never offer | Revenue/sales guarantees, "Etsy partner/onaylı", HB/N11, automatic ETGB declaration | feature-inventory §4 |
 
 **Unit economics used in this plan** (assumptions, update with real data in week 6):
-- First paid plan = Starter at the founding price: ₺2.499 × 0,60 ≈ **₺1.499 a month**.
-- Trial → paid = **10%** (assumption from the ads playbook).
-- With the partner commission in §4.2 (30%), a referred Starter-founding customer costs **≈ ₺450 a month while they pay**. That is about ₺2.700 for an average 6-month life, and it is only paid out of money already collected. Compare ₺4.500 CAC for paid ads (ads-playbook §3).
+- Average first payment of a referred paying customer: about **₺33.000**. That's Büyüme yearly at the founding price (₺54.990 × 0,60), the most likely pick for export sellers; Aylık buyers pull it down.
+- Trial → paid: **6%** for yearly and **4%** for Aylık. Prepay converts lower than monthly.
+- **Partner cost per paying customer:** a one-time bounty of 25% of the first yearly payment (≈ ₺8.250 on the example above), or a fixed ₺1.500 for Aylık. It is paid only after the money has been collected and the refund window has passed.
+- Paid ads must beat that per customer before they scale (ads-playbook §3; its thresholds get recalculated for yearly prices before Phase 2).
 
 ---
 
@@ -86,7 +90,7 @@ Cash cost = what we pay before knowing whether a customer comes. Estimates are e
 | Rank | Channel | Cash cost / paying customer (estimate) | Speed | Owner | Phase | Status |
 |---|---|---|---|---|---|---|
 | 1 | **App-directory listings**: Chrome Web Store (live), Shopify App Store, Play Store, Claude/ChatGPT MCP directories (in review) | ≈ ₺0 | Slow, steady | Already handled by the extension / app / MCP sessions. **Marketing only links to them, never edits them** | 1 | Running |
-| 2 | **Referral partners**: FB/Telegram admins, X voices, small YouTubers, mali müşavirler. 30% revenue share | ₺0 up front; ≈ ₺2.700 over the customer's life, out of collected revenue | Fast once 10+ partners are active | Merisa (groups, müşavirler), Ekin (X, YouTube) | **1 (main)** | To build (§4) |
+| 2 | **Referral partners**: FB/Telegram admins, X voices, small YouTubers, mali müşavirler. One-time bounty | ₺0 up front; one-time ₺1.500 (Aylık) to ≈ ₺8.250 (Büyüme yearly, founding price), out of collected revenue | Fast once 10+ partners are active | Merisa (groups, müşavirler), Ekin (X, YouTube) | **1 (main)** | To build (§4) |
 | 3 | **Helpful community answers** (no links where forbidden) | ₺0 (time only) | Medium | Merisa, Ekin | 1 | Kit ready (social/README §4) |
 | 4 | **YouTube tutorials public + embedded on the site** | ₺0 | Slow, compounding | gtm-overhaul session (uploads); Ekin (comments, Shorts) | 1 | 15 videos, unlisted |
 | 5 | **Turkish SEO blog** (2 posts a week, calendar ready) | ₺0 (Claude drafts, Merisa fact-checks) | Slow (3–6 months) | gtm-overhaul session + Merisa | 1 | Calendar written, cadence **not started** |
@@ -110,34 +114,35 @@ Cash cost = what we pay before knowing whether a customer comes. Estimates are e
 
 ### 4.2 The referral program: "KolayXport Ortaklık Programı"
 
-**Approved 2026-10-19** (orchestrator, for Atilla): 30% for 12 months, 35% from the 10th paying referral, and the 20%-for-3-months partner code. Build spec: [referral-spec.md](referral-spec.md).
+**Decided by Atilla, 2026-10-19:** a one-time bounty (no recurring commission), a partner dashboard in the app, and payouts through Stripe from Tamsar, Inc. Build spec: [referral-spec.md](referral-spec.md).
 
-| Term | Default | Note |
+| Term | Rule | Note |
 |---|---|---|
-| Commission | **30% of net revenue collected** from each referred customer (KDV excluded, after discounts and refunds) | SaaS norm is 20–30%. 30% keeps Phase 1 attractive when we have no brand |
-| Duration | **12 months** from that customer's first payment | Recurring, so admins keep recommending |
-| Bonus tier | **35%** from the partner's 10th paying referral onward | Rewards the few partners that work |
-| AI credit packs | Included in "revenue" (they are part of what the customer pays) | Optional: Atilla can exclude them |
+| Bounty: yearly package | **25% of the customer's first yearly payment** (net of KDV, after discounts). **30%** for customers who pay after the partner already has 10 paying referrals | Paid once. Later renewals pay nothing |
+| Bounty: Aylık (monthly) | **A fixed ₺1.500**, earned when the customer makes their **2nd** monthly payment | Sign-up-and-cancel earns nothing |
+| Upgrade | Aylık → yearly within 90 days of the first payment: the partner gets the yearly bounty **minus** the ₺1.500 already paid | No double payment |
+| Modules, AI credit packs | Not part of the bounty | Keeps the bounty predictable |
 | Attribution | Partner link (`kolayxport.com/?ref=<KOD>`) or partner promo code. **First touch wins**, 90-day window, 1 partner per customer | Same 90 days as `captureAttribution` |
-| Not eligible | Self-referral, existing users, reviewer accounts, paid-ad traffic that bid on our brand, coupon-site posting | Standard |
-| Hold | Commission becomes payable **30 days after** the customer's payment (refund window) | |
-| Payout | Monthly, **EFT/FAST in TRY** to a Turkish IBAN, from **₺1.000** accrued (the rest rolls over). Partner sends a fatura (company / şahıs şirketi). For a private individual, the muhasebeci decides the paperwork (gider pusulası + stopaj, or a serbest meslek makbuzu) | PayPal doesn't work in Turkey, so don't use tools that only pay out via PayPal |
-| Partner perks | Free Growth account while the partner is active (≥1 paying referral per quarter); an early look at new features | Replaces Varyant 1's "free account". Granted by an admin through the existing admin user PATCH (plan growth, no Stripe), on Merisa's request; it never uses a founding spot (referral-spec §4) |
+| Not eligible | Self-referral, existing users, reviewer accounts, Shopify App Store installs, paid-ad traffic that bid on our brand, coupon-site posting | Standard |
+| Hold | Payable **30 days after** the payment that earned it (refund window). A refund inside the window cancels the bounty | |
+| Payout | Monthly, from **Tamsar, Inc.** through **Stripe Global Payouts**, in **TRY by wire** to the partner's Turkish bank account. The partner enters the bank details on a Stripe-hosted form; we never store IBANs | Stripe Global Payouts supports Turkish recipients (individual: e-mail + name; company: e-mail, company name, address). Tamsar, Inc. collects a W-8BEN / W-8BEN-E; the partner declares the income in Turkey (accountant to confirm, pricing-v2 §5) |
+| Partner dashboard | `/app/ortaklik`: the partner's link and code, every referral in **masked** form (e.g. "A*** K. · Büyüme yıllık · ödedi · ödül bekliyor"), and earned / pending / paid totals | Transparent without exposing customers. One line in the privacy notice covers it (KVKK) |
+| Partner perks | Free Growth (Büyüme) account while the partner is active (≥1 paying referral per quarter); an early look at new features | Granted by an admin, on Merisa's request; it never uses a founding spot (referral-spec §4) |
 | Disclosure | Every partner post must carry **#işbirliği @kolayxport** or **#reklam**; videos also say it aloud | legal-notes §3. Reklam veren must inform the partner: the terms text does it |
-| Claims | Partners may only use the "Söyleyebilirsin" list (social/README §3). No income guarantees | |
-| Termination | Either side, any time, by e-mail. Commission already earned is still paid. Misleading claims or spam end it immediately with no further payouts | |
+| Claims | Partners may only use the "Söyleyebilirsin" list (social/README §3). No income guarantees, no prices until pricing v2 is live | |
+| Termination | Either side, any time, by e-mail. Bounties already earned are still paid. Misleading claims or spam end it immediately with no further payouts | |
 
 **Tracking: what has to be built (this blocks signing the 1st partner):**
 1. **Store attribution on the user at signup** (roadmap G2): keep the first-touch UTM + `ref` code on the `User` row (signup form and Google/Apple sign-in).
 2. **`?ref=<KOD>` capture**: the same as UTM capture, plus `utm_source=partner&utm_content=ref-<kod>` for GA4.
-3. **A partner report** (admin-only page or a monthly script): per code → signups, activated, trialing, paying, collected net revenue, commission owed.
+3. **A partner report** (admin) and the **partner dashboard** (`/app/ortaklik`): per code → signups, activated, trialing, paying, bounties pending / payable / paid.
 4. **Stripe promotion codes per partner** (founder creates them in Stripe or delegates; the field already shows when the founding coupon doesn't apply). The code also counts as attribution if the link was missed.
 
-Effort: about 2–3 dev days. Full spec with data model, capture points, report and acceptance tests: [referral-spec.md](referral-spec.md). Under the freeze, the ref is captured with our own first-party cookie (middleware) and a post-login claim endpoint; NextAuth/OAuth config is not touched. **Owner:** a dev Claude session that the orchestrator assigns, deployed through the deploy queue (mybaby-sync-product-50). It doesn't touch `lib/mcp/*`, `pages/api/mcp/*` or OAuth/consent (freeze), so the signup change must go through the Google/Apple sign-in callback carefully; flag it to the queue. A third-party tool (Rewardful, Tolt, FirstPromoter, ~$49+/mo) is the fallback, but their PayPal/Wise payouts don't fit Turkish partners, so the in-house report + EFT is recommended.
+Effort: about 2–3 dev days. Full spec with data model, capture points, report and acceptance tests: [referral-spec.md](referral-spec.md). Under the freeze, the ref is captured with our own first-party cookie (middleware) and a post-login claim endpoint; NextAuth/OAuth config is not touched. **Owner:** a dev Claude session that the orchestrator assigns, deployed through the deploy queue (mybaby-sync-product-50). It doesn't touch `lib/mcp/*`, `pages/api/mcp/*` or OAuth/consent (freeze), so the signup change must go through the Google/Apple sign-in callback carefully; flag it to the queue. Stage A (capture, admin report) was deployed on 2026-10-19 by mybaby-sync-product-d7. Stage B (bounty ledger, dashboard, Stripe Global Payouts) follows the updated spec.
 
 **Until it's live:** Merisa may talk to partners, but gives out links only once tracking works. Tell them "takip sistemimiz [tarih] itibarıyla aktif".
 
-**Partner terms page:** a short Turkish page `/ortaklik` with the table above. gtm-overhaul drafts it now and **publishes only when** the terms are approved (done), the `?ref` capture and signup attribution are live, and the muhasebeci has checked the stopaj / gider pusulası line. Until then, Merisa sends the terms as a PDF by e-mail.
+**Partner terms page:** a short Turkish page `/ortaklik` with the table above. gtm-overhaul drafts it now and **publishes only when** the terms are approved (done), the `?ref` capture and signup attribution are live, and the accountant has confirmed the payout paperwork (pricing-v2 §5). Until then, Merisa sends the terms as a PDF by e-mail.
 
 ### 4.3 Who Merisa and Ekin target, and how many
 
@@ -185,7 +190,7 @@ Ben [Merisa/Ekin], KolayXport'ta pazarlamadan sorumluyum. [Grup adı]'nda [konu]
 
 KolayXport, yurt dışına satan Türk satıcılar için bir panel: Etsy ve eBay ilanlarını yapay zekâyla İngilizce düzenleme, ürün ve anahtar kelime araştırması, sipariş ve yurt dışı kargo etiketi bir arada. 14 gün ücretsiz, kart gerekmiyor.
 
-Grup yöneticileriyle bir ortaklık programı başlatıyoruz: sizin linkinizle gelen ve abone olan her satıcının ödediği tutarın %30'u, 12 ay boyunca her ay size ödeniyor. Sizden bir paylaşım zorunluluğu yok; ürünü önce kendiniz deneyin diye size ücretsiz bir Growth hesabı da açarız.
+Grup yöneticileriyle bir ortaklık programı başlatıyoruz: sizin linkinizle gelip yıllık paket alan her satıcı için ilk yıllık ödemesinin %25'i, aylık plana geçen her satıcı için 1.500 TL tek seferlik ödül. Kim geldi, kim abone oldu, ne kadar kazandınız; hepsini panelinizde anlık görürsünüz. Sizden bir paylaşım zorunluluğu yok; ürünü önce kendiniz deneyin diye size ücretsiz bir Growth hesabı da açarız.
 
 Program şartlarını kısa bir metin olarak gönderebilirim. İlgilenmezseniz de hiç sorun değil, teşekkürler.
 
@@ -198,7 +203,7 @@ Merhaba [ad], [paylaşım/video adı]'nda [somut nokta] kısmı çok netti, taki
 
 Ben [ad], KolayXport'tan. Yurt dışına satan Türk satıcılar için Etsy/eBay ilan optimizasyonu, araştırma ve yurt dışı kargo etiketini tek panelde topluyoruz.
 
-E-ihracat üzerine içerik üretenlerle bir ortaklık programı başlattık: linkinizle gelip abone olan her satıcının ödemesinin %30'u, 12 ay boyunca her ay sizin. Ücretsiz bir hesapla önce kendiniz deneyebilirsiniz; beğenmezseniz hiçbir yükümlülüğünüz olmaz.
+E-ihracat üzerine içerik üretenlerle bir ortaklık programı başlattık: linkinizle gelip yıllık paket alan her satıcı için ilk ödemesinin %25'i (10. müşteriden sonra %30), aylık plan için 1.500 TL, tek seferde sizin. Gelenleri ve kazancınızı panelinizden takip edersiniz. Ücretsiz bir hesapla önce kendiniz deneyebilirsiniz; beğenmezseniz hiçbir yükümlülüğünüz olmaz.
 
 Şartları DM'den mi yoksa e-postayla mı göndermemi istersiniz?
 ```
@@ -208,11 +213,12 @@ E-ihracat üzerine içerik üretenlerle bir ortaklık programı başlattık: lin
 Harika, teşekkürler [ad]!
 
 1) Ortaklık linkiniz: https://kolayxport.com/?ref=[KOD]
-   [Kurucu üye kontenjanı dolduktan sonra geçerli] Takipçilerinize özel kod: [KOD], ilk 3 ay %20 indirim.
+   [Kurucu üye kontenjanı dolduktan sonra geçerli] Takipçilerinize özel kod: [KOD], ilk yıllık ödemede veya aylık planın ilk 3 ayında %20 indirim.
+   Ortaklık paneliniz: https://kolayxport.com/app/ortaklik (gelen kayıtlar, abonelikler ve ödülleriniz)
 2) Ücretsiz Growth hesabınız [e-posta] adresine açıldı.
 3) Paylaşımlarınızda "#işbirliği @kolayxport" (videoda ayrıca sesli olarak) belirtmeniz yasal bir zorunluluk (Reklam Kurulu Sosyal Medya Etkileyicileri Kılavuzu). Kılavuz: [link]
 4) Söyleyebileceğiniz özellikler ve kullanabileceğiniz ekran görüntüleri: [paylaşılan klasör linki]. Lütfen gelir veya satış garantisi gibi ifadeler kullanmayın.
-5) Ödemeler her ayın [5]'inde, en az ₺1.000 biriktiğinde IBAN'ınıza yapılır; aylık raporunuzu e-postayla göndeririz.
+5) Ödüller, müşterinin ödemesinden 30 gün sonra ödenebilir hale gelir ve her ayın [5]'inde Stripe üzerinden banka hesabınıza TL olarak gönderilir. Banka bilgilerinizi Stripe'ın güvenli formuna kendiniz girersiniz; biz IBAN saklamayız.
 
 Paylaşım metnini isterseniz biz taslak olarak hazırlayabiliriz, son söz sizde.
 ```
@@ -228,9 +234,9 @@ Hepsiburada/N11 yok, odak yurt dışı satış.
 
 Extend [social/outreach-tracker.csv](social/outreach-tracker.csv) with these columns (one row per candidate):
 
-`score`, `partner_type` (fb_admin | tg_admin | x_voice | youtube | musavir), `audience_size`, `terms_sent`, `terms_accepted_date`, `ref_code`, `promo_code`, `free_account_email`, `first_post_date`, `post_link`, `disclosure_ok` (yes/no + screenshot link), `signups`, `activated`, `paying`, `net_revenue_try`, `commission_owed_try`, `commission_paid_try`, `last_payout_date`, `iban_on_file` (yes/no; **the IBAN itself lives in the accounting folder, not the sheet**).
+`score`, `partner_type` (fb_admin | tg_admin | x_voice | youtube | musavir), `audience_size`, `terms_sent`, `terms_accepted_date`, `ref_code`, `promo_code`, `free_account_email`, `first_post_date`, `post_link`, `disclosure_ok` (yes/no + screenshot link), `signups`, `activated`, `paying`, `bounty_pending_try`, `bounty_paid_try`, `last_payout_date`, `stripe_payout_onboarded` (yes/no; bank details live only in Stripe).
 
-Numbers for `signups`…`commission_owed_try` come from the partner report (§4.2 item 3), never typed by hand.
+Numbers for `signups`…`bounty_paid_try` come from the partner report (§4.2 item 3), never typed by hand.
 
 ### 4.7 Daily and weekly routine
 
@@ -240,7 +246,7 @@ Numbers for `signups`…`commission_owed_try` come from the partner report (§4.
 | Mon | Pick this week's 30 contacts from the shortlist (highest score first); weekly KPI sheet update | Pick 20 X/YouTube contacts |
 | Wed | One live demo for a partner group (from week 4), 30 min, scripted on tutorials V01/V02 | Prepares the demo slides/screens from the demo account |
 | Fri | KPI report to the orchestrator (§4.8). Unusual deals → one message to Atilla | Content report: which posts brought signups |
-| Monthly (5th) | Partner statements e-mailed; payout list to the muhasebeci/Atilla for EFT | — |
+| Monthly (5th) | Check the payable bounties in the admin report; send the payout list to Atilla for one approval; payouts go out through Stripe Global Payouts | — |
 
 Hours: **Ekin ~15 h a week** on KolayXport (she splits 30 h with the Amazon shop; founder, 2026-10-19). Merisa is planned at ~20 h a week. The disclosure checks moved from Ekin to Merisa. If Ekin has less time in a given week, drop the YouTube contacts first, then the clips.
 
@@ -332,7 +338,7 @@ Day 1 = **Mon 2026-10-26** (one week to get Atilla's approvals and the attributi
 | Google ads | — | — | ₺3.000 *(only if the gate passed; the full ₺5k test runs the month after)* |
 | Reserve (unspent rolls over) | ₺18.500 | ₺23.500 | ₺3.500 |
 | **Cash total** | **₺6.500 (~$130)** | **₺1.500 (~$30)** | **₺21.500 (~$440)** |
-| Commission (results only, outside the cap) | ₺0 | ~₺0–1.000 | ~₺2–4k |
+| Partner bounties (results only, outside the cap) | ₺0 | ~₺0–10k | ~₺10–40k (covered by the yearly payments that earned them) |
 
 Merisa's and Ekin's pay is not in this table (not known to this plan). USD at ~₺49,2.
 
@@ -342,10 +348,10 @@ Merisa's and Ekin's pay is not in this table (not known to this plan). USD at ~�
 |---|---|
 | Activated users | ≥ 100 (gate) |
 | Paying customers | ≥ 10 (founding spots half full) |
-| MRR | ≥ ₺15.000 (10 × ~₺1.500) |
+| Revenue collected | ≥ ₺150.000 (yearly prepay + Aylık mix; ~₺33.000 per yearly customer at the founding price) |
 | Active partners | ≥ 13 |
 | Share of signups from partners | ≥ 50% |
-| Cost per paying customer (cash, excl. commission) | ≤ ₺1.000 |
+| Cost per paying customer (cash, excl. partner bounties) | ≤ ₺1.000 |
 | Testimonials with written consent | ≥ 2 |
 
 ---
@@ -363,7 +369,8 @@ Merisa's and Ekin's pay is not in this table (not known to this plan). USD at ~�
 | 4 | Create the GTM container, GA4 and Meta pixel IDs and set them in the Hetzner `.env` via stdin (LAUNCH-CHECKLIST §C), or give Merisa admin on the Google/Meta accounts and only do the `.env` step | **By 30 Nov** (Phase 2 gate) | 30 min |
 | 5 | Stripe: create the partner coupon once (20% off, repeating 3 months) and set `STRIPE_PARTNER_COUPON_ID`; the admin partner tool then creates each partner's code (referral-spec §4) | Before the first partner link goes out | 5 min |
 | 5b | Grant the free Growth account to each new partner (admin user page), or give the admin role to someone who does it | Per partner, on Merisa's request | 2 min each |
-| 6 | Monthly partner payouts: approve the list Merisa sends, EFT (or have the muhasebeci do it) | 5th of each month | 10 min |
+| 6 | Monthly partner payouts: approve the payout list Merisa sends; payouts go out through Stripe Global Payouts from Tamsar, Inc. (enable Global Payouts once in the Stripe dashboard) | 5th of each month | 10 min |
+| 6b | Confirm the pricing v2 numbers ([pricing-v2.md](pricing-v2.md) §3), and ask the accountant the two questions in pricing-v2 §5 (seller of record + KDV, payout paperwork) | Before pricing v2 is built | 30 min |
 | 7 | ~~KDV~~ decided: prices shown "+KDV". Have the muhasebeci check the partner payout paperwork (stopaj / gider pusulası / fatura) | Before the first payout (5 Jan) | — |
 | 8 | Phase 2 only: approve the ad budget start; send one intro e-mail each to ShipEntegra and Paraşüt/QNB partner teams (Merisa drafts them) | After the gate | 15 min |
 
@@ -401,16 +408,24 @@ Everything in §4.3–4.8 and §5: shortlists, outreach, partner onboarding, dem
 | Founding coupon blocks partner promo codes for the first 20 | Intended: referred users get 40% for life anyway; the partner link still attributes them |
 | Attribution build slips | No links go out before it's live; partners can be signed but are told the start date |
 | Tracking/cookie panel late → Phase 2 delayed | It's in the gate on purpose; Phase 1 doesn't need pixels |
-| Commission payouts to individuals create tax paperwork | Muhasebeci decides the document; ₺1.000 minimum keeps the count of payouts low |
+| Payouts to individuals create tax paperwork | Paid by Tamsar, Inc. through Stripe Global Payouts; W-8BEN on file; the partner declares the income in Turkey (accountant confirms) |
+| Yearly-first pricing converts lower without taksit | iyzico/PayTR with taksit before pricing v2 goes live; Aylık stays as the low-commitment option |
 | Review freezes (Shopify, MCP, Play) | Marketing never edits those listings or reviewer accounts; links only |
 
 ---
 
 ## 9. Decisions and open items
 
-Decided 2026-10-19 (orchestrator, for Atilla): 30% for 12 months, 35% from the 10th paying referral; a partner code of 20% for 3 months after the founding spots; prices shown "+KDV".
+Decided:
+- **2026-10-19 (Atilla):**
+  - Pricing v2 model: yearly packages, one monthly plan, modules, and iyzico/PayTR for taksit.
+  - One-time partner bounty: 25% of the first yearly payment, 30% from the 10th paying referral, ₺1.500 for Aylık after the 2nd payment.
+  - Partner dashboard in the app.
+  - Payouts through Stripe Global Payouts from Tamsar, Inc., which collects in TRY.
+- **2026-10-19 (orchestrator):** prices shown "+KDV"; partner code 20% off the first payment or 3 months; Ekin ~15 h/week.
 
 Still open:
-1. ~~Ekin's hours~~: decided, ~15 h/week on KolayXport (targets rescaled; gate moves from W10 to W11). Merisa's hours are planned at ~20 h/week; confirm if different.
-3. Pricing structure (one monthly plan + modules, yearly packages as the main offer, taksit via iyzico/PayTR) and the referral payout model (one-time bounty, partner dashboard, Stripe Global Payouts): waiting for Atilla. §2 and §4.2 will be rewritten once he decides.
-2. The Atilla actions in §7 with dates: YouTube phone verification (26 Oct), tutorials Public (2 Nov), tracking IDs (30 Nov).
+1. Pricing v2 numbers (pricing-v2 §3): Atilla confirms.
+2. Accountant: seller of record + KDV for Turkish customers, and the payout paperwork (pricing-v2 §5). This also decides which entity holds iyzico/PayTR.
+3. Merisa's hours (planned ~20 h/week).
+4. The dated Atilla actions in §7: YouTube phone verification (26 Oct), tutorials Public (2 Nov), tracking IDs (30 Nov).

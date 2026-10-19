@@ -4,7 +4,7 @@
 // break billing.
 //
 // Rules (Atilla, 2026-10-19):
-//  - Yearly: 25% of the customer's first yearly payment, net of KDV, after discounts; 30% when the partner already had
+//  - Yearly: 25% of the customer's first yearly payment, net of any KDV charged (none on Tamsar, Inc. sales), after discounts; 30% when the partner already had
 //    ≥ tierThreshold paying referred customers.
 //  - Aylık (monthly): fixed ₺1.500 on the customer's 2nd successful monthly payment.
 //  - Upgrade Aylık → yearly within 90 days of the first payment: yearly bounty minus the monthly bounty already earned.
@@ -12,7 +12,6 @@
 //  - Shopify-billed / review / admin / excluded customers: nothing (no partnerId on their UserAcquisition, or guarded).
 //  - Hold 30 days; refunds before payout void or reduce; after payout a negative reversal row nets the next payout.
 import prisma from '@/lib/prisma';
-import { logger } from '@/lib/logger';
 import { EXCLUSION_USER_SELECT, isExcluded } from './acquisition';
 
 const DAY_MS = 86_400_000;
@@ -22,8 +21,6 @@ export const YEAR_RATE = 0.25;
 export const YEAR_TIER_RATE = 0.3;
 export const MONTH_BOUNTY_MINOR = 150_000; // ₺1.500
 export const MONTH_BOUNTY_CURRENCY = 'try';
-/** Default KDV used only when a provider gives no tax figure on a "+KDV" price. */
-export const KDV_RATE = 0.2;
 
 export type PaymentProvider = 'stripe' | 'iyzico' | 'paytr';
 export type BountyKind = 'bounty_year' | 'bounty_month' | 'bounty_upgrade' | 'reversal';
@@ -57,10 +54,13 @@ export type BountyDecision =
 
 interface PriorPayment { interval: string; paidAt: Date }
 
-/** Net of KDV. Uses the provider's tax figure; falls back to gross / 1.20 for TRY ("+KDV" prices). */
-export function netOfTax(grossMinor: number, taxMinor: number | null, currency: string): { netMinor: number; estimated: boolean } {
+/**
+ * Net of KDV. Uses the provider's tax figure when there is one. Without one the payment carried no KDV: Tamsar, Inc.
+ * sells and adds none (founder, 2026-10-19), so the full amount is the net. `estimated` stays in the result for the
+ * day a "+KDV" seller (e.g. Modsons via iyzico / PayTR) passes its tax explicitly.
+ */
+export function netOfTax(grossMinor: number, taxMinor: number | null, _currency: string): { netMinor: number; estimated: boolean } {
   if (taxMinor != null && taxMinor > 0) return { netMinor: Math.max(0, grossMinor - taxMinor), estimated: false };
-  if (currency.toLowerCase() === 'try') return { netMinor: Math.round(grossMinor / (1 + KDV_RATE)), estimated: true };
   return { netMinor: grossMinor, estimated: false };
 }
 
@@ -124,8 +124,7 @@ export async function onPaymentSucceeded(p: PaymentSucceeded): Promise<Succeeded
   if (!partner) return { status: 'skipped', reason: 'not a partner referral' };
   if (await prisma.partnerPaymentEvent.findUnique({ where: { objectId: p.objectId }, select: { id: true } })) return { status: 'duplicate' };
 
-  const { netMinor, estimated } = netOfTax(p.grossMinor, p.taxMinor, p.currency);
-  if (estimated) logger.warn('Partner bounty: no tax amount, net estimated at 20% KDV', { provider: p.provider, objectId: p.objectId });
+  const { netMinor } = netOfTax(p.grossMinor, p.taxMinor, p.currency);
 
   const [prior, monthBounty, yearOrUpgrade, payingBefore] = await Promise.all([
     prisma.partnerPaymentEvent.findMany({ where: { userId: p.userId, paidAt: { lte: p.paidAt } }, orderBy: { paidAt: 'asc' }, select: { interval: true, paidAt: true } }),

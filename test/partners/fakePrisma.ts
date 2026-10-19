@@ -7,6 +7,11 @@ type Row = Record<string, any>;
 function matches(row: Row, where: Row | undefined): boolean {
   if (!where) return true;
   for (const [k, cond] of Object.entries(where)) {
+    // Compound unique key, e.g. { userId_module: { userId, module } }.
+    if (k.includes('_') && cond && typeof cond === 'object' && !(cond instanceof Date) && !Array.isArray(cond) && Object.keys(cond).every((f) => k.split('_').includes(f))) {
+      if (!matches(row, cond as Row)) return false;
+      continue;
+    }
     if (k === 'OR') { if (!(cond as Row[]).some((c) => matches(row, c))) return false; continue; }
     const v = row[k];
     if (cond !== null && typeof cond === 'object' && !(cond instanceof Date)) {
@@ -17,7 +22,8 @@ function matches(row: Row, where: Row | undefined): boolean {
         else if (op === 'lt' && !(v < (x as any))) return false;
         else if (op === 'gte' && !(v >= (x as any))) return false;
         else if (op === 'startsWith' && !(typeof v === 'string' && v.startsWith(x as string))) return false;
-        else if (!['in', 'not', 'lte', 'lt', 'gte', 'startsWith'].includes(op)) throw new Error(`fakePrisma: unsupported op ${op}`);
+        else if (op === 'notIn' && (x as unknown[]).includes(v)) return false;
+        else if (!['in', 'not', 'notIn', 'lte', 'lt', 'gte', 'startsWith'].includes(op)) throw new Error(`fakePrisma: unsupported op ${op}`);
       }
     } else if (v !== cond) return false;
   }
@@ -65,6 +71,14 @@ function table(name: string, uniques: string[] = []) {
     async count({ where }: Row = {}) { return rows.filter((x) => matches(x, where)).length; },
     async create({ data }: Row) { const row = { id: randomUUID(), createdAt: new Date(), ...data }; unique(row); rows.push(row); return { ...row }; },
     async update({ where, data }: Row) { const r = rows.find((x) => matches(x, where)); if (!r) throw new Error(`fakePrisma: ${name} not found`); Object.assign(r, data); return { ...r }; },
+    async upsert({ where, create, update }: Row) {
+      const r = rows.find((x) => matches(x, where));
+      if (r) { Object.assign(r, update); return { ...r }; }
+      const row = { id: randomUUID(), createdAt: new Date(), ...create };
+      unique(row);
+      rows.push(row);
+      return { ...row };
+    },
     async updateMany({ where, data }: Row) { const list = rows.filter((x) => matches(x, where)); list.forEach((r) => Object.assign(r, data)); return { count: list.length }; },
     async aggregate({ where, _sum }: Row) { const list = rows.filter((x) => matches(x, where)); const out: Row = {}; for (const k of Object.keys(_sum)) out[k] = list.length ? list.reduce((s, r) => s + (r[k] ?? 0), 0) : null; return { _sum: out }; },
     async groupBy({ by, where, _count }: Row) {
@@ -94,6 +108,7 @@ export function makeFakePrisma() {
     etsyShop: table('etsyShop'),
     shopifyShop: table('shopifyShop'),
     wixSite: table('wixSite'),
+    billingModule: table('billingModule'),
     async $transaction(ops: Promise<unknown>[]) { return Promise.all(ops); },
   };
   return db;

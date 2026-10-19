@@ -10,6 +10,9 @@ import { getAuthUser } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 import { checkoutSuccessUrl, checkoutCancelUrl } from '@/lib/billing/checkoutUrls';
 import { isPlayRequest } from '@/lib/billing/playClient';
+import { pricingV2Enabled } from '@/lib/billing/pricingV2';
+import { resolveV2PriceId, v2PlanInterval } from '@/lib/billing/stripeV2';
+import { isModuleKey } from '@/lib/billing/modules';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -40,24 +43,41 @@ export default async function handler(req, res) {
     });
   }
 
-  const { plan, interval, currency, expectFounding } = req.body as {
-    plan: PlanKey | 'kurumsal';
+  const { plan, interval: requestedInterval, currency, expectFounding, modules: requestedModules } = req.body as {
+    plan: PlanKey | 'kurumsal' | string;
     interval: 'month' | 'year';
     currency?: string;
     expectFounding?: boolean;
+    /** Pricing v2 only: { financials: 1, extraStore: 2, ... } */
+    modules?: Record<string, unknown>;
   };
 
   if (plan === 'kurumsal') {
     return res.status(400).json({ error: 'Kurumsal plan handled manually. Please contact sales.' });
   }
 
-  if (!plan || !interval || !Object.prototype.hasOwnProperty.call(STRIPE_PRICES, plan) || (interval !== 'month' && interval !== 'year')) {
+  // Pricing v2 (lib/billing/stripeV2.ts): only while PRICING_V2 is on. The plan fixes the interval (Aylık monthly,
+  // packages yearly); modules are extra line items at the same interval.
+  const v2Interval = pricingV2Enabled() ? v2PlanInterval(String(plan)) : null;
+  const interval = v2Interval ?? requestedInterval;
+
+  if (!v2Interval && (!plan || !interval || !Object.prototype.hasOwnProperty.call(STRIPE_PRICES, plan) || (interval !== 'month' && interval !== 'year'))) {
     return res.status(400).json({ error: 'Invalid plan or interval.' });
   }
 
+  const moduleItems: { price: string; quantity: number }[] = [];
   try {
     // Validate price configuration first
-    const priceId = priceIdFor(plan, interval, currency);
+    const priceId = v2Interval ? await resolveV2PriceId(String(plan), v2Interval) : priceIdFor(plan as PlanKey, interval, currency);
+    if (v2Interval && requestedModules && typeof requestedModules === 'object') {
+      for (const [key, raw] of Object.entries(requestedModules)) {
+        const qty = Number(raw);
+        if (!isModuleKey(key) || !Number.isInteger(qty) || qty < 1 || qty > 50) return res.status(400).json({ error: `Invalid module ${key}.` });
+        const modulePrice = await resolveV2PriceId(key, v2Interval);
+        if (!modulePrice) return res.status(400).json({ error: 'Price configuration missing for a module.' });
+        moduleItems.push({ price: modulePrice, quantity: qty });
+      }
+    }
     if (!priceId) {
       logger.error('Missing price ID for plan', undefined, { plan, interval });
       return res.status(400).json({ error: 'Price configuration missing for selected plan. Please check environment variables.' });
@@ -247,7 +267,7 @@ export default async function handler(req, res) {
         payment_method_types: ['card'],
         billing_address_collection: 'required',
         customer: stripeCustomerId,
-        line_items: [{ price: priceId, quantity: 1 }],
+        line_items: [{ price: priceId, quantity: 1 }, ...moduleItems],
         mode: 'subscription',
         subscription_data: {
           // Carry over what is left of the in-app trial instead of starting a new one.

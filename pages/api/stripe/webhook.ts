@@ -10,6 +10,7 @@ import { contextFromMetadata, sendServerEvent } from '@/lib/tracking/server';
 import { logBillingEvent, logSecurityEvent } from '@/lib/admin/events';
 import { fulfilStripeCreditSession } from '@/lib/billing/aiCreditsPurchase';
 import { attributePromoCheckout, attributePromoInvoice, bountyFromStripeInvoice, bountyFromStripeRefund } from '@/lib/partners/stripeBounty';
+import { subscriptionIdOfInvoice, syncSubscriptionFromStripe } from '@/lib/billing/stripeV2';
 
 /**
  * Upsert a WebhookEvent row with provider/eventType/status. Safe to call multiple times:
@@ -233,6 +234,13 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
               params: { plan: String(plan || ''), interval: String(interval) },
             }, contextFromMetadata(checkoutSession.metadata as Record<string, string>));
 
+            // Pricing v2 module items + v2 plan keys (lib/billing/stripeV2.ts). Errors are logged, never fatal.
+            try {
+              await syncSubscriptionFromStripe(user.id, subscription);
+            } catch (e) {
+              logger.warn('Subscription sync failed', { eventId: event.id, error: e instanceof Error ? e.message : String(e) });
+            }
+
             // Partner promo code typed at checkout (docs/gtm/referral-spec.md §2.4). Never affects billing.
             try {
               await attributePromoCheckout(checkoutSession, user.id);
@@ -288,6 +296,16 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
               event.type,
             );
             if (bountyUser) {
+              // The live endpoint gets no checkout.session.completed today, so the first paid invoice is where a new
+              // subscription's plan + modules are applied (lib/billing/stripeV2.ts).
+              const subId = subscriptionIdOfInvoice(invoice);
+              if (subId) {
+                try {
+                  await syncSubscriptionFromStripe(bountyUser.id, await stripe.subscriptions.retrieve(subId));
+                } catch (e) {
+                  logger.warn('Subscription sync failed', { eventId: event.id, error: e instanceof Error ? e.message : String(e) });
+                }
+              }
               await attributePromoInvoice(invoice, bountyUser.id);
               await bountyFromStripeInvoice(invoice, bountyUser.id);
             }
@@ -366,6 +384,14 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
             where: { id: user.id },
             data: updateData,
           });
+          // Plan changes in the portal and module add / remove (lib/billing/stripeV2.ts). Never fatal.
+          if (updatedSubscription.status !== 'canceled') {
+            try {
+              await syncSubscriptionFromStripe(user.id, updatedSubscription);
+            } catch (e) {
+              logger.warn('Subscription sync failed', { eventId: event.id, error: e instanceof Error ? e.message : String(e) });
+            }
+          }
           break;
         }
         case 'customer.subscription.deleted': {

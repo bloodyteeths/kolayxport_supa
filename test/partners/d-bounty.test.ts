@@ -35,10 +35,16 @@ const bounties = () => h.db.partnerCommission.rows;
 beforeEach(() => { h.db = makeFakePrisma(); });
 
 describe('netOfTax', () => {
-  it('uses the provider tax, else splits a TRY "+KDV" price at 20%, else keeps the gross', () => {
+  it('uses the provider tax; without one the payment carried no KDV (Tamsar, Inc. adds none), so net = gross', () => {
     expect(netOfTax(6_598_800, 1_099_800, 'try')).toEqual({ netMinor: 5_499_000, estimated: false });
-    expect(netOfTax(120_000, null, 'try')).toEqual({ netMinor: 100_000, estimated: true });
+    expect(netOfTax(5_499_000, null, 'try')).toEqual({ netMinor: 5_499_000, estimated: false });
     expect(netOfTax(5_000, null, 'usd')).toEqual({ netMinor: 5_000, estimated: false });
+  });
+
+  it('a Büyüme yıllık payment of ₺54.990 with no KDV earns 25% of the full amount', async () => {
+    const { userId } = await seed();
+    await year(userId, 'in_nokdv', T0, 5_499_000, null);
+    expect(bounties()[0]).toMatchObject({ netMinor: 5_499_000, commissionMinor: 1_374_750, taxMinor: 0 });
   });
 });
 

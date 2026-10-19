@@ -5,6 +5,7 @@ import type Stripe from 'stripe';
 import prisma from '@/lib/prisma';
 import { stripe } from '@/lib/stripe';
 import { planFromPriceId, priceIdOfLine } from '@/lib/billing/stripeAccountServer';
+import { v2ItemFromPriceId } from '@/lib/billing/stripeV2';
 import { partnerAllowedFor, recordAcquisition } from './acquisition';
 import { onPaymentRefunded, onPaymentSucceeded, type RefundedResult, type SucceededResult } from './bounty';
 
@@ -19,18 +20,25 @@ export function invoiceTaxMinor(invoice: Stripe.Invoice): number | null {
 }
 
 /** The plan line of an invoice (a KolayXport plan price). Modules, credit packs and unknown prices return null. */
-export function planOfInvoice(invoice: Stripe.Invoice): { plan: string; interval: 'month' | 'year' } | null {
+export async function planOfInvoice(invoice: Stripe.Invoice): Promise<{ plan: string; interval: 'month' | 'year' } | null> {
   for (const line of invoice.lines?.data ?? []) {
     if ((line.amount ?? 0) <= 0) continue; // proration credits
-    const hit = planFromPriceId(priceIdOfLine(line));
+    const priceId = priceIdOfLine(line);
+    const hit = planFromPriceId(priceId);
     if (hit) return hit;
+    try {
+      const v2 = await v2ItemFromPriceId(priceId);
+      if (v2?.kind === 'plan') return { plan: v2.key, interval: v2.interval };
+    } catch {
+      /* price lookup unavailable: treat as not a plan line */
+    }
   }
   return null;
 }
 
 export async function bountyFromStripeInvoice(invoice: Stripe.Invoice, userId: string): Promise<SucceededResult | { status: 'skipped'; reason: string }> {
   if (!invoice.id || (invoice.amount_paid ?? 0) <= 0) return { status: 'skipped', reason: 'nothing paid' };
-  const plan = planOfInvoice(invoice);
+  const plan = await planOfInvoice(invoice);
   if (!plan) return { status: 'skipped', reason: 'not a plan payment' };
   const paidSec = invoice.status_transitions?.paid_at || invoice.created;
   return onPaymentSucceeded({

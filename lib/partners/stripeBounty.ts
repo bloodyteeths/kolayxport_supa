@@ -63,27 +63,11 @@ export async function bountyFromStripeRefund(charge: Stripe.Charge): Promise<Ref
   return onPaymentRefunded({ provider: 'stripe', objectId: invoiceId, refundedMinor: charge.amount_refunded ?? 0, totalMinor: charge.amount ?? 0 });
 }
 
-/**
- * §2.4: a partner promo code typed at checkout attributes the customer when no link did (first touch wins).
- * Never re-points an existing partnerId; excluded accounts are handled by recordAcquisition's rules.
- */
-export async function attributePromoCheckout(session: Stripe.Checkout.Session, userId: string): Promise<'attributed' | 'kept' | 'none'> {
-  let promoIds = (session.discounts ?? [])
-    .map((d) => (typeof d.promotion_code === 'string' ? d.promotion_code : d.promotion_code?.id))
-    .filter((v): v is string => !!v);
-  if (!promoIds.length && (session.total_details?.amount_discount ?? 0) > 0) {
-    const full = await stripe.checkout.sessions.retrieve(session.id, { expand: ['total_details.breakdown.discounts.discount.promotion_code'] });
-    promoIds = (full.total_details?.breakdown?.discounts ?? [])
-      .map((d) => {
-        const pc = (d.discount as unknown as { promotion_code?: string | { id: string } | null }).promotion_code;
-        return typeof pc === 'string' ? pc : pc?.id;
-      })
-      .filter((v): v is string => !!v);
-  }
+/** Attach a promo-code partner to a customer that no link attributed (first touch wins). */
+async function attributePromoIds(promoIds: string[], userId: string): Promise<'attributed' | 'kept' | 'none'> {
   if (!promoIds.length) return 'none';
   const partner = await prisma.partner.findFirst({ where: { stripePromotionCode: { in: promoIds }, status: 'active' }, select: { id: true, code: true } });
   if (!partner) return 'none';
-
   const existing = await prisma.userAcquisition.findUnique({ where: { userId }, select: { partnerId: true, refCode: true } });
   if (!existing) {
     const r = await recordAcquisition(userId, { body: { ref: partner.code }, via: 'promo' });
@@ -94,4 +78,37 @@ export async function attributePromoCheckout(session: Stripe.Checkout.Session, u
   if (!(await partnerAllowedFor(userId, partner.id))) return 'none';
   await prisma.userAcquisition.update({ where: { userId }, data: { partnerId: partner.id, refCode: existing.refCode ?? partner.code } });
   return 'attributed';
+}
+
+const promoIdOf = (pc: unknown): string | undefined =>
+  typeof pc === 'string' ? pc : pc && typeof pc === 'object' && typeof (pc as { id?: unknown }).id === 'string' ? (pc as { id: string }).id : undefined;
+
+/**
+ * §2.4 at checkout (checkout.session.completed). The live KolayXport webhook endpoint is not subscribed to that event
+ * today, so attributePromoInvoice below is what actually runs; this stays for when it is.
+ */
+export async function attributePromoCheckout(session: Stripe.Checkout.Session, userId: string): Promise<'attributed' | 'kept' | 'none'> {
+  let promoIds = (session.discounts ?? []).map((d) => promoIdOf(d.promotion_code)).filter((v): v is string => !!v);
+  if (!promoIds.length && (session.total_details?.amount_discount ?? 0) > 0) {
+    const full = await stripe.checkout.sessions.retrieve(session.id, { expand: ['total_details.breakdown.discounts.discount.promotion_code'] });
+    promoIds = (full.total_details?.breakdown?.discounts ?? [])
+      .map((d) => promoIdOf((d.discount as unknown as { promotion_code?: unknown }).promotion_code))
+      .filter((v): v is string => !!v);
+  }
+  return attributePromoIds(promoIds, userId);
+}
+
+/** §2.4 from the paid invoice (invoice.payment_succeeded): runs before the bounty so a promo customer earns it. */
+export async function attributePromoInvoice(invoice: Stripe.Invoice, userId: string): Promise<'attributed' | 'kept' | 'none'> {
+  const raw = invoice.discounts ?? [];
+  if (!raw.length) return 'none';
+  let discounts = raw;
+  if (raw.some((d) => typeof d === 'string') && invoice.id) {
+    const full = await stripe.invoices.retrieve(invoice.id, { expand: ['discounts'] });
+    discounts = full.discounts ?? [];
+  }
+  const promoIds = discounts
+    .map((d) => (typeof d === 'object' && d && 'promotion_code' in d ? promoIdOf((d as { promotion_code?: unknown }).promotion_code) : undefined))
+    .filter((v): v is string => !!v);
+  return attributePromoIds(promoIds, userId);
 }

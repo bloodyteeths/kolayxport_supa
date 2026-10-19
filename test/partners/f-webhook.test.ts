@@ -11,6 +11,7 @@ const h = vi.hoisted(() => ({
   bountyInvoice: vi.fn(),
   bountyRefund: vi.fn(),
   promo: vi.fn(),
+  promoInvoice: vi.fn(),
 }));
 
 vi.mock('micro', () => ({ buffer: vi.fn(async () => Buffer.from('{}')) }));
@@ -34,6 +35,7 @@ vi.mock('@/lib/partners/stripeBounty', () => ({
   bountyFromStripeInvoice: (...a: unknown[]) => h.bountyInvoice(...a),
   bountyFromStripeRefund: (...a: unknown[]) => h.bountyRefund(...a),
   attributePromoCheckout: (...a: unknown[]) => h.promo(...a),
+  attributePromoInvoice: (...a: unknown[]) => h.promoInvoice(...a),
 }));
 
 import handler from '@/pages/api/stripe/webhook';
@@ -73,6 +75,7 @@ describe('Stripe webhook partner hooks', () => {
     const res = await run();
     expect(res.statusCode).toBe(200);
     expect(h.bountyInvoice).toHaveBeenCalledTimes(1);
+    expect(h.promoInvoice.mock.invocationCallOrder[0]).toBeLessThan(h.bountyInvoice.mock.invocationCallOrder[0]);
   });
 
   it('charge.refunded reaches the refund hook; a throw still answers 200', async () => {

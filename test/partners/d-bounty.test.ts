@@ -198,3 +198,20 @@ describe('decideBounty edge cases', () => {
     expect(d).toMatchObject({ kind: 'bounty_upgrade', amountMinor: 250_000 });
   });
 });
+
+describe('§2.4 promo code on the paid invoice', () => {
+  it('attributes an organic customer to the promo partner, then the bounty follows; a link partner is kept', async () => {
+    const { attributePromoInvoice } = await import('@/lib/partners/stripeBounty');
+    await h.db.partner.create({ data: { id: 'pp', code: 'PROMO10', name: 'Promo', type: 'youtube', status: 'active', email: 'promo@partner.test', tierThreshold: 10, stripePromotionCode: 'promo_1', userId: null } });
+    await h.db.user.create({ data: { id: 'organic', email: 'organic@example.com', role: 'user', billingProvider: 'stripe', subscriptionPlan: 'trial', shopifyShops: [] } });
+    await h.db.userAcquisition.create({ data: { userId: 'organic', partnerId: null, refCode: null } });
+    const invoice = { id: 'in_p', discounts: [{ id: 'di_1', promotion_code: 'promo_1' }] } as any;
+    expect(await attributePromoInvoice(invoice, 'organic')).toBe('attributed');
+    expect(h.db.userAcquisition.rows.find((r) => r.userId === 'organic')).toMatchObject({ partnerId: 'pp', refCode: 'PROMO10' });
+    expect(await year('organic', 'in_p', T0)).toMatchObject({ kind: 'bounty_year' });
+
+    const { userId } = await seed();
+    expect(await attributePromoInvoice(invoice, userId)).toBe('kept');
+    expect(h.db.userAcquisition.rows.find((r) => r.userId === userId)!.partnerId).toBe('p1');
+  });
+});

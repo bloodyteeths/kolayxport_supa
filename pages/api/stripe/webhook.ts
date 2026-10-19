@@ -9,7 +9,7 @@ import { logger } from '@/lib/logger';
 import { contextFromMetadata, sendServerEvent } from '@/lib/tracking/server';
 import { logBillingEvent, logSecurityEvent } from '@/lib/admin/events';
 import { fulfilStripeCreditSession } from '@/lib/billing/aiCreditsPurchase';
-import { attributePromoCheckout, bountyFromStripeInvoice, bountyFromStripeRefund } from '@/lib/partners/stripeBounty';
+import { attributePromoCheckout, attributePromoInvoice, bountyFromStripeInvoice, bountyFromStripeRefund } from '@/lib/partners/stripeBounty';
 
 /**
  * Upsert a WebhookEvent row with provider/eventType/status. Safe to call multiple times:
@@ -287,7 +287,10 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
               event.id,
               event.type,
             );
-            if (bountyUser) await bountyFromStripeInvoice(invoice, bountyUser.id);
+            if (bountyUser) {
+              await attributePromoInvoice(invoice, bountyUser.id);
+              await bountyFromStripeInvoice(invoice, bountyUser.id);
+            }
           } catch (e) {
             logger.warn('Partner bounty failed', { eventId: event.id, error: e instanceof Error ? e.message : String(e) });
           }

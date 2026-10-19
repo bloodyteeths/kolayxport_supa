@@ -15,7 +15,17 @@ import { appleClientSecret, appleConfigured } from '@/lib/auth/appleSecret';
 // PrismaAdapter is only needed for OAuth (Google) to auto-create User + Account records.
 // We wrap it to prevent it from interfering with CredentialsProvider sign-in,
 // which is a known NextAuth issue when combining adapter + credentials + JWT strategy.
-const prismaAdapter = PrismaAdapter(prisma);
+const baseAdapter = PrismaAdapter(prisma);
+// User.id has no DB default (our signup generates a uuid), so the stock adapter's createUser failed with
+// "Argument `id` is missing" and every first Google/Apple sign-in bounced back to /login.
+// The provider has verified the email, so it counts as verified here.
+const prismaAdapter = {
+  ...baseAdapter,
+  createUser: ({ id: _ignored, ...data }: any) =>
+    prisma.user.create({
+      data: { ...data, id: crypto.randomUUID(), emailVerified: data.emailVerified ?? new Date() },
+    }),
+};
 
 /** Claim that marks a JWT as an extension Bearer token. */
 const EXTENSION_TOKEN_CLAIM = 'kx_ext';

@@ -72,6 +72,6 @@ It suits sellers who sell internationally on Amazon and pack those orders alongs
 
 - No Amazon listing creation or editing.
 - Nothing is written to Amazon stock.
-- Product research in the app doesn't cover Amazon; the Chrome extension only shows estimates read from Amazon pages, and it isn't on the Chrome Web Store yet.
+- Product research in the app doesn't cover Amazon; the Chrome extension only shows estimates read from Amazon pages.
 - Because of Amazon's permission scope, some orders may lack product images or buyer details.
 - Messages to buyers are one-way; replies can't be read.

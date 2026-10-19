@@ -5,17 +5,17 @@ description: >-
   Etsy'ye gönderin.
 h1: Etsy ilanınızı yapay zekâyla iyileştirin
 keyword: etsy başlık ve etiket optimizasyonu
-updated: '2026-10-17'
+updated: '2026-10-18'
 inventoryRefs:
   - ai-listing-copy
   - etsy-listing-editor
   - staged-drafts-send
 draft: false
 order: 2
-duration: PT1M14S
+duration: PT1M11S
 video:
   file: ai-ilan-optimizasyonu
-  youtubeId: 0lUVhwLfATE
+  youtubeId: VlDAzTUXLJE
   uploadDate: '2026-10-17'
 steps:
   - name: İlanı açın

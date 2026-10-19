@@ -50,7 +50,7 @@ capabilities:
     ref: research-keywords
   - label: "Extension overlay"
     status: "partial"
-    note: "Works on Etsy pages; the extension isn't on the Chrome Web Store yet"
+    note: "Works on Etsy pages; install it from the Chrome Web Store"
     ref: ext-etsy-research
 faq:
   - q: "Can I connect more than one Etsy shop?"
@@ -58,7 +58,7 @@ faq:
   - q: "Does an edit change Etsy right away?"
     a: "No. Changes stay as drafts and go to Etsy when you press Send or at the time you schedule. If the listing changed on Etsy in the meantime, the send stops."
   - q: "Why are addresses missing on Etsy orders?"
-    a: "Etsy's API doesn't share the buyer's address or email. The Chrome extension brings in the full address. The extension isn't on the Chrome Web Store yet; our support team can send you the current version."
+    a: "Etsy's API doesn't share the buyer's address or email. The Chrome extension brings in the full address. Install it from the Chrome Web Store."
   - q: "Can I reply to Etsy messages?"
     a: "Not right now. The inbox covers Trendyol customer questions and Wix chats only."
 ---
@@ -77,7 +77,7 @@ Orders land in the same list as your other channels, and you print international
 
 ## Limits
 
-- Etsy's API doesn't provide buyer addresses or emails; these, and pushing tracking numbers to Etsy, depend on the Chrome extension, which isn't on the Chrome Web Store yet.
+- Etsy's API doesn't provide buyer addresses or emails; these, and pushing tracking numbers to Etsy, depend on the KolayXport Chrome extension.
 - Etsy messages aren't in the app.
 - Etsy's own shipping labels (Etsy Postage) aren't supported.
 - Stock sync is in beta and stays off until you complete the wizard and go live.

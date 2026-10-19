@@ -5,12 +5,12 @@ description: >-
   kelimeleri bulun.
 h1: Etsy için anahtar kelime araştırması yapın
 keyword: etsy anahtar kelime araştırması
-updated: '2026-10-17'
+updated: '2026-10-18'
 inventoryRefs:
   - research-keywords
 draft: false
 order: 5
-duration: PT1M13S
+duration: PT1M9S
 video:
   file: anahtar-kelime-arastirmasi
   youtubeId: POX-IWeXD3o

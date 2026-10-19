@@ -35,7 +35,7 @@ rows:
   - feature: "Browser extension"
     us: "partial"
     them: "yes"
-    note: "The KolayXport extension isn't published on the Chrome Web Store yet."
+    note: "The KolayXport extension is on the Chrome Web Store."
   - feature: "Edit the listing on Etsy directly (single and bulk)"
     us: "yes"
     them: "no"

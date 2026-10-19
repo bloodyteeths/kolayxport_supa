@@ -5,14 +5,14 @@ description: >-
   kârı izleyin. Pro planda.
 h1: Gerçek kârınızı kâr raporunda görün
 keyword: etsy kar hesaplama
-updated: '2026-10-17'
+updated: '2026-10-18'
 inventoryRefs:
   - reports-profit
   - finance-auto-sync
   - reports-sales
 draft: false
 order: 10
-duration: PT1M17S
+duration: PT1M13S
 video:
   file: kar-raporu
   youtubeId: z5t8k9EENwI

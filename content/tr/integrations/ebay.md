@@ -48,7 +48,7 @@ capabilities:
     ref: research-keywords
   - label: "Eklenti katmanı"
     status: "partial"
-    note: "7 eBay alan adında çalışır; eklenti henüz Chrome Web Mağazası'nda değil"
+    note: "7 eBay alan adında çalışır; Chrome Web Mağazası'ndan kurulur"
     ref: ext-ebay-amazon-research
 faq:
   - q: "Seller Hub'da açtığım ilanları neden düzenleyemiyorum?"

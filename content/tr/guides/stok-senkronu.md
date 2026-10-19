@@ -5,13 +5,13 @@ description: >-
   görün, sonra canlıya alın.
 h1: Stoğunuzu mağazalar arasında senkron tutun
 keyword: etsy trendyol stok senkronizasyonu
-updated: '2026-10-17'
+updated: '2026-10-18'
 inventoryRefs:
   - stock-sync
   - stock-sku-matching
 draft: false
 order: 9
-duration: PT1M24S
+duration: PT1M20S
 video:
   file: stok-senkronu
   youtubeId: ''

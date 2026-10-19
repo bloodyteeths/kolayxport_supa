@@ -5,7 +5,7 @@ description: >-
   bağlıysa e-Arşiv için ne olduğunu öğrenin.
 h1: ETGB dosyasını gümrük müşavirinize gönderin
 keyword: etgb nasıl hazırlanır
-updated: '2026-10-17'
+updated: '2026-10-18'
 inventoryRefs:
   - etgb-excel-email
   - sender-profile
@@ -13,7 +13,7 @@ inventoryRefs:
   - parasut-einvoice
 draft: false
 order: 8
-duration: PT1M17S
+duration: PT1M13S
 video:
   file: etgb-ve-e-arsiv
   youtubeId: U1ns-AKE9pw

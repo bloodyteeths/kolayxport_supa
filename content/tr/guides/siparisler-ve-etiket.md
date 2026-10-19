@@ -5,7 +5,7 @@ description: >-
   etiketini panelden oluşturun.
 h1: 'Siparişleri görün, FedEx/UPS etiketi basın'
 keyword: fedex ups kargo etiketi oluşturma
-updated: '2026-10-17'
+updated: '2026-10-18'
 inventoryRefs:
   - orders-unified-list
   - label-fedex
@@ -14,7 +14,7 @@ inventoryRefs:
   - customs-commercial-invoice
 draft: false
 order: 7
-duration: PT1M29S
+duration: PT1M24S
 video:
   file: siparisler-ve-etiket
   youtubeId: dJJ7ApyrI7E

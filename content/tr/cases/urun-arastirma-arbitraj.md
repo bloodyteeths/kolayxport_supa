@@ -39,7 +39,7 @@ faq:
   - q: "Amazon'da ürün araştırması yapabilir miyim?"
     a: "Panelde Amazon araştırması şu an yok. Chrome eklentimiz Amazon sayfalarında satış, sıralama ve rekabet için tahmini değerler gösteriyor; bunlar sayfadan okunan tahminlerdir, resmi veri değildir."
   - q: "Chrome eklentisini nereden kurarım?"
-    a: "Eklenti henüz Chrome Web Mağazası'nda yok. Güncel sürümü destek ekibimizden alabilirsiniz. Araştırma ekranı eklenti olmadan da çalışır."
+    a: "KolayXport eklentisini Chrome Web Mağazası'ndan kurabilirsiniz. Araştırma ekranı eklenti olmadan da çalışır."
   - q: "Rakip mağaza takibinde bildirim alıyor muyum?"
     a: "Mağazalar günlük olarak kaydedilir. Bazı uyarı türleri henüz açılmadı; ekranda 'yakında' olarak görünenler bunlardır. İzleyebileceğiniz mağaza sayısı sınırlıdır."
   - q: "Arbitraj tablosundaki her ürün kârlı mı?"
@@ -72,7 +72,6 @@ Araştırma tek başına bir işe yaramaz; bulduğunuz bilgiyi ilana dökmeniz g
 ## Neyi yapmıyoruz
 
 - Panelde Amazon araştırması yok; eklentinin Amazon sayfalarında gösterdiği değerler tahmindir.
-- Chrome eklentisi henüz Chrome Web Mağazası'nda değil.
 - Arbitraj tablosu kâr hesabı yapmaz; kargo, komisyon ve gümrük maliyetini siz eklersiniz.
 - Rakip takibinde bazı uyarılar henüz açılmadı ve izlenebilecek mağaza sayısı sınırlı.
 - Etsy araştırmaları Etsy'nin günlük API kotasını paylaşır.

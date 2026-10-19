@@ -1,7 +1,7 @@
 slug: chrome-eklentisi
 order: 12
 title: "KolayXport Chrome eklentisi ne işe yarar?"
-description: "Chrome eklentisi Etsy alıcı adreslerini aktarır, takip numarasını Etsy'ye girer, Etsy sayfalarına araştırma ekler. Henüz Web Mağazası'nda yok."
+description: "Chrome eklentisi Etsy alıcı adreslerini aktarır, takip numarasını Etsy'ye girer; Etsy, eBay, Amazon, Trendyol ve Hepsiburada sayfalarına satış ve fiyat bilgisi ekler. Chrome Web Mağazası'ndan kurulur."
 keyword: "etsy chrome eklentisi"
 inventoryRefs: [ext-etsy-address, ext-etsy-tracking, ext-etsy-research, tracking-push-etsy, help-getting-started]
 tags: [chrome eklentisi, etsy, etsy adres, etsy takip numarası]
@@ -18,7 +18,7 @@ steps:
       - hover: { text: "Etsy adresleri için eklentiyi kurun" }
     zoom: { text: "Etsy adresleri için eklentiyi kurun", scale: 1.4 }
   - title: "Neden gerekli?"
-    say: "Etsy, alıcının teslimat adresini API ile paylaşmıyor. Etsy bağlantınızda da bu uyarıyı görürsünüz."
+    say: "Etsy, alıcının teslimat adresini API ile paylaşmıyor. Etsy bağlantınızda da bu uyarıyı görürsünüz. Bu yüzden alıcı adresleri ve takip numarası için eklenti gerekir."
     do:
       - click: { testid: nav-item-settings }
       - click: { testid: settings-nav-connections }
@@ -27,7 +27,7 @@ steps:
       - hover: { text: "Etsy API Kısıtlaması" }
     zoom: { text: "Etsy API Kısıtlaması", scale: 1.5 }
   - title: "Alıcı adreslerini aktarır"
-    say: "Eklenti kuruluyken Etsy'deki siparişler sayfanızı açtığınızda, alıcı adresleri KolayXport'a aktarılır. Böylece etiket için adresi elle yazmazsınız."
+    say: "Eklenti kuruluyken Etsy'deki siparişler sayfanızı açtığınızda, alıcı adresleri KolayXport'a aktarılır. Böylece etiket için adresi elle yazmazsınız. Adres siparişin içine kaydedilir ve kargo etiketinde kendiliğinden kullanılır."
     do:
       - click: { testid: action-etsy-close }
       - click: { testid: nav-item-orders }
@@ -39,13 +39,13 @@ steps:
     do:
       - hover: { text: "Takip gönderildi ✓" }
     zoom: { text: "Takip gönderildi ✓", scale: 1.6 }
-  - title: "Etsy sayfalarında araştırma"
-    say: "Eklenti ayrıca Etsy'deki arama, ilan ve mağaza sayfalarına araştırma bilgileri ekler."
+  - title: "Pazaryeri sayfalarında araştırma"
+    say: "Eklenti ayrıca Etsy, eBay, Amazon, Trendyol ve Hepsiburada'daki arama, ürün ve mağaza sayfalarına satış ve fiyat bilgisi ekler."
     do:
       - scroll: 500
       - hover: { testid: nav-item-orders }
-  - title: "Kurulum durumu"
-    say: "Eklenti henüz Chrome Web Mağazası'nda yayında değil. Şimdilik kurulum için destek ekibimize yazmanız gerekiyor. Eklenti olmadan da siparişleriniz gelir; yalnızca Etsy adresleri ve takip numarası gönderimi eksik kalır."
+  - title: "Kurulum"
+    say: "Eklentiyi Chrome Web Mağazası'ndan kurabilirsiniz; mağazada KolayXport diye aratmanız yeterli. Eklenti olmadan da siparişleriniz gelir; yalnızca Etsy adresleri ve takip numarası gönderimi eksik kalır."
     do:
       - click: { testid: nav-item-help }
       - waitFor: { text: "Etsy adresleri için eklentiyi kurun" }

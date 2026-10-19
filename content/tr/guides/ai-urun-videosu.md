@@ -15,7 +15,7 @@ order: 13
 duration: PT1M32S
 video:
   file: ai-urun-videosu
-  youtubeId: ''
+  youtubeId: gEBx1ZXj6ZY
 steps:
   - name: Video stüdyosunu açın
     text: Sol menüden Video stüdyosu'na tıklayın.

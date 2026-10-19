@@ -5,17 +5,17 @@ description: >-
   hepsini birlikte gönderin.
 h1: Etsy ilanlarını toplu düzenleyin
 keyword: etsy toplu ilan düzenleme
-updated: '2026-10-17'
+updated: '2026-10-18'
 inventoryRefs:
   - etsy-bulk-editor
   - ai-bulk-optimize
   - staged-drafts-send
 draft: false
 order: 3
-duration: PT1M16S
+duration: PT1M13S
 video:
   file: toplu-duzenleme
-  youtubeId: ''
+  youtubeId: JbFB3KyholY
 steps:
   - name: Toplu düzenlemeyi açın
     text: Etsy ilanları sayfasında sağ üstteki Toplu düzenle'ye tıklayın. İlanlarınız düzenlenebilir bir tabloda açılır.

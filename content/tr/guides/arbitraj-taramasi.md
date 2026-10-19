@@ -5,13 +5,13 @@ description: >-
   ürünleri bulun. Pro planda.
 h1: Trendyol–eBay fiyat farkını bulun
 keyword: trendyol ebay fiyat farkı
-updated: '2026-10-17'
+updated: '2026-10-18'
 inventoryRefs:
   - arbitrage-price-gap
   - research-product-finder
 draft: false
 order: 6
-duration: PT1M20S
+duration: PT1M17S
 video:
   file: arbitraj-taramasi
   youtubeId: vMZIW3NYkJA

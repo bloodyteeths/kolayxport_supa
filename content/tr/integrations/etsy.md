@@ -50,7 +50,7 @@ capabilities:
     ref: research-keywords
   - label: "Eklenti katmanı"
     status: "partial"
-    note: "Etsy sayfalarında çalışır; eklenti henüz Chrome Web Mağazası'nda değil"
+    note: "Etsy sayfalarında çalışır; Chrome Web Mağazası'ndan kurulur"
     ref: ext-etsy-research
 faq:
   - q: "Birden fazla Etsy mağazamı bağlayabilir miyim?"
@@ -58,7 +58,7 @@ faq:
   - q: "Düzenlediğim ilan hemen Etsy'de değişir mi?"
     a: "Hayır. Değişiklikler önce taslakta kalır; 'Gönder'e bastığınızda ya da planladığınız saatte Etsy'ye gider. İlan bu arada Etsy'de değiştiyse gönderim durur."
   - q: "Etsy siparişlerinde adres neden eksik?"
-    a: "Etsy API'si alıcı adresini ve e-postasını paylaşmıyor. Tam adres Chrome eklentisiyle aktarılır. Eklenti henüz Chrome Web Mağazası'nda yok; güncel sürümü destek ekibimizden alabilirsiniz."
+    a: "Etsy API'si alıcı adresini ve e-postasını paylaşmıyor. Tam adres Chrome eklentisiyle aktarılır. Eklentiyi Chrome Web Mağazası'ndan kurabilirsiniz."
   - q: "Etsy mesajlarını yanıtlayabilir miyim?"
     a: "Şu an hayır. Mesaj kutusu yalnızca Trendyol müşteri sorularını ve Wix sohbetlerini kapsıyor."
 ---
@@ -77,7 +77,7 @@ Siparişler diğer kanallarınızla aynı listeye gelir. Kendi FedEx veya UPS he
 
 ## Sınırlar
 
-- Etsy API'si alıcı adresi ve e-postasını vermez; bunlar ve Etsy'ye takip numarası aktarımı Chrome eklentisine bağlıdır. Eklenti henüz Chrome Web Mağazası'nda yok.
+- Etsy API'si alıcı adresi ve e-postasını vermez; bunlar ve Etsy'ye takip numarası aktarımı KolayXport Chrome eklentisine bağlıdır.
 - Etsy mesajları panelde yok.
 - Etsy'nin kendi kargo etiketi (Etsy Postage) desteklenmiyor.
 - Stok senkronu beta aşamasında ve siz sihirbazı tamamlayıp canlıya alana kadar kapalıdır.

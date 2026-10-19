@@ -16182,7 +16182,7 @@
       },
       "extension": {
         "title": "Install the extension for Etsy addresses",
-        "body": "Etsy does not share buyer addresses through its API. The KolayXport Chrome extension is not on the Chrome Web Store yet; ask destek@kolayxport.com for the install file. With the extension on, open your Orders page on Etsy and the addresses import in one go.",
+        "body": "Etsy does not share buyer addresses through its API. Install the KolayXport Chrome extension from the Chrome Web Store. With the extension on, open your Orders page on Etsy and the addresses import in one go.",
         "action": "See the extension in Connections"
       },
       "listings": {

@@ -16,7 +16,7 @@ order: 15
 duration: PT1M48S
 video:
   file: ebay-ilan-olusturma
-  youtubeId: ''
+  youtubeId: oT9AunoAyi0
 steps:
   - name: Ürün fotoğrafınızı ekleyin
     text: 'eBay › Yeni ilan sayfasında önce ürün fotoğrafınızı ekleyin. İlk fotoğraf, ilanın ana fotoğrafı olur.'

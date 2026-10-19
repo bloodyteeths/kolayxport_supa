@@ -16,7 +16,7 @@ order: 14
 duration: PT1M35S
 video:
   file: etsy-ilan-olusturma
-  youtubeId: ''
+  youtubeId: '-kwciQziesA'
 steps:
   - name: Ürün fotoğrafınızı ekleyin
     text: 'Etsy › Yeni ilan sayfasında önce ürün fotoğrafınızı ekleyin. İlk fotoğraf, ilanın ana fotoğrafı olur.'

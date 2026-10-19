@@ -48,7 +48,7 @@ capabilities:
     ref: research-keywords
   - label: "Extension overlay"
     status: "partial"
-    note: "Works on 7 eBay domains; the extension isn't on the Chrome Web Store yet"
+    note: "Works on 7 eBay domains; install it from the Chrome Web Store"
     ref: ext-ebay-amazon-research
 faq:
   - q: "Why can't I edit listings I created in Seller Hub?"

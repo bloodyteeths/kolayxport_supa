@@ -16182,7 +16182,7 @@
       },
       "extension": {
         "title": "Etsy adresleri için eklentiyi kurun",
-        "body": "Etsy alıcı adresini API ile vermez. KolayXport Chrome eklentisi henüz Chrome Web Mağazası'nda değil; kurulum dosyasını destek@kolayxport.com'dan isteyin. Eklenti açıkken Etsy'de Siparişler sayfasını açın: adresler toplu aktarılır.",
+        "body": "Etsy alıcı adresini API ile vermez. KolayXport Chrome eklentisini Chrome Web Mağazası'ndan kurun. Eklenti açıkken Etsy'de Siparişler sayfasını açın: adresler toplu aktarılır.",
         "action": "Bağlantılarda eklentiyi gör"
       },
       "listings": {

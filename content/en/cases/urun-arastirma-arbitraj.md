@@ -39,7 +39,7 @@ faq:
   - q: "Can I research Amazon products?"
     a: "There's no Amazon research in the app right now. Our Chrome extension shows estimated sales, rank and competition on Amazon pages; these are estimates read from the page, not official data."
   - q: "Where do I install the Chrome extension?"
-    a: "The extension isn't on the Chrome Web Store yet. Our support team can send you the current version. Research in the app works without the extension."
+    a: "From the Chrome Web Store: search for KolayXport. Research in the app works without the extension."
   - q: "Do I get alerts from the shop tracker?"
     a: "Shops are recorded daily. Some alert types aren't switched on yet; those are the ones marked 'coming soon' on screen. The number of shops you can watch is limited."
   - q: "Is every product in the arbitrage table profitable?"
@@ -72,7 +72,6 @@ Research on its own doesn't do much; you need to turn what you learn into a list
 ## What we don't do
 
 - No Amazon research in the app; the numbers the extension shows on Amazon pages are estimates.
-- The Chrome extension isn't on the Chrome Web Store yet.
 - The arbitrage table doesn't calculate profit; you add shipping, fees and duties.
 - Some shop tracker alerts aren't on yet, and the number of watched shops is limited.
 - Etsy research shares Etsy's daily API quota.

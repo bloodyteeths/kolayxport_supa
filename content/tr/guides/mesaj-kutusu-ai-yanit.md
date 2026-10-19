@@ -5,13 +5,13 @@ description: >-
   taslağı alın.
 h1: Mesajları yapay zekâ taslağıyla yanıtlayın
 keyword: trendyol müşteri sorularını yanıtlama
-updated: '2026-10-17'
+updated: '2026-10-18'
 inventoryRefs:
   - inbox-unified
   - ai-message-draft
 draft: false
 order: 11
-duration: PT1M11S
+duration: PT1M7S
 video:
   file: mesaj-kutusu-ai-yanit
   youtubeId: VNM6NTX4XcA

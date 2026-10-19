@@ -72,6 +72,6 @@ Amazon'da yurt dışına satan ve siparişlerini Etsy ya da eBay siparişleriyle
 
 - Amazon ilanlarını oluşturma veya düzenleme yok.
 - Amazon stoğuna yazılmaz.
-- Paneldeki ürün araştırmasında Amazon yok; Chrome eklentisi Amazon sayfalarında yalnızca sayfadan okunan tahmini değerler gösterir ve eklenti henüz Chrome Web Mağazası'nda değil.
+- Paneldeki ürün araştırmasında Amazon yok; Chrome eklentisi Amazon sayfalarında yalnızca sayfadan okunan tahmini değerler gösterir.
 - Amazon'un izin kapsamı nedeniyle bazı siparişlerde ürün görseli ve alıcı bilgileri eksik olabilir.
 - Alıcıya giden mesajlar tek yönlüdür; yanıtlar okunamaz.

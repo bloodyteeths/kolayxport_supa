@@ -35,7 +35,7 @@ rows:
   - feature: "Tarayıcı eklentisi"
     us: "partial"
     them: "yes"
-    note: "KolayXport eklentisi henüz Chrome Web Mağazası'nda yayında değil."
+    note: "KolayXport eklentisi Chrome Web Mağazası'nda."
   - feature: "İlanı doğrudan Etsy'de düzenleme (tekil ve toplu)"
     us: "yes"
     them: "no"

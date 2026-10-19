@@ -5,7 +5,7 @@ description: >-
   gelsin.
 h1: Etsy mağazanızı KolayXport'a bağlayın
 keyword: etsy entegrasyonu nasıl yapılır
-updated: '2026-10-17'
+updated: '2026-10-18'
 inventoryRefs:
   - settings-connections
   - order-sync-etsy
@@ -13,10 +13,10 @@ inventoryRefs:
   - ext-etsy-address
 draft: false
 order: 1
-duration: PT1M14S
+duration: PT1M11S
 video:
   file: etsy-baglama
-  youtubeId: taV9Gb0sl_c
+  youtubeId: 2xrS8l_aruk
   uploadDate: '2026-10-17'
 steps:
   - name: Ayarlar › Bağlantılar'ı açın

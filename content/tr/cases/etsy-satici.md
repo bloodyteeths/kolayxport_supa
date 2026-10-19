@@ -46,7 +46,7 @@ faq:
   - q: "Yaptığım bir değişiklik yanlışlıkla Etsy'ye gider mi?"
     a: "Gitmez. Tüm düzenlemeler önce taslakta durur, siz 'Gönder'e basınca Etsy'ye iletilir. Yanlış bir değişikliği ilan sürüm geçmişinden geri alabilirsiniz."
   - q: "Etsy siparişlerinde alıcı adresi neden eksik görünüyor?"
-    a: "Etsy'nin API'si alıcı adresini ve e-postasını paylaşmıyor. Tam adresi siparişe aktarmak için Chrome eklentimiz gerekiyor. Eklenti henüz Chrome Web Mağazası'nda yok; güncel sürümü destek ekibimizden alabilirsiniz."
+    a: "Etsy'nin API'si alıcı adresini ve e-postasını paylaşmıyor. Tam adresi siparişe aktarmak için Chrome eklentimiz gerekiyor. Eklentiyi Chrome Web Mağazası'ndan ücretsiz kurabilirsiniz."
   - q: "Takip numarası Etsy'ye otomatik yüklenir mi?"
     a: "Kısmen. Takip numarası sırada bekler ve Chrome eklentisi açıkken Etsy'deki forma sizin yerinize girilir. Eklenti çalışmıyorsa numarayı Etsy'ye elle girmeniz gerekir."
   - q: "Etsy'nin kargo etiketini (Etsy Postage) buradan alabilir miyim?"
@@ -76,6 +76,6 @@ Etsy siparişleriniz diğer pazaryerlerindeki siparişlerinizle aynı listede g�
 
 - Satış garantisi vermiyoruz; ilanınızı aramaya daha uygun hale getirmenize yardım ediyoruz.
 - Etsy ödemelerinin Türkiye'ye ulaşmaması ya da mağaza kapanması gibi sorunlara yazılımla çözüm sunamıyoruz.
-- Etsy alıcı adresleri ve takip numarası aktarımı Chrome eklentisi gerektiriyor; eklenti henüz Chrome Web Mağazası'nda değil.
+- Etsy alıcı adresleri ve takip numarası aktarımı KolayXport Chrome eklentisini (Chrome Web Mağazası) gerektiriyor.
 - Etsy mesajları panelde görünmüyor.
 - FedEx/UPS için kendi kargo hesabınız gerekiyor; navlun fiyatı sizin anlaşmanıza göre belirlenir.

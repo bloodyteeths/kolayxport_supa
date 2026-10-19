@@ -46,7 +46,7 @@ faq:
   - q: "Can an edit reach Etsy by accident?"
     a: "No. Every edit stays in a draft until you press Send. If you make a mistake, you can restore an earlier version from the listing's history."
   - q: "Why are Etsy buyer addresses missing?"
-    a: "Etsy's API does not share the buyer's address or email. Our Chrome extension brings the full address into the order. The extension isn't on the Chrome Web Store yet; our support team can send you the current version."
+    a: "Etsy's API does not share the buyer's address or email. Our Chrome extension brings the full address into the order. Install it free from the Chrome Web Store."
   - q: "Is the tracking number uploaded to Etsy automatically?"
     a: "Partly. The number is queued and entered into Etsy's form for you while the Chrome extension is running. Without the extension, you enter it on Etsy yourself."
   - q: "Can I buy Etsy Postage labels here?"
@@ -76,6 +76,6 @@ Your Etsy orders appear in the same list as your other marketplaces. Connect you
 
 - We don't guarantee sales. We help you make your listings easier to find.
 - Software can't fix Etsy payouts that fail to reach Turkey or shop suspensions.
-- Etsy buyer addresses and tracking upload need the Chrome extension, which isn't on the Chrome Web Store yet.
+- Etsy buyer addresses and tracking upload need the KolayXport Chrome extension (Chrome Web Store).
 - Etsy messages aren't shown in the app.
 - FedEx and UPS need your own carrier account; your rate is whatever you've agreed with the carrier.

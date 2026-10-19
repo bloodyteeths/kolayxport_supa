@@ -5,17 +5,17 @@ description: >-
   ekleyin.
 h1: Yapay zekâyla ürün fotoğrafı oluşturun
 keyword: yapay zeka ile ürün fotoğrafı
-updated: '2026-10-17'
+updated: '2026-10-18'
 inventoryRefs:
   - ai-image-gen
   - etsy-listing-editor
   - staged-drafts-send
 draft: false
 order: 4
-duration: PT1M3S
+duration: PT0M59S
 video:
   file: ai-urun-fotografi
-  youtubeId: QSYWeFE4I_8
+  youtubeId: U3xI7MtGLbE
   uploadDate: '2026-10-17'
 steps:
   - name: Fotoğraflar bölümüne bakın

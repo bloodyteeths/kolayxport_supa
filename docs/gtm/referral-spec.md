@@ -201,6 +201,7 @@ Each provider's webhook calls these at the end of its handler, inside its own tr
 - **Onboarding:** create a Stripe recipient for the partner (`Partner.stripeRecipientId`, new field) and give the partner a Stripe-hosted link to enter bank details and tax form (W-8BEN / W-8BEN-E). **We never store IBANs.**
 - **Payout run:** one outbound payment per partner per month for the payable sum, `PartnerPayout{ provider:'stripe_global', externalId, amountMinor, currency:'try', paidAt }` (add `provider` + `externalId`). On success, mark the included rows `paid`; on failure, keep them `payable` and show the error in admin.
 - The founder enables Global Payouts once in the Stripe dashboard. Fees are as shown there; check them before the first run.
+- **Which entity pays depends on pricing-v2 §5.** If Modsons becomes the seller of record for Turkish customers, bounties on Modsons sales are paid by EFT from Modsons (CSV run + admin marks paid, with the fatura / gider pusulası the accountant specifies). Global Payouts applies to bounties on Tamsar, Inc. sales. Keep `PartnerPayout.provider` = `stripe_global` | `eft_modsons`.
 - **Fallback** if Global Payouts isn't enabled for the account: the run outputs a CSV for a manual transfer, and an admin marks rows paid with a reference.
 
 ### 4.4 Free Growth perk

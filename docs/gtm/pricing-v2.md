@@ -7,7 +7,7 @@ Supersedes the monthly ladder (Starter ₺2.499 / Growth ₺4.999 / Pro ₺7.999
 
 1. **Yearly packages are the main offer.** Only **one** monthly plan exists. Monthly users add **modules** instead of upgrading.
 2. **iyzico or PayTR** for yearly payments in TRY **with taksit**. Turkish sellers pay ₺30–90k yearly fees in installments, and Stripe can't offer Turkish installments.
-3. Payments are collected by **Tamsar, Inc.** (US), in TRY, under its agreement with Modsons Yazılım.
+3. **Today**, payments are collected by **Tamsar, Inc.** (US) in TRY via Stripe, under its agreement with Modsons Yazılım (Atilla, 2026-10-19). KolayXport itself is published by **Modsons Yazılım E-Ticaret İthalat İhracat Ltd. Şti.** (Adana; [company.md](company.md)). Which entity sells to *Turkish* customers is the accountant question in §5.
 4. Prices are shown **"+KDV"**, with the KDV-inclusive total at checkout (orchestrator decision, 2026-10-19). **See §5: this needs the accountant now that the seller is a US company.**
 
 ## 2. Why (PraPazar, checked 2026-10-19 on prapazar.com/tr/paketler)
@@ -78,13 +78,23 @@ The feature split follows today's gates (Pro-only = `financials`, `arbitrage`, b
 
 ## 5. Open items that need the accountant (before P2/P4 go live)
 
-1. **Seller of record and KDV.** Tamsar, Inc. collects the payment, but "+KDV" implies a Turkish KDV invoice.
-   - A foreign company selling electronic services to Turkish consumers has its own KDV registration duty.
-   - B2B buyers would self-assess KDV on a foreign invoice (sorumlu sıfatıyla).
-   - Turkish sellers also strongly prefer a Turkish e-fatura as their expense document.
-   - Options: (a) Modsons is the seller of record for Turkish customers (e-fatura, iyzico/PayTR) and Tamsar, Inc. for international customers; or (b) Tamsar, Inc. sells everywhere, KDV is handled as the accountant advises, and the "+KDV" wording changes.
-   - **This decides which entity holds the iyzico/PayTR account.**
-2. **Partner payouts from Tamsar, Inc.** via Stripe Global Payouts (see referral-spec §5): confirm the paperwork. The US side normally collects a W-8BEN / W-8BEN-E from foreign payees, and partners declare the income in Turkey.
+**Recommended (orchestrator + this plan):** split by customer country.
+- **Turkish customers:** **Modsons is the seller of record.** It issues an e-fatura/e-Arşiv with KDV, holds the iyzico/PayTR account (yearly with taksit), and possibly also takes Aylık via iyzico/PayTR card subscriptions.
+- **Non-Turkish customers:** Tamsar, Inc. stays the seller via Stripe.
+- **Why:** Turkish sellers can book a Turkish e-fatura as an expense and deduct its KDV directly. A US invoice forces them to self-assess KDV (sorumlu sıfatıyla), which small sellers dislike. iyzico/PayTR also need a Turkish merchant.
+- This changes what Atilla described today (Tamsar collects TRY from everyone), so **he and the accountant decide**.
+
+**Question for the accountant:**
+1. Can Modsons be the seller of record for KolayXport subscriptions sold to Turkish customers (e-fatura/e-Arşiv with 20% KDV, payment through iyzico/PayTR with taksit), while Tamsar, Inc. keeps selling to foreign customers via Stripe? Does the existing Modsons–Tamsar agreement need changing for that?
+2. If Tamsar, Inc. instead keeps collecting from Turkish customers: what are its KDV obligations as a foreign e-service provider (B2C registration, B2B reverse charge), and can we still show prices "+KDV"?
+3. Partner referral bounties (one-time, ₺1.500–₺27.000) paid to Turkish individuals and companies:
+   - **If Modsons pays:** companies send a fatura; for individuals, is it a gider pusulası with stopaj (which rate), or must they issue a serbest meslek makbuzu?
+   - **If Tamsar, Inc. pays** via Stripe Global Payouts: is a W-8BEN / W-8BEN-E enough, with the partner declaring the income in Turkey?
+4. Is the KolayXport subscription a deductible expense for Turkish sellers in each case (Modsons e-fatura vs Tamsar invoice)?
+
+**What changes with the answer:**
+- **Modsons sells in Turkey:** iyzico/PayTR (P2) under Modsons; Stripe stays for non-TR customers. Partner payouts go by **EFT from Modsons**: the bounty ledger stays the same and the payout run uses the CSV fallback (referral-spec §4.3). Stripe Global Payouts only covers bounties earned on Tamsar, Inc. sales.
+- **Tamsar, Inc. sells everywhere:** as written today; iyzico/PayTR would need another route (they are Turkish merchants), and "+KDV" wording follows the accountant.
 
 ## 6. Effect on the gameplan
 

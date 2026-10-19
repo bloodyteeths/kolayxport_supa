@@ -195,6 +195,12 @@
     if (bar) return bar;
     var firstCard = cardAnchors()[0];
     var list = firstCard && (firstCard.closest('[class*="search-result-content"], [class*="productList"], ul, [data-testid="product-list"]') || firstCard.parentElement);
+    // Store pages open with a carousel ("En çok satanlar"): never inside it. Climb to the first block that is wide
+    // (≥ 60 % of the viewport) and not part of a carousel, and put the bar above it.
+    var wide = list;
+    var vw = window.innerWidth || 0;
+    while (wide && wide !== document.body && vw > 0 && (wide.offsetWidth < vw * 0.6 || (wide.closest && wide.closest('[class*="swiper"], [class*="carousel"], [class*="slider"]')))) wide = wide.parentElement;
+    if (wide && wide !== document.body && vw > 0 && wide.offsetWidth >= vw * 0.6) list = wide;
     if (!list || !list.parentElement) return null;
     bar = el('div', 'kx-stats-bar');
     bar.id = id;

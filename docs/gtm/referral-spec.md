@@ -8,6 +8,9 @@ Effort: S–M (2–3 dev days). Deploy only through the mybaby-sync-product-50 q
 - **Do not touch:** `lib/auth.ts`, `pages/api/auth/[...nextauth].*`, NextAuth/Apple cookie settings, OAuth providers/consent screens, `lib/mcp/*`, `pages/api/mcp/*`, or reviewer accounts.
 - Capture uses **our own first-party cookies**, set in `middleware.js` (a no-op today; its matcher already excludes `api/auth`).
 - For OAuth (Google/Apple) users, attribution is written by a **post-login claim endpoint**, not by the NextAuth `events.createUser` hook.
+- **Middleware scope (deploy-queue owner, 2026-10-19):** `middleware.js` runs on every route. Its matcher (or an early `return NextResponse.next()`) must exclude `/api/mcp/*`, `/oauth/*`, `/.well-known/*`, `/api/auth/*`, `/api/shopify/*` and `/api/integrations/shopify/*`. The Claude/ChatGPT MCP reviews and the Shopify review are live, and a cookie or redirect there could break them. Simplest option: only act on page paths (not `/api/*`) that carry `?ref=` or `utm_*`.
+- **Shopify-connected accounts** (`shopify_free` or Shopify-billed) never see referral rewards, Stripe prices or upgrades (App Store rule 1.2.1). Gate any referral UI on the existing neutral-billing check (`useAiCostsVisible` / `balance.neutral`). Shopify-billed customers create no commission.
+- **Protected accounts** (review@, play-review@, mcp-review@) are never modified, attributed or comped.
 - `pages/api/auth/signup.ts` is our own credentials-signup route, not NextAuth config. The plan adds one additive write there (§2.2). If the queue owner treats the whole `pages/api/auth/` folder as frozen, drop that write: the claim endpoint (§2.3) still covers credentials users who log in on the same browser.
 
 ## 1. Data model (Prisma, one migration)
@@ -171,7 +174,7 @@ Vitest unit/API tests (mock Stripe and Prisma as the existing tests do), plus a 
 | 1 | GET `/?ref=etsyilegelir` with no cookies | `kx_ref=ETSYILEGELIR\|…`, HttpOnly, Secure, Lax, 90 d |
 | 2 | Same request with an existing `kx_ref=OTHER` | Cookie unchanged (first touch) |
 | 3 | `?ref=<script>` or a 40-char value | No cookie set |
-| 4 | Requests to `/api/auth/*`, `/api/mcp/*`, `/_next/*` | Middleware does nothing (matcher/skip) |
+| 4 | Requests to `/api/auth/*`, `/api/mcp/*`, `/oauth/*`, `/.well-known/*`, `/api/shopify/*`, `/api/integrations/shopify/*`, `/_next/*`, even with `?ref=` | Middleware does nothing: no Set-Cookie, no redirect |
 | 5 | Credentials signup with `kx_ref` for an active partner | `UserAcquisition{via:'signup', partnerId}`; the signup still returns 201 even if `recordAcquisition` throws |
 | 6 | Google sign-in (new user), then `_app` claim | `UserAcquisition{via:'claim'}`; a second claim returns `exists`; cookies cleared |
 | 7 | Claim by a user created 3 days ago | `too_old`, no row |
@@ -188,6 +191,7 @@ Vitest unit/API tests (mock Stripe and Prisma as the existing tests do), plus a 
 | 18 | Report for a month | Counts match fixtures; CSV has no user e-mails |
 | 19 | Statement script without `--write` | No DB writes |
 | 20 | Comped partner account | No founding spot used, no commission rows |
+| 21 | Shopify-connected account (shopify_free) with a ref cookie | No referral UI shown, no Stripe prices; no commission rows |
 
 Manual prod check after the deploy (Merisa + dev session):
 1. Open `https://kolayxport.com/?ref=TEST-PARTNER` in a private window and sign up with a test e-mail.

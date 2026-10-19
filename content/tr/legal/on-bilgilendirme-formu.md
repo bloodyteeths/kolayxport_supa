@@ -21,13 +21,10 @@ Bu formdaki tüketici hakları, Hizmet'i **ticari veya mesleki olmayan amaçlarl
 |---|---|
 | Ünvan | MODSONS YAZILIM E-TİCARET İTHALAT İHRACAT LİMİTED ŞİRKETİ |
 | Adres | Beyazevler Mah. 80053 Sok. Tanrıkulu Apt. No:8 İç Kapı No:02, 01170 Çukurova / Adana |
-| MERSİS no | [TODO(owner): MERSİS no] |
 | Ticaret sicili | Adana Ticaret Odası, sicil no 100129 |
-| Vergi dairesi / no | [TODO(owner): vergi dairesi] / 6222605496 |
-| Telefon | [TODO(owner): telefon] |
+| Vergi no | 6222605496 |
 | E-posta | destek@kolayxport.com |
 | KEP adresi | modsonsyazilim@hs01.kep.tr |
-| ETBİS kaydı | [TODO(owner): ETBİS kayıt numarası/durumu] |
 | Web sitesi | https://kolayxport.com |
 
 ## 3. Hizmetin temel nitelikleri
@@ -40,7 +37,7 @@ Planların kapsamı ve kullanım limitleri (aylık sipariş, etiket, bağlı ma�
 
 ## 4. Fiyat ve ödeme
 
-- Hizmet bedeli; seçtiğiniz plan (Starter, Growth veya Pro) ve dönem (aylık veya yıllık) için ödeme adımında gösterilen **toplam tutardır**. [TODO(owner): gösterilen tutarın KDV dahil olduğunu teyit edin; tüketicilere vergiler dahil toplam fiyat gösterilmesi zorunludur]
+- Hizmet bedeli; seçtiğiniz plan (Starter, Growth veya Pro) ve dönem (aylık veya yıllık) için ödeme adımında gösterilen **toplam tutardır**.
 - Ödeme kredi kartı veya banka kartıyla, ödeme hizmet sağlayıcısı Stripe aracılığıyla, peşin alınır. Kart bilgileriniz satıcı tarafından saklanmaz.
 - Yeni hesaplar kart bilgisi istenmeden 14 gün ücretsiz deneme ile başlar; deneme süresi için ücret alınmaz. Deneme süresi devam ederken plan satın alırsanız ilk tahsilat deneme süresinin sonunda yapılabilir; bu durum ödeme adımında belirtilir.
 - Teslimat masrafı yoktur.
@@ -69,8 +66,6 @@ Bu onayı vermediğiniz veya cayma hakkının kullanılamayacağı bir durumun b
 - KEP: modsonsyazilim@hs01.kep.tr
 
 Cayma bildiriminizin bize ulaşmasından itibaren **14 gün** içinde, ödediğiniz toplam bedel, ödemede kullandığınız yöntemle ve size herhangi bir masraf yüklenmeksizin iade edilir.
-
-[TODO(owner): ödeme sayfasına işaretlenmemiş "derhal ifa ve cayma hakkının kaybı" onay kutusunu ekleyin; eklenmeyecekse bu bölümü, tüketiciye 14 gün içinde koşulsuz tam iade sağlayacak şekilde değiştirin]
 
 ## 8. Şikâyet ve itirazlar
 

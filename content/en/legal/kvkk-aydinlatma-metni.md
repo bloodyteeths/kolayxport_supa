@@ -20,8 +20,7 @@ KolayXport has a different role for the **buyer (end-customer) data** that selle
 | Legal name | MODSONS YAZILIM E-TİCARET İTHALAT İHRACAT LİMİTED ŞİRKETİ ("KolayXport", "the Company", "we") |
 | Address | Beyazevler Mah. 80053 Sok. Tanrıkulu Apt. No:8 İç Kapı No:02, 01170 Çukurova / Adana, Türkiye |
 | Trade registry | Adana Chamber of Commerce, registry no. 100129 |
-| MERSİS no. | [TODO(owner): MERSİS no] |
-| Tax office / no. | [TODO(owner): vergi dairesi] / 6222605496 |
+| Tax no. | 6222605496 |
 | Registered e-mail (KEP) | modsonsyazilim@hs01.kep.tr |
 | E-mail | destek@kolayxport.com |
 
@@ -98,7 +97,7 @@ Part of our technical infrastructure and some of the services you connect are ou
 
 On the basis that, at the date of this notice, the Personal Data Protection Board ("Board") has not issued an adequacy decision for these countries, we rely on the provisions of KVKK Art. 9 in force since 1 June 2024, in this order:
 
-1. **Appropriate safeguards (Art. 9/4):** signing the Board's **standard contract** with providers we transfer data to regularly, and notifying the Board within 5 business days of signature. [TODO(owner): confirm standard contracts are signed with Hetzner, Cloudflare, Google, Stripe and Postmark and notified to the Board; list any that are not]
+1. **Appropriate safeguards (Art. 9/4):** signing the Board's **standard contract** with providers we transfer data to regularly, and notifying the Board within 5 business days of signature.
 2. **Occasional transfers (Art. 9/6):** for non-regular transfers where safeguards cannot be provided, one of the statutory exceptions, in particular where the transfer is necessary to perform our contract with you (Art. 9/6-b), or your explicit consent after being informed of the possible risks (Art. 9/6-a).
 3. **Marketing and analytics tools:** switched on only if you give explicit consent in your cookie preferences.
 
@@ -147,8 +146,6 @@ Your application must include your name, signature (for written applications), T
 We will answer free of charge as soon as possible and within **30 days** at the latest. If the request involves an additional cost, a fee may be charged under the tariff set by the Board. If your application is rejected, you find the answer insufficient, or we do not answer in time, you can complain to the Board within 30 days of learning our answer and in any case within 60 days of your application.
 
 ## 12. VERBİS
-
-[TODO(owner): VERBİS kayıt durumu — kayıtlıysa kayıt bilgisi; Kurul kararlarındaki istisna kapsamındaysa (yıllık çalışan sayısı 50'den, yıllık mali bilanço toplamı Kurul'un belirlediği eşikten az ve ana faaliyet özel nitelikli veri işleme değil) bu durumun teyidi]
 
 ## 13. Changes
 

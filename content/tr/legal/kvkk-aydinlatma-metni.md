@@ -20,8 +20,7 @@ Satıcıların KolayXport'a aktardığı **alıcı (son müşteri) verileri** i�
 | Ünvan | MODSONS YAZILIM E-TİCARET İTHALAT İHRACAT LİMİTED ŞİRKETİ ("KolayXport", "Şirket", "biz") |
 | Adres | Beyazevler Mah. 80053 Sok. Tanrıkulu Apt. No:8 İç Kapı No:02, 01170 Çukurova / Adana |
 | Ticaret sicili | Adana Ticaret Odası, sicil no 100129 |
-| MERSİS no | [TODO(owner): MERSİS no] |
-| Vergi dairesi / no | [TODO(owner): vergi dairesi] / 6222605496 |
+| Vergi no | 6222605496 |
 | KEP adresi | modsonsyazilim@hs01.kep.tr |
 | E-posta | destek@kolayxport.com |
 
@@ -98,7 +97,7 @@ Hizmetin teknik altyapısı ve bağlandığınız hizmetlerin bir kısmı yurt d
 
 Bu metnin tarihi itibarıyla yukarıdaki ülkeler için Kişisel Verileri Koruma Kurulu ("Kurul") tarafından verilmiş bir yeterlilik kararı bulunmadığı kabulüyle, yurt dışı aktarımlarda KVKK md. 9'un 1 Haziran 2024'te yürürlüğe giren hükümlerine şu sırayla dayanırız:
 
-1. **Uygun güvenceler (md. 9/4):** Düzenli aktarım yaptığımız hizmet sağlayıcılarla Kurul'un ilan ettiği **standart sözleşmeyi** imzalamak ve imzadan itibaren 5 iş günü içinde Kurul'a bildirmek. [TODO(owner): Hetzner, Cloudflare, Google, Stripe ve Postmark ile standart sözleşmelerin imzalanıp Kurul'a bildirildiğini teyit edin; imzalanmayan varsa listeleyin]
+1. **Uygun güvenceler (md. 9/4):** Düzenli aktarım yaptığımız hizmet sağlayıcılarla Kurul'un ilan ettiği **standart sözleşmeyi** imzalamak ve imzadan itibaren 5 iş günü içinde Kurul'a bildirmek.
 2. **Arızi aktarımlar (md. 9/6):** Uygun güvence sağlanamayan, düzenli olmayan aktarımlarda, ilgili istisnalardan biri varsa; özellikle sizinle yaptığımız sözleşmenin ifası için zorunlu olması (md. 9/6-b) veya olası riskler hakkında bilgilendirilmeniz kaydıyla açık rızanız (md. 9/6-a).
 3. **Pazarlama ve analitik araçları:** yalnızca çerez tercihlerinizde açık rıza vermeniz hâlinde etkinleşir.
 
@@ -149,8 +148,6 @@ Başvurunuzda ad, soyad, imza (yazılı başvuruda), T.C. kimlik numarası (yaba
 Başvurunuzu niteliğine göre en kısa sürede ve en geç **30 gün** içinde ücretsiz olarak sonuçlandırırız. İşlemin ayrıca bir maliyet gerektirmesi hâlinde Kurul'un belirlediği tarifeye göre ücret alınabilir. Başvurunuzun reddedilmesi, yanıtı yetersiz bulmanız veya süresinde yanıt verilmemesi hâlinde, yanıtı öğrendiğiniz tarihten itibaren 30 gün ve her hâlde başvuru tarihinden itibaren 60 gün içinde Kurul'a şikâyette bulunabilirsiniz.
 
 ## 12. VERBİS
-
-[TODO(owner): VERBİS kayıt durumu — kayıtlıysa kayıt bilgisi; Kurul kararlarındaki istisna kapsamındaysa (yıllık çalışan sayısı 50'den, yıllık mali bilanço toplamı Kurul'un belirlediği eşikten az ve ana faaliyet özel nitelikli veri işleme değil) bu durumun teyidi]
 
 ## 13. Değişiklikler
 

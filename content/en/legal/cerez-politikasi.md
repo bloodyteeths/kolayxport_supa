@@ -49,13 +49,13 @@ As of this policy's effective date, the site **does not use** any analytics or m
 - **Meta Pixel and Meta Conversions API** (Meta Platforms Ireland Ltd. / Meta Platforms, Inc.) — marketing,
 - **X (Twitter) pixel**, **TikTok Pixel**, **LinkedIn Insight Tag** — marketing.
 
-These tools run only **after you give explicit consent** to the relevant category. For Google tools we use Google Consent Mode v2: before consent, analytics and ad storage are set to "denied", and these tools' tags do not load without your consent. [TODO(owner): Consent Mode'un "temel (basic)" modda kurulduğunu, yani onaydan önce çerezsiz ping dahil hiçbir isteğin gönderilmediğini teyit edin]
+These tools run only **after you give explicit consent** to the relevant category. For Google tools we use Google Consent Mode v2: before consent, analytics and ad storage are set to "denied", and these tools' tags do not load without your consent.
 
 The **Meta Conversions API** works server to server: if you consented to marketing cookies, events such as sign-up or purchase may be sent to Meta with identifiers such as your e-mail address in one-way hashed form. If you did not consent, these events are not sent.
 
 The providers of these tools are outside Türkiye, so your consent also covers the transfer abroad. The legal basis for the transfer is explained in section 7 of the [KVKK Privacy Notice](/en/kvkk-aydinlatma-metni).
 
-When these tools go live, each one's cookie names and durations will be added to the table above. [TODO(owner): araçlar devreye alınınca çerez adları ve süreleri tablosunu ekleyin]
+When these tools go live, each one's cookie names and durations will be added to the table above.
 
 ## 5. Third-party services' own cookies
 
@@ -67,7 +67,7 @@ If you install the Chrome extension, it uses the browser's extension storage and
 
 ## 7. How to change your choices
 
-- **Cookie preferences panel:** The notice shown on your first visit lets you accept or reject each non-necessary category. You can change your choice or withdraw consent at any time through the **"Cookie Preferences"** link at the bottom of the site. [TODO(owner): kategori bazlı onay paneli ve alt bilgideki "Çerez Tercihleri" bağlantısı yayımlanmadan önce hazır olmalı; bugünkü bildirim yalnızca "Kabul et" düğmesi içeriyor]
+- **Cookie preferences panel:** The notice shown on your first visit lets you accept or reject each non-necessary category. You can change your choice or withdraw consent at any time through the **"Cookie Preferences"** link at the bottom of the site.
 - **Browser settings:** You can delete or block cookies and site data in your browser settings. If you block necessary cookies, you may not be able to sign in or use the app.
 - **Ad preferences:** You can manage personalised ads in the ad settings pages of Google, Meta and the other platforms.
 

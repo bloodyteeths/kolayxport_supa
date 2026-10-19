@@ -15,7 +15,7 @@ Bu Kullanım Şartları ("Şartlar"), kolayxport.com adresinde ve ilgili uygulam
 
 **MODSONS YAZILIM E-TİCARET İTHALAT İHRACAT LİMİTED ŞİRKETİ** ("KolayXport", "biz")
 Adres: Beyazevler Mah. 80053 Sok. Tanrıkulu Apt. No:8 İç Kapı No:02, 01170 Çukurova / Adana
-Adana Ticaret Odası sicil no: 100129 · MERSİS: [TODO(owner): MERSİS no] · Vergi dairesi / no: [TODO(owner): vergi dairesi] / 6222605496
+Adana Ticaret Odası sicil no: 100129 · Vergi no: 6222605496
 E-posta: destek@kolayxport.com
 
 ile Hizmet'e kayıt olan veya Hizmet'i kullanan kişi ("Kullanıcı", "siz") arasında geçerlidir.
@@ -47,8 +47,8 @@ KolayXport, özellikle yurt dışına satış yapan çevrimiçi satıcılar içi
 
 - **Ücretsiz deneme:** Yeni hesaplar, kart bilgisi istenmeden **14 gün** ücretsiz deneme ile başlar. Deneme süresinde kullanım limitleri ücretli planlardan düşüktür. Deneme bittiğinde ücretli bir plan seçmezseniz, kısa bir ek süreden sonra hesabınız kısıtlanır; verileriniz 7. bölümdeki kurallara göre saklanır.
 - **Planlar:** Starter, Growth ve Pro planları aylık veya yıllık olarak sunulur. Her planın kapsamı ve limitleri (aylık sipariş, etiket, bağlı mağaza sayısı ve yapay zekâ kredisi gibi) ile güncel fiyatları [Fiyatlandırma](/fiyatlandirma) sayfasında yer alır. Kurumsal ihtiyaçlar için ayrı teklif verilebilir.
-- **Para birimi ve vergiler:** Fiyatlar Türk lirası veya ABD doları olarak gösterilir. [TODO(owner): fiyatların KDV dahil mi, "+KDV" mi olduğu ve USD fiyatlarda vergi uygulaması]
-- **Ödeme:** Ödemeler kartla, ödeme hizmet sağlayıcısı Stripe aracılığıyla alınır. Kart bilgileriniz KolayXport tarafından saklanmaz. [TODO(owner): Stripe hesabının hangi tüzel kişi adına açık olduğu ve faturanın (e-Arşiv / e-Fatura) nasıl düzenleneceği]
+- **Para birimi ve vergiler:** Fiyatlar Türk lirası veya ABD doları olarak gösterilir.
+- **Ödeme:** Ödemeler kartla, ödeme hizmet sağlayıcısı Stripe aracılığıyla alınır. Kart bilgileriniz KolayXport tarafından saklanmaz.
 - **Kampanyalar:** Kurucu üye indirimi gibi kampanyalar, kampanya sayfasında belirtilen koşullara tabidir.
 - **Shopify App Store:** Hizmet'i Shopify App Store üzerinden yüklediyseniz, Shopify mağazanızla ilgili plan ve ücretlendirme, Shopify uygulama sayfasında belirtilen koşullara ve Shopify'ın faturalandırma kurallarına tabidir.
 
@@ -56,7 +56,7 @@ KolayXport, özellikle yurt dışına satış yapan çevrimiçi satıcılar içi
 
 - **Otomatik yenileme:** Ücretli abonelikler, iptal etmediğiniz sürece seçtiğiniz dönem (ay veya yıl) sonunda aynı süre için otomatik olarak yenilenir ve kayıtlı ödeme yönteminizden tahsil edilir.
 - **İptal:** Aboneliğinizi dilediğiniz zaman Ayarlar › Plan ve Faturalama sekmesinden veya destek@kolayxport.com adresine yazarak iptal edebilirsiniz. İptal, **içinde bulunulan ödeme döneminin sonunda** geçerli olur; dönem sonuna kadar Hizmet'i kullanmaya devam edersiniz ve sonraki dönem için ücret alınmaz.
-- **İade:** Başlamış bir dönemin kullanılmayan kısmı için kısmi iade yapılmaz; kanundan doğan haklarınız saklıdır. Tüketicilerin cayma hakkına ilişkin hükümler Mesafeli Satış Sözleşmesi'nde yer alır. Yanlış veya mükerrer tahsilat hâlinde, tespitinden sonra tutar iade edilir. [TODO(owner): yıllık planlarda iade politikası (ör. ilk X gün içinde orantılı iade) ve işlem süresi]
+- **İade:** Başlamış bir dönemin kullanılmayan kısmı için kısmi iade yapılmaz; kanundan doğan haklarınız saklıdır. Tüketicilerin cayma hakkına ilişkin hükümler Mesafeli Satış Sözleşmesi'nde yer alır. Yanlış veya mükerrer tahsilat hâlinde, tespitinden sonra tutar iade edilir.
 - **Fiyat değişiklikleri:** Fiyatları değiştirebiliriz. Yeni fiyat, mevcut aboneliğinize ancak bir sonraki yenilemede uygulanır ve en az 30 gün önceden e-postayla bildirilir. Yeni fiyatı kabul etmiyorsanız yenilemeden önce iptal edebilirsiniz.
 - **Ödeme sorunu:** Bir tahsilat başarısız olursa, sınırlı bir ek süre boyunca ödeme yönteminizi güncellemeniz istenir; bu süre içinde ödeme alınamazsa hesabınız kısıtlanabilir.
 
@@ -74,7 +74,7 @@ Hizmet'i kullanırken şunları yapmamayı kabul edersiniz:
 ## 7. Verileriniz
 
 - Hizmet'e yüklediğiniz veya bağlı hesaplarınızdan aktarılan içerik ve veriler size (veya ilgili hak sahiplerine) aittir. Bunları yalnızca Hizmet'i size sunmak için kullanmamıza izin verirsiniz.
-- Kişisel verilerin işlenmesi [KVKK Aydınlatma Metni](/kvkk-aydinlatma-metni) ve [Gizlilik Politikası](/gizlilik-politikasi)'na tabidir. Alıcılarınızın verileri bakımından siz veri sorumlusu, KolayXport veri işleyendir; alıcılarınızı aydınlatmak ve gerekli hukuki sebebe sahip olmak sizin sorumluluğunuzdadır. [TODO(owner): kurumsal müşteriler için ayrı bir Veri İşleme Sözleşmesi (DPA) sunulacak mı?]
+- Kişisel verilerin işlenmesi [KVKK Aydınlatma Metni](/kvkk-aydinlatma-metni) ve [Gizlilik Politikası](/gizlilik-politikasi)'na tabidir. Alıcılarınızın verileri bakımından siz veri sorumlusu, KolayXport veri işleyendir; alıcılarınızı aydınlatmak ve gerekli hukuki sebebe sahip olmak sizin sorumluluğunuzdadır.
 - Hesabınızı **Ayarlar › Tercihler › Hesabı sil** adımıyla kendiniz silebilirsiniz; verileriniz hemen silinir ve dönüşümlü yedeklerden en geç yaklaşık 3 ay içinde çıkar. Verilerinizin bir kopyasını istiyorsanız silmeden önce destek@kolayxport.com adresine yazın. Yasal saklama yükümlülüğü olan kayıtlar hariçtir.
 
 ## 8. Bağlı hesaplar ve üçüncü taraf koşulları

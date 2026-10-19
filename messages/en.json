@@ -10151,10 +10151,10 @@
       "draftBanner": "Draft: prices are final; goes live once the payment setup is ready. Not live.",
       "seo": {
         "title": "Pricing · KolayXport",
-        "description": "Yearly packages in installments, one monthly plan and modules as you need them. 14 days free, no card needed."
+        "description": "Yearly packages, one no-commitment monthly plan and modules as you need them. 14 days free, no card needed."
       },
       "title": "Pricing",
-      "subtitle": "Pay for a yearly package in installments instead of up front. If you'd rather not prepay, there is one monthly plan.",
+      "subtitle": "Yearly packages give the best price. If you'd rather not pay a year up front, start with the no-commitment monthly plan.",
       "trialLine": "14 days free. No card needed.",
       "taxNote": "The prices shown are the full amount you pay; no VAT (KDV) is added. Invoices are issued by Tamsar, Inc. (US).",
       "founding": {
@@ -10165,8 +10165,6 @@
       "yearlyHeading": "Yearly packages",
       "perYear": "/ year",
       "perMonthApprox": "About {price} a month",
-      "taksit": "Up to {n} installments",
-      "taksitCustom": "Installments by agreement",
       "quote": "Get a quote",
       "recommended": "Recommended",
       "plans": {
@@ -10244,20 +10242,18 @@
         "ordersYear": "Orders / year",
         "labelsYear": "Labels / year",
         "aiMonth": "AI credits / month",
-        "taksit": "Installments",
         "financials": "Profit report",
         "arbitrage": "Price-gap scan",
         "bulkPhotoStudio": "Bulk photo studio",
         "priority": "Priority support",
         "module": "Module",
-        "custom": "Custom",
-        "upTo": "Up to {n}"
+        "custom": "Custom"
       },
       "faq": {
         "title": "Questions",
-        "taksit": {
-          "q": "Can I pay in installments?",
-          "a": "Yes. Yearly packages can be paid by card in up to 6, 9 or 12 installments depending on the package. The monthly plan is charged to your card each month."
+        "payInFull": {
+          "q": "Do I pay for a yearly package all at once?",
+          "a": "Yes. Yearly packages are paid in one payment by credit or debit card; there are no installments. If you'd rather not pay a year up front, start with the no-commitment monthly plan (₺2,999 a month), charged to your card each month."
         },
         "kdv": {
           "q": "Is VAT (KDV) added to the prices?",
@@ -10269,7 +10265,7 @@
         },
         "monthlyVsYearly": {
           "q": "Monthly or yearly?",
-          "a": "If you'll use it for more than a few months, a yearly package is cheaper and can be paid in installments. The 14-day trial needs no card, and the monthly plan is there if you'd rather not prepay."
+          "a": "If you'll use it for more than a few months, a yearly package is cheaper. If you'd rather not pay a year up front, the monthly plan has no commitment. The 14-day trial needs no card."
         },
         "modules": {
           "q": "What is a module?",
@@ -10280,8 +10276,9 @@
           "a": "The first {total} subscribers get {percent}% off for life on the package or monthly plan they choose. The number of spots left is shown live at the top of the page."
         }
       },
-      "draftNotes": "Draft notes: prices and limits confirmed on 19 Oct 2026 (pricing-v2.md §3). The seller is Tamsar, Inc. (US); prices are final amounts with no VAT added (Atilla's decision). Before going live the accountant should confirm: a foreign company's VAT registration duty when selling electronic services to Turkish consumers, and whether Turkish businesses can expense a foreign invoice. The installment payment provider (iyzico/PayTR) isn't built yet.",
-      "fromNote": "Starting price, by quote"
+      "draftNotes": "Draft notes: prices and limits confirmed on 19 Oct 2026 (pricing-v2.md §3). The seller is Tamsar, Inc. (US); prices are final amounts with no VAT added (Atilla's decision). Before going live the accountant should confirm: a foreign company's VAT registration duty when selling electronic services to Turkish consumers, and whether Turkish businesses can expense a foreign invoice. The card checkout for yearly packages (P2, pay in full) isn't built yet; no installments (Atilla's decision).",
+      "fromNote": "Starting price, by quote",
+      "payInFull": "One yearly payment by card"
     }
   },
   "ui": {
@@ -16677,11 +16674,10 @@
       },
       "testimonialsTitle": "What sellers say",
       "pricingYearly": {
-        "title": "Yearly packages, in installments",
+        "title": "Yearly packages, no-commitment monthly plan",
         "lead": "Every package starts with a 14-day free trial. No credit card.",
         "cta": "Compare packages",
         "perYear": "/yr",
-        "perMonthTaksit": "About {price} a month · up to {n} installments",
         "plans": {
           "baslangic": {
             "name": "Starter",
@@ -16698,7 +16694,8 @@
         },
         "monthly": "Prefer not to prepay? Monthly plan: {price} / month",
         "tax": "Final prices, no VAT added",
-        "founding": "Founding members: {percent}% off for life for the first 20 subscribers. Spots left: {remaining}"
+        "founding": "Founding members: {percent}% off for life for the first 20 subscribers. Spots left: {remaining}",
+        "perMonthPayInFull": "About {price} a month · one yearly payment"
       }
     },
     "footer": {

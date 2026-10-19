@@ -1,6 +1,6 @@
 // Pricing v2 (docs/gtm/pricing-v2.md §3): Turkey pricing, yearly packages first + one monthly plan + modules.
 // Numbers confirmed by Atilla on 2026-10-19 (final). The page stays unpublished (PRICING_V2_DRAFT) until the
-// installment checkout (P2) exists and the accountant has confirmed the no-KDV setup (seller: Tamsar, Inc.). It deliberately lives outside lib/billing: nothing here is wired to checkout, entitlements or Stripe.
+// card checkout for yearly packages (P2, pay in full, no installments) exists and the accountant has confirmed the no-KDV setup (seller: Tamsar, Inc.). It deliberately lives outside lib/billing: nothing here is wired to checkout, entitlements or Stripe.
 // When P1 ships (plan keys + limits in lib/billing), this file is replaced by reads from lib/billing.
 
 /** While true: draft banner + noindex on the v2 pricing page. Flip to false at go-live (P2 checkout live, §5 settled). */
@@ -17,8 +17,6 @@ export interface YearlyFacts {
   priceYear: number | null;
   /** Kurumsal: "from" amount. */
   fromYear?: number;
-  /** Max installments ("taksit"); `null` = by agreement. */
-  taksit: number | null;
   stores: number | null;
   ordersYear: number | null;
   labelsYear: number | null;
@@ -29,10 +27,10 @@ export interface YearlyFacts {
 }
 
 export const YEARLY: Readonly<Record<YearlyPlan, YearlyFacts>> = {
-  baslangic: { priceYear: 29990, taksit: 6, stores: 3, ordersYear: 6000, labelsYear: 3000, aiCreditsMonth: 300, proFeatures: false, prioritySupport: false },
-  buyume: { priceYear: 54990, taksit: 9, stores: 6, ordersYear: 24000, labelsYear: 12000, aiCreditsMonth: 1500, proFeatures: false, prioritySupport: false },
-  pro: { priceYear: 89990, taksit: 12, stores: 12, ordersYear: 72000, labelsYear: 36000, aiCreditsMonth: 3000, proFeatures: true, prioritySupport: true },
-  kurumsal: { priceYear: null, fromYear: 149990, taksit: null, stores: null, ordersYear: null, labelsYear: null, aiCreditsMonth: 10000, proFeatures: true, prioritySupport: true },
+  baslangic: { priceYear: 29990, stores: 3, ordersYear: 6000, labelsYear: 3000, aiCreditsMonth: 300, proFeatures: false, prioritySupport: false },
+  buyume: { priceYear: 54990, stores: 6, ordersYear: 24000, labelsYear: 12000, aiCreditsMonth: 1500, proFeatures: false, prioritySupport: false },
+  pro: { priceYear: 89990, stores: 12, ordersYear: 72000, labelsYear: 36000, aiCreditsMonth: 3000, proFeatures: true, prioritySupport: true },
+  kurumsal: { priceYear: null, fromYear: 149990, stores: null, ordersYear: null, labelsYear: null, aiCreditsMonth: 10000, proFeatures: true, prioritySupport: true },
 };
 
 export const MONTHLY = { priceMonth: 2999, stores: 2, ordersMonth: 500, labelsMonth: 250, aiCreditsMonth: 300 } as const;

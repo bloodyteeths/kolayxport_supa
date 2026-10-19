@@ -11,9 +11,9 @@ import { Section } from './Blocks';
 import { PRICING_V2_DRAFT, BASE_FEATURES, CREDIT_PACKS, MODULES, MONTHLY, RECOMMENDED_YEARLY, YEARLY, YEARLY_PLANS, foundingPrice, perMonth, type YearlyPlan } from './pricingV2Draft';
 
 /**
- * DRAFT of the pricing v2 page (docs/gtm/pricing-v2.md §4 P4): yearly packages first (installments), one
+ * DRAFT of the pricing v2 page (docs/gtm/pricing-v2.md §4 P4): yearly packages first (paid in full by card), one
  * monthly plan, modules. Numbers come from ./pricingV2Draft (placeholders, not wired to checkout). Not linked
- * from the live site until the installment checkout exists (prices final, Tamsar, Inc. sells with no KDV added).
+ * from the live site until the yearly card checkout exists (prices final, Tamsar, Inc. sells with no KDV added).
  */
 export default function SitePricingYearly({ locale, draft = PRICING_V2_DRAFT }: { locale: SiteLocale; draft?: boolean }) {
   const t = useTranslations('marketing.pricingYearly');
@@ -45,7 +45,7 @@ function Body({ locale, draft }: { locale: SiteLocale; draft: boolean }) {
     return () => { alive = false; };
   }, [router]);
 
-  const faqKeys = ['taksit', 'kdv', 'trial', 'monthlyVsYearly', 'modules', 'founding'] as const;
+  const faqKeys = ['payInFull', 'kdv', 'trial', 'monthlyVsYearly', 'modules', 'founding'] as const;
   const faq = faqKeys.map((k) => ({ q: t(`faq.${k}.q`), a: t(`faq.${k}.a`, { total: spots?.total ?? 20, percent: spots?.percentOff ?? 40 }) }));
   const signup = (plan: string) => `${SIGNUP_HREF}&plan=${plan}&currency=try`;
   const on = <Check size={18} className="inline text-[#0F7A4A]" aria-label="✓" />;
@@ -56,7 +56,6 @@ function Body({ locale, draft }: { locale: SiteLocale; draft: boolean }) {
     { id: 'orders', label: t('compare.ordersYear'), cell: (p) => (YEARLY[p].ordersYear === null ? t('compare.custom') : nf(YEARLY[p].ordersYear!)) },
     { id: 'labels', label: t('compare.labelsYear'), cell: (p) => (YEARLY[p].labelsYear === null ? t('compare.custom') : nf(YEARLY[p].labelsYear!)) },
     { id: 'ai', label: t('compare.aiMonth'), cell: (p) => nf(YEARLY[p].aiCreditsMonth) },
-    { id: 'taksit', label: t('compare.taksit'), cell: (p) => (YEARLY[p].taksit === null ? t('compare.custom') : t('compare.upTo', { n: YEARLY[p].taksit! })) },
     ...(['financials', 'arbitrage', 'bulkPhotoStudio'] as const).map((k) => ({ id: k, label: t(`compare.${k}`), cell: (p: YearlyPlan) => (YEARLY[p].proFeatures ? on : t('compare.module')) })),
     { id: 'priority', label: t('compare.priority'), cell: (p) => (YEARLY[p].prioritySupport ? on : off) },
   ];
@@ -98,13 +97,13 @@ function Body({ locale, draft }: { locale: SiteLocale; draft: boolean }) {
                   {f.priceYear !== null ? (
                     <>
                       <p><span className="display text-[40px] tabular-nums">{tl(f.priceYear)}</span><span className="ml-1 text-ink-mute">{t('perYear')}</span></p>
-                      <p className="text-sm text-ink-soft">{t('perMonthApprox', { price: tl(perMonth(f.priceYear)) })} · {t('taksit', { n: f.taksit! })}</p>
+                      <p className="text-sm text-ink-soft">{t('perMonthApprox', { price: tl(perMonth(f.priceYear)) })} · {t('payInFull')}</p>
                       {spots ? <p className="mt-1 text-sm font-semibold text-kx-deep">{t('founding.price', { price: tl(foundingPrice(f.priceYear, spots.percentOff)) })}</p> : null}
                     </>
                   ) : (
                     <>
                       <p><span className="display text-[40px] tabular-nums">{tl(f.fromYear!)}</span><span className="ml-1 text-ink-mute">{t('perYear')}</span></p>
-                      <p className="text-sm text-ink-soft">{t('fromNote')} · {t('taksitCustom')}</p>
+                      <p className="text-sm text-ink-soft">{t('fromNote')}</p>
                     </>
                   )}
                 </div>

@@ -34,7 +34,7 @@ export default function PricingTeaserYearly({ locale }: { locale: SiteLocale }) 
                 <span className="display text-[40px] tabular-nums text-ink">{tl(f.priceYear!)}</span>
                 <span className="ml-1 text-ink-mute">{t('perYear')}</span>
               </p>
-              <p className="text-sm text-ink-soft">{t('perMonthTaksit', { price: tl(perMonth(f.priceYear!)), n: f.taksit! })}</p>
+              <p className="text-sm text-ink-soft">{t('perMonthPayInFull', { price: tl(perMonth(f.priceYear!)) })}</p>
               <p className="mt-3 text-ink-soft">{t(`plans.${plan}.line`)}</p>
             </li>
           );

@@ -10151,10 +10151,10 @@
       "draftBanner": "Taslak: fiyatlar kesin, ödeme altyapısı hazır olunca yayına girer. Yayında değil.",
       "seo": {
         "title": "Fiyatlandırma · KolayXport",
-        "description": "Yıllık paketler taksitle, tek aylık plan ve ihtiyacınız kadar modül. 14 gün ücretsiz, kart gerekmez."
+        "description": "Yıllık paketler, taahhütsüz tek aylık plan ve ihtiyacınız kadar modül. 14 gün ücretsiz, kart gerekmez."
       },
       "title": "Fiyatlandırma",
-      "subtitle": "Yıllık paketle peşin değil, taksitle ödeyin. Peşin ödemek istemiyorsanız tek bir aylık planımız var.",
+      "subtitle": "Yıllık paketler en uygun fiyat. Bir yılı peşin ödemek istemiyorsanız, taahhütsüz Aylık planla başlayın.",
       "trialLine": "14 gün ücretsiz. Kart gerekmez.",
       "taxNote": "Gösterilen fiyatlar ödeyeceğiniz tutarın tamamıdır; üzerine KDV eklenmez. Faturanız Tamsar, Inc. (ABD) tarafından düzenlenir.",
       "founding": {
@@ -10165,8 +10165,6 @@
       "yearlyHeading": "Yıllık paketler",
       "perYear": "/ yıl",
       "perMonthApprox": "Aylık yaklaşık {price}",
-      "taksit": "{n} taksite kadar",
-      "taksitCustom": "Taksit size göre",
       "quote": "Teklif alın",
       "recommended": "Önerilen",
       "plans": {
@@ -10244,20 +10242,18 @@
         "ordersYear": "Sipariş / yıl",
         "labelsYear": "Etiket / yıl",
         "aiMonth": "AI kredisi / ay",
-        "taksit": "Taksit",
         "financials": "Kâr raporu",
         "arbitrage": "Fiyat farkı taraması",
         "bulkPhotoStudio": "Toplu fotoğraf stüdyosu",
         "priority": "Öncelikli destek",
         "module": "Modül",
-        "custom": "Özel",
-        "upTo": "{n}'e kadar"
+        "custom": "Özel"
       },
       "faq": {
         "title": "Sık sorulanlar",
-        "taksit": {
-          "q": "Taksitle ödeyebilir miyim?",
-          "a": "Evet. Yıllık paketleri kredi kartınızla, paketine göre 6, 9 veya 12 taksite kadar ödeyebilirsiniz. Aylık plan her ay karttan çekilir."
+        "payInFull": {
+          "q": "Yıllık paketi tek seferde mi ödüyorum?",
+          "a": "Evet. Yıllık paketler kredi veya banka kartınızla tek seferde ödenir; taksit seçeneği yoktur. Bir yılı peşin ödemek istemiyorsanız taahhütsüz Aylık planla (ayda ₺2.999) başlayın; her ay kartınızdan çekilir."
         },
         "kdv": {
           "q": "Fiyatlara KDV eklenir mi?",
@@ -10269,7 +10265,7 @@
         },
         "monthlyVsYearly": {
           "q": "Aylık mı, yıllık mı?",
-          "a": "Birkaç aydan uzun kullanacaksanız yıllık paket daha uygundur ve taksitle ödenir. Önce denemek isteyen ama kart vermek istemeyenler için 14 günlük deneme, peşin ödemek istemeyenler için Aylık plan var."
+          "a": "Birkaç aydan uzun kullanacaksanız yıllık paket daha uygundur. Bir yılı peşin ödemek istemiyorsanız Aylık plan taahhütsüzdür. Önce denemek isterseniz 14 günlük deneme kart istemez."
         },
         "modules": {
           "q": "Modül nedir?",
@@ -10280,8 +10276,9 @@
           "a": "İlk {total} aboneye seçtikleri paket ya da Aylık plan için ömür boyu %{percent} indirim. Kalan yer sayısı sayfanın üstünde canlı gösterilir."
         }
       },
-      "draftNotes": "Taslak notları: fiyatlar ve limitler 19 Ekim 2026'da onaylandı (pricing-v2.md §3). Satıcı Tamsar, Inc. (ABD); fiyatlar nihai tutardır, KDV eklenmez (Atilla kararı). Yayından önce muhasebeci teyit etmeli: yabancı şirketin Türk tüketicilere elektronik hizmet satışında KDV kaydı yükümlülüğü ve Türk işletmelerin yurt dışı faturayı gider olarak kullanması. Taksitli ödeme altyapısı (iyzico/PayTR) henüz yok.",
-      "fromNote": "Başlangıç fiyatı, teklifle"
+      "draftNotes": "Taslak notları: fiyatlar ve limitler 19 Ekim 2026'da onaylandı (pricing-v2.md §3). Satıcı Tamsar, Inc. (ABD); fiyatlar nihai tutardır, KDV eklenmez (Atilla kararı). Yayından önce muhasebeci teyit etmeli: yabancı şirketin Türk tüketicilere elektronik hizmet satışında KDV kaydı yükümlülüğü ve Türk işletmelerin yurt dışı faturayı gider olarak kullanması. Yıllık paketler için kartla tek seferde ödeme altyapısı (P2) henüz yok; taksit yok (Atilla kararı).",
+      "fromNote": "Başlangıç fiyatı, teklifle",
+      "payInFull": "Yıllık tek ödeme, kartla"
     }
   },
   "ui": {
@@ -16483,7 +16480,7 @@
       }
     },
     "common": {
-      "trialLine": "14 gün ücretsiz · Kredi kartı gerekmez · Yıllık pakete taksit",
+      "trialLine": "14 gün ücretsiz · Kredi kartı gerekmez · Taahhütsüz aylık plan",
       "ctaTrial": "14 gün ücretsiz deneyin",
       "ctaPricing": "Fiyatları görün",
       "ctaContact": "Bize yazın",
@@ -16677,11 +16674,10 @@
       },
       "testimonialsTitle": "Satıcılarımız ne diyor",
       "pricingYearly": {
-        "title": "Yıllık paket, taksitle",
+        "title": "Yıllık paketler, taahhütsüz aylık plan",
         "lead": "Bütün paketlerde 14 gün ücretsiz deneme. Kredi kartı istemeyiz.",
         "cta": "Paketleri karşılaştırın",
         "perYear": "/yıl",
-        "perMonthTaksit": "Aylık yaklaşık {price} · {n} taksite kadar",
         "plans": {
           "baslangic": {
             "name": "Başlangıç",
@@ -16698,7 +16694,8 @@
         },
         "monthly": "Peşin ödemek istemeyenlere Aylık plan: {price} / ay",
         "tax": "Fiyatlar nihai tutardır, KDV eklenmez",
-        "founding": "Kurucu üye: ilk 20 aboneye ömür boyu %{percent} indirim. Kalan yer: {remaining}"
+        "founding": "Kurucu üye: ilk 20 aboneye ömür boyu %{percent} indirim. Kalan yer: {remaining}",
+        "perMonthPayInFull": "Aylık yaklaşık {price} · yıllık tek ödeme"
       }
     },
     "footer": {

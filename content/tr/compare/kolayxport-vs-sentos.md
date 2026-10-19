@@ -68,7 +68,7 @@ KolayXport ise yurt dışına satan satıcı için kuruldu: Etsy ve eBay ilanlar
 **KolayXport daha uygun olabilir, eğer:**
 - Ana kanalınız Etsy ve/veya eBay ise,
 - İlanlarınızın görünürlüğü sorun oluyorsa ve İngilizce başlık, etiket ve araştırma araçlarına ihtiyacınız varsa,
-- Yıllık ücreti peşin değil taksitle ödemek ya da peşinatsız aylık bir planla başlamak istiyorsanız.
+- Bir yılı peşin ödemeden, taahhütsüz aylık bir planla başlamak istiyorsanız.
 
 **İkisini birlikte kullanmak:** Yurt içi pazaryerlerini mevcut entegratörünüzde tutup Etsy ve eBay tarafını KolayXport ile yönetmek de mümkün. Bu durumda stok senkronunu tek bir araçta çalıştırın; iki ayrı aracın aynı ürünün stokunu yazması karışıklığa yol açar.
 

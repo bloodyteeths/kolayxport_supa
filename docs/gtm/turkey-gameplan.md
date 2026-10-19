@@ -21,7 +21,7 @@ Built on the existing research. This plan doesn't redo any of it, it only links 
 | Tracking | **Not live.** No GTM, GA4 or Meta IDs are in prod, and the cookie banner only has "Kabul et" (the full panel is still being built) | gtm-overhaul session |
 | YouTube | 7 new tutorials, all unlisted; 8 more are blocked by the upload cap on the unverified channel (15 in total) | gtm-overhaul session |
 | Chrome extension | Live on the Chrome Web Store. 9.12.0 (adds Trendyol and Hepsiburada) is in Google review | gtm-overhaul session |
-| Prices | Starter ₺2.499, Growth ₺4.999, Pro ₺7.999 a month; yearly = 2 months free. Whether they include KDV is **still to be confirmed** | competitors.md §4 |
+| Prices | Starter ₺2.499, Growth ₺4.999, Pro ₺7.999 a month; yearly = 2 months free. **Shown as "+KDV"** (B2B norm), with the KDV-inclusive total visible at checkout | competitors.md §4; orchestrator decision 2026-10-19 |
 | Referral support in the app | **None.** First-touch UTMs are kept in the browser (`lib/tracking/events.ts`) and sent with the server `sign_up` event, but **not stored on the user**. Stripe Checkout shows a promotion-code field only when the founding coupon doesn't apply (`pages/api/stripe/create-checkout-session.ts:244`) | code |
 | Hepsiburada, Çiçeksepeti | Not live (waiting for integrator approval / replies). **Don't promise them** | feature-inventory N-1, project notes |
 | App-store listings | Shopify, Play Store, Claude and ChatGPT MCP directories are in review. **Freeze applies:** nobody touches MCP/OAuth/review accounts | coordination rules |
@@ -110,7 +110,7 @@ Cash cost = what we pay before knowing whether a customer comes. Estimates are e
 
 ### 4.2 The referral program: "KolayXport Ortaklık Programı"
 
-**Recommended default, Atilla approves once** (Q: comfortable with these numbers? Change any line before week 1):
+**Approved 2026-10-19** (orchestrator, for Atilla): 30% for 12 months, 35% from the 10th paying referral, and the 20%-for-3-months partner code. Build spec: [referral-spec.md](referral-spec.md).
 
 | Term | Default | Note |
 |---|---|---|
@@ -122,7 +122,7 @@ Cash cost = what we pay before knowing whether a customer comes. Estimates are e
 | Not eligible | Self-referral, existing users, reviewer accounts, paid-ad traffic that bid on our brand, coupon-site posting | Standard |
 | Hold | Commission becomes payable **30 days after** the customer's payment (refund window) | |
 | Payout | Monthly, **EFT/FAST in TRY** to a Turkish IBAN, from **₺1.000** accrued (the rest rolls over). Partner sends a fatura (company / şahıs şirketi). For a private individual, the muhasebeci decides the paperwork (gider pusulası + stopaj, or a serbest meslek makbuzu) | PayPal doesn't work in Turkey, so don't use tools that only pay out via PayPal |
-| Partner perks | Free Growth account while the partner is active (≥1 paying referral per quarter); an early look at new features | Replaces Varyant 1's "free account" |
+| Partner perks | Free Growth account while the partner is active (≥1 paying referral per quarter); an early look at new features | Replaces Varyant 1's "free account". Granted by an admin through the existing admin user PATCH (plan growth, no Stripe), on Merisa's request; it never uses a founding spot (referral-spec §4) |
 | Disclosure | Every partner post must carry **#işbirliği @kolayxport** or **#reklam**; videos also say it aloud | legal-notes §3. Reklam veren must inform the partner: the terms text does it |
 | Claims | Partners may only use the "Söyleyebilirsin" list (social/README §3). No income guarantees | |
 | Termination | Either side, any time, by e-mail. Commission already earned is still paid. Misleading claims or spam end it immediately with no further payouts | |
@@ -133,11 +133,11 @@ Cash cost = what we pay before knowing whether a customer comes. Estimates are e
 3. **A partner report** (admin-only page or a monthly script): per code → signups, activated, trialing, paying, collected net revenue, commission owed.
 4. **Stripe promotion codes per partner** (founder creates them in Stripe or delegates; the field already shows when the founding coupon doesn't apply). The code also counts as attribution if the link was missed.
 
-Effort: about 1–2 dev days (S). **Owner:** a dev Claude session that the orchestrator assigns, deployed through the deploy queue (mybaby-sync-product-50). It doesn't touch `lib/mcp/*`, `pages/api/mcp/*` or OAuth/consent (freeze), so the signup change must go through the Google/Apple sign-in callback carefully; flag it to the queue. A third-party tool (Rewardful, Tolt, FirstPromoter, ~$49+/mo) is the fallback, but their PayPal/Wise payouts don't fit Turkish partners, so the in-house report + EFT is recommended.
+Effort: about 2–3 dev days. Full spec with data model, capture points, report and acceptance tests: [referral-spec.md](referral-spec.md). Under the freeze, the ref is captured with our own first-party cookie (middleware) and a post-login claim endpoint; NextAuth/OAuth config is not touched. **Owner:** a dev Claude session that the orchestrator assigns, deployed through the deploy queue (mybaby-sync-product-50). It doesn't touch `lib/mcp/*`, `pages/api/mcp/*` or OAuth/consent (freeze), so the signup change must go through the Google/Apple sign-in callback carefully; flag it to the queue. A third-party tool (Rewardful, Tolt, FirstPromoter, ~$49+/mo) is the fallback, but their PayPal/Wise payouts don't fit Turkish partners, so the in-house report + EFT is recommended.
 
 **Until it's live:** Merisa may talk to partners, but gives out links only once tracking works. Tell them "takip sistemimiz [tarih] itibarıyla aktif".
 
-**Partner terms page:** a short Turkish page `/ortaklik` (or a PDF sent by e-mail in week 1) with the table above. gtm-overhaul owns the site, so Merisa asks that session for it; the text goes through the claims check.
+**Partner terms page:** a short Turkish page `/ortaklik` with the table above. gtm-overhaul drafts it now and **publishes only when** the terms are approved (done), the `?ref` capture and signup attribution are live, and the muhasebeci has checked the stopaj / gider pusulası line. Until then, Merisa sends the terms as a PDF by e-mail.
 
 ### 4.3 Who Merisa and Ekin target, and how many
 
@@ -271,7 +271,7 @@ Week 1 is set-up (no contacts). Signups include organic from directories, SEO an
 1. **100 activated users** (§4.1).
 2. **≥ 5 paying customers**, or trial→paid ≥ 8% on the first full cohort.
 3. **Tracking live:** GTM + GA4 + Meta pixel/CAPI set in prod, test events verified (LAUNCH-CHECKLIST §C).
-4. **Cookie panel complete** (Accept / Reject / Preferences), consent-gated pixels (gtm-overhaul session).
+4. **Cookie panel complete** (Accept / Reject / Preferences), consent-gated pixels. gtm-overhaul ships it by **26 Oct**.
 5. Attribution stored on the user (§4.2 items 1–2), so ads can be judged by trial→paid.
 6. At least 2 customers have given **written consent** for a testimonial (legal-notes §2). This is not strictly required for ads, but it multiplies their conversion.
 
@@ -298,8 +298,8 @@ Day 1 = **Mon 2026-10-26** (one week to get Atilla's approvals and the attributi
 
 | Week | Targets | Who |
 |---|---|---|
-| W1 (26 Oct) | Partner terms approved (Atilla, 15 min). Attribution + ref + partner report built and deployed (dev session via deploy queue). Shortlist of 200 scored (Bionluk + Claude). Sheet set up. Merisa and Ekin each post 15 helpful answers. YouTube channel phone-verified (Atilla, 2 min) so the remaining tutorials go up | Atilla, dev session, Merisa, Ekin, freelancer |
-| W2 (2 Nov) | 40 contacts. 2 partners signed. Tutorials made public and linked on the site (gtm-overhaul). Blog cadence starts (2/week) | Merisa, Ekin, gtm-overhaul |
+| W1 (26 Oct) | Partner terms approved (done 19 Oct). Cookie panel live (gtm-overhaul, 26 Oct). Attribution + ref + partner report built and deployed (dev session via deploy queue). Shortlist of 200 scored (Bionluk + Claude). Sheet set up. Merisa and Ekin each post 15 helpful answers. YouTube channel phone-verified (Atilla, 2 min) | Atilla, dev session, gtm-overhaul, Merisa, Ekin, freelancer |
+| W2 (2 Nov) | 40 contacts. 2 partners signed. Tutorials switched Unlisted → Public (Atilla's OK, then gtm-overhaul; embeds are already live). Blog cadence starts (2/week, Merisa fact-checks each post before it ships) | Merisa, Ekin, gtm-overhaul |
 | W3 (9 Nov) | 60 contacts (cum. 100). 5 partners. First partner posts | Merisa, Ekin |
 | W4 (16 Nov) | 60 contacts (cum. 160). 8 partners, 4 active. **First live demo** in a partner group. 25 activated users. Review assumptions with real reply/accept rates | Merisa, Ekin |
 
@@ -308,7 +308,7 @@ Day 1 = **Mon 2026-10-26** (one week to get Atilla's approvals and the attributi
 | Week | Targets |
 |---|---|
 | W5 (23 Nov) | Black Friday/Cyber Monday content via partners ("Kasım'da ilanlarınızı hazırlayın", seo/content-calendar anchors). 60 contacts |
-| W6 (30 Nov) | 14 partners, 8 active. 50 activated. First trial→paid read. **Tracking + cookie panel live** (needed for the gate) |
+| W6 (30 Nov) | 14 partners, 8 active. 50 activated. First trial→paid read. **GTM/GA4/Meta IDs live** (Atilla's deadline 30 Nov; needed for the gate) |
 | W7 (7 Dec) | Second live demo. Ask the first paying customers for feedback + testimonial consent (Merisa, written form) |
 | W8 (14 Dec) | 20 partners, 12 active. 80 activated, 6 paying. First partner payout run (5 Jan for December revenue, after the 30-day hold) |
 
@@ -356,13 +356,15 @@ Merisa's and Ekin's pay is not in this table (not known to this plan). USD at ~�
 
 | # | Task | When | Time |
 |---|---|---|---|
-| 1 | Approve the partner terms table (§4.2), or change the %/duration once | Before W1 | 15 min |
+| 1 | ~~Approve the partner terms~~ (done 2026-10-19 via orchestrator) | — | — |
 | 2 | Approve the outreach templates (Varyant 5/6 + acceptance text) once, so Merisa/Ekin can send them without asking every time (social/README §5 still applies to anything non-standard) | Before W1 | 10 min |
-| 3 | Phone-verify the YouTube channel (lifts the upload cap) | W1 | 2 min |
-| 4 | Create the GTM container, GA4 and Meta pixel IDs and set them in the Hetzner `.env` via stdin (LAUNCH-CHECKLIST §C), or give Merisa admin on the Google/Meta accounts and only do the `.env` step | By W6 | 30 min |
-| 5 | Stripe: create partner promotion codes, **or** give Merisa a restricted Stripe role that can create promotion codes | When the first partner signs after the founding spots are gone | 5 min |
+| 3 | Phone-verify the YouTube channel (lifts the ~10/day upload cap and makes description links clickable) | **By 26 Oct** | 2 min |
+| 3b | OK to switch the tutorials from Unlisted to Public | **By 2 Nov** | 1 min |
+| 4 | Create the GTM container, GA4 and Meta pixel IDs and set them in the Hetzner `.env` via stdin (LAUNCH-CHECKLIST §C), or give Merisa admin on the Google/Meta accounts and only do the `.env` step | **By 30 Nov** (Phase 2 gate) | 30 min |
+| 5 | Stripe: create the partner coupon once (20% off, repeating 3 months) and set `STRIPE_PARTNER_COUPON_ID`; the admin partner tool then creates each partner's code (referral-spec §4) | Before the first partner link goes out | 5 min |
+| 5b | Grant the free Growth account to each new partner (admin user page), or give the admin role to someone who does it | Per partner, on Merisa's request | 2 min each |
 | 6 | Monthly partner payouts: approve the list Merisa sends, EFT (or have the muhasebeci do it) | 5th of each month | 10 min |
-| 7 | Confirm whether list prices include KDV (needed for commission maths and any price in copy) | Before W1 | 2 min |
+| 7 | ~~KDV~~ decided: prices shown "+KDV". Have the muhasebeci check the partner payout paperwork (stopaj / gider pusulası / fatura) | Before the first payout (5 Jan) | — |
 | 8 | Phase 2 only: approve the ad budget start; send one intro e-mail each to ShipEntegra and Paraşüt/QNB partner teams (Merisa drafts them) | After the gate | 15 min |
 
 **Atilla never does:** sales calls, demos, DMs, posting, chasing partners.
@@ -404,9 +406,10 @@ Everything in §4.3–4.8 and §5: shortlists, outreach, partner onboarding, dem
 
 ---
 
-## 9. Open decisions (for Atilla, one line each)
+## 9. Decisions and open items
 
-1. Partner commission: **30% for 12 months, 35% from the 10th paying referral**: OK, or change?
-2. Partner audience code after the founding spots: **20% off the first 3 months**: OK?
-3. Are list prices KDV-inclusive?
-4. Ekin's role and weekly hours (the plan assumes ~20 h/week each for Merisa and Ekin).
+Decided 2026-10-19 (orchestrator, for Atilla): 30% for 12 months, 35% from the 10th paying referral; a partner code of 20% for 3 months after the founding spots; prices shown "+KDV".
+
+Still open:
+1. Ekin's role and weekly hours (the plan assumes ~20 h/week each for Merisa and Ekin). The orchestrator is asking Atilla.
+2. The Atilla actions in §7 with dates: YouTube phone verification (26 Oct), tutorials Public (2 Nov), tracking IDs (30 Nov).

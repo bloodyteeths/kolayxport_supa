@@ -1,5 +1,5 @@
 // /api/cron/partner-bounties — daily: partner bounties whose 30-day hold has passed move pending → payable
-// (lib/partners/bounty.ts). The admin report and payout run also promote due rows, so a missed run only delays the
+// (lib/partners/bounty.ts). HTTP fallback for the VPS scheduler job (lib/partners/jobs.ts). The admin report and payout run also promote due rows, so a missed run only delays the
 // status, never a payout.
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { runCronGuard } from '@/lib/cron/idempotency';

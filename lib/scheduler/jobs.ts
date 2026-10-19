@@ -4,7 +4,7 @@
  * W1's core jobs plus each workstream's array:
  *   lib/stock/jobs.ts (W2), lib/etsy/listingJobs.ts (W3: listing reconcile),
  *   lib/orders/jobs.ts (W4: etsy-orders-incremental / reconcile),
- *   lib/notificationCenter/jobs.ts (W5).
+ *   lib/notificationCenter/jobs.ts (W5), lib/partners/jobs.ts (referral bounties).
  * Job names must be unique; a duplicate is dropped (first wins) and logged.
  */
 import type { ScheduledJob } from './types';
@@ -14,6 +14,7 @@ import { listingJobs } from '@/lib/etsy/listingJobs';
 import { orderJobs } from '@/lib/orders/jobs';
 import { notificationJobs } from '@/lib/notificationCenter/jobs';
 import { hepsiburadaJobs } from '@/lib/hepsiburada/jobs';
+import { partnerJobs } from '@/lib/partners/jobs';
 
 const MINUTE = 60_000;
 
@@ -151,4 +152,4 @@ function dedupe(jobs: ScheduledJob[]): ScheduledJob[] {
   return out;
 }
 
-export const allJobs: ScheduledJob[] = dedupe([...coreJobs, ...stockJobs, ...listingJobs, ...orderJobs, ...notificationJobs, ...listingsGridJobs, ...hepsiburadaJobs]);
+export const allJobs: ScheduledJob[] = dedupe([...coreJobs, ...stockJobs, ...listingJobs, ...orderJobs, ...notificationJobs, ...listingsGridJobs, ...hepsiburadaJobs, ...partnerJobs]);

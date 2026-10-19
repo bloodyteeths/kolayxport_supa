@@ -56,20 +56,3 @@ jobs:
           curl --fail --silent --show-error --max-time 120 \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             "${KOLAYXPORT_BASE_URL}/api/cron/track-ranks"
-
-  partner-bounties:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Move partner bounties past their 30-day hold to payable
-        env:
-          KOLAYXPORT_BASE_URL: ${{ secrets.KOLAYXPORT_BASE_URL }}
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-        run: |
-          set -euo pipefail
-          if [ -z "${KOLAYXPORT_BASE_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
-            echo "::error::Missing required secret KOLAYXPORT_BASE_URL or CRON_SECRET"
-            exit 1
-          fi
-          curl --fail --silent --show-error --max-time 60 \
-            -H "Authorization: Bearer ${CRON_SECRET}" \
-            "${KOLAYXPORT_BASE_URL}/api/cron/partner-bounties"

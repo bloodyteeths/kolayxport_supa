@@ -12077,7 +12077,9 @@
       "openCta": "Trendyol'da ara",
       "needsExtension": "KolayXport Chrome eklentisi gerekir (sürüm 9.11 veya üstü).",
       "waiting": "Trendyol sekmesi açıldı. Sayfa yüklenince sonuçlar burada görünecek…",
-      "priceGap": "Fiyat farkı: Trendyol → yurt dışı"
+      "priceGap": "Fiyat farkı: Trendyol → yurt dışı",
+      "autoTitle": "Trendyol'da aranıyor…",
+      "autoBody": "KolayXport eklentisi bu aramayı arka planda açıp okuyor. Sonuç birkaç saniye içinde burada."
     },
     "niches": {
       "title": "Bugün güçlü nişler",

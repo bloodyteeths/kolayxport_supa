@@ -219,6 +219,23 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
   const data = result.data;
   const ready = Boolean(data) && (result.region.state === 'ready' || result.region.state === 'stale');
   const waitingForSnapshot = mkt === 'trendyol' && result.notice?.key === 'research.products.trendyolOpen';
+  // Extension ready (data-kx-market="1" set by kolayxport.js): the seller's search is read in a background Trendyol
+  // tab automatically, once per query; otherwise the "Search on Trendyol" button below opens it visibly.
+  const [autoSearch, setAutoSearch] = React.useState<{ q: string; state: 'running' | 'failed'; reason?: string | null } | null>(null);
+  React.useEffect(() => {
+    if (!waitingForSnapshot || !q || autoSearch?.q === q) return undefined;
+    if (typeof document === 'undefined' || document.documentElement.getAttribute('data-kx-market') !== '1') return undefined;
+    const onResult = (e: MessageEvent) => {
+      const d = e.data;
+      if (e.source !== window || !d || d.source !== 'kolayxport-ext' || d.type !== 'kx-market-search-result' || d.q !== q) return;
+      if (!d.ok) setAutoSearch({ q, state: 'failed', reason: d.reason ?? null });
+    };
+    window.addEventListener('message', onResult);
+    setAutoSearch({ q, state: 'running' });
+    setTrendyolWaiting(true);
+    window.postMessage({ source: 'kolayxport-app', type: 'kx-market-search', mkt: 'trendyol', q }, window.location.origin);
+    return () => window.removeEventListener('message', onResult);
+  }, [waitingForSnapshot, q, autoSearch?.q]);
   React.useEffect(() => {
     if (!waitingForSnapshot || !trendyolWaiting) return undefined;
     const id = window.setInterval(() => result.region.retry?.(), 4000);
@@ -502,6 +519,10 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
           />
         </Box>
       </EmptyState>
+    );
+  } else if (result.notice?.key === 'research.products.trendyolOpen' && autoSearch?.q === q && autoSearch.state === 'running' && trendyolWaiting) {
+    body = (
+      <EmptyState kind="first-use" brand="trendyol" title={t('trendyol.autoTitle')} body={t('trendyol.autoBody')} data-testid="research-trendyol-auto" />
     );
   } else if (result.notice?.key === 'research.products.trendyolOpen') {
     // Trendyol blocks servers: the seller's browser opens the search, the extension posts the page's data and this

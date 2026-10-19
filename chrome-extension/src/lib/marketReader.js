@@ -163,10 +163,13 @@
       if (c && !seen[c.id]) { seen[c.id] = 1; items.push(c); }
     }
     var cm = u.pathname.match(/-x-([cbg]\d+)/);
+    // Category best-seller pages: /sr?wc=<category id>&sst=BEST_SELLER (no query); store lists: /sr?mid=<seller>.
+    var wc = (u.searchParams.get('wc') || '').match(/^\d+/);
+    var mid = (u.searchParams.get('mid') || '').match(/^\d+/);
     return {
       mkt: 'trendyol', pageType: 'search', parserVersion: VERSION,
       query: q || null,
-      categoryId: q ? null : (cm ? cm[1] : u.pathname.slice(0, 30)),
+      categoryId: q ? null : wc ? 'c' + wc[0] : mid ? 'm' + mid[0] : (cm ? cm[1] : u.pathname.slice(0, 30)),
       page: Math.max(1, Number(u.searchParams.get('pi')) || 1),
       total: data && typeof data.total === 'number' ? data.total : null,
       items: items,

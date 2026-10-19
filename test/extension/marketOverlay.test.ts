@@ -68,6 +68,13 @@ describe('Trendyol readers', () => {
     expect(s.items[0]).toMatchObject({ id: '1173797433', title: 'Ahşap Takı Kutusu 0', price: 1000, rating: 4.4, ratingCount: 185 });
   });
 
+  it('category best sellers (/sr?wc=) and store lists (/sr?mid=): keyed by category / seller', () => {
+    const a = docOf('https://www.trendyol.com/sr?wc=104038&sst=BEST_SELLER', searchHtml(12, ''));
+    expect(R.trendyolSearch(a, a.location.href)).toMatchObject({ query: null, categoryId: 'c104038' });
+    const b = docOf('https://www.trendyol.com/sr?mid=312549&os=1', searchHtml(12, ''));
+    expect(R.trendyolSearch(b, b.location.href)).toMatchObject({ query: null, categoryId: 'm312549' });
+  });
+
   it('category page: keyed by the category id from the URL', () => {
     const doc = docOf('https://www.trendyol.com/taki-kutusu-x-c104038?pi=2', searchHtml());
     expect(R.trendyolSearch(doc, doc.location.href)).toMatchObject({ query: null, categoryId: 'c104038', page: 2 });

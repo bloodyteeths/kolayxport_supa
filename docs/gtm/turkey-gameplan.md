@@ -64,7 +64,7 @@ Amazon.com.tr-only sellers aren't a separate push: orders and labels work, but t
 **Pricing v2 (Atilla, 2026-10-19), full detail in [pricing-v2.md](pricing-v2.md):**
 - **Yearly packages are the main offer:** Başlangıç ₺29.990, Büyüme ₺54.990, Pro ₺89.990, Kurumsal from ₺149.990. These are final amounts with no KDV added (Tamsar, Inc. sells). Yearly packages are paid in full by card; there is no taksit (pricing-v2 §5).
 - **One monthly plan:** Aylık ₺2.999. Monthly users add **modules** (finance, arbitrage, photo studio, extra stores/orders, AI credit packs) instead of upgrading.
-- Package and Aylık prices were confirmed by Atilla on 2026-10-19; module prices are still a proposal. Until v2 checkout exists, partners and copy quote **no prices**: they link to `/fiyatlandirma`.
+- All prices (packages, Aylık, modules) were confirmed by Atilla on 2026-10-19. Until v2 checkout exists, partners and copy quote **no prices**: they link to `/fiyatlandirma`.
 
 | Element | Turkey offer | Why |
 |---|---|---|
@@ -370,7 +370,7 @@ Merisa's and Ekin's pay is not in this table (not known to this plan). USD at ~�
 | 5 | Stripe: create the partner coupon once (20% off, repeating 3 months) and set `STRIPE_PARTNER_COUPON_ID`; the admin partner tool then creates each partner's code (referral-spec §4) | Before the first partner link goes out | 5 min |
 | 5b | Grant the free Growth account to each new partner (admin user page), or give the admin role to someone who does it | Per partner, on Merisa's request | 2 min each |
 | 6 | Monthly partner payouts: approve the payout list Merisa sends; payouts go out through Stripe Global Payouts from Tamsar, Inc. (enable Global Payouts once in the Stripe dashboard) | 5th of each month | 10 min |
-| 6b | ~~Confirm pricing v2, seller of record and taksit~~: done 2026-10-19 (Tamsar, Inc. sells, no KDV, yearly pay-in-full only). Final OK on the module prices on the board | This week | 5 min |
+| 6b | ~~Confirm pricing v2, seller of record and taksit~~: done 2026-10-19 (Tamsar, Inc. sells, no KDV, yearly pay-in-full only). Module prices confirmed 2026-10-19 | — | — |
 | 7 | Have the accountant confirm the partner payout paperwork once (W-8BEN from partners; partners declare the income in Turkey) | Before the first payout (5 Jan) | — |
 | 8 | Phase 2 only: approve the ad budget start; send one intro e-mail each to ShipEntegra and Paraşüt/QNB partner teams (Merisa drafts them) | After the gate | 15 min |
 
@@ -426,7 +426,7 @@ Decided:
 - **2026-10-19 (orchestrator):** ~~prices shown "+KDV"~~ (superseded); partner code 20% off the first payment or 3 months; Ekin ~15 h/week.
 
 Still open:
-1. ~~Pricing v2 package prices~~ confirmed 2026-10-19. Module prices (pricing-v2 §3) still to confirm.
-2. ~~Taksit~~: decided, yearly pay-in-full only; real taksit parked until a Turkish seller entity exists. Module prices: final OK on the board.
+1. ~~Pricing v2 prices~~: packages, Aylık and modules all confirmed 2026-10-19.
+2. ~~Taksit~~: decided, yearly pay-in-full only; real taksit parked until a Turkish seller entity exists. Module prices: confirmed 2026-10-19 (20:23).
 3. Merisa's hours (planned ~20 h/week).
 4. The dated Atilla actions in §7: YouTube phone verification (26 Oct), tutorials Public (2 Nov), tracking IDs (30 Nov).

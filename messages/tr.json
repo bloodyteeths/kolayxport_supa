@@ -220,7 +220,8 @@
       "reportsProfit": "Kâr raporu",
       "reportsPayouts": "Ödemeler raporu",
       "reportsTransactions": "İşlemler raporu",
-      "videoStudio": "Video stüdyosu"
+      "videoStudio": "Video stüdyosu",
+      "partner": "Ortaklık"
     },
     "groups": {
       "listings": "İlanlar"
@@ -9212,7 +9213,7 @@
         "trialing": "Denemede",
         "paying": "Ödeyen",
         "netRevenue": "Net gelir",
-        "pending": "Bekleyen komisyon",
+        "pending": "Bekleyen prim",
         "payable": "Ödenecek",
         "paid": "Ödendi",
         "actions": "İşlemler",
@@ -9227,10 +9228,14 @@
       "action": {
         "activate": "Etkinleştir",
         "pause": "Duraklat",
-        "terminate": "Sonlandır"
+        "terminate": "Sonlandır",
+        "link": "Giriş bağla",
+        "relink": "Girişi değiştir",
+        "save": "Kaydet",
+        "cancel": "Vazgeç"
       },
       "empty": "Henüz ortak yok.",
-      "footnote": "Aktif = kayıttan sonraki 7 gün içinde bir pazaryeri bağlamış. Etsy, Shopify ve Wix bağlantı tarihine göre sayılır; eBay, Amazon, Trendyol ve Hepsiburada için tahmin kullanılır (7 gün içinde ilk sipariş ya da ilk 7 günde şu an bağlı olmak). Bu yüzden bu pazaryerlerini bağlayıp henüz siparişi olmayan satıcılar eksik sayılır. Ödeyen = aktif ücretli Stripe planı. Gelir ve komisyon, komisyon defteri devreye girince dolar.",
+      "footnote": "Aktif = kayıttan sonraki 7 gün içinde bir pazaryeri bağlamış. Etsy, Shopify ve Wix bağlantı tarihine göre sayılır; eBay, Amazon, Trendyol ve Hepsiburada için tahmin kullanılır (7 gün içinde ilk sipariş ya da ilk 7 günde şu an bağlı olmak). Bu yüzden bu pazaryerlerini bağlayıp henüz siparişi olmayan satıcılar eksik sayılır. Ödeyen = aktif ücretli Stripe planı. Net gelir = getirilen müşterilerin prim doğuran ödemeleri, KDV hariç. Primler tek seferlik: ilk yıllık ödemenin %25'i (10 ödeyen müşteriden sonra %30) ya da 2. aylık ödemede ₺1.500; 30 gün bekletilir.",
       "unattributed": "Ortaksız kayıtlar (ilk temas kaynağına göre)",
       "new": {
         "title": "Ortak ekle",
@@ -9240,7 +9245,8 @@
         "email": "E-posta (dökümler için)",
         "submit": "Ekle",
         "createPromo": "Stripe promosyon kodu da oluştur (ortak kuponu)",
-        "linkHint": "Ortak linki: https://kolayxport.com/?ref=KOD"
+        "linkHint": "Ortak linki: https://kolayxport.com/?ref=KOD",
+        "userEmail": "Ortağın KolayXport girişi (panel)"
       },
       "type": {
         "fb_admin": "Facebook grup yöneticisi",
@@ -9253,7 +9259,31 @@
       "created": "{code} ortağı eklendi",
       "updated": "Ortak güncellendi",
       "error": "Bir hata oluştu",
-      "promoLine": "promosyon kodu {promo}"
+      "promoLine": "promosyon kodu {promo}",
+      "payouts": {
+        "title": "Ödemeler",
+        "hint": "Önce deneme çalıştırması: her ortağın ne alacağını gösterir, hiçbir şeyi değiştirmez. Primler ödemeden 30 gün sonra ödenebilir olur; ödeme sonrası iadeler burada mahsup edilir.",
+        "dryRun": "{month} için deneme",
+        "confirmStripe": "Stripe ile {count} ödeme gönder",
+        "confirmManual": "{count} manuel ödeme oluştur",
+        "provider": {
+          "stripe_global": "Stripe Global Payouts",
+          "manual": "Manuel banka havalesi (CSV)"
+        },
+        "amount": "Tutar",
+        "rows": "Prim",
+        "toPay": "ödenecek",
+        "nothing": "Ödenecek bir şey yok.",
+        "skip": {
+          "missing_bank_details": "banka bilgisi eksik",
+          "non_positive": "devredildi (iadeler ≥ primler)"
+        },
+        "done": "Ödeme çalıştırması tamamlandı",
+        "history": "Ödeme geçmişi",
+        "none": "Henüz ödeme yok.",
+        "reference": "Banka referansı",
+        "markPaid": "Ödendi işaretle"
+      }
     }
   },
   "marketing": {
@@ -17281,6 +17311,75 @@
       "nothing": "Yazdırılacak yeni Trendyol etiketi yok",
       "nothingZpl": "ZPL ile yazdırılacak etiket yok: bu siparişlerin kargo firması Trendyol Express / Aras değil. PDF ile yazdırın",
       "failed": "Trendyol etiketleri oluşturulamadı: {reason}"
+    }
+  },
+  "partners": {
+    "dashboard": {
+      "title": "Ortaklık programı",
+      "loading": "Yükleniyor…",
+      "loadError": "Ortaklık sayfanız yüklenemedi. Lütfen tekrar deneyin.",
+      "paused": "Ortaklık linkiniz duraklatıldı. Tekrar aktif olana kadar yeni kayıtlar size yazılmaz.",
+      "linkTitle": "Linkiniz",
+      "linkHint": "Bu linki paylaşın. Link üzerinden 90 gün içinde kayıt olan satıcılar size yazılır.",
+      "link": "Link",
+      "code": "Kod",
+      "promoCode": "Promosyon kodu",
+      "copy": "Kopyala",
+      "copied": "Kopyalandı",
+      "copyFailed": "Kopyalanamadı",
+      "totals": {
+        "signups": "Kayıt",
+        "activated": "Aktif",
+        "paying": "Ödeyen",
+        "pending": "Bekleyen",
+        "pendingHint": "Ödemeden sonra 30 gün bekletilir",
+        "payable": "Ödenecek",
+        "paid": "Ödenen",
+        "source": "KolayXport ortaklık programı"
+      },
+      "referralsTitle": "Getirdiğiniz kullanıcılar",
+      "referralsHint": "İsimler gizlilik için kısaltılır.",
+      "noReferrals": "Henüz kayıt yok. Başlamak için linkinizi paylaşın.",
+      "status": {
+        "deneme": "Deneme",
+        "aktif": "Aktif",
+        "odedi": "Ödedi",
+        "iptal": "İptal"
+      },
+      "interval": {
+        "month": "aylık",
+        "year": "yıllık"
+      },
+      "field": {
+        "plan": "Paket",
+        "signedUp": "Kayıt tarihi",
+        "bounty": "Prim",
+        "payableAt": "Ödenebilir tarih"
+      },
+      "noBounty": "Henüz prim yok",
+      "bountyStatus": {
+        "pending": "bekliyor",
+        "payable": "ödenecek",
+        "paid": "ödendi",
+        "void": "iptal (iade)"
+      },
+      "bank": {
+        "title": "Banka bilgileri",
+        "hint": "Ödemeler Stripe üzerinden TL olarak banka havalesiyle gönderilir. Banka bilgilerinizi ve vergi formunu Stripe'ın güvenli sayfasında girersiniz; KolayXport bu bilgileri görmez.",
+        "manualHint": "Ödemeler banka havalesiyle gönderilir. İlk ödemeden önce banka bilgileriniz için sizinle iletişime geçeceğiz.",
+        "enter": "Banka bilgilerimi gir",
+        "update": "Banka bilgilerimi güncelle",
+        "error": "Banka bilgileri sayfası açılamadı. Lütfen tekrar deneyin.",
+        "returned": "Teşekkürler. Stripe bilgilerinizi kontrol ediyor; bu biraz sürebilir."
+      },
+      "payoutsTitle": "Ödemeler",
+      "noPayouts": "Henüz ödeme yok.",
+      "payoutStatus": {
+        "processing": "işleniyor",
+        "paid": "gönderildi",
+        "failed": "başarısız, tekrar denenecek"
+      },
+      "privacyNote": "Getirdiğiniz kullanıcıların yalnızca kısaltılmış adını, paketini ve ödeme durumunu görürsünüz. Lütfen bunları paylaşmayın."
     }
   }
 }

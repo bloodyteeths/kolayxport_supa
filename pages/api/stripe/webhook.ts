@@ -9,6 +9,7 @@ import { logger } from '@/lib/logger';
 import { contextFromMetadata, sendServerEvent } from '@/lib/tracking/server';
 import { logBillingEvent, logSecurityEvent } from '@/lib/admin/events';
 import { fulfilStripeCreditSession } from '@/lib/billing/aiCreditsPurchase';
+import { attributePromoCheckout, bountyFromStripeInvoice, bountyFromStripeRefund } from '@/lib/partners/stripeBounty';
 
 /**
  * Upsert a WebhookEvent row with provider/eventType/status. Safe to call multiple times:
@@ -69,6 +70,8 @@ const relevantEvents = new Set([
   'invoice.payment_failed',
   'customer.subscription.updated',
   'customer.subscription.deleted',
+  // Partner bounties only (lib/partners): a refund voids or claws back a bounty.
+  'charge.refunded',
 ]);
 
 /**
@@ -229,6 +232,13 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
               currency: checkoutSession.currency || item?.currency || undefined,
               params: { plan: String(plan || ''), interval: String(interval) },
             }, contextFromMetadata(checkoutSession.metadata as Record<string, string>));
+
+            // Partner promo code typed at checkout (docs/gtm/referral-spec.md §2.4). Never affects billing.
+            try {
+              await attributePromoCheckout(checkoutSession, user.id);
+            } catch (e) {
+              logger.warn('Partner promo attribution failed', { eventId: event.id, error: e instanceof Error ? e.message : String(e) });
+            }
           }
           break;
         }
@@ -269,6 +279,18 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
               },
             });
           }
+
+          // Partner bounty (lib/partners/bounty.ts): every paid plan invoice of a referred customer. Never affects billing.
+          try {
+            const bountyUser = await findUserForStripeCustomer(
+              typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id,
+              event.id,
+              event.type,
+            );
+            if (bountyUser) await bountyFromStripeInvoice(invoice, bountyUser.id);
+          } catch (e) {
+            logger.warn('Partner bounty failed', { eventId: event.id, error: e instanceof Error ? e.message : String(e) });
+          }
           break;
         }
         case 'invoice.payment_failed': {
@@ -302,6 +324,15 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
               where: { id: user.id },
               data: { subscriptionStatus: 'past_due' as any },
             });
+          }
+          break;
+        }
+        case 'charge.refunded': {
+          // Partner bounties only: void / reduce / reverse (lib/partners/bounty.ts). Never affects billing.
+          try {
+            await bountyFromStripeRefund(event.data.object as Stripe.Charge);
+          } catch (e) {
+            logger.warn('Partner bounty refund failed', { eventId: event.id, error: e instanceof Error ? e.message : String(e) });
           }
           break;
         }

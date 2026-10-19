@@ -15,9 +15,20 @@ const str = (v: unknown, max = 200) => (typeof v === 'string' && v.trim() ? v.tr
 const rate = (v: unknown) => (typeof v === 'number' && v >= 0 && v <= 1 ? v : undefined);
 const int = (v: unknown, min: number, max: number) => (typeof v === 'number' && Number.isInteger(v) && v >= min && v <= max ? v : undefined);
 
+/** The partner's own KolayXport login (partner dashboard). undefined = not given, null = clear, string = user id. */
+async function resolveUserId(v: unknown, partnerId?: string): Promise<{ ok: true; userId: string | null | undefined } | { ok: false; error: string }> {
+  if (v === undefined) return { ok: true, userId: undefined };
+  if (v === null || v === '') return { ok: true, userId: null };
+  if (typeof v !== 'string') return { ok: false, error: 'userEmail must be a string' };
+  const user = await prisma.user.findUnique({ where: { email: v.trim().toLowerCase() }, select: { id: true, role: true } });
+  if (!user) return { ok: false, error: 'no KolayXport account with that e-mail' };
+  const taken = await prisma.partner.findUnique({ where: { userId: user.id }, select: { id: true } });
+  return taken && taken.id !== partnerId ? { ok: false, error: 'that account is already linked to a partner' } : { ok: true, userId: user.id };
+}
+
 const SELECT = {
   id: true, code: true, name: true, type: true, email: true, status: true, rate: true, tierRate: true, tierThreshold: true,
-  months: true, stripePromotionCode: true, promoCodeText: true, notes: true, createdAt: true,
+  months: true, stripePromotionCode: true, promoCodeText: true, notes: true, userId: true, stripeRecipientId: true, createdAt: true,
 } as const;
 
 export default withAdmin(async (req: NextApiRequest, res: NextApiResponse) => {
@@ -36,6 +47,9 @@ export default withAdmin(async (req: NextApiRequest, res: NextApiResponse) => {
     if (!name) return res.status(400).json({ error: 'name is required' });
     if (!type || !TYPES.has(type)) return res.status(400).json({ error: `type must be one of ${[...TYPES].join(', ')}` });
     if (await prisma.partner.findUnique({ where: { code }, select: { id: true } })) return res.status(409).json({ error: 'code already exists' });
+
+    const link = await resolveUserId(body.userEmail);
+    if (!link.ok) return res.status(400).json({ error: link.error });
 
     let stripePromotionCode: string | null = null;
     const promoCodeText = normalizeRefCode(body.promoCodeText) ?? code;
@@ -64,6 +78,7 @@ export default withAdmin(async (req: NextApiRequest, res: NextApiResponse) => {
         stripePromotionCode,
         promoCodeText: stripePromotionCode ? promoCodeText : null,
         notes: str(body.notes, 2000) ?? null,
+        userId: link.userId ?? null,
       },
       select: SELECT,
     });
@@ -84,6 +99,11 @@ export default withAdmin(async (req: NextApiRequest, res: NextApiResponse) => {
     if (rate(body.tierRate) !== undefined) data.tierRate = rate(body.tierRate);
     if (int(body.tierThreshold, 1, 1000) !== undefined) data.tierThreshold = int(body.tierThreshold, 1, 1000);
     if (int(body.months, 1, 120) !== undefined) data.months = int(body.months, 1, 120);
+    if (body.userEmail !== undefined) {
+      const link = await resolveUserId(body.userEmail, id);
+      if (!link.ok) return res.status(400).json({ error: link.error });
+      data.userId = link.userId;
+    }
     if (!Object.keys(data).length) return res.status(400).json({ error: 'nothing to update' });
     const existing = await prisma.partner.findUnique({ where: { id }, select: { id: true, stripePromotionCode: true } });
     if (!existing) return res.status(404).json({ error: 'not found' });

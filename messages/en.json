@@ -220,7 +220,8 @@
       "reportsProfit": "Profit report",
       "reportsPayouts": "Payouts report",
       "reportsTransactions": "Transactions report",
-      "videoStudio": "Video studio"
+      "videoStudio": "Video studio",
+      "partner": "Partner program"
     },
     "groups": {
       "listings": "Listings"
@@ -9212,7 +9213,7 @@
         "trialing": "Trialing",
         "paying": "Paying",
         "netRevenue": "Net revenue",
-        "pending": "Commission pending",
+        "pending": "Bounty pending",
         "payable": "Payable",
         "paid": "Paid",
         "actions": "Actions",
@@ -9227,10 +9228,14 @@
       "action": {
         "activate": "Activate",
         "pause": "Pause",
-        "terminate": "Terminate"
+        "terminate": "Terminate",
+        "link": "Link login",
+        "relink": "Change login",
+        "save": "Save",
+        "cancel": "Cancel"
       },
       "empty": "No partners yet.",
-      "footnote": "Activated = a marketplace connected within 7 days of signup. Etsy, Shopify and Wix use the connection date; eBay, Amazon, Trendyol and Hepsiburada use a proxy (first synced order within 7 days, or connected now during the first 7 days), so sellers who connected those but have no order yet are undercounted. Paying = active paid Stripe plan. Revenue and commission fill in once the commission ledger is live.",
+      "footnote": "Activated = a marketplace connected within 7 days of signup. Etsy, Shopify and Wix use the connection date; eBay, Amazon, Trendyol and Hepsiburada use a proxy (first synced order within 7 days, or connected now during the first 7 days), so sellers who connected those but have no order yet are undercounted. Paying = active paid Stripe plan. Net revenue = the referred customers' bounty-earning payments, net of KDV. Bounties: one-time, 25% (30% from 10 paying referrals) of the first yearly payment or ₺1.500 on the 2nd monthly payment, held 30 days.",
       "unattributed": "Signups without a partner (by first-touch source)",
       "new": {
         "title": "Add partner",
@@ -9240,7 +9245,8 @@
         "email": "E-mail (for statements)",
         "submit": "Add",
         "createPromo": "Also create a Stripe promotion code (partner coupon)",
-        "linkHint": "Partner link: https://kolayxport.com/?ref=CODE"
+        "linkHint": "Partner link: https://kolayxport.com/?ref=CODE",
+        "userEmail": "Partner's KolayXport login (dashboard)"
       },
       "type": {
         "fb_admin": "Facebook group admin",
@@ -9253,7 +9259,31 @@
       "created": "Partner {code} added",
       "updated": "Partner updated",
       "error": "Something went wrong",
-      "promoLine": "promotion code {promo}"
+      "promoLine": "promotion code {promo}",
+      "payouts": {
+        "title": "Payouts",
+        "hint": "Dry run first: it shows what each partner would get and changes nothing. Bounties are payable 30 days after the payment; refunds after a payout are netted here.",
+        "dryRun": "Dry run for {month}",
+        "confirmStripe": "Send {count} payouts via Stripe",
+        "confirmManual": "Create {count} manual payouts",
+        "provider": {
+          "stripe_global": "Stripe Global Payouts",
+          "manual": "Manual bank transfer (CSV)"
+        },
+        "amount": "Amount",
+        "rows": "Bounties",
+        "toPay": "to pay",
+        "nothing": "Nothing payable.",
+        "skip": {
+          "missing_bank_details": "bank details missing",
+          "non_positive": "carried (refunds ≥ bounties)"
+        },
+        "done": "Payout run finished",
+        "history": "Payout history",
+        "none": "No payouts yet.",
+        "reference": "Bank reference",
+        "markPaid": "Mark paid"
+      }
     }
   },
   "marketing": {
@@ -17281,6 +17311,75 @@
       "nothing": "No new Trendyol labels to print",
       "nothingZpl": "No labels to print as ZPL: these orders' carrier isn't Trendyol Express / Aras. Print them as PDF",
       "failed": "Couldn't create the Trendyol labels: {reason}"
+    }
+  },
+  "partners": {
+    "dashboard": {
+      "title": "Partner program",
+      "loading": "Loading…",
+      "loadError": "Could not load your partner page. Please try again.",
+      "paused": "Your partner link is paused. New sign-ups are not credited until it is active again.",
+      "linkTitle": "Your link",
+      "linkHint": "Share this link. Sellers who sign up through it within 90 days are credited to you.",
+      "link": "Link",
+      "code": "Code",
+      "promoCode": "Promo code",
+      "copy": "Copy",
+      "copied": "Copied",
+      "copyFailed": "Could not copy",
+      "totals": {
+        "signups": "Sign-ups",
+        "activated": "Activated",
+        "paying": "Paying",
+        "pending": "Pending",
+        "pendingHint": "Held for 30 days after payment",
+        "payable": "To be paid",
+        "paid": "Paid",
+        "source": "KolayXport partner program"
+      },
+      "referralsTitle": "Your referrals",
+      "referralsHint": "Names are shortened for privacy.",
+      "noReferrals": "No sign-ups yet. Share your link to get started.",
+      "status": {
+        "deneme": "Trial",
+        "aktif": "Active",
+        "odedi": "Paid",
+        "iptal": "Cancelled"
+      },
+      "interval": {
+        "month": "monthly",
+        "year": "yearly"
+      },
+      "field": {
+        "plan": "Plan",
+        "signedUp": "Signed up",
+        "bounty": "Bounty",
+        "payableAt": "Payable from"
+      },
+      "noBounty": "No bounty yet",
+      "bountyStatus": {
+        "pending": "pending",
+        "payable": "to be paid",
+        "paid": "paid",
+        "void": "cancelled (refund)"
+      },
+      "bank": {
+        "title": "Bank details",
+        "hint": "Payouts are sent in TRY by bank transfer through Stripe. You enter your bank details and tax form on Stripe's secure page; KolayXport never sees them.",
+        "manualHint": "Payouts are sent by bank transfer. We will contact you for your bank details before the first payout.",
+        "enter": "Enter bank details",
+        "update": "Update bank details",
+        "error": "Could not open the bank details page. Please try again.",
+        "returned": "Thanks. Stripe is checking your details; this can take a short while."
+      },
+      "payoutsTitle": "Payouts",
+      "noPayouts": "No payouts yet.",
+      "payoutStatus": {
+        "processing": "processing",
+        "paid": "sent",
+        "failed": "failed, we will retry"
+      },
+      "privacyNote": "You see your referrals' shortened name, plan and payment status only. Please do not share them."
     }
   }
 }

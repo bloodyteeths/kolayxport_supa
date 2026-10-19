@@ -64,6 +64,7 @@ export type NavItemId =
   | 'video-studio'
   | 'reports'
   | 'notifications'
+  | 'partner'
   | 'settings'
   | 'help';
 
@@ -88,7 +89,9 @@ export type NavRequires =
   /** `knownOnly`: hidden while connections are unknown (rows for integrations most accounts cannot connect yet). */
   | { kind: 'providers'; providers: readonly MarketplaceKey[]; knownOnly?: boolean }
   | { kind: 'connectCta' }
-  | { kind: 'stockSync' };
+  | { kind: 'stockSync' }
+  /** Referral partners only (a Partner row linked to this login; never Shopify-connected accounts). */
+  | { kind: 'partner' };
 
 export type NavItemConfig = {
   id: NavItemId;
@@ -256,6 +259,14 @@ export const NAV_CONFIG: readonly NavGroupConfig[] = [
     id: 'account',
     bottom: true,
     items: [
+      {
+        id: 'partner',
+        labelKey: 'nav.items.partner',
+        href: '/app/ortaklik',
+        icon: 'finance',
+        match: ['/app/ortaklik'],
+        requires: { kind: 'partner' },
+      },
       {
         id: 'notifications',
         labelKey: 'nav.items.notifications',

@@ -15,6 +15,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/router';
 import { useTranslations } from 'next-intl';
+import useSWR from 'swr';
 import { useConnections, type ConnectionsMap } from '@/lib/hooks/useConnections';
 import useMessageCountStore from '@/lib/stores/useMessageCountStore';
 import { icons, type IconKey, type LucideIcon } from '@/lib/ds/icons';
@@ -181,6 +182,8 @@ export type BuildNavModelInput = {
   billingProvider?: string | null;
   /** Stock sync has been configured (shows the row even with < 2 stores). */
   stockSyncConfigured?: boolean;
+  /** This login is a referral partner (GET /api/partner/me); shows the Ortaklık row. */
+  isPartner?: boolean;
 };
 
 /**
@@ -250,8 +253,9 @@ export function providersUnlocked(providers: readonly string[], known: Known): b
   return true;
 }
 
-function isVisible(req: NavRequires | undefined, known: Known, ctx: { showConnectCta: boolean; stockSyncConfigured: boolean }) {
+function isVisible(req: NavRequires | undefined, known: Known, ctx: { showConnectCta: boolean; stockSyncConfigured: boolean; isPartner: boolean }) {
   if (!req) return true;
+  if (req.kind === 'partner') return ctx.isPartner;
   if (req.kind === 'providers') {
     if (req.knownOnly) return req.providers.some((p) => known(p) === true);
     return providersUnlocked(req.providers, known);
@@ -294,7 +298,7 @@ export function buildNavModel(input: BuildNavModelInput): NavModel {
 
   const storeStates = STORE_PROVIDERS.map(known);
   const showConnectCta = storeStates.every((v) => v !== undefined) && storeStates.some((v) => v === false);
-  const ctx = { showConnectCta, stockSyncConfigured: Boolean(input.stockSyncConfigured) };
+  const ctx = { showConnectCta, stockSyncConfigured: Boolean(input.stockSyncConfigured), isPartner: Boolean(input.isPartner) };
 
   // Reauth from live data only (P6: never invented from cache or unknown).
   const reauth = new Set<string>();
@@ -617,6 +621,9 @@ export function useNavModel(options: UseNavModelOptions = {}): NavModel {
 
   const t = React.useCallback<Translate>((key, values) => tRoot(key as never, values as never) as string, [tRoot]);
   const path = router?.asPath ?? '/';
+  // Referral partners get an Ortaklık row; everyone else never sees it (lib/partners).
+  const { data: partnerMe } = useSWR<{ isPartner?: boolean }>(uid ? '/api/partner/me' : null, (u: string) => fetch(u).then((r) => (r.ok ? r.json() : { isPartner: false })), { revalidateOnFocus: false, dedupingInterval: 600_000 });
+  const isPartner = Boolean(partnerMe?.isPartner);
 
   const countsKey = options.counts
     ? `${options.counts.orders.toShip}|${options.counts.orders.overdue}|${options.counts.drafts.etsy}|${options.counts.drafts.ebay}`
@@ -633,8 +640,9 @@ export function useNavModel(options: UseNavModelOptions = {}): NavModel {
         messagesUnread,
         billingProvider: options.billingProvider,
         stockSyncConfigured: options.stockSyncConfigured,
+        isPartner,
       }),
-    [t, path, connections, cachedFlags, countsKey, messagesUnread, options.billingProvider, options.stockSyncConfigured],
+    [t, path, connections, cachedFlags, countsKey, messagesUnread, options.billingProvider, options.stockSyncConfigured, isPartner],
   );
 }
 

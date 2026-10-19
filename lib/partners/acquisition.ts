@@ -55,29 +55,43 @@ export function resolveTouch(input: Pick<AcquisitionInput, 'cookies' | 'body'>):
 
 export type RecordResult = { status: 'created'; partnerId: string | null } | { status: 'exists' } | { status: 'no_user' };
 
+type UserForExclusion = { email: string | null; role: string | null; billingProvider: string | null; subscriptionPlan: string | null; shopifyShops: { id: string }[] };
+
+export const EXCLUSION_USER_SELECT = { email: true, role: true, billingProvider: true, subscriptionPlan: true, shopifyShops: { where: { isActive: true }, select: { id: true }, take: 1 } } as const;
+
+/** Exclusion rules (§2.5): the partner's own e-mail, admins, review accounts, Shopify-connected accounts. */
+export function isExcluded(user: UserForExclusion, partner: { email: string | null }): boolean {
+  const email = (user.email || '').toLowerCase();
+  const shopify = user.billingProvider === 'shopify' || user.billingProvider === 'shopify_free' || user.subscriptionPlan === 'shopify_free' || user.shopifyShops.length > 0;
+  return Boolean(
+    (partner.email && email && partner.email.toLowerCase() === email)
+    || user.role === 'admin'
+    || reviewAccountEmails().has(email)
+    || shopify,
+  );
+}
+
+/** May this user be credited to this (active) partner? Used by the promo-code path. */
+export async function partnerAllowedFor(userId: string, partnerId: string): Promise<boolean> {
+  const [user, partner] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: EXCLUSION_USER_SELECT }),
+    prisma.partner.findFirst({ where: { id: partnerId, status: 'active' }, select: { email: true } }),
+  ]);
+  return Boolean(user && partner && !isExcluded(user, partner));
+}
+
 export async function recordAcquisition(userId: string, input: AcquisitionInput): Promise<RecordResult> {
   const existing = await prisma.userAcquisition.findUnique({ where: { userId }, select: { userId: true } });
   if (existing) return { status: 'exists' };
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { email: true, role: true, billingProvider: true, subscriptionPlan: true, shopifyShops: { where: { isActive: true }, select: { id: true }, take: 1 } },
-  });
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: EXCLUSION_USER_SELECT });
   if (!user) return { status: 'no_user' };
 
   const touch = resolveTouch(input);
   let partnerId: string | null = null;
   if (touch.refCode) {
     const partner = await prisma.partner.findFirst({ where: { code: touch.refCode, status: 'active' }, select: { id: true, email: true } });
-    const email = (user.email || '').toLowerCase();
-    const shopify = user.billingProvider === 'shopify_free' || user.subscriptionPlan === 'shopify_free' || user.shopifyShops.length > 0;
-    const excluded = !partner
-      || (partner.email && email && partner.email.toLowerCase() === email)
-      || user.role === 'admin'
-      || reviewAccountEmails().has(email)
-      || shopify;
-    partnerId = excluded ? null : partner!.id;
+    partnerId = partner && !isExcluded(user, partner) ? partner.id : null;
   }
-
   try {
     await prisma.userAcquisition.create({
       data: {

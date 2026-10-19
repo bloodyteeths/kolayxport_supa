@@ -9,6 +9,7 @@
 //    The proxy undercounts sellers who connected one of those but had no order yet (footnote in the UI / CSV).
 import prisma from '@/lib/prisma';
 import { MARKETPLACE_PROVIDERS, getConnectionStatus } from '@/lib/integrations/connectionStatus';
+import { promoteDueBounties } from './bounty';
 
 const DAY_MS = 86_400_000;
 export const ACTIVATION_DAYS = 7;
@@ -153,6 +154,8 @@ async function activationFor(userId: string, signedUpAt: Date, now: Date): Promi
 }
 
 export async function loadPartnerReport(month: string | null, now = new Date()): Promise<PartnerReport> {
+  // Bounties past their 30-day hold show as payable even if the daily cron did not run.
+  await promoteDueBounties(now);
   const range = monthRange(month);
   const [partners, acquisitions] = await Promise.all([
     prisma.partner.findMany({ select: { id: true, code: true, name: true, status: true }, orderBy: { code: 'asc' } }),

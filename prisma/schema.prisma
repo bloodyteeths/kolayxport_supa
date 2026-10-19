@@ -1641,10 +1641,10 @@ model TrendyolProduct {
   supplierId String
 
   // Trendyol identifiers
-  barcode       String
-  stockCode     String?
-  productMainId String?
-  trendyolId    String? // Trendyol's internal product ID
+  barcode          String
+  stockCode        String?
+  productMainId    String?
+  trendyolId       String? // Trendyol's internal product ID
   /// Public product id (trendyol.com/...-p-<id>): links the store's own orders to crowd market data (calibration).
   productContentId String?
 
@@ -2711,6 +2711,10 @@ model Partner {
   /// The code customers type, usually == code.
   promoCodeText       String?
   notes               String?
+  /// The partner's own KolayXport login (partner dashboard /app/ortaklik). Linked by an admin.
+  userId              String?             @unique
+  /// Stripe Global Payouts recipient (Tamsar, Inc. account). Bank details live at Stripe, never here.
+  stripeRecipientId   String?
   createdAt           DateTime            @default(now())
   acquisitions        UserAcquisition[]
   commissions         PartnerCommission[]
@@ -2749,8 +2753,14 @@ model PartnerCommission {
   userId          String
   /// Invoice id (in_...), checkout session id (cs_...) for credit packs, refund id (re_...).
   stripeObjectId  String   @unique
-  /// invoice | credit_pack | refund
+  /// bounty_year | bounty_month | bounty_upgrade | reversal
   kind            String
+  /// stripe | iyzico | paytr
+  provider        String   @default("stripe")
+  /// Human-readable rule that produced the row (e.g. "year 25%", "month 2nd payment", "refund re_...").
+  reason          String?
+  /// Bounty before any partial refund; commissionMinor is reduced from it.
+  earnedMinor     Int?
   paidAt          DateTime
   /// try | usd
   currency        String
@@ -2779,7 +2789,34 @@ model PartnerPayout {
   fxNote      String?
   paidAt      DateTime?
   reference   String?
+  /// stripe_global | manual
+  provider    String    @default("manual")
+  /// Stripe outbound payment id, or the bank reference for manual payouts.
+  externalId  String?
+  /// created | sent | paid | failed
+  status      String    @default("created")
+  error       String?
   createdAt   DateTime  @default(now())
 
   @@index([partnerId])
+}
+
+/// Subscription payments of partner-referred customers (lib/partners/bounty.ts). Lets the bounty rules tell a first
+/// payment from a second / renewal / upgrade the same way for every provider. Only attributed users get rows.
+model PartnerPaymentEvent {
+  id         String   @id @default(uuid())
+  userId     String
+  provider   String
+  /// Provider object id (Stripe invoice in_..., iyzico/PayTR order id). Unique, so replays are no-ops.
+  objectId   String   @unique
+  /// month | year
+  interval   String
+  planKey    String?
+  paidAt     DateTime
+  currency   String
+  grossMinor Int
+  netMinor   Int
+  createdAt  DateTime @default(now())
+
+  @@index([userId, paidAt])
 }

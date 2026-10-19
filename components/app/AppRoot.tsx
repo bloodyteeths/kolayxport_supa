@@ -27,6 +27,7 @@ import { CommandPalette, GoShortcutHint } from '@/components/ds/shell/CommandPal
 import { useGoShortcuts } from '@/lib/nav/useGoShortcuts';
 import { isShellRoute } from '@/lib/nav/shellRoutes';
 import { isPlayClient } from '@/lib/billing/playClient';
+import { AcquisitionClaim } from '@/lib/partners/AcquisitionClaim';
 
 // Inter via next/font (self-hosted). latin-ext covers ğ ş ı İ. Exposed as --font-inter at :root below.
 // preload: false — marketing pages never use Inter; app pages fetch it on first use (then cached).
@@ -145,6 +146,8 @@ export function AppRoot({ children, session, shell }: { children: ReactNode; ses
         {/* Live events: SSE stream, new-order chime + toast, live SWR refresh. Signed-in /app/* only. */}
         <LiveAppMount ordersPath="/app/labels" />
         <LimitReachedDialog />
+        {/* Referral / first-touch attribution for Google / Apple sign-ups (lib/partners). */}
+        <AcquisitionClaim />
         <CreditsDialog />
       </ConfirmProvider>
       </ThemeProvider>

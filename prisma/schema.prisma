@@ -87,6 +87,7 @@ model User {
   aiConnections           AiConnection[]
   notificationSettings    NotificationSettings?
   pushDevices             PushDevice[]
+  acquisition             UserAcquisition?
   stockSettings           StockSettings?
   stockItems              StockItem[]
 }
@@ -2685,4 +2686,100 @@ model MarketIngestStat {
   rejected      Int      @default(0)
 
   @@unique([day, mkt, pageType, parserVersion])
+}
+
+/// Referral partners (docs/gtm/referral-spec.md, docs/gtm/turkey-gameplan.md §4.2).
+model Partner {
+  id                  String              @id @default(uuid())
+  /// Upper case A–Z, 0–9, '-', 3–20 chars, e.g. "ETSYILEGELIR".
+  code                String              @unique
+  name                String
+  /// fb_admin | tg_admin | x_voice | youtube | musavir | other
+  type                String
+  /// For statements; never shown to anyone else.
+  email               String?
+  /// active | paused | terminated
+  status              String              @default("active")
+  rate                Decimal             @default(0.30) @db.Decimal(5, 4)
+  tierRate            Decimal             @default(0.35) @db.Decimal(5, 4)
+  /// Distinct paying referred customers before tierRate applies.
+  tierThreshold       Int                 @default(10)
+  /// Commission window in months from the customer's first payment.
+  months              Int                 @default(12)
+  /// Stripe promotion_code id (promo_...).
+  stripePromotionCode String?             @unique
+  /// The code customers type, usually == code.
+  promoCodeText       String?
+  notes               String?
+  createdAt           DateTime            @default(now())
+  acquisitions        UserAcquisition[]
+  commissions         PartnerCommission[]
+}
+
+/// First-touch signup attribution: one row per user, written once (signup, post-login claim, or promo code).
+model UserAcquisition {
+  userId      String    @id
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmContent  String?
+  utmTerm     String?
+  /// First landing path.
+  landing     String?
+  /// Raw ?ref= value as captured (upper-cased, format-checked).
+  refCode     String?
+  /// Set only when refCode / promo code matches an active, eligible Partner.
+  partnerId   String?
+  partner     Partner?  @relation(fields: [partnerId], references: [id])
+  /// signup | claim | promo
+  via         String
+  /// When the first-touch cookie was set.
+  firstSeenAt DateTime?
+  capturedAt  DateTime  @default(now())
+
+  @@index([partnerId])
+}
+
+/// Partner commission ledger (Stage B: written from Stripe webhooks).
+model PartnerCommission {
+  id              String   @id @default(uuid())
+  partnerId       String
+  partner         Partner  @relation(fields: [partnerId], references: [id])
+  userId          String
+  /// Invoice id (in_...), checkout session id (cs_...) for credit packs, refund id (re_...).
+  stripeObjectId  String   @unique
+  /// invoice | credit_pack | refund
+  kind            String
+  paidAt          DateTime
+  /// try | usd
+  currency        String
+  grossMinor      Int
+  taxMinor        Int
+  netMinor        Int
+  rate            Decimal  @db.Decimal(5, 4)
+  commissionMinor Int
+  /// pending | payable | paid | void
+  status          String   @default("pending")
+  payableAt       DateTime
+  payoutId        String?
+  createdAt       DateTime @default(now())
+
+  @@index([partnerId, status])
+}
+
+/// Monthly partner payouts (EFT in TRY).
+model PartnerPayout {
+  id          String    @id @default(uuid())
+  partnerId   String
+  /// "2026-12"
+  period      String
+  amountMinor Int
+  currency    String
+  fxNote      String?
+  paidAt      DateTime?
+  reference   String?
+  createdAt   DateTime  @default(now())
+
+  @@index([partnerId])
 }

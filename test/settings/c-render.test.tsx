@@ -13,6 +13,12 @@ import { SettingsShellContext, type SettingsShellValue } from '@/components/doma
 import { LOCALES, intlErrors, renderC } from './c-harness';
 import { flatten, groupC, GROUP_C_OWNED } from './c-messages';
 
+// PreferencesPanel hosts the account-deletion section, which reads the session e-mail.
+vi.mock('next-auth/react', () => ({
+  useSession: () => ({ data: { user: { email: 'seller@example.com' } }, status: 'authenticated' }),
+  signOut: vi.fn(),
+}));
+
 const SHELL = { tab: 'senderProfile' } as unknown as SettingsShellValue;
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });

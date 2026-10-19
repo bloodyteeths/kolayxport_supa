@@ -49,7 +49,17 @@ export function captureAttribution(search: string) {
   if (typeof window === 'undefined') return;
   try {
     const p = new URLSearchParams(search);
-    const found = Object.fromEntries(UTM_KEYS.map((k) => [k, p.get(k)]).filter(([, v]) => v));
+    const found: Record<string, string> = Object.fromEntries(UTM_KEYS.map((k) => [k, p.get(k)]).filter(([, v]) => v));
+    // Partner links (?ref=, docs/gtm/referral-spec.md): keep the code, and tag them for GA4 when no utm_* is set.
+    const ref = p.get('ref');
+    if (ref && /^[A-Za-z0-9-]{3,20}$/.test(ref)) {
+      const code = ref.toUpperCase();
+      found.ref = code;
+      if (!UTM_KEYS.some((k) => k.startsWith('utm_') && found[k])) {
+        found.utm_source = 'partner';
+        found.utm_content = `ref-${code.toLowerCase()}`;
+      }
+    }
     if (!Object.keys(found).length) return;
     const prev = JSON.parse(window.localStorage.getItem(UTM_STORE) || 'null');
     if (prev && Date.now() - prev.at < 90 * 864e5) return;

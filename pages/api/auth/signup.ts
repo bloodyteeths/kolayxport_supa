@@ -9,6 +9,8 @@ import { logAuthEvent } from '@/lib/admin/events';
 import { validatePassword } from '@/lib/auth/passwordPolicy';
 import { newTrialExpiry } from '@/lib/billing/planLimits';
 import { contextFromRequest, sendServerEvent } from '@/lib/tracking/server';
+import { recordAcquisition } from '@/lib/partners/acquisition';
+import { logger } from '@/lib/logger';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -63,6 +65,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(409).json({ error: 'An account with this email already exists' });
     }
     throw e;
+  }
+
+  // First-touch partner code / UTMs (docs/gtm/referral-spec.md §2.2). Never fails the signup.
+  try {
+    await recordAcquisition(user.id, { cookies: req.cookies, body: req.body?.attribution, via: 'signup' });
+  } catch (e) {
+    logger.warn('Signup acquisition not recorded', { error: e instanceof Error ? e.message : String(e) });
   }
 
   // Funnel: server copies of sign_up / start_trial (same event_id as the browser event, consent-gated).

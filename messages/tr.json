@@ -9189,7 +9189,72 @@
     "user": "Kullanıcı",
     "admin": "Yönetici",
     "overview": "Genel Bakış",
-    "activity": "Aktivite"
+    "activity": "Aktivite",
+    "partners": {
+      "title": "Ortaklar (referans)",
+      "subtitle": "Ortak linki başına kayıt, aktivasyon ve komisyon. Yalnızca sayılar ve tutarlar.",
+      "back": "← Yönetim",
+      "forbidden": "Yönetici yetkisi gerekiyor.",
+      "allTime": "Tüm zamanlar",
+      "month": "Ay",
+      "csv": "CSV indir",
+      "totals": {
+        "signups": "Kayıt",
+        "activated": "Aktif",
+        "paying": "Ödeyen"
+      },
+      "col": {
+        "code": "Kod",
+        "name": "Ad",
+        "status": "Durum",
+        "signups": "Kayıt",
+        "activated": "Aktif",
+        "trialing": "Denemede",
+        "paying": "Ödeyen",
+        "netRevenue": "Net gelir",
+        "pending": "Bekleyen komisyon",
+        "payable": "Ödenecek",
+        "paid": "Ödendi",
+        "actions": "İşlemler",
+        "source": "Kaynak"
+      },
+      "statusValue": {
+        "active": "Aktif",
+        "paused": "Duraklatıldı",
+        "terminated": "Sonlandırıldı"
+      },
+      "activatedSplit": "Mağaza bağlantısı: {store} · sipariş/bağlantı tahmini: {proxy}",
+      "action": {
+        "activate": "Etkinleştir",
+        "pause": "Duraklat",
+        "terminate": "Sonlandır"
+      },
+      "empty": "Henüz ortak yok.",
+      "footnote": "Aktif = kayıttan sonraki 7 gün içinde bir pazaryeri bağlamış. Etsy, Shopify ve Wix bağlantı tarihine göre sayılır; eBay, Amazon, Trendyol ve Hepsiburada için tahmin kullanılır (7 gün içinde ilk sipariş ya da ilk 7 günde şu an bağlı olmak). Bu yüzden bu pazaryerlerini bağlayıp henüz siparişi olmayan satıcılar eksik sayılır. Ödeyen = aktif ücretli Stripe planı. Gelir ve komisyon, komisyon defteri devreye girince dolar.",
+      "unattributed": "Ortaksız kayıtlar (ilk temas kaynağına göre)",
+      "new": {
+        "title": "Ortak ekle",
+        "code": "Kod (örn. ETSYILEGELIR)",
+        "name": "Ad",
+        "type": "Tür",
+        "email": "E-posta (dökümler için)",
+        "submit": "Ekle",
+        "createPromo": "Stripe promosyon kodu da oluştur (3 ay %20 indirim)",
+        "linkHint": "Ortak linki: https://kolayxport.com/?ref=KOD"
+      },
+      "type": {
+        "fb_admin": "Facebook grup yöneticisi",
+        "tg_admin": "Telegram yöneticisi",
+        "x_voice": "X hesabı",
+        "youtube": "YouTube",
+        "musavir": "Mali müşavir / danışman",
+        "other": "Diğer"
+      },
+      "created": "{code} ortağı eklendi",
+      "updated": "Ortak güncellendi",
+      "error": "Bir hata oluştu",
+      "promoLine": "promosyon kodu {promo}"
+    }
   },
   "marketing": {
     "home": {

@@ -9189,7 +9189,72 @@
     "user": "User",
     "admin": "Admin",
     "overview": "Overview",
-    "activity": "Activity"
+    "activity": "Activity",
+    "partners": {
+      "title": "Referral partners",
+      "subtitle": "Signups, activation and commission per partner link. Counts and money only.",
+      "back": "← Admin",
+      "forbidden": "Admin access required.",
+      "allTime": "All time",
+      "month": "Month",
+      "csv": "Download CSV",
+      "totals": {
+        "signups": "Signups",
+        "activated": "Activated",
+        "paying": "Paying"
+      },
+      "col": {
+        "code": "Code",
+        "name": "Name",
+        "status": "Status",
+        "signups": "Signups",
+        "activated": "Activated",
+        "trialing": "Trialing",
+        "paying": "Paying",
+        "netRevenue": "Net revenue",
+        "pending": "Commission pending",
+        "payable": "Payable",
+        "paid": "Paid",
+        "actions": "Actions",
+        "source": "Source"
+      },
+      "statusValue": {
+        "active": "Active",
+        "paused": "Paused",
+        "terminated": "Terminated"
+      },
+      "activatedSplit": "Store connection: {store} · order/connection proxy: {proxy}",
+      "action": {
+        "activate": "Activate",
+        "pause": "Pause",
+        "terminate": "Terminate"
+      },
+      "empty": "No partners yet.",
+      "footnote": "Activated = a marketplace connected within 7 days of signup. Etsy, Shopify and Wix use the connection date; eBay, Amazon, Trendyol and Hepsiburada use a proxy (first synced order within 7 days, or connected now during the first 7 days), so sellers who connected those but have no order yet are undercounted. Paying = active paid Stripe plan. Revenue and commission fill in once the commission ledger is live.",
+      "unattributed": "Signups without a partner (by first-touch source)",
+      "new": {
+        "title": "Add partner",
+        "code": "Code (e.g. ETSYILEGELIR)",
+        "name": "Name",
+        "type": "Type",
+        "email": "E-mail (for statements)",
+        "submit": "Add",
+        "createPromo": "Also create a Stripe promotion code (20% off for 3 months)",
+        "linkHint": "Partner link: https://kolayxport.com/?ref=CODE"
+      },
+      "type": {
+        "fb_admin": "Facebook group admin",
+        "tg_admin": "Telegram admin",
+        "x_voice": "X account",
+        "youtube": "YouTube",
+        "musavir": "Accountant / consultant",
+        "other": "Other"
+      },
+      "created": "Partner {code} added",
+      "updated": "Partner updated",
+      "error": "Something went wrong",
+      "promoLine": "promotion code {promo}"
+    }
   },
   "marketing": {
     "home": {

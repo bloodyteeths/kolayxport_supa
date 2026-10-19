@@ -18,7 +18,7 @@ Built on the existing research. This plan doesn't redo any of it, it only links 
 | Phases | Phase 1: referral partners (Facebook group admins, X voices), **no ad spend until 100 users**. Phase 2: Instagram posts, then Meta and Google ads | Founder, via orchestrator |
 | Executors | Merisa and Ekin. Atilla stays out of the day-to-day | Founder, via orchestrator |
 | Marketing site | gtm/overhaul is live (main `43b3bb4f`): the 6 `/cozumler/*` pages and 4 Turkish blog posts | gtm-overhaul session |
-| Tracking | **Not live.** No GTM, GA4 or Meta IDs are in prod, and the cookie banner only has "Kabul et" (the full panel is still being built) | gtm-overhaul session |
+| Tracking | **Not live.** No GTM, GA4 or Meta IDs are in prod, The full cookie panel ("Tümünü kabul et" / "Yalnızca zorunlu" / "Tercihleri yönet" + Consent Mode) has been live since 2026-10-17 (`d03421a2`) | gtm-overhaul session |
 | YouTube | 7 new tutorials, all unlisted; 8 more are blocked by the upload cap on the unverified channel (15 in total) | gtm-overhaul session |
 | Chrome extension | Live on the Chrome Web Store. 9.12.0 (adds Trendyol and Hepsiburada) is in Google review | gtm-overhaul session |
 | Prices | **Pricing v2** ([pricing-v2.md](pricing-v2.md)): yearly packages Başlangıç ₺29.990 / Büyüme ₺54.990 / Pro ₺89.990 / Kurumsal (quote), with taksit via iyzico/PayTR; **one** monthly plan, Aylık ₺2.999, plus modules. Shown "+KDV" (accountant to confirm, pricing-v2 §5). Collected by **Tamsar, Inc.** (US) in TRY | Atilla 2026-10-19 (model; numbers are a proposal) |
@@ -98,7 +98,7 @@ Cash cost = what we pay before knowing whether a customer comes. Estimates are e
 | 7 | **Logistics / accounting partnerships** (ShipEntegra, Paraşüt/QNB partner programs, kargo acenteleri) | ₺0, rev share | Slow (BD cycles) | Atilla: one intro each; Merisa runs it | 2 | Not started |
 | 8 | **Freelancers on Bionluk** for list-building (finding groups, admins, X accounts, contact info) | ≈ ₺4–6k one-off, spread over the first ~30 partners | Fast | Merisa hires, one-off job | 1 (week 1) | — |
 | 9 | **Instagram organic** (calendar-30d copy reused) | ₺0 + time | Medium | Ekin | **2** | Copy ready |
-| 10 | **Meta ads** (ads-playbook, 8 concepts) | Target ≤ ₺4.500 / paying | Fast, costly | Merisa runs, Atilla approves budget | **2**, after the gate | Blocked: tracking + cookie panel |
+| 10 | **Meta ads** (ads-playbook, 8 concepts) | Target ≤ ₺4.500 / paying | Fast, costly | Merisa runs, Atilla approves budget | **2**, after the gate | Blocked: GTM/GA4/Meta IDs (Atilla) |
 | 11 | **Google Search ads** (high-intent: "etsy seo aracı", "etgb nedir", "etsy kar hesaplama") | Likely ≥ Meta; test small | Fast | Merisa | 2 (month 3+) | — |
 | 12 | Fairs, association stands, paid big-YouTuber sponsorships | ₺20k+ per event or video | — | — | 3, only with traction and testimonials | — |
 
@@ -277,7 +277,7 @@ Week 1 is set-up (no contacts). Signups include organic from directories, SEO an
 1. **100 activated users** (§4.1).
 2. **≥ 5 paying customers**, or trial→paid ≥ 8% on the first full cohort.
 3. **Tracking live:** GTM + GA4 + Meta pixel/CAPI set in prod, test events verified (LAUNCH-CHECKLIST §C).
-4. **Cookie panel complete** (Accept / Reject / Preferences), consent-gated pixels. gtm-overhaul ships it by **26 Oct**.
+4. ~~**Cookie panel complete**~~: done, live since 2026-10-17 (`d03421a2`).
 5. Attribution stored on the user (§4.2 items 1–2), so ads can be judged by trial→paid.
 6. At least 2 customers have given **written consent** for a testimonial (legal-notes §2). This is not strictly required for ads, but it multiplies their conversion.
 
@@ -304,7 +304,7 @@ Day 1 = **Mon 2026-10-26** (one week to get Atilla's approvals and the attributi
 
 | Week | Targets | Who |
 |---|---|---|
-| W1 (26 Oct) | Partner terms approved (done 19 Oct). Cookie panel live (gtm-overhaul, 26 Oct). Attribution + ref + partner report built and deployed (dev session via deploy queue). Shortlist of 200 scored (Bionluk + Claude). Sheet set up. Merisa and Ekin each post 15 helpful answers. YouTube channel phone-verified (Atilla, 2 min) | Atilla, dev session, gtm-overhaul, Merisa, Ekin, freelancer |
+| W1 (26 Oct) | Partner terms approved (done 19 Oct). Attribution + ref + partner report built and deployed (dev session via deploy queue). Shortlist of 200 scored (Bionluk + Claude). Sheet set up. Merisa and Ekin each post 15 helpful answers. YouTube channel phone-verified (Atilla, 2 min) | Atilla, dev session, gtm-overhaul, Merisa, Ekin, freelancer |
 | W2 (2 Nov) | 40 contacts. 2 partners signed. Tutorials switched Unlisted → Public (Atilla's OK, then gtm-overhaul; embeds are already live). Blog cadence starts (2/week, Merisa fact-checks each post before it ships) | Merisa, Ekin, gtm-overhaul |
 | W3 (9 Nov) | 55 contacts (cum. 95). 4 partners. First partner posts | Merisa, Ekin |
 | W4 (16 Nov) | 55 contacts (cum. 150). 7 partners, 4 active. **First live demo** in a partner group. 23 activated users. Review assumptions with real reply/accept rates | Merisa, Ekin |
@@ -385,7 +385,7 @@ Everything in §4.3–4.8 and §5: shortlists, outreach, partner onboarding, dem
 | Work | Session |
 |---|---|
 | Referral attribution + `?ref=` + partner report (§4.2) | A dev session the orchestrator assigns; deploy only via mybaby-sync-product-50's queue; no MCP/OAuth-consent files touched |
-| Cookie panel, tutorials public + embedded, `/ortaklik` terms page, blog cadence, Instagram assets | kolayxport-gtm-overhaul |
+| Tutorials public + embedded, `/ortaklik` terms page, blog cadence, Instagram assets | kolayxport-gtm-overhaul |
 | Extension listing (Chrome Web Store copy), extension referral link in the limit screen (`utm_source=extension` already exists) | hepsiburada-full-integration (extension owner) |
 | Play Store / iOS store listings | mybaby-sync-product-d7 |
 | Weekly: shortlist research (finding new groups/accounts), personalised first lines for Merisa/Ekin to review, KPI report from the partner report | A marketing-support Claude session (web research only; any prod DB read needs Atilla's explicit permission) |
@@ -407,7 +407,7 @@ Everything in §4.3–4.8 and §5: shortlists, outreach, partner onboarding, dem
 | HB/N11 sellers sign up and churn | Every message says "Hepsiburada/N11 yok, odak yurt dışı". Revisit when HB integration is live |
 | Founding coupon blocks partner promo codes for the first 20 | Intended: referred users get 40% for life anyway; the partner link still attributes them |
 | Attribution build slips | No links go out before it's live; partners can be signed but are told the start date |
-| Tracking/cookie panel late → Phase 2 delayed | It's in the gate on purpose; Phase 1 doesn't need pixels |
+| Tracking IDs late → Phase 2 delayed | It's in the gate on purpose; Phase 1 doesn't need pixels |
 | Payouts to individuals create tax paperwork | Paid by Tamsar, Inc. through Stripe Global Payouts; W-8BEN on file; the partner declares the income in Turkey (accountant confirms) |
 | Yearly-first pricing converts lower without taksit | iyzico/PayTR with taksit before pricing v2 goes live; Aylık stays as the low-commitment option |
 | Review freezes (Shopify, MCP, Play) | Marketing never edits those listings or reviewer accounts; links only |

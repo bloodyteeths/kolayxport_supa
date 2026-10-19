@@ -64,7 +64,7 @@ model PartnerCommission {
   kind            String              // invoice | credit_pack | refund
   paidAt          DateTime
   currency        String              // try | usd
-  grossMinor      Int                 // amount paid, incl. KDV
+  grossMinor      Int                 // amount paid (no KDV is charged today)
   taxMinor        Int                 // KDV on the invoice (0 if none)
   netMinor        Int                 // gross − tax (negative for refunds)
   rate            Decimal
@@ -139,13 +139,13 @@ In `checkout.session.completed`, add a block that leaves the existing logic unch
 ## 3. Stage B: bounty ledger
 
 Business rules (Atilla, 2026-10-19):
-- **Yearly package:** 25% of the customer's **first yearly payment**, net of KDV, after discounts. The rate is 30% if the partner already had ≥ 10 paying referred customers before this payment.
+- **Yearly package:** 25% of the customer's **first yearly payment**, the amount paid, after discounts (no KDV is charged). The rate is 30% if the partner already had ≥ 10 paying referred customers before this payment.
 - **Aylık (monthly):** a fixed **₺1.500**, earned on the customer's **2nd** successful monthly payment.
 - **Upgrade:** Aylık → yearly within 90 days of the first payment earns the yearly bounty **minus** any Aylık bounty already earned. Never negative.
 - **Exclusions:** modules, AI credit packs and renewals earn nothing. Shopify-billed customers, comped accounts and protected review accounts earn nothing.
 - **Hold:** 30 days after the payment that earned it. A refund within the hold voids the bounty.
 
-**Payment-provider agnostic.** Payments arrive from Stripe (Aylık, modules, and possibly yearly) and, after pricing v2, from **iyzico or PayTR** (yearly with taksit; pricing-v2 §4 P2). Put the rules in `lib/partners/bounty.ts` with one entry point:
+**Payment-provider agnostic.** Today every payment comes from Stripe (Tamsar, Inc. is the seller for all customers; iyzico/PayTR were dropped, pricing-v2 §5). Keep one provider-agnostic entry point anyway, in `lib/partners/bounty.ts`:
 
 ```ts
 onPaymentSucceeded({ userId, provider: 'stripe'|'iyzico'|'paytr', objectId, paidAt, currency, grossMinor, taxMinor, planKey, interval: 'year'|'month', isFirstPaymentOfPlan })
@@ -161,8 +161,7 @@ Each provider's webhook calls these at the end of its handler, inside its own tr
 
 **Net amount:**
 - Stripe: `amount_paid − sum(total_tax_amounts)`.
-- iyzico/PayTR: the KDV amount from our own order record.
-- If no tax amount is known while prices are "+KDV": log a warning and use `round(gross / 1.20)`.
+- No KDV is charged (Tamsar, Inc. adds none), so normally `taxMinor = 0` and net = amount paid. Never apply a /1.20 fallback.
 
 **Refunds:**
 - Stripe: add `charge.refunded` to `relevantEvents`. iyzico/PayTR: their refund callbacks.
@@ -201,7 +200,7 @@ Each provider's webhook calls these at the end of its handler, inside its own tr
 - **Onboarding:** create a Stripe recipient for the partner (`Partner.stripeRecipientId`, new field) and give the partner a Stripe-hosted link to enter bank details and tax form (W-8BEN / W-8BEN-E). **We never store IBANs.**
 - **Payout run:** one outbound payment per partner per month for the payable sum, `PartnerPayout{ provider:'stripe_global', externalId, amountMinor, currency:'try', paidAt }` (add `provider` + `externalId`). On success, mark the included rows `paid`; on failure, keep them `payable` and show the error in admin.
 - The founder enables Global Payouts once in the Stripe dashboard. Fees are as shown there; check them before the first run.
-- **Which entity pays depends on pricing-v2 §5.** If Modsons becomes the seller of record for Turkish customers, bounties on Modsons sales are paid by EFT from Modsons (CSV run + admin marks paid, with the fatura / gider pusulası the accountant specifies). Global Payouts applies to bounties on Tamsar, Inc. sales. Keep `PartnerPayout.provider` = `stripe_global` | `eft_modsons`.
+- **Payer: Tamsar, Inc.** (seller for all customers, decided 2026-10-19), so all bounties go through Stripe Global Payouts. Keep `PartnerPayout.provider` (`stripe_global`, or `manual` for the CSV fallback).
 - **Fallback** if Global Payouts isn't enabled for the account: the run outputs a CSV for a manual transfer, and an admin marks rows paid with a reference.
 
 ### 4.4 Free Growth perk
@@ -216,7 +215,7 @@ Stage B tests (Vitest, mocks as in existing tests):
 
 | # | Case | Expected |
 |---|---|---|
-| B1 | Referred user pays the first Büyüme yearly payment: gross ₺65.988 incl. ₺10.998 KDV | `bounty_year`, net 5.499.000 minor, bounty 1.374.750 minor (25%), `payableAt +30 d` |
+| B1 | Referred user pays the first Büyüme yearly payment: ₺54.990, no tax line | `bounty_year`, net 5.499.000 minor, bounty 1.374.750 minor (25%), `payableAt +30 d` |
 | B2 | Same event replayed | No duplicate row |
 | B3 | Partner already has 10 paying referrals; the 11th pays yearly | Rate 0.30 |
 | B4 | Aylık first payment | No bounty |
@@ -227,7 +226,7 @@ Stage B tests (Vitest, mocks as in existing tests):
 | B9 | Module or AI credit pack purchase | No bounty |
 | B10 | Full refund 10 days after the yearly payment | Bounty `void` |
 | B11 | Refund after the bounty was paid | `reversal` row, netted in the next payout run; the run never sends a negative amount |
-| B12 | iyzico/PayTR yearly payment (when P2 exists) | Same as B1 through the shared entry point, `provider` set |
+| B12 | "Yearly, paid monthly" subscription (if Atilla approves pricing-v2 §5) | 25% of the 12-month contract value, half after the 2nd and half after the 6th monthly payment |
 | B13 | Bounty code throws inside a webhook | Billing still updates; webhook returns 200; error logged |
 | B14 | Payout run without `confirm` | No DB writes, no Stripe call |
 | B15 | Payout run with a partner with no recipient onboarding | Partner skipped, listed as "banka bilgisi eksik" |
@@ -246,5 +245,5 @@ Manual prod check after Stage B (dev session + Merisa):
 1. ~~Stage A~~ (deployed 2026-10-19).
 2. Stage B: the bounty ledger + cron on Stripe events first, then the dashboard, then Global Payouts.
 3. The founder creates the partner coupon(s) and sets `STRIPE_PARTNER_COUPON_ID` (and `PARTNER_YEARLY_COUPON_ID` if needed) via stdin, and enables Global Payouts.
-4. The iyzico/PayTR hook goes in when pricing v2 P2 is built.
+4. If Atilla approves "yearly, paid monthly" (pricing-v2 §5), add its bounty rule (B12).
 5. The gtm-overhaul session publishes `/ortaklik` (terms) only after Stage B is live, the founder has approved the terms (done) and the accountant has confirmed the payout paperwork (pricing-v2 §5).

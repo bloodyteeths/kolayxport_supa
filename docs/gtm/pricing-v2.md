@@ -1,31 +1,31 @@
 # Pricing v2 for Turkey: yearly packages + one monthly plan + modules
 
-Date: 2026-10-19. Status: **model and package prices decided by Atilla** (prices confirmed 2026-10-19, 19:48: Başlangıç ₺29.990, Büyüme ₺54.990, Pro ₺89.990, Kurumsal from ₺149.990 a year, Aylık ₺2.999 a month, all +KDV). **Module prices are still a proposal.** Still open: seller of record / KDV (§5). Nothing is built or published yet; partners quote no prices until checkout exists.
+Date: 2026-10-19. Status: **model, package prices and seller decided by Atilla.** Prices (confirmed 2026-10-19, 19:48): Başlangıç ₺29.990, Büyüme ₺54.990, Pro ₺89.990, Kurumsal from ₺149.990 a year, Aylık ₺2.999 a month. These are **final amounts: Tamsar, Inc. sells and adds no KDV**. All 14 Stripe prices exist (created by d7, live but inert behind `PRICING_V2`; the code is waiting for a deploy). **Module prices** were created at the amounts in §3 and are on Atilla's board for a final OK. Open: how to offer taksit (§5). Partners quote no prices until checkout is live.
 Supersedes the monthly ladder (Starter ₺2.499 / Growth ₺4.999 / Pro ₺7.999 a month) for Turkish customers. Shopify App Store pricing (`shopify_free`) is not affected.
 
 ## 1. Decisions (Atilla, 2026-10-19)
 
 1. **Yearly packages are the main offer.** Only **one** monthly plan exists. Monthly users add **modules** instead of upgrading.
-2. **iyzico or PayTR** for yearly payments in TRY **with taksit**. Turkish sellers pay ₺30–90k yearly fees in installments, and Stripe can't offer Turkish installments.
-3. **Today**, payments are collected by **Tamsar, Inc.** (US) in TRY via Stripe, under its agreement with Modsons Yazılım (Atilla, 2026-10-19). KolayXport itself is published by **Modsons Yazılım E-Ticaret İthalat İhracat Ltd. Şti.** (Adana; [company.md](company.md)). Which entity sells to *Turkish* customers is the accountant question in §5.
-4. Prices are shown **"+KDV"**, with the KDV-inclusive total at checkout (orchestrator decision, 2026-10-19). **See §5: this needs the accountant now that the seller is a US company.**
+2. **Taksit is wanted** for the yearly fees (₺30–90k). Turkish sellers are used to paying these in installments. iyzico/PayTR were the first idea; they don't fit the seller model below (§5).
+3. **Seller of record = Tamsar, Inc.** (US) for all customers. It charges in TRY via Stripe, **with no KDV added**. Modsons Yazılım E-Ticaret İthalat İhracat Ltd. Şti. ([company.md](company.md)) invoices Tamsar, Inc. for its services and runs marketing on the Turkish side (Atilla, 2026-10-19, in d7's session).
+4. **Prices are shown as final amounts**, with no "+KDV" (this supersedes the earlier "+KDV" decision of the same day).
 
 ## 2. Why (PraPazar, checked 2026-10-19 on prapazar.com/tr/paketler)
 
 - **Monthly:** one plan only, Eko Aylık at ₺2.550/mo (5 stores, 1.000 orders, no sub-users), with paid modules such as e-Fatura +₺1.850, Mağaza Import +₺1.150, and stock modules at +₺250 each.
 - **Yearly:** Eko Plus ₺27.250, Pra ₺39.250, Uzman ₺59.250 and Enterprise ₺74.250. Cargo integration is a +₺13.000/yr module below Uzman.
 - **KDV and payment:** prices carry no KDV (teknopark exemption), and 3 taksit are offered on major cards.
-- **Where we stand:** our yearly equivalents (₺24.990 / ₺49.990 / ₺79.990 +KDV) were already in PraPazar's range. The gap was the structure, not the level. Sentos (₺89k) and Entegra (₺125k) are still far above us for the Etsy/eBay tier ([competitors.md](competitors.md) §4).
+- **Where we stand:** our old yearly equivalents (₺24.990 / ₺49.990 / ₺79.990) were already in PraPazar's range. The gap was the structure, not the level. Sentos (₺89k) and Entegra (₺125k) are still far above us for the Etsy/eBay tier ([competitors.md](competitors.md) §4).
 
-## 3. Proposed price list (+KDV)
+## 3. Price list (final amounts, no KDV added)
 
-### Yearly packages (main offer, taksit via iyzico/PayTR): prices DECIDED 2026-10-19
+### Yearly packages (main offer): prices DECIDED 2026-10-19
 
 | | **Başlangıç** | **Büyüme** | **Pro** | **Kurumsal** |
 |---|---|---|---|---|
 | Price / year | **₺29.990** | **₺54.990** | **₺89.990** | from **₺149.990** (quote) |
 | ≈ per month | ₺2.499 | ₺4.583 | ₺7.499 | — |
-| Taksit | up to 6 | up to 9 | up to 12 | by agreement |
+| Payment | yearly in full, or (proposal, §5) 12 monthly payments on a 12-month commitment | same | same | by agreement |
 | Connected stores | 3 | 6 | 12 | custom |
 | Orders / year | 6.000 | 24.000 | 72.000 | custom |
 | Labels / year | 3.000 | 12.000 | 36.000 | custom |
@@ -42,11 +42,11 @@ The feature split follows today's gates (Pro-only = `financials`, `arbitrage`, b
 
 | **Aylık** | |
 |---|---|
-| Price | **₺2.999 / month** +KDV (card, Stripe) |
+| Price | **₺2.999 / month** (card, Stripe; no KDV added) |
 | Includes | 2 stores, 500 orders/month, 250 labels/month, 300 AI credits/month, listing studio, AI text, research, Chrome extension, labels, ETGB file, stock sync |
 | Purpose | A low-commitment entry for sellers who won't prepay. It's deliberately priced above Başlangıç's monthly equivalent (₺2.499), so yearly is the obvious deal |
 
-### Modules (add-ons): prices still a PROPOSAL
+### Modules (add-ons): created in Stripe at these amounts; Atilla's final OK pending on the board
 
 | Module | On Aylık (per month) | On a yearly package (per year) |
 |---|---|---|
@@ -61,7 +61,7 @@ The feature split follows today's gates (Pro-only = `financials`, `arbitrage`, b
 
 ### Offers that stay
 
-- **14-day trial, no card**, no free tier. At the end of the trial, the default offer is a **yearly package with taksit**, with Aylık as the secondary button.
+- **14-day trial, no card**, no free tier. At the end of the trial, the default offer is a **yearly package** (in full, or monthly on a 12-month commitment if §5 is approved), with Aylık as the secondary button.
 - **Founding member: 40% off for life, first 20 subscribers**, on any package or Aylık. Live counter only.
 - **Partner audience code** (after the founding spots are gone): **20% off** the first yearly payment, or the first 3 months of Aylık.
 - **Shopify App Store installs:** unchanged (`shopify_free`; no prices or upgrades shown, App Store rule 1.2.1).
@@ -71,30 +71,23 @@ The feature split follows today's gates (Pro-only = `financials`, `arbitrage`, b
 | # | Work | Owner | Notes |
 |---|---|---|---|
 | P1 | Plan keys `aylik`, `baslangic_yil`, `buyume_yil`, `pro_yil`, `kurumsal`; yearly order/label buckets; module entitlements (`financials`, `arbitrage`, `bulkPhotoStudio`, `extraStore`, `extraOrders`) | **DONE** 2026-10-19 (d7, `d44c426e`, behind `PRICING_V2`, flag off) | `lib/billing/planLimits.ts`, `featureMap.ts`, usage middleware. Existing Starter/Growth/Pro subscribers (none paying today) can be migrated or grandfathered |
-| P2 | iyzico **or** PayTR checkout for yearly TRY payments with taksit; webhook → same entitlement code as Stripe | dev session | Merchant account: whichever entity the accountant names (§5). The partner bounty must also fire on these payments (referral-spec §3) |
-| P3 | Stripe prices for Aylık + modules (TRY and USD) | **On hold until the accountant answers** (orchestrator, 2026-10-19); then Atilla creates them in Stripe and dev wires the env ids | |
-| P4 | `/fiyatlandirma` redesign: 4 yearly cards + "Aylık" line + module table, "+KDV" with the total at checkout | kolayxport-gtm-overhaul | Claims check; no AI credit counts unless metered (they are now, see AI credits) |
+| P2 | ~~iyzico/PayTR checkout~~ → **re-evaluated (§5)**: proposed "yearly, paid monthly" Stripe subscriptions on a 12-month commitment | dev session, after Atilla approves §5 | The partner bounty rule for this option is in §5 |
+| P3 | Stripe prices: all 14 (yearly packages, Aylık, modules; TRY and USD) | **DONE** 2026-10-19 by d7 (live, inert behind `PRICING_V2`); the code is waiting for a deploy slot | Module amounts pending Atilla's final OK |
+| P4 | `/fiyatlandirma` redesign: 4 yearly cards + "Aylık" line + module table, **final amounts (no "+KDV")** | kolayxport-gtm-overhaul | Claims check; no AI credit counts unless metered (they are now, see AI credits) |
 | P5 | Copy updates (cases, compare pages, ads playbook unit economics) | kolayxport-gtm-overhaul | After P1–P4 are live |
 
-## 5. Open items that need the accountant (before P2/P4 go live)
+## 5. Seller of record (resolved) and taksit (open)
 
-**Recommended (orchestrator + this plan):** split by customer country.
-- **Turkish customers:** **Modsons is the seller of record.** It issues an e-fatura/e-Arşiv with KDV, holds the iyzico/PayTR account (yearly with taksit), and possibly also takes Aylık via iyzico/PayTR card subscriptions.
-- **Non-Turkish customers:** Tamsar, Inc. stays the seller via Stripe.
-- **Why:** Turkish sellers can book a Turkish e-fatura as an expense and deduct its KDV directly. A US invoice forces them to self-assess KDV (sorumlu sıfatıyla), which small sellers dislike. iyzico/PayTR also need a Turkish merchant.
-- This changes what Atilla described today (Tamsar collects TRY from everyone), so **he and the accountant decide**.
+**Resolved by Atilla (2026-10-19):** Tamsar, Inc. is the seller for all customers, charges in TRY via Stripe and adds no KDV. Modsons invoices Tamsar, Inc. for services and does marketing in Turkey. Consequences:
+- **Partner bounties are paid by Tamsar, Inc.** via Stripe Global Payouts (referral-spec §4.3). For tax paperwork (W-8BEN / W-8BEN-E from partners; partners declare the income in Turkey), have the accountant confirm once before the first payout run (5 Jan). This is not a blocker for building.
+- **Bounty base = the amount paid** (no KDV is charged, so nothing is deducted).
+- **Copy:** never "+KDV"; prices are final amounts.
 
-**Question for the accountant:**
-1. Can Modsons be the seller of record for KolayXport subscriptions sold to Turkish customers (e-fatura/e-Arşiv with 20% KDV, payment through iyzico/PayTR with taksit), while Tamsar, Inc. keeps selling to foreign customers via Stripe? Does the existing Modsons–Tamsar agreement need changing for that?
-2. If Tamsar, Inc. instead keeps collecting from Turkish customers: what are its KDV obligations as a foreign e-service provider (B2C registration, B2B reverse charge), and can we still show prices "+KDV"?
-3. Partner referral bounties (one-time, ₺1.500–₺27.000) paid to Turkish individuals and companies:
-   - **If Modsons pays:** companies send a fatura; for individuals, is it a gider pusulası with stopaj (which rate), or must they issue a serbest meslek makbuzu?
-   - **If Tamsar, Inc. pays** via Stripe Global Payouts: is a W-8BEN / W-8BEN-E enough, with the partner declaring the income in Turkey?
-4. Is the KolayXport subscription a deductible expense for Turkish sellers in each case (Modsons e-fatura vs Tamsar invoice)?
-
-**What changes with the answer:**
-- **Modsons sells in Turkey:** iyzico/PayTR (P2) under Modsons; Stripe stays for non-TR customers. Partner payouts go by **EFT from Modsons**: the bounty ledger stays the same and the payout run uses the CSV fallback (referral-spec §4.3). Stripe Global Payouts only covers bounties earned on Tamsar, Inc. sales.
-- **Tamsar, Inc. sells everywhere:** as written today; iyzico/PayTR would need another route (they are Turkish merchants), and "+KDV" wording follows the accountant.
+**Taksit under this model: recommendation**
+1. **iyzico/PayTR don't fit.** Both onboard Turkish-registered merchants (vergi levhası is in iyzico's required documents), so Tamsar, Inc. can't hold them. Routing payments through Modsons would make Modsons the seller, which contradicts the decided model. Stripe card installments exist only for Mexico and Japan accounts, not for Turkish cards.
+2. **Recommended:** offer every yearly package as **"Yıllık paket, 12 ay boyunca aylık ödeme"**. This is a Stripe subscription billed monthly (Başlangıç ₺2.499, Büyüme ₺4.583, Pro ₺7.499 a month) on a **12-month commitment** written into the terms, next to "pay the year in full". It works like taksit without a bank, keeps Tamsar, Inc. as the seller, and needs only 3 more Stripe prices plus a commitment rule. Pay-in-full could get a small extra incentive (e.g. one extra month of AI credits; Atilla decides).
+   - **Partner bounty for this option (proposal):** 25% of the 12-month contract value, paid half after the customer's 2nd monthly payment and half after the 6th.
+3. **Optional:** many Turkish banks let cardholders split a past purchase into installments in their banking app ("sonradan taksitlendirme"). Whether that works for a purchase from a foreign merchant varies by bank, so check 2–3 major banks before it goes into any FAQ, and never promise it.
 
 ## 6. Effect on the gameplan
 

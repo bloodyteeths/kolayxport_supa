@@ -28,9 +28,14 @@
     "top": {
       "col": {
         "orders": "Trendyol orders",
-        "ratings": "Ratings"
+        "ratings": "Ratings",
+        "salesDay": "Sales/day",
+        "revenueDay": "Revenue/day",
+        "lifetime": "Lifetime sales"
       },
-      "ordersBadge": "{badge} orders"
+      "ordersBadge": "{badge} orders",
+      "crowdPerDay": "~{count}/day",
+      "crowdRatings": "+{count} ratings/mo"
     },
     "demand": {
       "input": {

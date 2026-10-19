@@ -28,9 +28,14 @@
     "top": {
       "col": {
         "orders": "Trendyol sipariş",
-        "ratings": "Değerlendirme"
+        "ratings": "Değerlendirme",
+        "salesDay": "Satış/gün",
+        "revenueDay": "Ciro/gün",
+        "lifetime": "Toplam satış"
       },
-      "ordersBadge": "{badge} sipariş"
+      "ordersBadge": "{badge} sipariş",
+      "crowdPerDay": "~{count}/gün",
+      "crowdRatings": "+{count} puan/ay"
     },
     "demand": {
       "input": {

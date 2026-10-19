@@ -137,6 +137,15 @@ export interface TopListing {
   orderBadge?: string | null;
   /** Trendyol: number of ratings (a sales trace: buyers who rated). */
   ratingCount?: number | null;
+  /** Trendyol/Hepsiburada: crowd sales (lib/market/sales): per day/30 days with a calibration, lifetime, rating growth. */
+  crowd?: {
+    salesPerDay: number | null;
+    revenuePerDay: number | null;
+    salesPer30d: number | null;
+    revenuePer30d: number | null;
+    lifetimeSales: number | null;
+    ratingsPer30d: number | null;
+  } | null;
 }
 
 export interface BuyerWord {

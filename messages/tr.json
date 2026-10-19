@@ -11573,7 +11573,10 @@
         "sales": "Aylık satış",
         "revenue": "Aylık ciro",
         "orders": "Trendyol sipariş",
-        "ratings": "Değerlendirme"
+        "ratings": "Değerlendirme",
+        "salesDay": "Satış/gün",
+        "revenueDay": "Ciro/gün",
+        "lifetime": "Toplam satış"
       },
       "favoritesAll": "{count} (tüm zamanlar)",
       "favoritesCard": "{count} favori (tüm zamanlar)",
@@ -11597,7 +11600,9 @@
       "salesValue": "~{count}/ay {kind, select, measured {· ölçüldü} other {· tahmin}}",
       "salesUpTo": "en çok {count}/ay",
       "salesCard": "Satış: {value}",
-      "ordersBadge": "{badge} sipariş"
+      "ordersBadge": "{badge} sipariş",
+      "crowdPerDay": "~{count}/gün",
+      "crowdRatings": "+{count} puan/ay"
     },
     "source": {
       "searchApiOrder": "{marketplace} araması (API sırası, kişiselleştirilmemiş)",

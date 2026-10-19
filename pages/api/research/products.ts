@@ -260,6 +260,18 @@ export async function researchTrendyol(
     cached: true,
     evidence: (p) => buildEvidence({ ...p, money: opts.fmt.money, percent: opts.fmt.percent, count: opts.fmt.count, noVolume: true, basisKey: 'research.evidence.basisTrendyol' }),
   });
+  // Sales from the shared crowd readings (calibrated rating growth; lifetime from ratings) for the listed products.
+  try {
+    const { readCards } = await import('@/lib/market/read');
+    const cards = await readCards('trendyol', result.top.map((t) => t.id));
+    const byId = new Map(cards.map((c) => [c.id, c.sales]));
+    result.top = result.top.map((t) => {
+      const s = byId.get(t.id);
+      return s ? { ...t, crowd: { salesPerDay: s.salesPerDay, revenuePerDay: s.revenuePerDay, salesPer30d: s.salesPer30d, revenuePer30d: s.revenuePer30d, lifetimeSales: s.lifetimeSales, ratingsPer30d: s.ratingsPer30d } } : t;
+    });
+  } catch (err) {
+    logger.warn('[research/products] trendyol crowd sales failed', { error: (err as Error)?.message });
+  }
   const errors: ResearchSectionError[] = hit.fresh ? [] : [{ section: 'all', key: 'research.error.stale' }];
   return { result, source: priceSource('research.sourceName.trendyolSnapshot', hit.fetchedAt, result.price, hit.data.items.length), errors };
 }

@@ -11573,7 +11573,10 @@
         "sales": "Monthly sales",
         "revenue": "Monthly revenue",
         "orders": "Trendyol orders",
-        "ratings": "Ratings"
+        "ratings": "Ratings",
+        "salesDay": "Sales/day",
+        "revenueDay": "Revenue/day",
+        "lifetime": "Lifetime sales"
       },
       "favoritesAll": "{count} (all time)",
       "favoritesCard": "{count} favorites (all time)",
@@ -11597,7 +11600,9 @@
       "salesValue": "~{count}/mo {kind, select, measured {· measured} other {· estimate}}",
       "salesUpTo": "up to {count}/mo",
       "salesCard": "Sales: {value}",
-      "ordersBadge": "{badge} orders"
+      "ordersBadge": "{badge} orders",
+      "crowdPerDay": "~{count}/day",
+      "crowdRatings": "+{count} ratings/mo"
     },
     "source": {
       "searchApiOrder": "{marketplace} search (API order, not personalized)",

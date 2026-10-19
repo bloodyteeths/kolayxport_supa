@@ -149,6 +149,16 @@ export function normalizeTopListing(raw: unknown, fallbackCurrency: string): Top
     tags: Array.isArray(raw.tags) ? raw.tags.filter((t): t is string => typeof t === 'string' && t.trim().length > 0).map((t) => decodeEntities(t)) : [],
     orderBadge: str(raw.orderBadge),
     ratingCount: num(raw.ratingCount),
+    crowd: raw.crowd && typeof raw.crowd === 'object'
+      ? {
+          salesPerDay: num((raw.crowd as any).salesPerDay),
+          revenuePerDay: num((raw.crowd as any).revenuePerDay),
+          salesPer30d: num((raw.crowd as any).salesPer30d),
+          revenuePer30d: num((raw.crowd as any).revenuePer30d),
+          lifetimeSales: num((raw.crowd as any).lifetimeSales),
+          ratingsPer30d: num((raw.crowd as any).ratingsPer30d),
+        }
+      : null,
   };
 }
 

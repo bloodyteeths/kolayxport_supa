@@ -245,7 +245,22 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
   // Estimated monthly sales for the top listings (Etsy), loaded after the result so the answer shows first.
   const salesState = useListingSales(mkt, !priceGap && !comparing && ready && data ? data.top : EMPTY_TOP);
   const marketSales = React.useMemo(() => {
-    if (!data || mkt !== 'etsy') return undefined;
+    if (!data) return undefined;
+    if (mkt === 'trendyol') {
+      // Crowd sales (calibrated rating growth) over the listed products, per month, in TRY.
+      const rows = data.top.filter((r) => r.crowd?.salesPer30d != null);
+      const revenue = rows.reduce((sum, r) => sum + (r.crowd?.revenuePer30d ?? 0), 0);
+      return {
+        counted: rows.length,
+        monthlySales: Math.round(rows.reduce((sum, r) => sum + (r.crowd?.salesPer30d ?? 0), 0)),
+        revenue: rows.length ? Math.round(revenue) : null,
+        currency: 'TRY',
+        measured: rows.length,
+        loading: false,
+        listed: data.top.length,
+      };
+    }
+    if (mkt !== 'etsy') return undefined;
     return { ...marketTotals(data.top, salesState.sales), loading: salesState.loading, listed: data.top.length };
   }, [data, mkt, salesState.sales, salesState.loading]);
 

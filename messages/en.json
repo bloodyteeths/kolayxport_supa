@@ -10146,6 +10146,142 @@
         "enterprise": "Enterprise: custom quote with unlimited usage, through our contact form.",
         "footer": "Every plan starts with a 14-day free trial without a card. Every marketplace and carrier integration is included. No other fees."
       }
+    },
+    "pricingYearly": {
+      "draftBanner": "Draft: proposed prices awaiting approval. Not live.",
+      "seo": {
+        "title": "Pricing · KolayXport",
+        "description": "Yearly packages in installments, one monthly plan and modules as you need them. 14 days free, no card needed."
+      },
+      "title": "Pricing",
+      "subtitle": "Pay for a yearly package in installments instead of up front. If you'd rather not prepay, there is one monthly plan.",
+      "trialLine": "14 days free. No card needed.",
+      "taxNote": "Prices exclude VAT (KDV). The total including VAT is shown at checkout.",
+      "founding": {
+        "offer": "Founding member offer: {percent}% off for life for the first {total} subscribers",
+        "count": "{remaining} of {total} spots left",
+        "price": "Founding member price: {price}"
+      },
+      "yearlyHeading": "Yearly packages",
+      "perYear": "/ year",
+      "perMonthApprox": "About {price} a month",
+      "taksit": "Up to {n} installments",
+      "taksitCustom": "Installments by agreement",
+      "quote": "Get a quote",
+      "recommended": "Recommended",
+      "plans": {
+        "baslangic": {
+          "name": "Starter",
+          "tagline": "For steady sellers on one marketplace"
+        },
+        "buyume": {
+          "name": "Growth",
+          "tagline": "For shops growing across several marketplaces"
+        },
+        "pro": {
+          "name": "Pro",
+          "tagline": "Profit, price gap and bulk photos included"
+        },
+        "kurumsal": {
+          "name": "Enterprise",
+          "tagline": "Many shops, custom limits and a contract"
+        }
+      },
+      "limit": {
+        "stores": "{count} connected stores",
+        "ordersYear": "{count} orders a year",
+        "labelsYear": "{count} shipping labels a year",
+        "aiMonth": "{count} AI credits a month",
+        "custom": "Custom limits"
+      },
+      "base": {
+        "listingStudio": "Listing studio and AI copy",
+        "aiText": "AI titles, descriptions and tags",
+        "research": "Market research",
+        "extension": "Chrome extension",
+        "labels": "FedEx, UPS and DHL eCommerce labels",
+        "etgb": "ETGB file",
+        "stockSync": "Stock sync"
+      },
+      "pro": {
+        "included": "Profit report, price-gap scan and bulk photo studio included",
+        "asModule": "Profit report, price gap and bulk photos: added as modules",
+        "priority": "Priority WhatsApp support"
+      },
+      "cta": {
+        "trial": "Try free for 14 days",
+        "talk": "Contact us",
+        "monthly": "Start with the monthly plan"
+      },
+      "monthly": {
+        "heading": "If you'd rather not prepay: Monthly",
+        "price": "{price} / month",
+        "includes": "{stores} stores, {orders} orders, {labels} labels and {ai} AI credits a month. Listing studio, research, extension, labels, ETGB and stock sync included.",
+        "why": "The monthly plan costs a little more than Starter's monthly equivalent: if you'll use KolayXport for long, a yearly package is the better deal."
+      },
+      "modules": {
+        "heading": "Modules",
+        "intro": "Add what you need. If your modules cost more than the next package, we'll suggest that package instead.",
+        "colModule": "Module",
+        "colMonthly": "On the monthly plan",
+        "colYearly": "On a yearly package",
+        "perMonth": "{price} / month",
+        "perYear": "{price} / year",
+        "includedPro": "Included in Pro and Enterprise",
+        "financials": "Profit report (Etsy, eBay, Amazon, Trendyol)",
+        "arbitrage": "Trendyol → abroad price gap",
+        "bulkPhotoStudio": "Bulk photo studio",
+        "extraStore": "Extra connected store (each)",
+        "extraOrders": "+500 orders / month (yearly: +6,000 / year)",
+        "credits": "AI credit packs",
+        "creditsLine": "{credits} credits: {price}",
+        "creditsNote": "Credit packs are one-time and never expire."
+      },
+      "compare": {
+        "title": "Compare packages",
+        "feature": "Feature",
+        "stores": "Connected stores",
+        "ordersYear": "Orders / year",
+        "labelsYear": "Labels / year",
+        "aiMonth": "AI credits / month",
+        "taksit": "Installments",
+        "financials": "Profit report",
+        "arbitrage": "Price-gap scan",
+        "bulkPhotoStudio": "Bulk photo studio",
+        "priority": "Priority support",
+        "module": "Module",
+        "custom": "Custom",
+        "upTo": "Up to {n}"
+      },
+      "faq": {
+        "title": "Questions",
+        "taksit": {
+          "q": "Can I pay in installments?",
+          "a": "Yes. Yearly packages can be paid by card in up to 6, 9 or 12 installments depending on the package. The monthly plan is charged to your card each month."
+        },
+        "kdv": {
+          "q": "Do prices include VAT?",
+          "a": "No, prices exclude VAT (KDV). The total including VAT is shown separately at checkout."
+        },
+        "trial": {
+          "q": "How does the trial work?",
+          "a": "For 14 days you use the Pro features without entering a card. When the trial ends you have 3 more days to choose a package. After that, order import and new labels stop; your data is not deleted."
+        },
+        "monthlyVsYearly": {
+          "q": "Monthly or yearly?",
+          "a": "If you'll use it for more than a few months, a yearly package is cheaper and can be paid in installments. The 14-day trial needs no card, and the monthly plan is there if you'd rather not prepay."
+        },
+        "modules": {
+          "q": "What is a module?",
+          "a": "Features such as the profit report, price-gap scan, bulk photo studio, extra stores and extra orders can be added without changing your package. Pro already includes the first three."
+        },
+        "founding": {
+          "q": "What is the founding member discount?",
+          "a": "The first {total} subscribers get {percent}% off for life on the package or monthly plan they choose. The number of spots left is shown live at the top of the page."
+        }
+      },
+      "draftNotes": "Draft notes: prices and limits are the proposal in pricing-v2.md §3; the seller (Tamsar, Inc. / Modsons) and the VAT wording are final only after the accountant confirms; the installment payment provider (iyzico/PayTR) isn't built yet.",
+      "fromNote": "Starting price, by quote"
     }
   },
   "ui": {
@@ -16539,7 +16675,31 @@
         "title": "Strengthen your first listing today",
         "text": "Connect your shop, rewrite one listing with AI and see the difference yourself."
       },
-      "testimonialsTitle": "What sellers say"
+      "testimonialsTitle": "What sellers say",
+      "pricingYearly": {
+        "title": "Yearly packages, in installments",
+        "lead": "Every package starts with a 14-day free trial. No credit card.",
+        "cta": "Compare packages",
+        "perYear": "/yr",
+        "perMonthTaksit": "About {price} a month · up to {n} installments",
+        "plans": {
+          "baslangic": {
+            "name": "Starter",
+            "line": "3 stores, listing studio, research, labels and ETGB"
+          },
+          "buyume": {
+            "name": "Growth",
+            "line": "6 stores, 24,000 orders a year, 1,500 AI credits a month"
+          },
+          "pro": {
+            "name": "Pro",
+            "line": "12 stores, profit report, price gap, bulk photos, priority support"
+          }
+        },
+        "monthly": "Prefer not to prepay? Monthly plan: {price} / month",
+        "tax": "Prices exclude VAT",
+        "founding": "Founding members: {percent}% off for life for the first 20 subscribers. Spots left: {remaining}"
+      }
     },
     "footer": {
       "tagline": "One dashboard for selling abroad.",

@@ -63,7 +63,7 @@ KolayXport'un odağı yurt dışı: Etsy ve eBay ilanlarını tek tek ya da topl
 **KolayXport daha uygun olabilir, eğer:**
 - Satışınızın ağırlığı Etsy ve/veya eBay'deyse,
 - İlanlarınızı İngilizce arama diline göre düzenlemek ve araştırmak istiyorsanız,
-- Yıllık peşin ödeme yerine aylık abonelik istiyorsanız.
+- Yıllık ücreti peşin değil taksitle ödemek ya da peşinatsız aylık bir planla başlamak istiyorsanız.
 
 **Birlikte kullanmak:** Yurt içi kanalları Entegra'da tutup Etsy ve eBay ilanlarını KolayXport'ta yönetebilirsiniz. Aynı ürünün stokunu iki ayrı aracın yazmaması için stok senkronunu yalnızca birinde açın.
 

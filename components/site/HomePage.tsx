@@ -9,6 +9,7 @@ import SiteLayout from './SiteLayout';
 import { Shot, Photo, ManifestCard } from './Media';
 import { Section, Heading, TrialCta, PainQuotes, Steps, Bullets, Faq, CtaBand } from './Blocks';
 import PricingTeaser from './PricingTeaser';
+import PricingTeaserYearly from './PricingTeaserYearly';
 
 export interface HomeProps {
   locale: SiteLocale;
@@ -155,7 +156,8 @@ function HomeBody({ locale, shots, photos, integrations, testimonials }: HomePro
 
       {/* PRICING */}
       <Section tone="paper-2">
-        <PricingTeaser locale={locale} />
+        {/* Pricing v2 (yearly-first) is Turkish pricing; English keeps the USD monthly teaser until international pricing is decided. */}
+        {locale === 'tr' ? <PricingTeaserYearly locale={locale} /> : <PricingTeaser locale={locale} />}
       </Section>
 
       {/* TESTIMONIALS: rendered only when real, consented entries exist (content/testimonials). */}

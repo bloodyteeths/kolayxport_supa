@@ -10146,6 +10146,142 @@
         "enterprise": "Enterprise: custom quote with unlimited usage, through our contact form.",
         "footer": "Every plan starts with a 14-day free trial without a card. Every marketplace and carrier integration is included. No other fees."
       }
+    },
+    "pricingYearly": {
+      "draftBanner": "Taslak: önerilen fiyatlar, onay bekliyor. Yayında değil.",
+      "seo": {
+        "title": "Fiyatlandırma · KolayXport",
+        "description": "Yıllık paketler taksitle, tek aylık plan ve ihtiyacınız kadar modül. 14 gün ücretsiz, kart gerekmez."
+      },
+      "title": "Fiyatlandırma",
+      "subtitle": "Yıllık paketle peşin değil, taksitle ödeyin. Peşin ödemek istemiyorsanız tek bir aylık planımız var.",
+      "trialLine": "14 gün ücretsiz. Kart gerekmez.",
+      "taxNote": "Fiyatlara KDV dahil değildir. KDV dahil toplam ödeme adımında gösterilir.",
+      "founding": {
+        "offer": "Kurucu üye fırsatı: İlk {total} aboneye ömür boyu %{percent} indirim",
+        "count": "{total} yerden {remaining} tanesi kaldı",
+        "price": "Kurucu üye fiyatı: {price}"
+      },
+      "yearlyHeading": "Yıllık paketler",
+      "perYear": "/ yıl",
+      "perMonthApprox": "Aylık yaklaşık {price}",
+      "taksit": "{n} taksite kadar",
+      "taksitCustom": "Taksit size göre",
+      "quote": "Teklif alın",
+      "recommended": "Önerilen",
+      "plans": {
+        "baslangic": {
+          "name": "Başlangıç",
+          "tagline": "Tek pazaryerinde düzenli satan için"
+        },
+        "buyume": {
+          "name": "Büyüme",
+          "tagline": "Birkaç pazaryerinde büyüyen mağaza için"
+        },
+        "pro": {
+          "name": "Pro",
+          "tagline": "Kâr, fiyat farkı ve toplu fotoğraf dahil"
+        },
+        "kurumsal": {
+          "name": "Kurumsal",
+          "tagline": "Çok mağaza, özel limitler ve sözleşme"
+        }
+      },
+      "limit": {
+        "stores": "{count} bağlı mağaza",
+        "ordersYear": "Yılda {count} sipariş",
+        "labelsYear": "Yılda {count} kargo etiketi",
+        "aiMonth": "Ayda {count} AI kredisi",
+        "custom": "Size özel limitler"
+      },
+      "base": {
+        "listingStudio": "İlan stüdyosu ve AI metin",
+        "aiText": "AI başlık, açıklama ve etiket",
+        "research": "Pazar araştırması",
+        "extension": "Chrome eklentisi",
+        "labels": "FedEx, UPS ve DHL eCommerce etiketleri",
+        "etgb": "ETGB dosyası",
+        "stockSync": "Stok senkronu"
+      },
+      "pro": {
+        "included": "Kâr raporu, fiyat farkı taraması ve toplu fotoğraf stüdyosu dahil",
+        "asModule": "Kâr raporu, fiyat farkı ve toplu fotoğraf: modül olarak eklenir",
+        "priority": "Öncelikli WhatsApp desteği"
+      },
+      "cta": {
+        "trial": "14 gün ücretsiz deneyin",
+        "talk": "Bize ulaşın",
+        "monthly": "Aylık planla başlayın"
+      },
+      "monthly": {
+        "heading": "Peşin ödemek istemiyorsanız: Aylık",
+        "price": "{price} / ay",
+        "includes": "{stores} mağaza, ayda {orders} sipariş, {labels} etiket ve {ai} AI kredisi. İlan stüdyosu, araştırma, eklenti, etiket, ETGB ve stok senkronu dahil.",
+        "why": "Aylık plan, Başlangıç paketinin aylık karşılığından biraz yüksek: uzun süre kullanacaksanız yıllık paket daha uygun."
+      },
+      "modules": {
+        "heading": "Modüller",
+        "intro": "İhtiyacınız olanı ekleyin. Modülleriniz bir üst paketin fiyatını geçerse, size o paketi öneririz.",
+        "colModule": "Modül",
+        "colMonthly": "Aylık planda",
+        "colYearly": "Yıllık pakette",
+        "perMonth": "{price} / ay",
+        "perYear": "{price} / yıl",
+        "includedPro": "Pro ve Kurumsal'da dahil",
+        "financials": "Kâr raporu (Etsy, eBay, Amazon, Trendyol)",
+        "arbitrage": "Trendyol → yurt dışı fiyat farkı",
+        "bulkPhotoStudio": "Toplu fotoğraf stüdyosu",
+        "extraStore": "Ek bağlı mağaza (her biri)",
+        "extraOrders": "+500 sipariş / ay (yıllıkta +6.000 / yıl)",
+        "credits": "AI kredi paketleri",
+        "creditsLine": "{credits} kredi: {price}",
+        "creditsNote": "Kredi paketleri tek seferliktir, süresi dolmaz."
+      },
+      "compare": {
+        "title": "Paketleri karşılaştırın",
+        "feature": "Özellik",
+        "stores": "Bağlı mağaza",
+        "ordersYear": "Sipariş / yıl",
+        "labelsYear": "Etiket / yıl",
+        "aiMonth": "AI kredisi / ay",
+        "taksit": "Taksit",
+        "financials": "Kâr raporu",
+        "arbitrage": "Fiyat farkı taraması",
+        "bulkPhotoStudio": "Toplu fotoğraf stüdyosu",
+        "priority": "Öncelikli destek",
+        "module": "Modül",
+        "custom": "Özel",
+        "upTo": "{n}'e kadar"
+      },
+      "faq": {
+        "title": "Sık sorulanlar",
+        "taksit": {
+          "q": "Taksitle ödeyebilir miyim?",
+          "a": "Evet. Yıllık paketleri kredi kartınızla, paketine göre 6, 9 veya 12 taksite kadar ödeyebilirsiniz. Aylık plan her ay karttan çekilir."
+        },
+        "kdv": {
+          "q": "Fiyatlara KDV dahil mi?",
+          "a": "Hayır, fiyatlar KDV hariçtir. KDV dahil toplam, ödeme adımında ayrıca gösterilir."
+        },
+        "trial": {
+          "q": "Deneme nasıl işliyor?",
+          "a": "14 gün boyunca kart girmeden Pro özelliklerini kullanırsınız. Deneme bitince paket seçmek için 3 gününüz daha olur. Sonrasında sipariş aktarımı ve yeni etiketler durur; verileriniz silinmez."
+        },
+        "monthlyVsYearly": {
+          "q": "Aylık mı, yıllık mı?",
+          "a": "Birkaç aydan uzun kullanacaksanız yıllık paket daha uygundur ve taksitle ödenir. Önce denemek isteyen ama kart vermek istemeyenler için 14 günlük deneme, peşin ödemek istemeyenler için Aylık plan var."
+        },
+        "modules": {
+          "q": "Modül nedir?",
+          "a": "Kâr raporu, fiyat farkı taraması, toplu fotoğraf stüdyosu, ek mağaza ve ek sipariş gibi özellikleri paketinizi değiştirmeden ekleyebilirsiniz. Pro pakette ilk üçü zaten dahildir."
+        },
+        "founding": {
+          "q": "Kurucu üye indirimi nedir?",
+          "a": "İlk {total} aboneye seçtikleri paket ya da Aylık plan için ömür boyu %{percent} indirim. Kalan yer sayısı sayfanın üstünde canlı gösterilir."
+        }
+      },
+      "draftNotes": "Taslak notları: fiyatlar ve limitler pricing-v2.md §3'teki öneridir; satıcı (Tamsar, Inc. / Modsons) ve KDV metni muhasebeci onayından sonra kesinleşir; taksit ödeme altyapısı (iyzico/PayTR) henüz yok.",
+      "fromNote": "Başlangıç fiyatı, teklifle"
     }
   },
   "ui": {
@@ -16347,7 +16483,7 @@
       }
     },
     "common": {
-      "trialLine": "14 gün ücretsiz · Kredi kartı gerekmez · İstediğiniz zaman iptal",
+      "trialLine": "14 gün ücretsiz · Kredi kartı gerekmez · Yıllık pakete taksit",
       "ctaTrial": "14 gün ücretsiz deneyin",
       "ctaPricing": "Fiyatları görün",
       "ctaContact": "Bize yazın",
@@ -16539,7 +16675,31 @@
         "title": "İlk ilanınızı bugün güçlendirin",
         "text": "Mağazanızı bağlayın, bir ilanı yapay zekâyla yeniden yazın, farkı kendiniz görün."
       },
-      "testimonialsTitle": "Satıcılarımız ne diyor"
+      "testimonialsTitle": "Satıcılarımız ne diyor",
+      "pricingYearly": {
+        "title": "Yıllık paket, taksitle",
+        "lead": "Bütün paketlerde 14 gün ücretsiz deneme. Kredi kartı istemeyiz.",
+        "cta": "Paketleri karşılaştırın",
+        "perYear": "/yıl",
+        "perMonthTaksit": "Aylık yaklaşık {price} · {n} taksite kadar",
+        "plans": {
+          "baslangic": {
+            "name": "Başlangıç",
+            "line": "3 mağaza, ilan stüdyosu, araştırma, etiket ve ETGB"
+          },
+          "buyume": {
+            "name": "Büyüme",
+            "line": "6 mağaza, yılda 24.000 sipariş, ayda 1.500 AI kredisi"
+          },
+          "pro": {
+            "name": "Pro",
+            "line": "12 mağaza, kâr raporu, fiyat farkı, toplu fotoğraf, öncelikli destek"
+          }
+        },
+        "monthly": "Peşin ödemek istemeyenlere Aylık plan: {price} / ay",
+        "tax": "Fiyatlara KDV dahil değildir",
+        "founding": "Kurucu üye: ilk 20 aboneye ömür boyu %{percent} indirim. Kalan yer: {remaining}"
+      }
     },
     "footer": {
       "tagline": "Yurt dışına satışın tek paneli.",

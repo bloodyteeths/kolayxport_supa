@@ -10148,7 +10148,7 @@
       }
     },
     "pricingYearly": {
-      "draftBanner": "Taslak: önerilen fiyatlar, onay bekliyor. Yayında değil.",
+      "draftBanner": "Taslak: fiyatlar kesin, ödeme altyapısı hazır olunca yayına girer. Yayında değil.",
       "seo": {
         "title": "Fiyatlandırma · KolayXport",
         "description": "Yıllık paketler taksitle, tek aylık plan ve ihtiyacınız kadar modül. 14 gün ücretsiz, kart gerekmez."
@@ -10280,7 +10280,7 @@
           "a": "İlk {total} aboneye seçtikleri paket ya da Aylık plan için ömür boyu %{percent} indirim. Kalan yer sayısı sayfanın üstünde canlı gösterilir."
         }
       },
-      "draftNotes": "Taslak notları: fiyatlar ve limitler pricing-v2.md §3'teki öneridir; satıcı (Tamsar, Inc. / Modsons) ve KDV metni muhasebeci onayından sonra kesinleşir; taksit ödeme altyapısı (iyzico/PayTR) henüz yok.",
+      "draftNotes": "Taslak notları: fiyatlar ve limitler 19 Ekim 2026'da onaylandı (pricing-v2.md §3). Satıcı (Tamsar, Inc. / Modsons) ve KDV metni muhasebeci onayından sonra kesinleşir; taksitli ödeme altyapısı (iyzico/PayTR) henüz yok.",
       "fromNote": "Başlangıç fiyatı, teklifle"
     }
   },

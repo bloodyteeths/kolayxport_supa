@@ -10148,7 +10148,7 @@
       }
     },
     "pricingYearly": {
-      "draftBanner": "Draft: proposed prices awaiting approval. Not live.",
+      "draftBanner": "Draft: prices are final; goes live once the payment setup is ready. Not live.",
       "seo": {
         "title": "Pricing · KolayXport",
         "description": "Yearly packages in installments, one monthly plan and modules as you need them. 14 days free, no card needed."
@@ -10280,7 +10280,7 @@
           "a": "The first {total} subscribers get {percent}% off for life on the package or monthly plan they choose. The number of spots left is shown live at the top of the page."
         }
       },
-      "draftNotes": "Draft notes: prices and limits are the proposal in pricing-v2.md §3; the seller (Tamsar, Inc. / Modsons) and the VAT wording are final only after the accountant confirms; the installment payment provider (iyzico/PayTR) isn't built yet.",
+      "draftNotes": "Draft notes: prices and limits confirmed on 19 Oct 2026 (pricing-v2.md §3). The seller (Tamsar, Inc. / Modsons) and the VAT wording are final only after the accountant confirms; the installment payment provider (iyzico/PayTR) isn't built yet.",
       "fromNote": "Starting price, by quote"
     }
   },

@@ -1,9 +1,9 @@
-// DRAFT (docs/gtm/pricing-v2.md §3): proposed Turkey pricing, yearly packages first + one monthly plan + modules.
-// Every number here is a placeholder until Atilla confirms it and the seller-of-record / KDV question (§5) is
-// settled. It deliberately lives outside lib/billing: nothing here is wired to checkout, entitlements or Stripe.
+// Pricing v2 (docs/gtm/pricing-v2.md §3): Turkey pricing, yearly packages first + one monthly plan + modules.
+// Numbers confirmed by Atilla on 2026-10-19 (final). The page stays unpublished (PRICING_V2_DRAFT) until the
+// installment checkout (P2) and the seller-of-record / KDV answer (§5) exist. It deliberately lives outside lib/billing: nothing here is wired to checkout, entitlements or Stripe.
 // When P1 ships (plan keys + limits in lib/billing), this file is replaced by reads from lib/billing.
 
-/** While true: draft banner + noindex on the v2 pricing page. Flip to false at go-live (Atilla confirms prices, §5 settled). */
+/** While true: draft banner + noindex on the v2 pricing page. Flip to false at go-live (P2 checkout live, §5 settled). */
 export const PRICING_V2_DRAFT = true;
 
 export type YearlyPlan = 'baslangic' | 'buyume' | 'pro' | 'kurumsal';

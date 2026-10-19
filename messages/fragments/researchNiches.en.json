@@ -1,0 +1,16 @@
+{
+  "research": {
+    "niches": {
+      "title": "Strong niches today",
+      "description": "Etsy niches measured again every day: monthly sales, revenue, typical price and competition. Click one for the full answer.",
+      "sales": "{count} sales/mo",
+      "revenue": "{amount}/mo",
+      "price": "Typical price {amount}",
+      "competitors": "{count} competing listings",
+      "basis": "From {counted} of the top 48 listings, {measured} measured"
+    },
+    "sort": {
+      "sales": "Best sellers"
+    }
+  }
+}

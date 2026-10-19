@@ -1,6 +1,6 @@
 /**
  * Hepsiburada order/claim webhooks (`createOrder`, `createPackages`, `orderCancel`, `intransit`, `deliver`,
- * `awaitingAction`, …). HB pushes to `<base>/<event>` with Basic credentials agreed at onboarding
+ * `awaitingAction`, …). HB pushes to `<base>` or `<base>/<event>` (optional catch-all: the bare base URL answers too) with Basic credentials agreed at onboarding
  * (HEPSIBURADA_WEBHOOK_USER / HEPSIBURADA_WEBHOOK_PASSWORD). The payload is not trusted for data: we only use it to
  * find the merchant and run that user's normal order sync (idempotent), so retries and duplicates are harmless.
  * Answers 204 at once (HB wants a reply within ~5 s). Polling (hepsiburada-orders job) remains the source of truth.

@@ -79,8 +79,17 @@ export function TopListingsTable({ rows, mkt, total, source, sort, onSortChange,
     : [];
 
   // Trendyol: the marketplace's own signals instead of our estimates (order badge "100+", ratings count).
+  const crowdDay = (r: TopListing) => {
+    const c = r.crowd;
+    if (c?.salesPerDay != null) return t('top.crowdPerDay', { count: c.salesPerDay < 10 ? fmt.num(c.salesPerDay, { decimals: 1 }) : fmt.num(Math.round(c.salesPerDay)) });
+    if (c?.ratingsPer30d != null) return t('top.crowdRatings', { count: fmt.num(c.ratingsPer30d, { decimals: 1 }) });
+    return '—';
+  };
   const trendyolColumns: Column<TopListing>[] = mkt === 'trendyol'
     ? [
+        { key: 'crowdDay', header: t('top.col.salesDay'), width: 120, align: 'right', render: crowdDay, mobile: 'subtitle' },
+        { key: 'crowdRevenue', header: t('top.col.revenueDay'), width: 120, align: 'right', render: (r) => (r.crowd?.revenuePerDay != null ? fmt.money(r.crowd.revenuePerDay, 'TRY', { approx: true }) : '—'), mobile: 'meta' },
+        { key: 'crowdLifetime', header: t('top.col.lifetime'), width: 120, align: 'right', render: (r) => (r.crowd?.lifetimeSales != null ? `~${fmt.num(r.crowd.lifetimeSales)}` : '—'), mobile: 'meta' },
         { key: 'orders', header: t('top.col.orders'), width: 120, align: 'right', render: (r) => r.orderBadge ? t('top.ordersBadge', { badge: r.orderBadge }) : '—', mobile: 'subtitle' },
         { key: 'ratings', header: t('top.col.ratings'), width: 110, align: 'right', render: (r) => (r.ratingCount != null ? fmt.num(r.ratingCount) : '—'), mobile: 'meta' },
       ]
@@ -122,6 +131,19 @@ export function TopListingsTable({ rows, mkt, total, source, sort, onSortChange,
 
   const sortOptions = PRODUCT_SORTS.map((s) => ({ value: s, label: t(`sort.${s.replace('.', '_')}`) }));
 
+  // "Best sellers": once the sales are in, rows go by monthly sales (an upper bound counts for half of itself,
+  // below any real number of the same size), then favorites. Re-sorted once, after loading, so rows don't jump.
+  const shownRows = React.useMemo(() => {
+    if (sort !== 'sales' || !sales || salesLoading) return rows;
+    const val = (r: TopListing) => {
+      const s = sales[r.id];
+      if (s?.monthlySales != null) return s.monthlySales;
+      if (s?.monthlySalesUpperBound != null) return s.monthlySalesUpperBound * 0.5;
+      return -1;
+    };
+    return [...rows].sort((a, b) => val(b) - val(a) || (b.favorites ?? 0) - (a.favorites ?? 0));
+  }, [rows, sort, sales, salesLoading]);
+
   return (
     <Box component="section" aria-labelledby="research-top-title" sx={{ mb: '24px' }} data-testid="research-top">
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '12px', mb: '8px', flexWrap: 'wrap' }}>
@@ -141,8 +163,8 @@ export function TopListingsTable({ rows, mkt, total, source, sort, onSortChange,
         />
       </Box>
       <DataTable
-        rows={rows}
-        columns={columns}
+        rows={shownRows}
+        columns={mkt === 'trendyol' ? columns.filter((c) => c.key !== 'age') : columns}
         getRowId={(r) => r.id}
         state={loading ? 'loading' : rows.length ? 'ready' : 'empty'}
         onRowOpen={onOpen}

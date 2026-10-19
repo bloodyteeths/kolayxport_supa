@@ -33,6 +33,18 @@
       <div id="researchLimit" style="margin-top:6px;display:none;"></div>
     </div>
 
+    <div class="card" id="marketCard">
+      <h3 class="card-title" data-i18n="marketTitle">Trendyol &amp; Hepsiburada</h3>
+      <p class="text-muted market-text" data-i18n="marketText" style="margin:0 0 8px;font-size:12px;line-height:1.45;">Trendyol ve Hepsiburada’da gezdiğiniz sayfalarda satış, ciro, buybox ve sıralama bilgisi gösterir.</p>
+      <p class="text-muted market-text" data-i18n="marketConsent" style="margin:0 0 8px;font-size:12px;line-height:1.45;">Açtığınız sayfalardaki herkese açık ürün bilgileri (fiyat, puan, satıcı, favori) anonim olarak KolayXport topluluk verisine eklenir ve herkesin araştırmasını güçlendirir. Adınız, sepetiniz, siparişleriniz ve adresleriniz asla alınmaz.</p>
+      <button id="marketEnable" class="btn btn-primary full-width" data-i18n="marketEnable">Aç ve paylaşmayı kabul et</button>
+      <div class="setting-row" id="marketShareRow" style="display:none;">
+        <span id="marketShareLabel" data-i18n="marketShare">Topluluğa katkı (paylaşım)</span>
+        <label class="toggle"><input type="checkbox" id="marketShare" checked aria-labelledby="marketShareLabel"><span class="slider" aria-hidden="true"></span></label>
+      </div>
+      <div id="marketStatus" class="text-muted" style="margin-top:4px;font-size:12px;"></div>
+    </div>
+
     <div class="card">
       <h3 class="card-title" data-i18n="overlayTitle">Araştırma Panelleri</h3>
       <div class="setting-row">
@@ -88,7 +100,7 @@
     </a>
 
     <footer>
-      <span class="text-muted" id="versionLabel">v9.10.0</span>
+      <span class="text-muted" id="versionLabel">v9.12.0</span>
       <span class="sep">·</span>
       <a href="https://kolayxport.com/help/chrome-extension" target="_blank" data-i18n="help">Yardım</a>
     </footer>

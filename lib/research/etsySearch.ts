@@ -178,8 +178,23 @@ export async function readShared<T>(cacheKey: string, userId = SHARED_CACHE_USER
   }
 }
 
+/**
+ * Pure: strings Postgres jsonb accepts. A title cut in the middle of an emoji leaves a lone UTF-16 surrogate and
+ * jsonb rejects the whole row ("unexpected end of hex escape"); NUL is rejected too. Both are dropped.
+ */
+export function jsonbSafe<T>(value: T): T {
+  if (typeof value === 'string') return value.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]|\u0000/g, '') as T;
+  if (Array.isArray(value)) return value.map((v) => jsonbSafe(v)) as T;
+  if (value && typeof value === 'object' && !(value instanceof Date)) {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[k] = jsonbSafe(v);
+    return out as T;
+  }
+  return value;
+}
+
 export async function writeShared<T>(cacheKey: string, data: T, ttlMs: number, fetchedAt = new Date().toISOString(), userId = SHARED_CACHE_USER): Promise<void> {
-  const env: CachedEnvelope<T> = { v: 1, fetchedAt, data };
+  const env: CachedEnvelope<T> = { v: 1, fetchedAt, data: jsonbSafe(data) };
   const expiresAt = new Date(Date.now() + ttlMs);
   try {
     await prisma.researchCache.upsert({
@@ -434,15 +449,15 @@ function trendsLib(): any {
  * or an empty timeline throws inside `live()`, so nothing is written to the shared cache (a stale value is served if
  * one exists) and one transient miss does not blank the input for every user for 24 h.
  */
-export async function fetchTrendsMean(q: string): Promise<number | null> {
-  const key = `public:trends:mean:${sha1(normalizeQuery(q))}`;
+export async function fetchTrendsMean(q: string, geo: 'US' | 'TR' = 'US'): Promise<number | null> {
+  const key = `public:trends:mean:${geo === 'US' ? '' : `${geo}:`}${sha1(normalizeQuery(q))}`;
   try {
     const served = await cachedLive<number | null>(key, SIGNAL_TTL_MS, async () => {
       const lib = trendsLib();
       if (!lib) throw new Error('google-trends-api unavailable');
       const startTime = new Date(Date.now() - 365 * DAY_MS);
       const raw = await Promise.race([
-        lib.interestOverTime({ keyword: q, startTime, geo: 'US' }),
+        lib.interestOverTime({ keyword: q, startTime, geo }),
         new Promise<null>((resolve) => setTimeout(() => resolve(null), 8_000)),
       ]);
       if (!raw) throw new Error('trends timeout');

@@ -1737,7 +1737,9 @@
         "permission": "İzin",
         "create": "Anahtar oluştur",
         "once": "Bu anahtarı şimdi kopyalayın: bir daha gösterilmez.",
-        "claudeCode": "Claude Code için:"
+        "claudeCode": "Claude Code için:",
+        "shareBuyer": "Alıcı adlarını ve teslimat adreslerini paylaş",
+        "shareBuyerHint": "Bağladığınız yapay zekâ şirketi bu bilgileri görür. Amazon siparişleri hiçbir zaman paylaşılmaz; e-posta ve telefon gizli kalır."
       },
       "defaultName": "Kişisel anahtar",
       "scope": {
@@ -1758,7 +1760,11 @@
       "revoked": "Bağlantı kaldırıldı",
       "revokeFailed": "Bağlantı kaldırılamadı. Tekrar deneyin.",
       "createFailed": "Anahtar oluşturulamadı. Tekrar deneyin.",
-      "privacy": "Alıcılarınızın adı, adresi, e-postası ve telefonu yapay zekâ uygulamalarına hiç gönderilmez (siparişlerde yalnızca ülke). Bağlantılar en geç bir yılda kendiliğinden sona erer."
+      "privacy": "Alıcılarınızın e-postası ve telefonu yapay zekâ uygulamalarına hiç gönderilmez. Ad ve teslimat adresi yalnızca paylaşımı açtığınız bağlantılara gider (Amazon siparişleri hiçbir zaman); diğer bağlantılar yalnızca ülkeyi görür. Bağlantılar en geç bir yılda kendiliğinden sona erer.",
+      "buyer": {
+        "on": "alıcı adı ve adresi paylaşılıyor",
+        "off": "yalnızca ülke"
+      }
     },
     "deleteAccount": {
       "title": "Hesabı sil",
@@ -11317,12 +11323,14 @@
       "input": {
         "googleTrends": "Google ilgisi",
         "autocomplete": "Otomatik tamamlama",
-        "engagement": "Etkileşim"
+        "engagement": "Etkileşim",
+        "trendyolFavorites": "Trendyol favorileri"
       },
       "value": {
         "googleTrends": "{value} (12 ay)",
         "autocomplete": "3 öneri listesinin {value} tanesinde",
-        "engagement": "ayda {value} favori (medyan)"
+        "engagement": "ayda {value} favori (medyan)",
+        "trendyolFavorites": "{value} favori (ortanca, ilk sonuçlar, tüm zamanlar)"
       },
       "inputMissing": "mevcut değil"
     },
@@ -11551,7 +11559,8 @@
       "price_asc": "En düşük fiyat",
       "price_desc": "En yüksek fiyat",
       "favorites": "En çok favori",
-      "newest": "En yeni"
+      "newest": "En yeni",
+      "sales": "En çok satan"
     },
     "top": {
       "title": "Öne çıkan ilanlar ({count})",
@@ -11564,7 +11573,10 @@
         "sales": "Aylık satış",
         "revenue": "Aylık ciro",
         "orders": "Trendyol sipariş",
-        "ratings": "Değerlendirme"
+        "ratings": "Değerlendirme",
+        "salesDay": "Satış/gün",
+        "revenueDay": "Ciro/gün",
+        "lifetime": "Toplam satış"
       },
       "favoritesAll": "{count} (tüm zamanlar)",
       "favoritesCard": "{count} favori (tüm zamanlar)",
@@ -11588,7 +11600,9 @@
       "salesValue": "~{count}/ay {kind, select, measured {· ölçüldü} other {· tahmin}}",
       "salesUpTo": "en çok {count}/ay",
       "salesCard": "Satış: {value}",
-      "ordersBadge": "{badge} sipariş"
+      "ordersBadge": "{badge} sipariş",
+      "crowdPerDay": "~{count}/gün",
+      "crowdRatings": "+{count} puan/ay"
     },
     "source": {
       "searchApiOrder": "{marketplace} araması (API sırası, kişiselleştirilmemiş)",
@@ -12068,7 +12082,18 @@
       "openCta": "Trendyol'da ara",
       "needsExtension": "KolayXport Chrome eklentisi gerekir (sürüm 9.11 veya üstü).",
       "waiting": "Trendyol sekmesi açıldı. Sayfa yüklenince sonuçlar burada görünecek…",
-      "priceGap": "Fiyat farkı: Trendyol → yurt dışı"
+      "priceGap": "Fiyat farkı: Trendyol → yurt dışı",
+      "autoTitle": "Trendyol'da aranıyor…",
+      "autoBody": "KolayXport eklentisi bu aramayı arka planda açıp okuyor. Sonuç birkaç saniye içinde burada."
+    },
+    "niches": {
+      "title": "Bugün güçlü nişler",
+      "description": "Her gün yeniden ölçülen Etsy nişleri: aylık satış, ciro, tipik fiyat ve rekabet. Birine tıklayın, cevap hemen açılır.",
+      "sales": "{count} satış/ay",
+      "revenue": "{amount}/ay",
+      "price": "Tipik fiyat {amount}",
+      "competitors": "{count} rakip ilan",
+      "basis": "İlk 48 ilanın {counted} tanesinden, {measured} ölçüldü"
     }
   },
   "ds": {
@@ -17054,12 +17079,15 @@
       "invalidBody": "Bağlantıyı yapay zekâ uygulamanızdan yeniden başlatın.",
       "title": "{app} KolayXport hesabınıza bağlanmak istiyor",
       "subtitle": "İzin verirseniz bu uygulama mağazanızla ilgili sorularınızı yanıtlayabilir.",
+      "redirectHost": "Yanıtınızdan sonra {host} adresine dönersiniz",
       "canTitle": "Görebilecekleri:",
-      "canOrders": "Siparişleriniz (alıcının adı ve adresi olmadan, yalnızca ülke)",
+      "canOrders": "Siparişleriniz (aşağıda izin vermediğiniz sürece alıcı adı ve adresi olmadan, yalnızca ülke)",
       "canListings": "İlanlarınız, fiyat, stok ve ilan sağlığı",
       "canSales": "Satış özetleri ve pazar araştırması",
       "write": "Taslak da hazırlayabilsin",
       "writeHint": "İlan metni, fiyat, stok, yeni ilan ve fotoğraf — siz KolayXport'ta gönderene kadar pazaryerinde hiçbir şey değişmez. Yapay zekâ ile görsel üretirse AI kredinizden düşer.",
+      "shareBuyer": "Alıcı adlarını ve teslimat adreslerini paylaş",
+      "shareBuyerHint": "Bağladığınız yapay zekâ şirketi bu bilgileri görür. Amazon siparişleri hiçbir zaman paylaşılmaz; e-posta ve telefon gizli kalır.",
       "never": "Bağlantıyı istediğiniz an Ayarlar → Yapay zekâ bölümünden kaldırabilirsiniz.",
       "deny": "Vazgeç",
       "allow": "İzin ver"

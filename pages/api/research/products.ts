@@ -25,7 +25,7 @@ import {
 import { buildFxTable, decodeEntities } from '@/lib/research/stats';
 import { convertCurrency } from '@/lib/finance/fx';
 import { readShared } from '@/lib/research/etsySearch';
-import { snapshotKey, snapshotResult, type MarketSnapshot } from '@/lib/research/marketSnapshot';
+import { medianFavorites, snapshotKey, snapshotResult, trendyolDemand, type MarketSnapshot } from '@/lib/research/marketSnapshot';
 import {
   isResearchMkt, type Guarded, type ProductsData, type ProductsResult, type ResearchErrorBody, type ResearchMkt,
   type ResearchResponse, type ResearchSectionError, type SourceNoteProps, type TopListing,
@@ -33,7 +33,7 @@ import {
 
 export const MAX_COMPARE = 3;
 export const MAX_QUERY_LEN = 120;
-const SORTS = ['relevance', 'price.asc', 'price.desc', 'favorites', 'newest'] as const;
+const SORTS = ['sales', 'relevance', 'price.asc', 'price.desc', 'favorites', 'newest'] as const;
 type TopSort = (typeof SORTS)[number];
 
 const ok = (value: number): Guarded<number> => ({ value, kind: 'measured', guard: { ok: true } });
@@ -41,6 +41,9 @@ const no = (reasonKey: string): Guarded<number> => ({ value: null, kind: 'measur
 
 export function sortTop(top: TopListing[], sort: TopSort): TopListing[] {
   if (sort === 'relevance') return top;
+  // Best sellers first: sales arrive later on the page (/api/research/sales), which re-sorts by them; until then
+  // favorites are the best proxy the search itself has.
+  if (sort === 'sales') sort = 'favorites';
   const s = [...top];
   const price = (t: TopListing) => t.priceConverted?.amount ?? t.price?.amount ?? null;
   const cmp = (a: number | null, b: number | null, dir: 1 | -1) => (a == null ? 1 : b == null ? -1 : (a - b) * dir);
@@ -250,13 +253,25 @@ export async function researchTrendyol(
 ): Promise<{ result: ProductsResult; source: SourceNoteProps; errors: ResearchSectionError[] }> {
   const hit = await readShared<MarketSnapshot>(snapshotKey('trendyol', q));
   if (!hit) throw new NoSnapshotError();
-  const [trendsMean, autocompleteSources] = await Promise.all([fetchTrendsMean(q), fetchAutocompleteSources(q)]);
-  const demand = demandSignal({ trendsMean, autocompleteSources, engagement: null });
+  const trendsMean = await fetchTrendsMean(q, 'TR');
+  const demand = trendyolDemand(trendsMean, medianFavorites(hit.data));
   const result = snapshotResult(hit.data, {
     demand,
     cached: true,
     evidence: (p) => buildEvidence({ ...p, money: opts.fmt.money, percent: opts.fmt.percent, count: opts.fmt.count, noVolume: true, basisKey: 'research.evidence.basisTrendyol' }),
   });
+  // Sales from the shared crowd readings (calibrated rating growth; lifetime from ratings) for the listed products.
+  try {
+    const { readCards } = await import('@/lib/market/read');
+    const cards = await readCards('trendyol', result.top.map((t) => t.id));
+    const byId = new Map(cards.map((c) => [c.id, c.sales]));
+    result.top = result.top.map((t) => {
+      const s = byId.get(t.id);
+      return s ? { ...t, crowd: { salesPerDay: s.salesPerDay, revenuePerDay: s.revenuePerDay, salesPer30d: s.salesPer30d, revenuePer30d: s.revenuePer30d, lifetimeSales: s.lifetimeSales, ratingsPer30d: s.ratingsPer30d } } : t;
+    });
+  } catch (err) {
+    logger.warn('[research/products] trendyol crowd sales failed', { error: (err as Error)?.message });
+  }
   const errors: ResearchSectionError[] = hit.fresh ? [] : [{ section: 'all', key: 'research.error.stale' }];
   return { result, source: priceSource('research.sourceName.trendyolSnapshot', hit.fetchedAt, result.price, hit.data.items.length), errors };
 }
@@ -290,7 +305,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const country = /^[A-Z]{2}$/.test(countryRaw) ? countryRaw : 'US';
   const taxRaw = Number(firstParam(req.query.taxonomyId));
   const taxonomyId = Number.isInteger(taxRaw) && taxRaw > 0 ? taxRaw : null;
-  const sortRaw = firstParam(req.query.sort) ?? 'relevance';
+  const sortRaw = firstParam(req.query.sort) ?? 'sales';
   const sort: TopSort = (SORTS as readonly string[]).includes(sortRaw) ? (sortRaw as TopSort) : 'relevance';
   const fmt = formattersFor(requestLocale(req));
 

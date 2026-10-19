@@ -15,6 +15,12 @@ const _t = {
     status: 'Durum', checking: 'Kontrol ediliyor...', connected: 'Bağlı',
     disconnected: 'Bağlı Değil', error: 'Hata', user: 'Kullanıcı',
     overlayTitle: 'Araştırma Panelleri', allOverlays: 'Tüm paneller',
+    marketTitle: 'Trendyol & Hepsiburada',
+    marketText: 'Trendyol ve Hepsiburada’da gezdiğiniz sayfalarda satış, ciro, buybox ve sıralama bilgisi gösterir.',
+    marketConsent: 'Açtığınız sayfalardaki herkese açık ürün bilgileri (fiyat, puan, satıcı, favori) anonim olarak KolayXport topluluk verisine eklenir ve herkesin araştırmasını güçlendirir. Adınız, sepetiniz, siparişleriniz ve adresleriniz asla alınmaz.',
+    marketEnable: 'Aç ve paylaşmayı kabul et', marketShare: 'Topluluğa katkı (paylaşım)',
+    marketOn: 'Açık: Trendyol ve Hepsiburada sayfalarında paneller görünür.', marketOffShare: 'Paylaşım kapalı: paneller yalnızca sayfadaki bilgiyi gösterir; topluluk verisi 30 gün sonra kapanır.',
+    marketDenied: 'İzin verilmedi. Tekrar denemek için butona tıklayın.',
     cacheTitle: 'Önbellek', researchData: 'Araştırma verileri',
     clear: 'Temizle', cleared: 'Temizlendi!',
     openApp: 'KolayXport\'u Aç', help: 'Yardım',
@@ -37,6 +43,12 @@ const _t = {
     status: 'Status', checking: 'Checking...', connected: 'Connected',
     disconnected: 'Not Connected', error: 'Error', user: 'User',
     overlayTitle: 'Research Panels', allOverlays: 'All panels',
+    marketTitle: 'Trendyol & Hepsiburada',
+    marketText: 'Shows sales, revenue, buybox and rankings on the Trendyol and Hepsiburada pages you browse.',
+    marketConsent: 'Public product facts on the pages you open (price, rating, seller, favorites) are added anonymously to KolayXport’s community data, which powers everyone’s research. Your name, basket, orders and addresses are never collected.',
+    marketEnable: 'Turn on and agree to share', marketShare: 'Contribute (sharing)',
+    marketOn: 'On: panels show on Trendyol and Hepsiburada pages.', marketOffShare: 'Sharing off: panels show only what the page says; community data stops after 30 days.',
+    marketDenied: 'Permission not granted. Click the button to try again.',
     cacheTitle: 'Cache', researchData: 'Research data',
     clear: 'Clear', cleared: 'Cleared!',
     openApp: 'Open KolayXport', help: 'Help',
@@ -332,6 +344,33 @@ function setupListeners() {
       out.textContent = resp.status === 'completed' ? t('importSent', resp.sent || 0) : (resp.error || '');
       setTimeout(checkPendingAddresses, 1500);
     });
+  });
+
+  // Trendyol & Hepsiburada: optional site access + consent to share (the button is the user gesture Chrome needs).
+  const MARKET_ORIGINS = ['https://www.trendyol.com/*', 'https://www.hepsiburada.com/*'];
+  const renderMarket = () => {
+    if (!chrome.permissions) { $('marketCard').style.display = 'none'; return; }
+    chrome.permissions.contains({ origins: MARKET_ORIGINS }, (granted) => {
+      chrome.storage.local.get('kx_market_share', (r) => {
+        const share = r.kx_market_share !== false;
+        $('marketEnable').style.display = granted ? 'none' : '';
+        $('marketShareRow').style.display = granted ? '' : 'none';
+        $('marketShare').checked = share;
+        $('marketStatus').textContent = granted ? t(share ? 'marketOn' : 'marketOffShare') : '';
+      });
+    });
+  };
+  renderMarket();
+  $('marketEnable').addEventListener('click', () => {
+    chrome.permissions.request({ origins: MARKET_ORIGINS }, (granted) => {
+      if (!granted) { $('marketStatus').textContent = t('marketDenied'); return; }
+      chrome.storage.local.set({ kx_market_share: true, kx_market_consent_at: new Date().toISOString() }, () => {
+        chrome.runtime.sendMessage({ type: 'kx_market_sync_scripts' }, () => renderMarket());
+      });
+    });
+  });
+  $('marketShare').addEventListener('change', (e) => {
+    chrome.storage.local.set({ kx_market_share: e.target.checked }, renderMarket);
   });
 
   $('toggleOverlays').addEventListener('change', (e) => {

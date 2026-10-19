@@ -76,7 +76,7 @@ export const PRODUCTS_SCHEMA = {
   q: urlField.string(undefined, { maxLength: 200 }),
   country: urlField.enum(COUNTRIES, 'US'),
   compare: urlField.string(undefined, { maxLength: 640 }),
-  sort: urlField.enum(PRODUCT_SORTS, 'relevance'),
+  sort: urlField.enum(PRODUCT_SORTS, 'sales'),
   /** Set by the search router for a pasted Etsy listing / eBay item link (detectQuery.routeForQuery). */
   compareListing: urlField.string(undefined, { maxLength: 40 }),
   compareItem: urlField.string(undefined, { maxLength: 40 }),
@@ -219,6 +219,23 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
   const data = result.data;
   const ready = Boolean(data) && (result.region.state === 'ready' || result.region.state === 'stale');
   const waitingForSnapshot = mkt === 'trendyol' && result.notice?.key === 'research.products.trendyolOpen';
+  // Extension ready (data-kx-market="1" set by kolayxport.js): the seller's search is read in a background Trendyol
+  // tab automatically, once per query; otherwise the "Search on Trendyol" button below opens it visibly.
+  const [autoSearch, setAutoSearch] = React.useState<{ q: string; state: 'running' | 'failed'; reason?: string | null } | null>(null);
+  React.useEffect(() => {
+    if (!waitingForSnapshot || !q || autoSearch?.q === q) return undefined;
+    if (typeof document === 'undefined' || document.documentElement.getAttribute('data-kx-market') !== '1') return undefined;
+    const onResult = (e: MessageEvent) => {
+      const d = e.data;
+      if (e.source !== window || !d || d.source !== 'kolayxport-ext' || d.type !== 'kx-market-search-result' || d.q !== q) return;
+      if (!d.ok) setAutoSearch({ q, state: 'failed', reason: d.reason ?? null });
+    };
+    window.addEventListener('message', onResult);
+    setAutoSearch({ q, state: 'running' });
+    setTrendyolWaiting(true);
+    window.postMessage({ source: 'kolayxport-app', type: 'kx-market-search', mkt: 'trendyol', q }, window.location.origin);
+    return () => window.removeEventListener('message', onResult);
+  }, [waitingForSnapshot, q, autoSearch?.q]);
   React.useEffect(() => {
     if (!waitingForSnapshot || !trendyolWaiting) return undefined;
     const id = window.setInterval(() => result.region.retry?.(), 4000);
@@ -228,7 +245,22 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
   // Estimated monthly sales for the top listings (Etsy), loaded after the result so the answer shows first.
   const salesState = useListingSales(mkt, !priceGap && !comparing && ready && data ? data.top : EMPTY_TOP);
   const marketSales = React.useMemo(() => {
-    if (!data || mkt !== 'etsy') return undefined;
+    if (!data) return undefined;
+    if (mkt === 'trendyol') {
+      // Crowd sales (calibrated rating growth) over the listed products, per month, in TRY.
+      const rows = data.top.filter((r) => r.crowd?.salesPer30d != null);
+      const revenue = rows.reduce((sum, r) => sum + (r.crowd?.revenuePer30d ?? 0), 0);
+      return {
+        counted: rows.length,
+        monthlySales: Math.round(rows.reduce((sum, r) => sum + (r.crowd?.salesPer30d ?? 0), 0)),
+        revenue: rows.length ? Math.round(revenue) : null,
+        currency: 'TRY',
+        measured: rows.length,
+        loading: false,
+        listed: data.top.length,
+      };
+    }
+    if (mkt !== 'etsy') return undefined;
     return { ...marketTotals(data.top, salesState.sales), loading: salesState.loading, listed: data.top.length };
   }, [data, mkt, salesState.sales, salesState.loading]);
 
@@ -400,7 +432,8 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
             data-testid="research-products-search"
           />
         </Box>
-        <FilterButton
+        {/* Trendyol is Turkey only: no country to pick. */}
+        {mkt === 'trendyol' ? null : <FilterButton
           label={t('toolbar.country')}
           value={url.country}
           options={countryOptions}
@@ -411,7 +444,7 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
             if (next && (COUNTRIES as readonly string[]).includes(next)) setUrl({ country: next as (typeof COUNTRIES)[number] });
           }}
           data-testid="research-country"
-        />
+        />}
         <Button
           variant="secondary"
           size={mobile ? 'md' : 'sm'}
@@ -501,6 +534,10 @@ export function ProductFinder({ amazonEligible = false }: ProductFinderProps = {
           />
         </Box>
       </EmptyState>
+    );
+  } else if (result.notice?.key === 'research.products.trendyolOpen' && autoSearch?.q === q && autoSearch.state === 'running' && trendyolWaiting) {
+    body = (
+      <EmptyState kind="first-use" brand="trendyol" title={t('trendyol.autoTitle')} body={t('trendyol.autoBody')} data-testid="research-trendyol-auto" />
     );
   } else if (result.notice?.key === 'research.products.trendyolOpen') {
     // Trendyol blocks servers: the seller's browser opens the search, the extension posts the page's data and this

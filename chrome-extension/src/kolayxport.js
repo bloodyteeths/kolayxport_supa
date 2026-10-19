@@ -98,3 +98,31 @@ function onVisible() {
   if (document.visibilityState === 'visible' && contextAlive()) fetchAuthToken();
 }
 document.addEventListener('visibilitychange', onVisible);
+
+// ---------------------------------------------------------------------------
+// Trendyol / Hepsiburada research from the app: the page tells the app the extension can read those sites
+// (documentElement data-kx-market="1"), and on the app's request (a seller's own search in Product finder) asks
+// the background worker to open that one search page in an inactive tab, read it, and close it.
+// ---------------------------------------------------------------------------
+function markMarketStatus() {
+  safeSendMessage({ type: 'kx_market_status' }).then(function (r) {
+    try {
+      document.documentElement.setAttribute('data-kx-ext', '1');
+      document.documentElement.setAttribute('data-kx-market', r && r.granted && r.share ? '1' : '0');
+    } catch (_) { /* ignore */ }
+  });
+}
+markMarketStatus();
+document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && contextAlive()) markMarketStatus(); });
+
+window.addEventListener('message', function (e) {
+  if (e.source !== window || e.origin !== window.location.origin) return;
+  var d = e.data;
+  if (!d || d.source !== 'kolayxport-app' || d.type !== 'kx-market-search') return;
+  var mkt = d.mkt === 'hepsiburada' ? 'hepsiburada' : d.mkt === 'trendyol' ? 'trendyol' : null;
+  var q = typeof d.q === 'string' ? d.q.trim().slice(0, 120) : '';
+  if (!mkt || !q) return;
+  safeSendMessage({ type: 'kx_market_fetch', params: { mkt: mkt, q: q } }).then(function (r) {
+    window.postMessage({ source: 'kolayxport-ext', type: 'kx-market-search-result', mkt: mkt, q: q, ok: !!(r && r.ok), reason: r && r.reason || null }, window.location.origin);
+  });
+});

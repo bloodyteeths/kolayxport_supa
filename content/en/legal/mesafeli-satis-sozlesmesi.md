@@ -19,10 +19,8 @@ The Turkish version of this agreement is the binding text; this English version 
 |---|---|
 | Legal name | MODSONS YAZILIM E-TİCARET İTHALAT İHRACAT LİMİTED ŞİRKETİ |
 | Address | Beyazevler Mah. 80053 Sok. Tanrıkulu Apt. No:8 İç Kapı No:02, 01170 Çukurova / Adana, Türkiye |
-| MERSİS no. | [TODO(owner): MERSİS no] |
 | Trade registry | Adana Chamber of Commerce, registry no. 100129 |
-| Tax office / no. | [TODO(owner): vergi dairesi] / 6222605496 |
-| Phone | [TODO(owner): telefon] |
+| Tax no. | 6222605496 |
 | E-mail | destek@kolayxport.com |
 | Registered e-mail (KEP) | modsonsyazilim@hs01.kep.tr |
 
@@ -47,7 +45,7 @@ For Buyers who buy the Service for business or professional purposes, the consum
 | Payment method | Credit / debit card, through Stripe, in advance |
 | Delivery | No physical delivery; the Service is made available electronically in the Buyer's account immediately after payment is confirmed |
 
-The plan's scope and usage limits are as stated on the [Pricing](/fiyatlandirma) page and at checkout when the agreement is formed. [TODO(owner): bedelin KDV dahil gösterildiğini teyit edin]
+The plan's scope and usage limits are as stated on the [Pricing](/fiyatlandirma) page and at checkout when the agreement is formed.
 
 ## 4. Pre-contract information
 

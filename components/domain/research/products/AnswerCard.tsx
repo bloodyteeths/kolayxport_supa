@@ -49,6 +49,8 @@ export function AnswerCard({ result, onUsePrice, market }: AnswerCardProps) {
   const p = result.price;
   const total = result.competition.total.guard.ok ? result.competition.total.value : null;
   const newcomers = result.newcomers.guard.ok ? result.newcomers.value : null;
+  // Trendyol shows no shop opening dates: no tile instead of a tile that is always "—".
+  const showNewcomers = result.newcomers.guard.ok || result.newcomers.guard.reasonKey !== 'research.guard.notAvailableTrendyol';
   const hasRange = p.p25 != null && p.p75 != null && p.n >= 5 && p.quality !== 'implausible';
   const median = p.median != null && p.n >= 5 && p.quality !== 'implausible' ? p.median : null;
 
@@ -116,7 +118,7 @@ export function AnswerCard({ result, onUsePrice, market }: AnswerCardProps) {
         </Box>
       ) : null}
 
-      <Box sx={{ mt: '14px', display: 'grid', gap: '10px', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(4, minmax(0, 1fr))' } }}>
+      <Box sx={{ mt: '14px', display: 'grid', gap: '10px', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: showNewcomers ? 'repeat(4, minmax(0, 1fr))' : 'repeat(3, minmax(0, 1fr))' } }}>
         <Tile
           label={t('tile.demand')}
           value={o.demand ? t(`level.${o.demand}`) : t('level.unknown')}
@@ -145,13 +147,13 @@ export function AnswerCard({ result, onUsePrice, market }: AnswerCardProps) {
           toneKey={o.competition ? COMPETITION_TONE[o.competition] : undefined}
           testId="research-answer-competition"
         />
-        <Tile
+        {showNewcomers ? <Tile
           label={t('tile.newcomers')}
           value={newcomers != null ? fmt.percent(newcomers) : '—'}
           sub={newcomers != null ? t(o.newcomersOk ? 'tile.newcomersOk' : 'tile.newcomersHard') : t('tile.newcomersNa')}
           toneKey={o.newcomersOk == null ? undefined : o.newcomersOk ? 'success' : 'warning'}
           testId="research-answer-newcomers"
-        />
+        /> : null}
       </Box>
 
       <ButtonBase

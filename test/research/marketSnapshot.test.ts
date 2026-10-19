@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/prisma', () => ({ default: {} }));
 
-import { parseCompact, parseSnapshot, sellerTop5Share, snapshotFacts, snapshotResult, toTopListingsFromSnapshot } from '@/lib/research/marketSnapshot';
+import { medianFavorites, trendyolDemand, parseCompact, parseSnapshot, sellerTop5Share, snapshotFacts, snapshotResult, toTopListingsFromSnapshot } from '@/lib/research/marketSnapshot';
 
 // Shape of what content-trendyol-search.js sends, from a real "ahşap takı kutusu" page (2026-10-18).
 const item = (i: number, over: Record<string, unknown> = {}) => ({
@@ -72,5 +72,18 @@ describe('result building', () => {
     expect(r.price.currency).toBe('TRY');
     expect(r.competition.total.value).toBe(5109);
     expect(r.newcomers.guard.ok).toBe(false);
+  });
+});
+
+describe('Trendyol demand (Turkey trends + page favorites, no US sources)', () => {
+  const s = parseSnapshot(body(), '2026-10-18T13:00:00.000Z')!;
+  it('median favorites of organic results', () => {
+    expect(medianFavorites(s)).toBe(9000); // 3K and 15K alternate: even count → mean of the middle two
+  });
+  it('needs both inputs; favorites on a log scale', () => {
+    expect(trendyolDemand(null, 15000).tier).toBeNull();
+    const d = trendyolDemand(40, 2000);
+    expect(d.tier).toBe(3);
+    expect(d.inputs.map((i) => i.key)).toEqual(['googleTrends', 'trendyolFavorites']);
   });
 });

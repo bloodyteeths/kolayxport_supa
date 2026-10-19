@@ -122,6 +122,7 @@ All five editable marketplaces share one editor and one grid, and all edits are 
 | `ai-message-draft` | AI ile yanıt taslağı | AI reply drafts | Wix, Trendyol | production | all | Messages › Draft with AI | `pages/api/messages/draft-reply.ts` | |
 | `ai-research-explain` | AI ile araştırma açıklaması | AI research explain | Etsy, eBay | production | all | Research › Explain | `pages/api/research/explain.ts` | The UI says "1 credit", but credits are **not metered** (H-4). |
 | `ai-amazon` | Amazon AI araçları | Amazon AI actions | Amazon | stub | n/a | none (no UI caller) | `pages/api/ai/amazon.ts` | Orphaned endpoint. |
+| `ai-connector-mcp` | Kendi yapay zekânızı bağlayın (Claude, ChatGPT) | Connect your own AI (MCP connector for Claude and ChatGPT) | Etsy, eBay, Amazon, Trendyol, Hepsiburada, Wix, Shopify | production | all | Settings › AI; https://kolayxport.com/api/mcp | `pages/api/mcp/index.ts`, `lib/mcp/tools.ts`, `lib/mcp/listingTools.ts`, `lib/mcp/financeTools.ts`, `lib/mcp/orderData.ts`, `lib/mcp/tokens.ts`, `pages/oauth/authorize.tsx` | OAuth 2.1 or a personal key. Read tools for orders, listings, sales and finance; writes only stage drafts. Buyer names and addresses only with the opt-in, never Amazon, never e-mail or phone. finance_summary follows the Financials plan check. The AI image tool is off. |
 | `ai-assistant` | Türkçe AI asistan | AI chat assistant | n/a | none | n/a | none | | Planned in navigation docs; not built. |
 
 ### Research & arbitrage

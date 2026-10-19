@@ -1819,7 +1819,9 @@
         "permission": "Permission",
         "create": "Create key",
         "once": "Copy this key now: it will not be shown again.",
-        "claudeCode": "For Claude Code:"
+        "claudeCode": "For Claude Code:",
+        "shareBuyer": "Share buyer names and shipping addresses",
+        "shareBuyerHint": "The AI company you connect will see this information. Amazon orders are never shared; e-mail and phone stay hidden."
       },
       "defaultName": "Personal key",
       "scope": {
@@ -1840,7 +1842,11 @@
       "revoked": "Connection removed",
       "revokeFailed": "Could not remove the connection. Try again.",
       "createFailed": "Could not create the key. Try again.",
-      "privacy": "Your buyers' names, addresses, e-mails and phone numbers are never sent to AI apps (orders carry the country only). Connections end by themselves after a year at the latest."
+      "privacy": "Your buyers' e-mails and phone numbers are never sent to AI apps. Names and shipping addresses go only to connections where you turn on sharing (never for Amazon orders); other connections see the country only. Connections end by themselves after a year at the latest.",
+      "buyer": {
+        "on": "buyer names and addresses shared",
+        "off": "country only"
+      }
     },
     "deleteAccount": {
       "title": "Delete account",
@@ -11317,12 +11323,14 @@
       "input": {
         "googleTrends": "Google interest",
         "autocomplete": "Autocomplete",
-        "engagement": "Engagement"
+        "engagement": "Engagement",
+        "trendyolFavorites": "Trendyol favorites"
       },
       "value": {
         "googleTrends": "{value} (12 months)",
         "autocomplete": "in {value} of 3 suggestion lists",
-        "engagement": "{value} favorites per month (median)"
+        "engagement": "{value} favorites per month (median)",
+        "trendyolFavorites": "{value} favorites (median, top results, all time)"
       },
       "inputMissing": "not available"
     },
@@ -11551,7 +11559,8 @@
       "price_asc": "Lowest price",
       "price_desc": "Highest price",
       "favorites": "Most favorites",
-      "newest": "Newest"
+      "newest": "Newest",
+      "sales": "Best sellers"
     },
     "top": {
       "title": "Top listings ({count})",
@@ -11564,7 +11573,10 @@
         "sales": "Monthly sales",
         "revenue": "Monthly revenue",
         "orders": "Trendyol orders",
-        "ratings": "Ratings"
+        "ratings": "Ratings",
+        "salesDay": "Sales/day",
+        "revenueDay": "Revenue/day",
+        "lifetime": "Lifetime sales"
       },
       "favoritesAll": "{count} (all time)",
       "favoritesCard": "{count} favorites (all time)",
@@ -11588,7 +11600,9 @@
       "salesValue": "~{count}/mo {kind, select, measured {· measured} other {· estimate}}",
       "salesUpTo": "up to {count}/mo",
       "salesCard": "Sales: {value}",
-      "ordersBadge": "{badge} orders"
+      "ordersBadge": "{badge} orders",
+      "crowdPerDay": "~{count}/day",
+      "crowdRatings": "+{count} ratings/mo"
     },
     "source": {
       "searchApiOrder": "{marketplace} search (API order, not personalized)",
@@ -12068,7 +12082,18 @@
       "openCta": "Search on Trendyol",
       "needsExtension": "Needs the KolayXport Chrome extension (version 9.11 or later).",
       "waiting": "Trendyol tab opened. Results will appear here once the page loads…",
-      "priceGap": "Price gap: Trendyol → abroad"
+      "priceGap": "Price gap: Trendyol → abroad",
+      "autoTitle": "Searching Trendyol…",
+      "autoBody": "The KolayXport extension is opening and reading this search in the background. The answer appears here in a few seconds."
+    },
+    "niches": {
+      "title": "Strong niches today",
+      "description": "Etsy niches measured again every day: monthly sales, revenue, typical price and competition. Click one for the full answer.",
+      "sales": "{count} sales/mo",
+      "revenue": "{amount}/mo",
+      "price": "Typical price {amount}",
+      "competitors": "{count} competing listings",
+      "basis": "From {counted} of the top 48 listings, {measured} measured"
     }
   },
   "ds": {
@@ -17054,12 +17079,15 @@
       "invalidBody": "Start the connection again from your AI app.",
       "title": "{app} wants to connect to your KolayXport account",
       "subtitle": "If you allow it, this app can answer your questions about your shop.",
+      "redirectHost": "After you answer, you return to {host}",
       "canTitle": "It can see:",
-      "canOrders": "Your orders (no buyer names or addresses, country only)",
+      "canOrders": "Your orders (country only, unless you allow buyer details below)",
       "canListings": "Your listings, prices, stock and listing health",
       "canSales": "Sales summaries and market research",
       "write": "Also let it prepare drafts",
       "writeHint": "Listing text, prices, stock, new listings and photos — nothing changes on a marketplace until you send it in KolayXport. AI-generated photos use your AI credits.",
+      "shareBuyer": "Share buyer names and shipping addresses",
+      "shareBuyerHint": "The AI company you connect will see this information. Amazon orders are never shared; e-mail and phone stay hidden.",
       "never": "You can remove the connection any time in Settings → AI.",
       "deny": "Cancel",
       "allow": "Allow"

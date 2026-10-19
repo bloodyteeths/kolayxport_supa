@@ -36,8 +36,10 @@ const args = process.argv.slice(2);
 const only = args.filter((a) => !a.startsWith('--'));
 const localeArg = args.find((a) => a.startsWith('--locale='))?.split('=')[1];
 const previewDir = args.find((a) => a.startsWith('--preview='))?.split('=')[1];
-const PLAY = args.includes('--play');
-const PLAY_OUT = path.join(ROOT, 'design', 'play-listing', 'screens');
+const IOS = args.includes('--ios');
+const PLAY = args.includes('--play') || IOS;
+/** --ios: App Store 6.9" iPhone shots (440x956 at 3x = 1320x2868), iOS store-app mode (kx_client=ios). */
+const PLAY_OUT = path.join(ROOT, 'design', IOS ? 'appstore-listing' : 'play-listing', 'screens');
 /** Store order of the Google Play phone screenshots (ids from SCREENS, plus the overview). */
 const PLAY_SCREENS = ['overview', 'orders', 'etsy-listings', 'listing-editor', 'research', 'profit', 'inbox', 'stock-sync'];
 const LOCALES: Array<'tr' | 'en'> = localeArg === 'tr' || localeArg === 'en' ? [localeArg] : ['tr', 'en'];
@@ -413,7 +415,7 @@ async function main() {
           : SCREENS.filter((s) => !!s.mobile === mobile && s.id !== 'overview' && (only.length === 0 || only.includes(s.id)));
         if (!screens.length) continue;
         const ctx = await browser.newContext({
-          viewport: PLAY ? { width: 360, height: 640 } : mobile ? { width: 390, height: 844 } : { width: 1440, height: 900 },
+          viewport: IOS ? { width: 440, height: 956 } : PLAY ? { width: 360, height: 640 } : mobile ? { width: 390, height: 844 } : { width: 1440, height: 900 },
           deviceScaleFactor: mobile ? 3 : 2,
           isMobile: mobile, hasTouch: mobile,
           locale: locale === 'tr' ? 'tr-TR' : 'en-US',
@@ -427,7 +429,7 @@ async function main() {
         }, [locale]);
         await installMocks(ctx);
         await login(ctx);
-        if (PLAY) await ctx.addCookies([{ name: 'kx_client', value: 'play', url: BASE }]);
+        if (PLAY) await ctx.addCookies([{ name: 'kx_client', value: IOS ? 'ios' : 'play', url: BASE }]);
         for (const s of screens) {
           try { await capture(ctx, s, locale); } catch (e) { console.error(`  FAILED ${s.id}: ${(e as Error).message}`); }
         }

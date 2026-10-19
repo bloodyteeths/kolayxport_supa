@@ -21,13 +21,10 @@ The consumer rights in this form apply to individuals or legal entities who buy 
 |---|---|
 | Legal name | MODSONS YAZILIM E-TİCARET İTHALAT İHRACAT LİMİTED ŞİRKETİ |
 | Address | Beyazevler Mah. 80053 Sok. Tanrıkulu Apt. No:8 İç Kapı No:02, 01170 Çukurova / Adana, Türkiye |
-| MERSİS no. | [TODO(owner): MERSİS no] |
 | Trade registry | Adana Chamber of Commerce, registry no. 100129 |
-| Tax office / no. | [TODO(owner): vergi dairesi] / 6222605496 |
-| Phone | [TODO(owner): telefon] |
+| Tax no. | 6222605496 |
 | E-mail | destek@kolayxport.com |
 | Registered e-mail (KEP) | modsonsyazilim@hs01.kep.tr |
-| ETBİS registration | [TODO(owner): ETBİS kayıt numarası/durumu] |
 | Website | https://kolayxport.com |
 
 ## 3. Main characteristics of the Service
@@ -40,7 +37,7 @@ The scope and usage limits of each plan (monthly orders, labels, connected shops
 
 ## 4. Price and payment
 
-- The fee is the **total amount** shown at checkout for the plan (Starter, Growth or Pro) and period (monthly or yearly) you choose. [TODO(owner): gösterilen tutarın KDV dahil olduğunu teyit edin; tüketicilere vergiler dahil toplam fiyat gösterilmesi zorunludur]
+- The fee is the **total amount** shown at checkout for the plan (Starter, Growth or Pro) and period (monthly or yearly) you choose.
 - Payment is taken in advance by credit or debit card through our payment provider Stripe. The seller does not store your card details.
 - New accounts start with a 14-day free trial with no card required; there is no charge for the trial. If you buy a plan while your trial is still running, the first charge may be taken at the end of the trial; checkout will say so.
 - There are no delivery costs.
@@ -69,8 +66,6 @@ If you do not give this confirmation, or no exception applies, you can send your
 - KEP: modsonsyazilim@hs01.kep.tr
 
 We refund the total amount you paid within **14 days** of receiving your notice of withdrawal, using the payment method you used and at no cost to you.
-
-[TODO(owner): ödeme sayfasına işaretlenmemiş "derhal ifa ve cayma hakkının kaybı" onay kutusunu ekleyin; eklenmeyecekse bu bölümü, tüketiciye 14 gün içinde koşulsuz tam iade sağlayacak şekilde değiştirin]
 
 ## 8. Complaints and disputes
 

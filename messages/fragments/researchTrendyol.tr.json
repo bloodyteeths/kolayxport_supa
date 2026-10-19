@@ -6,7 +6,9 @@
       "openCta": "Trendyol'da ara",
       "needsExtension": "KolayXport Chrome eklentisi gerekir (sürüm 9.11 veya üstü).",
       "waiting": "Trendyol sekmesi açıldı. Sayfa yüklenince sonuçlar burada görünecek…",
-      "priceGap": "Fiyat farkı: Trendyol → yurt dışı"
+      "priceGap": "Fiyat farkı: Trendyol → yurt dışı",
+      "autoTitle": "Trendyol'da aranıyor…",
+      "autoBody": "KolayXport eklentisi bu aramayı arka planda açıp okuyor. Sonuç birkaç saniye içinde burada."
     },
     "evidence": {
       "basisTrendyol": "Trendyol arama sayfasından {n} ürün (tarayıcınızdan)"
@@ -26,9 +28,22 @@
     "top": {
       "col": {
         "orders": "Trendyol sipariş",
-        "ratings": "Değerlendirme"
+        "ratings": "Değerlendirme",
+        "salesDay": "Satış/gün",
+        "revenueDay": "Ciro/gün",
+        "lifetime": "Toplam satış"
       },
-      "ordersBadge": "{badge} sipariş"
+      "ordersBadge": "{badge} sipariş",
+      "crowdPerDay": "~{count}/gün",
+      "crowdRatings": "+{count} puan/ay"
+    },
+    "demand": {
+      "input": {
+        "trendyolFavorites": "Trendyol favorileri"
+      },
+      "value": {
+        "trendyolFavorites": "{value} favori (ortanca, ilk sonuçlar, tüm zamanlar)"
+      }
     }
   }
 }

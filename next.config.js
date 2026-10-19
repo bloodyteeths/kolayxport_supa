@@ -162,6 +162,8 @@ const nextConfig = {
       { source: '/.well-known/oauth-authorization-server/:path*', destination: '/api/mcp/oauth/metadata' },
       { source: '/.well-known/oauth-protected-resource', destination: '/api/mcp/oauth/resource' },
       { source: '/.well-known/oauth-protected-resource/:path*', destination: '/api/mcp/oauth/resource' },
+      // OpenAI apps (ChatGPT) domain verification: the token from OpenAI's portal, served from OPENAI_APPS_CHALLENGE.
+      { source: '/.well-known/openai-apps-challenge', destination: '/api/mcp/openai-challenge' },
     ];
   },
 

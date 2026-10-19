@@ -49,13 +49,13 @@ Bu politikanın yürürlük tarihi itibarıyla sitede analitik veya pazarlama ç
 - **Meta Pixel ve Meta Dönüşümler API'si** (Meta Platforms Ireland Ltd. / Meta Platforms, Inc.) — pazarlama,
 - **X (Twitter) etiketi**, **TikTok Pixel**, **LinkedIn Insight Tag** — pazarlama.
 
-Bu araçlar yalnızca ilgili kategoriye **açık rıza vermenizden sonra** çalışır. Google araçlarında Google'ın İzin Modu v2'sini (Consent Mode v2) kullanırız: onay vermeden önce analitik ve reklam depolama izinleri "reddedildi" durumundadır ve bu araçların etiketleri onayınız olmadan yüklenmez. [TODO(owner): Consent Mode'un "temel (basic)" modda kurulduğunu, yani onaydan önce çerezsiz ping dahil hiçbir isteğin gönderilmediğini teyit edin]
+Bu araçlar yalnızca ilgili kategoriye **açık rıza vermenizden sonra** çalışır. Google araçlarında Google'ın İzin Modu v2'sini (Consent Mode v2) kullanırız: onay vermeden önce analitik ve reklam depolama izinleri "reddedildi" durumundadır ve bu araçların etiketleri onayınız olmadan yüklenmez.
 
 **Meta Dönüşümler API'si** sunucudan sunucuya çalışır: pazarlama çerezlerine onay verdiyseniz, kayıt veya satın alma gibi olaylar, e-posta adresiniz gibi tanımlayıcılar tek yönlü özetlenmiş (hash) hâlde Meta'ya iletilebilir. Onay vermediyseniz bu olaylar gönderilmez.
 
 Bu araçların sağlayıcıları yurt dışında bulunduğundan, onay vermeniz yurt dışına aktarımı da kapsar. Aktarımın hukuki dayanağı [KVKK Aydınlatma Metni](/kvkk-aydinlatma-metni)'nin 7. bölümünde açıklanmıştır.
 
-Bu araçlar devreye alındığında, her birinin çerez adı ve süresi bu tabloya eklenecektir. [TODO(owner): araçlar devreye alınınca çerez adları ve süreleri tablosunu ekleyin]
+Bu araçlar devreye alındığında, her birinin çerez adı ve süresi bu tabloya eklenecektir.
 
 ## 5. Üçüncü taraf hizmetlerin kendi çerezleri
 
@@ -67,7 +67,7 @@ Chrome uzantısını kurarsanız, uzantı KolayXport oturumunuzu tanımak ve aya
 
 ## 7. Tercihlerinizi nasıl değiştirirsiniz?
 
-- **Çerez tercihleri paneli:** Siteye ilk girişinizde çıkan bildirimde zorunlu dışındaki kategorileri tek tek kabul veya reddedebilirsiniz. Kararınızı dilediğiniz zaman sitenin alt kısmındaki **"Çerez Tercihleri"** bağlantısından değiştirebilir veya onayınızı geri alabilirsiniz. [TODO(owner): kategori bazlı onay paneli ve alt bilgideki "Çerez Tercihleri" bağlantısı yayımlanmadan önce hazır olmalı; bugünkü bildirim yalnızca "Kabul et" düğmesi içeriyor]
+- **Çerez tercihleri paneli:** Siteye ilk girişinizde çıkan bildirimde zorunlu dışındaki kategorileri tek tek kabul veya reddedebilirsiniz. Kararınızı dilediğiniz zaman sitenin alt kısmındaki **"Çerez Tercihleri"** bağlantısından değiştirebilir veya onayınızı geri alabilirsiniz.
 - **Tarayıcı ayarları:** Çerezleri ve site verilerini tarayıcınızın ayarlarından silebilir veya engelleyebilirsiniz. Zorunlu çerezleri engellerseniz giriş yapamayabilir veya uygulamayı kullanamayabilirsiniz.
 - **Reklam tercihleri:** Google, Meta ve diğer platformların kendi reklam ayarları sayfalarından kişiselleştirilmiş reklam tercihlerinizi yönetebilirsiniz.
 

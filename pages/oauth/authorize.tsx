@@ -10,8 +10,11 @@ export default function OAuthAuthorize() {
   const t = useTranslations('mcp.consent');
   const router = useRouter();
   const [clientName, setClientName] = useState<string | null>(null);
+  const [redirectHost, setRedirectHost] = useState<string | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'invalid' | 'sending'>('loading');
   const [write, setWrite] = useState(true);
+  // Buyer names + addresses: off by default, only the seller's tick grants it (never the app's requested scope).
+  const [shareBuyer, setShareBuyer] = useState(false);
   const q = router.query;
   const param = (k: string) => (typeof q[k] === 'string' ? (q[k] as string) : '');
 
@@ -28,6 +31,7 @@ export default function OAuthAuthorize() {
       const d = await r.json().catch(() => null);
       if (!r.ok || !d?.clientName) { setState('invalid'); return; }
       setClientName(d.clientName);
+      setRedirectHost(typeof d.redirectHost === 'string' ? d.redirectHost : null);
       setWrite(!param('scope') || param('scope').split(/\s+/).includes('write'));
       setState('ready');
     })();
@@ -42,6 +46,7 @@ export default function OAuthAuthorize() {
         approve, client_id: param('client_id'), redirect_uri: param('redirect_uri'), state: param('state'),
         code_challenge: param('code_challenge'), code_challenge_method: param('code_challenge_method') || 'S256',
         scope: write ? 'read write' : 'read',
+        share_buyer: shareBuyer,
       }),
     });
     const d = await r.json().catch(() => null);
@@ -68,7 +73,8 @@ export default function OAuthAuthorize() {
           {(state === 'ready' || state === 'sending') && clientName ? (
             <>
               <h1 className="text-lg font-semibold mb-1">{t('title', { app: clientName })}</h1>
-              <p className="text-sm text-gray-500 mb-4">{t('subtitle')}</p>
+              <p className="text-sm text-gray-500 mb-1">{t('subtitle')}</p>
+              {redirectHost ? <p className="text-xs text-gray-500 mb-4" data-testid="consent-redirect-host">{t('redirectHost', { host: redirectHost })}</p> : <div className="mb-3" />}
               <div className="text-sm font-medium text-gray-800 mb-2">{t('canTitle')}</div>
               <ul className="text-sm text-gray-700 space-y-1 mb-4 list-disc pl-5">
                 <li>{t('canOrders')}</li>
@@ -78,6 +84,10 @@ export default function OAuthAuthorize() {
               <label className="flex gap-2 items-start text-sm text-gray-800 mb-4 cursor-pointer">
                 <input type="checkbox" className="mt-1" checked={write} onChange={(e) => setWrite(e.target.checked)} />
                 <span>{t('write')}<span className="block text-xs text-gray-500">{t('writeHint')}</span></span>
+              </label>
+              <label className="flex gap-2 items-start text-sm text-gray-800 mb-4 cursor-pointer">
+                <input type="checkbox" className="mt-1" data-testid="consent-share-buyer" checked={shareBuyer} onChange={(e) => setShareBuyer(e.target.checked)} />
+                <span>{t('shareBuyer')}<span className="block text-xs text-gray-500">{t('shareBuyerHint')}</span></span>
               </label>
               <p className="text-xs text-gray-500 mb-5">{t('never')}</p>
               <div className="flex gap-2 justify-end">

@@ -57,6 +57,16 @@ Yapay zekâ özelliklerini (başlık, açıklama ve etiket önerisi, görsel ür
 
 Yapay zekâ çıktıları öneridir; pazaryerine gönderilmeden önce sizin incelemeniz ve onaylamanız gerekir. Hizmet, yapay zekâ çıktısına dayanarak sizin veya alıcılarınız hakkında hukuki sonuç doğuran otomatik bir karar vermez. Gemini API'yi ücretli katmanda kullanırız; Google bu katmanda gönderilen içerikleri modellerini eğitmek için kullanmaz. Google'ın bu verileri işlemesine Google'ın API koşulları uygulanır.
 
+### Kendi yapay zekânızı bağlama (Claude, ChatGPT ve diğer MCP istemcileri)
+
+Kullandığınız bir yapay zekâ asistanını (örneğin Claude veya ChatGPT) bağlayıcımız (`https://kolayxport.com/api/mcp`) üzerinden KolayXport hesabınıza bağlayabilirsiniz. Bağlantıyı siz başlatırsınız ve neler yapabileceğini onay ekranında ya da Ayarlar › Yapay zekâ'da kişisel anahtar oluştururken siz seçersiniz.
+
+- **Yapay zekâ sağlayıcısının aldığı veriler:** yalnızca siz kullanırken yapay zekânın istediği veriler: kendi siparişleriniz (sipariş numarası, tarihler, pazaryeri, ürünler, fiyatlar, indirimler, kargo, vergi, alıcının ülkesi), ilanlarınız ve stoklarınız, satış toplamları ve senkronlanmış finans kayıtlarınızdaki kesinti, ödeme ve bakiyeler. Yapay zekâ sağlayıcısı (örneğin Anthropic veya OpenAI) bu verileri, o sağlayıcıyla kabul ettiğiniz kendi koşulları ve gizlilik politikası kapsamında işler.
+- **Alıcı kişisel verileri:** alıcı adları ve teslimat adresleri yalnızca o bağlantı için "Alıcı adlarını ve teslimat adreslerini paylaş" kutusunu işaretlerseniz paylaşılır; bu seçenek kapalı gelir. Amazon siparişlerine ait alıcı verileri, e-posta adresleri ve telefon numaraları bağlayıcı üzerinden hiçbir zaman paylaşılmaz. Bu seçeneği açtığınızda alıcılarınızın verilerini veri sorumlusu olarak yapay zekâ sağlayıcısına aktarmış olursunuz; bunun için hukuki bir dayanağınız olduğundan emin olun.
+- **Yapay zekânın değiştirebildikleri:** pazaryerlerinde hiçbir şey. Yazma işlemleri yalnızca KolayXport'ta taslak oluşturur; taslağı siz inceleyip gönderirsiniz.
+- **Sakladıklarımız:** bağlantının kendisi (izinleri, oluşturulma ve son kullanım zamanı) ve erişim anahtarının özetlenmiş (hash) kopyası; anahtarı hiçbir zaman okunabilir biçimde saklamayız. Hangi aracın ne zaman çağrıldığını ve alıcı verisi döndürülüp döndürülmediğini kaydederiz, yanıtların içeriğini kaydetmeyiz. Bu kayıtlar sistem kayıtlarıdır (Saklama süreleri bölümüne bakın).
+- **Durdurma:** bağlantıyı Ayarlar › Yapay zekâ'dan iptal edin veya bağlayıcıyı yapay zekâ uygulamanızdan kaldırın. İptal edilen bağlantı hemen çalışmaz hâle gelir; bağlantıların bir son kullanma tarihi de vardır.
+
 ## 5. Paylaştığımız taraflar
 
 Verileri yalnızca aşağıdaki taraflarla ve gerekli olduğu ölçüde paylaşırız:

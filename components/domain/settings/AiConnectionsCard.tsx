@@ -6,7 +6,7 @@ import { useState } from 'react';
 import useSWR from 'swr';
 import Box from '@mui/material/Box';
 import { useTranslations } from 'next-intl';
-import { Button, SegmentedControl, TextField } from '@/components/ds/inputs';
+import { Button, Checkbox, SegmentedControl, TextField } from '@/components/ds/inputs';
 import { Section } from '@/components/ds/page';
 import { useToast } from '@/components/ds/feedback';
 import { useConfirm } from '@/components/ds/overlay/ConfirmDialog';
@@ -30,6 +30,8 @@ export function AiConnectionsCard() {
   const { data, mutate } = useSWR(KEY, fetcher, { revalidateOnFocus: true });
   const [name, setName] = useState('');
   const [scope, setScope] = useState<'read' | 'write'>('write');
+  // Buyer names + addresses (orders:buyer): off by default, only granted when ticked.
+  const [shareBuyer, setShareBuyer] = useState(false);
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState<string | null>(null);
   const url = typeof window !== 'undefined' ? `${window.location.origin}/api/mcp` : 'https://kolayxport.com/api/mcp';
@@ -37,11 +39,12 @@ export function AiConnectionsCard() {
   const create = async () => {
     setCreating(true);
     try {
-      const r = await fetch(KEY, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim() || t('defaultName'), scopes: scope === 'write' ? ['read', 'write'] : ['read'] }) });
+      const r = await fetch(KEY, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim() || t('defaultName'), scopes: scope === 'write' ? ['read', 'write'] : ['read'], shareBuyer }) });
       const d = await r.json().catch(() => null);
       if (!r.ok || !d?.token) throw new Error(d?.code || 'create');
       setCreated(d.token);
       setName('');
+      setShareBuyer(false);
       await mutate();
     } catch {
       toast.error(t('createFailed'));
@@ -91,6 +94,7 @@ export function AiConnectionsCard() {
             <SegmentedControl<'read' | 'write'> aria-label={t('key.permission')} value={scope} onChange={setScope} options={[{ value: 'read', label: t('scope.read') }, { value: 'write', label: t('scope.write') }]} size="sm" />
             <Button variant="secondary" onClick={() => void create()} loading={creating}>{t('key.create')}</Button>
           </Box>
+          <Checkbox checked={shareBuyer} onChange={setShareBuyer} label={t('key.shareBuyer')} description={t('key.shareBuyerHint')} data-testid="ai-connections-share-buyer" />
           {created ? (
             <Box sx={{ p: '10px', borderRadius: '8px', bgcolor: tone.warning.bg, border: `1px solid ${tone.warning.border}`, display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }} data-testid="ai-connections-new-key">
               <Box sx={{ fontSize: 12, fontWeight: 600, color: tone.warning.fg }}>{t('key.once')}</Box>
@@ -109,7 +113,7 @@ export function AiConnectionsCard() {
               <Box sx={{ flex: '1 1 200px', minWidth: 0 }}>
                 <Box sx={{ fontSize: 13, fontWeight: 600, color: n[800], overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</Box>
                 <Box sx={{ fontSize: 12, color: n[500] }}>
-                  {c.kind === 'oauth' ? t('kind.oauth') : t('kind.token', { prefix: c.tokenPrefix })} · {c.scopes.includes('write') ? t('scope.write') : t('scope.read')} · {c.lastUsedAt ? t('lastUsed', { date: f.relative(c.lastUsedAt) }) : t('neverUsed')}
+                  {c.kind === 'oauth' ? t('kind.oauth') : t('kind.token', { prefix: c.tokenPrefix })} · {c.scopes.includes('write') ? t('scope.write') : t('scope.read')} · {c.scopes.includes('orders:buyer') ? t('buyer.on') : t('buyer.off')} · {c.lastUsedAt ? t('lastUsed', { date: f.relative(c.lastUsedAt) }) : t('neverUsed')}
                 </Box>
               </Box>
               <Button variant="ghost" size="sm" onClick={() => void revoke(c)}>{t('revoke')}</Button>

@@ -1644,6 +1644,8 @@ model TrendyolProduct {
   stockCode     String?
   productMainId String?
   trendyolId    String? // Trendyol's internal product ID
+  /// Public product id (trendyol.com/...-p-<id>): links the store's own orders to crowd market data (calibration).
+  productContentId String?
 
   // Content
   title        String
@@ -2566,4 +2568,121 @@ model PushDevice {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+/// Crowd market data (Trendyol, Hepsiburada): public product facts read by the KolayXport extension from pages
+/// sellers open in their own browser, shared by everyone. Rows never carry a userId (lib/market/ingest.ts).
+/// One row per marketplace product: the latest known state.
+model MarketProduct {
+  id               String   @id @default(cuid())
+  mkt              String // trendyol | hepsiburada
+  productId        String
+  title            String
+  brand            String?
+  sellerId         String?
+  sellerName       String?
+  categoryId       String?
+  categoryName     String?
+  url              String?
+  imageUrl         String?
+  price            Float?
+  currency         String   @default("TRY")
+  rating           Float?
+  ratingCount      Int?
+  reviewCount      Int?
+  favorites        Int?
+  otherSellerCount Int?
+  firstSeenAt      DateTime @default(now())
+  lastSeenAt       DateTime @default(now())
+
+  @@unique([mkt, productId])
+  @@index([mkt, sellerId])
+  @@index([mkt, categoryId])
+  @@index([lastSeenAt])
+}
+
+/// Time series of a product's public counters, at most one row per product per hour (sales = deltas).
+model MarketProductObservation {
+  id               String   @id @default(cuid())
+  mkt              String
+  productId        String
+  hourBucket       DateTime
+  observedAt       DateTime @default(now())
+  source           String // search | product | store
+  price            Float?
+  originalPrice    Float?
+  rating           Float?
+  ratingCount      Int?
+  reviewCount      Int?
+  favorites        Int?
+  basketCount      Int?
+  viewCount        Int?
+  orderBadge       String?
+  ordersAtLeast    Int?
+  otherSellerCount Int?
+  buyboxSellerId   String?
+  /// Product page buybox: [{ sellerId, name, price, score }] as shown.
+  offers           Json?
+
+  @@unique([mkt, productId, hourBucket])
+  @@index([mkt, productId, observedAt])
+  @@index([observedAt])
+}
+
+/// A search/category page as seen: total and the ordered organic + sponsored product ids (ranks, SEO, ad share).
+model MarketSearchObservation {
+  id           String   @id @default(cuid())
+  mkt          String
+  queryKey     String // normalized query, or "c:<categoryId>" for category pages
+  query        String
+  hourBucket   DateTime
+  observedAt   DateTime @default(now())
+  total        Int?
+  page         Int      @default(1)
+  organicIds   Json
+  sponsoredIds Json
+
+  @@unique([mkt, queryKey, page, hourBucket])
+  @@index([mkt, queryKey, observedAt])
+  @@index([observedAt])
+}
+
+/// Store (seller) facts as seen on store/product pages.
+model MarketSeller {
+  id           String   @id @default(cuid())
+  mkt          String
+  sellerId     String
+  name         String?
+  score        Float?
+  followers    Int?
+  productCount Int?
+  firstSeenAt  DateTime @default(now())
+  lastSeenAt   DateTime @default(now())
+
+  @@unique([mkt, sellerId])
+}
+
+/// Who contributed how much (give-to-get, rate limits, "you added N products"). Separate from the data rows.
+model MarketContribution {
+  id       String   @id @default(cuid())
+  userId   String
+  day      DateTime @db.Date
+  mkt      String
+  products Int      @default(0)
+  pages    Int      @default(0)
+
+  @@unique([userId, day, mkt])
+}
+
+/// Reader health per extension parser version: accepted vs rejected pages (Trendyol page changes show up here).
+model MarketIngestStat {
+  id            String   @id @default(cuid())
+  day           DateTime @db.Date
+  mkt           String
+  pageType      String
+  parserVersion String
+  accepted      Int      @default(0)
+  rejected      Int      @default(0)
+
+  @@unique([day, mkt, pageType, parserVersion])
 }

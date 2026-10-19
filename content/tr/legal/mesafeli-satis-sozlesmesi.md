@@ -17,10 +17,8 @@ inventoryRefs: []
 |---|---|
 | Ünvan | MODSONS YAZILIM E-TİCARET İTHALAT İHRACAT LİMİTED ŞİRKETİ |
 | Adres | Beyazevler Mah. 80053 Sok. Tanrıkulu Apt. No:8 İç Kapı No:02, 01170 Çukurova / Adana |
-| MERSİS no | [TODO(owner): MERSİS no] |
 | Ticaret sicili | Adana Ticaret Odası, sicil no 100129 |
-| Vergi dairesi / no | [TODO(owner): vergi dairesi] / 6222605496 |
-| Telefon | [TODO(owner): telefon] |
+| Vergi no | 6222605496 |
 | E-posta | destek@kolayxport.com |
 | KEP adresi | modsonsyazilim@hs01.kep.tr |
 
@@ -45,7 +43,7 @@ Hizmet'i ticari veya mesleki amaçla satın alan Alıcılar bakımından Kanun v
 | Ödeme yöntemi | Kredi kartı / banka kartı, Stripe aracılığıyla, peşin |
 | Teslimat | Fiziksel teslimat yoktur; Hizmet, ödeme onayından hemen sonra Alıcı'nın hesabında elektronik ortamda kullanıma açılır |
 
-Planın kapsamı ve kullanım limitleri, sözleşmenin kurulduğu andaki [Fiyatlandırma](/fiyatlandirma) sayfasında ve ödeme adımında belirtildiği gibidir. [TODO(owner): bedelin KDV dahil gösterildiğini teyit edin]
+Planın kapsamı ve kullanım limitleri, sözleşmenin kurulduğu andaki [Fiyatlandırma](/fiyatlandirma) sayfasında ve ödeme adımında belirtildiği gibidir.
 
 ## 4. Ön bilgilendirme
 

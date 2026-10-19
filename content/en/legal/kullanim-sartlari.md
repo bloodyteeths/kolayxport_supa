@@ -17,7 +17,7 @@ These Terms of Service ("Terms") govern the use of the KolayXport software servi
 
 **MODSONS YAZILIM E-TİCARET İTHALAT İHRACAT LİMİTED ŞİRKETİ** ("KolayXport", "we")
 Address: Beyazevler Mah. 80053 Sok. Tanrıkulu Apt. No:8 İç Kapı No:02, 01170 Çukurova / Adana, Türkiye
-Adana Chamber of Commerce registry no.: 100129 · MERSİS: [TODO(owner): MERSİS no] · Tax office / no.: [TODO(owner): vergi dairesi] / 6222605496
+Adana Chamber of Commerce registry no.: 100129 · Tax no.: 6222605496
 E-mail: destek@kolayxport.com
 
 and the person who signs up for or uses the Service ("User", "you").
@@ -49,8 +49,8 @@ Features may change over time. Some features depend on what the relevant third p
 
 - **Free trial:** New accounts start with a **14-day** free trial with no card required. Usage limits during the trial are lower than on paid plans. If you do not choose a paid plan when the trial ends, your account is restricted after a short grace period; your data is kept under the rules in section 7.
 - **Plans:** Starter, Growth and Pro are offered monthly or yearly. Each plan's scope and limits (such as monthly orders, labels, connected shops and AI credits) and current prices are on the [Pricing](/fiyatlandirma) page. Custom quotes may be offered for enterprise needs.
-- **Currency and taxes:** Prices are shown in Turkish lira or US dollars. [TODO(owner): fiyatların KDV dahil mi, "+KDV" mi olduğu ve USD fiyatlarda vergi uygulaması]
-- **Payment:** Payments are taken by card through our payment provider Stripe. KolayXport does not store your card details. [TODO(owner): Stripe hesabının hangi tüzel kişi adına açık olduğu ve faturanın (e-Arşiv / e-Fatura) nasıl düzenleneceği]
+- **Currency and taxes:** Prices are shown in Turkish lira or US dollars.
+- **Payment:** Payments are taken by card through our payment provider Stripe. KolayXport does not store your card details.
 - **Promotions:** Promotions such as the founding member discount are subject to the conditions stated on the promotion page.
 - **Shopify App Store:** If you installed the Service through the Shopify App Store, plans and charges for your Shopify shop follow the terms on the Shopify app listing and Shopify's billing rules.
 
@@ -58,7 +58,7 @@ Features may change over time. Some features depend on what the relevant third p
 
 - **Auto-renewal:** Paid subscriptions renew automatically for the same period (month or year) at the end of each period unless you cancel, and are charged to your saved payment method.
 - **Cancellation:** You can cancel at any time in Settings › Plan & Billing or by writing to destek@kolayxport.com. Cancellation takes effect **at the end of the current billing period**; you keep using the Service until then and are not charged for the next period.
-- **Refunds:** We do not give partial refunds for the unused part of a period that has started; your statutory rights are not affected. Consumers' right of withdrawal is set out in the Distance Sales Agreement. If you are charged in error or twice, we refund the amount once confirmed. [TODO(owner): yıllık planlarda iade politikası (ör. ilk X gün içinde orantılı iade) ve işlem süresi]
+- **Refunds:** We do not give partial refunds for the unused part of a period that has started; your statutory rights are not affected. Consumers' right of withdrawal is set out in the Distance Sales Agreement. If you are charged in error or twice, we refund the amount once confirmed.
 - **Price changes:** We may change prices. A new price applies to your existing subscription only from the next renewal, and we will tell you by e-mail at least 30 days in advance. If you do not accept the new price, you can cancel before renewal.
 - **Payment problems:** If a charge fails, you will be asked to update your payment method within a limited grace period; if payment is not received in that time, your account may be restricted.
 
@@ -76,7 +76,7 @@ You agree not to:
 ## 7. Your data
 
 - Content and data you upload or bring in from connected accounts belong to you (or the relevant rights holders). You allow us to use them only to provide the Service to you.
-- Processing of personal data is governed by the [KVKK Privacy Notice](/en/kvkk-aydinlatma-metni) and the [Privacy Policy](/en/gizlilik-politikasi). For your buyers' data you are the data controller and KolayXport is the data processor; you are responsible for informing your buyers and having the necessary legal basis. [TODO(owner): kurumsal müşteriler için ayrı bir Veri İşleme Sözleşmesi (DPA) sunulacak mı?]
+- Processing of personal data is governed by the [KVKK Privacy Notice](/en/kvkk-aydinlatma-metni) and the [Privacy Policy](/en/gizlilik-politikasi). For your buyers' data you are the data controller and KolayXport is the data processor; you are responsible for informing your buyers and having the necessary legal basis.
 - You can delete your account yourself under **Settings › Preferences › Delete account**; your data is deleted immediately and leaves the rotating backups within about 3 months at most. If you want a copy of your data, write to destek@kolayxport.com before deleting. Records we must keep by law are excluded.
 
 ## 8. Connected accounts and third-party terms

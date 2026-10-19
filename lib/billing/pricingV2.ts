@@ -1,6 +1,6 @@
-// lib/billing/pricingV2.ts — pricing v2 flag + catalog (docs/gtm/pricing-v2.md §3). The catalog is the PROPOSED
-// price list (+KDV, TRY) for Atilla to confirm; P3 (Stripe prices), P2 (iyzico / PayTR checkout) and P4 (pricing
-// page) read it from here. Until PRICING_V2=1 nothing sells the v2 plans: the plan keys, limits, features and
+// lib/billing/pricingV2.ts — pricing v2 flag + catalog (docs/gtm/pricing-v2.md §3). Prices confirmed by Atilla
+// 2026-10-19: TRY, full amounts (Tamsar, Inc. sells via Stripe and adds no KDV), yearly packages paid in full, no
+// taksit (P2 iyzico / PayTR dropped). The Stripe prices (lib/billing/stripeV2.ts) and P4 (pricing page) follow it. Until PRICING_V2=1 nothing sells the v2 plans: the plan keys, limits, features and
 // modules are recognised everywhere (lib/billing/planLimits.ts, featureMap.ts, modules.ts) so an admin can assign
 // them for testing, and the live pricing page / checkout stay on today's ladder.
 import { DECIDED_PLAN_LIMITS, EXTRA_ORDERS_PER_UNIT, type V2PlanKey } from './planLimits';
@@ -14,21 +14,21 @@ export function pricingV2Enabled(): boolean {
 export interface V2PlanOffer {
   key: V2PlanKey;
   interval: 'month' | 'year';
-  /** TRY, +KDV, whole lira; null = quote (Kurumsal). */
+  /** TRY, full amount (no KDV added), whole lira; null = quote (Kurumsal). */
   priceTry: number | null;
-  /** Most taksit offered on a yearly package (iyzico / PayTR); 1 = single payment. */
+  /** Always 1: yearly packages are paid in full, no taksit (founder, 2026-10-19). */
   maxInstallments: number;
 }
 
 export const V2_PLANS: readonly V2PlanOffer[] = [
   { key: 'aylik', interval: 'month', priceTry: 2999, maxInstallments: 1 },
-  { key: 'baslangic_yil', interval: 'year', priceTry: 29990, maxInstallments: 6 },
-  { key: 'buyume_yil', interval: 'year', priceTry: 54990, maxInstallments: 9 },
-  { key: 'pro_yil', interval: 'year', priceTry: 89990, maxInstallments: 12 },
-  { key: 'kurumsal', interval: 'year', priceTry: null, maxInstallments: 12 },
+  { key: 'baslangic_yil', interval: 'year', priceTry: 29990, maxInstallments: 1 },
+  { key: 'buyume_yil', interval: 'year', priceTry: 54990, maxInstallments: 1 },
+  { key: 'pro_yil', interval: 'year', priceTry: 89990, maxInstallments: 1 },
+  { key: 'kurumsal', interval: 'year', priceTry: null, maxInstallments: 1 },
 ];
 
-/** Module prices, TRY +KDV: per month on Aylık, per year on a yearly package. */
+/** Module prices, TRY (full amounts): per month on Aylık, per year on a yearly package. */
 export const V2_MODULE_PRICES: Readonly<Record<ModuleKey, { month: number; year: number }>> = {
   financials: { month: 990, year: 9900 },
   arbitrage: { month: 990, year: 9900 },
@@ -37,7 +37,7 @@ export const V2_MODULE_PRICES: Readonly<Record<ModuleKey, { month: number; year:
   extraOrders: { month: 490, year: 4900 },
 };
 
-/** KDV rate for "+KDV" prices (the total shown at checkout). */
+/** KDV rate, only for a future seller that adds KDV; Tamsar, Inc. prices carry none. */
 export const KDV_RATE = 0.2;
 
 export function withKdv(priceTry: number): number {

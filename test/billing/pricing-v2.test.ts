@@ -149,7 +149,9 @@ describe('catalog API is flag-gated', () => {
     const res = call();
     expect(res.statusCode).toBe(200);
     expect(res.body.plans.map((p: any) => p.key)).toEqual(['aylik', 'baslangic_yil', 'buyume_yil', 'pro_yil', 'kurumsal']);
-    expect(res.body.plans.find((p: any) => p.key === 'buyume_yil')).toMatchObject({ priceTry: 54990, maxInstallments: 9, limits: { connectedStores: 6 } });
+    expect(res.body.plans.find((p: any) => p.key === 'buyume_yil')).toMatchObject({ priceTry: 54990, maxInstallments: 1, limits: { connectedStores: 6 } });
     expect(res.body.modules.financials).toEqual({ month: 990, year: 9900 });
+    expect(res.body.plans.every((p: any) => p.maxInstallments === 1)).toBe(true);
+    expect(res.body.pricesExcludeKdv).toBe(false);
   });
 });

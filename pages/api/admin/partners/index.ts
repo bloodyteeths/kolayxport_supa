@@ -1,6 +1,6 @@
 // /api/admin/partners — list (GET), create (POST) and update (PATCH) referral partners. Admin only.
 // docs/gtm/referral-spec.md §4. On create with `createPromo: true`, a Stripe promotion code is made on coupon
-// STRIPE_PARTNER_COUPON_ID (20% off, repeating, 3 months; created once by the founder) and its id stored.
+// STRIPE_PARTNER_COUPON_ID (the discount itself lives on that Stripe coupon, set up by the founder) and its id stored.
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { withAdmin } from '@/lib/middleware/withAdmin';

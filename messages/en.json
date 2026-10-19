@@ -9239,7 +9239,7 @@
         "type": "Type",
         "email": "E-mail (for statements)",
         "submit": "Add",
-        "createPromo": "Also create a Stripe promotion code (20% off for 3 months)",
+        "createPromo": "Also create a Stripe promotion code (partner coupon)",
         "linkHint": "Partner link: https://kolayxport.com/?ref=CODE"
       },
       "type": {

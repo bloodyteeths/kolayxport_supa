@@ -9239,7 +9239,7 @@
         "type": "Tür",
         "email": "E-posta (dökümler için)",
         "submit": "Ekle",
-        "createPromo": "Stripe promosyon kodu da oluştur (3 ay %20 indirim)",
+        "createPromo": "Stripe promosyon kodu da oluştur (ortak kuponu)",
         "linkHint": "Ortak linki: https://kolayxport.com/?ref=KOD"
       },
       "type": {

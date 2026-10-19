@@ -21,7 +21,7 @@ Built on the existing research. This plan doesn't redo any of it, it only links 
 | Tracking | **Not live.** No GTM, GA4 or Meta IDs are in prod, The full cookie panel ("Tümünü kabul et" / "Yalnızca zorunlu" / "Tercihleri yönet" + Consent Mode) has been live since 2026-10-17 (`d03421a2`) | gtm-overhaul session |
 | YouTube | 7 new tutorials, all unlisted; 8 more are blocked by the upload cap on the unverified channel (15 in total) | gtm-overhaul session |
 | Chrome extension | Live on the Chrome Web Store. 9.12.0 (adds Trendyol and Hepsiburada) is in Google review | gtm-overhaul session |
-| Prices | **Pricing v2** ([pricing-v2.md](pricing-v2.md)): yearly packages Başlangıç ₺29.990 / Büyüme ₺54.990 / Pro ₺89.990 / Kurumsal (from ₺149.990); **one** monthly plan, Aylık ₺2.999, plus modules. **Final amounts, no KDV added.** Sold by **Tamsar, Inc.** (US) in TRY via Stripe; Modsons invoices Tamsar for services and runs marketing in Turkey. Taksit: proposed as "yearly, paid monthly on a 12-month commitment" (pricing-v2 §5) | Atilla 2026-10-19 |
+| Prices | **Pricing v2** ([pricing-v2.md](pricing-v2.md)): yearly packages Başlangıç ₺29.990 / Büyüme ₺54.990 / Pro ₺89.990 / Kurumsal (from ₺149.990); **one** monthly plan, Aylık ₺2.999, plus modules. **Final amounts, no KDV added.** Sold by **Tamsar, Inc.** (US) in TRY via Stripe; Modsons invoices Tamsar for services and runs marketing in Turkey. Yearly = pay-in-full only (no taksit) | Atilla 2026-10-19 |
 | Referral support in the app | **None.** First-touch UTMs are kept in the browser (`lib/tracking/events.ts`) and sent with the server `sign_up` event, but **not stored on the user**. Stripe Checkout shows a promotion-code field only when the founding coupon doesn't apply (`pages/api/stripe/create-checkout-session.ts:244`) | code |
 | Hepsiburada, Çiçeksepeti | Not live (waiting for integrator approval / replies). **Don't promise them** | feature-inventory N-1, project notes |
 | App-store listings | Shopify, Play Store, Claude and ChatGPT MCP directories are in review. **Freeze applies:** nobody touches MCP/OAuth/review accounts | coordination rules |
@@ -62,13 +62,13 @@ Amazon.com.tr-only sellers aren't a separate push: orders and labels work, but t
 ## 2. Offer, pricing and onboarding hook (Turkey, TRY)
 
 **Pricing v2 (Atilla, 2026-10-19), full detail in [pricing-v2.md](pricing-v2.md):**
-- **Yearly packages are the main offer:** Başlangıç ₺29.990, Büyüme ₺54.990, Pro ₺89.990, Kurumsal from ₺149.990. These are final amounts with no KDV added (Tamsar, Inc. sells). Taksit is proposed as "yearly, paid monthly on a 12-month commitment" (pricing-v2 §5).
+- **Yearly packages are the main offer:** Başlangıç ₺29.990, Büyüme ₺54.990, Pro ₺89.990, Kurumsal from ₺149.990. These are final amounts with no KDV added (Tamsar, Inc. sells). Yearly packages are paid in full by card; there is no taksit (pricing-v2 §5).
 - **One monthly plan:** Aylık ₺2.999. Monthly users add **modules** (finance, arbitrage, photo studio, extra stores/orders, AI credit packs) instead of upgrading.
 - Package and Aylık prices were confirmed by Atilla on 2026-10-19; module prices are still a proposal. Until v2 checkout exists, partners and copy quote **no prices**: they link to `/fiyatlandirma`.
 
 | Element | Turkey offer | Why |
 |---|---|---|
-| Entry | **14-day trial, no card** (no free tier, founder decision). At the end of the trial, the default offer is a yearly package with taksit; Aylık is the second option | Turkish sellers are used to yearly packages paid in installments (PraPazar, Sentos, Entegra) |
+| Entry | **14-day trial, no card** (no free tier, founder decision). At the end of the trial, the default offer is a yearly package paid in full; Aylık is the second option | Turkish sellers are used to yearly packages paid in installments (PraPazar, Sentos, Entegra) |
 | Urgency (real) | **Founding member: 40% off for life, first 20 subscribers**, on any package. Link to the live counter on `/fiyatlandirma`; never state the remaining number | Real scarcity only (README "Real FOMO") |
 | Partner audience offer | While founding spots last, referred users get the founding price like everyone else. **After the 20 are gone:** a partner-specific promo code, **20% off** the first yearly payment or the first 3 months of Aylık | Approved 2026-10-19 |
 | Anchor in copy | "Etsy ve eBay için Türk entegratörlerde yıllık ₺89–125 bin; KolayXport Pro yıllık ₺89.990 ve her şey dahil" (only with the sourced numbers from competitors.md §5, re-checked before use) | We sit at Sentos Platinum's level with far more export tooling. Never compare to BirFatura on price |
@@ -370,7 +370,7 @@ Merisa's and Ekin's pay is not in this table (not known to this plan). USD at ~�
 | 5 | Stripe: create the partner coupon once (20% off, repeating 3 months) and set `STRIPE_PARTNER_COUPON_ID`; the admin partner tool then creates each partner's code (referral-spec §4) | Before the first partner link goes out | 5 min |
 | 5b | Grant the free Growth account to each new partner (admin user page), or give the admin role to someone who does it | Per partner, on Merisa's request | 2 min each |
 | 6 | Monthly partner payouts: approve the payout list Merisa sends; payouts go out through Stripe Global Payouts from Tamsar, Inc. (enable Global Payouts once in the Stripe dashboard) | 5th of each month | 10 min |
-| 6b | ~~Confirm pricing v2 + seller of record~~: done 2026-10-19 (Tamsar, Inc. sells, no KDV). Approve the taksit proposal (pricing-v2 §5) and the module prices on the board | This week | 10 min |
+| 6b | ~~Confirm pricing v2, seller of record and taksit~~: done 2026-10-19 (Tamsar, Inc. sells, no KDV, yearly pay-in-full only). Final OK on the module prices on the board | This week | 5 min |
 | 7 | Have the accountant confirm the partner payout paperwork once (W-8BEN from partners; partners declare the income in Turkey) | Before the first payout (5 Jan) | — |
 | 8 | Phase 2 only: approve the ad budget start; send one intro e-mail each to ShipEntegra and Paraşüt/QNB partner teams (Merisa drafts them) | After the gate | 15 min |
 
@@ -409,7 +409,7 @@ Everything in §4.3–4.8 and §5: shortlists, outreach, partner onboarding, dem
 | Attribution build slips | No links go out before it's live; partners can be signed but are told the start date |
 | Tracking IDs late → Phase 2 delayed | It's in the gate on purpose; Phase 1 doesn't need pixels |
 | Payouts to individuals create tax paperwork | Paid by Tamsar, Inc. through Stripe Global Payouts; W-8BEN on file; the partner declares the income in Turkey (accountant confirms) |
-| Yearly-first pricing converts lower without taksit | "Yearly, paid monthly on a 12-month commitment" through Stripe (iyzico/PayTR need a Turkish merchant, and Tamsar, Inc. is the seller); Aylık stays as the low-commitment option |
+| Yearly-first pricing converts lower without taksit | Accepted risk (Atilla: pay-in-full only). Aylık is the no-commitment option; measure yearly vs Aylık conversion from week 6. Real taksit is parked until a Turkish seller entity exists (pricing-v2 §5) |
 | Review freezes (Shopify, MCP, Play) | Marketing never edits those listings or reviewer accounts; links only |
 
 ---
@@ -427,6 +427,6 @@ Decided:
 
 Still open:
 1. ~~Pricing v2 package prices~~ confirmed 2026-10-19. Module prices (pricing-v2 §3) still to confirm.
-2. Taksit: approve "yearly, paid monthly on a 12-month commitment" (pricing-v2 §5) and its bounty rule. Module prices: final OK on the board.
+2. ~~Taksit~~: decided, yearly pay-in-full only; real taksit parked until a Turkish seller entity exists. Module prices: final OK on the board.
 3. Merisa's hours (planned ~20 h/week).
 4. The dated Atilla actions in §7: YouTube phone verification (26 Oct), tutorials Public (2 Nov), tracking IDs (30 Nov).

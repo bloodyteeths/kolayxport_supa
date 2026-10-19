@@ -226,7 +226,7 @@ Stage B tests (Vitest, mocks as in existing tests):
 | B9 | Module or AI credit pack purchase | No bounty |
 | B10 | Full refund 10 days after the yearly payment | Bounty `void` |
 | B11 | Refund after the bounty was paid | `reversal` row, netted in the next payout run; the run never sends a negative amount |
-| B12 | "Yearly, paid monthly" subscription (if Atilla approves pricing-v2 §5) | 25% of the 12-month contract value, half after the 2nd and half after the 6th monthly payment |
+| B12 | ~~"Yearly, paid monthly"~~ | Dropped (Atilla, 2026-10-19): yearly is pay-in-full only, so no split bounty |
 | B13 | Bounty code throws inside a webhook | Billing still updates; webhook returns 200; error logged |
 | B14 | Payout run without `confirm` | No DB writes, no Stripe call |
 | B15 | Payout run with a partner with no recipient onboarding | Partner skipped, listed as "banka bilgisi eksik" |
@@ -245,5 +245,5 @@ Manual prod check after Stage B (dev session + Merisa):
 1. ~~Stage A~~ (deployed 2026-10-19).
 2. Stage B: the bounty ledger + cron on Stripe events first, then the dashboard, then Global Payouts.
 3. The founder creates the partner coupon(s) and sets `STRIPE_PARTNER_COUPON_ID` (and `PARTNER_YEARLY_COUPON_ID` if needed) via stdin, and enables Global Payouts.
-4. If Atilla approves "yearly, paid monthly" (pricing-v2 §5), add its bounty rule (B12).
+4. ~~Yearly paid monthly~~: rejected; nothing to add.
 5. The gtm-overhaul session publishes `/ortaklik` (terms) only after Stage B is live, the founder has approved the terms (done) and the accountant has confirmed the payout paperwork (pricing-v2 §5).

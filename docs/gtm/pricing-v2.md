@@ -6,7 +6,7 @@ Supersedes the monthly ladder (Starter ₺2.499 / Growth ₺4.999 / Pro ₺7.999
 ## 1. Decisions (Atilla, 2026-10-19)
 
 1. **Yearly packages are the main offer.** Only **one** monthly plan exists. Monthly users add **modules** instead of upgrading.
-2. **Taksit is wanted** for the yearly fees (₺30–90k). Turkish sellers are used to paying these in installments. iyzico/PayTR were the first idea; they don't fit the seller model below (§5).
+2. **Yearly packages are pay-in-full only** (Stripe card). There is no taksit and no "yearly, paid monthly" option. Aylık ₺2.999 stays as the no-commitment option (Atilla, 2026-10-19, via the board).
 3. **Seller of record = Tamsar, Inc.** (US) for all customers. It charges in TRY via Stripe, **with no KDV added**. Modsons Yazılım E-Ticaret İthalat İhracat Ltd. Şti. ([company.md](company.md)) invoices Tamsar, Inc. for its services and runs marketing on the Turkish side (Atilla, 2026-10-19, in d7's session).
 4. **Prices are shown as final amounts**, with no "+KDV" (this supersedes the earlier "+KDV" decision of the same day).
 
@@ -25,7 +25,7 @@ Supersedes the monthly ladder (Starter ₺2.499 / Growth ₺4.999 / Pro ₺7.999
 |---|---|---|---|---|
 | Price / year | **₺29.990** | **₺54.990** | **₺89.990** | from **₺149.990** (quote) |
 | ≈ per month | ₺2.499 | ₺4.583 | ₺7.499 | — |
-| Payment | yearly in full, or (proposal, §5) 12 monthly payments on a 12-month commitment | same | same | by agreement |
+| Payment | yearly, **paid in full** by card (Stripe) | same | same | by agreement |
 | Connected stores | 3 | 6 | 12 | custom |
 | Orders / year | 6.000 | 24.000 | 72.000 | custom |
 | Labels / year | 3.000 | 12.000 | 36.000 | custom |
@@ -61,7 +61,7 @@ The feature split follows today's gates (Pro-only = `financials`, `arbitrage`, b
 
 ### Offers that stay
 
-- **14-day trial, no card**, no free tier. At the end of the trial, the default offer is a **yearly package** (in full, or monthly on a 12-month commitment if §5 is approved), with Aylık as the secondary button.
+- **14-day trial, no card**, no free tier. At the end of the trial, the default offer is a **yearly package, paid in full**, with Aylık as the no-commitment option.
 - **Founding member: 40% off for life, first 20 subscribers**, on any package or Aylık. Live counter only.
 - **Partner audience code** (after the founding spots are gone): **20% off** the first yearly payment, or the first 3 months of Aylık.
 - **Shopify App Store installs:** unchanged (`shopify_free`; no prices or upgrades shown, App Store rule 1.2.1).
@@ -71,23 +71,25 @@ The feature split follows today's gates (Pro-only = `financials`, `arbitrage`, b
 | # | Work | Owner | Notes |
 |---|---|---|---|
 | P1 | Plan keys `aylik`, `baslangic_yil`, `buyume_yil`, `pro_yil`, `kurumsal`; yearly order/label buckets; module entitlements (`financials`, `arbitrage`, `bulkPhotoStudio`, `extraStore`, `extraOrders`) | **DONE** 2026-10-19 (d7, `d44c426e`, behind `PRICING_V2`, flag off) | `lib/billing/planLimits.ts`, `featureMap.ts`, usage middleware. Existing Starter/Growth/Pro subscribers (none paying today) can be migrated or grandfathered |
-| P2 | ~~iyzico/PayTR checkout~~ → **re-evaluated (§5)**: proposed "yearly, paid monthly" Stripe subscriptions on a 12-month commitment | dev session, after Atilla approves §5 | The partner bounty rule for this option is in §5 |
+| P2 | ~~iyzico/PayTR checkout~~ | **Dropped** 2026-10-19 (Atilla) | Parked idea in §5 |
 | P3 | Stripe prices: all 14 (yearly packages, Aylık, modules; TRY and USD) | **DONE** 2026-10-19 by d7 (live, inert behind `PRICING_V2`); the code is waiting for a deploy slot | Module amounts pending Atilla's final OK |
 | P4 | `/fiyatlandirma` redesign: 4 yearly cards + "Aylık" line + module table, **final amounts (no "+KDV")** | kolayxport-gtm-overhaul | Claims check; no AI credit counts unless metered (they are now, see AI credits) |
 | P5 | Copy updates (cases, compare pages, ads playbook unit economics) | kolayxport-gtm-overhaul | After P1–P4 are live |
 
-## 5. Seller of record (resolved) and taksit (open)
+## 5. Seller of record and taksit (both resolved)
 
 **Resolved by Atilla (2026-10-19):** Tamsar, Inc. is the seller for all customers, charges in TRY via Stripe and adds no KDV. Modsons invoices Tamsar, Inc. for services and does marketing in Turkey. Consequences:
 - **Partner bounties are paid by Tamsar, Inc.** via Stripe Global Payouts (referral-spec §4.3). For tax paperwork (W-8BEN / W-8BEN-E from partners; partners declare the income in Turkey), have the accountant confirm once before the first payout run (5 Jan). This is not a blocker for building.
 - **Bounty base = the amount paid** (no KDV is charged, so nothing is deducted).
 - **Copy:** never "+KDV"; prices are final amounts.
 
-**Taksit under this model: recommendation**
-1. **iyzico/PayTR don't fit.** Both onboard Turkish-registered merchants (vergi levhası is in iyzico's required documents), so Tamsar, Inc. can't hold them. Routing payments through Modsons would make Modsons the seller, which contradicts the decided model. Stripe card installments exist only for Mexico and Japan accounts, not for Turkish cards.
-2. **Recommended:** offer every yearly package as **"Yıllık paket, 12 ay boyunca aylık ödeme"**. This is a Stripe subscription billed monthly (Başlangıç ₺2.499, Büyüme ₺4.583, Pro ₺7.499 a month) on a **12-month commitment** written into the terms, next to "pay the year in full". It works like taksit without a bank, keeps Tamsar, Inc. as the seller, and needs only 3 more Stripe prices plus a commitment rule. Pay-in-full could get a small extra incentive (e.g. one extra month of AI credits; Atilla decides).
-   - **Partner bounty for this option (proposal):** 25% of the 12-month contract value, paid half after the customer's 2nd monthly payment and half after the 6th.
-3. **Optional:** many Turkish banks let cardholders split a past purchase into installments in their banking app ("sonradan taksitlendirme"). Whether that works for a purchase from a foreign merchant varies by bank, so check 2–3 major banks before it goes into any FAQ, and never promise it.
+**Taksit: decided by Atilla (2026-10-19, via the board)**
+- Yearly packages are **pay-in-full only** by card through Stripe. Aylık ₺2.999 a month is the no-commitment option.
+- "Yearly, paid monthly on a 12-month commitment" was proposed and **rejected**.
+- iyzico/PayTR (P2) are **dropped**: they onboard Turkish-registered merchants only, and Tamsar, Inc. is the seller. Stripe card installments exist only for Mexico and Japan accounts.
+- The partner bounty stays at **25% of the first yearly payment**, paid once (no split).
+- **Parked idea:** real taksit is only possible later via a Turkish seller entity (e.g. a Turkish company selling to Turkish customers with iyzico/PayTR). Revisit only if yearly conversion proves too low.
+- Copy never mentions taksit. If a seller asks, the answer is: "Yıllık paket tek çekimle ödenir; taahhütsüz seçenek olarak Aylık plan var." Don't suggest bank-side installment conversion.
 
 ## 6. Effect on the gameplan
 

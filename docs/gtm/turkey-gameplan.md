@@ -146,9 +146,9 @@ Effort: about 2–3 dev days. Full spec with data model, capture points, report 
 | Facebook group admins (Merisa) | 80 groups | 25 | 1–2 |
 | Telegram / WhatsApp group admins (Merisa) | 30 groups | 10 | 1 |
 | Mali müşavir / e-ihracat consultants (Merisa) | 20 | 5 | 0–1 |
-| X voices (Ekin) | 50 accounts | 15 | 1 |
-| Small/mid YouTube educators, 2k–110k subs (Ekin) | 20 channels | 5 | 0–1 |
-| **Total** | **200** | **60** | **3–5** |
+| X voices (Ekin) | 50 accounts | 12 | 1 |
+| Small/mid YouTube educators, 2k–110k subs (Ekin) | 20 channels | 3 | 0–1 |
+| **Total** | **200** | **55** (Merisa 40, Ekin 15) | **3–4** |
 
 Conversion assumptions: ~30% reply, ~25% of replies accept → ~7% of contacts sign. About half of the partners who sign actually post. Replace these with tracker data in week 4.
 
@@ -236,25 +236,25 @@ Numbers for `signups`…`commission_owed_try` come from the partner report (§4.
 
 | When | Merisa | Ekin |
 |---|---|---|
-| Daily (~3 h) | 5 helpful answers in target groups (no links); 5 new admin messages (Varyant 5); follow-ups due today; reply to partner questions | 3 X replies/quotes on e-ihracat threads; 3 new messages (Varyant 6); check new partner posts for #işbirliği; 1 Short/clip from the tutorials (when they're public) |
+| Daily | ~4 h, Mon–Fri: 5 helpful answers in target groups (no links); 8 new admin messages (Varyant 5); follow-ups due today; reply to partner questions; check new partner posts for #işbirliği | ~3 h, Mon–Fri: 3 X replies/quotes on e-ihracat threads; 3 new messages (Varyant 6); 2 Shorts/clips a week from the tutorials (when they're public) |
 | Mon | Pick this week's 30 contacts from the shortlist (highest score first); weekly KPI sheet update | Pick 20 X/YouTube contacts |
 | Wed | One live demo for a partner group (from week 4), 30 min, scripted on tutorials V01/V02 | Prepares the demo slides/screens from the demo account |
 | Fri | KPI report to the orchestrator (§4.8). Unusual deals → one message to Atilla | Content report: which posts brought signups |
 | Monthly (5th) | Partner statements e-mailed; payout list to the muhasebeci/Atilla for EFT | — |
 
-Assumption: each works ~20 h a week on this. **Ekin's exact role and hours are still to be confirmed**; if Ekin has less time, drop the YouTube row first.
+Hours: **Ekin ~15 h a week** on KolayXport (she splits 30 h with the Amazon shop; founder, 2026-10-19). Merisa is planned at ~20 h a week. The disclosure checks moved from Ekin to Merisa. If Ekin has less time in a given week, drop the YouTube contacts first, then the clips.
 
 ### 4.8 Phase 1 KPIs (weekly)
 
 | KPI | Definition | W2 | W4 | W6 | W8 | W10 |
 |---|---|---|---|---|---|---|
-| Contacts sent (cum.) | First messages, all types | 40 | 160 | 280 | 400 | 520 |
-| Partners signed (cum.) | Terms accepted + code issued | 2 | 8 | 14 | 20 | 26 |
-| Partners active (cum.) | ≥1 post with disclosure | 1 | 4 | 8 | 12 | 15 |
-| Signups (cum.) | All sources | 10 | 45 | 90 | 140 | 190 |
-| **Activated users (cum.)** | Store connected within 7 days | 5 | 25 | 50 | 80 | **100+** |
+| Contacts sent (cum.) | First messages, all types | 40 | 150 | 260 | 370 | 480 |
+| Partners signed (cum.) | Terms accepted + code issued | 2 | 7 | 12 | 18 | 23 |
+| Partners active (cum.) | ≥1 post with disclosure | 1 | 4 | 7 | 10 | 13 |
+| Signups (cum.) | All sources | 10 | 42 | 85 | 130 | 175 |
+| **Activated users (cum.)** | Store connected within 7 days | 5 | 23 | 45 | 72 | 95 (**100 in W11**) |
 | Activation rate | activated / signups | ≥50% | ≥50% | ≥50% | ≥55% | ≥55% |
-| Paying (cum.) | First successful Stripe payment | 0 | 1 | 3 | 6 | 10 |
+| Paying (cum.) | First successful Stripe payment | 0 | 1 | 3 | 5 | 9 |
 | Trial → paid | Paying / trials ended (cohort) | — | — | read | ≥8% | ≥10% |
 | Commission owed | From partner report | ₺0 | ₺0 | small | — | — |
 
@@ -275,7 +275,7 @@ Week 1 is set-up (no contacts). Signups include organic from directories, SEO an
 5. Attribution stored on the user (§4.2 items 1–2), so ads can be judged by trial→paid.
 6. At least 2 customers have given **written consent** for a testimonial (legal-notes §2). This is not strictly required for ads, but it multiplies their conversion.
 
-If by **week 10 (~2027-01-04)** the gate isn't met, Merisa reports the numbers and the orchestrator/Atilla decide. **Ads don't start automatically.**
+If by **the end of week 11 (~2027-01-10)** the gate isn't met, Merisa reports the numbers and the orchestrator/Atilla decide. **Ads don't start automatically.**
 
 ---
 
@@ -300,24 +300,24 @@ Day 1 = **Mon 2026-10-26** (one week to get Atilla's approvals and the attributi
 |---|---|---|
 | W1 (26 Oct) | Partner terms approved (done 19 Oct). Cookie panel live (gtm-overhaul, 26 Oct). Attribution + ref + partner report built and deployed (dev session via deploy queue). Shortlist of 200 scored (Bionluk + Claude). Sheet set up. Merisa and Ekin each post 15 helpful answers. YouTube channel phone-verified (Atilla, 2 min) | Atilla, dev session, gtm-overhaul, Merisa, Ekin, freelancer |
 | W2 (2 Nov) | 40 contacts. 2 partners signed. Tutorials switched Unlisted → Public (Atilla's OK, then gtm-overhaul; embeds are already live). Blog cadence starts (2/week, Merisa fact-checks each post before it ships) | Merisa, Ekin, gtm-overhaul |
-| W3 (9 Nov) | 60 contacts (cum. 100). 5 partners. First partner posts | Merisa, Ekin |
-| W4 (16 Nov) | 60 contacts (cum. 160). 8 partners, 4 active. **First live demo** in a partner group. 25 activated users. Review assumptions with real reply/accept rates | Merisa, Ekin |
+| W3 (9 Nov) | 55 contacts (cum. 95). 4 partners. First partner posts | Merisa, Ekin |
+| W4 (16 Nov) | 55 contacts (cum. 150). 7 partners, 4 active. **First live demo** in a partner group. 23 activated users. Review assumptions with real reply/accept rates | Merisa, Ekin |
 
 ### Days 31–60 (weeks 5–8): scale partners, Black Friday angle
 
 | Week | Targets |
 |---|---|
 | W5 (23 Nov) | Black Friday/Cyber Monday content via partners ("Kasım'da ilanlarınızı hazırlayın", seo/content-calendar anchors). 60 contacts |
-| W6 (30 Nov) | 14 partners, 8 active. 50 activated. First trial→paid read. **GTM/GA4/Meta IDs live** (Atilla's deadline 30 Nov; needed for the gate) |
+| W6 (30 Nov) | 12 partners, 7 active. 45 activated. First trial→paid read. **GTM/GA4/Meta IDs live** (Atilla's deadline 30 Nov; needed for the gate) |
 | W7 (7 Dec) | Second live demo. Ask the first paying customers for feedback + testimonial consent (Merisa, written form) |
-| W8 (14 Dec) | 20 partners, 12 active. 80 activated, 6 paying. First partner payout run (5 Jan for December revenue, after the 30-day hold) |
+| W8 (14 Dec) | 18 partners, 10 active. 72 activated, 5 paying. First partner payout run (5 Jan for December revenue, after the 30-day hold) |
 
 ### Days 61–90 (weeks 9–13): gate, then Phase 2 if met
 
 | Week | Targets |
 |---|---|
-| W9–W10 (21 Dec – 3 Jan) | 100 activated, ≥5 paying → **gate review** (§4.9). Holiday weeks: keep outreach light, focus on onboarding the new users |
-| W11 (4 Jan) | If the gate is met: Instagram organic starts (Ekin). Partnership intros (Atilla sends one e-mail each to ShipEntegra and Paraşüt/QNB partner teams; Merisa follows up) |
+| W9–W10 (21 Dec – 3 Jan) | 95 activated, 9 paying. Holiday weeks: keep outreach light, focus on onboarding the new users |
+| W11 (4 Jan) | 100 activated → **gate review** (§4.9). If the gate is met: Instagram organic starts (Ekin). Partnership intros (Atilla sends one e-mail each to ShipEntegra and Paraşüt/QNB partner teams; Merisa follows up) |
 | W12–W13 (11–24 Jan) | Meta ads test at ₺15k for the month, per playbook. Valentine's/Mother's Day listing-prep content (January). Partners keep going |
 
 ### Budget (cash cap ₺25.000 / month)
@@ -343,7 +343,7 @@ Merisa's and Ekin's pay is not in this table (not known to this plan). USD at ~�
 | Activated users | ≥ 100 (gate) |
 | Paying customers | ≥ 10 (founding spots half full) |
 | MRR | ≥ ₺15.000 (10 × ~₺1.500) |
-| Active partners | ≥ 15 |
+| Active partners | ≥ 13 |
 | Share of signups from partners | ≥ 50% |
 | Cost per paying customer (cash, excl. commission) | ≤ ₺1.000 |
 | Testimonials with written consent | ≥ 2 |
@@ -411,5 +411,6 @@ Everything in §4.3–4.8 and §5: shortlists, outreach, partner onboarding, dem
 Decided 2026-10-19 (orchestrator, for Atilla): 30% for 12 months, 35% from the 10th paying referral; a partner code of 20% for 3 months after the founding spots; prices shown "+KDV".
 
 Still open:
-1. Ekin's role and weekly hours (the plan assumes ~20 h/week each for Merisa and Ekin). The orchestrator is asking Atilla.
+1. ~~Ekin's hours~~: decided, ~15 h/week on KolayXport (targets rescaled; gate moves from W10 to W11). Merisa's hours are planned at ~20 h/week; confirm if different.
+3. Pricing structure (one monthly plan + modules, yearly packages as the main offer, taksit via iyzico/PayTR) and the referral payout model (one-time bounty, partner dashboard, Stripe Global Payouts): waiting for Atilla. §2 and §4.2 will be rewritten once he decides.
 2. The Atilla actions in §7 with dates: YouTube phone verification (26 Oct), tutorials Public (2 Nov), tracking IDs (30 Nov).

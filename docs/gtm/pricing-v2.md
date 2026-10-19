@@ -70,9 +70,9 @@ The feature split follows today's gates (Pro-only = `financials`, `arbitrage`, b
 
 | # | Work | Owner | Notes |
 |---|---|---|---|
-| P1 | Plan keys `aylik`, `baslangic_yil`, `buyume_yil`, `pro_yil`, `kurumsal`; yearly order/label buckets; module entitlements (`financials`, `arbitrage`, `bulkPhotoStudio`, `extraStore`, `extraOrders`) | dev session | `lib/billing/planLimits.ts`, `featureMap.ts`, usage middleware. Existing Starter/Growth/Pro subscribers (none paying today) can be migrated or grandfathered |
+| P1 | Plan keys `aylik`, `baslangic_yil`, `buyume_yil`, `pro_yil`, `kurumsal`; yearly order/label buckets; module entitlements (`financials`, `arbitrage`, `bulkPhotoStudio`, `extraStore`, `extraOrders`) | **DONE** 2026-10-19 (d7, `d44c426e`, behind `PRICING_V2`, flag off) | `lib/billing/planLimits.ts`, `featureMap.ts`, usage middleware. Existing Starter/Growth/Pro subscribers (none paying today) can be migrated or grandfathered |
 | P2 | iyzico **or** PayTR checkout for yearly TRY payments with taksit; webhook → same entitlement code as Stripe | dev session | Merchant account: whichever entity the accountant names (§5). The partner bounty must also fire on these payments (referral-spec §3) |
-| P3 | Stripe prices for Aylık + modules (TRY and USD) | Atilla creates them in Stripe (Tamsar, Inc.); dev wires the env ids | |
+| P3 | Stripe prices for Aylık + modules (TRY and USD) | **On hold until the accountant answers** (orchestrator, 2026-10-19); then Atilla creates them in Stripe and dev wires the env ids | |
 | P4 | `/fiyatlandirma` redesign: 4 yearly cards + "Aylık" line + module table, "+KDV" with the total at checkout | kolayxport-gtm-overhaul | Claims check; no AI credit counts unless metered (they are now, see AI credits) |
 | P5 | Copy updates (cases, compare pages, ads playbook unit economics) | kolayxport-gtm-overhaul | After P1–P4 are live |
 

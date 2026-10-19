@@ -32,7 +32,7 @@
       results: 'Sonuç', typical: 'Tipik fiyat', range: 'Fiyat aralığı', ads: 'Reklam', top5: 'İlk 5 satıcı payı',
       pageSales: 'Sayfa satışı/gün', pageRevenue: 'Sayfa cirosu/gün', measuredOf: '{n}/{m} ürün ölçüldü',
       perDay: '{n} satış/gün', revDay: '{v}/gün', ratingsMonth: '+{n} değerlendirme/ay', firstSeen: 'Ölçülüyor: satış hızı birkaç saat/gün içinde',
-      orders: '{n} sipariş', lifetimeLine: '~{n} toplam satış', fav: '♥ {n}', analyse: 'KolayXport’ta analiz et', storeTitle: '{name} mağazası',
+      orders: '{n} sipariş', ratingsLine: '★ {r} ({n})', lifetimeLine: '~{n} toplam satış', fav: '♥ {n}', analyse: 'KolayXport’ta analiz et', storeTitle: '{name} mağazası',
       salesDay: 'Satış/gün', revenueDay: 'Ciro/gün', ratingGrowth: 'Değerlendirme artışı', baskets: 'Sepette', favorites: 'Favori',
       views24: 'Görüntülenme (24 saat)', sellers: 'Satıcı sayısı', lifetime: 'Toplam satış', priceChange: 'Fiyat değişimi',
       buybox: 'Satıcılar ve fiyatlar', buyboxHolder: 'Buybox', buyboxOpen: 'Tüm satıcıları görmek için “Tüm satıcıları göster”e tıklayın.',
@@ -51,7 +51,7 @@
       results: 'Results', typical: 'Typical price', range: 'Price range', ads: 'Ads', top5: 'Top-5 seller share',
       pageSales: 'Page sales/day', pageRevenue: 'Page revenue/day', measuredOf: '{n}/{m} products measured',
       perDay: '{n} sales/day', revDay: '{v}/day', ratingsMonth: '+{n} ratings/month', firstSeen: 'Measuring: sales speed within hours/days',
-      orders: '{n} orders', lifetimeLine: '~{n} sales in total', fav: '♥ {n}', analyse: 'Analyse in KolayXport', storeTitle: '{name} store',
+      orders: '{n} orders', ratingsLine: '★ {r} ({n})', lifetimeLine: '~{n} sales in total', fav: '♥ {n}', analyse: 'Analyse in KolayXport', storeTitle: '{name} store',
       salesDay: 'Sales/day', revenueDay: 'Revenue/day', ratingGrowth: 'Rating growth', baskets: 'In baskets', favorites: 'Favorites',
       views24: 'Views (24 h)', sellers: 'Sellers', lifetime: 'Lifetime sales', priceChange: 'Price change',
       buybox: 'Sellers and prices', buyboxHolder: 'Buybox', buyboxOpen: 'Click “Show all sellers” to read every seller.',
@@ -135,6 +135,7 @@
     }
     var fav = typeof item.favorites === 'number' ? item.favorites : R.compact(item.favorites);
     if (fav != null) parts.push(t('fav', { n: short(fav) }));
+    if (item.ratingCount != null && item.ratingCount > 0) parts.push(t('ratingsLine', { r: item.rating != null ? num(item.rating, 1) : '', n: short(item.ratingCount) }));
     if (item.orderBadge) parts.push(t('orders', { n: item.orderBadge }));
     return parts;
   }
@@ -347,15 +348,25 @@
   var lastKey = '';
   var busy = false;
 
+  // Infinite scroll rewrites the address (…&pi=2) without a new page: the embedded results are still the page the
+  // seller opened, so a search is read under that address (page number and ranks stay right).
+  var openedHref = location.href;
+  function withoutPage(href) {
+    try { var u = new URL(href); u.searchParams.delete('pi'); u.searchParams.delete('sayfa'); return u.toString(); } catch (_) { return href; }
+  }
+  function searchHref() {
+    return withoutPage(location.href) === withoutPage(openedHref) ? openedHref : location.href;
+  }
+
   function readPage() {
     var type = MKT === 'trendyol' ? R.trendyolPageType(location.href) : R.hepsiburadaPageType(location.href);
     if (!type) return null;
     if (MKT === 'trendyol') {
-      if (type === 'search') return R.trendyolSearch(document, location.href);
+      if (type === 'search') return R.trendyolSearch(document, searchHref());
       if (type === 'store') return R.trendyolStore(document, location.href);
       return R.trendyolProduct(document, location.href, socialTexts);
     }
-    if (type === 'search') return R.hepsiburadaSearch(document, location.href);
+    if (type === 'search') return R.hepsiburadaSearch(document, searchHref());
     if (type === 'product') return R.hepsiburadaProduct(document, location.href);
     return null;
   }
@@ -389,7 +400,7 @@
       var obs = readPage();
       if (!obs) return;
       var count = obs.items ? obs.items.length : obs.product ? (obs.product.offers || []).length : 0;
-      var key = location.href + '|' + count;
+      var key = withoutPage(location.href) + '|' + count;
       if (!force && key === lastKey) return;
       lastKey = key;
 
@@ -428,7 +439,9 @@
       var cards = cardAnchors().length;
       var offers = document.querySelectorAll('[class*="other-merchant-item-box"]').length;
       if (href !== lastHref || cards >= lastCards + 12 || offers > lastOffers) {
-        var navigated = href !== lastHref;
+        // Only the page number changed (infinite scroll): same page, more cards: not a navigation.
+        var navigated = withoutPage(href) !== withoutPage(lastHref);
+        if (navigated) openedHref = href;
         lastHref = href; lastCards = cards; lastOffers = offers;
         if (navigated) { var b = document.getElementById('kx-mkt-bar'); if (b) b.remove(); var p = document.getElementById('kx-mkt-panel'); if (p) p.remove(); }
         setTimeout(function () { run(navigated); }, 1200);

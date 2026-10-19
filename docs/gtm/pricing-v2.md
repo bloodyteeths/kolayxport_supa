@@ -1,6 +1,6 @@
 # Pricing v2 for Turkey: yearly packages + one monthly plan + modules
 
-Date: 2026-10-19. Status: **the model is decided by Atilla; the numbers are a proposal for him to confirm.** Nothing is built or published yet.
+Date: 2026-10-19. Status: **model and package prices decided by Atilla** (prices confirmed 2026-10-19, 19:48: Başlangıç ₺29.990, Büyüme ₺54.990, Pro ₺89.990, Kurumsal from ₺149.990 a year, Aylık ₺2.999 a month, all +KDV). **Module prices are still a proposal.** Still open: seller of record / KDV (§5). Nothing is built or published yet; partners quote no prices until checkout exists.
 Supersedes the monthly ladder (Starter ₺2.499 / Growth ₺4.999 / Pro ₺7.999 a month) for Turkish customers. Shopify App Store pricing (`shopify_free`) is not affected.
 
 ## 1. Decisions (Atilla, 2026-10-19)
@@ -19,7 +19,7 @@ Supersedes the monthly ladder (Starter ₺2.499 / Growth ₺4.999 / Pro ₺7.999
 
 ## 3. Proposed price list (+KDV)
 
-### Yearly packages (main offer, taksit via iyzico/PayTR)
+### Yearly packages (main offer, taksit via iyzico/PayTR): prices DECIDED 2026-10-19
 
 | | **Başlangıç** | **Büyüme** | **Pro** | **Kurumsal** |
 |---|---|---|---|---|
@@ -38,7 +38,7 @@ Supersedes the monthly ladder (Starter ₺2.499 / Growth ₺4.999 / Pro ₺7.999
 
 The feature split follows today's gates (Pro-only = `financials`, `arbitrage`, bulk photo studio in `lib/billing/featureMap.ts`), so the code change is mostly plan keys, limits and checkout. Order/label limits move from monthly to yearly buckets for yearly packages.
 
-### The one monthly plan
+### The one monthly plan: price DECIDED 2026-10-19
 
 | **Aylık** | |
 |---|---|
@@ -46,7 +46,7 @@ The feature split follows today's gates (Pro-only = `financials`, `arbitrage`, b
 | Includes | 2 stores, 500 orders/month, 250 labels/month, 300 AI credits/month, listing studio, AI text, research, Chrome extension, labels, ETGB file, stock sync |
 | Purpose | A low-commitment entry for sellers who won't prepay. It's deliberately priced above Başlangıç's monthly equivalent (₺2.499), so yearly is the obvious deal |
 
-### Modules (add-ons)
+### Modules (add-ons): prices still a PROPOSAL
 
 | Module | On Aylık (per month) | On a yearly package (per year) |
 |---|---|---|

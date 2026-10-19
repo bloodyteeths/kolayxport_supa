@@ -21,7 +21,7 @@ Built on the existing research. This plan doesn't redo any of it, it only links 
 | Tracking | **Not live.** No GTM, GA4 or Meta IDs are in prod, The full cookie panel ("Tümünü kabul et" / "Yalnızca zorunlu" / "Tercihleri yönet" + Consent Mode) has been live since 2026-10-17 (`d03421a2`) | gtm-overhaul session |
 | YouTube | 7 new tutorials, all unlisted; 8 more are blocked by the upload cap on the unverified channel (15 in total) | gtm-overhaul session |
 | Chrome extension | Live on the Chrome Web Store. 9.12.0 (adds Trendyol and Hepsiburada) is in Google review | gtm-overhaul session |
-| Prices | **Pricing v2** ([pricing-v2.md](pricing-v2.md)): yearly packages Başlangıç ₺29.990 / Büyüme ₺54.990 / Pro ₺89.990 / Kurumsal (quote), with taksit via iyzico/PayTR; **one** monthly plan, Aylık ₺2.999, plus modules. Shown "+KDV" (accountant to confirm, pricing-v2 §5). Collected by **Tamsar, Inc.** (US) in TRY | Atilla 2026-10-19 (model; numbers are a proposal) |
+| Prices | **Pricing v2** ([pricing-v2.md](pricing-v2.md)): yearly packages Başlangıç ₺29.990 / Büyüme ₺54.990 / Pro ₺89.990 / Kurumsal (quote), with taksit via iyzico/PayTR; **one** monthly plan, Aylık ₺2.999, plus modules. Shown "+KDV" (accountant to confirm, pricing-v2 §5). Collected by **Tamsar, Inc.** (US) in TRY | Atilla 2026-10-19 (model + package prices decided; module prices still a proposal) |
 | Referral support in the app | **None.** First-touch UTMs are kept in the browser (`lib/tracking/events.ts`) and sent with the server `sign_up` event, but **not stored on the user**. Stripe Checkout shows a promotion-code field only when the founding coupon doesn't apply (`pages/api/stripe/create-checkout-session.ts:244`) | code |
 | Hepsiburada, Çiçeksepeti | Not live (waiting for integrator approval / replies). **Don't promise them** | feature-inventory N-1, project notes |
 | App-store listings | Shopify, Play Store, Claude and ChatGPT MCP directories are in review. **Freeze applies:** nobody touches MCP/OAuth/review accounts | coordination rules |
@@ -64,7 +64,7 @@ Amazon.com.tr-only sellers aren't a separate push: orders and labels work, but t
 **Pricing v2 (Atilla, 2026-10-19), full detail in [pricing-v2.md](pricing-v2.md):**
 - **Yearly packages are the main offer:** Başlangıç ₺29.990, Büyüme ₺54.990, Pro ₺89.990, Kurumsal from ₺149.990, all +KDV, with taksit via iyzico/PayTR.
 - **One monthly plan:** Aylık ₺2.999 +KDV. Monthly users add **modules** (finance, arbitrage, photo studio, extra stores/orders, AI credit packs) instead of upgrading.
-- The numbers are a proposal for Atilla to confirm. Until v2 is live, partners and copy quote **no prices**: they link to `/fiyatlandirma`.
+- Package and Aylık prices were confirmed by Atilla on 2026-10-19; module prices are still a proposal. Until v2 checkout exists, partners and copy quote **no prices**: they link to `/fiyatlandirma`.
 
 | Element | Turkey offer | Why |
 |---|---|---|
@@ -425,7 +425,7 @@ Decided:
 - **2026-10-19 (orchestrator):** prices shown "+KDV"; partner code 20% off the first payment or 3 months; Ekin ~15 h/week.
 
 Still open:
-1. Pricing v2 numbers (pricing-v2 §3): Atilla confirms.
+1. ~~Pricing v2 package prices~~ confirmed 2026-10-19. Module prices (pricing-v2 §3) still to confirm.
 2. Accountant: seller of record + KDV for Turkish customers, and the payout paperwork (pricing-v2 §5). This also decides which entity holds iyzico/PayTR.
 3. Merisa's hours (planned ~20 h/week).
 4. The dated Atilla actions in §7: YouTube phone verification (26 Oct), tutorials Public (2 Nov), tracking IDs (30 Nov).

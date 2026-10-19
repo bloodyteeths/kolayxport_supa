@@ -10156,7 +10156,7 @@
       "title": "Pricing",
       "subtitle": "Pay for a yearly package in installments instead of up front. If you'd rather not prepay, there is one monthly plan.",
       "trialLine": "14 days free. No card needed.",
-      "taxNote": "Prices exclude VAT (KDV). The total including VAT is shown at checkout.",
+      "taxNote": "The prices shown are the full amount you pay; no VAT (KDV) is added. Invoices are issued by Tamsar, Inc. (US).",
       "founding": {
         "offer": "Founding member offer: {percent}% off for life for the first {total} subscribers",
         "count": "{remaining} of {total} spots left",
@@ -10260,8 +10260,8 @@
           "a": "Yes. Yearly packages can be paid by card in up to 6, 9 or 12 installments depending on the package. The monthly plan is charged to your card each month."
         },
         "kdv": {
-          "q": "Do prices include VAT?",
-          "a": "No, prices exclude VAT (KDV). The total including VAT is shown separately at checkout."
+          "q": "Is VAT (KDV) added to the prices?",
+          "a": "No. The price you see is the full amount you pay; no VAT or other fee is added. Payment is collected by Tamsar, Inc. in the US, which also issues your invoice."
         },
         "trial": {
           "q": "How does the trial work?",
@@ -10280,7 +10280,7 @@
           "a": "The first {total} subscribers get {percent}% off for life on the package or monthly plan they choose. The number of spots left is shown live at the top of the page."
         }
       },
-      "draftNotes": "Draft notes: prices and limits confirmed on 19 Oct 2026 (pricing-v2.md §3). The seller (Tamsar, Inc. / Modsons) and the VAT wording are final only after the accountant confirms; the installment payment provider (iyzico/PayTR) isn't built yet.",
+      "draftNotes": "Draft notes: prices and limits confirmed on 19 Oct 2026 (pricing-v2.md §3). The seller is Tamsar, Inc. (US); prices are final amounts with no VAT added (Atilla's decision). Before going live the accountant should confirm: a foreign company's VAT registration duty when selling electronic services to Turkish consumers, and whether Turkish businesses can expense a foreign invoice. The installment payment provider (iyzico/PayTR) isn't built yet.",
       "fromNote": "Starting price, by quote"
     }
   },
@@ -16697,7 +16697,7 @@
           }
         },
         "monthly": "Prefer not to prepay? Monthly plan: {price} / month",
-        "tax": "Prices exclude VAT",
+        "tax": "Final prices, no VAT added",
         "founding": "Founding members: {percent}% off for life for the first 20 subscribers. Spots left: {remaining}"
       }
     },

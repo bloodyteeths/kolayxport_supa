@@ -13,7 +13,7 @@ import { PRICING_V2_DRAFT, BASE_FEATURES, CREDIT_PACKS, MODULES, MONTHLY, RECOMM
 /**
  * DRAFT of the pricing v2 page (docs/gtm/pricing-v2.md §4 P4): yearly packages first (installments), one
  * monthly plan, modules. Numbers come from ./pricingV2Draft (placeholders, not wired to checkout). Not linked
- * from the live site until Atilla confirms the prices and the seller-of-record / KDV question is settled.
+ * from the live site until the installment checkout exists (prices final, Tamsar, Inc. sells with no KDV added).
  */
 export default function SitePricingYearly({ locale, draft = PRICING_V2_DRAFT }: { locale: SiteLocale; draft?: boolean }) {
   const t = useTranslations('marketing.pricingYearly');

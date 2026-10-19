@@ -10156,7 +10156,7 @@
       "title": "Fiyatlandırma",
       "subtitle": "Yıllık paketle peşin değil, taksitle ödeyin. Peşin ödemek istemiyorsanız tek bir aylık planımız var.",
       "trialLine": "14 gün ücretsiz. Kart gerekmez.",
-      "taxNote": "Fiyatlara KDV dahil değildir. KDV dahil toplam ödeme adımında gösterilir.",
+      "taxNote": "Gösterilen fiyatlar ödeyeceğiniz tutarın tamamıdır; üzerine KDV eklenmez. Faturanız Tamsar, Inc. (ABD) tarafından düzenlenir.",
       "founding": {
         "offer": "Kurucu üye fırsatı: İlk {total} aboneye ömür boyu %{percent} indirim",
         "count": "{total} yerden {remaining} tanesi kaldı",
@@ -10260,8 +10260,8 @@
           "a": "Evet. Yıllık paketleri kredi kartınızla, paketine göre 6, 9 veya 12 taksite kadar ödeyebilirsiniz. Aylık plan her ay karttan çekilir."
         },
         "kdv": {
-          "q": "Fiyatlara KDV dahil mi?",
-          "a": "Hayır, fiyatlar KDV hariçtir. KDV dahil toplam, ödeme adımında ayrıca gösterilir."
+          "q": "Fiyatlara KDV eklenir mi?",
+          "a": "Hayır. Gördüğünüz fiyat ödeyeceğiniz tutarın tamamıdır; üzerine KDV veya başka bir ücret eklenmez. Ödemeyi ABD'deki Tamsar, Inc. alır ve faturanızı da Tamsar, Inc. düzenler."
         },
         "trial": {
           "q": "Deneme nasıl işliyor?",
@@ -10280,7 +10280,7 @@
           "a": "İlk {total} aboneye seçtikleri paket ya da Aylık plan için ömür boyu %{percent} indirim. Kalan yer sayısı sayfanın üstünde canlı gösterilir."
         }
       },
-      "draftNotes": "Taslak notları: fiyatlar ve limitler 19 Ekim 2026'da onaylandı (pricing-v2.md §3). Satıcı (Tamsar, Inc. / Modsons) ve KDV metni muhasebeci onayından sonra kesinleşir; taksitli ödeme altyapısı (iyzico/PayTR) henüz yok.",
+      "draftNotes": "Taslak notları: fiyatlar ve limitler 19 Ekim 2026'da onaylandı (pricing-v2.md §3). Satıcı Tamsar, Inc. (ABD); fiyatlar nihai tutardır, KDV eklenmez (Atilla kararı). Yayından önce muhasebeci teyit etmeli: yabancı şirketin Türk tüketicilere elektronik hizmet satışında KDV kaydı yükümlülüğü ve Türk işletmelerin yurt dışı faturayı gider olarak kullanması. Taksitli ödeme altyapısı (iyzico/PayTR) henüz yok.",
       "fromNote": "Başlangıç fiyatı, teklifle"
     }
   },
@@ -16697,7 +16697,7 @@
           }
         },
         "monthly": "Peşin ödemek istemeyenlere Aylık plan: {price} / ay",
-        "tax": "Fiyatlara KDV dahil değildir",
+        "tax": "Fiyatlar nihai tutardır, KDV eklenmez",
         "founding": "Kurucu üye: ilk 20 aboneye ömür boyu %{percent} indirim. Kalan yer: {remaining}"
       }
     },

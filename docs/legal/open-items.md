@@ -4,7 +4,7 @@ Moved out of content/*/legal on 2026-10-19 because the `[TODO(owner)]` notes wer
 
 - Consent Mode'un "temel (basic)" modda kurulduğunu, yani onaydan önce çerezsiz ping dahil hiçbir isteğin gönderilmediğini teyit edin  _(was in cerez-politikasi.md)_
 - araçlar devreye alınınca çerez adları ve süreleri tablosunu ekleyin  _(was in cerez-politikasi.md)_
-- kategori bazlı onay paneli ve alt bilgideki "Çerez Tercihleri" bağlantısı yayımlanmadan önce hazır olmalı; bugünkü bildirim yalnızca "Kabul et" düğmesi içeriyor  _(was in cerez-politikasi.md)_
+- ~~kategori bazlı onay paneli~~ **Tamam (2026-10-17, d03421a2):** "Tümünü kabul et" / "Yalnızca zorunlu" / "Tercihleri yönet" (zorunlu, analitik, pazarlama) canlıda. Alt bilgideki "Çerez Tercihleri" bağlantısının yerini teyit edin  _(was in cerez-politikasi.md)_
 - fiyatların KDV dahil mi, "+KDV" mi olduğu ve USD fiyatlarda vergi uygulaması  _(was in kullanim-sartlari.md)_
 - Stripe hesabının hangi tüzel kişi adına açık olduğu ve faturanın (e-Arşiv / e-Fatura) nasıl düzenleneceği  _(was in kullanim-sartlari.md)_
 - yıllık planlarda iade politikası (ör. ilk X gün içinde orantılı iade) ve işlem süresi  _(was in kullanim-sartlari.md)_
@@ -15,3 +15,4 @@ Moved out of content/*/legal on 2026-10-19 because the `[TODO(owner)]` notes wer
 - gösterilen tutarın KDV dahil olduğunu teyit edin; tüketicilere vergiler dahil toplam fiyat gösterilmesi zorunludur  _(was in on-bilgilendirme-formu.md)_
 - ödeme sayfasına işaretlenmemiş "derhal ifa ve cayma hakkının kaybı" onay kutusunu ekleyin; eklenmeyecekse bu bölümü, tüketiciye 14 gün içinde koşulsuz tam iade sağlayacak şekilde değiştirin  _(was in on-bilgilendirme-formu.md)_
 - Hetzner, Cloudflare, Google, Stripe ve Postmark ile standart sözleşmelerin imzalanıp Kurul'a bildirildiğini teyit edin; imzalanmayan varsa listeleyin  _(was in kvkk-aydinlatma-metni.md)_
+- **Ortaklık programı (2026-10-19, branch gtm/kvkk-partner-referrals):** KVKK Aydınlatma Metni §2, §3 (amaç 8), §4, §6, §8 ve Gizlilik Politikası §5'e eklenen iş ortağı satırlarını hukukçu gözden geçirmeli: maskelenmiş verinin (baş harfler + plan + durum + kayıt tarihi + ödül) iş ortağına gösterilmesi için meşru menfaat (md. 5/2-f) yeterli mi, yoksa kayıt sırasında ayrıca bilgilendirme/rıza mı gerekir; ortaklık kayıtlarının saklama süresi. Onaylanmadan main'e alınmaz.

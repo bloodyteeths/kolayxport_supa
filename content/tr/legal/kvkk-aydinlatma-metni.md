@@ -3,7 +3,7 @@ title: "KVKK Aydınlatma Metni | KolayXport"
 description: "KolayXport'un kişisel verilerinizi hangi amaçla, hangi hukuki sebeple işlediğini, kimlere aktardığını ve KVKK kapsamındaki haklarınızı açıklar."
 h1: "KVKK Aydınlatma Metni"
 keyword: "kolayxport kvkk aydınlatma metni"
-updated: 2026-10-17
+updated: 2026-10-19
 effective: 2026-10-17
 lawyerReviewed: true
 inventoryRefs: []
@@ -34,6 +34,7 @@ KolayXport'u kullanmanıza bağlı olarak aşağıdaki kişisel verileriniz işl
 - **Finans:** fatura bilgileri, ödeme durumu, abonelik ve fatura geçmişi. Kart bilgileriniz Stripe tarafından alınır ve işlenir; kart numaranızın tamamı KolayXport sunucularında saklanmaz.
 - **Mesleki / ticari bilgiler:** mağaza adları, bağladığınız pazaryeri ve kargo hesaplarına ait tanımlayıcılar, ürün ve ilan içerikleri, sipariş ve finans kayıtları, ihracat belgeleri için girdiğiniz vergi numarası ve benzeri bilgiler (şahıs işletmelerinde bu bilgiler kişisel veri niteliği taşıyabilir).
 - **İşlem güvenliği:** şifrenizin özet (hash) değeri, oturum bilgileri, IP adresi, tarayıcı ve cihaz bilgisi, giriş ve işlem kayıtları (log), bağladığınız hesapların erişim anahtarları (token) ve API anahtarları.
+- **Ortaklık programı:** bir iş ortağımızın bağlantısı veya indirim koduyla geldiyseniz, sizi hangi iş ortağının yönlendirdiği (ortaklık kodu) ve kayıt tarihiniz.
 - **Pazarlama:** çerez tercihleriniz; ileride açacağımız analitik ve pazarlama araçlarında, yalnızca onay vermeniz hâlinde, çevrimiçi tanımlayıcılar ve reklam etkileşim verileri (bkz. [Çerez Politikası](/cerez-politikasi)).
 
 Kural olarak özel nitelikli kişisel veri (KVKK md. 6) işlemeyiz ve bu tür verileri bize iletmemenizi rica ederiz.
@@ -49,7 +50,8 @@ Kişisel verilerinizi şu amaçlarla işleriz:
 5. Bilgi güvenliğini sağlamak, kötüye kullanımı ve yetkisiz erişimi önlemek, hataları tespit etmek ve gidermek.
 6. Mevzuattan doğan yükümlülükleri (vergi, ticaret, tüketici ve elektronik ticaret mevzuatı) yerine getirmek, yetkili kurumların taleplerini karşılamak.
 7. Hukuki uyuşmazlıklarda hakların tesisi, kullanılması ve korunması.
-8. Yalnızca onay vermeniz hâlinde: site kullanımını ölçmek, reklam kampanyalarının performansını ölçmek ve size ticari elektronik ileti göndermek.
+8. Ortaklık programını yürütmek: sizi yönlendiren iş ortağına doğan tek seferlik ödülü hesaplamak ve ödemek, iş ortağına yönlendirdiği müşterilerin durumunu maskelenmiş olarak göstermek, programın kötüye kullanılmasını önlemek (bu bölüm yalnızca bir iş ortağı aracılığıyla geldiyseniz uygulanır).
+9. Yalnızca onay vermeniz hâlinde: site kullanımını ölçmek, reklam kampanyalarının performansını ölçmek ve size ticari elektronik ileti göndermek.
 
 ## 4. Hukuki sebepler
 
@@ -59,8 +61,8 @@ Kişisel verilerinizi KVKK md. 5'te sayılan şu hukuki sebeplere dayanarak işl
 - **Hukuki yükümlülük (md. 5/2-ç):** faturalandırma, defter ve belge saklama, mesafeli sözleşme kayıtları, kurum talepleri (amaç 3 ve 6).
 - **Kanunlarda açıkça öngörülme (md. 5/2-a):** mevzuatın açıkça saklanmasını öngördüğü kayıtlar.
 - **Bir hakkın tesisi, kullanılması veya korunması (md. 5/2-e):** uyuşmazlık ve talepler (amaç 7).
-- **Meşru menfaat (md. 5/2-f):** güvenlik kayıtları, kötüye kullanımın önlenmesi, hata ayıklama ve hizmetin geliştirilmesi (amaç 5), temel hak ve özgürlüklerinize zarar vermemek kaydıyla.
-- **Açık rıza (md. 5/1):** analitik ve pazarlama çerezleri, reklam ölçümü, ticari elektronik ileti ve aşağıda belirtilen bazı yurt dışı aktarımlar (amaç 8). Açık rızanızı dilediğiniz zaman geri alabilirsiniz; geri alma, önceki işlemlerin hukuka uygunluğunu etkilemez.
+- **Meşru menfaat (md. 5/2-f):** güvenlik kayıtları, kötüye kullanımın önlenmesi, hata ayıklama ve hizmetin geliştirilmesi (amaç 5) ile ortaklık programının yürütülmesi (amaç 8), temel hak ve özgürlüklerinize zarar vermemek kaydıyla.
+- **Açık rıza (md. 5/1):** analitik ve pazarlama çerezleri, reklam ölçümü, ticari elektronik ileti ve aşağıda belirtilen bazı yurt dışı aktarımlar (amaç 9). Açık rızanızı dilediğiniz zaman geri alabilirsiniz; geri alma, önceki işlemlerin hukuka uygunluğunu etkilemez.
 
 ## 5. Toplama yöntemi
 
@@ -79,6 +81,7 @@ Kişisel verileriniz, yukarıdaki amaçlarla sınırlı olarak ve KVKK md. 8'e u
 
 - **Sizin talimatınızla bağlandığınız yurt içi hizmetler:** Trendyol, Hepsiburada, N11, Çiçeksepeti gibi pazaryerleri; DHL eCommerce (MNG Kargo); Paraşüt. Bu aktarım, bu hizmetleri sizin adınıza kullanabilmeniz için yapılır.
 - **Yetkili kamu kurum ve kuruluşları ile adli makamlar:** mevzuatın gerektirdiği hâllerde ve talep üzerine.
+- **Sizi yönlendiren iş ortağı (ortaklık programı):** yalnızca bir iş ortağının bağlantısı veya koduyla geldiyseniz. İş ortağı, kendi panelinde sizi maskelenmiş olarak görür: adınızın baş harfleri (ör. "A*** Y"), seçtiğiniz plan ve ödeme aralığı, durumunuz (deneme, aktif, ödedi, iptal), kayıt tarihiniz ve kendisine doğan ödül tutarı. E-posta adresiniz, tam adınız, mağaza adlarınız, sipariş ve alıcı verileriniz iş ortağıyla paylaşılmaz. Amaç, iş ortağının hak ettiği ödülü şeffaf biçimde görebilmesidir; hukuki sebep meşru menfaattir (md. 5/2-f).
 - **Danışmanlar:** mali müşavir, denetçi ve hukuk danışmanları, sır saklama yükümlülüğü altında ve gerekli olduğu ölçüde.
 
 ## 7. Kişisel verilerin yurt dışına aktarılması (md. 9)
@@ -111,6 +114,7 @@ Kişisel verilerinizi işleme amacının gerektirdiği süre boyunca ve mevzuatt
 - **Fatura, ödeme ve sözleşme kayıtları:** Türk Ticaret Kanunu ve Vergi Usul Kanunu kapsamındaki süreler boyunca (10 yıla kadar); mesafeli sözleşme kayıtları en az 3 yıl.
 - **Bağlı hesap erişim anahtarları:** bağlantı devam ettiği sürece; bağlantıyı kestiğinizde silinir.
 - **Sistem ve güvenlik kayıtları:** en fazla 12 ay; şifre ve erişim anahtarları gibi gizli bilgiler kayıtlara yazılmadan önce maskelenir.
+- **Ortaklık kayıtları:** sizi yönlendiren iş ortağının ödülü hesaplanıp ödenene kadar; ödüle ilişkin ödeme ve muhasebe kayıtları yukarıdaki fatura süreleri boyunca.
 - **Yedekler:** şifreli yedekler dönüşümlü olarak en fazla yaklaşık 3 ay tutulur.
 
 Süresi dolan veriler Kişisel Verilerin Silinmesi, Yok Edilmesi veya Anonim Hale Getirilmesi Hakkında Yönetmelik'e uygun olarak silinir, yok edilir veya anonimleştirilir.

@@ -3,7 +3,7 @@ title: "KVKK Privacy Notice | KolayXport"
 description: "Why and on what legal basis KolayXport processes your personal data, who receives it, and your rights under Turkish data protection law (KVKK)."
 h1: "Privacy Notice under KVKK"
 keyword: "kolayxport kvkk privacy notice"
-updated: 2026-10-17
+updated: 2026-10-19
 effective: 2026-10-17
 lawyerReviewed: true
 inventoryRefs: []
@@ -34,6 +34,7 @@ Depending on how you use KolayXport, we may process:
 - **Financial:** billing details, payment status, subscription and invoice history. Card details are collected and processed by Stripe; your full card number is not stored on KolayXport servers.
 - **Professional / business information:** shop names, identifiers of the marketplace and carrier accounts you connect, product and listing content, order and finance records, the tax number and similar details you enter for export documents (for sole traders this information can be personal data).
 - **Transaction security:** a hash of your password, session data, IP address, browser and device information, sign-in and activity logs, access tokens and API keys for the accounts you connect.
+- **Partner program:** if you came through one of our partners' links or discount codes, which partner referred you (partner code) and your signup date.
 - **Marketing:** your cookie preferences; in analytics and marketing tools we plan to add, and only if you consent, online identifiers and ad interaction data (see the [Cookie Policy](/en/cerez-politikasi)).
 
 As a rule we do not process special categories of personal data (KVKK Art. 6), and we ask you not to send us such data.
@@ -49,7 +50,8 @@ We process your personal data to:
 5. Keep the service secure, prevent abuse and unauthorised access, and find and fix errors.
 6. Meet legal obligations (tax, commercial, consumer and e-commerce law) and respond to requests from competent authorities.
 7. Establish, exercise and defend legal claims.
-8. Only with your consent: measure site usage, measure ad campaign performance, and send you commercial electronic messages.
+8. Run the partner program: calculate and pay the one-time reward owed to the partner who referred you, show partners the status of the customers they referred in masked form, and prevent abuse of the program (this applies only if you came through a partner).
+9. Only with your consent: measure site usage, measure ad campaign performance, and send you commercial electronic messages.
 
 ## 4. Legal bases
 
@@ -59,8 +61,8 @@ We rely on these legal bases under KVKK Art. 5:
 - **Legal obligation (Art. 5/2-ç):** invoicing, keeping books and records, distance contract records, requests from authorities (purposes 3 and 6).
 - **Expressly provided for by law (Art. 5/2-a):** records the law expressly requires us to keep.
 - **Establishing, exercising or protecting a right (Art. 5/2-e):** disputes and claims (purpose 7).
-- **Legitimate interest (Art. 5/2-f):** security logs, abuse prevention, debugging and improving the service (purpose 5), provided this does not harm your fundamental rights and freedoms.
-- **Explicit consent (Art. 5/1):** analytics and marketing cookies, ad measurement, commercial electronic messages, and certain transfers abroad described below (purpose 8). You can withdraw consent at any time; withdrawal does not affect the lawfulness of earlier processing.
+- **Legitimate interest (Art. 5/2-f):** security logs, abuse prevention, debugging and improving the service (purpose 5) and running the partner program (purpose 8), provided this does not harm your fundamental rights and freedoms.
+- **Explicit consent (Art. 5/1):** analytics and marketing cookies, ad measurement, commercial electronic messages, and certain transfers abroad described below (purpose 9). You can withdraw consent at any time; withdrawal does not affect the lawfulness of earlier processing.
 
 ## 5. How we collect data
 
@@ -79,6 +81,7 @@ Limited to the purposes above and in line with KVKK Art. 8, personal data may be
 
 - **Domestic services you connect on your instruction:** marketplaces such as Trendyol, Hepsiburada, N11 and Çiçeksepeti; DHL eCommerce (MNG Kargo); Paraşüt. We transfer data so you can use these services on your own behalf.
 - **Competent public authorities and courts:** where the law requires and on request.
+- **The partner who referred you (partner program):** only if you came through a partner's link or code. In their dashboard the partner sees you in masked form: your initials (e.g. "A*** Y"), the plan and billing interval you chose, your status (trial, active, paid, cancelled), your signup date and the reward owed to them. Your e-mail address, full name, store names, order and buyer data are not shared with the partner. The purpose is to let the partner see the reward they earn transparently; the legal basis is legitimate interest (Art. 5/2-f).
 - **Advisers:** accountants, auditors and lawyers, under confidentiality and only as far as necessary.
 
 ## 7. Transfers abroad (Art. 9)
@@ -111,6 +114,7 @@ We keep personal data for as long as the purpose requires and for the periods se
 - **Invoices, payments and contract records:** for the periods set by the Turkish Commercial Code and Tax Procedure Law (up to 10 years); distance contract records for at least 3 years.
 - **Access tokens for connected accounts:** while the connection exists; deleted when you disconnect.
 - **System and security logs:** up to 12 months; secrets such as passwords and access tokens are masked before they are written to logs.
+- **Partner records:** until the reward of the partner who referred you has been calculated and paid; the related payment and accounting records for the invoice periods above.
 - **Backups:** encrypted backups are rotated and kept for about 3 months at most.
 
 When a period ends, data is deleted, destroyed or anonymised in line with the Regulation on the Deletion, Destruction or Anonymisation of Personal Data.

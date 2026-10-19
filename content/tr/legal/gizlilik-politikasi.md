@@ -3,7 +3,7 @@ title: "Gizlilik Politikası | KolayXport"
 description: "KolayXport hangi verileri işler, satıcıların alıcı verilerini nasıl korur, verileri ne kadar saklar ve kimlerle paylaşır? Tüm ayrıntılar bu sayfada."
 h1: "Gizlilik Politikası"
 keyword: "kolayxport gizlilik politikası"
-updated: 2026-10-18
+updated: 2026-10-19
 effective: 2026-10-17
 lawyerReviewed: true
 inventoryRefs: []
@@ -73,6 +73,7 @@ Verileri yalnızca aşağıdaki taraflarla ve gerekli olduğu ölçüde paylaş�
 
 - **Altyapı hizmet sağlayıcıları:** Hetzner Online GmbH (barındırma, Almanya), Cloudflare (şifreli yedek depolama), Google (giriş ve Gemini API), Stripe (ödeme), Postmark (işlemsel e-posta).
 - **Sizin bağladığınız hizmetler:** pazaryerleri, kargo firmaları ve Paraşüt; yalnızca sizin talimatınızla ve işlemin gerektirdiği veriler (ör. etiket için alıcı adresi kargo firmasına, e-fatura için alıcı bilgileri Paraşüt'e, ETGB dosyası belirttiğiniz gümrük müşavirine).
+- **Sizi yönlendiren iş ortağı:** bir iş ortağımızın bağlantısı veya koduyla geldiyseniz, iş ortağı kendi panelinde sizi yalnızca maskelenmiş olarak görür: adınızın baş harfleri (ör. "A*** Y"), plan ve ödeme aralığı, durum (deneme, aktif, ödedi, iptal), kayıt tarihi ve kendisine doğan ödül. E-posta adresiniz, tam adınız, mağaza, sipariş ve alıcı verileriniz paylaşılmaz (ayrıntılar KVKK Aydınlatma Metni'nde).
 - **Yetkili makamlar:** yasal zorunluluk hâlinde.
 - **Şirket yapısındaki değişiklikler:** birleşme, devir veya satış hâlinde, bu politikadaki korumaları sürdürmek kaydıyla.
 

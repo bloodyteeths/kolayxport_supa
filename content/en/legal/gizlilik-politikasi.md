@@ -3,7 +3,7 @@ title: "Privacy Policy | KolayXport"
 description: "What data KolayXport processes, how it protects sellers' buyer data, how long it keeps data and who it shares it with. All the details are here."
 h1: "Privacy Policy"
 keyword: "kolayxport privacy policy"
-updated: 2026-10-18
+updated: 2026-10-19
 effective: 2026-10-17
 lawyerReviewed: true
 inventoryRefs: []
@@ -73,6 +73,7 @@ We share data only with the following, and only as far as necessary:
 
 - **Infrastructure providers:** Hetzner Online GmbH (hosting, Germany), Cloudflare (encrypted backup storage), Google (sign-in and Gemini API), Stripe (payments), Postmark (transactional e-mail).
 - **Services you connect:** marketplaces, carriers and Paraşüt, only on your instruction and only the data the task needs (for example the buyer address to the carrier for a label, buyer details to Paraşüt for an e-invoice, the ETGB file to the customs broker you name).
+- **The partner who referred you:** if you came through one of our partners' links or codes, the partner sees you in their dashboard in masked form only: your initials (e.g. "A*** Y"), plan and billing interval, status (trial, active, paid, cancelled), signup date and the reward owed to them. Your e-mail address, full name, store, order and buyer data are not shared (details in the KVKK Information Notice).
 - **Authorities:** where the law requires.
 - **Changes in company structure:** in a merger, transfer or sale, provided the protections in this policy continue.
 

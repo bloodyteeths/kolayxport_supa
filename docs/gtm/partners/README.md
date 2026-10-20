@@ -9,6 +9,7 @@ Date: 2026-10-20. Phase 1 of [turkey-gameplan.md](../turkey-gameplan.md): referr
 | [ortaklik-sartlari.md](ortaklik-sartlari.md) | Partner terms in Turkish, sent as PDF to everyone who says yes | After a yes |
 | [ortak-sss.md](ortak-sss.md) | Copy-paste answers to partner and seller questions | Daily |
 | [canli-demo-senaryosu.md](canli-demo-senaryosu.md) | 30-minute live demo script | From week 4 |
+| [wave1_first_messages.md](wave1_first_messages.md) | 15 personalised first messages (Merisa 10, Ekin 5) with a status tracker | Week 2 onward, after the value-first step |
 | [shortlist-wave1.csv](shortlist-wave1.csv) | First researched shortlist, scored: 89 rows (27 X, 26 Facebook = 21 groups + 5 pages, 13 Telegram, 13 YouTube, 10 müşavir/consultant). Public pages only, checked 2026-10-20; 2 rows "unverified" | Week 1: Merisa/Ekin re-check the top rows, then paste them into the ERP "Partner pipeline" tab |
 | [../KolayXport-ERP.xlsx](../KolayXport-ERP.xlsx) | Tracking: tasks, pipeline, weekly targets, decisions | Every day |
 
@@ -35,6 +36,6 @@ Date: 2026-10-20. Phase 1 of [turkey-gameplan.md](../turkey-gameplan.md): referr
 - `scam_flag=yes` (4 rows) = income-promise marketing. **Don't partner with these.** "COURSE SELLER" in the note = ordinary course/consulting sellers. They're allowed, but check their claims first.
 - The biggest groups (etsytr, TurkiyeAmazon) ban promo posts, so the only way in is the admins (Varyant 5).
 - **Ahmet Konak (@koneeek, Optimsy): wave 2** (orchestrator, 2026-10-20). Contact him only after 2–3 wave-1 partners are signed, so we come with proof. Pitch the complementary angle: Optimsy does Etsy listings, KolayXport does multi-marketplace orders, finance/net profit and stock, so this is a referral or integration, not a fight over SEO. Don't lead with listing-SEO tools. If he reads as a competitor, drop it politely.
-- Kerem Başalı (@k_basali) owns t.me/etsyilegelir and @EtsyileGelir, which are already in communities.csv. Treat them as one contact.
+- **Kerem Başalı (@k_basali): wave 2.** He co-founded Toolsy.io, an Etsy SEO tool. He also owns t.me/etsyilegelir and @EtsyileGelir, so treat them all as one wave-2 contact, handled the same way as Konak.
 - **Gaps:** few Trendyol-seller and print-on-demand Facebook groups found. A second research pass is planned.
 - Counts and activity are a snapshot (2026-10-20). Re-check on the day you contact someone.

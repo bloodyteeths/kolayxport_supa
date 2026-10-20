@@ -15,7 +15,9 @@ try{var c=JSON.parse(localStorage.getItem('kx-consent')||'null');if(c&&c.v===1){
 
 const GTM_LOADER = (id) => `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','${id}');`;
 
-export default function MyDocument({ lang }) {
+export default function MyDocument({ lang, tracking }) {
+  // No GTM/GA4 on the MCP OAuth consent screens (/oauth/*): they stay free of third-party scripts.
+  const gtm = GTM_ID && tracking !== false;
   return (
     // Marketing pages under /en render English; everything else starts Turkish and
     // pages/_app.tsx syncs <html lang> to the client UI locale.
@@ -30,7 +32,7 @@ export default function MyDocument({ lang }) {
         {process.env.NEXT_PUBLIC_BING_VERIFICATION ? <meta name="msvalidate.01" content={process.env.NEXT_PUBLIC_BING_VERIFICATION} /> : null}
 
         <script dangerouslySetInnerHTML={{ __html: CONSENT_DEFAULTS }} />
-        {GTM_ID ? <script dangerouslySetInnerHTML={{ __html: GTM_LOADER(GTM_ID) }} /> : null}
+        {gtm ? <script dangerouslySetInnerHTML={{ __html: GTM_LOADER(GTM_ID) }} /> : null}
 
         {/* PWA meta tags */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -44,7 +46,7 @@ export default function MyDocument({ lang }) {
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </Head>
       <body>
-        {GTM_ID ? (
+        {gtm ? (
           <noscript>
             <iframe src={`https://www.googletagmanager.com/ns.html?id=${GTM_ID}`} height="0" width="0" style={{ display: 'none', visibility: 'hidden' }} title="gtm" />
           </noscript>
@@ -59,5 +61,5 @@ export default function MyDocument({ lang }) {
 MyDocument.getInitialProps = async (ctx) => {
   const initial = await Document.getInitialProps(ctx);
   const path = ctx.pathname || '';
-  return { ...initial, lang: path === '/en' || path.startsWith('/en/') ? 'en' : 'tr' };
+  return { ...initial, lang: path === '/en' || path.startsWith('/en/') ? 'en' : 'tr', tracking: !(path === '/oauth' || path.startsWith('/oauth/')) };
 };

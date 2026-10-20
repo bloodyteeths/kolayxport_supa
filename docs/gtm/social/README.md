@@ -43,21 +43,21 @@ Her iddia `feature-inventory.md` içindeki bir satıra dayanmalı. Bu tablo en s
 | Etsy ↔ eBay tek tıkla ilan kopyalama | `crosslist-etsy-ebay` | Para birimi farklıysa fiyat boş gelir |
 | Kendi FedEx / UPS hesabınla yurt dışı etiket, elektronik ticari fatura | `label-fedex`, `label-ups`, `customs-commercial-invoice` | "Ucuz kargo" deme; KolayXport kargo satmıyor. FedEx/UPS yurt içi yok |
 | Yurt içi DHL eCommerce (MNG) etiketi, kapıda ödeme | `label-dhl-ecommerce` | Yurtiçi/Aras/Sürat **yok** |
-| ETGB için Excel dosyası hazırlanır, müşavirine e-postayla gider | `etgb-excel-email` | **Yalnızca gtm/overhaul canlıya alındıktan sonra** (ihracatçı bilgisi kullanıcıya özel hale geldi). "ETGB beyanı yapıyoruz" **asla** |
+| ETGB için Excel dosyası hazırlanır, müşavirine e-postayla gider | `etgb-excel-email` | Canlıda (2026-10-17). "ETGB beyanı yapıyoruz" **asla** |
 | Çok kanallı stok senkronu (Etsy, eBay, Trendyol, Shopify) | `stock-sync` | **Beta**. "Wix'e stok yazar" deme; Amazon ve Hepsiburada yok |
 | Komisyon, kargo, reklam ve maliyet düşülmüş net kâr (Etsy, eBay, Amazon, Trendyol) | `reports-profit` | Pro plan. Shopify/Wix finansı yok |
 | Trendyol müşteri soruları ve Wix sohbeti için AI yanıt taslağı | `inbox-unified`, `ai-message-draft` | **Beta**. Etsy/eBay/Amazon mesajları **yok** |
-| 14 gün ücretsiz deneme, kredi kartı gerekmez | site, `af08f85` | Canlıya alındıktan sonra. Deneme bitince otomatik ücret alınmaz |
+| 14 gün ücretsiz deneme, kredi kartı gerekmez | site, `af08f85` | Canlıda (/fiyatlandirma). Deneme bitince otomatik ücret alınmaz |
+| KolayXport Chrome eklentisini Chrome Web Mağazası'ndan kur: Etsy, eBay, Amazon, Trendyol ve Hepsiburada sayfalarında satış, fiyat ve buybox bilgisi | Web Mağazası sayfası (`fjlfihofjojemlofkfejikgdbjemncba`, 9.12.0, kontrol 2026-10-20) | Rakamlar **tahmindir**. Günlük satış hızı, birkaç saat arayla okunan ürünlerde çıkar; "anlık satış verisi" deme. Trendyol/Hepsiburada paneli kullanıcının onayıyla açılır |
 | Kurucu üye fırsatı: ilk 20 ücretli aboneye ömür boyu %40 indirim | `d446f0a` (Stripe kuponu) | **Kalan kontenjan sayısı asla yazılmaz**; "ilk 20 abone" + /fiyatlandirma linki |
 | Türkçe ve İngilizce arayüz, aylık ödeme | `settings-preferences`, `billing-checkout` | |
 
 ### Asla söyleme (feature-inventory §4)
 
-- Hepsiburada / N11 / Çiçeksepeti entegrasyonu. "Tüm pazaryerleri", "tüm Türk kargo firmaları", Yurtiçi/Aras/Sürat/PTT etiketi.
+- Hepsiburada / N11 / Çiçeksepeti **entegrasyonu** (sipariş, ilan, stok). Hepsiburada için yalnızca Chrome eklentisinin araştırma paneli var. "Tüm pazaryerleri", "tüm Türk kargo firmaları", Yurtiçi/Aras/Sürat/PTT etiketi.
 - "ETGB'yi otomatik beyan ediyoruz", "gümrük beyannamesi", "otomatik e-Fatura/e-Arşiv kesimi".
 - Amazon ilan veya stok yönetimi; Amazon ürün araştırması.
 - "Etsy'ye takip numarası otomatik gider" (Chrome eklentisi gerekir); Trendyol/Shopify'a takip numarası otomatik yüklenir.
-- "Chrome Web Mağazası'ndan yükleyin" (eklenti henüz mağazada değil).
 - "Etsy, eBay, Amazon mesajları tek kutuda"; "AI asistan / sohbet"; "Telegram bildirimi".
 - FedEx/UPS kargo takibi (durum güncellemesi), yurt içi FedEx/UPS, Shippo/Veeqo üzerinden indirimli etiket.
 - "X AI kredisi dahil", "N mağaza bağla" gibi plan limitleri (sayılmıyor).

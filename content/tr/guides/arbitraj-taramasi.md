@@ -14,7 +14,7 @@ order: 6
 duration: PT1M17S
 video:
   file: arbitraj-taramasi
-  youtubeId: vMZIW3NYkJA
+  youtubeId: ROsJDkq8i6c
   uploadDate: '2026-10-17'
 steps:
   - name: Ürün bulucuyu açın

@@ -13,7 +13,7 @@ order: 5
 duration: PT1M9S
 video:
   file: anahtar-kelime-arastirmasi
-  youtubeId: POX-IWeXD3o
+  youtubeId: 6o8rsKlUiio
   uploadDate: '2026-10-17'
 steps:
   - name: Anahtar kelime gezginini açın

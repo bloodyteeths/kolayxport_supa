@@ -14,7 +14,7 @@ order: 9
 duration: PT1M20S
 video:
   file: stok-senkronu
-  youtubeId: ''
+  youtubeId: sGoKW8eyvHw
 steps:
   - name: Durumu ve sayıları görün
     text: 'Stok senkronu sayfasının üstünde durum ve sayılar var: kaç ürün olduğu, kaç ilanın bağlı olduğu ve bekleyen işler.'

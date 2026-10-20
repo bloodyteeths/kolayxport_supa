@@ -17,7 +17,7 @@ order: 12
 duration: PT1M18S
 video:
   file: chrome-eklentisi
-  youtubeId: ''
+  youtubeId: rWpksDIH9yU
   uploadDate: '2026-10-17'
 steps:
   - name: Yardım sayfasındaki adıma bakın

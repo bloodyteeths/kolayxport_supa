@@ -16432,7 +16432,9 @@
       "breadcrumbHome": "Home",
       "notFound": "This page could not be found.",
       "statusLabel": "Status",
-      "demoData": "Screenshot from a demo account; figures are illustrative."
+      "demoData": "Screenshot from a demo account; figures are illustrative.",
+      "playBadgeAlt": "Get it on Google Play",
+      "appLine": "Android app: your orders and listings on your phone."
     },
     "home": {
       "seoTitle": "KolayXport — One dashboard for selling abroad",
@@ -16617,7 +16619,8 @@
       "kep": "KEP",
       "etsyNotice": "The term 'Etsy' is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed or certified by Etsy, Inc.",
       "marks": "Other marketplace and carrier names are trademarks of their owners and are used only to identify the connected service.",
-      "rights": "© {year} KolayXport"
+      "rights": "© {year} KolayXport",
+      "playMark": "Google Play and the Google Play logo are trademarks of Google LLC."
     },
     "pricingTeaser": {},
     "casesIndex": {

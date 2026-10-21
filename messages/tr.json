@@ -16432,7 +16432,9 @@
       "breadcrumbHome": "Ana sayfa",
       "notFound": "Bu sayfa bulunamadı.",
       "statusLabel": "Durum",
-      "demoData": "Demo hesaptan ekran görüntüsü; veriler örnektir."
+      "demoData": "Demo hesaptan ekran görüntüsü; veriler örnektir.",
+      "playBadgeAlt": "Google Play'den alın",
+      "appLine": "Android uygulaması: siparişler ve ilanlar telefonunuzda."
     },
     "home": {
       "seoTitle": "KolayXport — Yurt dışına satışın tek paneli",
@@ -16617,7 +16619,8 @@
       "kep": "KEP",
       "etsyNotice": "\"Etsy\" terimi Etsy, Inc.'in ticari markasıdır. Bu uygulama Etsy API'sini kullanır ancak Etsy, Inc. tarafından onaylanmamış veya sertifikalandırılmamıştır.",
       "marks": "Diğer pazaryeri ve kargo firması adları sahiplerinin markalarıdır; yalnızca bağlantı kurulan hizmeti belirtmek için kullanılır.",
-      "rights": "© {year} KolayXport"
+      "rights": "© {year} KolayXport",
+      "playMark": "Google Play ve Google Play logosu Google LLC'nin ticari markalarıdır."
     },
     "pricingTeaser": {},
     "casesIndex": {

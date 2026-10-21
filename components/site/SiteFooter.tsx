@@ -4,6 +4,7 @@ import { COMPANY, addressLine } from '@/lib/site/company';
 import { CASES, localePath, type SiteLocale } from '@/lib/site/routes';
 import { openCookiePreferences } from './cookieConsent';
 import { usePlayClient } from '@/lib/billing/usePlayClient';
+import PlayBadge from './PlayBadge';
 
 export default function SiteFooter({ locale }: { locale: SiteLocale }) {
   const t = useTranslations('site');
@@ -55,6 +56,7 @@ export default function SiteFooter({ locale }: { locale: SiteLocale }) {
             <p className="mt-4 text-sm">
               <a href={`mailto:${COMPANY.email}`} className="underline underline-offset-4 hover:text-kx-soft">{COMPANY.email}</a>
             </p>
+            <PlayBadge locale={locale} placement="footer" height={48} className="mt-4 -ml-1.5" />
             {social.length > 0 && (
               <ul className="mt-4 flex flex-wrap gap-3 text-sm">
                 {social.map(([name, url]) => (
@@ -92,6 +94,7 @@ export default function SiteFooter({ locale }: { locale: SiteLocale }) {
           <div>
             <p>{t('footer.etsyNotice')}</p>
             <p className="mt-2">{t('footer.marks')}</p>
+            <p className="mt-2">{t('footer.playMark')}</p>
             <p className="mt-4">{t('footer.rights', { year: new Date().getFullYear() })}</p>
           </div>
         </div>

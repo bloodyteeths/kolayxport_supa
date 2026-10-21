@@ -9,6 +9,7 @@ import SiteLayout from './SiteLayout';
 import { Shot, Photo, ManifestCard } from './Media';
 import { Section, Heading, TrialCta, PainQuotes, Steps, Bullets, Faq, CtaBand } from './Blocks';
 import PricingTeaser from './PricingTeaser';
+import PlayBadge from './PlayBadge';
 
 export interface HomeProps {
   locale: SiteLocale;
@@ -69,6 +70,10 @@ function HomeBody({ locale, shots, photos, integrations, testimonials }: HomePro
             <p className="site-rise site-rise-3 mt-6 max-w-[34rem] text-lg leading-relaxed text-ink-soft md:text-[21px]">{t('hero.lead')}</p>
             <div className="site-rise site-rise-4 mt-8">
               <TrialCta secondary={{ href: '#nasil-calisir', label: t('hero.ctaSecondary') }} />
+            </div>
+            <div className="site-rise site-rise-4 mt-6 flex flex-wrap items-center gap-x-4 gap-y-1">
+              <PlayBadge locale={locale} placement="home_hero" height={56} className="-ml-2" />
+              <p className="text-sm text-ink-mute">{c('appLine')}</p>
             </div>
           </div>
           <div className="relative">

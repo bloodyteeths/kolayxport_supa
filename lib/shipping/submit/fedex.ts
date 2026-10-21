@@ -112,6 +112,8 @@ export function buildFedexRequest(draft: LabelDraft, ctx: SubmitContext = {}): L
     recipientEmail: s.email,
     orderId: draft.orderId,
     orderItemId,
+    // EU VAT: IOSS (autofilled from eBay / Etsy, or typed). generate-label sends it only for EU recipients.
+    iossNumber: draft.customs.ioss || undefined,
     forceCancelled: ctx.forceCancelled || undefined,
   };
 

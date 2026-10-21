@@ -10,7 +10,8 @@ import { logger } from '../../../../lib/logger';
 import { withUsageLimiter } from '../../../../lib/middleware/withUsageLimiter';
 import { assertOrderLabelable, labelGuardOverride } from '@/lib/orders/labelGuard';
 import { labelGuardBody, publishLabelCreated } from '@/lib/orders/labelEvents';
-import { defaultProductIds, fedexRegulatoryDetail, isEuCountry } from '@/lib/shipping/euPid';
+import { defaultProductIds, fedexRegulatoryDetail, isEuCountry, isIoss, suggestIoss } from '@/lib/shipping/euPid';
+import { canonicalStore } from '@/lib/marketplaces/canonical';
 
 // Utility to parse phone number and extension - handles Amazon format like "+1 415-851-9136 ext. 96793"
 // Same logic as UPS but adapted for FedEx (max 6 chars extension vs UPS 4 chars)
@@ -153,6 +154,7 @@ async function handler(
     packageWidth,
     packageHeight,
     dimensionUnits: dimensionUnitsOverride,
+    iossNumber: iossFromRequest,
     // ... any other specific overrides from body
   } = req.body;
 
@@ -342,6 +344,10 @@ async function handler(
     // merchant / manufacturer / standard product identifiers. The label panel sends them per line (`pid`); an older
     // client that does not is filled here from the same defaults (SKU, else listing id, else the order item id).
     const euDestination = isEuCountry(parsedShippingAddress.country);
+    // Etsy orders carry the shop name as marketplace: resolve it so Etsy's IOSS can be suggested server side too.
+    const iossMarketplace = euDestination && !isIoss(iossFromRequest)
+      ? canonicalStore(orderRecord.marketplace, (await prisma.etsyShop.findMany({ where: { userId: authUser.id }, select: { shopName: true } })).map((e) => e.shopName ?? '')).marketplace
+      : null;
     const dbItems: Array<{ id: string; sku: string | null; listingRef: string | null }> = (orderRecord as any).items ?? [];
     const euRegulatoryDetails = (item: any): { regulatoryDetails?: unknown[] } => {
       if (!euDestination) return {};
@@ -426,6 +432,10 @@ async function handler(
       recipientState: parsedShippingAddress.state || undefined,
       recipientPostal: parsedShippingAddress.postal,
       recipientCountry: parsedShippingAddress.country ? parsedShippingAddress.country.toUpperCase() : '', // Normalize country code to uppercase
+      // EU VAT: the IOSS the panel sent, else the same autofill (eBay's IOSS on the order, Etsy's when it collected VAT).
+      iossNumber: isIoss(iossFromRequest)
+        ? String(iossFromRequest).trim().toUpperCase()
+        : suggestIoss({ country: parsedShippingAddress.country, marketplace: iossMarketplace, rawData: orderRecord.rawData }).ioss || undefined,
       ...(() => {
         // Parse phone number and extension using same logic as UPS
         const { phone: normalizedPhone, ext: phoneExt } = parsePhoneNumberWithExt(parsedShippingAddress.phone || '');

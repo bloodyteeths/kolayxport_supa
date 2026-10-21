@@ -12,6 +12,7 @@ import { logger } from '../logger';
 import { retrieveAsyncShipment, extractShipmentDetails, FedexShipResponse, FedexAsyncError } from './fedex.async';
 // Tokens are cached per (base URL + sha256 of API key/secret), never shared across tenants.
 import { getFedExOAuthToken, invalidateFedExToken, FEDEX_API_BASE_URL } from './fedex.tokenCache';
+import { isEuCountry, isIoss } from '@/lib/shipping/euPid';
 
 const DEFAULT_PHONE_NUMBER_TS   = '0000000000';
 const DEFAULT_TERMS_OF_SALE_TS  = 'DDU';
@@ -40,6 +41,22 @@ const STOCK_FOR_LABEL: Record<string, FedexLabelStockType> = {
   FEDEX_TUBE:             'PAPER_4X6',
   YOUR_PACKAGING:         'PAPER_LETTER',
 };
+
+/**
+ * Shipper TINs: the sender profile's tax number, plus, for EU recipients, the IOSS number (marketplace-collected VAT
+ * or the seller's own) as an EU-wide "business union" TIN (FedEx IOSS guide; validated on the sandbox 2026-10-21).
+ */
+export function fedexShipperTins(
+  shipper: { shipperTinNumber?: string | null; shipperTinType?: string | null },
+  orderData: { iossNumber?: string | null; recipientCountry?: string | null },
+): Array<{ number: string; tinType: string }> {
+  const tins: Array<{ number: string; tinType: string }> = [];
+  if (shipper.shipperTinNumber && shipper.shipperTinType) tins.push({ number: shipper.shipperTinNumber, tinType: shipper.shipperTinType.toUpperCase() });
+  if (orderData.iossNumber && isEuCountry(orderData.recipientCountry) && isIoss(orderData.iossNumber)) {
+    tins.push({ number: String(orderData.iossNumber).trim().toUpperCase(), tinType: 'BUSINESS_UNION' });
+  }
+  return tins;
+}
 
 export async function createFedexShipment(
   orderData: any,
@@ -238,12 +255,10 @@ export async function createFedexShipment(
           postalCode: shipper.shipperPostalCode,
           countryCode: shipperCountryNormalized,
         },
-        ...(shipper.shipperTinNumber && shipper.shipperTinType && {
-          tins: [{
-            number: shipper.shipperTinNumber,
-            tinType: shipper.shipperTinType.toUpperCase(),
-          }]
-        }),
+        ...(() => {
+          const tins = fedexShipperTins(shipper, orderData);
+          return tins.length ? { tins } : {};
+        })(),
       },
       recipients: [{
         contact: {

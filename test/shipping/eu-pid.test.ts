@@ -165,3 +165,22 @@ describe('UPS EU product identifiers', async () => {
     expect(payload.ShipmentRequest.Shipment.ShipperType).toBeUndefined();
   });
 });
+
+describe('IOSS to FedEx', async () => {
+  const { fedexShipperTins } = await import('@/lib/fedex/fedex.service');
+  it('adds the IOSS as a BUSINESS_UNION TIN for EU recipients only, next to the sender TIN', () => {
+    const shipper = { shipperTinNumber: '1234567890', shipperTinType: 'business_national' };
+    expect(fedexShipperTins(shipper, { iossNumber: 'im2760000742', recipientCountry: 'DE' })).toEqual([
+      { number: '1234567890', tinType: 'BUSINESS_NATIONAL' },
+      { number: 'IM2760000742', tinType: 'BUSINESS_UNION' },
+    ]);
+    expect(fedexShipperTins(shipper, { iossNumber: 'IM2760000742', recipientCountry: 'GB' })).toHaveLength(1);
+    expect(fedexShipperTins(shipper, { iossNumber: 'not-an-ioss', recipientCountry: 'DE' })).toHaveLength(1);
+    expect(fedexShipperTins({}, { iossNumber: null, recipientCountry: 'DE' })).toEqual([]);
+  });
+  it('the FedEx label body carries the autofilled IOSS', () => {
+    const d = draftFromOrder(ORDER, { sender: { shipperCountryCode: 'TR' }, presets: [], baseCurrency: 'USD', carrier: 'fedex' });
+    const body = JSON.parse(String(buildFedexRequest(d)[2].init.body));
+    expect(body.iossNumber).toBe(ETSY_IOSS);
+  });
+});

@@ -199,7 +199,7 @@ export function CustomsSection({
               disabled={disabled}
             />
           </FormField>
-          {isUps && showIoss ? (
+          {showIoss ? (
             <FormField label={t('field.ioss')} htmlFor="customs-ioss" hint="ioss" optional>
               <TextField id="customs-ioss" value={customs.ioss} onChange={(v) => set({ ioss: v.trim() })} mono maxLength={12} disabled={disabled} />
             </FormField>

@@ -51,6 +51,9 @@ export function buildFedexRequest(draft: LabelDraft, ctx: SubmitContext = {}): L
     hs_code: it.hsCode,
     country_of_origin: it.origin,
     sku: it.sku,
+    listing_ref: it.listingRef,
+    // EU product identifiers; generate-label adds FedEx regulatoryDetails only for EU destinations.
+    pid: it.pid,
   }));
 
   const options = {

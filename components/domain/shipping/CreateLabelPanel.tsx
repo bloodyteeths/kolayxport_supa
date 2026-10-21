@@ -105,8 +105,8 @@ interface Created {
 export function fieldDomId(path: FieldPath): string {
   if (path.startsWith('shipTo.')) return `label-shipto-${path.slice(7)}`;
   if (path === 'pkg.weightKg') return 'label-weight';
-  const m = /^customs\.items\.(\d+)\.(description|hsCode)$/.exec(path);
-  if (m) return m[2] === 'hsCode' ? `customs-${m[1]}-hs` : `customs-${m[1]}-description`;
+  const m = /^customs\.items\.(\d+)\.(description|hsCode|pid)$/.exec(path);
+  if (m) return m[2] === 'hsCode' ? `customs-${m[1]}-hs` : m[2] === 'pid' ? `customs-${m[1]}-pid-m` : `customs-${m[1]}-description`;
   return '';
 }
 

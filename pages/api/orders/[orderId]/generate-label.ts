@@ -10,6 +10,7 @@ import { logger } from '../../../../lib/logger';
 import { withUsageLimiter } from '../../../../lib/middleware/withUsageLimiter';
 import { assertOrderLabelable, labelGuardOverride } from '@/lib/orders/labelGuard';
 import { labelGuardBody, publishLabelCreated } from '@/lib/orders/labelEvents';
+import { defaultProductIds, fedexRegulatoryDetail, isEuCountry } from '@/lib/shipping/euPid';
 
 // Utility to parse phone number and extension - handles Amazon format like "+1 415-851-9136 ext. 96793"
 // Same logic as UPS but adapted for FedEx (max 6 chars extension vs UPS 4 chars)
@@ -337,6 +338,25 @@ async function handler(
       return sanitized;
     };
 
+    // EU customs reform (1 Nov 2026; FedEx enforces from 26 Oct): every commodity to an EU country carries the
+    // merchant / manufacturer / standard product identifiers. The label panel sends them per line (`pid`); an older
+    // client that does not is filled here from the same defaults (SKU, else listing id, else the order item id).
+    const euDestination = isEuCountry(parsedShippingAddress.country);
+    const dbItems: Array<{ id: string; sku: string | null; listingRef: string | null }> = (orderRecord as any).items ?? [];
+    const euRegulatoryDetails = (item: any): { regulatoryDetails?: unknown[] } => {
+      if (!euDestination) return {};
+      const db = dbItems.find((d) => d.id === item.id);
+      const sent = item.pid && typeof item.pid === 'object' ? item.pid : null;
+      const fallback = defaultProductIds({ sku: item.sku || db?.sku, listingRef: item.listing_ref || db?.listingRef, itemId: item.id || db?.id || orderRecord.id });
+      const pid = {
+        merchant: String(sent?.merchant ?? '').trim() || fallback.merchant,
+        manufacturer: String(sent?.manufacturer ?? '').trim() || fallback.manufacturer,
+        gtin: String(sent?.gtin ?? '').trim() || fallback.gtin,
+      };
+      const detail = fedexRegulatoryDetail(pid);
+      return detail ? { regulatoryDetails: [detail] } : {};
+    };
+
     const validGlobalHsOverride = sanitizeAndValidateHsCode(harmonizedCodeOverride);
     const DEFAULT_FALLBACK_HS_CODE_FOR_TYPE_CHECKER = '000000';
 
@@ -368,7 +388,7 @@ async function handler(
         weight: { units: 'KG', value: itemWeightKg }, // Nested weight
         countryOfManufacture: (item.country_of_origin || countryOfMfgOverride || orderRecord.countryOfMfg || etdDefaults.countryOfMfg || '').toUpperCase(), // Normalize to uppercase
         ...(effectiveItemHs && { harmonizedCode: effectiveItemHs }), // Uses correct type now
-        // sku: item.sku || undefined // SKU is not typically part of FedEx commodities array
+        ...euRegulatoryDetails(item),
       };
     });
 

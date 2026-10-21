@@ -13586,7 +13586,9 @@
       "districtDhl": "DHL eCommerce için ilçe gerekli",
       "stateRequired": "{country} için zorunlu",
       "maxChars": "En fazla {max} karakter",
-      "hsFormat": "6 ile 10 hane arasında girin"
+      "hsFormat": "6 ile 10 hane arasında girin",
+      "pidRequired": "AB gümrüğü bu ürün için satıcı ve üretici kodunu istiyor.",
+      "gtinInvalid": "Bu barkod geçerli değil. Üründe barkod yoksa boş bırakın (NA gönderilir)."
     },
     "error": {
       "title": "Etiket oluşturulamadı",
@@ -13639,6 +13641,17 @@
       "paidBy": "{who, select, sender {Ücreti gönderici öder} other {Ücreti alıcı öder}}",
       "cod": "Kapıda ödeme {amount}",
       "sms": "{state, select, both {SMS: kargoda + teslim} shipped {SMS: kargoda} delivered {SMS: teslim} other {SMS yok}}"
+    },
+    "pid": {
+      "merchant": "Satıcı ürün kodu (AB)",
+      "merchantHelp": "Ürün için kendi kodunuz, örn. SKU.",
+      "manufacturer": "Üretici ürün kodu (AB)",
+      "manufacturerHelp": "El yapımı ya da kendi markanızsa aynı kod yeterli.",
+      "gtin": "Barkod (GTIN/EAN/UPC)",
+      "gtinHelp": "Yalnızca üründe varsa. Boş bırakılırsa NA gönderilir.",
+      "gtinNone": "NA — barkod yok",
+      "gtinInvalid": "Geçerli bir barkod değil. Üründe barkod yoksa boş bırakın.",
+      "required": "AB gümrüğü için zorunlu."
     }
   },
   "billing": {

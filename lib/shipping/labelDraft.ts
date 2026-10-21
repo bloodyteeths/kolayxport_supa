@@ -4,6 +4,8 @@
 // (`LabelStep`, `LabelSubmitResult`, `executeSteps`) is shared by `lib/shipping/submit/{fedex,ups,dhl}.ts`.
 
 /** 'dhl' = DHL eCommerce (MNG API). Never "MNG Kargo" in the UI. */
+import { EU_COUNTRIES, defaultProductIds, suggestIoss, type ProductIds } from './euPid';
+
 export type CarrierKey = 'fedex' | 'ups' | 'dhl';
 export const CARRIER_KEYS: readonly CarrierKey[] = ['fedex', 'ups', 'dhl'];
 
@@ -46,6 +48,10 @@ export interface CustomsItem {
   sku?: string;
   /** Additive: the item's own weight per unit (kg) as loaded; FedEx/UPS line weights. */
   weightKg?: number;
+  /** Additive: marketplace listing id (Etsy listing / eBay item), the merchant-ID fallback when there is no SKU. */
+  listingRef?: string;
+  /** EU product identifiers (lib/shipping/euPid.ts), prefilled for every line, sent only to EU destinations. */
+  pid?: ProductIds;
 }
 
 export type ExportReason = 'SALE' | 'GIFT' | 'SAMPLE' | 'RETURN' | 'REPAIR';
@@ -160,6 +166,7 @@ export interface RawOrderLike {
     hs_code?: string | null;
     country_of_origin?: string | null;
     sku?: string | null;
+    listingRef?: string | null;
   } | null> | null;
   termsOfSale?: string | null;
   sendCommercialInvoiceViaEtd?: boolean | null;
@@ -259,10 +266,8 @@ export function toIso2(input: unknown): string {
 }
 
 /** EU member states (IOSS applies). */
-export const EU_COUNTRIES: ReadonlySet<string> = new Set([
-  'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU',
-  'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE',
-]);
+// One list for the label panel, validation and the EU product-identifier rule (lib/shipping/euPid.ts).
+export { EU_COUNTRIES };
 /** State/province is required for these recipient countries (FedEx/UPS). */
 export const STATE_REQUIRED_COUNTRIES: ReadonlySet<string> = new Set(['US', 'CA']);
 
@@ -384,6 +389,8 @@ export function customsItemsFromOrder(order: LabelOrderInput, defaultOrigin: str
       origin: toIso2(clean(oi.originCountry) || clean(ri.country_of_origin)) || defaultOrigin,
       sku: clean(oi.sku) || clean(ri.sku) || undefined,
       weightKg: num(oi.weightKg) ?? num(ri.weight) ?? undefined,
+      listingRef: clean(ri.listingRef) || undefined,
+      pid: defaultProductIds({ sku: clean(oi.sku) || clean(ri.sku), listingRef: clean(ri.listingRef), itemId: clean(oi.id) || clean(ri.id) }),
     });
   }
   if (out.length === 0) {
@@ -484,12 +491,15 @@ export function draftFromOrder(
   const marketplace = clean(row.store?.marketplace) || clean(row.marketplace) || clean(raw.marketplace);
   const currency = clean(row.currency) || clean(raw.currency) || ctx.baseCurrency || 'USD';
   const storedStock = clean(raw.labelStockType);
+  const shipTo = resolveShipTo(row);
+  // EU customs reform: the marketplace's IOSS when it collected the VAT (eBay on the order, Etsy's own number).
+  const ioss = suggestIoss({ country: shipTo.country, marketplace, rawData: raw.rawData });
 
   return {
     orderId: row.id,
     orderNumber,
     marketplace,
-    shipTo: resolveShipTo(row),
+    shipTo,
     pkg: {
       weightKg,
       lengthCm: preset?.lengthCm ?? num(raw.packageLength) ?? undefined,
@@ -504,7 +514,7 @@ export function draftFromOrder(
       currency: currency.toUpperCase(),
       terms: profileTerms(sender),
       exportReason: 'SALE',
-      ioss: '',
+      ioss: ioss.ioss,
       vat: '',
       invoiceNumber: `INV-${orderNumber}`,
       sendEtgb: false,

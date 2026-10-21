@@ -5,15 +5,16 @@ import {
   type CarrierKey, type LabelDraft, type SenderProfile, type ShipToField,
 } from './labelDraft';
 import { UPS_DESCRIPTION_MAX } from './submit/ups';
+import { productIdProblems } from './euPid';
 
-export type ValidationCode = 'required' | 'weight' | 'phoneDhl' | 'districtDhl' | 'stateRequired' | 'maxChars' | 'hsFormat';
+export type ValidationCode = 'required' | 'weight' | 'phoneDhl' | 'districtDhl' | 'stateRequired' | 'maxChars' | 'hsFormat' | 'pidRequired' | 'gtinInvalid';
 export interface FieldError { code: ValidationCode; params?: Record<string, string | number> }
 
 /**
  * Field paths, in display order (the first error gets focus): `shipTo.<field>`, `pkg.weightKg`,
  * `customs.items.<i>.description|hsCode`.
  */
-export type FieldPath = `shipTo.${ShipToField}` | 'pkg.weightKg' | `customs.items.${number}.${'description' | 'hsCode'}`;
+export type FieldPath = `shipTo.${ShipToField}` | 'pkg.weightKg' | `customs.items.${number}.${'description' | 'hsCode' | 'pid'}`;
 export type DraftErrors = Partial<Record<FieldPath, FieldError>>;
 
 export interface ValidateContext {
@@ -63,6 +64,12 @@ export function validateDraft(draft: LabelDraft, ctx: ValidateContext): DraftErr
       }
       const hs = clean(it.hsCode).replace(/[.\s]/g, '');
       if (hs && !HS_RE.test(hs)) errors[`customs.items.${i}.hsCode`] = { code: 'hsFormat' };
+      // EU customs reform: merchant + manufacturer IDs are mandatory, a barcode only when it is a real one.
+      if (showsIoss(s.country)) {
+        const problems = productIdProblems(it.pid);
+        if (problems.includes('merchantMissing') || problems.includes('manufacturerMissing')) errors[`customs.items.${i}.pid`] = { code: 'pidRequired' };
+        else if (problems.includes('gtinInvalid')) errors[`customs.items.${i}.pid`] = { code: 'gtinInvalid' };
+      }
     });
   }
   return errors;

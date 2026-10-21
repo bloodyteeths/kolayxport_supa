@@ -4,6 +4,8 @@
  * read-only, the sender profile's value, since generate-label reads nothing else), reason for export,
  * currency, IOSS (EU recipients only), recipient VAT (UPS only), invoice number, and "Send ETGB document after
  * the label is created" (only when ETGB is on in Settings; it is a separate `/api/etgb/process` call).
+ * EU recipients (customs reform, 1 Nov 2026): a product-identifier row per item (merchant ID, manufacturer ID,
+ * barcode or NA), prefilled by lib/shipping/euPid.ts.
  */
 import React from 'react';
 import { Box } from '@mui/material';
@@ -23,6 +25,7 @@ import { neutral as n } from '@/lib/ds/tokens';
 import { useFormatters } from '@/lib/format';
 import { EXPORT_REASONS, customsTotal, type CarrierKey, type CustomsItem, type LabelCustoms } from '@/lib/shipping/labelDraft';
 import { UPS_DESCRIPTION_MAX } from '@/lib/shipping/submit/ups';
+import { productIdProblems, type ProductIds } from '@/lib/shipping/euPid';
 
 export interface CustomsSectionProps {
   customs: LabelCustoms;
@@ -48,6 +51,12 @@ export function CustomsSection({
     set({ items: customs.items.map((it, j) => (j === i ? { ...it, ...patch } : it)) });
   const total = customsTotal(customs.items);
   const isUps = carrier === 'ups';
+  // showIoss is "the recipient is in the EU": the same rule decides the product-identifier rows.
+  const showPids = showIoss;
+  const setPid = (i: number, patch: Partial<ProductIds>) => {
+    const cur = customs.items[i].pid ?? { merchant: '', manufacturer: '', gtin: '' };
+    setItem(i, { pid: { ...cur, ...patch } });
+  };
 
   return (
     <SidePanelSection
@@ -127,6 +136,26 @@ export function CustomsSection({
                 disabled={disabled}
               />
             </FormField>
+            {showPids ? (() => {
+              const pid = it.pid ?? { merchant: '', manufacturer: '', gtin: '' };
+              const problems = productIdProblems(pid);
+              return (
+                <Box sx={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, gap: '8px' }} data-testid="customs-pid">
+                  <FormField label={t('pid.merchant')} htmlFor={`customs-${i}-pid-m`} helper={t('pid.merchantHelp')} error={problems.includes('merchantMissing') ? t('pid.required') : undefined} required>
+                    <TextField id={`customs-${i}-pid-m`} value={pid.merchant} onChange={(v) => setPid(i, { merchant: v })} mono maxLength={100} disabled={disabled} />
+                  </FormField>
+                  <FormField label={t('pid.manufacturer')} htmlFor={`customs-${i}-pid-n`} helper={t('pid.manufacturerHelp')} error={problems.includes('manufacturerMissing') ? t('pid.required') : undefined} required>
+                    <TextField id={`customs-${i}-pid-n`} value={pid.manufacturer} onChange={(v) => setPid(i, { manufacturer: v })} mono maxLength={100} disabled={disabled} />
+                  </FormField>
+                  <FormField label={t('pid.gtin')} htmlFor={`customs-${i}-pid-g`} helper={t('pid.gtinHelp')} error={problems.includes('gtinInvalid') ? t('pid.gtinInvalid') : undefined} optional>
+                    <TextField id={`customs-${i}-pid-g`} value={pid.gtin} onChange={(v) => setPid(i, { gtin: v.replace(/[^\dXx]/g, '') })} placeholder={t('pid.gtinNone')} inputMode="numeric" mono maxLength={14} disabled={disabled} />
+                  </FormField>
+                  {errors[`items.${i}.pid`] ? (
+                    <Box sx={{ gridColumn: '1 / -1', fontSize: 12, color: 'error.main' }} role="alert">{errors[`items.${i}.pid`]}</Box>
+                  ) : null}
+                </Box>
+              );
+            })() : null}
           </Box>
         ))}
 

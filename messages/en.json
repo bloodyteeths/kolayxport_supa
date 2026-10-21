@@ -13586,7 +13586,9 @@
       "districtDhl": "DHL eCommerce needs the district",
       "stateRequired": "Required for {country}",
       "maxChars": "Up to {max} characters",
-      "hsFormat": "Use 6 to 10 digits"
+      "hsFormat": "Use 6 to 10 digits",
+      "pidRequired": "EU customs needs the merchant and manufacturer IDs for this item.",
+      "gtinInvalid": "This barcode is not valid. Clear it if the product has none (sent as NA)."
     },
     "error": {
       "title": "Couldn't create the label",
@@ -13639,6 +13641,17 @@
       "paidBy": "{who, select, sender {Paid by sender} other {Paid by recipient}}",
       "cod": "Cash on delivery {amount}",
       "sms": "{state, select, both {SMS: shipped + delivered} shipped {SMS: shipped} delivered {SMS: delivered} other {No SMS}}"
+    },
+    "pid": {
+      "merchant": "Merchant ID (EU)",
+      "merchantHelp": "Your own code for the product, e.g. the SKU.",
+      "manufacturer": "Manufacturer ID (EU)",
+      "manufacturerHelp": "Handmade or your own brand: the same code is fine.",
+      "gtin": "Barcode (GTIN/EAN/UPC)",
+      "gtinHelp": "Only if the product has one. Empty is sent as NA.",
+      "gtinNone": "NA — no barcode",
+      "gtinInvalid": "Not a valid barcode. Clear it if the product has none.",
+      "required": "Required for EU customs."
     }
   },
   "billing": {

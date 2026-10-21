@@ -20,6 +20,7 @@ import {
   isOrderSoundMuted,
   isSoundArmed,
   playOrderSound,
+  consumeGestureUnlock,
   setOrderSoundMuted,
   subscribeOrderSound,
 } from './orderSound';
@@ -49,7 +50,10 @@ export default function LiveSoundToggle({ size = 'medium', sx }: LiveSoundToggle
 
   const onClick = useCallback(() => {
     const current = readSoundState();
-    if (current === 'muted') {
+    const unlockedNow = consumeGestureUnlock(); // read once per click, so it never leaks into the next one
+    if (current === 'armed' && unlockedNow) {
+      playOrderSound('test'); // this very click unlocked audio: it means "turn on", not "mute"
+    } else if (current === 'muted') {
       setOrderSoundMuted(false);
       playOrderSound('test');
     } else if (current === 'needsGesture') {

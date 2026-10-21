@@ -1,9 +1,10 @@
 /**
- * New-order chime (owner W6-live). Synthesized with the Web Audio API, so no
- * audio asset ships.
+ * New-order chime (owner W6-live), played through the Web Audio API.
  *
- *   new / test  two quick bright bell tones (E6 -> B6) with a natural decay
- *   cancelled   a softer, lower, descending pair (G5 -> D5), half volume
+ *   new / test  the KolayXport cha-ching (public/sounds/order-new.mp3, 1.5 s; Freesound #351304, CC0,
+ *               trimmed for KolayXport 2026-10-22). Until the file has loaded (first seconds of a visit,
+ *               or offline) the old synthesized bell pair plays instead, so an order never goes silent.
+ *   cancelled   a softer, lower, descending synthesized pair (G5 -> D5), half volume
  *
  * Browsers refuse to start audio until the user interacts with the page.
  * armOrderSound() registers ONE capturing pointerdown/keydown/touchstart
@@ -25,8 +26,41 @@ export type OrderSoundKind = 'new' | 'cancelled' | 'test';
 
 type Ctx = AudioContext;
 let ctx: Ctx | null = null;
+
+export const ORDER_SOUND_URL = '/sounds/order-new.mp3';
+let orderBuffer: AudioBuffer | null = null;
+let orderBufferLoading: Promise<void> | null = null;
+
+/**
+ * Fetch + decode the cha-ching once per page. Decoding uses an OfflineAudioContext when available, so it starts at
+ * page load without the user gesture a live AudioContext needs; an AudioBuffer plays in any context.
+ */
+function loadOrderBuffer(c?: Ctx | null): void {
+  if (orderBuffer || orderBufferLoading || typeof fetch === 'undefined' || typeof window === 'undefined') return;
+  const OAC = (window as unknown as { OfflineAudioContext?: typeof OfflineAudioContext; webkitOfflineAudioContext?: typeof OfflineAudioContext })
+    .OfflineAudioContext || (window as unknown as { webkitOfflineAudioContext?: typeof OfflineAudioContext }).webkitOfflineAudioContext;
+  let decoder: BaseAudioContext | null = c ?? null;
+  try {
+    if (OAC) decoder = new OAC(1, 1, 48000);
+  } catch {
+    /* fall back to the live context */
+  }
+  if (!decoder) return;
+  const dec = decoder;
+  orderBufferLoading = fetch(ORDER_SOUND_URL)
+    .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+    .then((data) => new Promise<AudioBuffer>((resolve, reject) => {
+      // Safari only has the callback form of decodeAudioData.
+      const p = dec.decodeAudioData(data, resolve, reject) as unknown;
+      if (p && typeof (p as Promise<AudioBuffer>).then === 'function') (p as Promise<AudioBuffer>).then(resolve, reject);
+    }))
+    .then((buf) => { orderBuffer = buf; })
+    .catch(() => { orderBufferLoading = null; /* retry on the next play */ });
+}
 let armed = false;
 let gestureListenerInstalled = false;
+/** When the last gesture found audio locked (it is the gesture that unlocks it). */
+let unlockedByGestureAt = 0;
 const listeners = new Set<() => void>();
 
 function emitChange() {
@@ -98,6 +132,7 @@ function createContext(): Ctx | null {
   if (!AC) return null;
   try {
     ctx = new AC();
+    loadOrderBuffer(ctx);
     ctx.onstatechange = () => {
       armed = ctx?.state === 'running';
       emitChange();
@@ -130,8 +165,10 @@ function ensureRunning(): Ctx | null {
 export function armOrderSound(): void {
   if (typeof window === 'undefined' || gestureListenerInstalled) return;
   gestureListenerInstalled = true;
+  loadOrderBuffer(); // decode now, so the first order (or the first test click) already gets the cha-ching
   const onGesture = () => {
     if (ctx && ctx.state === 'running') return;
+    unlockedByGestureAt = Date.now();
     ensureRunning();
   };
   const opts: AddEventListenerOptions = { capture: true, passive: true };
@@ -141,6 +178,17 @@ export function armOrderSound(): void {
   window.addEventListener('storage', (e) => {
     if (e.key === ORDER_SOUND_MUTED_KEY || e.key === ORDER_SOUND_VOLUME_KEY) emitChange();
   });
+}
+
+/**
+ * True once when the current click is the one that unlocked audio. The capture-phase pointerdown resumes the
+ * AudioContext before the click handler runs, so without this the toggle would read "armed" and mute on the
+ * very click meant to turn the sound on.
+ */
+export function consumeGestureUnlock(): boolean {
+  const fresh = Date.now() - unlockedByGestureAt < 1500;
+  unlockedByGestureAt = 0;
+  return fresh;
 }
 
 export function isSoundArmed(): boolean {
@@ -202,6 +250,38 @@ export function playOrderSound(kind: OrderSoundKind = 'new', opts: { force?: boo
   const volume = opts.volume ?? getOrderSoundVolume();
   if (volume <= 0) return false;
   try {
+    if (kind !== 'cancelled') {
+      loadOrderBuffer(c);
+      const playFile = () => {
+        // The file is loudness-normalized: the volume setting applies as is.
+        const src = c.createBufferSource();
+        const g = c.createGain();
+        src.buffer = orderBuffer;
+        g.gain.value = Math.min(1, volume);
+        src.connect(g);
+        g.connect(c.destination);
+        src.start(c.currentTime + 0.02);
+      };
+      if (orderBuffer) {
+        playFile();
+        return true;
+      }
+      if (orderBufferLoading) {
+        // Still decoding (first seconds of a visit): play the file the moment it is ready, the bells if it fails.
+        orderBufferLoading.then(() => (orderBuffer ? playFile() : synth(c, kind, volume))).catch(() => synth(c, kind, volume));
+        return true;
+      }
+    }
+    synth(c, kind, volume);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The original synthesized chime: bells for new / test, a soft descending pair for cancelled. */
+function synth(c: Ctx, kind: OrderSoundKind, volume: number): void {
+  try {
     const master = c.createGain();
     const comp = c.createDynamicsCompressor();
     master.gain.value = Math.min(1, volume) * 0.55;
@@ -219,8 +299,7 @@ export function playOrderSound(kind: OrderSoundKind = 'new', opts: { force?: boo
       strike(c, master, t, 1318.51, 0.9, 0.9, BRIGHT); // E6
       strike(c, master, t + 0.12, 1975.53, 1.2, 0.8, BRIGHT); // B6
     }
-    return true;
   } catch {
-    return false;
+    /* no audio */
   }
 }

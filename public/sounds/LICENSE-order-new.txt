@@ -1,0 +1,5 @@
+Source: "Cha Ching.wav" by deleted_user_96253, Freesound sound 351304
+https://freesound.org/people/deleted_user_96253/sounds/351304/
+License: Creative Commons 0 (public domain) - commercial use allowed, no attribution required.
+Edited for KolayXport (2026-10-22): trimmed silence/extra mechanical tail, 3 ms fade-in, 20 ms fade-out, loudness normalized, 48 kHz.
+Files: kolayxport-siparis-1-kisa (1.45 s, main cha-ching only, recommended) and kolayxport-siparis-1-tam (1.9 s).

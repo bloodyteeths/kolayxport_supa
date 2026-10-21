@@ -71,8 +71,9 @@ export default withAdmin(async (req: NextApiRequest, res: NextApiResponse) => {
         name,
         type,
         email: str(body.email)?.toLowerCase() ?? null,
-        rate: rate(body.rate) ?? 0.3,
-        tierRate: rate(body.tierRate) ?? 0.35,
+        // One-time bounty terms (lib/partners/bounty.ts): 25%, 30% from tierThreshold paying referrals.
+        rate: rate(body.rate) ?? 0.25,
+        tierRate: rate(body.tierRate) ?? 0.3,
         tierThreshold: int(body.tierThreshold, 1, 1000) ?? 10,
         months: int(body.months, 1, 120) ?? 12,
         stripePromotionCode,

@@ -12,7 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const orderId = String(req.query.orderId || '');
   const order = await prisma.order.findFirst({ where: { id: orderId, userId: auth.id }, select: { id: true } });
   if (!order) return res.status(404).json({ error: 'Order not found' });
-  const items = await prisma.orderItem.findMany({ where: { orderId }, select: { id: true, sku: true, listingRef: true } });
+  const items = await prisma.orderItem.findMany({ where: { orderId }, select: { id: true, sku: true, listingRef: true, variantRef: true } });
   res.setHeader('Cache-Control', 'private, no-store');
   return res.status(200).json({ items: await lookupProductIds(auth.id, items) });
 }

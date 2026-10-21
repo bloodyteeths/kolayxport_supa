@@ -4,16 +4,17 @@
 import prisma from '@/lib/prisma';
 import { defaultProductIds, normalizeGtin, productIdsComplete, type ProductIds } from './euPid';
 
-export type ProductIdSource = 'saved' | 'ebay' | 'default';
+export type ProductIdSource = 'saved' | 'ebay' | 'shopify' | 'default';
 export interface ItemProductIds extends ProductIds { source: ProductIdSource }
 
-interface ItemRef { id: string; sku?: string | null; listingRef?: string | null }
+interface ItemRef { id: string; sku?: string | null; listingRef?: string | null; variantRef?: string | null }
 
 const clean = (v: unknown) => String(v ?? '').trim();
 
-/** Storage keys for an item, most specific first. */
-export function productKeys(item: { sku?: string | null; listingRef?: string | null }): string[] {
+/** Storage keys for an item, most specific first: the variant (a barcode belongs to one variant), SKU, listing. */
+export function productKeys(item: { sku?: string | null; listingRef?: string | null; variantRef?: string | null }): string[] {
   const out: string[] = [];
+  if (clean(item.listingRef) && clean(item.variantRef)) out.push(`variant:${clean(item.listingRef).slice(0, 60)}:${clean(item.variantRef).slice(0, 60)}`);
   if (clean(item.sku)) out.push(`sku:${clean(item.sku).slice(0, 120)}`);
   if (clean(item.listingRef)) out.push(`listing:${clean(item.listingRef).slice(0, 120)}`);
   return out;
@@ -41,12 +42,29 @@ export async function lookupProductIds(userId: string, items: readonly ItemRef[]
   const ebay = ebayWhere.length
     ? await prisma.ebayListing.findMany({ where: { userId, OR: ebayWhere }, select: { listingId: true, sku: true, aspects: true } })
     : [];
+  // Shopify: the synced product's variant barcode (order lines carry product_id → listingRef, variant_id → variantRef).
+  const shopifyProducts = listingRefs.length
+    ? await prisma.shopifyProduct.findMany({ where: { userId, shopifyProductId: { in: listingRefs } }, select: { shopifyProductId: true, variants: true } })
+    : [];
+  const shopifyBarcode = (item: ItemRef): string => {
+    const p = shopifyProducts.find((s) => s.shopifyProductId === clean(item.listingRef));
+    const variants = Array.isArray(p?.variants) ? (p!.variants as Array<Record<string, unknown>>) : [];
+    const v = variants.find((x) => clean(x.id) === clean(item.variantRef)) ?? (variants.length === 1 ? variants[0] : undefined);
+    return normalizeGtin(v?.barcode);
+  };
   const savedByKey = new Map(saved.map((s) => [s.key, s]));
   const out: Record<string, ItemProductIds> = {};
   for (const item of items) {
-    const hit = productKeys(item).map((k) => savedByKey.get(k)).find(Boolean);
+    // A known variant never borrows another variant's IDs through the product-level (listing) key.
+    const lookupKeys = productKeys(item).filter((k) => !(clean(item.variantRef) && k.startsWith('listing:')));
+    const hit = lookupKeys.map((k) => savedByKey.get(k)).find(Boolean);
     if (hit) {
       out[item.id] = { merchant: hit.merchant, manufacturer: hit.manufacturer, gtin: hit.gtin, source: 'saved' };
+      continue;
+    }
+    const shopifyGtin = shopifyBarcode(item);
+    if (shopifyGtin) {
+      out[item.id] = { ...defaultProductIds({ sku: item.sku, listingRef: item.listingRef, itemId: item.id, gtin: shopifyGtin }), source: 'shopify' };
       continue;
     }
     const listing = ebay.find((e) => (clean(item.listingRef) && e.listingId === clean(item.listingRef)) || (clean(item.sku) && e.sku === clean(item.sku)));
@@ -58,7 +76,7 @@ export async function lookupProductIds(userId: string, items: readonly ItemRef[]
 }
 
 /** Remember what the seller sent on a created EU label (only complete sets; best effort, never throws). */
-export async function saveProductIds(userId: string, entries: ReadonlyArray<{ sku?: string | null; listingRef?: string | null; pid: ProductIds | null | undefined }>): Promise<void> {
+export async function saveProductIds(userId: string, entries: ReadonlyArray<{ sku?: string | null; listingRef?: string | null; variantRef?: string | null; pid: ProductIds | null | undefined }>): Promise<void> {
   try {
     for (const e of entries) {
       if (!e.pid || !productIdsComplete(e.pid)) continue;

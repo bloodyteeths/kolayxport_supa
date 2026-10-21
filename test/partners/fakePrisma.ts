@@ -111,6 +111,7 @@ export function makeFakePrisma() {
     billingModule: table('billingModule'),
     productIdentifier: table('productIdentifier'),
     ebayListing: table('ebayListing'),
+    shopifyProduct: table('shopifyProduct'),
     async $transaction(ops: Promise<unknown>[]) { return Promise.all(ops); },
   };
   return db;

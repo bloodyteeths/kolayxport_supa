@@ -17,6 +17,9 @@ export function toLineItem(item: any): NormalizedLineItem {
     variant_title: item.variant_title || undefined,
     image: item.image?.src || undefined,
     product_variant: item.variant_title ? { title: item.variant_title } : undefined,
+    // Product / variant ids: link the order line to the synced ShopifyProduct (EU customs barcode, lib/shipping/productIds).
+    listingRef: item.product_id ? String(item.product_id) : undefined,
+    variantRef: item.variant_id ? String(item.variant_id) : undefined,
   };
 }
 

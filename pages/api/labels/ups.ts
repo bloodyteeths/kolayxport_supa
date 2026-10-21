@@ -13,8 +13,8 @@ import { saveProductIds } from '@/lib/shipping/productIds';
 /** UPS products are in order-item order (no item id): pair them with the order's items to remember the EU IDs. */
 async function rememberUpsProductIds(userId: string, orderId: string, products: Array<{ pid?: unknown }> | undefined) {
   if (!products?.length) return;
-  const items = await prisma.orderItem.findMany({ where: { orderId }, select: { id: true, sku: true, listingRef: true }, orderBy: { id: 'asc' } });
-  await saveProductIds(userId, products.map((p, i) => ({ sku: items[i]?.sku, listingRef: items[i]?.listingRef, pid: p.pid as any })));
+  const items = await prisma.orderItem.findMany({ where: { orderId }, select: { id: true, sku: true, listingRef: true, variantRef: true }, orderBy: { id: 'asc' } });
+  await saveProductIds(userId, products.map((p, i) => ({ sku: items[i]?.sku, listingRef: items[i]?.listingRef, variantRef: items[i]?.variantRef, pid: p.pid as any })));
 }
 
 // Utility to parse phone number and extension - handles Amazon format like "+1 415-851-9136 ext. 96793"

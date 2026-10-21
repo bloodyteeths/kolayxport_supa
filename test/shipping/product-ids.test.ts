@@ -13,6 +13,7 @@ beforeEach(() => { h.db = makeFakePrisma(); });
 describe('product ID lookup', () => {
   it('keys: SKU first, then listing id', () => {
     expect(productKeys({ sku: ' ORG-1 ', listingRef: '1500' })).toEqual(['sku:ORG-1', 'listing:1500']);
+    expect(productKeys({ sku: '', listingRef: '8123', variantRef: '501' })).toEqual(['variant:8123:501', 'listing:8123']);
     expect(productKeys({ sku: '', listingRef: '' })).toEqual([]);
   });
 
@@ -45,5 +46,35 @@ describe('product ID lookup', () => {
     await saveProductIds('u1', [{ sku: 'ORG-1', pid: { merchant: 'ORG-1', manufacturer: 'ORG-1', gtin: '4006381333931' } }]);
     expect(h.db.productIdentifier.rows).toHaveLength(1);
     expect(h.db.productIdentifier.rows[0].gtin).toBe('4006381333931');
+  });
+});
+
+describe('Shopify barcodes', () => {
+  it('the order mapper keeps product and variant ids on each line', async () => {
+    const { toLineItem } = await import('@/lib/mappers/shopify');
+    const li = toLineItem({ id: 11, title: 'Dress', price: '59.00', quantity: 1, sku: '', product_id: 8123, variant_id: 50038054650213 });
+    expect(li).toMatchObject({ listingRef: '8123', variantRef: '50038054650213' });
+    expect(toLineItem({ id: 12, title: 'X', price: '1' })).toMatchObject({ listingRef: undefined, variantRef: undefined });
+  });
+
+  it("uses the synced variant's barcode; remembered IDs still win", async () => {
+    await h.db.shopifyProduct.create({ data: { userId: 'u1', shopifyProductId: '8123', variants: [
+      { id: '50038054650213', sku: '', barcode: '4006381333931' },
+      { id: '50038054650214', sku: '', barcode: '' },
+    ] } });
+    const out = await lookupProductIds('u1', [
+      { id: 'a', sku: '', listingRef: '8123', variantRef: '50038054650213' },
+      { id: 'b', sku: '', listingRef: '8123', variantRef: '50038054650214' },
+    ]);
+    expect(out.a).toEqual({ merchant: '8123', manufacturer: '8123', gtin: '4006381333931', source: 'shopify' });
+    expect(out.b.source).toBe('default');
+    // Saved for variant ...214 only: variant ...213 keeps its own barcode (variant key is checked first).
+    await saveProductIds('u1', [{ listingRef: '8123', variantRef: '50038054650214', pid: { merchant: 'DRESS-RED-8', manufacturer: 'DRESS-RED-8', gtin: '' } }]);
+    const again = await lookupProductIds('u1', [
+      { id: 'a', listingRef: '8123', variantRef: '50038054650213' },
+      { id: 'b', listingRef: '8123', variantRef: '50038054650214' },
+    ]);
+    expect(again.b).toMatchObject({ merchant: 'DRESS-RED-8', source: 'saved' });
+    expect(again.a).toEqual({ merchant: '8123', manufacturer: '8123', gtin: '4006381333931', source: 'shopify' });
   });
 });

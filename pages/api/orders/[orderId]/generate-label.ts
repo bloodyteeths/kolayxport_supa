@@ -631,7 +631,7 @@ async function handler(
     if (euDestination) {
       void saveProductIds(authUser.id, lineItemsFromRequest.map((item: any) => {
         const db = dbItems.find((d) => d.id === item.id);
-        return { sku: item.sku || db?.sku, listingRef: item.listing_ref || db?.listingRef, pid: item.pid };
+        return { sku: item.sku || db?.sku, listingRef: item.listing_ref || db?.listingRef, variantRef: (db as { variantRef?: string | null } | undefined)?.variantRef, pid: item.pid };
       }));
     }
 

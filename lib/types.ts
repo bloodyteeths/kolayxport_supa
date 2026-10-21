@@ -31,6 +31,10 @@ export interface NormalizedLineItem {
   product_variant?: { title?: string };
   notes?: string;
   shipBy?: string;
+  /** Marketplace product / listing id (OrderItem.listingRef). */
+  listingRef?: string;
+  /** Marketplace variant id (OrderItem.variantRef). */
+  variantRef?: string;
 }
 
 export interface UIOrder {

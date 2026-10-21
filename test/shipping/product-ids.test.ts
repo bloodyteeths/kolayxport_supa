@@ -78,3 +78,20 @@ describe('Shopify barcodes', () => {
     expect(again.a).toEqual({ merchant: '8123', manufacturer: '8123', gtin: '4006381333931', source: 'shopify' });
   });
 });
+
+describe('Shopify mapper ids are strings (order upsert must not fail)', () => {
+  it('numeric ids → strings; a custom line item with variant_id null → null in the upsert line', async () => {
+    const { toLineItem } = await import('@/lib/mappers/shopify');
+    const { linesFromUIOrder } = await import('@/lib/orders/itemUpsert');
+    const lines = linesFromUIOrder({ marketplaceKey: 'shopify', line_items: [
+      toLineItem({ id: 1, title: 'Dress', price: '59', quantity: 1, product_id: 8123456789, variant_id: 50038054650213 }),
+      toLineItem({ id: 2, title: 'Custom gift wrap', price: '5', quantity: 1, product_id: null, variant_id: null }),
+    ] });
+    expect(lines[0].listingRef).toBe('8123456789');
+    expect(lines[0].variantRef).toBe('50038054650213');
+    expect(typeof lines[0].listingRef).toBe('string');
+    expect(typeof lines[0].variantRef).toBe('string');
+    expect(lines[1].listingRef).toBeNull();
+    expect(lines[1].variantRef).toBeNull();
+  });
+});

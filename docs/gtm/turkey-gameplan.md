@@ -3,6 +3,8 @@
 Date: 2026-10-19. Status: **plan only.** Nothing in here has been sent, posted or spent.
 Owner: Atilla (founder). Executed by **Merisa** and **Ekin** (marketing), with Claude sessions and freelancers.
 
+**Team ERP (source of truth for tasks, partners, targets):** [Google Sheet](https://docs.google.com/spreadsheets/d/1G0JnXXvjZViBD-wG3uH5GPam5IiiMaioOupks80v7oU) with an Apps Script menu ([docs/gtm/erp-apps-script/](erp-apps-script/README.md)). Team ERP Google Sheet created 2026-10-21.
+
 Built on the existing research. This plan doesn't redo any of it, it only links to it:
 - [positioning.md](positioning.md) (A + C: "Yurt dışına satışın tek paneli", plus the "Trendyol'dan dünyaya" track)
 - [competitors.md](competitors.md), [pain-points.md](pain-points.md), [feature-inventory.md](feature-inventory.md) (the only source for claims), [roadmap.md](roadmap.md)

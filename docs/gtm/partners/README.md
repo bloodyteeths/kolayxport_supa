@@ -11,7 +11,7 @@ Date: 2026-10-20. Phase 1 of [turkey-gameplan.md](../turkey-gameplan.md): referr
 | [canli-demo-senaryosu.md](canli-demo-senaryosu.md) | 30-minute live demo script | From week 4 |
 | [wave1_first_messages.md](wave1_first_messages.md) | 15 personalised first messages (Merisa 10, Ekin 5) with a status tracker | Week 2 onward, after the value-first step |
 | [shortlist-wave1.csv](shortlist-wave1.csv) | First researched shortlist, scored: 89 rows (27 X, 26 Facebook = 21 groups + 5 pages, 13 Telegram, 13 YouTube, 10 müşavir/consultant). Public pages only, checked 2026-10-20; 2 rows "unverified" | Week 1: Merisa/Ekin re-check the top rows, then paste them into the ERP "Partner pipeline" tab |
-| [../KolayXport-ERP.xlsx](../KolayXport-ERP.xlsx) | Tracking: tasks, pipeline, weekly targets, decisions | Every day |
+| **[Team ERP Google Sheet](https://docs.google.com/spreadsheets/d/1G0JnXXvjZViBD-wG3uH5GPam5IiiMaioOupks80v7oU)** | The source of truth: tasks, pipeline, wave-1 messages, weekly targets, decisions. Use the 🚀 KolayXport menu › Bugünüm ([how it works](../erp-apps-script/README.md)) | Every day |
 
 ## After a partner says yes (checklist)
 

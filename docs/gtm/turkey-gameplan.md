@@ -197,18 +197,11 @@ Rules from [social/outreach-messages.md](social/outreach-messages.md) §0 apply:
 ```
 
 **Kabul edenlere gönderilecek metin (after a yes)**
+*Send it with [ortaklik-sartlari.md](partners/ortaklik-sartlari.md) attached as a PDF. The PDF holds the bounty, payout, perks and rules, so the message stays short.*
 ```
-Harika, teşekkürler [ad]!
-
-1) Ortaklık linkiniz: https://kolayxport.com/?ref=[KOD]
-   [Kurucu üye kontenjanı dolduktan sonra geçerli] Takipçilerinize özel kod: [KOD], ilk yıllık ödemede veya aylık planın ilk 3 ayında %20 indirim.
-   Ortaklık paneliniz: https://kolayxport.com/app/ortaklik (gelen kayıtlar, abonelikler ve ödülleriniz)
-2) Ücretsiz Growth hesabınız [e-posta] adresine açıldı.
-3) Paylaşımlarınızda "#işbirliği @kolayxport" (videoda ayrıca sesli olarak) belirtmeniz yasal bir zorunluluk (Reklam Kurulu Sosyal Medya Etkileyicileri Kılavuzu). Kılavuz: [link]
-4) Söyleyebileceğiniz özellikler ve kullanabileceğiniz ekran görüntüleri: [paylaşılan klasör linki]. Lütfen gelir veya satış garantisi gibi ifadeler kullanmayın.
-5) Ödüller, müşterinin ödemesinden 30 gün sonra ödenebilir hale gelir ve her ayın [5]'inde Stripe üzerinden banka hesabınıza TL olarak gönderilir. Banka bilgilerinizi Stripe'ın güvenli formuna kendiniz girersiniz; biz IBAN saklamayız.
-
-Paylaşım metnini isterseniz biz taslak olarak hazırlayabiliriz, son söz sizde.
+Harika, teşekkürler [ad]! Ortaklık linkiniz: https://kolayxport.com/?ref=[KOD]
+Ödül, ödeme ve paylaşım kuralları ekteki kısa PDF'te; paylaşımlarda "#işbirliği @kolayxport" yazmak yasal bir zorunluluk.
+İsterseniz paylaşım metni için bir taslak da hazırlayabilirim.
 ```
 
 **Grup paylaşım taslağı (the partner adapts it; Merisa sends it only if asked)**

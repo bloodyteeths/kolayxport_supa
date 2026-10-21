@@ -57,6 +57,10 @@ C: Hayır. ETGB için gereken Excel dosyasını hazırlayıp gümrük müşaviri
 **S: Amazon ilanlarımı yönetebilir miyim?**
 C: Amazon siparişleri, etiket, takip ve finans var; Amazon ilan düzenleme henüz yok.
 
+**S: Mobil uygulama var mı?**
+C: Evet, Android için Google Play'de: "KolayXport: Etsy, eBay, Kargo" (play.google.com/store/apps/details?id=com.kolayxport.app). Siparişlerinizi ve ilanlarınızı telefondan da yönetebilirsiniz.
+*(Verified 2026-10-21 11:50 UTC: public Play listing live. iOS is not on the App Store yet, so don't promise it.)*
+
 **S: Chrome eklentisi var mı?**
 C: Evet, Chrome Web Mağazası'nda "KolayXport" adıyla. Etsy, eBay, Amazon, Trendyol ve Hepsiburada sayfalarında tahmini satış, fiyat ve rekabet bilgisi gösterir. Rakamlar tahmindir; satış hızı birkaç saat arayla yapılan okumalardan sonra görünür. Trendyol/Hepsiburada paneli sizin onayınızla açılır.
 *(Verified 2026-10-20 14:34 UTC: the Chrome Web Store page title is "KolayXport — Etsy, eBay, Amazon, Trendyol & Hepsiburada Research". Note the Hepsiburada here means research on Hepsiburada pages, not a Hepsiburada store integration.)*

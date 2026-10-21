@@ -2,6 +2,10 @@
 
 Date: 2026-10-20. 15 personalised first messages, in Turkish: **Merisa 10, Ekin 5**. **You** review, adapt and send them; nothing has been sent.
 
+## Style (Atilla, 2026-10-21)
+
+All drafts and anything you write yourself in a DM: **2 to 4 sentences**, natural language, no dashes as punctuation (—, – or " - "), no dash bullets, no bold, no stock openers. Open with the concrete thing you read or watched.
+
 ## Before you send (every message)
 
 1. **Give value first:** in a group, write ≥3 helpful answers (no links) over a few days; for a channel, watch the referenced video/post. Gameplan §4.5 rule.
@@ -48,145 +52,57 @@ Status values: `draft` → `sent` → `replied` (or `declined` / `no reply` / `o
 ### M1 · Etsy Türkiye Yardımlaşma Platformu, to the admins
 *Rule: the group doesn't allow promo posts, so this is a message to the admins only, never a group post.*
 ```
-Merhaba,
-
-Ben Merisa, KolayXport'ta topluluk ilişkilerinden sorumluyum. Etsy Türkiye Yardımlaşma Platformu'nu bir süredir takip ediyorum; [son konu, ör. "etiket ve görüntülenme sorunu"] gibi sorulara verilen cevaplar gerçekten yol gösterici.
-
-KolayXport, yurt dışına satan Türk satıcılar için bir panel: Etsy ve eBay ilanlarını yapay zekâyla İngilizce düzenleme, ilan doktoru, araştırma ve yurt dışı etiket bir arada.
-
-Grubunuzu reklamla doldurmak istemiyoruz. Size iki şey önermek isterim: üyelerinize ücretsiz, canlı bir "ilanını birlikte inceleyelim" oturumu ve grup yöneticilerine özel bir ortaklık programı (ücretli üye olan her satıcı için tek seferlik ödül). Önce sizin ücretsiz hesapla denemeniz yeterli.
-
-İlgilenirseniz kısa bilgi göndereyim; uygun değilse hiç sorun değil.
-Merisa · KolayXport
+Grubunuzda [son konu] üzerine yazılan cevaplar gerçekten yol gösterici; ben Merisa, KolayXport'ta topluluklarla çalışıyorum. KolayXport, yurt dışına satan Türk satıcılar için Etsy ve eBay ilanlarını yapay zekâyla İngilizce düzenleyen, araştırma ve yurt dışı etiketi tek yerde toplayan bir panel. Gruba reklam yapmak yerine üyelere ücretsiz canlı bir ilan inceleme oturumu ve yöneticilere ödüllü bir ortaklık önermek isterim. Uygunsa kısa bilgi göndereyim, değilse hiç sorun değil.
 ```
 
 ### M2 · E-Commerce Sellers & Suppliers Türkiye Network, to the admins
 ```
-Merhaba,
-
-Ben Merisa, KolayXport'tan. Grubunuzun Amazon'un yanında Etsy, Shopify ve ihracat yapan satıcıları da bir araya getirmesi çok değerli; [son konu] üzerine yazılanları ilgiyle okudum.
-
-KolayXport, Etsy, eBay ve Amazon'da satan Türk satıcılar için tek panel: siparişler, FedEx/UPS ile yurt dışı etiket, pazaryeri bazında net kâr ve ilan düzenleme.
-
-Grup yöneticileri için bir ortaklık programımız var: önerdiğiniz satıcılardan abone olan her biri için tek seferlik ödül, sizin için de ücretsiz hesap. Paylaşım zorunluluğu yok.
-
-Detayları göndermemi ister misiniz?
-Merisa · KolayXport
+Grubunuzun Amazon'un yanında Etsy, Shopify ve ihracat yapan satıcıları bir araya getirmesi çok değerli; ben Merisa, KolayXport'tan. Panelimiz Etsy, eBay ve Amazon siparişlerini, FedEx/UPS yurt dışı etiketini ve pazaryeri bazında net kârı tek yerde topluyor. Grup yöneticileri için önerdikleri satıcılar abone olduğunda tek seferlik ödül veren bir ortaklık programımız var, size de ücretsiz hesap açarız. Detayları göndermemi ister misiniz?
 ```
 
 ### M3 · ETSY TÜRKİYE - Mikro ihracat, to the admins
 *Rule: the group allows Etsy content only. Keep the message Etsy-focused, and send it to the admins only.*
 ```
-Merhaba,
-
-Ben Merisa, KolayXport'tan. Grubunuzu sadece Etsy'ye odaklı tutmanız çok iyi; [son konu] tartışması özellikle faydalıydı.
-
-Biz Etsy satıcıları için ilan doktoru (SEO notu ve rakip karşılaştırması), yapay zekâyla İngilizce başlık/etiket ve toplu düzenleme sunuyoruz; değişiklikler satıcı "Gönder" demeden Etsy'ye gitmiyor.
-
-Size ücretsiz bir hesap açmak ve isterseniz üyeler için canlı bir ilan inceleme oturumu yapmak isteriz. Ayrıca grup yöneticilerine özel bir ortaklık programımız var.
-
-Kısaca anlatayım mı?
-Merisa · KolayXport
+Grubunuzu sadece Etsy'ye odaklı tutmanız çok iyi, [son konu] tartışması özellikle faydalıydı; ben Merisa, KolayXport'tan. Etsy satıcılarına ilan doktoru, yapay zekâyla İngilizce başlık ve etiket ve toplu düzenleme sunuyoruz; değişiklikler satıcı onaylamadan Etsy'ye gitmiyor. Size ücretsiz hesap açmak ve isterseniz üyeler için canlı bir ilan inceleme oturumu yapmak isteriz. Kısaca anlatayım mı?
 ```
 
 ### M4 · E-Ticaret Yardımlaşma (Trendyol & HB & Etsy & Amazon), to the admins
 *Angle: Trendyol sellers who want to sell abroad (track C). Hepsiburada isn't integrated, so don't imply it is.*
 ```
-Merhaba,
-
-Ben Merisa, KolayXport'tan. Grubunuzda Trendyol satıcılarıyla Etsy/Amazon satıcılarının aynı yerde yardımlaşması çok güzel; [son konu] başlığını okudum.
-
-KolayXport'un odağı "Trendyol'dan dünyaya": Trendyol ürünlerini yönetip aynı ürünleri Etsy ve eBay'de İngilizce ilanla satmak, stok ve siparişi tek panelden izlemek. (Hepsiburada/N11 entegrasyonumuz yok; yurt içi kanallar için mevcut entegratör devam eder.)
-
-Grup yöneticilerine özel ortaklık programımızı ve üyelere ücretsiz bir "yurt dışına ilk ilan" oturumunu anlatmak isterim. Uygun mu?
-Merisa · KolayXport
+Grubunuzda Trendyol satıcılarıyla Etsy ve Amazon satıcılarının aynı yerde yardımlaşması çok güzel; ben Merisa, KolayXport'tan. Odağımız Trendyol'daki ürünleri Etsy ve eBay'de İngilizce ilanla satmak ve stok ile siparişi tek panelden izlemek; Hepsiburada ve N11 entegrasyonumuz ise yok. Yöneticilere özel ortaklık programımızı ve üyeler için ücretsiz bir "yurt dışına ilk ilan" oturumunu anlatmak isterim, uygun mu?
 ```
 
 ### M5 · Etsy Türkiye Yardımlaşma (9.3k), to the admins
 ```
-Merhaba,
-
-Ben Merisa, KolayXport'tan. Etsy Türkiye Yardımlaşma'da [son konu] hakkında yazılanları okudum; bilgi paylaşımının bu kadar açık olması nadir.
-
-KolayXport, Etsy satıcılarına ilanlarındaki eksikleri gösteren bir ilan doktoru, yapay zekâyla İngilizce başlık/etiket ve toplu düzenleme sunuyor.
-
-Size ücretsiz hesap açmak isteriz. Beğenirseniz grup yöneticilerine özel bir ortaklık programımız da var: önerdiğiniz satıcılardan abone olanlar için tek seferlik ödül. Hiçbir paylaşım şartı yok.
-
-Kısa bilgi göndermemi ister misiniz?
-Merisa · KolayXport
+Etsy Türkiye Yardımlaşma'da [son konu] hakkında yazılanları okudum, bilgi paylaşımının bu kadar açık olması nadir; ben Merisa, KolayXport'tan. Etsy satıcılarına ilanlarındaki eksikleri gösteren bir ilan doktoru ve yapay zekâyla İngilizce başlık ve etiket sunuyoruz. Size ücretsiz hesap açmak isteriz, beğenirseniz yöneticilere özel ödüllü bir ortaklık programımız da var. Kısa bilgi göndereyim mi?
 ```
 
 ### M6 · E-Ticaret Türkiye (YouTube + FB group + events)
 *They already run labelled #işbirliği posts. Offer a referral partnership, not a paid post; a paid sponsorship needs Atilla's approval.*
 ```
-Merhaba E-Ticaret Türkiye ekibi,
-
-Ben Merisa, KolayXport'tan. Sivas etkinliğinizin videosunu izledim; e-ticaret ve e-ihracatı Anadolu'daki satıcılara yerinde anlatmanız çok değerli.
-
-KolayXport, yurt dışına satan Türk satıcılar için tek panel: Etsy/eBay ilanlarını yapay zekâyla İngilizce düzenleme, ilan doktoru, araştırma, yurt dışı etiket ve net kâr raporu.
-
-Topluluğunuz ve etkinlikleriniz için performansa dayalı bir ortaklık önermek isteriz: önerdiğiniz satıcılardan abone olanlar için tek seferlik ödül, ayrıca bir etkinlikte ya da yayında canlı "ilanını birlikte inceleyelim" oturumu.
-
-Detayları kime iletmemi önerirsiniz?
-Merisa · KolayXport
+Sivas etkinliğinizin videosunu izledim, e-ticareti ve e-ihracatı Anadolu'daki satıcılara yerinde anlatmanız çok değerli; ben Merisa, KolayXport'tan. Yurt dışına satan Türk satıcılar için ilan, araştırma, yurt dışı etiket ve net kâr raporunu tek panelde topluyoruz. Topluluğunuz için performansa dayalı bir ortaklık ve bir etkinlikte canlı ilan inceleme oturumu önermek isteriz. Detayları kime iletmemi önerirsiniz?
 ```
 
 ### M7 · MZN Danışmanlık (Amazon training/consulting)
 *Amazon is our secondary focus. Lead with what's real for their students (orders, labels, finance), and don't offer Amazon listing management.*
 ```
-Merhaba MZN Danışmanlık ekibi,
-
-Ben Merisa, KolayXport'tan. "Amazon Bitti mi?" videonuzu izledim; konuya sakin, verilerle bakmanız güven veriyor.
-
-KolayXport, Amazon, Etsy ve eBay'de satan Türk satıcılar için tek panel: siparişler, FedEx/UPS ile yurt dışı etiket ve komisyon, kargo, reklam düşülmüş net kâr raporu. (Amazon ilan düzenleme şu an yok; bunu açıkça söylemek isteriz.)
-
-Eğitim verdiğiniz satıcılar için bir ortaklık programımız var: önerdiğiniz satıcılardan abone olanlar için tek seferlik ödül. Size ücretsiz hesap açalım, önce siz deneyin.
-
-İlgilenirseniz kısa bilgi göndereyim.
-Merisa · KolayXport
+"Amazon Bitti mi?" videonuzu izledim, konuya verilerle sakin bakmanız güven veriyor; ben Merisa, KolayXport'tan. Panelimiz Amazon, Etsy ve eBay siparişlerini, FedEx/UPS yurt dışı etiketini ve komisyon, kargo, reklam düşülmüş net kârı tek yerde topluyor; Amazon ilan düzenleme ise henüz yok. Eğitim verdiğiniz satıcılar için ödüllü bir ortaklık programımız var ve size ücretsiz hesap açabiliriz. İlgilenirseniz kısa bilgi göndereyim.
 ```
 
 ### M8 · Vergi Merkezi, Umut Akpınar (SMMM)
 *Via the website contact form. Mali müşavir angle: their e-ticaret clients' marketplace numbers. Note the ETGB Excel file goes to the **gümrük** müşaviri, so don't mix the two up.*
 ```
-Merhaba Umut Bey,
-
-Ben Merisa, KolayXport'tan. Sitenizdeki e-ticaret ve e-ihracat muhasebesi sayfanızı (ETGB, IOSS) ve dropshipping rehberinizi okudum; konuyu satıcının anlayacağı dille anlatıyorsunuz.
-
-KolayXport, Etsy, eBay, Amazon ve Trendyol'da satan müşterilerinizin komisyon, kargo, reklam ve ürün maliyeti düşülmüş net kârını pazaryeri bazında gösteren, ilan ve siparişlerini de yöneten bir panel.
-
-E-ihracat yapan müşterilerinize faydalı olacağını düşünüyoruz. Mali müşavirlere özel bir ortaklık programımız var: önerdiğiniz satıcılardan abone olanlar için tek seferlik ödül, size ücretsiz hesap.
-
-15 dakikalık kısa bir tanıtım ya da yazılı bilgi, hangisi uygunsa.
-Merisa · KolayXport
+Umut Bey, sitenizdeki e-ihracat muhasebesi sayfanızı ve dropshipping rehberinizi okudum, konuyu satıcının anlayacağı dille anlatıyorsunuz; ben Merisa, KolayXport'tan. Panelimiz Etsy, eBay, Amazon ve Trendyol satıcılarının komisyon, kargo, reklam ve maliyet düşülmüş net kârını pazaryeri bazında gösteriyor. Mali müşavirler için, önerdikleri müşteriler abone olduğunda tek seferlik ödül veren bir ortaklık programımız var; size de ücretsiz hesap açarız. Kısa bir tanıtım mı yoksa yazılı bilgi mi size daha uygun olur?
 ```
 
 ### M9 · İstanbul Mali Müşavirlik, Ayşe Nil Boyacıoğlu (SMMM)
 ```
-Merhaba Ayşe Nil Hanım,
-
-Ben Merisa, KolayXport'tan. Eylülde güncellediğiniz "E-Ticaret Muhasebesi: Trendyol, Amazon ve Etsy Vergi Rehberi"ni okudum; pazaryeri stopajı ve e-ihracat istisnası kısmı çok net.
-
-KolayXport, Etsy, eBay, Amazon ve Trendyol satıcılarının siparişlerini, ilanlarını ve pazaryeri bazında net kârını tek panelde toplayan bir yazılım.
-
-Müşterilerinize faydalı olabileceğini düşünüyoruz. Mali müşavirlere özel ortaklık programımızda, önerdiğiniz satıcılardan abone olanlar için tek seferlik ödül veriyoruz; size de ücretsiz hesap açarız.
-
-Kısa bir bilgi göndermemi ister misiniz?
-Merisa · KolayXport
+Ayşe Nil Hanım, eylülde güncellediğiniz e-ticaret ve pazaryeri vergi rehberinizi okudum, stopaj ve e-ihracat istisnası kısmı çok net; ben Merisa, KolayXport'tan. Etsy, eBay, Amazon ve Trendyol satıcılarının siparişlerini, ilanlarını ve pazaryeri bazında net kârını tek panelde topluyoruz. Mali müşavirlere özel ödüllü bir ortaklık programımız var ve size ücretsiz hesap açabiliriz. Kısa bilgi göndermemi ister misiniz?
 ```
 
 ### M10 · SMMM Sinem Yavuz
 ```
-Merhaba Sinem Hanım,
-
-Ben Merisa, KolayXport'tan. "E-Ticarette NACE Kodu Değişti mi?" yazınızı okudum; ürün bazlı kod ve KDV eşleşmesi konusu pazaryeri satıcılarının en çok karıştırdığı yerlerden biri.
-
-KolayXport, Trendyol, Etsy, eBay ve Amazon'da satan işletmelerin siparişlerini, ilanlarını ve pazaryeri bazında net kârını tek panelde gösteren bir yazılım.
-
-E-ticaret müşterilerinize faydalı olabileceğini düşünüyoruz. Mali müşavirlere özel ortaklık programımız var: önerdiğiniz satıcılardan abone olanlar için tek seferlik ödül, size ücretsiz hesap.
-
-Uygunsa kısa bilgi göndereyim.
-Merisa · KolayXport
+Sinem Hanım, e-ticarette NACE kodu yazınızı okudum, ürün bazlı kod ve KDV eşleşmesi satıcıların en çok karıştırdığı konulardan biri; ben Merisa, KolayXport'tan. Trendyol, Etsy, eBay ve Amazon satıcılarının siparişlerini, ilanlarını ve pazaryeri bazında net kârını tek panelde gösteriyoruz. Mali müşavirlere özel ödüllü bir ortaklık programımız var ve size ücretsiz hesap açabiliriz. Uygunsa kısa bilgi göndereyim.
 ```
 
 ---
@@ -196,58 +112,27 @@ Merisa · KolayXport
 ### E1 · Selim Özdemir (@S_Ozdemir_), X DM
 *He sells his own 6-week e-export program and warns against paid courses. Position KolayXport as a tool for his students, not a course.*
 ```
-Merhaba Selim Bey, ben Ekin, KolayXport'tan. "E-İhracatta Büyümek İsteyenlere" programınızı ve ücretsiz videolarınızı takip ediyorum; satıcıya gerçekçi beklenti vermeniz çok değerli.
-
-KolayXport, Etsy/eBay/Amazon'da satan Türk satıcılar için tek panel: ilan düzenleme ve araştırma, yurt dışı etiket, pazaryeri bazında net kâr.
-
-Öğrencileriniz için işe yarayacağını düşünüyoruz. Size ücretsiz hesap açalım; beğenirseniz performansa dayalı bir ortaklık programımız var (abone olan her satıcı için tek seferlik ödül). Detay göndereyim mi?
+Selim Bey, e-ihracat programınızı ve ücretsiz videolarınızı takip ediyorum, satıcıya gerçekçi beklenti vermeniz çok değerli; ben Ekin, KolayXport'tan. Etsy, eBay ve Amazon'da satan Türk satıcılar için ilan, araştırma, yurt dışı etiket ve net kârı tek panelde topluyoruz. Size ücretsiz hesap açalım, beğenirseniz öğrencileriniz için ödüllü bir ortaklık programımız var. Detay göndereyim mi?
 ```
 
 ### E2 · Hakan Gerin, via the YouTube business contact
 ```
-Merhaba Hakan Bey,
-
-Ben Ekin, KolayXport'tan. "Etsy'de Başarılı Bir Mağaza Nasıl Kurulur? (Ürün + SEO + Reklam + Lojistik)" videonuzu izledim; özellikle sipariş ekonomisini açık açık göstermeniz çok öğretici.
-
-KolayXport, Etsy satıcılarına ilan doktoru (SEO notu, rakip karşılaştırma), yapay zekâyla İngilizce başlık/etiket, yurt dışı etiket ve net kâr raporu sunan bir panel.
-
-Size ücretsiz hesap açmak isteriz. Kanalınız için performansa dayalı bir ortaklık programımız var: izleyicilerinizden abone olanlar için tek seferlik ödül. Paylaşım zorunluluğu yok; paylaşırsanız #işbirliği beyanı yeterli.
-
-Detayları göndermemi ister misiniz?
-Ekin · KolayXport
+Hakan Bey, Etsy'de başarılı mağaza kurma videonuzu izledim, sipariş ekonomisini açık açık göstermeniz çok öğretici; ben Ekin, KolayXport'tan. Etsy satıcılarına ilan doktoru, yapay zekâyla İngilizce başlık ve etiket, yurt dışı etiket ve net kâr raporu sunan bir panelimiz var. Size ücretsiz hesap açmak isteriz; kanalınız için de izleyicileriniz abone olduğunda tek seferlik ödül veren bir ortaklık programımız var. Detayları göndermemi ister misiniz?
 ```
 
 ### E3 · Tayfun Tolga Bilgi, via the YouTube business contact
 ```
-Merhaba Tayfun Bey,
-
-Ben Ekin, KolayXport'tan. "0 TL ile Mağaza Açtım, 2 Haftada 17 Satış" videonuzu izledim; denemeyi şeffaf şekilde paylaşmanız yeni başlayanlar için çok değerli.
-
-Sıradaki adımlarınızda işinize yarayabilir: KolayXport'un ilan doktoru Etsy ilanına SEO notu verip rakiplerle karşılaştırıyor, yapay zekâyla İngilizce başlık/etiket öneriyor. Size ücretsiz hesap açalım, isterseniz videoda gerçek bir test olarak kullanın.
-
-Kanalınız için ortaklık programımız da var (abone olan her izleyici için tek seferlik ödül, #işbirliği beyanıyla). Detay göndereyim mi?
-Ekin · KolayXport
+Tayfun Bey, 0 TL ile mağaza açıp 2 haftada 17 satış yaptığınız videoyu izledim, denemeyi şeffaf paylaşmanız yeni başlayanlar için çok değerli; ben Ekin, KolayXport'tan. İlan doktorumuz Etsy ilanına SEO notu verip rakiplerle karşılaştırıyor ve yapay zekâyla İngilizce başlık ve etiket öneriyor. Size ücretsiz hesap açalım; isterseniz bir sonraki videoda gerçek bir test olarak kullanın, kanalınız için ödüllü bir ortaklık programımız da var.
 ```
 
 ### E4 · Burak Çatak, via the YouTube business contact. ⚠ Check "Matesy" first
 ```
-Merhaba Burak Bey,
-
-Ben Ekin, KolayXport'tan. "Etsy Ornament Sezonuna Bu Yöntemle Hazırlan!" videonuzu izledim; sezon öncesi hazırlığı adım adım anlatmanız çok faydalı.
-
-KolayXport, Etsy/eBay satıcıları için ilanları toplu düzenleme (değişiklikler taslakta bekler), yapay zekâyla İngilizce başlık/etiket ve sezon öncesi güncellemeleri istediğiniz saate planlama sunuyor.
-
-Size ücretsiz hesap açmak isteriz. Kanalınız için performansa dayalı bir ortaklık programımız var: izleyicilerinizden abone olanlar için tek seferlik ödül. Uygunsa detayları göndereyim.
-Ekin · KolayXport
+Burak Bey, Etsy ornament sezonuna hazırlık videonuzu izledim, adım adım anlatmanız çok faydalı; ben Ekin, KolayXport'tan. Etsy ve eBay ilanlarını toplu düzenleme, yapay zekâyla İngilizce başlık ve etiket ve sezon güncellemelerini istediğiniz saate planlama sunuyoruz. Size ücretsiz hesap açmak isteriz ve kanalınız için ödüllü bir ortaklık programımız var. Uygunsa detayları göndereyim.
 ```
 
 ### E5 · Sedat Ateş (@sedat_ates), X DM. Read his latest tweets first and replace the bracket
 ```
-Merhaba Sedat Bey, ben Ekin, KolayXport'tan. [son paylaşımı, ör. e-ihracat teşvikleri / Temu'nun Türk satıcılara açılması] üzerine yazdıklarınızı takip ediyorum.
-
-KolayXport, Etsy, eBay ve Amazon'da satan Türk satıcılar için tek panel: ilan ve araştırma, yurt dışı etiket, pazaryeri bazında net kâr.
-
-E-ihracat danışmanlığı verdiğiniz satıcılar için işe yarayabilir. Size ücretsiz hesap açalım; beğenirseniz performansa dayalı ortaklık programımızı (abone olan her satıcı için tek seferlik ödül) anlatayım. Uygun mu?
+Sedat Bey, [son paylaşımı] üzerine yazdıklarınızı takip ediyorum; ben Ekin, KolayXport'tan. Etsy, eBay ve Amazon'da satan Türk satıcılar için ilan, araştırma, yurt dışı etiket ve net kârı tek panelde topluyoruz. Danışmanlık verdiğiniz satıcılar için işe yarayabilir; size ücretsiz hesap açalım, beğenirseniz ödüllü ortaklık programımızı anlatayım. Uygun mu?
 ```
 
 ---

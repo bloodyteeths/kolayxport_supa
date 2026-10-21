@@ -26,7 +26,7 @@ Built on the existing research. This plan doesn't redo any of it, it only links 
 | Prices | **Pricing v2** ([pricing-v2.md](pricing-v2.md)): yearly packages Başlangıç ₺29.990 / Büyüme ₺54.990 / Pro ₺89.990 / Kurumsal (from ₺149.990); **one** monthly plan, Aylık ₺2.999, plus modules. **Final amounts, no KDV added.** Sold by **Tamsar, Inc.** (US) in TRY via Stripe; Modsons invoices Tamsar for services and runs marketing in Turkey. Yearly = pay-in-full only (no taksit) | Atilla 2026-10-19 |
 | Referral support in the app | **None.** First-touch UTMs are kept in the browser (`lib/tracking/events.ts`) and sent with the server `sign_up` event, but **not stored on the user**. Stripe Checkout shows a promotion-code field only when the founding coupon doesn't apply (`pages/api/stripe/create-checkout-session.ts:244`) | code |
 | Hepsiburada, Çiçeksepeti | Not live (waiting for integrator approval / replies). **Don't promise them** | feature-inventory N-1, project notes |
-| App-store listings | Shopify, Play Store, Claude and ChatGPT MCP directories are in review. **Freeze applies:** nobody touches MCP/OAuth/review accounts | coordination rules |
+| App-store listings | **Google Play: live** ("KolayXport: Etsy, eBay, Kargo", play.google.com/store/apps/details?id=com.kolayxport.app; public listing checked 2026-10-21 11:50 UTC). Shopify, Claude and ChatGPT MCP directories are still in review. **Freeze applies:** nobody touches MCP/OAuth/review accounts | Atilla 2026-10-21 + listing check |
 
 ---
 
@@ -91,7 +91,7 @@ Cash cost = what we pay before knowing whether a customer comes. Estimates are e
 
 | Rank | Channel | Cash cost / paying customer (estimate) | Speed | Owner | Phase | Status |
 |---|---|---|---|---|---|---|
-| 1 | **App-directory listings**: Chrome Web Store (live), Shopify App Store, Play Store, Claude/ChatGPT MCP directories (in review) | ≈ ₺0 | Slow, steady | Already handled by the extension / app / MCP sessions. **Marketing only links to them, never edits them** | 1 | Running |
+| 1 | **App-directory listings**: Chrome Web Store (live), **Google Play (live 2026-10-21)**, Shopify App Store, Claude/ChatGPT MCP directories (in review) | ≈ ₺0 | Slow, steady | Already handled by the extension / app / MCP sessions. **Marketing only links to them, never edits them** | 1 | Running |
 | 2 | **Referral partners**: FB/Telegram admins, X voices, small YouTubers, mali müşavirler. One-time bounty | ₺0 up front; one-time ₺1.500 (Aylık) to ≈ ₺8.250 (Büyüme yearly, founding price), out of collected revenue | Fast once 10+ partners are active | Merisa (groups, müşavirler), Ekin (X, YouTube) | **1 (main)** | To build (§4) |
 | 3 | **Helpful community answers** (no links where forbidden) | ₺0 (time only) | Medium | Merisa, Ekin | 1 | Kit ready (social/README §4) |
 | 4 | **YouTube tutorials public + embedded on the site** | ₺0 | Slow, compounding | gtm-overhaul session (uploads); Ekin (comments, Shorts) | 1 | 15 videos, unlisted |
@@ -182,32 +182,18 @@ Skip: "Etsy danışmanı / kurs" sellers who promise income (A11 scams; working 
 
 ### 4.5 Outreach messages (Turkish, copy-paste ready)
 
+Style (Atilla, 2026-10-21): every DM is 2 to 4 sentences, natural, with no dashes as punctuation, no dash bullets, no bold and no stock opener. Personalised wave-1 drafts: [partners/wave1_first_messages.md](partners/wave1_first_messages.md).
+
 Rules from [social/outreach-messages.md](social/outreach-messages.md) §0 apply: give value first (3 helpful answers in the group, or watch 2 videos), say who you are, one channel per person, log every message, follow the 3-step follow-up sequence there.
 
 **Varyant 5 · Grup yöneticisine ortaklık (Facebook / Telegram)**
 ```
-Merhaba [ad],
-
-Ben [Merisa/Ekin], KolayXport'ta pazarlamadan sorumluyum. [Grup adı]'nda [konu] hakkında yazdığınız [somut ayrıntı] çok işime yaradı, emeğiniz belli oluyor.
-
-KolayXport, yurt dışına satan Türk satıcılar için bir panel: Etsy ve eBay ilanlarını yapay zekâyla İngilizce düzenleme, ürün ve anahtar kelime araştırması, sipariş ve yurt dışı kargo etiketi bir arada. 14 gün ücretsiz, kart gerekmiyor.
-
-Grup yöneticileriyle bir ortaklık programı başlatıyoruz: sizin linkinizle gelip yıllık paket alan her satıcı için ilk yıllık ödemesinin %25'i, aylık plana geçen her satıcı için 1.500 TL tek seferlik ödül. Kim geldi, kim abone oldu, ne kadar kazandınız; hepsini panelinizde anlık görürsünüz. Sizden bir paylaşım zorunluluğu yok; ürünü önce kendiniz deneyin diye size ücretsiz bir Growth hesabı da açarız.
-
-Program şartlarını kısa bir metin olarak gönderebilirim. İlgilenmezseniz de hiç sorun değil, teşekkürler.
-
-[ad] · KolayXport (Modsons Yazılım)
+[Grup adı]'nda [somut konu] hakkında yazdığınız cevap çok işime yaradı; ben [Merisa/Ekin], KolayXport'ta topluluklarla çalışıyorum. KolayXport, yurt dışına satan Türk satıcılar için Etsy ve eBay ilanlarını yapay zekâyla İngilizce düzenleyen, araştırma ve yurt dışı etiketi tek yerde toplayan bir panel. Grup yöneticilerine, önerdikleri satıcılar abone olduğunda tek seferlik ödül veren bir ortaklık programımız var; önce ücretsiz bir hesapla kendiniz deneyebilirsiniz. Kısa bilgi göndereyim mi?
 ```
 
 **Varyant 6 · X / YouTube sesine ortaklık**
 ```
-Merhaba [ad], [paylaşım/video adı]'nda [somut nokta] kısmı çok netti, takip ediyorum.
-
-Ben [ad], KolayXport'tan. Yurt dışına satan Türk satıcılar için Etsy/eBay ilan optimizasyonu, araştırma ve yurt dışı kargo etiketini tek panelde topluyoruz.
-
-E-ihracat üzerine içerik üretenlerle bir ortaklık programı başlattık: linkinizle gelip yıllık paket alan her satıcı için ilk ödemesinin %25'i (10. müşteriden sonra %30), aylık plan için 1.500 TL, tek seferde sizin. Gelenleri ve kazancınızı panelinizden takip edersiniz. Ücretsiz bir hesapla önce kendiniz deneyebilirsiniz; beğenmezseniz hiçbir yükümlülüğünüz olmaz.
-
-Şartları DM'den mi yoksa e-postayla mı göndermemi istersiniz?
+[Paylaşım/video adı]'nda [somut nokta] kısmı çok netti, sizi takip ediyorum; ben [ad], KolayXport'tan. Yurt dışına satan Türk satıcılar için Etsy/eBay ilan optimizasyonu, araştırma ve yurt dışı kargo etiketini tek panelde topluyoruz. İzleyicileriniz abone olduğunda tek seferlik ödül veren bir ortaklık programımız var ve size ücretsiz hesap açabiliriz. Şartları DM'den mi e-postayla mı göndereyim?
 ```
 
 **Kabul edenlere gönderilecek metin (after a yes)**

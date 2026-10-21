@@ -27,6 +27,8 @@ export function buildUpsRequest(draft: LabelDraft, ctx: SubmitContext = {}): Lab
     unitOfMeasurement: 'PCS',
     weight: fmt2(lineWeightKg(draft, i)),
     originCountry: it.origin,
+    // EU product identifiers; createUpsShipment sends them only to EU recipients.
+    ...('pid' in it && it.pid ? { pid: it.pid } : {}),
   }));
   const lineTotal = products.reduce((sum, p) => sum + p.quantity * p.value, 0);
 

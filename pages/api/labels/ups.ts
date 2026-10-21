@@ -7,6 +7,7 @@ import { saveUpsLabelToCache } from '@/lib/ups/cache';
 import { withUsageLimiter } from '@/lib/middleware/withUsageLimiter';
 import { assertOrderLabelable, labelGuardOverride } from '@/lib/orders/labelGuard';
 import { labelGuardBody, publishLabelCreated } from '@/lib/orders/labelEvents';
+import { defaultProductIds, isEuCountry } from '@/lib/shipping/euPid';
 
 // Utility to parse phone number and extension - handles Amazon format like "+1 415-851-9136 ext. 96793"
 function parsePhoneNumberWithExt(raw: string): { phone: string, ext?: string } {
@@ -161,6 +162,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         },
       },
     });
+
+    // EU customs reform: an older label panel sends no product identifiers. Fill them from the order's items (same
+    // order as the panel lists them: SKU, else listing id, else item id) so an EU label is never sent without them.
+    if (internationalForms?.products?.length && isEuCountry(normalizedRecipient.countryCode)
+      && internationalForms.products.some((p: { pid?: unknown }) => !p.pid)) {
+      const items = await prisma.orderItem.findMany({ where: { orderId }, select: { id: true, sku: true, listingRef: true }, orderBy: { id: 'asc' } });
+      internationalForms.products = internationalForms.products.map((p: Record<string, unknown>, i: number) =>
+        p.pid ? p : { ...p, pid: defaultProductIds({ sku: items[i]?.sku, listingRef: items[i]?.listingRef, itemId: items[i]?.id ?? orderId }) });
+    }
 
     const input: CreateShipmentInput = {
       shipper,

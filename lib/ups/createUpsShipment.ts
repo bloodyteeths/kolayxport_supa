@@ -1,4 +1,5 @@
 import fetch from 'node-fetch';
+import { isEuCountry, normalizeGtin, productIdsComplete, type ProductIds } from '@/lib/shipping/euPid';
 // @ts-ignore
 // import PDFDocument from 'pdfkit';
 // import getStream from 'get-stream';
@@ -38,6 +39,19 @@ export interface UpsRecipientAddress {
   countryCode: string;
 }
 
+/** UPS `InternationalForms.Product.ProductIdentifier`: 0100 merchant, 0200 manufacturer, 0300 standard (when one exists). */
+export function upsProductIdentifiers(pid: ProductIds | null | undefined): Array<{ ProductID: string; ProductIDTypeCode: string }> | null {
+  if (!pid || !productIdsComplete(pid)) return null;
+  const cut = (v: string) => v.trim().slice(0, 100);
+  const out = [
+    { ProductID: cut(pid.merchant), ProductIDTypeCode: '0100' },
+    { ProductID: cut(pid.manufacturer), ProductIDTypeCode: '0200' },
+  ];
+  const gtin = normalizeGtin(pid.gtin);
+  if (gtin) out.push({ ProductID: gtin, ProductIDTypeCode: '0300' });
+  return out;
+}
+
 export interface UpsPackageDetails {
   weightKg: number;
   lengthCm?: number;
@@ -61,6 +75,8 @@ export interface InternationalFormsInput {
     unitOfMeasurement: string;
     weight: string;
     originCountry: string;
+    /** EU customs reform: merchant / manufacturer / standard IDs (lib/shipping/euPid.ts). */
+    pid?: ProductIds;
   }>;
   soldTo: {
     name: string;
@@ -204,7 +220,7 @@ export async function getUpsAccessToken(apiKey: string, apiSecret: string): Prom
   }
 }
 
-function buildUpsShipmentPayload(
+export function buildUpsShipmentPayload(
   shipper: UpsShipperProfile,
   recipient: UpsRecipientAddress,
   pkg: UpsPackageDetails,
@@ -223,6 +239,8 @@ function buildUpsShipmentPayload(
         },
       },
       Shipment: {
+        // EU customs reform: UPS decides from these whether the EU product-identifier rule applies (B2C).
+        ...(isEuCountry(recipient.countryCode) ? { ShipperType: '01', ConsigneeType: recipient.company ? '01' : '02' } : {}),
         Description: description ? description.slice(0, 35) : 'global cargo shipment',
         Shipper: {
           Name: shipper.shipperName,
@@ -334,6 +352,7 @@ function buildUpsShipmentPayload(
       throw new Error(`Invalid currency code: ${internationalForms.currencyCode}. Must be 3 uppercase letters.`);
     }
 
+    const euDestination = isEuCountry(recipient.countryCode);
     const products = internationalForms.products.map((p, index) => {
       // Validate required fields
       if (!p.description || p.description.trim() === '') {
@@ -392,12 +411,16 @@ function buildUpsShipmentPayload(
         throw new Error(`Product #${index + 1} (${p.description}) has an invalid origin country code: ${originCountry}. Must be 2 uppercase letters.`);
       }
       
+      // EU customs reform (UPS checks from 25 Oct 2026): EU recipients get the product identifier list, the
+      // exempt indicator and the merchant ID as part number. Every other lane is sent exactly as before.
+      const euIds = euDestination ? upsProductIdentifiers(p.pid) : null;
       // Build the product payload following UPS EDI schema (Unit.Value is a numeric string)
       const productPayload: any = {
         Description: p.description.slice(0, 35),
         CommodityCode: p.commodityCode,
         OriginCountryCode: originCountry,
-        PartNumber: p.commodityCode,
+        PartNumber: euIds ? euIds[0].ProductID.slice(0, 35) : p.commodityCode,
+        ...(euIds ? { productIdentifierExemptIndicator: 'false', ProductIdentifier: euIds } : {}),
         Unit: {
           Number: String(quantity), // 1‑7 digits
           UnitOfMeasurement: { Code: unitOfMeasurement },

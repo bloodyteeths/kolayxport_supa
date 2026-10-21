@@ -121,3 +121,47 @@ describe('label draft + validation + FedEx body', () => {
     ]);
   });
 });
+
+describe('UPS EU product identifiers', async () => {
+  const { buildUpsShipmentPayload, upsProductIdentifiers } = await import('@/lib/ups/createUpsShipment');
+  const shipper = {
+    upsApiKey: 'k', upsApiSecret: 's', upsAccountNumber: 'A1B2C3', shipperName: 'Belle Couture', shipperPersonName: 'Atilla',
+    shipperPhoneNumber: '905320000000', shipperStreet1: 'Ataturk Cd 1', shipperCity: 'Adana', shipperStateCode: '', shipperPostalCode: '01000',
+    shipperCountryCode: 'TR', shipperTinNumber: '1234567890', shipperTinType: 'VAT',
+  };
+  const recipient = (countryCode: string) => ({ name: 'Anna Schmidt', phone: '4930123456', street1: 'Hauptstrasse 1', city: 'Berlin', postalCode: '10115', countryCode });
+  const forms = (pid?: object) => ({
+    invoiceNumber: 'INV-1', invoiceDate: '20261021', exportReason: 'SALE', currencyCode: 'USD',
+    invoiceLineTotal: { currencyCode: 'USD', monetaryValue: '59.00' },
+    products: [{ description: 'Girls organza dress', quantity: 1, value: 59, commodityCode: '620442', unitOfMeasurement: 'PCS', weight: '0.60', originCountry: 'TR', ...(pid ? { pid } : {}) }],
+    soldTo: { name: 'Anna Schmidt', attention: 'Anna Schmidt', street1: 'Hauptstrasse 1', city: 'Berlin', postalCode: '10115', countryCode: 'DE', phone: '4930123456' },
+  });
+  const productOf = (payload: any) => payload.ShipmentRequest.Shipment.ShipmentServiceOptions.InternationalForms.Product[0];
+
+  it('codes: 0100 merchant, 0200 manufacturer, 0300 barcode only when valid', () => {
+    expect(upsProductIdentifiers({ merchant: 'ORG-1', manufacturer: 'ORG-1', gtin: '' })).toEqual([
+      { ProductID: 'ORG-1', ProductIDTypeCode: '0100' }, { ProductID: 'ORG-1', ProductIDTypeCode: '0200' },
+    ]);
+    expect(upsProductIdentifiers({ merchant: 'A', manufacturer: 'M', gtin: '4006381333931' })?.[2]).toEqual({ ProductID: '4006381333931', ProductIDTypeCode: '0300' });
+    expect(upsProductIdentifiers({ merchant: '', manufacturer: 'M', gtin: '' })).toBeNull();
+  });
+
+  it('EU recipient: identifier list, exempt=false, merchant as part number, B2C party types', () => {
+    const payload: any = buildUpsShipmentPayload(shipper, recipient('DE'), { weightKg: 0.6 }, '65', true, 'Dress', forms({ merchant: 'ORG-1', manufacturer: 'ORG-1', gtin: '' }) as any);
+    const p = productOf(payload);
+    expect(p.PartNumber).toBe('ORG-1');
+    expect(p.productIdentifierExemptIndicator).toBe('false');
+    expect(p.ProductIdentifier).toHaveLength(2);
+    expect(payload.ShipmentRequest.Shipment.ShipperType).toBe('01');
+    expect(payload.ShipmentRequest.Shipment.ConsigneeType).toBe('02');
+  });
+
+  it('non-EU recipient: product sent exactly as before (part number = HS code, no new keys)', () => {
+    const payload: any = buildUpsShipmentPayload(shipper, recipient('GB'), { weightKg: 0.6 }, '65', true, 'Dress', forms({ merchant: 'ORG-1', manufacturer: 'ORG-1', gtin: '' }) as any);
+    const p = productOf(payload);
+    expect(p.PartNumber).toBe('620442');
+    expect(p.ProductIdentifier).toBeUndefined();
+    expect(p.productIdentifierExemptIndicator).toBeUndefined();
+    expect(payload.ShipmentRequest.Shipment.ShipperType).toBeUndefined();
+  });
+});

@@ -68,6 +68,7 @@ import { CustomsSection } from './CustomsSection';
 import { OptionsSection } from './OptionsSection';
 import { LabelSuccess, type PushState } from './LabelSuccess';
 import { ShipToSummary } from './ShipToSummary';
+import { isEuCountry } from '@/lib/shipping/euPid';
 import {
   isMaskedShipTo, primaryCarriersFor, rememberRouteRate, rememberedRate, routeOf, stripMasked,
 } from './labelUx';
@@ -224,6 +225,44 @@ export function CreateLabelPanel({ order, open, onClose, onBack, defaultCarrier,
     setAskFields(isMasked ? [] : missing);
     setAutoFocusField(mode === 'fixAddress' ? missing[0] : undefined);
   }, [open, order, ready, draftFor, settings.sender, settings.baseCurrency, presets, snapshots, senderCountry, defaultCarrier, mode]);
+
+  // EU customs: replace the SKU-based product-ID defaults with what the seller confirmed on an earlier label or what
+  // their eBay listing says (barcode / MPN). Only lines still holding their untouched default are changed.
+  const euOrderId = draft && draftFor && isEuCountry(draft.shipTo.country) ? draftFor : null;
+  useEffect(() => {
+    if (!euOrderId) return;
+    let alive = true;
+    const startDefaults = (JSON.parse(initialJson.current || '{}') as Partial<LabelDraft>).customs?.items ?? [];
+    fetch(`/api/orders/${encodeURIComponent(euOrderId)}/product-ids`, { credentials: 'same-origin' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body: { items?: Record<string, { merchant: string; manufacturer: string; gtin: string }> } | null) => {
+        if (!alive || !body?.items || currentOrderRef.current !== euOrderId) return;
+        const found = body.items;
+        const asPid = (h: { merchant: string; manufacturer: string; gtin: string }) => ({ merchant: h.merchant, manufacturer: h.manufacturer, gtin: h.gtin });
+        // The loaded IDs become the panel's starting point, so an untouched form is not "dirty" (no discard prompt).
+        try {
+          const base = JSON.parse(initialJson.current || '{}') as LabelDraft;
+          if (base.orderId === euOrderId && base.customs?.items) {
+            base.customs.items = base.customs.items.map((it) => (it.itemId && found[it.itemId] ? { ...it, pid: asPid(found[it.itemId]) } : it));
+            initialJson.current = JSON.stringify(base);
+          }
+        } catch { /* keep the old baseline */ }
+        setDraft((d) => {
+          if (!d || d.orderId !== euOrderId) return d;
+          let changed = false;
+          const items = d.customs.items.map((it, i) => {
+            const hit = it.itemId ? found[it.itemId] : undefined;
+            const untouched = JSON.stringify(it.pid ?? null) === JSON.stringify(startDefaults[i]?.pid ?? null);
+            if (!hit || !untouched) return it;
+            changed = true;
+            return { ...it, pid: asPid(hit) };
+          });
+          return changed ? { ...d, customs: { ...d.customs, items } } : d;
+        });
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [euOrderId]);
 
   const international = draft ? isInternational(draft, settings.sender) : false;
   const vctx = useMemo(() => ({ international }), [international]);

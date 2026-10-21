@@ -12,6 +12,7 @@ import { assertOrderLabelable, labelGuardOverride } from '@/lib/orders/labelGuar
 import { labelGuardBody, publishLabelCreated } from '@/lib/orders/labelEvents';
 import { defaultProductIds, fedexRegulatoryDetail, isEuCountry, isIoss, suggestIoss } from '@/lib/shipping/euPid';
 import { canonicalStore } from '@/lib/marketplaces/canonical';
+import { saveProductIds } from '@/lib/shipping/productIds';
 
 // Utility to parse phone number and extension - handles Amazon format like "+1 415-851-9136 ext. 96793"
 // Same logic as UPS but adapted for FedEx (max 6 chars extension vs UPS 4 chars)
@@ -626,6 +627,13 @@ async function handler(
     }
 
     publishLabelCreated(authUser.id, orderId, { carrier: 'FEDEX', trackingNumber: fedexResult.trackingNumber });
+    // Remember the EU product identifiers this label declared, for the next order of the same product.
+    if (euDestination) {
+      void saveProductIds(authUser.id, lineItemsFromRequest.map((item: any) => {
+        const db = dbItems.find((d) => d.id === item.id);
+        return { sku: item.sku || db?.sku, listingRef: item.listing_ref || db?.listingRef, pid: item.pid };
+      }));
+    }
 
     // Keep only essential success logging
     logger.info(`[API generate-label] Label generated successfully for order ${orderId}. Tracking: ${fedexResult.trackingNumber}`);

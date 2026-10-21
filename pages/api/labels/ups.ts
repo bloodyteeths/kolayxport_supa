@@ -8,6 +8,14 @@ import { withUsageLimiter } from '@/lib/middleware/withUsageLimiter';
 import { assertOrderLabelable, labelGuardOverride } from '@/lib/orders/labelGuard';
 import { labelGuardBody, publishLabelCreated } from '@/lib/orders/labelEvents';
 import { defaultProductIds, isEuCountry } from '@/lib/shipping/euPid';
+import { saveProductIds } from '@/lib/shipping/productIds';
+
+/** UPS products are in order-item order (no item id): pair them with the order's items to remember the EU IDs. */
+async function rememberUpsProductIds(userId: string, orderId: string, products: Array<{ pid?: unknown }> | undefined) {
+  if (!products?.length) return;
+  const items = await prisma.orderItem.findMany({ where: { orderId }, select: { id: true, sku: true, listingRef: true }, orderBy: { id: 'asc' } });
+  await saveProductIds(userId, products.map((p, i) => ({ sku: items[i]?.sku, listingRef: items[i]?.listingRef, pid: p.pid as any })));
+}
 
 // Utility to parse phone number and extension - handles Amazon format like "+1 415-851-9136 ext. 96793"
 function parsePhoneNumberWithExt(raw: string): { phone: string, ext?: string } {
@@ -218,6 +226,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
 
       publishLabelCreated(userId, orderId, { carrier: 'UPS', trackingNumber: shipmentResult.trackingNumber });
+      if (isEuCountry(normalizedRecipient.countryCode)) void rememberUpsProductIds(userId, orderId, internationalForms?.products);
 
       // No Step 2 needed – EDI label already generated
       return res.status(200).json(shipmentResult);
@@ -248,6 +257,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
       
       publishLabelCreated(userId, orderId, { carrier: 'UPS', trackingNumber: result.trackingNumber });
+      if (isEuCountry(normalizedRecipient.countryCode)) void rememberUpsProductIds(userId, orderId, internationalForms?.products);
 
       return res.status(200).json({ success: true, trackingNumber: result.trackingNumber, labelUrl: result.labelUrl });
     }

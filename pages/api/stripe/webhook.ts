@@ -12,6 +12,7 @@ import { fulfilStripeCreditSession } from '@/lib/billing/aiCreditsPurchase';
 import { attributePromoCheckout, attributePromoInvoice, bountyFromStripeInvoice, bountyFromStripeRefund } from '@/lib/partners/stripeBounty';
 import { subscriptionIdOfInvoice, syncSubscriptionFromStripe } from '@/lib/billing/stripeV2';
 import { linkPaymentLinkCustomer, notifyPaymentLinkSale, type LinkResult } from '@/lib/billing/paymentLinks';
+import { dedupeAction } from '@/lib/billing/webhookDedupe';
 
 /**
  * Upsert a WebhookEvent row with provider/eventType/status. Safe to call multiple times:
@@ -34,6 +35,7 @@ async function recordWebhookEvent(args: {
         status: args.status,
         errorMessage: args.errorMessage?.slice(0, 200) ?? null,
         userId: args.userId ?? null,
+        ...(args.status === 'received' ? { processingStartedAt: new Date() } : {}),
       },
       create: {
         id: args.id,
@@ -42,6 +44,7 @@ async function recordWebhookEvent(args: {
         status: args.status,
         errorMessage: args.errorMessage?.slice(0, 200) ?? null,
         userId: args.userId ?? null,
+        ...(args.status === 'received' ? { processingStartedAt: new Date() } : {}),
       },
     });
   } catch (err) {
@@ -152,10 +155,15 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     return res.status(400).send(`Webhook Error: signature verification failed`);
   }
 
-  // Idempotency: check if this event was already processed
-  const existing = await prisma.webhookEvent.findUnique({ where: { id: event.id } });
-  if (existing) {
+  // Idempotency (lib/billing/webhookDedupe.ts): finished events are duplicates; failed or stale ones run again,
+  // so Stripe's retry recovers a handler that threw; one still running gets 409 and Stripe retries later.
+  const existing = await prisma.webhookEvent.findUnique({ where: { id: event.id }, select: { status: true, createdAt: true, processingStartedAt: true } });
+  const action = dedupeAction(existing);
+  if (action === 'duplicate') {
     return res.status(200).json({ received: true, duplicate: true });
+  }
+  if (action === 'in_flight') {
+    return res.status(409).json({ received: true, inFlight: true });
   }
 
   // Record receipt before processing so an inflight failure still leaves a trace.

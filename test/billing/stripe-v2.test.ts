@@ -57,7 +57,9 @@ describe('lookup keys and metadata', () => {
     expect(v2ItemFromMetadata({ kx_v2: '1', kx_plan: 'pro_yil' }, 'year')).toEqual({ kind: 'plan', key: 'pro_yil', interval: 'year' });
     expect(v2ItemFromMetadata({ kx_v2: '1', kx_module: 'arbitrage' }, 'month')).toEqual({ kind: 'module', key: 'arbitrage', interval: 'month' });
     expect(v2ItemFromMetadata({ kx_plan: 'pro_yil' }, 'year')).toBeNull();
-    expect(v2ItemFromMetadata({ kx_v2: '1', kx_plan: 'kurumsal' }, 'year')).toBeNull();
+    // Kurumsal activates from its (payment-link) price, yearly only; it stays out of the self-serve lookup keys.
+    expect(v2ItemFromMetadata({ kx_v2: '1', kx_plan: 'kurumsal' }, 'year')).toEqual({ kind: 'plan', key: 'kurumsal', interval: 'year' });
+    expect(v2ItemFromMetadata({ kx_v2: '1', kx_plan: 'kurumsal' }, 'month')).toBeNull();
   });
 });
 

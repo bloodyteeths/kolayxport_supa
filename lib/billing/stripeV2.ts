@@ -35,6 +35,8 @@ export function v2ItemFromMetadata(meta: Record<string, string> | null | undefin
   const iv = interval === 'year' ? 'year' : interval === 'month' ? 'month' : null;
   if (!iv) return null;
   if (meta.kx_plan && (SELF_SERVE_PLANS as readonly string[]).includes(meta.kx_plan)) return { kind: 'plan', key: meta.kx_plan as V2PlanKey, interval: iv };
+  // Kurumsal is sold per deal (payment link, 2026-10-22), never in self-serve checkout: yearly only.
+  if (meta.kx_plan === 'kurumsal' && iv === 'year') return { kind: 'plan', key: 'kurumsal', interval: 'year' };
   if (isModuleKey(meta.kx_module)) return { kind: 'module', key: meta.kx_module, interval: iv };
   return null;
 }

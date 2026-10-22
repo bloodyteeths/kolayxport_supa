@@ -237,7 +237,8 @@ export const DECIDED_PLAN_LIMITS: Readonly<Record<PlanKey, DecidedPlan>> = {
   baslangic_yil: { limits: { orders: 6000, labels: 3000, connectedStores: 3, aiCredits: 300 }, stripeUpsell: true },
   buyume_yil: { limits: { orders: 24000, labels: 12000, connectedStores: 6, aiCredits: 1500 }, stripeUpsell: true },
   pro_yil: { limits: { orders: 72000, labels: 36000, connectedStores: 12, aiCredits: 3000 }, stripeUpsell: true },
-  kurumsal: { limits: { orders: null, labels: null, connectedStores: null, aiCredits: 10000 }, stripeUpsell: false },
+  // ₺149.990/yıl, up to 10 client stores (founder via orchestrator, 2026-10-22).
+  kurumsal: { limits: { orders: null, labels: null, connectedStores: 10, aiCredits: 10000 }, stripeUpsell: false },
 };
 
 /** tiers.md §1 constants. The trial length is enforced at account creation via `newTrialExpiry`. */

@@ -11,6 +11,7 @@ import { logBillingEvent, logSecurityEvent } from '@/lib/admin/events';
 import { fulfilStripeCreditSession } from '@/lib/billing/aiCreditsPurchase';
 import { attributePromoCheckout, attributePromoInvoice, bountyFromStripeInvoice, bountyFromStripeRefund } from '@/lib/partners/stripeBounty';
 import { subscriptionIdOfInvoice, syncSubscriptionFromStripe } from '@/lib/billing/stripeV2';
+import { linkPaymentLinkCustomer, notifyPaymentLinkSale, type LinkResult } from '@/lib/billing/paymentLinks';
 
 /**
  * Upsert a WebhookEvent row with provider/eventType/status. Safe to call multiple times:
@@ -170,6 +171,17 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       switch (event.type) {
         case 'checkout.session.completed': {
           const checkoutSession = event.data.object as Stripe.Checkout.Session;
+          // Payment-link sale (1:1 sales): attach the new Stripe customer to the buyer's account by verified email
+          // first, so the plan activation below finds the user; then alert. Never fatal.
+          if (checkoutSession.payment_link) {
+            let link: LinkResult = { status: 'no_match' };
+            try {
+              link = await linkPaymentLinkCustomer(checkoutSession);
+            } catch (e) {
+              logger.warn('Payment link customer match failed', { eventId: event.id, error: e instanceof Error ? e.message : String(e) });
+            }
+            await notifyPaymentLinkSale(checkoutSession, link);
+          }
           if (checkoutSession.mode === 'payment' && checkoutSession.metadata?.kind === 'ai_credits') {
             // AI kredisi pack (lib/billing/aiCreditsPurchase): added once per session (the return page may be first).
             const r = await fulfilStripeCreditSession(checkoutSession);

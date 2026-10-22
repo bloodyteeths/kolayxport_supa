@@ -86,6 +86,7 @@ model User {
   aiCreditEntries         AiCreditEntry[]
   aiConnections           AiConnection[]
   notificationSettings    NotificationSettings?
+  activationEmails        ActivationEmail[]
   pushDevices             PushDevice[]
   acquisition             UserAcquisition?
   stockSettings           StockSettings?
@@ -2857,5 +2858,17 @@ model ProductIdentifier {
   updatedAt    DateTime @updatedAt
 
   @@unique([userId, key])
+  @@index([userId])
+}
+
+/// Onboarding reminder emails to signups who haven't connected a store yet (lib/activation/emails.ts). One row per sent step.
+model ActivationEmail {
+  id     String   @id @default(cuid())
+  userId String
+  step   String // day1 | day4
+  sentAt DateTime @default(now())
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, step])
   @@index([userId])
 }

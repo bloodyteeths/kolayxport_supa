@@ -16620,7 +16620,9 @@
       "etsyNotice": "The term 'Etsy' is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed or certified by Etsy, Inc.",
       "marks": "Other marketplace and carrier names are trademarks of their owners and are used only to identify the connected service.",
       "rights": "© {year} KolayXport",
-      "playMark": "Google Play and the Google Play logo are trademarks of Google LLC."
+      "playMark": "Google Play and the Google Play logo are trademarks of Google LLC.",
+      "whatsapp": "WhatsApp: {number}",
+      "whatsappText": "Hi, I'd like to learn more about KolayXport."
     },
     "pricingTeaser": {},
     "casesIndex": {
@@ -17401,6 +17403,16 @@
         "failed": "failed, we will retry"
       },
       "privacyNote": "You see your referrals' shortened name, plan and payment status only. Please do not share them."
+    }
+  },
+  "support": {
+    "whatsapp": {
+      "connectHelp": "Stuck connecting? Message us on WhatsApp and we'll connect your store together.",
+      "cta": "Message on WhatsApp",
+      "prefillConnect": "Hi, I need help connecting my store to KolayXport.",
+      "helpTitle": "Live support",
+      "helpBody": "Send us your question on WhatsApp: {number}",
+      "prefillHelp": "Hi, I have a question about KolayXport."
     }
   }
 }

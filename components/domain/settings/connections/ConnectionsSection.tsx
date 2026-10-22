@@ -46,6 +46,7 @@ import { useCredentialsStore, type CredentialsStore } from './useIntegrationCred
 import { useStoreAllowance } from './useStoreAllowance';
 import { formatElapsed, useWixInstallPoll } from './useWixInstallPoll';
 import { useSettingsShell } from '../settingsNav';
+import WhatsAppHelp from '@/components/support/WhatsAppHelp';
 
 export const HIGHLIGHT_MS = 1500;
 
@@ -94,7 +95,7 @@ export function ConnectionsSection(props: ConnectionsSectionProps) {
   const f = useFormatters();
   const router = useRouter();
   const isPhone = useIsMobile();
-  const { connections, extension, isLoading, isValidating, error: connError, get, needsReauth, mutate } = useConnections();
+  const { connections, extension, isLoading, isValidating, error: connError, get, needsReauth, mutate, anyMarketplace } = useConnections();
 
   const credentials = useCredentialsStore(injected);
   const allowance = useStoreAllowance();
@@ -376,6 +377,8 @@ export function ConnectionsSection(props: ConnectionsSectionProps) {
         )}
       </div>
       <IntegrationGrid groups={groups} />
+      {/* Only before the first store: that's where new sellers get stuck. */}
+      {anyMarketplace === false && <div style={{ marginTop: 16 }}><WhatsAppHelp data-testid="connections-whatsapp" /></div>}
 
       <EtsyShopsPanel
         open={panel?.kind === 'etsy'}

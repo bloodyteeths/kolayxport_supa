@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { Page, PageHeader, Section } from '@/components/ds/page';
 import { Button } from '@/components/ds/inputs/Button';
 import { neutral as n, accent } from '@/lib/ds/tokens';
+import WhatsAppHelp from '@/components/support/WhatsAppHelp';
 
 type Step = { key: string; href: string; external?: boolean };
 
@@ -25,6 +26,7 @@ export default function HowToUsePage() {
   return (
     <Page title={t('title')} width="detail">
       <PageHeader title={t('title')} subtitle={t('subtitle')} />
+      <Box sx={{ mb: '16px' }}><WhatsAppHelp variant="help" /></Box>
       <Box component="ol" sx={{ listStyle: 'none', m: 0, p: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {STEPS.map((s, i) => (
           <Box component="li" key={s.key}>

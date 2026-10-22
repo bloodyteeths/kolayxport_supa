@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { COMPANY, addressLine } from '@/lib/site/company';
+import { COMPANY, addressLine, whatsappUrl, whatsappDisplay } from '@/lib/site/company';
 import { CASES, localePath, type SiteLocale } from '@/lib/site/routes';
 import { openCookiePreferences } from './cookieConsent';
 import { usePlayClient } from '@/lib/billing/usePlayClient';
@@ -56,6 +56,13 @@ export default function SiteFooter({ locale }: { locale: SiteLocale }) {
             <p className="mt-4 text-sm">
               <a href={`mailto:${COMPANY.email}`} className="underline underline-offset-4 hover:text-kx-soft">{COMPANY.email}</a>
             </p>
+            {whatsappUrl() && (
+              <p className="mt-2 text-sm">
+                <a href={whatsappUrl(t('footer.whatsappText')) ?? undefined} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4 hover:text-kx-soft">
+                  {t('footer.whatsapp', { number: whatsappDisplay() ?? '' })}
+                </a>
+              </p>
+            )}
             <PlayBadge locale={locale} placement="footer" height={48} className="mt-4 -ml-1.5" />
             {social.length > 0 && (
               <ul className="mt-4 flex flex-wrap gap-3 text-sm">

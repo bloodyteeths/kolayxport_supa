@@ -18,8 +18,8 @@ export const COMPANY = {
   kep: null as string | null, // TODO(owner): KEP adresi
   foundingDate: '2025-09-09',
   email: 'destek@kolayxport.com',
-  /** WhatsApp Business, E.164 without "+". NEXT_PUBLIC_WHATSAPP_NUMBER overrides it. */
-  whatsapp: (process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '905425683362').replace(/\D/g, '') || null,
+  /** WhatsApp support (founder, 2026-10-22), E.164 without "+". NEXT_PUBLIC_WHATSAPP_NUMBER overrides it. */
+  whatsapp: (process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '905335010211').replace(/\D/g, '') || null,
   phone: null as string | null,
   /** Only accounts that exist. Empty = nothing rendered (no dead social links). */
   social: {
@@ -37,4 +37,18 @@ export const SITE_URL = 'https://kolayxport.com';
 export function addressLine(): string {
   const a = COMPANY.address;
   return `${a.street}, ${a.postalCode} ${a.district} / ${a.city}`;
+}
+
+/** "+90 533 501 02 11" for display. */
+export function whatsappDisplay(): string | null {
+  const n = COMPANY.whatsapp;
+  if (!n) return null;
+  const m = n.match(/^90(\d{3})(\d{3})(\d{2})(\d{2})$/);
+  return m ? `+90 ${m[1]} ${m[2]} ${m[3]} ${m[4]}` : `+${n}`;
+}
+
+/** Click-to-chat link (wa.me) with an optional pre-filled first message; null when no number is configured. */
+export function whatsappUrl(text?: string): string | null {
+  if (!COMPANY.whatsapp) return null;
+  return `https://wa.me/${COMPANY.whatsapp}${text ? `?text=${encodeURIComponent(text)}` : ''}`;
 }

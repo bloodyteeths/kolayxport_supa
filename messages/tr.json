@@ -16620,7 +16620,9 @@
       "etsyNotice": "\"Etsy\" terimi Etsy, Inc.'in ticari markasıdır. Bu uygulama Etsy API'sini kullanır ancak Etsy, Inc. tarafından onaylanmamış veya sertifikalandırılmamıştır.",
       "marks": "Diğer pazaryeri ve kargo firması adları sahiplerinin markalarıdır; yalnızca bağlantı kurulan hizmeti belirtmek için kullanılır.",
       "rights": "© {year} KolayXport",
-      "playMark": "Google Play ve Google Play logosu Google LLC'nin ticari markalarıdır."
+      "playMark": "Google Play ve Google Play logosu Google LLC'nin ticari markalarıdır.",
+      "whatsapp": "WhatsApp: {number}",
+      "whatsappText": "Merhaba, KolayXport hakkında bilgi almak istiyorum."
     },
     "pricingTeaser": {},
     "casesIndex": {
@@ -17401,6 +17403,16 @@
         "failed": "başarısız, tekrar denenecek"
       },
       "privacyNote": "Getirdiğiniz kullanıcıların yalnızca kısaltılmış adını, paketini ve ödeme durumunu görürsünüz. Lütfen bunları paylaşmayın."
+    }
+  },
+  "support": {
+    "whatsapp": {
+      "connectHelp": "Bağlarken takıldınız mı? WhatsApp'tan yazın, mağazanızı birlikte bağlayalım.",
+      "cta": "WhatsApp'tan yaz",
+      "prefillConnect": "Merhaba, KolayXport'ta mağazamı bağlamak için yardım istiyorum.",
+      "helpTitle": "Canlı destek",
+      "helpBody": "Sorunuzu WhatsApp'tan yazın: {number}",
+      "prefillHelp": "Merhaba, KolayXport hakkında bir sorum var."
     }
   }
 }

@@ -54,6 +54,7 @@ import { SalesTrendChart, type SalesMetric } from './SalesTrendChart';
 import { StoreTable, currencySymbol, reportOrdersHref, storeDisplayName } from './StoreTable';
 import { TopProductsTable } from './TopProductsTable';
 import { StatusSummary } from './StatusSummary';
+import WhatsAppHelp from '@/components/support/WhatsAppHelp';
 
 export const SALES_URL_SCHEMA = {
   stores: urlField.list({ format: 'comma' }),
@@ -377,7 +378,9 @@ export function SalesReport({ now }: SalesReportProps = {}) {
         body={t('empty.connect.body')}
         action={{ id: 'connect-store', label: t('empty.connect.action'), icon: icons.add, href: links.settingsHref('connections') }}
         data-testid="sales-connect"
-      />
+      >
+        <WhatsAppHelp />
+      </EmptyState>
     );
   } else if (isRangeRejected(report.error)) {
     // 400 range_too_long / invalid_range: explain the limit; Retry would fail the same way.

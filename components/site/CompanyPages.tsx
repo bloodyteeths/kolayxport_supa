@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { Mail, MessageCircle, ArrowRight } from 'lucide-react';
-import { COMPANY, addressLine } from '@/lib/site/company';
+import { COMPANY, addressLine, whatsappUrl } from '@/lib/site/company';
 import { localePath, type SiteLocale } from '@/lib/site/routes';
 import type { InventoryRow } from '@/lib/site/inventory';
 import { track } from '@/lib/tracking/events';
@@ -136,7 +136,7 @@ function ContactBody({ locale }: { locale: SiteLocale }) {
     </label>
   );
 
-  const wa = COMPANY.whatsapp ? `https://wa.me/${COMPANY.whatsapp}?text=${encodeURIComponent(t('whatsappText'))}` : null;
+  const wa = whatsappUrl(t('whatsappText'));
 
   return (
     <Section>

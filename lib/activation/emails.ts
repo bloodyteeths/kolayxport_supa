@@ -141,10 +141,27 @@ export interface ActivationRunResult {
   wouldSend: number;
   skippedConnected: number;
   failed: number;
+  /** True when the run sent nothing because it is outside Mon–Fri 09:00–17:30 Turkey time. */
+  outsideWorkingHours?: boolean;
+}
+
+/**
+ * Founder rule (2026-10-22): "Dont email people outside of working hours for marketing." Sends only Mon–Fri
+ * 09:00–17:30 Turkey time (UTC+3 all year, no DST). The daily 09:15 Istanbul run is inside; a weekend run sends
+ * nothing and Monday's run picks the users up (dueStep still finds them inside the 7-day window).
+ */
+export function inWorkingHours(now: Date): boolean {
+  const tr = new Date(now.getTime() + 3 * 3600_000); // Europe/Istanbul is fixed UTC+3
+  const day = tr.getUTCDay(); // 0 Sun … 6 Sat
+  const minutes = tr.getUTCHours() * 60 + tr.getUTCMinutes();
+  return day >= 1 && day <= 5 && minutes >= 9 * 60 && minutes < 17 * 60 + 30;
 }
 
 export async function runActivationEmails(now: Date = new Date()): Promise<ActivationRunResult> {
   const dryRun = !activationEmailsEnabled();
+  if (!dryRun && !inWorkingHours(now)) {
+    return { dryRun, candidates: 0, sent: 0, wouldSend: 0, skippedConnected: 0, failed: 0, outsideWorkingHours: true };
+  }
   const users = await prisma.user.findMany({
     where: {
       createdAt: { gte: new Date(now.getTime() - WINDOW_HOURS * HOUR), lte: new Date(now.getTime() - STEP_AFTER_HOURS.day1 * HOUR) },

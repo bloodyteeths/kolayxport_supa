@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { afterEach, vi } from 'vitest';
-import { activationEmailBody, activationEmailsEnabled, dueStep, isSkippedAccount } from '@/lib/activation/emails';
+import { activationEmailBody, activationEmailsEnabled, dueStep, inWorkingHours, isSkippedAccount } from '@/lib/activation/emails';
 
 const H = 3600_000;
 const now = new Date('2026-10-22T06:15:00Z');
@@ -68,5 +68,19 @@ describe('activationEmailsEnabled', () => {
   it('unset is a dry run', () => {
     vi.stubEnv('ACTIVATION_EMAILS', undefined as unknown as string);
     expect(activationEmailsEnabled()).toBe(false);
+  });
+});
+
+describe('inWorkingHours (Mon–Fri 09:00–17:30 Turkey time)', () => {
+  it('the daily 06:15 UTC run on a weekday is inside', () => expect(inWorkingHours(new Date('2026-10-23T06:15:00Z'))).toBe(true)); // Fri 09:15 TR
+  it('weekends are outside', () => {
+    expect(inWorkingHours(new Date('2026-10-24T06:15:00Z'))).toBe(false); // Sat
+    expect(inWorkingHours(new Date('2026-10-25T06:15:00Z'))).toBe(false); // Sun
+  });
+  it('edges: 08:59 out, 09:00 in, 17:29 in, 17:30 out (TR)', () => {
+    expect(inWorkingHours(new Date('2026-10-26T05:59:00Z'))).toBe(false);
+    expect(inWorkingHours(new Date('2026-10-26T06:00:00Z'))).toBe(true);
+    expect(inWorkingHours(new Date('2026-10-26T14:29:00Z'))).toBe(true);
+    expect(inWorkingHours(new Date('2026-10-26T14:30:00Z'))).toBe(false);
   });
 });

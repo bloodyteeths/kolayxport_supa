@@ -79,6 +79,8 @@ import { useBulkAi } from './useBulkAi';
 import { withAiMarker } from './AiProposalCell';
 import { useStockManagedRows } from '@/components/domain/listings/stockManaged';
 import { isPlayClient } from '@/lib/billing/playClient';
+import { useEditorTier } from '@/lib/billing/useEditorTier';
+import { EditorUpgradeHost, requestEditorUpgrade } from '@/components/domain/listings/editor/EditorUpgrade';
 
 // ─── URL ────────────────────────────────────────────────────────────────────
 
@@ -336,6 +338,8 @@ export type BulkEditPageProps = {
 
 export function BulkEditPage({ marketplace, transport: injectedTransport, stagingAdapter, revertDeps }: BulkEditPageProps) {
   const config = bulkConfig(marketplace);
+  // Etsy bulk editor tiers (lib/billing/editorTier): a locked capability opens the upgrade prompt instead.
+  const editorTier = useEditorTier();
   const lc = config.listings;
   const t = useTranslations() as unknown as ListingsT;
   const format = useFormatter();
@@ -809,7 +813,7 @@ export function BulkEditPage({ marketplace, transport: injectedTransport, stagin
         icon: icons.ai,
         disabled: ai.limited || ai.running,
         disabledReason: ai.limited ? ai.limitLabel ?? undefined : undefined,
-        onClick: () => void improveWithAi(selectedRows),
+        onClick: () => (marketplace === 'etsy' && !editorTier.allows('ai') ? requestEditorUpgrade('ai') : void improveWithAi(selectedRows)),
       });
     }
     if (config.photosHref && photo.visible) {
@@ -863,9 +867,10 @@ export function BulkEditPage({ marketplace, transport: injectedTransport, stagin
       : undefined;
   const openFind = React.useCallback(async () => {
     if (findDisabledReason) return;
+    if (marketplace === 'etsy' && !editorTier.allows('findReplace')) { requestEditorUpgrade('findReplace'); return; }
     await queue.whenIdle();
     setUrl({ tool: 'findReplace' });
-  }, [findDisabledReason, queue, setUrl]);
+  }, [findDisabledReason, queue, setUrl, marketplace, editorTier]);
   const closeTool = React.useCallback(() => setUrl({ tool: undefined }), [setUrl]);
   const toolCtx: ListingsToolContext = React.useMemo(
     () => ({
@@ -1158,7 +1163,8 @@ export function BulkEditPage({ marketplace, transport: injectedTransport, stagin
           <Select<string> value={sectionValue} onChange={setSectionValue} options={sectionOptions} placeholder={t('bulk.section.pick')} fullWidth aria-label={t('bulk.col.section')} />
         </FormField>
       </Modal>
-      {ids ? null : <FindReplacePanel open={url.tool === 'findReplace'} onClose={closeTool} ctx={toolCtx} />}
+      {ids ? null : <FindReplacePanel open={url.tool === 'findReplace' && !(marketplace === 'etsy' && !editorTier.allows('findReplace'))} onClose={closeTool} ctx={toolCtx} />}
+      <EditorUpgradeHost />
     </Page>
   );
 }

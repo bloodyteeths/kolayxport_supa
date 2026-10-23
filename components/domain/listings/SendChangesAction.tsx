@@ -13,6 +13,8 @@ import { icons } from '@/lib/ds/icons';
 import type { ListingMarketplace, SendResult } from '@/lib/listings/types';
 import type { ListingsT } from './columns';
 import type { SendPlan, UseStagedChanges } from './useStagedChanges';
+import { useEditorTier } from '@/lib/billing/useEditorTier';
+import { requestEditorUpgrade } from '@/components/domain/listings/editor/EditorUpgrade';
 
 export type SendChangesOptions = {
   marketplace: ListingMarketplace;
@@ -58,6 +60,7 @@ export function useSendChanges({ marketplace, unsent, staged, t, disabledReason,
   const confirm = useConfirm();
   const toast = useToast();
   const [sendingCount, setSendingCount] = React.useState(0);
+  const editorTier = useEditorTier();
   const to = t('listings.mp.to', { marketplace });
 
   const report = React.useCallback(
@@ -77,6 +80,11 @@ export function useSendChanges({ marketplace, unsent, staged, t, disabledReason,
   const sendDrafts = React.useCallback(
     async (drafts: Array<{ draftId: string; id: string }>): Promise<SendResult | null> => {
       if (!drafts.length) return null;
+      // Etsy editor tier send cap (lib/billing/editorTier): over the cap → upgrade prompt, nothing sent.
+      if (marketplace === 'etsy' && !editorTier.withinCap(drafts.length)) {
+        requestEditorUpgrade('sendSize', { count: drafts.length });
+        return null;
+      }
       setSendingCount(drafts.length);
       try {
         const result = await staged.send(drafts);

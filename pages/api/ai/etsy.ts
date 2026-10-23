@@ -1,3 +1,5 @@
+import { editorAllows, editorLockedBody } from '@/lib/billing/editorTier';
+import { accountEditorTier } from '@/lib/billing/editorTierServer';
 import { AiNotConfiguredError, getAiModel, refineFromBody } from '@/lib/ai/gemini';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '../../../lib/auth';
@@ -946,6 +948,11 @@ export default async function handler(
   // Server-set context for lib/ai (never trusted from the client: any incoming __ctx is overwritten).
   const body = { ...rawBody, __ctx: { userId, action: String(action || '') } };
 
+  // Bulk AI is a Pro/Kurumsal editor capability (lib/billing/editorTier); single-listing AI is unchanged.
+  if (action === 'bulk_optimize') {
+    const tier = await accountEditorTier(userId);
+    if (!editorAllows(tier, 'ai')) return res.status(402).json(editorLockedBody(tier, 'ai'));
+  }
   if (!action) {
     return res.status(400).json({ error: 'action alanı zorunludur.', code: 'invalid_action' });
   }

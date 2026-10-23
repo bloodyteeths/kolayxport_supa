@@ -2,6 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { syncDraft } from '@/lib/etsy/draftService';
+import { EDITOR_LIMITS, editorLockedBody, sendWithinCap } from '@/lib/billing/editorTier';
+import { accountEditorTier } from '@/lib/billing/editorTierServer';
 import { BULK_CALLS_PER_DRAFT, EtsyPriority, canSpend, withEtsyBudget } from '@/lib/etsy/rateBudget';
 import { isEtsyDraftError } from '@/lib/etsy/draftErrors';
 
@@ -42,6 +44,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const force = req.body?.force === true;
 
   const ids = draftIds.map(String);
+  // Editor tier (lib/billing/editorTier): Aylık/Başlangıç 100 per send, Büyüme 500, Pro/Kurumsal no cap.
+  const tier = await accountEditorTier(user.id);
+  if (!sendWithinCap(tier, ids.length)) {
+    return res.status(402).json(editorLockedBody(tier, 'sendSize', { max: EDITOR_LIMITS[tier].maxPerSend, requested: ids.length }));
+  }
   const shops = new Map((await prisma.etsyListingDraft.findMany({ where: { id: { in: ids }, userId: user.id }, select: { id: true, etsyShopId: true } }))
     .map((d) => [d.id, d.etsyShopId ? String(d.etsyShopId) : undefined]));
   const out: Array<DraftResult | undefined> = new Array(ids.length);

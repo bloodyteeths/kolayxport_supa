@@ -14488,6 +14488,30 @@
         "processing": "Hazırlama süresi seç",
         "whoMade": "\"Kim yaptı\"yı doldur"
       }
+    },
+    "editorTier": {
+      "lockedTitle": "{feature} bu planda yok",
+      "sendSizeTitle": "Planınızda tek seferde en fazla {max} ilan gönderilebilir ({count} seçili)",
+      "unlockedOn": "{plan} planında açılır. Bu plan şunları ekler:",
+      "seePlans": "Planları gör",
+      "notNow": "Şimdi değil",
+      "addsMax": "Tek seferde {max} ilana kadar gönderim",
+      "addsUnlimited": "Sınırsız toplu gönderim (Etsy günlük kotası içinde)",
+      "locked": "Kilitli",
+      "plan": {
+        "plus": "Büyüme",
+        "pro": "Pro"
+      },
+      "cap": {
+        "findReplace": "Bul ve değiştir",
+        "schedule": "Zamanlanmış gönderim",
+        "csv": "CSV içe/dışa aktarma",
+        "ai": "Toplu yapay zekâ önerileri",
+        "templates": "Şablonlar",
+        "copyToShop": "Başka mağazaya kopyalama"
+      },
+      "neutralTitle": "{feature} mevcut planınızda bulunmuyor",
+      "ok": "Tamam"
     }
   },
   "listingEditor": {

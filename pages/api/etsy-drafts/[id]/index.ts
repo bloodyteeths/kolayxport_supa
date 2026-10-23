@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { getAuthUser } from '@/lib/auth';
+import { editorAllows, editorLockedBody } from '@/lib/billing/editorTier';
+import { accountEditorTier } from '@/lib/billing/editorTierServer';
 import { cancelDraftIfEmpty, discardDraft, removeDraftMedia, removeQueuedActions, toSerializable } from '@/lib/etsy/draftService';
 import { draftErrorResponse } from '@/lib/etsy/draftErrors';
 import { ScheduleError, scheduleErrorResponse, setDraftScheduledSendAt } from '@/lib/drafts/scheduledSend';
@@ -42,6 +44,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!Array.isArray(types) || types.length === 0 || types.some((t: unknown) => typeof t !== 'string')) {
           return res.status(400).json({ error: 'removeQueuedActions must be a non-empty array of action types' });
         }
+      }
+      // Scheduling a send needs the Büyüme tier or above (lib/billing/editorTier); clearing a schedule is always allowed.
+      if (hasSchedule && req.body.scheduledSendAt) {
+        const tier = await accountEditorTier(user.id);
+        if (!editorAllows(tier, 'schedule')) return res.status(402).json(editorLockedBody(tier, 'schedule'));
       }
       if (hasSchedule) {
         try {

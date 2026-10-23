@@ -92,6 +92,8 @@ import { ChangeStockModal } from './bulk/ChangeStockModal';
 import { AddTagsModal } from './bulk/AddTagsModal';
 import { ScheduleSendModal } from './bulk/ScheduleSendModal';
 import { CopyToShopModal } from './bulk/CopyToShopModal';
+import { useEditorTier } from '@/lib/billing/useEditorTier';
+import { EditorUpgradeHost, requestEditorUpgrade } from '@/components/domain/listings/editor/EditorUpgrade';
 import { SetFieldModal } from './bulk/SetFieldModal';
 import { NewDraftsBanner } from './NewDraftsBanner';
 import { buildVariationPriceInventories, priceModeToOp, type VariationMatch } from '@/lib/bulk/variationPriceOps';
@@ -264,6 +266,9 @@ const AUTO_PULL_AFTER_MS = 12 * 60 * 60 * 1000;
 
 export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageProps) {
   const config = listingsConfig(marketplace);
+  // Etsy bulk editor tiers (lib/billing/editorTier): a locked capability opens the upgrade prompt instead.
+  const editorTier = useEditorTier();
+  const etsyLocked = (cap: Parameters<typeof editorTier.allows>[0]) => marketplace === 'etsy' && !editorTier.allows(cap);
   const t = useTranslations() as unknown as ListingsT;
   const format = useFormatter();
   const toast = useToast();
@@ -631,9 +636,10 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
 
   const openSchedule = React.useCallback((draftIds: string[]) => {
     if (!draftIds.length) return;
+    if (marketplace === 'etsy' && !editorTier.allows('schedule')) { requestEditorUpgrade('schedule'); return; }
     setScheduleDrafts(draftIds);
     setModal('schedule');
-  }, []);
+  }, [marketplace, editorTier]);
 
   const sendRows = React.useCallback(
     (targets: ListingRow[]) => {
@@ -892,6 +898,7 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
           return;
         }
         case 'copyToShop':
+          if (etsyLocked('copyToShop')) { requestEditorUpgrade('copyToShop'); return; }
           setModalRows(targets);
           setModal('copyShop');
           return;
@@ -1043,12 +1050,24 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
   const toolItems = useToolsMenuItems({
     tools: config.tools.filter((k) => k !== 'scheduled' || SCHEDULED_SENDS_ENABLED),
     onOpen: (tool) => {
+      // Viewing the scheduled-sends list stays open (it also shows sends Etsy's daily budget moved to tomorrow).
+      const cap = tool === 'findReplace' ? 'findReplace' : tool === 'import' || tool === 'export' ? 'csv' : null;
+      if (cap && etsyLocked(cap)) { requestEditorUpgrade(cap); return; }
       setExportScope(undefined);
       setPanel({ tool, open: undefined });
     },
     activityHref: activity ? activity.href(storeId) : null,
     disabledReason: notConnected ? t('listings.empty.connectTitle', { marketplace: mpName }) : null,
   });
+  // A ?tool= link (or reload) to a locked tool: show the upgrade prompt instead of the panel.
+  const lockedUrlTool = url.tool === 'findReplace' ? (etsyLocked('findReplace') ? 'findReplace' : null)
+    : url.tool === 'import' || url.tool === 'export' ? (etsyLocked('csv') ? 'csv' : null) : null;
+  React.useEffect(() => {
+    if (!lockedUrlTool) return;
+    requestEditorUpgrade(lockedUrlTool);
+    closePanel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lockedUrlTool]);
   const toolCtx: ListingsToolContext = React.useMemo(
     () => ({
       marketplace,
@@ -1506,6 +1525,7 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
           return res;
         }}
       />
+      <EditorUpgradeHost />
       {staged.adapter.stagesCopyToShop ? (
         <CopyToShopModal
           open={modal === 'copyShop'}
@@ -1547,10 +1567,10 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
       ) : null}
 
       {/* Tools (G6), driven by ?tool= so a reload restores them. */}
-      <FindReplacePanel open={url.tool === 'findReplace'} onClose={closePanel} ctx={toolCtx} />
+      <FindReplacePanel open={url.tool === 'findReplace' && !etsyLocked('findReplace')} onClose={closePanel} ctx={toolCtx} />
       <DuplicatesPanel open={url.tool === 'duplicates'} onClose={closePanel} ctx={toolCtx} />
-      <CsvImportPanel open={url.tool === 'import'} onClose={closePanel} ctx={toolCtx} />
-      <ExportCsvModal open={url.tool === 'export'} onClose={closePanel} ctx={toolCtx} initialScope={exportScope} />
+      <CsvImportPanel open={url.tool === 'import' && !etsyLocked('csv')} onClose={closePanel} ctx={toolCtx} />
+      <ExportCsvModal open={url.tool === 'export' && !etsyLocked('csv')} onClose={closePanel} ctx={toolCtx} initialScope={exportScope} />
       {SCHEDULED_SENDS_ENABLED ? <ScheduledSendsPanel open={url.tool === 'scheduled'} onClose={closePanel} ctx={toolCtx} /> : null}
     </Page>
   );

@@ -14488,6 +14488,30 @@
         "processing": "Pick a processing time",
         "whoMade": "Fill in \"Who made it\""
       }
+    },
+    "editorTier": {
+      "lockedTitle": "{feature} isn't in your plan",
+      "sendSizeTitle": "Your plan sends up to {max} listings at a time ({count} selected)",
+      "unlockedOn": "Unlocked on {plan}. It adds:",
+      "seePlans": "See plans",
+      "notNow": "Not now",
+      "addsMax": "Send up to {max} listings at a time",
+      "addsUnlimited": "Unlimited bulk sends (within Etsy's daily quota)",
+      "locked": "Locked",
+      "plan": {
+        "plus": "Growth",
+        "pro": "Pro"
+      },
+      "cap": {
+        "findReplace": "Find & replace",
+        "schedule": "Scheduled sends",
+        "csv": "CSV import/export",
+        "ai": "Bulk AI suggestions",
+        "templates": "Templates",
+        "copyToShop": "Copy to another shop"
+      },
+      "neutralTitle": "{feature} isn't available on your current plan",
+      "ok": "OK"
     }
   },
   "listingEditor": {

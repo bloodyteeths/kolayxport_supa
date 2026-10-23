@@ -42,6 +42,7 @@ export default function SiteFooter({ locale }: { locale: SiteLocale }) {
         { href: href('/kullanim-sartlari'), label: t('footer.terms') },
         { href: href('/mesafeli-satis-sozlesmesi'), label: t('footer.distance') },
         { href: href('/on-bilgilendirme-formu'), label: t('footer.preinfo') },
+        { href: href('/hesap-silme'), label: t('footer.deleteAccount') },
       ],
     },
   ];

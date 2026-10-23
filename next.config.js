@@ -9,6 +9,8 @@ const MARKETING_REDIRECTS = [
   ['/privacy-tr', '/gizlilik-politikasi'],
   ['/terms', '/en/kullanim-sartlari'],
   ['/terms-tr', '/kullanim-sartlari'],
+  // EN guide renamed to its TR twin's slug so hreflang pairs them (content/README.md: same slug).
+  ['/en/nasil-kullanirim/connect-claude-chatgpt', '/en/nasil-kullanirim/claude-chatgpt-baglama'],
   // Old blog posts (unsourced, invented authors) were removed; send readers to the closest real page.
   ['/blog/trendyol-entegrasyonu-adim-adim', '/entegrasyonlar/trendyol'],
   ['/blog/fedex-ups-kargo-karsilastirmasi', '/cozumler/mikro-ihracat-kargo-etgb'],

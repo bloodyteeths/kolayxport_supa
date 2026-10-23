@@ -191,3 +191,16 @@ public/media/tutorials/
 public/robots.txt
 public/sitemap.xml
 public/sitemap-*.xml
+
+# GTM: keep prospect lists, money plans, partner terms and outreach drafts out of the repo while it is public
+docs/gtm/partners/
+docs/gtm/**/*prospect*.csv
+docs/gtm/**/money-plan*
+docs/gtm/**/plan-2026-*
+docs/gtm/capabilities-campaign.md
+docs/gtm/*vela*
+docs/gtm/etsy-bulk-editor-inventory-*
+docs/marketing/backlinks-*
+docs/gtm/social/communities.csv
+docs/gtm/social/outreach-tracker.csv
+docs/gtm/social/outreach-messages.md

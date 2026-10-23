@@ -1,3 +1,0 @@
-community,platform,contact_name,contact_handle,date_sent,variant,status,follow_up_1,follow_up_2,follow_up_3,outcome,code_issued,utm_content,signups_attributed,paid_attributed,consent_or_disclosure_proof,notes
-ÖRNEK - Etsy ile Gelir,Telegram,[yönetici adı],[@kullanıcıadı],2026-10-27,V3 canlı demo,sent,2026-10-31,2026-11-05,2026-11-12,,,grp-etsyilegelir,0,0,,"Örnek satır: gerçek kayıtla değiştir. status: draft | sent | replied | accepted | declined | opted_out | done"
-ÖRNEK - Veli Seferli,YouTube,Veli Seferli,@veli.seferli,2026-10-28,V1 ücretsiz hesap,accepted,2026-11-01,,,"6 ay Growth hesap açıldı; paylaşım şartı yok",,cr-veliseferli,0,0,,Örnek satır

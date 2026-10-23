@@ -3,6 +3,9 @@ const defaultSEOConfig = {
   defaultTitle: 'KolayXport | AI Destekli E-Ticaret Komuta Merkezi - Etsy, eBay & Amazon Araçları',
   description:
     'Etsy, eBay, Amazon, Trendyol, Wix ve Shopify entegrasyonu. AI listeleme optimizasyonu, pazar araştırması, otomatik kargo etiketi (UPS, FedEx, MNG) ve sipariş yönetimi. 14 gün ücretsiz deneme, kredi kartı gerekmez.',
+  // One robots tag per page: next-seo builds it from noindex/nofollow + these directives, so a page's
+  // own noindex (404, logout, auth) wins instead of being shadowed by a hard-coded "index, follow".
+  robotsProps: { maxImagePreview: 'large', maxSnippet: -1, maxVideoPreview: -1 },
   additionalMetaTags: [
     {
       name: 'keywords',
@@ -11,10 +14,6 @@ const defaultSEOConfig = {
     {
       name: 'author',
       content: 'KolayXport'
-    },
-    {
-      name: 'robots',
-      content: 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1'
     },
     {
       name: 'language',

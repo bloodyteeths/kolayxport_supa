@@ -72,6 +72,7 @@ function SiteShell({ locale, seo, jsonLd = [], children, tone, keepInPlayApp }: 
         canonical={canonical || SITE_URL}
         noindex={seo.noindex}
         nofollow={seo.noindex}
+        robotsProps={{ maxImagePreview: 'large', maxSnippet: -1, maxVideoPreview: -1 }}
         languageAlternates={seo.hasTwin ? [
           { hrefLang: 'tr', href: trUrl || SITE_URL },
           { hrefLang: 'en', href: enUrl },

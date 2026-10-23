@@ -22,6 +22,7 @@ export default function SiteFooter({ locale }: { locale: SiteLocale }) {
         ...(play ? [] : [{ href: href('/fiyatlandirma'), label: t('footer.pricing') }]),
         { href: href('/nasil-kullanirim'), label: t('footer.help') },
         { href: href('/blog'), label: t('footer.blog') },
+        { href: href('/araclar'), label: t('footer.tools') },
         { href: href('/karsilastirma'), label: t('footer.compare') },
       ],
     },

@@ -81,3 +81,5 @@ Bu tutarlar Cumhurbaşkanı kararıyla değiştirilebiliyor. Başvurmadan önce 
 ## KolayXport'ta ETGB dosyası
 
 KolayXport'ta yurt dışı siparişlerinizi seçip ETGB için gereken bilgileri tek bir Excel dosyasında toplayabilir ve gümrük müşavirinize e-postayla gönderebilirsiniz. İhracatçı adı, vergi numarası ve varsayılan GTİP gönderici profilinizden gelir. KolayXport beyannameyi kendisi vermez, beyanı kargo firmanız ya da müşaviriniz yapar. Adım adım kurulum için [ETGB rehberimize](/nasil-kullanirim/etgb-ve-e-arsiv) bakın.
+
+Trendyol ve Etsy satışlarınızda elinize ne kaldığını görmek için [ücretsiz hesaplayıcılarımıza](/araclar) da bakabilirsiniz.

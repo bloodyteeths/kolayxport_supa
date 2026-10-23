@@ -79,3 +79,5 @@ These amounts can be changed by presidential decree, so check the current figure
 ## The ETGB file in KolayXport
 
 In KolayXport you can select your international orders, collect the data the ETGB needs into one Excel file and email it to your customs broker. Exporter name, tax number and default HS code come from your sender profile. KolayXport doesn't file the declaration itself: your carrier or broker does. See the [step-by-step ETGB guide](/nasil-kullanirim/etgb-ve-e-arsiv) (in Turkish).
+
+To see what you keep from a Trendyol or Etsy sale, try our [free calculators](/en/araclar).

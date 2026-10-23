@@ -19,6 +19,8 @@ export interface SendEmailArgs {
   textBody: string;
   /** Defaults to the branded HTML rendering of textBody. */
   htmlBody?: string;
+  /** Where replies go (e.g. the support inbox). */
+  replyTo?: string;
 }
 
 export interface SendEmailResult {
@@ -60,6 +62,7 @@ export async function sendEmail(args: SendEmailArgs): Promise<SendEmailResult> {
         TextBody: args.textBody,
         HtmlBody: args.htmlBody || renderEmailHtml({ text: args.textBody }),
         MessageStream: 'outbound',
+        ...(args.replyTo ? { ReplyTo: args.replyTo } : {}),
       }),
     });
 

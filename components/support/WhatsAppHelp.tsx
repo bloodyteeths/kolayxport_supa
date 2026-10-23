@@ -13,10 +13,12 @@ const WA_GREEN = '#25D366';
 
 export interface WhatsAppHelpProps {
   variant?: 'connect' | 'help';
+  /** Help card only: also link to the support tickets page (off on that page itself). */
+  showTicketLink?: boolean;
   'data-testid'?: string;
 }
 
-export default function WhatsAppHelp({ variant = 'connect', 'data-testid': testId = 'whatsapp-help' }: WhatsAppHelpProps) {
+export default function WhatsAppHelp({ variant = 'connect', showTicketLink = false, 'data-testid': testId = 'whatsapp-help' }: WhatsAppHelpProps) {
   const t = useTranslations('support.whatsapp');
   const href = whatsappUrl(t(variant === 'help' ? 'prefillHelp' : 'prefillConnect'));
   if (!href) return null;
@@ -45,7 +47,14 @@ export default function WhatsAppHelp({ variant = 'connect', 'data-testid': testI
           <Box sx={{ fontSize: 14, fontWeight: 600, color: n[900] }}>{t('helpTitle')}</Box>
           <Box sx={{ fontSize: 14, color: n[600], mt: '2px' }}>{t('helpBody', { number: whatsappDisplay() ?? '' })}</Box>
         </Box>
-        {link}
+        <Box sx={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {link}
+          {showTicketLink && (
+            <Box component="a" href="/app/destek" sx={{ display: 'inline-flex', alignItems: 'center', px: '12px', minHeight: 36, borderRadius: '8px', border: `1px solid ${n[300]}`, color: n[900], fontSize: 14, fontWeight: 600, textDecoration: 'none', bgcolor: '#fff', '&:hover': { borderColor: n[500] } }}>
+              {t('ticketCta')}
+            </Box>
+          )}
+        </Box>
       </Box>
     );
   }

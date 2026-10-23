@@ -129,7 +129,7 @@ export type NavGroupConfig = {
  * prefixes their breadcrumb.
  */
 export type NavExtraDestination = {
-  id: 'etsy-activity' | 'invoices' | 'guides' | 'reports-profit' | 'reports-payouts' | 'reports-transactions';
+  id: 'etsy-activity' | 'invoices' | 'guides' | 'support' | 'reports-profit' | 'reports-payouts' | 'reports-transactions';
   /** Palette label key. */
   labelKey: string;
   /** Breadcrumb label key (defaults to `labelKey`). */
@@ -314,6 +314,14 @@ export const NAV_EXTRA_DESTINATIONS: readonly NavExtraDestination[] = [
     parentId: 'settings',
     match: ['/faturalar'],
     hideForShopifyFree: true,
+  },
+  {
+    id: 'support',
+    labelKey: 'nav.items.support',
+    href: '/app/destek',
+    icon: 'help',
+    parentId: 'help',
+    match: ['/app/destek'],
   },
   {
     id: 'guides',

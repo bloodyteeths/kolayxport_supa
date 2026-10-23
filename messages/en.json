@@ -221,7 +221,8 @@
       "reportsPayouts": "Payouts report",
       "reportsTransactions": "Transactions report",
       "videoStudio": "Video studio",
-      "partner": "Partner program"
+      "partner": "Partner program",
+      "support": "Support tickets"
     },
     "groups": {
       "listings": "Listings"
@@ -9317,6 +9318,27 @@
       "plan": "Plan",
       "reminders": "Reminders",
       "noStore": "Not connected"
+    },
+    "support": {
+      "title": "Support tickets",
+      "subtitle": "User tickets. Your answer is also emailed to the user.",
+      "back": "← Admin",
+      "forbidden": "This page is for admins only.",
+      "filter": "Status",
+      "all": "All",
+      "loading": "Loading…",
+      "empty": "No tickets.",
+      "pick": "Pick a ticket on the left.",
+      "team": "Team",
+      "user": "User",
+      "reply": "Reply",
+      "replyPlaceholder": "Write your answer…",
+      "sendAnswer": "Answer and email",
+      "close": "Close",
+      "reopen": "Reopen",
+      "sent": "Answer sent.",
+      "failed": "Couldn't send.",
+      "emailNote": "If the user replies by email, it lands in the support inbox (kolayxport@gmail.com)."
     }
   },
   "marketing": {
@@ -17445,7 +17467,53 @@
       "prefillConnect": "Hi, I need help connecting my store to KolayXport.",
       "helpTitle": "Live support",
       "helpBody": "Send us your question on WhatsApp: {number}",
-      "prefillHelp": "Hi, I have a question about KolayXport."
+      "prefillHelp": "Hi, I have a question about KolayXport.",
+      "ticketTitle": "Support ticket",
+      "ticketBody": "Describe the problem; our answer shows in the app and in your email.",
+      "ticketCta": "Open a support ticket"
+    },
+    "tickets": {
+      "title": "Support",
+      "subtitle": "Write to us; our answer shows here and in your email.",
+      "new": "New support ticket",
+      "subject": "Subject",
+      "categoryLabel": "Topic",
+      "message": "Your message",
+      "messageHelper": "Say what you were trying to do and what happened. Never share passwords or card details.",
+      "submit": "Send ticket",
+      "cancel": "Cancel",
+      "created": "Ticket {ref} received.",
+      "empty": "You have no support tickets yet.",
+      "back": "← My tickets",
+      "fromTeam": "KolayXport team",
+      "fromYou": "You",
+      "reply": "Your reply",
+      "replyReopens": "Replying reopens this ticket",
+      "send": "Send",
+      "replied": "Reply sent.",
+      "close": "Close ticket",
+      "typeFirst": "Type a message first",
+      "fillBoth": "Subject and message are required",
+      "status": {
+        "open": "Waiting for us",
+        "answered": "Answered",
+        "closed": "Closed"
+      },
+      "category": {
+        "connection": "Connecting a store",
+        "orders": "Orders",
+        "labels": "Shipping labels",
+        "billing": "Billing and plan",
+        "other": "Other"
+      },
+      "errors": {
+        "subject_required": "Subject is required.",
+        "body_required": "Message is required.",
+        "too_long": "Text is too long.",
+        "rate_limited": "You opened many tickets today; please write in an existing one.",
+        "generic": "Something went wrong, please try again.",
+        "load": "Couldn't load your tickets."
+      }
     }
   }
 }

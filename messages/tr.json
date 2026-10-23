@@ -221,7 +221,8 @@
       "reportsPayouts": "Ödemeler raporu",
       "reportsTransactions": "İşlemler raporu",
       "videoStudio": "Video stüdyosu",
-      "partner": "Ortaklık"
+      "partner": "Ortaklık",
+      "support": "Destek talepleri"
     },
     "groups": {
       "listings": "İlanlar"
@@ -9317,6 +9318,27 @@
       "plan": "Plan",
       "reminders": "Hatırlatmalar",
       "noStore": "Bağlı değil"
+    },
+    "support": {
+      "title": "Destek talepleri",
+      "subtitle": "Kullanıcı talepleri. Yanıtınız kullanıcıya e-postayla da gider.",
+      "back": "← Yönetim",
+      "forbidden": "Bu sayfa yalnızca yöneticiler içindir.",
+      "filter": "Durum",
+      "all": "Tümü",
+      "loading": "Yükleniyor…",
+      "empty": "Talep yok.",
+      "pick": "Soldan bir talep seçin.",
+      "team": "Ekip",
+      "user": "Kullanıcı",
+      "reply": "Yanıt",
+      "replyPlaceholder": "Yanıtınızı yazın…",
+      "sendAnswer": "Yanıtla ve e-posta gönder",
+      "close": "Kapat",
+      "reopen": "Yeniden aç",
+      "sent": "Yanıt gönderildi.",
+      "failed": "Gönderilemedi.",
+      "emailNote": "Kullanıcı e-postayla yanıt verirse yanıt destek kutusuna (kolayxport@gmail.com) düşer."
     }
   },
   "marketing": {
@@ -17445,7 +17467,53 @@
       "prefillConnect": "Merhaba, KolayXport'ta mağazamı bağlamak için yardım istiyorum.",
       "helpTitle": "Canlı destek",
       "helpBody": "Sorunuzu WhatsApp'tan yazın: {number}",
-      "prefillHelp": "Merhaba, KolayXport hakkında bir sorum var."
+      "prefillHelp": "Merhaba, KolayXport hakkında bir sorum var.",
+      "ticketTitle": "Destek talebi",
+      "ticketBody": "Sorununuzu yazın; yanıtımız uygulamada ve e-postanızda görünür.",
+      "ticketCta": "Destek talebi aç"
+    },
+    "tickets": {
+      "title": "Destek",
+      "subtitle": "Bize yazın; yanıtımız burada ve e-postanızda görünür.",
+      "new": "Yeni destek talebi",
+      "subject": "Konu",
+      "categoryLabel": "Konu türü",
+      "message": "Mesajınız",
+      "messageHelper": "Ne yapmaya çalıştığınızı ve ne olduğunu yazın. Şifre veya kart bilgisi paylaşmayın.",
+      "submit": "Talebi gönder",
+      "cancel": "Vazgeç",
+      "created": "{ref} numaralı talebiniz alındı.",
+      "empty": "Henüz destek talebiniz yok.",
+      "back": "← Taleplerim",
+      "fromTeam": "KolayXport ekibi",
+      "fromYou": "Siz",
+      "reply": "Yanıtınız",
+      "replyReopens": "Yanıt yazarsanız talep yeniden açılır",
+      "send": "Gönder",
+      "replied": "Yanıtınız gönderildi.",
+      "close": "Talebi kapat",
+      "typeFirst": "Önce bir mesaj yazın",
+      "fillBoth": "Konu ve mesaj gerekli",
+      "status": {
+        "open": "Yanıt bekliyor",
+        "answered": "Yanıtlandı",
+        "closed": "Kapandı"
+      },
+      "category": {
+        "connection": "Mağaza bağlama",
+        "orders": "Siparişler",
+        "labels": "Kargo etiketi",
+        "billing": "Ödeme ve plan",
+        "other": "Diğer"
+      },
+      "errors": {
+        "subject_required": "Konu gerekli.",
+        "body_required": "Mesaj gerekli.",
+        "too_long": "Metin çok uzun.",
+        "rate_limited": "Bugün çok fazla talep açtınız; lütfen mevcut talebinizden yazın.",
+        "generic": "Bir sorun oluştu, lütfen tekrar deneyin.",
+        "load": "Talepler yüklenemedi."
+      }
     }
   }
 }

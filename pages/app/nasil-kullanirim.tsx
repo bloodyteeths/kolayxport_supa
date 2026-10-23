@@ -26,7 +26,7 @@ export default function HowToUsePage() {
   return (
     <Page title={t('title')} width="detail">
       <PageHeader title={t('title')} subtitle={t('subtitle')} />
-      <Box sx={{ mb: '16px' }}><WhatsAppHelp variant="help" /></Box>
+      <Box sx={{ mb: '16px' }}><WhatsAppHelp variant="help" showTicketLink /></Box>
       <Box component="ol" sx={{ listStyle: 'none', m: 0, p: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {STEPS.map((s, i) => (
           <Box component="li" key={s.key}>

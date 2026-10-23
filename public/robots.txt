@@ -1,9 +1,0 @@
-# *
-User-agent: *
-Allow: /
-
-# Host
-Host: https://kolayxport.com
-
-# Sitemaps
-Sitemap: https://kolayxport.com/sitemap.xml

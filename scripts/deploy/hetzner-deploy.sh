@@ -114,6 +114,12 @@ if [ "$MODE" = "full" ]; then
     exit 4
   fi
 
+  # robots.txt + sitemap (next-sitemap.config.js). `npm run build` would run it as postbuild; we call next
+  # directly, so run it here against .next-new. It reads .next-new manifests only and writes only
+  # public/robots.txt + public/sitemap*.xml, which are gitignored, so it never blocks `git pull`. Never fatal.
+  echo "==> next-sitemap (public/robots.txt, public/sitemap*.xml)"
+  NEXT_DIST_DIR=.next-new npx next-sitemap || echo "::warning::next-sitemap failed; robots.txt/sitemap may be missing until the next deploy"
+
   echo "==> new BUILD_ID=$(cat .next-new/BUILD_ID); swapping .next <- .next-new"
 
   # Atomic-ish swap: two rename(2) syscalls back-to-back. The window where

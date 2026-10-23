@@ -14,6 +14,11 @@
  *        P1 Webhook     allowed while < 85% (then deferred to 00:05 UTC)
  *        P3 Interactive allowed while < 90%
  *        P2 Reconcile   allowed while < 70% (then deferred to 00:05 UTC)
+ *        P4 Bulk        allowed while < 75% (seller-triggered bulk / scheduled sends of many drafts)
+ *
+ *     Plus a per-shop cap on P4 Bulk calls per day: BULK_SHOP_DAILY_CAP (20,000 ≈ 6,500 listings), so one
+ *     big shop's bulk send can never drain the app's shared quota (measured 2026-10-24 from Etsy's headers:
+ *     x-limit-per-second 150, x-limit-per-day 100,000 for our app key).
  *
  *     Plus a per-shop cap on P1+P2 calls per day:
  *        clamp(floor(0.6 * limit / activeShopsToday), 300, 5000)
@@ -34,6 +39,8 @@ export enum EtsyPriority {
   Webhook = 1,
   Reconcile = 2,
   Interactive = 3,
+  /** Seller-triggered bulk sends (bulk-sync, scheduled sends): gated at 75% and capped per shop per day. */
+  Bulk = 4,
 }
 
 export type EtsyBudgetContext = {
@@ -79,7 +86,13 @@ export const DAILY_GATES: Record<EtsyPriority, number> = {
   [EtsyPriority.Webhook]: 0.85,
   [EtsyPriority.Reconcile]: 0.7,
   [EtsyPriority.Interactive]: 0.9,
+  [EtsyPriority.Bulk]: 0.75,
 };
+
+/** Max P4 Bulk calls per shop per UTC day (~3 calls per listing → ≈ 6,500 listings). */
+export const BULK_SHOP_DAILY_CAP = 20_000;
+/** Typical Etsy calls for one draft send (fetch + inventory for the conflict check, update). */
+export const BULK_CALLS_PER_DRAFT = 3;
 
 const UNKNOWN_SHOP = '_';
 
@@ -111,6 +124,8 @@ export type GateInput = {
   /** Calls this shop already made today at P1+P2. */
   shopBackgroundCalls: number;
   shopCap: number;
+  /** Calls this shop already made today at P4 Bulk. */
+  shopBulkCalls?: number;
   calls?: number;
   nowMs?: number;
 };
@@ -124,6 +139,9 @@ export function evaluateDailyGate(input: GateInput): GateResult {
   const threshold = DAILY_GATES[priority] ?? DAILY_GATES[EtsyPriority.Interactive];
   if (input.usedFraction >= threshold) {
     if (priority === EtsyPriority.Critical) return { ok: false, retryAfterMs: P0_RETRY_MS, reason: 'p0_retry' };
+    return { ok: false, retryAfterMs: msUntilNextDayWindow(nowMs), reason: 'budget' };
+  }
+  if (priority === EtsyPriority.Bulk && (input.shopBulkCalls ?? 0) + Math.max(1, input.calls ?? 1) > BULK_SHOP_DAILY_CAP) {
     return { ok: false, retryAfterMs: msUntilNextDayWindow(nowMs), reason: 'budget' };
   }
   if (priority === EtsyPriority.Webhook || priority === EtsyPriority.Reconcile) {
@@ -158,7 +176,7 @@ export function parseQuotaHeaders(headers: { get(name: string): string | null } 
 // State
 // ---------------------------------------------------------------------------
 
-type ShopCounters = { calls: number; background: number };
+type ShopCounters = { calls: number; background: number; bulk: number };
 
 type DayCounters = {
   day: string;
@@ -307,6 +325,7 @@ export function canSpend(shopId: string, priority: EtsyPriority, calls = 1): { o
     usedFraction: usedFraction(nowMs),
     shopBackgroundCalls: shop?.background ?? 0,
     shopCap: perShopCap(effectiveLimit(), activeShopsToday()),
+    shopBulkCalls: shop?.bulk ?? 0,
     calls,
     nowMs,
   });
@@ -373,9 +392,10 @@ export function recordEtsyCall(shopId: string | undefined, priority: EtsyPriorit
   const key = shopId || UNKNOWN_SHOP;
   c.total += 1;
   c.byPriority[priority] = (c.byPriority[priority] || 0) + 1;
-  const s = c.byShop.get(key) || { calls: 0, background: 0 };
+  const s = c.byShop.get(key) || { calls: 0, background: 0, bulk: 0 };
   s.calls += 1;
   if (isBackground(priority)) s.background += 1;
+  if (priority === EtsyPriority.Bulk) s.bulk += 1;
   c.byShop.set(key, s);
   addPending(c.day, key, priority, 1, 0);
 }
@@ -488,9 +508,10 @@ export async function loadEtsyUsageFromDb(): Promise<{ rows: number }> {
       c.total += row.calls;
       c.throttled += row.throttled;
       c.byPriority[row.priority] = (c.byPriority[row.priority] || 0) + row.calls;
-      const s = c.byShop.get(row.shopId) || { calls: 0, background: 0 };
+      const s = c.byShop.get(row.shopId) || { calls: 0, background: 0, bulk: 0 };
       s.calls += row.calls;
       if (isBackground(row.priority as EtsyPriority)) s.background += row.calls;
+      if ((row.priority as EtsyPriority) === EtsyPriority.Bulk) s.bulk += row.calls;
       c.byShop.set(row.shopId, s);
     }
     if (quota && quota.limitPerDay !== null && quota.observedAt.getTime() > S.remote.observedAt) {

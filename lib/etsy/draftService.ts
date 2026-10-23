@@ -1759,6 +1759,8 @@ export type SyncDraftOptions = {
    * (re-bases the draft onto the current remote state first). Default false.
    */
   force?: boolean;
+  /** Budget priority for the Etsy calls (default: the enclosing context's, else Interactive). Bulk sends pass Bulk. */
+  priority?: EtsyPriority;
 };
 
 export type SyncDraftResult = {
@@ -1832,7 +1834,8 @@ function firstOfferingReadiness(inventory: any): number | null {
 
 /** Runs a draft sync at Interactive priority in the Etsy rate budget. */
 export async function syncDraft(draftId: string, userId: string, options: SyncDraftOptions = {}): Promise<SyncDraftResult> {
-  return withEtsyBudget({ userId, priority: EtsyPriority.Interactive }, () => syncDraftInner(draftId, userId, options));
+  const priority = options.priority ?? getEtsyBudgetContext()?.priority ?? EtsyPriority.Interactive;
+  return withEtsyBudget({ userId, priority }, () => syncDraftInner(draftId, userId, options));
 }
 
 async function syncDraftInner(draftId: string, userId: string, options: SyncDraftOptions = {}): Promise<SyncDraftResult> {

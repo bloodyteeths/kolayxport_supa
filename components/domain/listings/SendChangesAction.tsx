@@ -69,6 +69,7 @@ export function useSendChanges({ marketplace, unsent, staged, t, disabledReason,
       } else {
         toast.success(message);
       }
+      if (result.scheduled?.length) toast.info(t('listings.send.scheduledOverBudget', { count: result.scheduled.length }));
     },
     [t, to, toast],
   );

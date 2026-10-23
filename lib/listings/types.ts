@@ -524,6 +524,8 @@ export type SendResult = {
   sent: string[];
   failed: { id: string; errorKey: string; errorParams?: Record<string, string | number> }[];
   conflicts: string[];
+  /** Not sent now because the shop's daily Etsy budget is used up; scheduled for the next window (Etsy bulk-sync). */
+  scheduled?: string[];
 };
 
 export interface StagingAdapter {

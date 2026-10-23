@@ -169,6 +169,7 @@ export function toSendResult(data: unknown, requested: string[]): SendResult {
       const status = String(r.status ?? '');
       if (status === 'success' || status === 'synced' || status === 'sent') out.sent.push(id);
       else if (status === 'conflict') out.conflicts.push(id);
+      else if (status === 'deferred') (out.scheduled ||= []).push(id); // over today's Etsy budget: scheduled, not failed
       else if (status === 'syncing' || status === 'pending') continue; // Trendyol async batch: still in flight
       else if (status === 'skipped' && r.reason === 'empty') continue; // nothing left to send: cancelled server-side, not a failure
       else if (status === 'skipped' && r.reason === 'legacy') continue; // eBay listing created on eBay: not sendable from here, not a failure
@@ -196,7 +197,7 @@ export function toSendResult(data: unknown, requested: string[]): SendResult {
 }
 
 function mergeResults(a: SendResult, b: SendResult): SendResult {
-  return { sent: [...a.sent, ...b.sent], failed: [...a.failed, ...b.failed], conflicts: [...a.conflicts, ...b.conflicts] };
+  return { sent: [...a.sent, ...b.sent], failed: [...a.failed, ...b.failed], conflicts: [...a.conflicts, ...b.conflicts], scheduled: [...(a.scheduled || []), ...(b.scheduled || [])] };
 }
 
 async function sendChunked(draftIds: string[], sendChunk: (ids: string[]) => Promise<unknown>): Promise<SendResult> {

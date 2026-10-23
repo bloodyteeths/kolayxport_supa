@@ -13954,7 +13954,8 @@
       "selected": "Seçili değişiklikleri gönder",
       "toastResult": "{sent} değişiklik {to} gönderildi{failed, plural, =0 {} other { · # tanesi gönderilemedi}}",
       "retryFailed": "Gönderilemeyenleri yeniden dene",
-      "failedGeneric": "Gönderilemedi. Hiçbir şey değişmedi."
+      "failedGeneric": "Gönderilemedi. Hiçbir şey değişmedi.",
+      "scheduledOverBudget": "{count, plural, one {# değişiklik} other {# değişiklik}} Etsy'nin günlük kotası nedeniyle yarına planlandı ve otomatik gönderilecek."
     },
     "action": {
       "deleteNow": "{kind, select, archive {Şimdi arşivle} other {Şimdi sil}}",

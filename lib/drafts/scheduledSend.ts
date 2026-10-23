@@ -29,6 +29,7 @@ import { logger } from '@/lib/logger';
 import { notify } from '@/lib/notifications';
 import { isKnownType } from '@/lib/notificationCenter/registry';
 import { syncDraft as syncEtsyDraft } from '@/lib/etsy/draftService';
+import { BULK_CALLS_PER_DRAFT, EtsyPriority, canSpend, withEtsyBudget } from '@/lib/etsy/rateBudget';
 import { syncDraft as syncEbayDraft } from '@/lib/ebay/draftService';
 import type { ScheduledJob } from '@/lib/scheduler/types';
 import {
@@ -263,9 +264,17 @@ export async function runScheduledSends(opts: RunScheduledSendsOptions = {}): Pr
   // Etsy and eBay: one draft at a time through their own sync services.
   for (const kind of ['etsy', 'ebay'] as const) {
     if (!summary.supported[kind] || aborted()) continue;
-    const rows = await dueDrafts(kind, now, limit, {});
+    const rows = await dueDrafts(kind, now, limit, kind === 'etsy' ? { etsyShopId: true } : {});
     for (let i = 0; i < rows.length && !aborted(); i++) {
       const row = rows[i];
+      // Etsy: scheduled sends run at P4 Bulk with the shop's daily cap. Over budget → move to the next window.
+      if (kind === 'etsy') {
+        const gate = canSpend(row.etsyShopId ? String(row.etsyShopId) : '', EtsyPriority.Bulk, BULK_CALLS_PER_DRAFT);
+        if (!gate.ok) {
+          await delegate(kind).updateMany({ where: { id: row.id, scheduledSendAt: { lte: now } }, data: { scheduledSendAt: new Date(Date.now() + (gate.retryAfterMs ?? 3_600_000) + 5 * 60_000) } });
+          continue;
+        }
+      }
       if (!(await claim(kind, row.id, now))) continue;
       // Re-read after the claim: `rows` can be minutes old by now, and the
       // sync service runs whatever is queued at the time it reads the draft.
@@ -280,7 +289,8 @@ export async function runScheduledSends(opts: RunScheduledSendsOptions = {}): Pr
       }
       try {
         const result: any = kind === 'etsy'
-          ? await (deps.syncEtsy || syncEtsyDraft)(row.id, row.userId, { force: false })
+          ? await withEtsyBudget({ shopId: row.etsyShopId ? String(row.etsyShopId) : undefined, userId: row.userId, priority: EtsyPriority.Bulk },
+            () => (deps.syncEtsy || syncEtsyDraft)(row.id, row.userId, { force: false, priority: EtsyPriority.Bulk }))
           : await (deps.syncEbay || syncEbayDraft)(row.id, row.userId);
         tally(summary, row.userId, kind, result?.status === 'conflict' ? 'conflicts'
           : result?.status === 'skipped' ? (result?.reason === 'legacy' ? 'legacy' : 'empty') : 'sent');

@@ -122,7 +122,7 @@ describe('runScheduledSends', () => {
     const syncEtsy = vi.fn(async () => ({ status: 'success' }));
     const s = await runScheduledSends({ now: NOW, interDraftDelayMs: 0, deps: { supported: allSupported, syncEtsy: syncEtsy as any, syncEbay: vi.fn() as any, sendCatalog: vi.fn() as any, resolveBatches: vi.fn(async () => ({ synced: 0, failed: 0, pending: 0 })) } });
     expect(syncEtsy).toHaveBeenCalledTimes(1);
-    expect(syncEtsy).toHaveBeenCalledWith('e1', 'u1', { force: false });
+    expect(syncEtsy).toHaveBeenCalledWith('e1', 'u1', { force: false, priority: 4 }) // P4 Bulk (lib/etsy/rateBudget);
     expect(s.byUser.u1.etsy).toMatchObject({ sent: 1 });
     expect(h.etsyListingDraft.rows[0].scheduledSendAt).toBeNull();
     expect(h.etsyListingDraft.rows[1].scheduledSendAt).toEqual(LATER);
@@ -150,7 +150,7 @@ describe('runScheduledSends', () => {
     });
     const s = await runScheduledSends({ now: NOW, interDraftDelayMs: 0, deps: { supported: (k) => k === 'etsy', syncEtsy: syncEtsy as any } });
     expect(syncEtsy).toHaveBeenCalledTimes(1);
-    expect(syncEtsy).toHaveBeenCalledWith('e1', 'u1', { force: false });
+    expect(syncEtsy).toHaveBeenCalledWith('e1', 'u1', { force: false, priority: 4 }) // P4 Bulk (lib/etsy/rateBudget);
     expect(s.byUser.u1.etsy).toMatchObject({ sent: 1, skipped: 1 });
   });
 

@@ -13954,7 +13954,8 @@
       "selected": "Send selected changes",
       "toastResult": "{sent} sent to {to}{failed, plural, =0 {} other { · # failed}}",
       "retryFailed": "Retry failed",
-      "failedGeneric": "Couldn't send. Nothing was changed."
+      "failedGeneric": "Couldn't send. Nothing was changed.",
+      "scheduledOverBudget": "{count, plural, one {# change was} other {# changes were}} scheduled for tomorrow because of Etsy's daily limit and will be sent automatically."
     },
     "action": {
       "deleteNow": "{kind, select, archive {Archive now} other {Delete now}}",

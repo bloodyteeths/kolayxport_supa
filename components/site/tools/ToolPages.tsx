@@ -6,14 +6,27 @@ import { localePath, type SiteLocale } from '@/lib/site/routes';
 import SiteLayout from '../SiteLayout';
 import { Section, CtaBand } from '../Blocks';
 import TrendyolProfitCalculator from './TrendyolProfitCalculator';
+import EtsyFeeCalculator from './EtsyFeeCalculator';
 
-export const TOOLS = [{ slug: 'trendyol-komisyon-ve-kar-hesaplama', key: 'trendyolProfit' }] as const;
+export const TOOLS = [
+  { slug: 'trendyol-komisyon-ve-kar-hesaplama', key: 'trendyolProfit' },
+  { slug: 'etsy-komisyon-hesaplama', key: 'etsyFees' },
+] as const;
 
 export function TrendyolProfitPage({ locale, usdTry }: { locale: SiteLocale; usdTry: number | null }) {
   const t = useTranslations('site.tools.trendyolProfit');
   return (
     <SiteLayout locale={locale} seo={{ title: t('seoTitle'), description: t('seoDescription'), path: '/araclar/trendyol-komisyon-ve-kar-hesaplama', hasTwin: true }}>
       <TrendyolProfitCalculator locale={locale} usdTry={usdTry} />
+    </SiteLayout>
+  );
+}
+
+export function EtsyFeesPage({ locale, usdTry }: { locale: SiteLocale; usdTry: number | null }) {
+  const t = useTranslations('site.tools.etsyFees');
+  return (
+    <SiteLayout locale={locale} seo={{ title: t('seoTitle'), description: t('seoDescription'), path: '/araclar/etsy-komisyon-hesaplama', hasTwin: true }}>
+      <EtsyFeeCalculator locale={locale} usdTry={usdTry} />
     </SiteLayout>
   );
 }

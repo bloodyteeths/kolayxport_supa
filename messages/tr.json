@@ -16805,7 +16805,7 @@
     "tools": {
       "common": {
         "signup": "Ücretsiz hesap aç",
-        "estimateNote": "Rakamlar tahminidir; kendi verinizle kontrol edin.",
+        "estimateNote": "Rakamlar tahminidir, kendi verinizle kontrol edin.",
         "loading": "Yükleniyor…",
         "help": "Sorunuz mu var?",
         "ticket": "Destek talebi açın",
@@ -16824,7 +16824,7 @@
         "seoTitle": "Trendyol Komisyon ve Kâr Hesaplama (2026) — KolayXport",
         "seoDescription": "Trendyol'da kategori komisyonu, kargo, platform hizmet bedeli, stopaj ve KDV sonrası ürün başına net kârınızı hesaplayın. Aynı ürünü Etsy'de satsaydınız ne kalırdı, yan yana görün.",
         "cardTitle": "Trendyol komisyon ve kâr hesaplama",
-        "cardText": "Komisyon, kargo, hizmet bedeli, stopaj ve KDV sonrası net kâr; Etsy ile yan yana.",
+        "cardText": "Komisyon, kargo, hizmet bedeli, stopaj ve KDV sonrası net kâr. Etsy ile yan yana.",
         "title": "Trendyol Komisyon ve Kâr Hesaplama: Kategori, Kargo ve KDV Dahil",
         "intro": "Trendyol'da satış fiyatı ile hesabınıza yatan tutar arasında kategori komisyonu, kargo, hizmet bedeli ve KDV var. Kategorinizi, fiyatınızı ve maliyetinizi girin, ürün başına net kârınızı ve kâr marjınızı görün.",
         "price": "Satış fiyatı (KDV dahil)",
@@ -16833,14 +16833,14 @@
         "categoryAny": "Kategori seçin",
         "categoryHelp": "Seçerseniz hesaplamadan sonra bu kategorinin çok satanlarını (tahmini) gösteririz.",
         "commission": "Kategori komisyonu",
-        "commissionHelp": "Trendyol satıcı panelinizde kategorinizin oranını görün; çoğu kategoride %10 ile %22 arasındadır.",
+        "commissionHelp": "Kategorinizin oranını Trendyol satıcı panelinizde görebilirsiniz. Oran kategoriye göre değişir.",
         "vat": "Ürün KDV oranı",
         "cost": "Ürün maliyeti (KDV dahil)",
         "costHelp": "Alış ya da üretim maliyetiniz.",
         "cargo": "Kargo ücreti (KDV dahil)",
         "cargoHelp": "Anlaşmalı kargonuzun bu paketin desisi için ücreti.",
         "fee": "Platform hizmet bedeli (KDV dahil)",
-        "feeHelp": "Gönderi başına; 10,99 TL + KDV = 13,19 TL. \"Bugün Kargoda\" gibi indirimli tutarınız varsa onu yazın.",
+        "feeHelp": "Gönderi başına 10,99 TL + KDV = 13,19 TL. \"Bugün Kargoda\" gibi indirimli tutarınız varsa onu yazın.",
         "calculate": "Hesapla",
         "result": "Sipariş başına sonuç",
         "rCommission": "Komisyon",
@@ -16854,7 +16854,7 @@
         "rProfit": "Net kâr",
         "rMargin": "Kâr marjı",
         "etsyTitle": "Aynı ürünü Etsy'de satsaydınız",
-        "etsyIntro": "Yurt dışı fiyatınızı girin; Etsy kesintilerinden sonra elinize kalanı Trendyol ile karşılaştırın.",
+        "etsyIntro": "Yurt dışı fiyatınızı girin. Etsy kesintilerinden sonra elinize kalanı Trendyol ile karşılaştırın.",
         "etsy": {
           "priceUsd": "Etsy fiyatı ($)",
           "shipUsd": "Alıcıdan alınan kargo ($)",
@@ -16864,15 +16864,15 @@
         "etsyNet": "Etsy'nin yatıracağı",
         "etsyProfit": "Etsy'de net kâr",
         "etsyVsTrendyol": "Trendyol'a göre fark",
-        "etsyRate": "Dolar kuru: {rate} ₺ (6 saatte bir güncellenir). Etsy kesintileri: Etsy Yardım Merkezi'ndeki Türkiye oranları.",
+        "etsyRate": "Dolar kuru: {rate} ₺ (6 saatte bir güncellenir). Etsy kesintileri Etsy Yardım Merkezi'ndeki Türkiye oranlarıdır.",
         "teaserTitle": "{category} kategorisinde çok satanlar (tahmini)",
         "perDay": "günde ~{n} satış",
         "teaserNone": "Bu kategori için henüz yeterli veri yok.",
         "teaserLabel": "Tahmini günlük satış · Trendyol değerlendirme artışından hesaplanır, gerçek satış sayacı değildir. Mağaza adları gösterilmez.",
         "teaserMore": "Bu kategoride {n} ürün daha var. Tüm ürünlerin günlük satış tahminini görmek için ücretsiz hesap açın.",
-        "sources": "Kurallar {date} tarihinde KolayXport'a bağlı mağazaların gerçek Trendyol hesap ekstreleriyle kontrol edildi (komisyon KDV dahil satış fiyatı üzerinden; hizmet bedeli 10,99 TL + KDV; stopaj KDV hariç tutarın %1'i).",
+        "sources": "Kurallar {date} tarihinde kendi Trendyol mağazamızın hesap ekstresiyle kontrol edildi: komisyon KDV dahil satış fiyatı üzerinden, hizmet bedeli 10,99 TL + KDV, stopaj KDV hariç tutarın %1'i.",
         "ctaTitle": "Trendyol kârınızı her siparişte görün",
-        "ctaText": "Trendyol siparişlerinizi KolayXport'a bağlayın, kârınızı her siparişte otomatik görün. Aynı ürünü yurt dışında Etsy'de satarsanız ne kazandıracağını da yan yana karşılaştırın."
+        "ctaText": "Trendyol siparişlerinizi KolayXport'a bağlayın, her siparişin net kârını Pro planda otomatik görün."
       }
     }
   },

@@ -16805,7 +16805,7 @@
     "tools": {
       "common": {
         "signup": "Create a free account",
-        "estimateNote": "Figures are estimates; check them against your own data.",
+        "estimateNote": "Figures are estimates. Check them against your own data.",
         "loading": "Loading…",
         "help": "Questions?",
         "ticket": "Open a support ticket",
@@ -16833,7 +16833,7 @@
         "categoryAny": "Choose a category",
         "categoryHelp": "If you pick one, we show that category's estimated best sellers after the calculation.",
         "commission": "Category commission",
-        "commissionHelp": "Your category's rate is in your Trendyol seller panel; most categories are between 10% and 22%.",
+        "commissionHelp": "Your category's rate is in your Trendyol seller panel. It varies by category.",
         "vat": "Product VAT rate",
         "cost": "Product cost (VAT incl.)",
         "costHelp": "Your purchase or production cost.",
@@ -16864,15 +16864,15 @@
         "etsyNet": "Etsy pays out",
         "etsyProfit": "Net profit on Etsy",
         "etsyVsTrendyol": "Difference vs Trendyol",
-        "etsyRate": "USD rate: {rate} ₺ (updated every 6 hours). Etsy fees: Türkiye rates from Etsy Help.",
+        "etsyRate": "USD rate: {rate} ₺ (updated every 6 hours). Etsy fees are the Türkiye rates from Etsy Help.",
         "teaserTitle": "Best sellers in {category} (estimated)",
         "perDay": "~{n} sales/day",
         "teaserNone": "Not enough data for this category yet.",
         "teaserLabel": "Estimated daily sales · calculated from Trendyol rating growth, not a real sales counter. Store names are not shown.",
         "teaserMore": "{n} more products in this category. Create a free account to see the daily sales estimate for all of them.",
-        "sources": "Rules checked on {date} against real Trendyol statements of stores connected to KolayXport (commission on the VAT-inclusive price; platform fee 10.99 TL + VAT; withholding 1% of the VAT-exclusive amount).",
+        "sources": "Rules checked on {date} against our own Trendyol store's statements: commission on the VAT-inclusive price, platform fee 10.99 TL + VAT, withholding 1% of the VAT-exclusive amount.",
         "ctaTitle": "See your Trendyol profit on every order",
-        "ctaText": "Connect your Trendyol orders to KolayXport and see your profit on every order automatically, side by side with what the same product would earn on Etsy."
+        "ctaText": "Connect your Trendyol orders to KolayXport and see the net profit of every order automatically on the Pro plan."
       }
     }
   },

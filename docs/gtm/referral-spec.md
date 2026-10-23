@@ -140,8 +140,8 @@ In `checkout.session.completed`, add a block that leaves the existing logic unch
 
 Business rules (Atilla, 2026-10-19):
 - **Yearly package:** 25% of the customer's **first yearly payment**, the amount paid, after discounts (no KDV is charged). The rate is 30% if the partner already had ≥ 10 paying referred customers before this payment.
-- **Aylık (monthly):** a fixed **₺1.500**, earned on the customer's **2nd** successful monthly payment.
-- **Upgrade:** Aylık → yearly within 90 days of the first payment earns the yearly bounty **minus** any Aylık bounty already earned. Never negative.
+- **Aylık (monthly):** 25% of **each of the customer's first 2** collected monthly payments, the amount paid after discounts (30% once the partner already had ≥ 10 paying referred customers). Later monthly payments earn nothing. Changed 2026-10-23 (orchestrator, founder rule "everything is with percent"); it was a fixed ₺1.500 on the 2nd payment. Code: 801aa779.
+- **Upgrade:** Aylık → yearly within 90 days of the first payment earns the yearly bounty **minus the sum** of the Aylık bounties already earned. Never negative.
 - **Exclusions:** modules, AI credit packs and renewals earn nothing. Shopify-billed customers, comped accounts and protected review accounts earn nothing.
 - **Hold:** 30 days after the payment that earned it. A refund within the hold voids the bounty.
 

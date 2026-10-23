@@ -10,12 +10,12 @@ KolayXport, yurt dışına (Etsy, eBay, Amazon) ve Trendyol'da satan Türk satı
 
 ## 2. Ödül
 
-| Müşterinin aldığı plan | Size ödenen (tek sefer) | Ne zaman kazanılır |
+| Müşterinin aldığı plan | Size ödenen | Ne zaman kazanılır |
 |---|---|---|
 | **Yıllık paket** (Başlangıç, Büyüme, Pro, Kurumsal) | Müşterinin **ilk yıllık ödemesinin %25'i** | Ödemeden 30 gün sonra (iade süresi dolunca) |
 | Yıllık paket, **10. ücretli müşterinizden itibaren** | **%30** | Aynı |
-| **Aylık plan** | **1.500 TL** sabit | Müşterinin **2. aylık ödemesinden** 30 gün sonra |
-| Aylık plandan ilk 90 gün içinde yıllığa geçiş | Yıllık ödülün, daha önce ödenen 1.500 TL düşülmüş hâli | Yıllık ödemeden 30 gün sonra |
+| **Aylık plan** | Müşterinin **ilk 2 aylık ödemesinin her birinin %25'i** (10. ücretli müşterinizden itibaren %30) | Her ödemeden 30 gün sonra |
+| Aylık plandan ilk 90 gün içinde yıllığa geçiş | Yıllık ödülden, o müşteri için daha önce kazandığınız aylık ödüller düşülür | Yıllık ödemeden 30 gün sonra |
 
 - Ödül, müşterinin **gerçekten ödediği tutar** üzerinden hesaplanır (indirimler düşülür; KDV eklenmez).
 - Yenilemeler, ek modüller ve yapay zekâ kredi paketleri ödüle dahil değildir.

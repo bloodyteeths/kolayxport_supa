@@ -9,7 +9,7 @@ Kural: Burada cevabı olmayan bir soru gelirse **tahmin etme**. "Bunu ekibe soru
 ### Program ve ödül
 
 **S: Ne kadar kazanırım?**
-C: Linkinizle gelip yıllık paket alan her satıcı için ilk yıllık ödemesinin %25'i (10. müşterinizden sonra %30); aylık plana geçen her satıcı için 1.500 TL. Tek seferlik ödenir.
+C: Linkinizle gelip yıllık paket alan her satıcı için ilk yıllık ödemesinin %25'i (10. müşterinizden sonra %30); aylık plana geçen her satıcı için ilk 2 aylık ödemesinin her birinin %25'i (10. müşterinizden sonra %30). Sonraki ödemeler için ödül yoktur.
 
 **S: Neden her ay değil de tek sefer?**
 C: Programı basit ve şeffaf tutmak için. Yıllık paketler tek çekimle ödendiği için ödülünüz de baştan büyük ve net.

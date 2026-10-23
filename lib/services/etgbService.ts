@@ -4,6 +4,8 @@ import { InvoiceService } from './invoiceService';
 import { logger } from '../logger';
 import prisma from '../prisma';
 import { Order, OrderItem } from '@prisma/client';
+import { rowHsCode } from './etgbExcelService';
+import { convertCurrency } from '@/lib/finance/fx';
 
 export interface EtgbProcessResult {
   success: boolean;
@@ -54,10 +56,24 @@ export class EtgbService {
       // The exporter is the seller's own company (ShipperProfile), never a built-in default.
       const profile = await prisma.shipperProfile.findUnique({
         where: { userId },
-        select: { shipperName: true, shipperTinNumber: true, defaultHarmonizedCode: true, defaultCountryOfMfg: true },
+        select: { shipperName: true, shipperTinNumber: true, shipperTaxOffice: true, defaultHarmonizedCode: true, defaultCountryOfMfg: true },
       });
       if (!profile?.shipperName?.trim() || !profile?.shipperTinNumber?.trim()) {
         throw new Error('ETGB exporter details missing. Please set your company name and tax number (VKN/TCKN) in Settings › Shipping.');
+      }
+
+      // Every row needs a GTIP: a broker can't declare a line without one (no invented fallback).
+      const noHs = ordersMissingHs(orders, profile.defaultHarmonizedCode);
+      if (noHs.length) {
+        throw new Error(`GTIP (HS code) missing for order(s) ${noHs.slice(0, 10).join(', ')}${noHs.length > 10 ? ' …' : ''}. Add it on the label screen or set a default HS code in Settings › Shipping.`);
+      }
+
+      // KUR: TRY per 1 unit of each order currency, today's rate (the declaration date). Refuse rather than send 1.
+      const rates: Record<string, number> = {};
+      for (const cur of Array.from(new Set(orders.map((o) => (o.currency || 'USD').toUpperCase())))) {
+        const r = cur === 'TRY' ? 1 : await convertCurrency(1, cur, 'TRY');
+        if (!r || !Number.isFinite(r) || r <= 0) throw new Error(`Exchange rate ${cur}/TRY unavailable right now; try again in a few minutes.`);
+        rates[cur] = Math.round(r * 10000) / 10000;
       }
 
       // Create order batch
@@ -65,9 +81,11 @@ export class EtgbService {
         orders,
         batchId,
         userId,
+        rates,
         exporter: {
           name: profile.shipperName.trim(),
           taxNumber: profile.shipperTinNumber.trim(),
+          taxOffice: profile.shipperTaxOffice,
           defaultHsCode: profile.defaultHarmonizedCode,
           defaultCountryOfMfg: profile.defaultCountryOfMfg,
         },
@@ -241,4 +259,11 @@ export class EtgbService {
       });
     }
   }
+}
+
+/** Pure: order numbers with at least one row that would have no GTIP (order line, order and default all empty). */
+export function ordersMissingHs(orders: Array<{ orderNumber?: string | null; id: string; harmonizedCode?: string | null; items: Array<{ harmonizedCode?: string | null }> }>, defaultHs?: string | null): string[] {
+  return orders
+    .filter((o) => (o.items.length ? o.items : [null]).some((it) => !rowHsCode(it, o, defaultHs)))
+    .map((o) => o.orderNumber || o.id);
 }

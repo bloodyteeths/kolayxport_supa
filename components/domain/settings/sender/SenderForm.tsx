@@ -182,6 +182,7 @@ export function SenderForm(props: SenderFormProps) {
             </div>
           )}
         </SettingsRow>
+        {text('shipperTaxOffice', t('field.taxOffice'), { optional: true, width: 'medium' })}
       </Section>
 
       <Section variant="card" id="sender-address" title={t('group.address')}>

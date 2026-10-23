@@ -29,6 +29,8 @@ export interface EtgbOrderData {
 export interface EtgbExporter {
   name: string;
   taxNumber: string;
+  /** Vergi dairesi; shown as "VERGİ DAİRESİ / VKN" in GÖNDEREN V.D. when set. */
+  taxOffice?: string | null;
   defaultHsCode?: string | null;
   defaultCountryOfMfg?: string | null;
 }
@@ -38,6 +40,22 @@ export interface OrderBatch {
   batchId: string;
   userId: string;
   exporter: EtgbExporter;
+  /** TRY per 1 unit of each order currency (KUR), fetched by etgbService before the Excel is built. */
+  rates?: Record<string, number>;
+}
+
+/** Pure: a short commercial description (TİCARİ TANIM), whole words, max 60 characters. */
+export function shortCommercialDescription(s: string | null | undefined, max = 60): string {
+  const t = String(s ?? '').replace(/\s+/g, ' ').trim();
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max);
+  const at = cut.lastIndexOf(' ');
+  return (at > 20 ? cut.slice(0, at) : cut).replace(/[\s,;:–-]+$/, '');
+}
+
+/** Pure: the GTIP for a row, most specific first (order line, order, the seller's default). */
+export function rowHsCode(item: { harmonizedCode?: string | null } | null, order: { harmonizedCode?: string | null }, defaultHs?: string | null): string {
+  return String(item?.harmonizedCode || order.harmonizedCode || defaultHs || '').trim();
 }
 
 export class EtgbExcelService {
@@ -80,7 +98,7 @@ export class EtgbExcelService {
       });
 
       // Convert orders to ETGB format
-      const etgbData = this.convertOrdersToEtgbFormat(orderBatch.orders, orderBatch.exporter);
+      const etgbData = this.convertOrdersToEtgbFormat(orderBatch.orders, orderBatch.exporter, orderBatch.rates ?? {});
 
       // Create workbook
       const workbook = XLSX.utils.book_new();
@@ -134,22 +152,22 @@ export class EtgbExcelService {
   /**
    * Convert orders to ETGB data format
    */
-  private convertOrdersToEtgbFormat(orders: (Order & { items: OrderItem[] })[], exporter: EtgbExporter): EtgbOrderData[] {
+  private convertOrdersToEtgbFormat(orders: (Order & { items: OrderItem[] })[], exporter: EtgbExporter, rates: Record<string, number>): EtgbOrderData[] {
     return orders.flatMap(order => {
       // Handle orders without items
       if (!order.items || order.items.length === 0) {
-        return [this.orderToEtgbData(order, null, exporter)];
+        return [this.orderToEtgbData(order, null, exporter, rates)];
       }
 
       // Create one row per item
-      return order.items.map(item => this.orderToEtgbData(order, item, exporter));
+      return order.items.map(item => this.orderToEtgbData(order, item, exporter, rates));
     });
   }
 
   /**
    * Convert single order to ETGB format
    */
-  private orderToEtgbData(order: Order, item: OrderItem | null, exporter: EtgbExporter): EtgbOrderData {
+  private orderToEtgbData(order: Order, item: OrderItem | null, exporter: EtgbExporter, rates: Record<string, number> = {}): EtgbOrderData {
     const shippingAddr = order.shippingAddress as any;
     const raw: any = (order as any).rawData || {};
     const rawLineItems: any[] = Array.isArray(raw?.line_items) ? raw.line_items : [];
@@ -239,19 +257,21 @@ export class EtgbExcelService {
       packageCount: 1,
       grossWeight: (item ? (order.weightKg || 0.5) : 0.5),
       sender: exporter.name,
-      senderTaxOffice: exporter.taxNumber,
+      senderTaxOffice: exporter.taxOffice?.trim() ? `${exporter.taxOffice.trim()} / ${exporter.taxNumber}` : exporter.taxNumber,
       recipient: order.customerName || shippingAddr?.name || '',
       originCountry: order.countryOfMfg || exporter.defaultCountryOfMfg || 'TÜRKİYE',
       tradeCountry: shippingAddr?.country_code || 'ABD',
       previousCountry: shippingAddr?.country_code || 'ABD',
       deliveryMethod: 'FOB',
       // No invented fallbacks: a blank description / GTIP is visible to the broker, a wrong one is not.
-      commercialDescription: item?.productName || order.commodityDesc || '',
-      gtipNo: order.harmonizedCode || exporter.defaultHsCode || '',
-      completionMethod: 'addon',
-      completionMethodDescription: 'addon',
+      commercialDescription: shortCommercialDescription(order.commodityDesc || item?.productName),
+      gtipNo: rowHsCode(item as { harmonizedCode?: string | null } | null, order, exporter.defaultHsCode),
+      // Left blank until the broker's list template says what belongs here (was a placeholder "addon").
+      completionMethod: '',
+      completionMethodDescription: '',
       currency: order.currency || 'USD',
-      rate: 1,
+      // TRY per 1 unit of the order currency; 0 only if etgbService could not fetch it (it refuses to send then).
+      rate: rates[(order.currency || 'USD').toUpperCase()] ?? 0,
       value: declaredValue,
       commercialInvoiceNo: `INV${order.orderNumber}`,
       commercialInvoiceDate: order.createdAt.toISOString().split('T')[0]

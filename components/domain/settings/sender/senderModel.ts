@@ -12,7 +12,7 @@ export interface SenderShipping {
 
 /** Field names of `shipperProfile` (unchanged PATCH contract of /api/user/settings). */
 export const SENDER_FIELDS = [
-  'shipperName', 'shipperPersonName', 'shipperPhoneNumber', 'shipperTinNumber', 'shipperTinType',
+  'shipperName', 'shipperPersonName', 'shipperPhoneNumber', 'shipperTinNumber', 'shipperTinType', 'shipperTaxOffice',
   'shipperStreet1', 'shipperStreet2', 'shipperCity', 'shipperStateCode', 'shipperPostalCode', 'shipperCountryCode',
   'defaultCurrencyCode', 'dutiesPaymentType', 'defaultShippingChargesPaymentType', 'fedexFolderId', 'importerOfRecord',
 ] as const;

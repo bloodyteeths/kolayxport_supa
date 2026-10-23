@@ -87,7 +87,7 @@ export const initialFormData: UserSettingsResponse = {
   },
   shipperProfile: {
     shipperName: '', shipperPersonName: '', shipperPhoneNumber: '', shipperStreet1: '', shipperStreet2: '',
-    shipperCity: '', shipperStateCode: '', shipperPostalCode: '', shipperCountryCode: '', shipperTinNumber: '',
+    shipperCity: '', shipperStateCode: '', shipperPostalCode: '', shipperCountryCode: '', shipperTinNumber: '', shipperTaxOffice: '',
     shipperTinType: '', importerOfRecord: '', fedexFolderId: '', defaultCurrencyCode: 'USD',
     dutiesPaymentType: 'SENDER', defaultShippingChargesPaymentType: 'SENDER',
   },

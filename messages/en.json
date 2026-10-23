@@ -1498,7 +1498,8 @@
         "dutiesPaidBy": "Duties paid by",
         "shippingPaidBy": "Shipping paid by",
         "fedexFolderId": "FedEx folder ID",
-        "etgbRecipientEmail": "Recipient email"
+        "etgbRecipientEmail": "Recipient email",
+        "taxOffice": "Tax office"
       },
       "error": {
         "required": "Fill this in to save",

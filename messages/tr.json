@@ -1416,7 +1416,8 @@
         "dutiesPaidBy": "Gümrük vergisini ödeyen",
         "shippingPaidBy": "Kargo ücretini ödeyen",
         "fedexFolderId": "FedEx klasör ID",
-        "etgbRecipientEmail": "Alıcı e-posta adresi"
+        "etgbRecipientEmail": "Alıcı e-posta adresi",
+        "taxOffice": "Vergi dairesi"
       },
       "error": {
         "required": "Kaydetmek için bu alanı doldurun",

@@ -420,6 +420,8 @@ model ShipperProfile {
   shipperPostalCode                 String?
   shipperCountryCode                String?
   shipperTinNumber                  String?
+  /// Vergi dairesi (tax office), printed on the ETGB list next to the tax number.
+  shipperTaxOffice                  String?
   importerOfRecord                  String?
   fedexFolderId                     String?
   defaultCurrencyCode               String?  @default("USD")

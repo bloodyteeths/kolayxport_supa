@@ -58,7 +58,7 @@ C: Hayır. ETGB için gereken Excel dosyasını hazırlayıp gümrük müşaviri
 C: Amazon siparişleri, etiket, takip ve finans var; Amazon ilan düzenleme henüz yok.
 
 **S: Mobil uygulama var mı?**
-C: Evet, Android için Google Play'de: "KolayXport: Etsy, eBay, Kargo" (play.google.com/store/apps/details?id=com.kolayxport.app). Siparişlerinizi ve ilanlarınızı telefondan da yönetebilirsiniz.
+C: Evet, Android için Google Play'de: "KolayXport: Etsy & eBay Seller" (play.google.com/store/apps/details?id=com.kolayxport.app). Siparişlerinizi ve ilanlarınızı telefondan da yönetebilirsiniz.
 *(Verified 2026-10-21 11:50 UTC: public Play listing live. iOS is not on the App Store yet, so don't promise it.)*
 
 **S: Chrome eklentisi var mı?**

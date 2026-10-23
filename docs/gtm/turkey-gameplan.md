@@ -26,7 +26,7 @@ Built on the existing research. This plan doesn't redo any of it, it only links 
 | Prices | **Pricing v2** ([pricing-v2.md](pricing-v2.md)): yearly packages Başlangıç ₺29.990 / Büyüme ₺54.990 / Pro ₺89.990 / Kurumsal (from ₺149.990); **one** monthly plan, Aylık ₺2.999, plus modules. **Final amounts, no KDV added.** Sold by **Tamsar, Inc.** (US) in TRY via Stripe; Modsons invoices Tamsar for services and runs marketing in Turkey. Yearly = pay-in-full only (no taksit) | Atilla 2026-10-19 |
 | Referral support in the app | **None.** First-touch UTMs are kept in the browser (`lib/tracking/events.ts`) and sent with the server `sign_up` event, but **not stored on the user**. Stripe Checkout shows a promotion-code field only when the founding coupon doesn't apply (`pages/api/stripe/create-checkout-session.ts:244`) | code |
 | Hepsiburada, Çiçeksepeti | Not live (waiting for integrator approval / replies). **Don't promise them** | feature-inventory N-1, project notes |
-| App-store listings | **Google Play: live** ("KolayXport: Etsy, eBay, Kargo", play.google.com/store/apps/details?id=com.kolayxport.app; public listing checked 2026-10-21 11:50 UTC). Shopify, Claude and ChatGPT MCP directories are still in review. **Freeze applies:** nobody touches MCP/OAuth/review accounts | Atilla 2026-10-21 + listing check |
+| App-store listings | **Google Play: live** ("KolayXport: Etsy & eBay Seller", play.google.com/store/apps/details?id=com.kolayxport.app; public listing checked 2026-10-21 11:50 UTC). Shopify, Claude and ChatGPT MCP directories are still in review. **Freeze applies:** nobody touches MCP/OAuth/review accounts | Atilla 2026-10-21 + listing check |
 
 ---
 

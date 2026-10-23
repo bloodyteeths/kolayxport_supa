@@ -54,7 +54,7 @@ import { SalesTrendChart, type SalesMetric } from './SalesTrendChart';
 import { StoreTable, currencySymbol, reportOrdersHref, storeDisplayName } from './StoreTable';
 import { TopProductsTable } from './TopProductsTable';
 import { StatusSummary } from './StatusSummary';
-import WhatsAppHelp from '@/components/support/WhatsAppHelp';
+import ConnectChecklist from '@/components/onboarding/ConnectChecklist';
 
 export const SALES_URL_SCHEMA = {
   stores: urlField.list({ format: 'comma' }),
@@ -370,18 +370,8 @@ export function SalesReport({ now }: SalesReportProps = {}) {
   if (!connKnown || !range.ready) {
     body = firstLoadSkeleton;
   } else if (conn.anyMarketplace === false) {
-    body = (
-      <EmptyState
-        kind="first-use"
-        icon={icons.connections}
-        title={t('empty.connect.title')}
-        body={t('empty.connect.body')}
-        action={{ id: 'connect-store', label: t('empty.connect.action'), icon: icons.add, href: links.settingsHref('connections') }}
-        data-testid="sales-connect"
-      >
-        <WhatsAppHelp />
-      </EmptyState>
-    );
+    // No store yet: the onboarding checklist with the store tiles inline (components/onboarding/ConnectChecklist.tsx).
+    body = <ConnectChecklist data-testid="sales-connect" />;
   } else if (isRangeRejected(report.error)) {
     // 400 range_too_long / invalid_range: explain the limit; Retry would fail the same way.
     body = (

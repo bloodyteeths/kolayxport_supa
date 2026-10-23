@@ -17515,5 +17515,39 @@
         "load": "Couldn't load your tickets."
       }
     }
+  },
+  "onboarding": {
+    "checklist": {
+      "title": "Set up KolayXport in 3 steps",
+      "subtitle": "Once your store is connected, your orders show up here.",
+      "step1": {
+        "title": "Connect your store",
+        "body": "Pick the marketplace you sell on. It takes about 2 minutes, and you can connect more than one store.",
+        "oauthNote": "For Etsy, eBay and Amazon you sign in with your own account and approve access; your password never reaches us."
+      },
+      "trendyol": {
+        "show": "Where do I find my Trendyol API key?",
+        "hide": "Hide the guide",
+        "steps": {
+          "1": "Sign in to your seller panel at partner.trendyol.com.",
+          "2": "Click your company name in the top right and open \"Hesap Bilgilerim\" (account details).",
+          "3": "Go to the \"Entegrasyon Bilgileri\" (integration details) tab; if nothing is there, click \"Oluştur\" (create).",
+          "4": "Copy the Supplier ID (Firma ID), API Key and API Secret.",
+          "5": "In KolayXport, open Trendyol, paste the three values and save."
+        },
+        "note": "Only the main (admin) user can see these. If you are a sub-user, ask the store owner.",
+        "openPanel": "Open Trendyol panel",
+        "enterKeys": "Enter the keys"
+      },
+      "step2": {
+        "title": "Fill in your sender profile",
+        "body": "The address, phone and tax number printed on labels and customs forms. You fill it in once.",
+        "cta": "Open sender profile"
+      },
+      "step3": {
+        "title": "Create your first label",
+        "body": "When orders arrive, tap one in Orders and choose \"Create label\"; FedEx, UPS and DHL eCommerce are supported."
+      }
+    }
   }
 }

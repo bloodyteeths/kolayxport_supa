@@ -218,11 +218,13 @@ describe('Sales states', () => {
     expect(screen.queryByTestId('sales-connect')).toBeNull();
   });
 
-  it('no store connected → connect empty state, no Export, no toolbar', async () => {
+  it('no store connected → the 3-step connect checklist with store tiles, no Export, no toolbar', async () => {
     conn.connections = { etsy: entry(false), trendyol: entry(false) };
     sales.isLoading = false;
     await renderSales();
-    expect(screen.getByTestId('sales-connect').textContent).toContain('Connect a store to see your sales');
+    expect(screen.getByTestId('sales-connect').textContent).toContain('Set up KolayXport in 3 steps');
+    expect(screen.getByTestId('checklist-store-etsy').getAttribute('href')).toBe('/api/integrations/etsy/connect');
+    expect(screen.getByTestId('checklist-store-trendyol').getAttribute('href')).toBe('/ayarlar?tab=connections&provider=trendyol');
     expect(screen.queryByRole('button', { name: 'Export CSV' })).toBeNull();
     expect(screen.queryByTestId('reports-toolbar')).toBeNull();
   });

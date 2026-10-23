@@ -17515,5 +17515,39 @@
         "load": "Talepler yüklenemedi."
       }
     }
+  },
+  "onboarding": {
+    "checklist": {
+      "title": "KolayXport'u 3 adımda kurun",
+      "subtitle": "Mağazanızı bağladığınızda siparişleriniz burada toplanır.",
+      "step1": {
+        "title": "Mağazanızı bağlayın",
+        "body": "Sattığınız pazaryerini seçin. Bağlantı 2 dakika sürer; birden fazla mağaza bağlayabilirsiniz.",
+        "oauthNote": "Etsy, eBay ve Amazon'da kendi hesabınızla giriş yapıp izin verirsiniz; şifreniz bize gelmez."
+      },
+      "trendyol": {
+        "show": "Trendyol API anahtarımı nerede bulurum?",
+        "hide": "Rehberi gizle",
+        "steps": {
+          "1": "partner.trendyol.com adresinden satıcı panelinize giriş yapın.",
+          "2": "Sağ üst köşede firma adınıza tıklayın ve \"Hesap Bilgilerim\"i açın.",
+          "3": "\"Entegrasyon Bilgileri\" sekmesine geçin; bilgiler yoksa \"Oluştur\"a tıklayın.",
+          "4": "Satıcı ID (Firma ID), API Key ve API Secret'ı kopyalayın.",
+          "5": "KolayXport'ta Trendyol'u açıp bu üç bilgiyi yapıştırın ve kaydedin."
+        },
+        "note": "Bu bilgileri yalnızca ana (yönetici) kullanıcı görebilir. Alt kullanıcıysanız mağaza sahibinden isteyin.",
+        "openPanel": "Trendyol panelini aç",
+        "enterKeys": "Anahtarları gir"
+      },
+      "step2": {
+        "title": "Gönderici profilinizi doldurun",
+        "body": "Etikette ve gümrük formunda yazan adresiniz, telefonunuz ve vergi numaranız. Bir kez doldurmanız yeterli.",
+        "cta": "Gönderici profilini aç"
+      },
+      "step3": {
+        "title": "İlk etiketinizi oluşturun",
+        "body": "Siparişleriniz geldiğinde Siparişler'de bir siparişe dokunup \"Etiket oluştur\" deyin; FedEx, UPS ve DHL eCommerce desteklenir."
+      }
+    }
   }
 }

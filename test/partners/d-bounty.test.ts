@@ -77,31 +77,31 @@ describe('bounty rules (B1–B12)', () => {
     expect(b.commissionMinor).toBe(Math.round(5_499_000 * 0.3));
   });
 
-  it('B4/B5: Aylık first payment earns nothing; the 2nd earns ₺1.500', async () => {
+  it('B4/B5: Aylık earns 25% of each of the first 2 collected monthly payments, nothing after', async () => {
     const { userId } = await seed();
-    expect(await month(userId, 'in_m1', T0)).toMatchObject({ kind: null, reason: 'first monthly payment' });
-    expect(bounties()).toHaveLength(0);
+    // ₺1.798,80 paid, ₺299,80 KDV → net ₺1.499 → 25% = ₺374,75 each.
+    expect(await month(userId, 'in_m1', T0)).toMatchObject({ kind: 'bounty_month' });
     expect(await month(userId, 'in_m2', at(30))).toMatchObject({ kind: 'bounty_month' });
-    expect(bounties()[0]).toMatchObject({ kind: 'bounty_month', commissionMinor: 150_000, currency: 'try' });
+    expect(bounties().map((b) => [b.kind, b.commissionMinor, b.currency])).toEqual([['bounty_month', 37_475, 'try'], ['bounty_month', 37_475, 'try']]);
     expect(await month(userId, 'in_m3', at(60))).toMatchObject({ kind: null, reason: 'monthly renewal' });
-    expect(bounties()).toHaveLength(1);
+    expect(bounties()).toHaveLength(2);
   });
 
-  it('B6: Aylık → yearly 40 days after the first payment pays the difference', async () => {
+  it('B6: Aylık → yearly 40 days after the first payment pays the yearly bounty minus both monthly ones', async () => {
     const { userId } = await seed();
     await month(userId, 'in_m1', T0);
     await month(userId, 'in_m2', at(30));
     expect(await year(userId, 'in_y', at(40))).toMatchObject({ kind: 'bounty_upgrade' });
     const up = bounties().find((b) => b.kind === 'bounty_upgrade')!;
-    expect(up.commissionMinor).toBe(1_374_750 - 150_000);
+    expect(up.commissionMinor).toBe(1_374_750 - 2 * 37_475);
   });
 
-  it('B7: the same switch 120 days after the first payment earns nothing', async () => {
+  it('B7: the same switch 120 days after the first payment earns nothing more', async () => {
     const { userId } = await seed();
     await month(userId, 'in_m1', T0);
     await month(userId, 'in_m2', at(30));
     expect(await year(userId, 'in_y', at(120))).toMatchObject({ kind: null });
-    expect(bounties().map((b) => b.kind)).toEqual(['bounty_month']);
+    expect(bounties().map((b) => b.kind)).toEqual(['bounty_month', 'bounty_month']);
   });
 
   it('B8: a yearly renewal one year later earns nothing', async () => {

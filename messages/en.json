@@ -9236,7 +9236,7 @@
         "cancel": "Cancel"
       },
       "empty": "No partners yet.",
-      "footnote": "Activated = a marketplace connected within 7 days of signup. Etsy, Shopify and Wix use the connection date; eBay, Amazon, Trendyol and Hepsiburada use a proxy (first synced order within 7 days, or connected now during the first 7 days), so sellers who connected those but have no order yet are undercounted. Paying = active paid Stripe plan. Net revenue = the referred customers' bounty-earning payments, net of KDV. Bounties: one-time, 25% (30% from 10 paying referrals) of the first yearly payment or ₺1.500 on the 2nd monthly payment, held 30 days.",
+      "footnote": "Activated = a marketplace connected within 7 days of signup. Etsy, Shopify and Wix use the connection date; eBay, Amazon, Trendyol and Hepsiburada use a proxy (first synced order within 7 days, or connected now during the first 7 days), so sellers who connected those but have no order yet are undercounted. Paying = active paid Stripe plan. Net revenue = the referred customers' bounty-earning payments, net of KDV. Bounties: one-time, 25% (30% from 10 paying referrals) of the first yearly payment, or of each of the first 2 monthly payments, held 30 days.",
       "unattributed": "Signups without a partner (by first-touch source)",
       "new": {
         "title": "Add partner",

@@ -6,8 +6,9 @@
 // Rules (Atilla, 2026-10-19):
 //  - Yearly: 25% of the customer's first yearly payment, net of any KDV charged (none on Tamsar, Inc. sales), after discounts; 30% when the partner already had
 //    ≥ tierThreshold paying referred customers.
-//  - Aylık (monthly): fixed ₺1.500 on the customer's 2nd successful monthly payment.
-//  - Upgrade Aylık → yearly within 90 days of the first payment: yearly bounty minus the monthly bounty already earned.
+//  - Aylık (monthly): 25% (30% after the tier) of each of the customer's first 2 collected monthly payments, net of KDV
+//    (founder via orchestrator 2026-10-23: percent only, no flat amounts; was a fixed ₺1.500 on the 2nd payment).
+//  - Upgrade Aylık → yearly within 90 days of the first payment: yearly bounty minus the monthly bounties already earned.
 //  - Renewals, modules, AI credit packs: nothing (callers only pass plan subscription payments; history tells renewals).
 //  - Shopify-billed / review / admin / excluded customers: nothing (no partnerId on their UserAcquisition, or guarded).
 //  - Hold 30 days; refunds before payout void or reduce; after payout a negative reversal row nets the next payout.
@@ -19,8 +20,8 @@ export const HOLD_DAYS = 30;
 export const UPGRADE_WINDOW_DAYS = 90;
 export const YEAR_RATE = 0.25;
 export const YEAR_TIER_RATE = 0.3;
-export const MONTH_BOUNTY_MINOR = 150_000; // ₺1.500
-export const MONTH_BOUNTY_CURRENCY = 'try';
+/** Monthly payments that earn a bounty: the customer's first two. */
+export const MONTH_BOUNTY_PAYMENTS = 2;
 
 export type PaymentProvider = 'stripe' | 'iyzico' | 'paytr';
 export type BountyKind = 'bounty_year' | 'bounty_month' | 'bounty_upgrade' | 'reversal';
@@ -66,7 +67,7 @@ export function netOfTax(grossMinor: number, taxMinor: number | null, _currency:
 
 /**
  * Pure rule engine (unit-tested). `prior` = this customer's earlier recorded subscription payments, oldest first.
- * `earnedMonthBounty` = a non-void bounty_month already earned for this customer (for the upgrade difference).
+ * `earnedMonthBounty` = the non-void bounty_month amounts already earned for this customer, summed (upgrade difference).
  */
 export function decideBounty(args: {
   interval: 'year' | 'month';
@@ -84,9 +85,9 @@ export function decideBounty(args: {
   if (interval === 'month') {
     if (prior.some((p) => p.interval === 'year')) return { kind: null, reason: 'monthly after yearly' };
     const priorMonths = prior.filter((p) => p.interval === 'month').length;
-    if (priorMonths !== 1) return { kind: null, reason: priorMonths === 0 ? 'first monthly payment' : 'monthly renewal' };
-    if (args.earnedMonthBounty) return { kind: null, reason: 'monthly bounty already earned' };
-    return { kind: 'bounty_month', amountMinor: MONTH_BOUNTY_MINOR, currency: MONTH_BOUNTY_CURRENCY, rate: 0, reason: 'month: 2nd payment' };
+    if (priorMonths >= MONTH_BOUNTY_PAYMENTS) return { kind: null, reason: 'monthly renewal' };
+    const mRate = args.payingReferralsBefore >= args.tierThreshold ? YEAR_TIER_RATE : YEAR_RATE;
+    return { kind: 'bounty_month', amountMinor: Math.round(args.netMinor * mRate), currency: args.currency, rate: mRate, reason: `month: payment ${priorMonths + 1} of ${MONTH_BOUNTY_PAYMENTS}, ${Math.round(mRate * 100)}%` };
   }
   // yearly
   if (args.alreadyHasYearOrUpgrade || prior.some((p) => p.interval === 'year')) return { kind: null, reason: 'yearly renewal' };
@@ -128,7 +129,8 @@ export async function onPaymentSucceeded(p: PaymentSucceeded): Promise<Succeeded
 
   const [prior, monthBounty, yearOrUpgrade, payingBefore] = await Promise.all([
     prisma.partnerPaymentEvent.findMany({ where: { userId: p.userId, paidAt: { lte: p.paidAt } }, orderBy: { paidAt: 'asc' }, select: { interval: true, paidAt: true } }),
-    prisma.partnerCommission.findFirst({ where: { userId: p.userId, kind: 'bounty_month', status: { not: 'void' } }, select: { commissionMinor: true, currency: true } }),
+    prisma.partnerCommission.findMany({ where: { userId: p.userId, kind: 'bounty_month', status: { not: 'void' } }, select: { commissionMinor: true, currency: true } })
+      .then((rows) => (rows.length ? { commissionMinor: rows.filter((r) => r.currency === rows[0].currency).reduce((n, r) => n + r.commissionMinor, 0), currency: rows[0].currency } : null)),
     prisma.partnerCommission.count({ where: { userId: p.userId, kind: { in: ['bounty_year', 'bounty_upgrade'] }, status: { not: 'void' } } }),
     prisma.partnerCommission.findMany({
       where: { partnerId: partner.id, kind: { in: ['bounty_year', 'bounty_month', 'bounty_upgrade'] }, status: { not: 'void' }, userId: { not: p.userId } },

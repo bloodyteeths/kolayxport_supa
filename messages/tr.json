@@ -9236,7 +9236,7 @@
         "cancel": "Vazgeç"
       },
       "empty": "Henüz ortak yok.",
-      "footnote": "Aktif = kayıttan sonraki 7 gün içinde bir pazaryeri bağlamış. Etsy, Shopify ve Wix bağlantı tarihine göre sayılır; eBay, Amazon, Trendyol ve Hepsiburada için tahmin kullanılır (7 gün içinde ilk sipariş ya da ilk 7 günde şu an bağlı olmak). Bu yüzden bu pazaryerlerini bağlayıp henüz siparişi olmayan satıcılar eksik sayılır. Ödeyen = aktif ücretli Stripe planı. Net gelir = getirilen müşterilerin prim doğuran ödemeleri, KDV hariç. Primler tek seferlik: ilk yıllık ödemenin %25'i (10 ödeyen müşteriden sonra %30) ya da 2. aylık ödemede ₺1.500; 30 gün bekletilir.",
+      "footnote": "Aktif = kayıttan sonraki 7 gün içinde bir pazaryeri bağlamış. Etsy, Shopify ve Wix bağlantı tarihine göre sayılır; eBay, Amazon, Trendyol ve Hepsiburada için tahmin kullanılır (7 gün içinde ilk sipariş ya da ilk 7 günde şu an bağlı olmak). Bu yüzden bu pazaryerlerini bağlayıp henüz siparişi olmayan satıcılar eksik sayılır. Ödeyen = aktif ücretli Stripe planı. Net gelir = getirilen müşterilerin prim doğuran ödemeleri, KDV hariç. Primler tek seferlik: ilk yıllık ödemenin %25'i (10 ödeyen müşteriden sonra %30) ya da ilk 2 aylık ödemenin her birinin %25'i; 30 gün bekletilir.",
       "unattributed": "Ortaksız kayıtlar (ilk temas kaynağına göre)",
       "new": {
         "title": "Ortak ekle",

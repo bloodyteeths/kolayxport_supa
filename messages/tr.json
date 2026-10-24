@@ -14010,7 +14010,8 @@
       },
       "unarchiveSkipped": "{count} ürün atlandı: yalnızca başka gönderilmemiş değişikliği olmayan arşivlenmiş ürünler arşivden çıkarılabilir",
       "editVariations": "Varyasyon / SKU düzenle",
-      "applyTemplate": "Şablon uygula"
+      "applyTemplate": "Şablon uygula",
+      "aiText": "Yapay zekâ ile açıklama / çeviri"
     },
     "tags": {
       "unsentSkipped": "{count} ilanda gönderilmemiş etiket düzenlemesi var: bunları düzenleyicide değiştirin",
@@ -14599,6 +14600,34 @@
         "weight": "Ağırlık",
         "dimensions": "Boyutlar"
       }
+    },
+    "aiText": {
+      "title": "{count} ilanda yapay zekâ ile açıklama / çeviri",
+      "description": "Sonuçları gözden geçirip taslak olarak hazırlarsınız; \"Değişiklikleri gönder\" deyince Etsy'ye gider.",
+      "mode": "Ne yapılsın?",
+      "modeTranslate": "İngilizceye çevir (Türkçe ilanlar için, ör. Trendyol'dan kopyalananlar)",
+      "modeImprove": "Açıklamayı İngilizce yeniden yaz ve iyileştir",
+      "fields": "Çevrilecek alanlar",
+      "field": {
+        "title": "Başlık",
+        "description": "Açıklama",
+        "tags": "Etiketler"
+      },
+      "instructions": "Ek talimat (isteğe bağlı)",
+      "instructionsHelp": "Ör. \"Hediye olarak uygun olduğunu vurgula\". Talimatı Türkçe yazabilirsiniz; sonuç İngilizce olur.",
+      "note": "Gönderilmemiş değişikliği olan alanlar atlanır. Gerçekler (ölçü, malzeme, adet) korunur, yeni bilgi eklenmez.",
+      "run": "{count} ilanı işle",
+      "progress": "{done} / {total} ilan işlendi",
+      "stage": "{count} ilanda değişikliği hazırla",
+      "ready": "{count} ilan için öneri hazır.",
+      "unusable": "{count} ilanda kullanılabilir öneri çıkmadı.",
+      "notSent": "{count} ilan atlandı (gönderilmemiş değişiklik veya boş açıklama).",
+      "failedCount": "{count} ilan işlenemedi.",
+      "more": "ve {count} ilan daha",
+      "loadFailed": "İlanların mevcut içeriği okunamadı",
+      "rateLimited": "Çok fazla istek; bir dakika sonra tekrar deneyin.",
+      "failed": "Yapay zekâ şu an yanıt vermiyor; daha sonra tekrar deneyin.",
+      "staged": "Yapay zekâ önerileri {count} ilanda hazırlandı"
     }
   },
   "listingEditor": {

@@ -520,6 +520,9 @@ async function handleBulkOptimize(body: any) {
   if (requested.size === 0) requested.add('title');
   const wants = (f: BulkField) => requested.has(f);
   const instructions = sanitizeInstructions(body.instructions);
+  // 'translate': faithful translation into US English (e.g. a Turkish listing copied from Trendyol) instead of a
+  // rewrite. Descriptions are read in full (the client sends few listings per request in this mode).
+  const translate = body.mode === 'translate';
 
   // Only trust listing IDs the client sent.
   const inputById = new Map<string, any>();
@@ -532,7 +535,7 @@ async function handleBulkOptimize(body: any) {
   const listingSummaries = Array.from(inputById.values()).map((l: any, i: number) => {
     return `Listing ${i + 1} (ID: ${l.listing_id}):
   Title: ${coerceAiString(l.title) || 'N/A'}
-  Description: ${coerceAiString(l.description).slice(0, wants('description') ? 1500 : 400) || 'N/A'}
+  Description: ${coerceAiString(l.description).slice(0, wants('description') ? (translate ? 6000 : 1500) : 400) || 'N/A'}
   Tags: ${listForPrompt(l.tags) || 'N/A'}
   Category: ${coerceAiString(l.category) || 'N/A'}`;
   }).join('\n\n');
@@ -540,7 +543,20 @@ async function handleBulkOptimize(body: any) {
   const outputShape = ['"listing_id": <same id>', ...Array.from(requested).map((f) => f === 'tags' ? '"tags": ["..."]' : `"${f}": "..."`)].join(', ');
   const tagsAgainst = wants('title') ? 'the NEW title you write' : 'the listing\'s CURRENT title (which is not being changed)';
 
-  const prompt = `You are a top Etsy SEO specialist. Optimize ONLY these fields for each listing: ${Array.from(requested).join(', ')}. Do not output other fields.
+  const prompt = translate
+    ? `You translate Etsy listings into natural US English for US buyers. Produce ONLY these fields for each listing: ${Array.from(requested).join(', ')}. Do not output other fields.
+${ENGLISH_RULE}
+TRANSLATION RULES:
+- Translate faithfully from whatever language the listing is in (usually Turkish). Keep every fact: materials, sizes, measurements, quantities, colors, care and shipping notes. Never add claims, features or numbers that are not in the original.
+- Natural buyer-friendly English, not word-for-word. Keep the original structure and paragraph breaks (\\n\\n); keep bullet points as bullet points.
+- If a field is already in good English, return it unchanged.
+${wants('title') ? `- The title is the translated product name written to these rules:\n${TITLE_RULES}` : ''}
+${wants('tags') ? `- Tags are English buyer search terms for the translated listing.\n${TAG_RULES}\n- Tag words must not overlap with ${tagsAgainst}.\n- Every tag must be TRUE for this exact product: use its real type, material, use, recipient, occasion and style as the listing states them. Never call it vintage, antique, or from another country or style (e.g. Moroccan) unless the listing says so, and never name items that are not included. Prefer fewer accurate tags over filler.` : ''}
+${instructions ? `\nSELLER INSTRUCTIONS (follow them unless they conflict with the rules above): ${instructions}\n` : ''}
+Return JSON: { "optimizations": [ { ${outputShape} }, ... ] }
+
+${listingSummaries}`
+    : `You are a top Etsy SEO specialist. Optimize ONLY these fields for each listing: ${Array.from(requested).join(', ')}. Do not output other fields.
 ${ENGLISH_RULE}
 
 ${wants('title') ? TITLE_RULES : ''}
@@ -596,7 +612,9 @@ ${listingSummaries}`;
       const d = Array.isArray(raw) && raw.every((p: unknown) => typeof p === 'string')
         ? (raw as string[]).join('\n\n').trim()
         : coerceAiString(raw);
-      if (d && d.length >= 80 && !looksGarbled(d)) out.description = d.slice(0, 10000);
+      // A translation of a short description is short too; a rewrite must be substantial.
+      const minLength = translate ? Math.min(80, Math.max(10, Math.floor(coerceAiString(input.description).length / 3))) : 80;
+      if (d && d.length >= minLength && !looksGarbled(d)) out.description = d.slice(0, 10000);
     }
     if (issues.length) out.issues = Array.from(new Set(issues));
     if (Object.keys(out).some((k) => k === 'title' || k === 'tags' || k === 'description')) optimized.push(out);
@@ -606,7 +624,7 @@ ${listingSummaries}`;
     return fail(502, 'invalid_ai_response', 'AI yanıtı işlenemedi');
   }
 
-  return { status: 200, data: { optimized, fields: Array.from(requested) } };
+  return { status: 200, data: { optimized, fields: Array.from(requested), ...(translate ? { mode: 'translate' } : {}) } };
 }
 
 async function handleNicheReport(body: any) {

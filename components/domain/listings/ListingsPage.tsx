@@ -56,7 +56,7 @@ import type { BulkActionKey, RowActionKey } from './config/types';
 import {
   COLUMN_SORT_FIELD,
   dirtyCellKeys,
-  displayPrice,
+  displayPrice, displayTitle,
   displayListPrice,
   displayQty,
   hasOpenChanges,
@@ -90,6 +90,8 @@ import { useListingsShortcuts } from './useListingsShortcuts';
 import { ChangePriceModal } from './bulk/ChangePriceModal';
 import { VariationEditModal } from './bulk/VariationEditModal';
 import { TemplatesModal } from './bulk/TemplatesModal';
+import { AiTextModal } from './bulk/AiTextModal';
+import type { AiTextField, AiTextInput, AiTextResult } from '@/lib/bulk/aiText';
 import { planTemplate, templateNeeds } from './bulk/templatePlan';
 import type { EditorTemplate } from '@/lib/bulk/editorTemplates';
 import { buildVariationEdits, type VariationEdits } from '@/lib/bulk/variationOps';
@@ -449,7 +451,7 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
   }, []);
 
   // ── panels / modals ──────────────────────────────────────────────────────────────────────────────────
-  const [modal, setModal] = React.useState<null | 'price' | 'stock' | 'tags' | 'schedule' | 'copyShop' | 'setField' | 'variations' | 'templates'>(null);
+  const [modal, setModal] = React.useState<null | 'price' | 'stock' | 'tags' | 'schedule' | 'copyShop' | 'setField' | 'variations' | 'templates' | 'aiText'>(null);
   const [modalRows, setModalRows] = React.useState<ListingRow[]>([]);
   // "Change stock" skips stock-managed rows (counted as skipped, like variation rows).
   const stockModalRows = React.useMemo(() => modalRows.map((r) => withStockManaged(r, stockManagedIds)), [modalRows, stockManagedIds]);
@@ -864,6 +866,38 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
     [marketplace, data?.store, storeId],
   );
 
+  // "AI description / translate" (Etsy): current title / description / tags in, staged drafts out (lib/bulk/aiText).
+  const loadAiTextInputs = React.useCallback(
+    async (targets: ListingRow[]): Promise<AiTextInput[]> => {
+      const [tags, descriptions] = await Promise.all([loadTags(targets), loadDescriptions(targets)]);
+      return targets.map((r) => {
+        const changed = r.sync && r.sync.status !== 'synced' ? r.sync.changedFields : [];
+        return {
+          id: r.id,
+          title: displayTitle(r, staged.overlays),
+          description: descriptions.get(r.id) ?? '',
+          tags: tags.get(r.id) ?? [],
+          unsent: (['title', 'description', 'tags'] as AiTextField[]).filter((f) => changed.includes(f)),
+        };
+      });
+    },
+    [loadTags, loadDescriptions, staged.overlays],
+  );
+  const stageAiText = React.useCallback(
+    async (results: AiTextResult[]) => {
+      const res = await staged.stageMany(
+        results.map((r) => ({
+          id: r.id,
+          patch: { ...(r.title ? { title: r.title } : {}), ...(r.description ? { description: r.description } : {}), ...(r.tags ? { tags: r.tags } : {}) } as ExtendedStagePatch,
+        })),
+      );
+      if (res.failed.length) toast.error(t('listings.tools.stageFailed', { count: res.failed.length }));
+      if (res.ok.length) toast.success(t('listings.aiText.staged', { count: res.ok.length }));
+      if (!res.failed.length) clearSelection();
+    },
+    [staged, toast, t, clearSelection],
+  );
+
   // "Apply template" (Etsy): replays a saved template's steps (price / tags / set field) as staged drafts; reads the
   // current tags / materials / descriptions first when a step needs them (templatePlan.ts).
   const applyTemplate = React.useCallback(
@@ -953,6 +987,17 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
           if (!rowsFor) return;
           setModalRows(rowsFor);
           setModal('setField');
+          return;
+        }
+        case 'aiText': {
+          if (etsyLocked('ai')) {
+            requestEditorUpgrade('ai');
+            return;
+          }
+          const rowsFor = editableTargets(targets);
+          if (!rowsFor) return;
+          setModalRows(rowsFor);
+          setModal('aiText');
           return;
         }
         case 'applyTemplate': {
@@ -1057,6 +1102,8 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
         return staged.adapter.stagesEtsyExtras && storeId ? t('listings.action.setField') : null;
       case 'editVariations':
         return staged.adapter.stagesEtsyExtras && storeId ? t('listings.bulk.editVariations') : null;
+      case 'aiText':
+        return staged.adapter.stagesEtsyExtras && storeId ? t('listings.bulk.aiText') : null;
       case 'applyTemplate':
         return staged.adapter.stagesEtsyExtras && storeId ? t('listings.bulk.applyTemplate') : null;
       case 'copyToShop':
@@ -1592,6 +1639,9 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
           }}
           t={t}
         />
+      ) : null}
+      {staged.adapter.stagesEtsyExtras && storeId ? (
+        <AiTextModal open={modal === 'aiText'} onClose={() => setModal(null)} rows={modalRows} loadInputs={loadAiTextInputs} onStage={stageAiText} />
       ) : null}
       {staged.adapter.stagesEtsyExtras && storeId ? (
         <TemplatesModal open={modal === 'templates'} onClose={() => setModal(null)} count={modalRows.length} onApply={(tpl) => applyTemplate(modalRows, tpl)} />

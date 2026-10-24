@@ -14010,7 +14010,8 @@
       },
       "unarchiveSkipped": "{count, plural, one {# product} other {# products}} skipped: only archived products without other unsent changes can be unarchived",
       "editVariations": "Edit variations / SKU",
-      "applyTemplate": "Apply template"
+      "applyTemplate": "Apply template",
+      "aiText": "AI description / translate"
     },
     "tags": {
       "unsentSkipped": "{count, plural, one {# listing has} other {# listings have}} unsent tag edits: change them in the editor",
@@ -14599,6 +14600,34 @@
         "weight": "Weight",
         "dimensions": "Dimensions"
       }
+    },
+    "aiText": {
+      "title": "AI description / translate on {count} listings",
+      "description": "Review the results, then stage them as drafts; they go to Etsy when you send them.",
+      "mode": "What should AI do?",
+      "modeTranslate": "Translate into English (for Turkish listings, e.g. copied from Trendyol)",
+      "modeImprove": "Rewrite and improve the description in English",
+      "fields": "Fields to translate",
+      "field": {
+        "title": "Title",
+        "description": "Description",
+        "tags": "Tags"
+      },
+      "instructions": "Extra instructions (optional)",
+      "instructionsHelp": "E.g. \"Mention it makes a great gift\". You can write them in any language; the result is English.",
+      "note": "Fields with an unsent change are skipped. Facts (sizes, materials, quantities) are kept; nothing new is added.",
+      "run": "Process {count} listings",
+      "progress": "{done} / {total} listings processed",
+      "stage": "Stage changes on {count} listings",
+      "ready": "Suggestions ready for {count} listings.",
+      "unusable": "{count} listings got no usable suggestion.",
+      "notSent": "{count} listings skipped (unsent change or empty description).",
+      "failedCount": "{count} listings could not be processed.",
+      "more": "and {count} more",
+      "loadFailed": "Couldn't read the listings' current content",
+      "rateLimited": "Too many requests; try again in a minute.",
+      "failed": "The AI isn't responding right now; try again later.",
+      "staged": "AI suggestions staged on {count} listings"
     }
   },
   "listingEditor": {

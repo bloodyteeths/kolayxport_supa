@@ -54,6 +54,8 @@ export type BulkActionKey =
   | 'editVariations'
   /** Etsy: apply a saved bulk-edit template (price / tags / set field steps) as staged drafts. */
   | 'applyTemplate'
+  /** Etsy: AI description rewrite / translation into English, staged as drafts. */
+  | 'aiText'
   | 'sendSelected'
   | 'discardSelected'
   | 'scheduleSend'

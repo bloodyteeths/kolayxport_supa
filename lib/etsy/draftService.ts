@@ -40,7 +40,7 @@ import { etsyFetch, callEtsyAPI, etsyAuthHeaders } from './http';
 export { etsyFetch, callEtsyAPI, etsyAuthHeaders };
 import { EtsyPriority, getEtsyBudgetContext, withEtsyBudget } from './rateBudget';
 import { withListingInventoryLock } from './inventoryLock';
-import { mergeFreshInventoryQuantities, reportedVariantKey, stripEditorFields } from './inventoryMerge';
+import { applyPlainFieldsToInventory, isSingleProductInventory, mergeFreshInventoryQuantities, reportedVariantKey, stripEditorFields } from './inventoryMerge';
 import { applyStockToEtsyDraftInventory, isListingStockManaged, settleEtsyDraftStockEcho } from '@/lib/stock/hooks';
 
 export function toSerializable<T>(value: T): T {
@@ -2129,24 +2129,17 @@ async function syncDraftInner(draftId: string, userId: string, options: SyncDraf
           { status: 400, key: 'draftSync.inventoryPatchRequired' },
         );
       }
-      return {
-        ...source,
-        products: products.map((p: any) => ({
-          ...p,
-          offerings: (Array.isArray(p.offerings) ? p.offerings : []).filter((o: any) => !o?.is_deleted).map((o: any) => ({
-            ...o,
-            ...(routed.price !== undefined ? { price: Number(String(routed.price).replace(',', '.')) } : {}),
-            ...(routed.quantity !== undefined ? { quantity: Math.trunc(Number(routed.quantity)) } : {}),
-            ...(explicitReadinessId ? { readiness_state_id: explicitReadinessId } : {}),
-          })),
-        })),
-      };
+      return applyPlainFieldsToInventory(source, { price: routed.price, quantity: routed.quantity, readinessStateId: explicitReadinessId || null });
     };
     let routedInventory: JsonMap | null = null;
     if (needsRoutedInventoryWrite && currentInventory) {
       routedInventory = buildRoutedInventory(currentInventory);
     }
-    if (hasInventoryPatch && routesPriceOrQty) {
+    // A single-product inventory patch (e.g. a bulk SKU edit) plus a plain price/quantity edit on the same draft:
+    // apply the plain edit onto the patch instead of dropping it. With variations the patch wins (per-variation
+    // values; the plain fields cannot say which variation they mean).
+    const foldRoutedIntoPatch = hasInventoryPatch && routesPriceOrQty && isSingleProductInventory(inventory);
+    if (hasInventoryPatch && routesPriceOrQty && !foldRoutedIntoPatch) {
       logger.info('Draft sync: field price/quantity ignored in favour of inventory patch', { draftId: draft.id });
     }
 
@@ -2303,7 +2296,7 @@ async function syncDraftInner(draftId: string, userId: string, options: SyncDraf
     // change take the fresh remote value -> stock-sync hook -> PUT. So a sale
     // that landed after the draft was staged is never overwritten by the
     // staged (older, higher) quantity.
-    const inventoryToWrite = hasInventoryPatch ? inventory : routedInventory;
+    const inventoryToWrite = hasInventoryPatch ? (foldRoutedIntoPatch ? buildRoutedInventory(inventory) : inventory) : routedInventory;
     if (inventoryToWrite?.products) {
       await withListingInventoryLock(String(syncedListingId), async () => {
         let freshInventory: any = null;

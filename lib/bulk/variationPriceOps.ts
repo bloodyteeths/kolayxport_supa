@@ -114,7 +114,7 @@ export function activeMatch(match: VariationMatch | null | undefined): Variation
 export function applyPriceOpsToInventory(
   inventory: unknown,
   ops: NumberOp[],
-  opts: { round?: PriceRounding; minPrice?: number; match?: VariationMatch | null } = {},
+  opts: { round?: PriceRounding; minPrice?: number; match?: VariationMatch | null; stampLoaded?: boolean } = {},
 ): AnyRecord | null {
   if (!ops.length || !isMultiVariation(inventory)) return null;
   const source = rec(inventory);
@@ -126,6 +126,10 @@ export function applyPriceOpsToInventory(
   return {
     products: products.map((p) => ({
       ...p,
+      // Live source: the quantity it had, so the sync keeps Etsy's fresh stock (a price edit never restores old stock).
+      ...(opts.stampLoaded && p.kx_loaded_quantity === undefined && Number.isFinite(Number(list(p.offerings).find((o) => !o.is_deleted)?.quantity))
+        ? { kx_loaded_quantity: Math.trunc(Number(list(p.offerings).find((o) => !o.is_deleted)?.quantity)) }
+        : {}),
       offerings: list(p.offerings)
         .filter((o) => !o.is_deleted)
         .map((o) => {
@@ -191,9 +195,10 @@ export async function buildVariationPriceInventory(
   deps: VariationPriceDeps = defaultVariationPriceDeps,
 ): Promise<AnyRecord | null> {
   const [remote, drafts] = await Promise.all([deps.fetchInventory(shopId, listingId), deps.fetchDrafts(shopId, listingId).catch(() => [])]);
-  const source = pendingInventoryOf(drafts) ?? (remote ? rec(remote) : null);
+  const pending = pendingInventoryOf(drafts);
+  const source = pending ?? (remote ? rec(remote) : null);
   if (!source) return null;
-  return applyPriceOpsToInventory(source, ops, opts);
+  return applyPriceOpsToInventory(source, ops, { ...opts, stampLoaded: !pending });
 }
 
 /**

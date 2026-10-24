@@ -50,6 +50,8 @@ export type BulkActionKey =
   | 'copyToShop'
   /** Etsy: "Set field…" (shipping / return policy / processing / category / item details / materials / description / personalization / weight / size). */
   | 'setField'
+  /** Etsy: stock / SKU per variation on listings with variations (inventory drafts). */
+  | 'editVariations'
   | 'sendSelected'
   | 'discardSelected'
   | 'scheduleSend'

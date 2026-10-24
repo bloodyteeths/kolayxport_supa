@@ -74,6 +74,38 @@ function loadedQuantity(product: Product): number | null {
   return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
+/** True for an inventory with exactly one live product and no variation values (a listing without variations). */
+export function isSingleProductInventory(inventory: unknown): boolean {
+  const products = (Array.isArray((inventory as any)?.products) ? (inventory as any).products : []).filter((p: any) => p && !p.is_deleted);
+  return products.length === 1 && !(Array.isArray(products[0].property_values) && products[0].property_values.length > 0);
+}
+
+/**
+ * Plain price / quantity / processing-profile edits applied onto a whole inventory (pure). Everything else is kept
+ * as it is (Etsy's PUT replaces the whole inventory): product sku and property values, offering is_enabled and
+ * readiness_state_id (unless one is given), *_on_property arrays and any bookkeeping fields. Deleted products and
+ * offerings are dropped. The caller decides single vs multi-variation.
+ */
+export function applyPlainFieldsToInventory(
+  source: unknown,
+  plain: { price?: unknown; quantity?: unknown; readinessStateId?: number | null },
+): Record<string, any> {
+  const src = (source && typeof source === 'object' ? source : {}) as Record<string, any>;
+  const products = (Array.isArray(src.products) ? src.products : []).filter((p: any) => p && !p.is_deleted);
+  return {
+    ...src,
+    products: products.map((p: any) => ({
+      ...p,
+      offerings: (Array.isArray(p.offerings) ? p.offerings : []).filter((o: any) => o && !o.is_deleted).map((o: any) => ({
+        ...o,
+        ...(plain.price !== undefined ? { price: Number(String(plain.price).replace(',', '.')) } : {}),
+        ...(plain.quantity !== undefined ? { quantity: Math.trunc(Number(plain.quantity)) } : {}),
+        ...(plain.readinessStateId ? { readiness_state_id: plain.readinessStateId } : {}),
+      })),
+    })),
+  };
+}
+
 /** Removes editor-only bookkeeping fields from a product (before any PUT). */
 export function stripEditorFields<T extends Product>(product: T): T {
   if (!product || typeof product !== 'object' || !(LOADED_QUANTITY_FIELD in product)) return product;

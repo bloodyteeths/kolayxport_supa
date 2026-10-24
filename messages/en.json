@@ -14008,7 +14008,8 @@
         "salePrice": "Sale price {from} → {to}",
         "listPrice": "List price {from} → {to}"
       },
-      "unarchiveSkipped": "{count, plural, one {# product} other {# products}} skipped: only archived products without other unsent changes can be unarchived"
+      "unarchiveSkipped": "{count, plural, one {# product} other {# products}} skipped: only archived products without other unsent changes can be unarchived",
+      "editVariations": "Edit variations / SKU"
     },
     "tags": {
       "unsentSkipped": "{count, plural, one {# listing has} other {# listings have}} unsent tag edits: change them in the editor",
@@ -14512,6 +14513,33 @@
       },
       "neutralTitle": "{feature} isn't available on your current plan",
       "ok": "OK"
+    },
+    "variations": {
+      "title": "Edit variations and SKU on {count} listings",
+      "description": "Change stock or SKU per variation on listings with variations, and the SKU on listings without. For variation prices use \"Change price\".",
+      "stage": "Stage changes on {count} listings",
+      "field": "Field",
+      "fieldQuantity": "Stock (per variation)",
+      "fieldSku": "SKU (per variation)",
+      "mode": "Operation",
+      "amount": "Amount",
+      "qtySet": "Set to",
+      "qtyInc": "Increase by",
+      "qtyDec": "Decrease by",
+      "qtyHelp": "Between 0 and 999.",
+      "skuTemplate": "Template",
+      "skuSet": "Same for all",
+      "skuPrefix": "Add prefix",
+      "skuSuffix": "Add suffix",
+      "skuReplace": "Find & replace",
+      "skuValue": "Value",
+      "skuFind": "Find",
+      "skuWith": "Replace with",
+      "skuTemplateHelp": "'{sku}' is the current SKU, '{n}' the variation number, and property names like '{Color}' become that variation's value. Max 32 characters.",
+      "skuMaxHelp": "Etsy SKUs can be at most 32 characters.",
+      "note": "Changes are staged and go to Etsy when you send them. SKUs that would exceed 32 characters are skipped.",
+      "staged": "Variation changes staged on {count} listings",
+      "skipped": "{count} listings skipped (stock on a listing without variations, no matching variation, SKU over 32 characters, or the listing could not be read)"
     }
   },
   "listingEditor": {

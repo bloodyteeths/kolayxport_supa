@@ -42,7 +42,7 @@ export const etsyConfig: ListingsConfig = {
   ],
   bulkPrimary: 'editInGrid',
   bulkActions: ['changePrice', 'addTags', 'setField', 'improveWithAi'],
-  bulkOverflow: ['sendSelected', 'discardSelected', 'scheduleSend', 'exportSelected', 'copyToShop', 'deactivate', 'activate', 'renew', 'delete'],
+  bulkOverflow: ['editVariations', 'sendSelected', 'discardSelected', 'scheduleSend', 'exportSelected', 'copyToShop', 'deactivate', 'activate', 'renew', 'delete'],
   tools: ['findReplace', 'duplicates', 'import', 'export', 'scheduled'],
   inlineEdit: { price: true, qty: true },
   validation: { priceMin: 0.2, qtyMax: 999 },

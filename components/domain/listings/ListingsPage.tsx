@@ -88,6 +88,8 @@ import { ListingsTable, listingsEmptyKind } from './ListingsTable';
 import { QuickViewPanel } from './QuickViewPanel';
 import { useListingsShortcuts } from './useListingsShortcuts';
 import { ChangePriceModal } from './bulk/ChangePriceModal';
+import { VariationEditModal } from './bulk/VariationEditModal';
+import { buildVariationEdits, type VariationEdits } from '@/lib/bulk/variationOps';
 import { ChangeStockModal } from './bulk/ChangeStockModal';
 import { AddTagsModal } from './bulk/AddTagsModal';
 import { ScheduleSendModal } from './bulk/ScheduleSendModal';
@@ -444,7 +446,7 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
   }, []);
 
   // ── panels / modals ──────────────────────────────────────────────────────────────────────────────────
-  const [modal, setModal] = React.useState<null | 'price' | 'stock' | 'tags' | 'schedule' | 'copyShop' | 'setField'>(null);
+  const [modal, setModal] = React.useState<null | 'price' | 'stock' | 'tags' | 'schedule' | 'copyShop' | 'setField' | 'variations'>(null);
   const [modalRows, setModalRows] = React.useState<ListingRow[]>([]);
   // "Change stock" skips stock-managed rows (counted as skipped, like variation rows).
   const stockModalRows = React.useMemo(() => modalRows.map((r) => withStockManaged(r, stockManagedIds)), [modalRows, stockManagedIds]);
@@ -803,6 +805,22 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
     };
   }, [staged, storeId, config.validation.priceMin, toast, t, clearSelection]);
 
+  // "Edit variations" (Etsy): stock / SKU per variation, staged as each listing's whole inventory.
+  const stageVariationEdits = React.useCallback(
+    async (targets: ListingRow[], edits: VariationEdits, match: VariationMatch | null) => {
+      if (!storeId) return;
+      const { patches, skipped } = await buildVariationEdits(storeId, targets.map((r) => r.id), edits, { match, minPrice: config.validation.priceMin });
+      const res = patches.length
+        ? await staged.stageMany(patches.map((p) => ({ id: p.id, patch: { etsy: { inventory: p.inventory } } as ExtendedStagePatch })))
+        : { ok: [], failed: [] };
+      if (res.failed.length) toast.error(t('listings.tools.stageFailed', { count: res.failed.length }));
+      else if (skipped.length) toast.info(t('listings.variations.skipped', { count: skipped.length }));
+      if (res.ok.length) toast.success(t('listings.variations.staged', { count: res.ok.length }));
+      if (!res.failed.length && res.ok.length) clearSelection();
+    },
+    [staged, storeId, config.validation.priceMin, toast, t, clearSelection],
+  );
+
   // ── bulk bar (§6.3) ──────────────────────────────────────────────────────────────────────────────────
   const loadTags = React.useCallback(
     async (targets: ListingRow[]) => {
@@ -897,6 +915,13 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
           setModal('setField');
           return;
         }
+        case 'editVariations': {
+          const rowsFor = editableTargets(targets);
+          if (!rowsFor) return;
+          setModalRows(rowsFor);
+          setModal('variations');
+          return;
+        }
         case 'copyToShop':
           if (etsyLocked('copyToShop')) { requestEditorUpgrade('copyToShop'); return; }
           setModalRows(targets);
@@ -979,6 +1004,8 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
         return config.tags ? t('listings.bulk.addTags') : null;
       case 'setField':
         return staged.adapter.stagesEtsyExtras && storeId ? t('listings.action.setField') : null;
+      case 'editVariations':
+        return staged.adapter.stagesEtsyExtras && storeId ? t('listings.bulk.editVariations') : null;
       case 'copyToShop':
         return staged.adapter.stagesCopyToShop && otherStores.length > 0 ? t('listings.action.copyToShop') : null;
       case 'sendSelected':
@@ -1510,6 +1537,9 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
           }}
           t={t}
         />
+      ) : null}
+      {staged.adapter.stagesEtsyExtras && storeId ? (
+        <VariationEditModal open={modal === 'variations'} onClose={() => setModal(null)} rows={modalRows} onStage={stageVariationEdits} t={t} />
       ) : null}
       <SetFieldModal
         open={modal === 'setField'}

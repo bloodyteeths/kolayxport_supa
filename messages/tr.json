@@ -14008,7 +14008,8 @@
         "salePrice": "Satış fiyatı {from} → {to}",
         "listPrice": "Liste fiyatı {from} → {to}"
       },
-      "unarchiveSkipped": "{count} ürün atlandı: yalnızca başka gönderilmemiş değişikliği olmayan arşivlenmiş ürünler arşivden çıkarılabilir"
+      "unarchiveSkipped": "{count} ürün atlandı: yalnızca başka gönderilmemiş değişikliği olmayan arşivlenmiş ürünler arşivden çıkarılabilir",
+      "editVariations": "Varyasyon / SKU düzenle"
     },
     "tags": {
       "unsentSkipped": "{count} ilanda gönderilmemiş etiket düzenlemesi var: bunları düzenleyicide değiştirin",
@@ -14512,6 +14513,33 @@
       },
       "neutralTitle": "{feature} mevcut planınızda bulunmuyor",
       "ok": "Tamam"
+    },
+    "variations": {
+      "title": "{count} ilanda varyasyon ve SKU düzenle",
+      "description": "Varyasyonlu ilanlarda stok veya SKU'yu, varyasyonsuz ilanlarda SKU'yu toplu değiştirin. Varyasyon fiyatları için \"Fiyatı değiştir\"i kullanın.",
+      "stage": "{count} ilanda değişikliği hazırla",
+      "field": "Alan",
+      "fieldQuantity": "Stok (varyasyon başına)",
+      "fieldSku": "SKU (varyasyon başına)",
+      "mode": "İşlem",
+      "amount": "Miktar",
+      "qtySet": "Şuna ayarla",
+      "qtyInc": "Şu kadar artır",
+      "qtyDec": "Şu kadar azalt",
+      "qtyHelp": "0 ile 999 arası.",
+      "skuTemplate": "Şablon",
+      "skuSet": "Hepsini aynı yap",
+      "skuPrefix": "Başına ekle",
+      "skuSuffix": "Sonuna ekle",
+      "skuReplace": "Bul ve değiştir",
+      "skuValue": "Değer",
+      "skuFind": "Bul",
+      "skuWith": "Şununla değiştir",
+      "skuTemplateHelp": "'{sku}' mevcut SKU, '{n}' varyasyon sırası; '{Color}' gibi özellik adları o varyasyonun değeri olur. En fazla 32 karakter.",
+      "skuMaxHelp": "Etsy SKU'ları en fazla 32 karakter olabilir.",
+      "note": "Değişiklikler hazırlanır, \"Değişiklikleri gönder\" deyince Etsy'ye gider. 32 karakteri aşacak SKU'lar atlanır.",
+      "staged": "{count} ilanda varyasyon değişikliği hazırlandı",
+      "skipped": "{count} ilan atlandı (varyasyonsuz ilanda stok, eşleşen varyasyon yok, SKU 32 karakteri aşıyor veya ilan okunamadı)"
     }
   },
   "listingEditor": {

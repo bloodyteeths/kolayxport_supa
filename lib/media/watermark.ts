@@ -30,7 +30,10 @@ async function renderMark(spec: WatermarkSpec, width: number, maxHeight: number,
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(width * 1.3)}" height="${h}">
 <text x="50%" y="${Math.round(fontSize * 1.02)}" text-anchor="middle" font-family="DejaVu Sans, Liberation Sans, Arial, Helvetica, sans-serif" font-weight="700" font-size="${fontSize.toFixed(1)}"
  fill="${spec.color ?? '#ffffff'}" fill-opacity="${alpha}" stroke="#000000" stroke-opacity="${(alpha * 0.35).toFixed(2)}" stroke-width="${stroke.toFixed(1)}" paint-order="stroke">${escapeXml(text)}</text></svg>`;
-  const out = await sharp(Buffer.from(svg)).png().trim({ threshold: 1 }).toBuffer({ resolveWithObject: true });
+  const trimmed = await sharp(Buffer.from(svg)).png().trim({ threshold: 1 }).toBuffer();
+  // Exactly `width` wide (capped by maxHeight): the mark's footprint must not depend on the font installed, and the
+  // browser preview (components/domain/media/WatermarkPreview.tsx) scales its text the same way.
+  const out = await sharp(trimmed).resize({ width, height: Math.max(1, Math.round(maxHeight)), fit: 'inside' }).png().toBuffer({ resolveWithObject: true });
   return { png: out.data, w: out.info.width, h: out.info.height };
 }
 

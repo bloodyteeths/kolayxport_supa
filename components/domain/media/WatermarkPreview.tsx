@@ -34,14 +34,26 @@ export function WatermarkPreview({ src, spec, alt }: Props) {
   const H = size?.h ?? 0;
   const markW = Math.max(4, (W * spec.sizePct) / 100);
   const maxH = H * (spec.position === 'tile' ? 0.35 : 0.6);
-  const fontSize = spec.kind === 'text' ? Math.max(6, Math.min(maxH * 0.8, markW / Math.max(1, (spec.text ?? '').length * 0.56))) : 0;
+  // Text is measured at a base size, then scaled to exactly the mark width (capped by maxH) — the server resizes its
+  // rendered text the same way, so the footprint does not depend on the font the browser or the server has.
+  const BASE = 100;
+  const [natText, setNatText] = React.useState<{ w: number; h: number } | null>(null);
+  const textScale = natText && natText.w > 0 ? Math.min(markW / natText.w, maxH / Math.max(1, natText.h)) : 0;
+  const fontSize = BASE * textScale;
   const margin = (Math.min(W, H) * spec.marginPct) / 100;
 
-  // Measure the mark as rendered (text width depends on the font) to place it like the server does.
+  // Text: natural size at BASE px (then scaled). Logo: measured as rendered.
+  const measureRef = React.useRef<HTMLDivElement | null>(null);
+  React.useLayoutEffect(() => {
+    const el = measureRef.current;
+    if (el) setNatText({ w: el.getBoundingClientRect().width, h: el.getBoundingClientRect().height });
+  }, [spec.text]);
   React.useLayoutEffect(() => {
     const el = markRef.current;
-    if (el) setMark({ w: el.offsetWidth, h: el.offsetHeight });
-  }, [spec.kind, spec.text, spec.logoId, fontSize, markW, maxH]);
+    if (!el) return;
+    if (spec.kind === 'text') setMark(natText ? { w: natText.w * textScale, h: natText.h * textScale } : null);
+    else setMark({ w: el.offsetWidth, h: el.offsetHeight });
+  }, [spec.kind, spec.logoId, natText, textScale, markW, maxH]);
 
   const markNode = (key?: React.Key, style?: React.CSSProperties, ref?: React.Ref<HTMLDivElement>) =>
     spec.kind === 'logo' && spec.logoId ? (
@@ -84,7 +96,11 @@ export function WatermarkPreview({ src, spec, alt }: Props) {
     <Box sx={{ position: 'relative', maxWidth: '100%', maxHeight: '100%', aspectRatio: natural ? `${natural.w} / ${natural.h}` : '1 / 1', overflow: 'hidden' }} ref={boxRef} data-testid="watermark-preview-live">
       <Box component="img" src={src} alt={alt} onLoad={(e: React.SyntheticEvent<HTMLImageElement>) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
         sx={{ display: 'block', width: '100%', height: '100%', objectFit: 'contain' }} />
-      {/* Invisible copy, only to measure the mark at this size. */}
+      {/* Invisible copies, only to measure: the text at BASE px, and the mark (logo) as rendered. */}
+      {spec.kind === 'text' ? (
+        <Box ref={measureRef} sx={{ position: 'absolute', visibility: 'hidden', whiteSpace: 'nowrap', lineHeight: 1, fontWeight: 700, fontSize: BASE,
+          fontFamily: '"DejaVu Sans", "Liberation Sans", Arial, Helvetica, sans-serif', left: 0, top: 0 }}>{spec.text}</Box>
+      ) : null}
       {markNode('measure', { visibility: 'hidden', left: 0, top: 0 }, markRef)}
       {layers}
     </Box>

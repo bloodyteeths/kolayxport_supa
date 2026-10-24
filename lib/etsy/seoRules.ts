@@ -185,7 +185,10 @@ export function normalizeTitle(input: unknown): string {
   const cased = phrases.map((phrase) =>
     phrase.split(' ').filter(Boolean).map((w, i) => smartCaseWord(w, i === 0, !mostlyCaps)).join(' '),
   );
-  return cased.join(', ').replace(/\s+/g, ' ').trim();
+  // Units after a number stay lowercase ("20 cm", not "20 Cm"): Title Case is for words, not measurements.
+  return cased.join(', ').replace(/\s+/g, ' ').trim()
+    .replace(/(\d)\s?(Cm|Mm|Kg|Ml|Oz|Ft|Lb|Lbs|Inch|Inches|In)\b/g, (_m, d: string, u: string) => `${d} ${u.toLowerCase()}`)
+    .replace(/(\d)\s*[X×]\s*(\d)/g, '$1 x $2');
 }
 
 export type TitleIssue =

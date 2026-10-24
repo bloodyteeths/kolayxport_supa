@@ -14664,7 +14664,15 @@
       "staged": "AI suggestions staged on {count} listings",
       "accept": "Apply to this listing",
       "alreadyEnglish": "{count} listings skipped because they are already in English.",
-      "cost": "This uses no AI credits; it's included in your plan."
+      "cost": "This uses no AI credits; it's included in your plan.",
+      "beta": "beta",
+      "droppedTags": "Removed because the listing does not say so: {tags}",
+      "droppedKind": {
+        "material": "material",
+        "origin": "origin",
+        "religion": "religious/cultural term",
+        "style": "style"
+      }
     },
     "categoryAttrs": {
       "title": "Category attributes on {count} listings",

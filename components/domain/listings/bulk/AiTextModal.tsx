@@ -133,7 +133,7 @@ export function AiTextModal({ open, onClose, rows, loadInputs, onStage }: AiText
               <FormField label={t('fields')}>
                 <Box sx={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                   {(['title', 'description', 'tags'] as const).map((f) => (
-                    <Checkbox key={f} checked={fields.includes(f)} onChange={(on) => toggle(f, on)} label={t(f === 'tags' ? 'field.tagsOptIn' : `field.${f}`)} />
+                    <Checkbox key={f} checked={fields.includes(f)} onChange={(on) => toggle(f, on)} label={f === 'tags' ? `${t('field.tagsOptIn')} (${t('beta')})` : t(`field.${f}`)} />
                   ))}
                 </Box>
               </FormField>
@@ -184,6 +184,12 @@ export function AiTextModal({ open, onClose, rows, loadInputs, onStage }: AiText
                       <Box sx={{ color: neutral[600] }}>
                         <Box component="span" sx={{ textDecoration: 'line-through', color: neutral[500] }}>{(before?.tags ?? []).join(', ') || '—'}</Box>
                         <Box>{r.tags.join(', ')}</Box>
+                      </Box>
+                    ) : null}
+                    {r.droppedTags?.length ? (
+                      // Tags the fact guard removed (lib/etsy/tagFacts): shown, never silently swallowed.
+                      <Box sx={{ color: '#9A3412', fontSize: 12 }} data-testid="ai-text-dropped-tags">
+                        {t('droppedTags', { tags: r.droppedTags.map((d) => `${d.tag} (${t(`droppedKind.${d.kind}`)})`).join(', ') })}
                       </Box>
                     ) : null}
                   </Box>

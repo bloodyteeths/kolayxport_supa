@@ -6,6 +6,7 @@
 // Answers pass the same guards as the grid AI (useBulkAi): coerceAiString / looksGarbled / normalizeTitle (≤140) /
 // normalizeTags (13 × 20, no title-word overlap). Listings with an unsent change to a field are not sent for that
 // field. Nothing is staged here: the caller stages the returned patches; nothing reaches Etsy before the send.
+import { guardTagFacts, type DroppedFactTag } from '@/lib/etsy/tagFacts';
 import { TITLE_MAX, coerceAiString, looksGarbled, normalizeTags, normalizeTitle } from '@/lib/etsy/seoRules';
 import { LIMIT_UI_HEADER } from '@/lib/http/limitInterceptor';
 
@@ -26,6 +27,8 @@ export interface AiTextResult {
   title?: string;
   description?: string;
   tags?: string[];
+  /** Translate: AI tags dropped because they state a fact the listing does not (shown in the review). */
+  droppedTags?: DroppedFactTag[];
 }
 
 const TR_LETTERS = /[çğıöşüÇĞİÖŞÜ]/;
@@ -80,7 +83,12 @@ const TURKISH_ONLY = /[ğĞşŞıİ]/;
 const sameTags = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x.toLocaleLowerCase() === b[i].toLocaleLowerCase());
 
 /** One `optimized[]` item → a guarded result, or null when nothing usable changed (pure). */
-export function guardAiTextItem(item: unknown, input: AiTextInput, fields: AiTextField[]): AiTextResult | null {
+function isDroppedFactTag(v: unknown): v is DroppedFactTag {
+  const d = v as DroppedFactTag;
+  return !!d && typeof d.tag === 'string' && typeof d.term === 'string' && ['material', 'origin', 'religion', 'style'].includes(d.kind);
+}
+
+export function guardAiTextItem(item: unknown, input: AiTextInput, fields: AiTextField[], mode: AiTextMode = 'improve'): AiTextResult | null {
   if (!item || typeof item !== 'object') return null;
   const it = item as Record<string, unknown>;
   const out: AiTextResult = { id: input.id };
@@ -97,9 +105,16 @@ export function guardAiTextItem(item: unknown, input: AiTextInput, fields: AiTex
     if (d && !looksGarbled(d) && d !== input.description.trim()) out.description = d.slice(0, 102400);
   }
   if (fields.includes('tags')) {
+    // No title-word overlap (founder rule). Translate re-applies the fact guard here too, so a tag that names a
+    // material / origin / religious term / style the listing does not state never reaches a draft.
+    const translate = mode === 'translate';
     const { tags: normalised } = normalizeTags(it.tags, { title, dropTitleOverlap: true });
-    const tags = normalised.filter((x) => !TURKISH_ONLY.test(x));
-    if (tags.length && !sameTags(tags, input.tags)) out.tags = tags;
+    const english = normalised.filter((x) => !TURKISH_ONLY.test(x));
+    const guarded = translate ? guardTagFacts(english, { title: input.title, description: input.description, tags: input.tags }) : { tags: english, dropped: [] as DroppedFactTag[] };
+    const fromServer = Array.isArray(it.droppedTags) ? (it.droppedTags as unknown[]).filter(isDroppedFactTag) : [];
+    const dropped = [...fromServer, ...guarded.dropped.filter((d) => !fromServer.some((x) => x.tag === d.tag))];
+    if (guarded.tags.length && !sameTags(guarded.tags, input.tags)) out.tags = guarded.tags;
+    if (translate && dropped.length) out.droppedTags = dropped;
   }
   return out.title || out.description || out.tags ? out : null;
 }
@@ -159,7 +174,7 @@ export async function runAiText(
             if (id && !byId.has(id)) byId.set(id, it);
           }
           for (const input of req.items) {
-            const r = guardAiTextItem(byId.get(input.id), input, req.fields);
+            const r = guardAiTextItem(byId.get(input.id), input, req.fields, opts.mode);
             if (r) summary.results.push(r);
             else summary.unusable += 1;
           }

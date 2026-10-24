@@ -14664,7 +14664,15 @@
       "staged": "Yapay zekâ önerileri {count} ilanda hazırlandı",
       "accept": "Bu ilanda uygula",
       "alreadyEnglish": "{count} ilan zaten İngilizce olduğu için atlandı.",
-      "cost": "Bu işlem AI kredisi harcamaz; planınıza dahildir."
+      "cost": "Bu işlem AI kredisi harcamaz; planınıza dahildir.",
+      "beta": "beta",
+      "droppedTags": "İlanda geçmediği için çıkarıldı: {tags}",
+      "droppedKind": {
+        "material": "malzeme",
+        "origin": "köken",
+        "religion": "dini/kültürel terim",
+        "style": "stil"
+      }
     },
     "categoryAttrs": {
       "title": "{count} ilanda kategori özellikleri",

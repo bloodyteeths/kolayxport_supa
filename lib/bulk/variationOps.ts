@@ -15,6 +15,7 @@ import {
   isMultiVariation,
   pendingInventoryOf,
   productMatches,
+  roundPrice,
   type NumberOp,
   type PriceRounding,
   type VariationMatch,
@@ -65,12 +66,7 @@ export type VariationEditResult =
   | { ok: true; inventory: AnyRecord; changed: number }
   | { ok: false; reason: 'single' | 'noMatch' | 'skuTooLong' | 'nothing' };
 
-const roundPrice = (v: number, round: PriceRounding) => {
-  let n = v;
-  if (round === '99') n = Math.floor(n) + 0.99;
-  else if (round === '00') n = Math.round(n);
-  return Math.round(n * 100) / 100;
-};
+// Shared rounding: never against the direction of the change (variationPriceOps.roundPrice).
 
 /** Pure: a property value of a product by property name (case-insensitive). */
 function valueOf(product: AnyRecord, propertyName: string): string {
@@ -171,7 +167,7 @@ export function applyVariationEdits(inventory: unknown, edits: VariationEdits, o
         } else if (edits.price?.ops.length) {
           const price = typeof o.price === 'object' && o.price ? rec(o.price) : {};
           const divisor = Number(price.divisor) || 100;
-          const value = Math.max(minPrice, roundPrice(applyNumberOps(moneyOf(o), edits.price.ops), edits.price.round ?? 'none'));
+          const value = Math.max(minPrice, roundPrice(applyNumberOps(moneyOf(o), edits.price.ops), edits.price.round ?? 'none', moneyOf(o)));
           offering.price = { ...price, amount: Math.round(value * divisor), divisor };
         }
         if (edits.quantity?.length) {

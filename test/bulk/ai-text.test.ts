@@ -61,3 +61,26 @@ describe('English-only titles and tags (Etsy rule)', () => {
     expect(r?.tags).toEqual(['gift for him']);
   });
 });
+
+import { alreadyEnglish, looksTurkish } from '@/lib/bulk/aiText';
+
+describe('translate guard: already-English listings are never "translated"', () => {
+  it('detects Turkish vs English', () => {
+    expect(looksTurkish('El Yapımı Bakır Cezve')).toBe(true);
+    expect(looksTurkish('Kisiye ozel isimli kolye ve kupe seti')).toBe(true);
+    expect(looksTurkish('Iznik Tulip Decorative Plate, Hand Painted Turkish Ceramic Wall Plate')).toBe(false);
+    expect(looksTurkish('Turkish Peshtemal Towel, Cotton Beach Towel, Hammam')).toBe(false);
+  });
+  it('English listings are skipped and counted, never sent', async () => {
+    const calls: any[] = [];
+    const fetcher = async (_u: string, init: any) => { calls.push(JSON.parse(init.body)); return new Response(JSON.stringify({ optimized: [] }), { status: 200 }); };
+    const en = { id: 'en', title: 'Iznik Tulip Decorative Plate, Hand Painted', description: 'A hand painted plate from Kutahya.', tags: ['plate'], unsent: [] };
+    const tr = { id: 'tr', title: 'El Yapımı Bakır Cezve', description: 'Saf bakır.', tags: [], unsent: [] };
+    expect(alreadyEnglish(en as any, 'translate')).toBe(true);
+    expect(alreadyEnglish(en as any, 'improve')).toBe(false);
+    const out = await runAiText([en, tr] as any, { mode: 'translate', fields: ['title', 'description'] }, fetcher as any);
+    expect(out.alreadyEnglish).toBe(1);
+    expect(calls.flatMap((c) => c.listings.map((l: any) => l.listing_id))).toEqual(['tr']);
+    expect(calls[0].fields).toEqual(['title', 'description']);
+  });
+});

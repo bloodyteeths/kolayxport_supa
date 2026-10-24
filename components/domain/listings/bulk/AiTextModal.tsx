@@ -32,7 +32,9 @@ type Phase = { kind: 'setup' } | { kind: 'running'; done: number; total: number 
 export function AiTextModal({ open, onClose, rows, loadInputs, onStage }: AiTextModalProps) {
   const t = useTranslations('listings.aiText');
   const [mode, setMode] = React.useState<AiTextMode>('translate');
-  const [fields, setFields] = React.useState<AiTextField[]>(['title', 'description', 'tags']);
+  // Tags are only translated when the seller asks: translating replaces the listing's own tags.
+  const [fields, setFields] = React.useState<AiTextField[]>(['title', 'description']);
+  const [rejected, setRejected] = React.useState<Set<string>>(new Set());
   const [instructions, setInstructions] = React.useState('');
   const [phase, setPhase] = React.useState<Phase>({ kind: 'setup' });
   const [error, setError] = React.useState<string | null>(null);
@@ -44,6 +46,8 @@ export function AiTextModal({ open, onClose, rows, loadInputs, onStage }: AiText
     setPhase({ kind: 'setup' });
     setError(null);
     setBusy(false);
+    setFields(['title', 'description']);
+    setRejected(new Set());
     return () => abort.current?.abort();
   }, [open]);
 
@@ -84,7 +88,7 @@ export function AiTextModal({ open, onClose, rows, loadInputs, onStage }: AiText
     if (phase.kind !== 'review' || !phase.summary.results.length) return;
     setBusy(true);
     try {
-      await onStage(phase.summary.results);
+      await onStage(phase.summary.results.filter((r) => !rejected.has(r.id)));
       onClose();
     } finally {
       setBusy(false);
@@ -94,7 +98,7 @@ export function AiTextModal({ open, onClose, rows, loadInputs, onStage }: AiText
   const running = phase.kind === 'running';
   const review = phase.kind === 'review' ? phase : null;
   const primary = review
-    ? { id: 'aiText-stage', label: t('stage', { count: review.summary.results.length }), onClick: () => void stage(), loading: busy, disabled: !review.summary.results.length }
+    ? { id: 'aiText-stage', label: t('stage', { count: review.summary.results.length - rejected.size }), onClick: () => void stage(), loading: busy, disabled: review.summary.results.length - rejected.size <= 0 }
     : { id: 'aiText-run', label: t('run', { count: rows.length }), onClick: () => void run(), loading: running, disabled: running || (mode === 'translate' && !fields.length) };
 
   return (
@@ -127,7 +131,7 @@ export function AiTextModal({ open, onClose, rows, loadInputs, onStage }: AiText
               <FormField label={t('fields')}>
                 <Box sx={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                   {(['title', 'description', 'tags'] as const).map((f) => (
-                    <Checkbox key={f} checked={fields.includes(f)} onChange={(on) => toggle(f, on)} label={t(`field.${f}`)} />
+                    <Checkbox key={f} checked={fields.includes(f)} onChange={(on) => toggle(f, on)} label={t(f === 'tags' ? 'field.tagsOptIn' : `field.${f}`)} />
                   ))}
                 </Box>
               </FormField>
@@ -150,13 +154,19 @@ export function AiTextModal({ open, onClose, rows, loadInputs, onStage }: AiText
               {t('ready', { count: review.summary.results.length })}
               {review.summary.unusable ? ` ${t('unusable', { count: review.summary.unusable })}` : ''}
               {review.summary.notSent ? ` ${t('notSent', { count: review.summary.notSent })}` : ''}
+              {review.summary.alreadyEnglish ? ` ${t('alreadyEnglish', { count: review.summary.alreadyEnglish })}` : ''}
               {review.summary.failed ? ` ${t('failedCount', { count: review.summary.failed })}` : ''}
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '45vh', overflowY: 'auto' }}>
-              {review.summary.results.slice(0, 5).map((r) => {
+              {review.summary.results.map((r) => {
                 const before = review.inputs.get(r.id);
                 return (
-                  <Box key={r.id} sx={{ border: `1px solid ${neutral[200]}`, borderRadius: '8px', p: '8px 10px', fontSize: 13, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <Box key={r.id} sx={{ border: `1px solid ${neutral[200]}`, borderRadius: '8px', p: '8px 10px', fontSize: 13, display: 'flex', flexDirection: 'column', gap: '4px', opacity: rejected.has(r.id) ? 0.5 : 1 }} data-testid="ai-text-result">
+                    <Checkbox
+                      checked={!rejected.has(r.id)}
+                      onChange={(on) => setRejected((cur) => { const n = new Set(cur); if (on) n.delete(r.id); else n.add(r.id); return n; })}
+                      label={t('accept')}
+                    />
                     {r.title ? (
                       <Box>
                         <Box component="span" sx={{ color: neutral[500], textDecoration: 'line-through' }}>{before?.title}</Box>
@@ -166,7 +176,12 @@ export function AiTextModal({ open, onClose, rows, loadInputs, onStage }: AiText
                       <Box sx={{ fontWeight: 600 }}>{before?.title}</Box>
                     )}
                     {r.description ? <Box sx={{ color: neutral[700], whiteSpace: 'pre-line' }}>{r.description.length > 260 ? `${r.description.slice(0, 260)}…` : r.description}</Box> : null}
-                    {r.tags ? <Box sx={{ color: neutral[600] }}>{r.tags.join(', ')}</Box> : null}
+                    {r.tags ? (
+                      <Box sx={{ color: neutral[600] }}>
+                        <Box component="span" sx={{ textDecoration: 'line-through', color: neutral[500] }}>{(before?.tags ?? []).join(', ') || '—'}</Box>
+                        <Box>{r.tags.join(', ')}</Box>
+                      </Box>
+                    ) : null}
                   </Box>
                 );
               })}

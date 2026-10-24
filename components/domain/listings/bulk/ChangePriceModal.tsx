@@ -14,7 +14,7 @@ import { MoneyField } from '@/components/ds/inputs/MoneyField';
 import { NumberField } from '@/components/ds/inputs/NumberField';
 import { TextField } from '@/components/ds/inputs/TextField';
 import { Button } from '@/components/ds/inputs/Button';
-import { activeMatch, type VariationMatch } from '@/lib/bulk/variationPriceOps';
+import { activeMatch, roundPrice, type VariationMatch } from '@/lib/bulk/variationPriceOps';
 import { neutral } from '@/lib/ds/tokens';
 import type { ListingRow, StagePatch } from '@/lib/listings/types';
 import type { ListingsT } from '../columns';
@@ -46,9 +46,8 @@ export function computeNewPrice(current: number, mode: PriceMode, value: number,
     default:
       return null;
   }
-  if (round === '99') next = Math.floor(next) + 0.99;
-  else if (round === '00') next = Math.round(next);
-  next = Math.round(next * 100) / 100;
+  // Never round against the direction of the change (a −10% must not become a ~7% cut).
+  next = roundPrice(next, round, mode === 'set' ? null : current);
   return next > 0 ? Math.max(0.01, next) : null;
 }
 

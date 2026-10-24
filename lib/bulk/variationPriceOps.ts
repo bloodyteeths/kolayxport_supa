@@ -77,10 +77,21 @@ export function isMultiVariation(inventory: unknown): boolean {
 /** Optional rounding applied after the ops, like `computeNewPrice` in ChangePriceModal. */
 export type PriceRounding = '99' | '00' | 'none';
 
-function roundPrice(value: number, round: PriceRounding): number {
+/**
+ * Rounds a new price WITHOUT going against the direction of the change (pure, shared by every bulk price path).
+ * A cut rounds down (.99 → the .99 at or below; .00 → floor), a raise rounds up (.99 → the .99 at or above;
+ * .00 → ceil): a "−10%" can never end as a ~7% cut. Without `from` (or no change) the old behaviour applies:
+ * .99 → floor + .99, .00 → nearest.
+ */
+export function roundPrice(value: number, round: PriceRounding, from?: number | null): number {
+  const dir = from == null || !Number.isFinite(from) || Math.abs(value - from) < 1e-9 ? 'none' : value < from ? 'down' : 'up';
   let next = value;
-  if (round === '99') next = Math.floor(next) + 0.99;
-  else if (round === '00') next = Math.round(next);
+  if (round === '99') {
+    next = Math.floor(value) + 0.99;
+    if (dir === 'down' && next > value + 1e-9) next -= 1;
+  } else if (round === '00') {
+    next = dir === 'down' ? Math.floor(value + 1e-9) : dir === 'up' ? Math.ceil(value - 1e-9) : Math.round(value);
+  }
   return Math.round(next * 100) / 100;
 }
 
@@ -140,7 +151,7 @@ export function applyPriceOpsToInventory(
           const price = plain === null ? rec(o.price) : {};
           const divisor = Number(price.divisor) || 100;
           const current = plain !== null ? (Number.isFinite(plain) ? plain : 0) : (Number(price.amount) || 0) / divisor;
-          const value = Math.max(minPrice, roundPrice(applyNumberOps(current, ops), round));
+          const value = Math.max(minPrice, roundPrice(applyNumberOps(current, ops), round, current));
           return { ...o, price: { ...price, amount: Math.round(value * divisor), divisor } };
         }),
     })),

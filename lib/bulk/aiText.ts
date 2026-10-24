@@ -28,12 +28,32 @@ export interface AiTextResult {
   tags?: string[];
 }
 
+const TR_LETTERS = /[çğıöşüÇĞİÖŞÜ]/;
+const TR_WORDS = new Set(['ve', 'ile', 'için', 'icin', 'bir', 'bu', 'olan', 'adet', 'renk', 'beden', 'hediye', 'yapımı', 'yapimi', 'el', 'kadın', 'kadin', 'erkek', 'çocuk', 'cocuk', 'takı', 'kolye', 'küpe', 'kupe', 'yüzük', 'yuzuk', 'pamuk', 'deri', 'gümüş', 'gumus', 'özel', 'ozel', 'kişiye', 'kisiye', 'set', 'takım', 'takim', 'adet']);
+/**
+ * Pure: does this listing text look Turkish? Turkish letters, or at least two common Turkish words. Used to skip
+ * listings that are already in English in the translate mode (never rewrite an English listing as a "translation").
+ */
+export function looksTurkish(text: string): boolean {
+  if (TR_LETTERS.test(text)) return true;
+  const words = text.toLocaleLowerCase('tr').split(/[^a-zçğıöşü]+/).filter(Boolean);
+  let hits = 0;
+  for (const w of words) if (TR_WORDS.has(w) && w !== 'set') hits += 1;
+  return hits >= 2;
+}
+
+/** Translate mode only: listings that are already English are not sent. */
+export function alreadyEnglish(input: AiTextInput, mode: AiTextMode): boolean {
+  return mode === 'translate' && !looksTurkish(`${input.title}\n${input.description}`);
+}
+
 /** Listings per request: descriptions are long (a translation reads them in full). */
 export const AI_TEXT_CHUNK = 4;
 export const AI_TEXT_PARALLEL = 2;
 
 /** Fields actually requested for one listing (mode fields minus unsent ones; descriptions need a source text). */
 export function fieldsFor(input: AiTextInput, mode: AiTextMode, fields: AiTextField[]): AiTextField[] {
+  if (alreadyEnglish(input, mode)) return [];
   const wanted = mode === 'improve' ? (['description'] as AiTextField[]) : fields;
   return wanted.filter((f) => !input.unsent.includes(f) && !(f === 'description' && !input.description.trim() && mode === 'translate'));
 }
@@ -92,6 +112,8 @@ export interface AiTextRunSummary {
   unusable: number;
   /** Listings not sent (every requested field had an unsent change, or no source text). */
   notSent: number;
+  /** Translate mode: listings skipped because they are already in English. */
+  alreadyEnglish: number;
   failed: number;
   stop: AiTextRunStop;
 }
@@ -104,7 +126,8 @@ export async function runAiText(
 ): Promise<AiTextRunSummary> {
   const requests = planAiTextRequests(inputs, opts.mode, opts.fields);
   const sentCount = requests.reduce((n, r) => n + r.items.length, 0);
-  const summary: AiTextRunSummary = { results: [], unusable: 0, notSent: inputs.length - sentCount, failed: 0, stop: null };
+  const english = inputs.filter((i) => alreadyEnglish(i, opts.mode)).length;
+  const summary: AiTextRunSummary = { results: [], unusable: 0, notSent: inputs.length - sentCount - english, failed: 0, stop: null, alreadyEnglish: english };
   let next = 0;
   let done = 0;
   const lane = async () => {

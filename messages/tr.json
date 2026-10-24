@@ -14633,7 +14633,8 @@
       "field": {
         "title": "Başlık",
         "description": "Açıklama",
-        "tags": "Etiketler"
+        "tags": "Etiketler",
+        "tagsOptIn": "Etiketleri de çevir (mevcut etiketlerin yerine geçer)"
       },
       "instructions": "Ek talimat (isteğe bağlı)",
       "instructionsHelp": "Ör. \"Hediye olarak uygun olduğunu vurgula\". Talimatı Türkçe yazabilirsiniz; sonuç İngilizce olur.",
@@ -14649,7 +14650,9 @@
       "loadFailed": "İlanların mevcut içeriği okunamadı",
       "rateLimited": "Çok fazla istek; bir dakika sonra tekrar deneyin.",
       "failed": "Yapay zekâ şu an yanıt vermiyor; daha sonra tekrar deneyin.",
-      "staged": "Yapay zekâ önerileri {count} ilanda hazırlandı"
+      "staged": "Yapay zekâ önerileri {count} ilanda hazırlandı",
+      "accept": "Bu ilanda uygula",
+      "alreadyEnglish": "{count} ilan zaten İngilizce olduğu için atlandı."
     },
     "categoryAttrs": {
       "title": "{count} ilanda kategori özellikleri",

@@ -14633,7 +14633,8 @@
       "field": {
         "title": "Title",
         "description": "Description",
-        "tags": "Tags"
+        "tags": "Tags",
+        "tagsOptIn": "Translate tags too (replaces the current tags)"
       },
       "instructions": "Extra instructions (optional)",
       "instructionsHelp": "E.g. \"Mention it makes a great gift\". You can write them in any language; the result is English.",
@@ -14649,7 +14650,9 @@
       "loadFailed": "Couldn't read the listings' current content",
       "rateLimited": "Too many requests; try again in a minute.",
       "failed": "The AI isn't responding right now; try again later.",
-      "staged": "AI suggestions staged on {count} listings"
+      "staged": "AI suggestions staged on {count} listings",
+      "accept": "Apply to this listing",
+      "alreadyEnglish": "{count} listings skipped because they are already in English."
     },
     "categoryAttrs": {
       "title": "Category attributes on {count} listings",

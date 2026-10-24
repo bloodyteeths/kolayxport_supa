@@ -41,7 +41,7 @@ export interface OperationBarProps {
 }
 
 const OP_KEY: Record<StudioOp, string> = {
-  add: 'op.add', replace: 'op.replace', delete: 'op.delete', move: 'op.move', alt: 'op.alt', enhance: 'op.enhance', removeBg: 'op.removeBg', copy: 'op.copy', watermark: 'op.watermark',
+  add: 'op.add', replace: 'op.replace', delete: 'op.delete', move: 'op.move', alt: 'op.alt', enhance: 'op.enhance', removeBg: 'op.removeBg', copy: 'op.copy', watermark: 'op.watermark', removeWatermark: 'op.removeWatermark',
 };
 const HAS_SOURCE: ReadonlySet<StudioOp> = new Set(['add', 'replace']);
 const HAS_POSITION: ReadonlySet<StudioOp> = new Set(['add', 'replace', 'delete', 'move', 'alt', 'enhance', 'removeBg', 'watermark']);

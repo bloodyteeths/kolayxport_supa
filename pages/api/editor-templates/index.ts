@@ -66,7 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // DELETE
   const id = typeof req.query.id === 'string' ? req.query.id : '';
   if (!id) return res.status(400).json({ error: 'id required', code: 'invalid' });
-  const row = await prisma.editorTemplate.findFirst({ where: { id, userId } });
+  const row = await prisma.editorTemplate.findFirst({ where: { id, userId, marketplace: MARKETPLACE } });
   if (!row) return res.status(404).json({ error: 'Not found' });
   const stepRaw = typeof req.query.step === 'string' ? req.query.step : '';
   if (stepRaw !== '') {

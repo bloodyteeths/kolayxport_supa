@@ -4,7 +4,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import { readWatermarkLogo, saveWatermarkLogo } from '@/lib/media/watermarkLogos';
 
-export const config = { api: { bodyParser: { sizeLimit: '5mb' } } };
+export const config = { api: { bodyParser: { sizeLimit: '3mb' } } }; // 2 MB logo as base64
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const user = await getAuthUser(req, res);
@@ -23,6 +23,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     return res.status(200).json(await saveWatermarkLogo(user.id, Buffer.from(m[2], 'base64')));
   } catch (e) {
-    return res.status(400).json({ error: 'Logo could not be read', code: (e as Error).message === 'logo_size' ? 'logo_size' : 'logo_unreadable' });
+    const code = (e as Error).message;
+    return res.status(400).json({ error: 'Logo could not be read', code: code === 'logo_size' || code === 'logo_type' ? code : 'logo_unreadable' });
   }
 }

@@ -49,7 +49,7 @@ export const IMAGE_FETCH_CONCURRENCY = 4;
 export const MAX_STUDIO_IDS = 250;
 
 export type StudioTab = 'photos' | 'video';
-export type StudioOp = 'add' | 'replace' | 'delete' | 'move' | 'alt' | 'enhance' | 'removeBg' | 'copy' | 'watermark';
+export type StudioOp = 'add' | 'replace' | 'delete' | 'move' | 'alt' | 'enhance' | 'removeBg' | 'copy' | 'watermark' | 'removeWatermark';
 export type StudioSource = 'upload' | 'ai' | 'url';
 export type StudioPosition = number | 'end';
 export type StudioFilter = 'all' | 'noPhotos' | 'lt5' | 'missingAlt';
@@ -57,7 +57,7 @@ export type AltMode = 'manual' | 'ai';
 export type VideoOp = 'add' | 'remove';
 export type VideoSource = 'upload' | 'url';
 
-export const STUDIO_OPS: readonly StudioOp[] = ['add', 'replace', 'delete', 'move', 'alt', 'enhance', 'removeBg', 'copy', 'watermark'];
+export const STUDIO_OPS: readonly StudioOp[] = ['add', 'replace', 'delete', 'move', 'alt', 'enhance', 'removeBg', 'copy', 'watermark', 'removeWatermark'];
 export const STUDIO_FILTERS: readonly StudioFilter[] = ['all', 'noPhotos', 'lt5', 'missingAlt'];
 /** Ops whose result is an AI image (always staged as `ai_upload`). */
 export const AI_IMAGE_OPS: ReadonlySet<StudioOp> = new Set(['enhance', 'removeBg']);
@@ -330,7 +330,7 @@ export interface StudioListingRef {
   syncing?: boolean;
 }
 
-export type SkipReason = 'notLoaded' | 'queuedDelete' | 'sending' | 'full' | 'noPhotoAtPosition' | 'lastPhoto' | 'pendingPhoto' | 'samePosition' | 'noVideo' | 'hasVideo' | 'isSource' | 'nothingToCopy' | 'noAltNeeded';
+export type SkipReason = 'notLoaded' | 'queuedDelete' | 'sending' | 'full' | 'noPhotoAtPosition' | 'lastPhoto' | 'pendingPhoto' | 'samePosition' | 'noVideo' | 'hasVideo' | 'isSource' | 'nothingToCopy' | 'noAltNeeded' | 'noWatermark';
 
 export interface PlannedUpload {
   listingId: string;
@@ -361,7 +361,12 @@ export interface PlannedMark {
   rank: number;
   refUrl: string;
   targetImageId: number;
+  /** 'restore' (Filigranı kaldır): refUrl is the stored original; it is staged back as-is. */
+  restore?: boolean;
 }
+
+/** Stored originals of watermarked photos per listing (GET /api/media/watermark-originals). */
+export type WatermarkOriginals = ReadonlyMap<string, ReadonlyArray<{ id: string; rank: number }>>;
 
 export interface StudioPlan {
   /** Watermark jobs. */
@@ -462,6 +467,7 @@ export function planOperation(
   input: PlanInput,
   selected: ReadonlyArray<StudioListingRef>,
   views: ReadonlyMap<string, ListingPhotoView>,
+  originals: WatermarkOriginals = new Map(),
 ): StudioPlan {
   const items: StudioPlan['items'] = [];
   const marks: PlannedMark[] = [];
@@ -592,6 +598,21 @@ export function planOperation(
           const src = bestSrc(img);
           if (src) marks.push({ listingId: id, rank: view.tiles.indexOf(tile) + 1, refUrl: src, targetImageId: tile.imageId as number });
         }
+        touched.add(id);
+        break;
+      }
+      case 'removeWatermark': {
+        // Each watermarked slot gets its stored original back (upload at the slot + delete of the photo there).
+        const rows = originals.get(id) ?? [];
+        const jobs = rows.flatMap((r) => {
+          const tile = view.tiles[r.rank - 1];
+          return tile && !tile.pending && tile.staged !== 'delete' && tile.imageId != null
+            ? [{ listingId: id, rank: r.rank, refUrl: `/api/media/watermark-originals?id=${encodeURIComponent(r.id)}`, targetImageId: tile.imageId, restore: true }]
+            : [];
+        });
+        if (!jobs.length) { skip(id, 'noWatermark'); break; }
+        if (view.room <= 0) { skip(id, 'full'); break; }
+        marks.push(...jobs.slice(0, view.room));
         touched.add(id);
         break;
       }

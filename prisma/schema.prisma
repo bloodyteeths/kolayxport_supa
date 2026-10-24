@@ -79,6 +79,7 @@ model User {
   inboxThreads            InboxThread[]
   savedReplies            SavedReply[]
   editorTemplates         EditorTemplate[]
+  watermarkOriginals      WatermarkOriginal[]
   researchWatches         ResearchWatch[]
   notificationPreferences NotificationPreference[]
   aiPreferences           AiPreference[]
@@ -2924,3 +2925,22 @@ model EditorTemplate {
   @@unique([userId, marketplace, name])
   @@index([userId, marketplace])
 }
+
+/// Full-resolution original of a photo that was watermarked (file under uploads/watermarks/<userId>/originals/<key>),
+/// linked to the listing and the photo slot it came from. Re-watermarking starts from it (never stacks) and
+/// "Filigranı kaldır" restores it into the same slot. Rows go with the account (cascade) and the files with it.
+model WatermarkOriginal {
+  id          String   @id @default(cuid())
+  userId      String
+  marketplace String // 'etsy', 'ebay', 'shopify', 'wix', 'trendyol'
+  listingId   String
+  rank        Int
+  fileKey     String // sha256 prefix + extension
+  contentType String
+  spec        Json
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, marketplace, listingId])
+}
+

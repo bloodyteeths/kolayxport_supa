@@ -37,6 +37,7 @@ export const psEn = {
       removeBg: 'Remove background',
       watermark: 'Add watermark',
       wmAll: 'All photos',
+      removeWatermark: 'Remove watermark',
       copy: 'Copy from…',
       chooseFiles: 'Choose files…',
       filesChosen: '{count, plural, one {# file} other {# files}}',
@@ -85,6 +86,7 @@ export const psEn = {
       isSource: 'it is the listing being copied',
       nothingToCopy: 'the source listing has no photos',
       noAltNeeded: 'alt text is already the same',
+      noWatermark: 'no watermarked photos',
     },
     result: {
       staged: '{count, plural, one {# change saved} other {# changes saved}} to your drafts · not sent yet',
@@ -172,6 +174,7 @@ export const psTr = {
       removeBg: 'Arka planı kaldır',
       watermark: 'Filigran ekle',
       wmAll: 'Tüm fotoğraflar',
+      removeWatermark: 'Filigranı kaldır',
       copy: 'Şuradan kopyala…',
       chooseFiles: 'Dosya seç…',
       filesChosen: '{count} dosya',
@@ -220,6 +223,7 @@ export const psTr = {
       isSource: 'kopyalanan ilanın kendisi',
       nothingToCopy: 'kaynak ilanda fotoğraf yok',
       noAltNeeded: 'alt metin zaten aynı',
+      noWatermark: 'filigranlı fotoğraf yok',
     },
     result: {
       staged: '{count} değişiklik taslaklarınıza kaydedildi · henüz gönderilmedi',

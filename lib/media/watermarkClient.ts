@@ -11,14 +11,37 @@ async function fail(res: Response): Promise<never> {
 }
 
 /** The watermarked copy of one photo as a File (same format; name gets "-wm"). */
-export async function watermarkPhoto(imageUrl: string, spec: WatermarkSpec, name = 'photo', signal?: AbortSignal): Promise<File> {
+export type WatermarkOriginRef = { marketplace: 'etsy' | 'ebay' | 'shopify' | 'wix' | 'trendyol'; listingId: string; rank: number };
+
+/**
+ * `origin` = the listing + photo slot: the server stores the original the first time and re-watermarks from it later
+ * (never stacking). `preview` skips storing.
+ */
+export async function watermarkPhoto(imageUrl: string, spec: WatermarkSpec, name = 'photo', signal?: AbortSignal, opts: { origin?: WatermarkOriginRef; preview?: boolean } = {}): Promise<File> {
   const res = await fetch('/api/media/watermark', {
-    method: 'POST', credentials: 'same-origin', signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageUrl, spec }),
+    method: 'POST', credentials: 'same-origin', signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageUrl, spec, ...opts }),
   });
   if (!res.ok) return fail(res);
   const blob = await res.blob();
   const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
   return new File([blob], `${name.replace(/\.[a-z0-9]+$/i, '')}-wm.${ext}`, { type: blob.type || 'image/jpeg' });
+}
+
+/** A stored original (for "Filigranı kaldır") as a File to stage back. */
+export async function fetchWatermarkOriginal(url: string, name: string, signal?: AbortSignal): Promise<File> {
+  const res = await fetch(url, { credentials: 'same-origin', signal });
+  if (!res.ok) throw new Error('original_missing');
+  const blob = await res.blob();
+  const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
+  return new File([blob], `${name}-original.${ext}`, { type: blob.type || 'image/jpeg' });
+}
+
+export async function listWatermarkOriginals(marketplace: WatermarkOriginRef['marketplace'], listingIds: string[]): Promise<{ id: string; listingId: string; rank: number }[]> {
+  if (!listingIds.length) return [];
+  const q = new URLSearchParams({ marketplace, listingIds: listingIds.join(',') });
+  const res = await fetch(`/api/media/watermark-originals?${q}`, { credentials: 'same-origin' });
+  if (!res.ok) return [];
+  return ((await res.json()) as { originals?: { id: string; listingId: string; rank: number }[] }).originals ?? [];
 }
 
 export async function uploadWatermarkLogo(file: File): Promise<{ id: string }> {

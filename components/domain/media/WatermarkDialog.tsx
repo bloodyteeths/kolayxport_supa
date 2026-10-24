@@ -29,6 +29,7 @@ import {
   uploadWatermarkLogo,
   watermarkLogoUrl,
   watermarkPhoto,
+  type WatermarkOriginRef,
   type WatermarkPreset,
 } from '@/lib/media/watermarkClient';
 
@@ -37,6 +38,8 @@ export type WatermarkDialogProps = {
   onClose: () => void;
   /** A photo of the seller's to preview on (any URL the editors show). */
   previewUrl: string | null;
+  /** Its listing + slot: a slot watermarked before previews on its stored original (what the result will use). */
+  previewOrigin?: WatermarkOriginRef | null;
   /** Primary button text, e.g. "12 fotoğrafa filigran ekle". */
   applyLabel: string;
   /** Runs with the final spec; the dialog shows progress until it resolves. */
@@ -47,7 +50,7 @@ export type WatermarkDialogProps = {
 
 const GRID: Exclude<WatermarkPosition, 'tile'>[] = ['tl', 'tc', 'tr', 'ml', 'c', 'mr', 'bl', 'bc', 'br'];
 
-export function WatermarkDialog({ open, onClose, previewUrl, applyLabel, onApply, children }: WatermarkDialogProps) {
+export function WatermarkDialog({ open, onClose, previewUrl, previewOrigin, applyLabel, onApply, children }: WatermarkDialogProps) {
   const t = useTranslations('watermark');
   const [draft, setDraft] = React.useState<WatermarkSpec>({ ...WATERMARK_DEFAULT });
   const [presets, setPresets] = React.useState<WatermarkPreset[]>([]);
@@ -72,7 +75,7 @@ export function WatermarkDialog({ open, onClose, previewUrl, applyLabel, onApply
     if (!open || !previewUrl || !spec) { setPreview(null); return; }
     const ctl = new AbortController();
     const timer = setTimeout(() => {
-      watermarkPhoto(previewUrl, spec, 'preview', ctl.signal)
+      watermarkPhoto(previewUrl, spec, 'preview', ctl.signal, { origin: previewOrigin ?? undefined, preview: true })
         .then((file) => { setPreviewError(false); setPreview((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(file); }); })
         .catch(() => { if (!ctl.signal.aborted) setPreviewError(true); });
     }, 350);

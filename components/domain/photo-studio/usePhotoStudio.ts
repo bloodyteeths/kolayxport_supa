@@ -2,7 +2,7 @@
 // Loads the selected listings (DB), their Etsy photos (one call per listing, concurrency 4, cached) and the shop's
 // staged drafts; runs operation-row plans and single-tile edits by STAGING them (batch-media / single-file
 // upload). It never sends: the listings / BulkGrid "Send N changes" picks the drafts up (one push place).
-import { watermarkPhoto } from '@/lib/media/watermarkClient';
+import { fetchWatermarkOriginal, watermarkPhoto } from '@/lib/media/watermarkClient';
 import type { WatermarkSpec } from '@/lib/media/watermarkSpec';
 import * as React from 'react';
 import { useFeatureLockStore } from '@/lib/http/limitInterceptor';
@@ -501,12 +501,16 @@ export function usePhotoStudio({ shopId, ids }: { shopId: string | null; ids: st
     }
     // 4. Watermarks: rendered by the server (concurrency 3), then staged like a Replace (upload at the photo's rank +
     // delete of the original in the same draft), so the original stays until Send.
-    if (plan.marks.length && ctx.watermark && !stopped) {
+    if (plan.marks.length && (ctx.watermark || plan.marks.every((m) => m.restore)) && !stopped) {
       const spec = ctx.watermark;
       const marked: { listingId: string; job: (typeof plan.marks)[number]; file: File }[] = [];
       await runPool(plan.marks, AI_CONCURRENCY, async (job) => {
         try {
-          marked.push({ listingId: job.listingId, job, file: await watermarkPhoto(job.refUrl, spec, `${job.listingId}-${job.rank}`) });
+          const name = `${job.listingId}-${job.rank}`;
+          const file = job.restore || !spec
+            ? await fetchWatermarkOriginal(job.refUrl, name)
+            : await watermarkPhoto(job.refUrl, spec, name, undefined, { origin: { marketplace: 'etsy', listingId: job.listingId, rank: job.rank } });
+          marked.push({ listingId: job.listingId, job, file });
         } catch (err) {
           fail(clientFailure(job.listingId, err));
         } finally {

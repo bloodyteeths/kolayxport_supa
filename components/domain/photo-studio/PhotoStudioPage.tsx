@@ -16,6 +16,7 @@
 // listings / BulkGrid "Send N changes" picks the drafts up.
 import { WatermarkDialog } from '@/components/domain/media/WatermarkDialog';
 import type { WatermarkSpec } from '@/lib/media/watermarkSpec';
+import { listWatermarkOriginals } from '@/lib/media/watermarkClient';
 import { useAiCostsVisible } from '@/components/domain/credits/useCredits';
 import * as React from 'react';
 import Box from '@mui/material/Box';
@@ -62,6 +63,7 @@ import {
   type StudioTab,
   type VideoOp,
   type VideoSource,
+  type WatermarkOriginals,
 } from './studioModel';
 
 export interface PhotoStudioPageProps {
@@ -167,7 +169,22 @@ function StudioBody({ studio, ids, tab, onTabChange, backHref, onHeader }: Studi
   React.useEffect(() => { if (tab === 'video') loadVideos(); }, [tab, loadVideos]);
 
   const selectedRefs = React.useMemo(() => listings.filter((l) => selected.has(l.id)), [listings, selected]);
-  const plan = React.useMemo(() => planOperation(input, selectedRefs, photoViews), [input, selectedRefs, photoViews]);
+  // Stored originals of watermarked photos (restore op; and the watermark preview uses a slot's stored original).
+  const [wmOriginals, setWmOriginals] = React.useState<WatermarkOriginals>(new Map());
+  const selectedKey = selectedRefs.map((r) => r.id).join(',');
+  React.useEffect(() => {
+    if (input.op !== 'removeWatermark' && input.op !== 'watermark') return;
+    let live = true;
+    void listWatermarkOriginals('etsy', selectedRefs.map((r) => r.id)).then((rows) => {
+      if (!live) return;
+      const m = new Map<string, { id: string; rank: number }[]>();
+      for (const r of rows) m.set(r.listingId, [...(m.get(r.listingId) ?? []), { id: r.id, rank: r.rank }]);
+      setWmOriginals(m);
+    });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [input.op, selectedKey, studio.progress == null]);
+  const plan = React.useMemo(() => planOperation(input, selectedRefs, photoViews, wmOriginals), [input, selectedRefs, photoViews, wmOriginals]);
   const videoPlan = React.useMemo(
     () => planVideo(videoOp, videoSource, videoUrl, Boolean(videoFile), selectedRefs, videoViews),
     [videoOp, videoSource, videoUrl, videoFile, selectedRefs, videoViews],
@@ -372,6 +389,7 @@ function StudioBody({ studio, ids, tab, onTabChange, backHref, onHeader }: Studi
         open={wmOpen}
         onClose={() => setWmOpen(false)}
         previewUrl={plan.marks[0]?.refUrl ?? null}
+        previewOrigin={plan.marks[0] ? { marketplace: 'etsy', listingId: plan.marks[0].listingId, rank: plan.marks[0].rank } : null}
         applyLabel={tWm('applyCount', { count: plan.marks.length })}
         onApply={async (spec) => {
           wmSpecRef.current = spec;

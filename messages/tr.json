@@ -15928,7 +15928,8 @@
       "copyFrom": "Fotoğrafları şuradan kopyala",
       "copyFromPlaceholder": "Bir ilan seçin",
       "watermark": "Filigran ekle",
-      "wmAll": "Tüm fotoğraflar"
+      "wmAll": "Tüm fotoğraflar",
+      "removeWatermark": "Filigranı kaldır"
     },
     "source": {
       "upload": "Yükle",
@@ -15969,7 +15970,8 @@
       "hasVideo": "zaten bir videosu var",
       "isSource": "kopyalanan ilanın kendisi",
       "nothingToCopy": "kaynak ilanda fotoğraf yok",
-      "noAltNeeded": "alt metin zaten aynı"
+      "noAltNeeded": "alt metin zaten aynı",
+      "noWatermark": "filigranlı fotoğraf yok"
     },
     "result": {
       "staged": "{count} değişiklik taslaklarınıza kaydedildi · henüz gönderilmedi",

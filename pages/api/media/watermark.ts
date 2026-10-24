@@ -8,6 +8,7 @@ import { loadImageForUser } from '@/lib/images/ownImage';
 import { applyWatermark } from '@/lib/media/watermark';
 import { normalizeWatermarkSpec } from '@/lib/media/watermarkSpec';
 import { readWatermarkLogo } from '@/lib/media/watermarkLogos';
+import { archiveOriginal, findOriginal, normalizeOrigin, readOriginalFile } from '@/lib/media/watermarkOriginals';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return res.status(405).json({ error: 'Method not allowed' }); }
@@ -17,12 +18,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const spec = normalizeWatermarkSpec(body.spec);
   if (!spec) return res.status(400).json({ error: 'Invalid watermark', code: 'invalid_spec' });
   const imageUrl = typeof body.imageUrl === 'string' ? body.imageUrl : '';
-  const img = await loadImageForUser(user.id, imageUrl);
+  // origin = the listing + photo slot. A slot watermarked before is re-watermarked from its stored original (never
+  // stacked on the watermarked photo); the first time, the original is stored (unless this is only a preview).
+  const origin = normalizeOrigin(body.origin);
+  const preview = body.preview === true;
+  const stored = origin ? await findOriginal(user.id, origin) : null;
+  const storedBytes = stored ? await readOriginalFile(user.id, stored.fileKey) : null;
+  const img = storedBytes ? { data: storedBytes.toString('base64'), mimeType: stored!.contentType } : await loadImageForUser(user.id, imageUrl);
   if (!img) return res.status(422).json({ error: 'Photo could not be read', code: 'image_unreadable' });
   const logo = spec.kind === 'logo' && spec.logoId ? await readWatermarkLogo(user.id, spec.logoId) : null;
   if (spec.kind === 'logo' && !logo) return res.status(422).json({ error: 'Logo not found', code: 'logo_missing' });
   try {
-    const out = await applyWatermark(Buffer.from(img.data, 'base64'), spec, logo);
+    const source = Buffer.from(img.data, 'base64');
+    const out = await applyWatermark(source, spec, logo);
+    if (origin && !preview) {
+      const row = storedBytes && stored ? stored : await archiveOriginal(user.id, origin, source, img.mimeType, spec);
+      res.setHeader('X-Watermark-Original', row.id);
+    }
     res.setHeader('Content-Type', out.mimeType);
     res.setHeader('Cache-Control', 'no-store');
     return res.status(200).send(out.data);

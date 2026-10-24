@@ -162,6 +162,13 @@ describe('planOperation', () => {
     expect(planOperation(plan({ op: 'watermark', wmAll: true }), sel.slice(0, 1), views([['1', full]])).marks).toHaveLength(1);
   });
 
+  it('Remove watermark: stages each stored original back into its slot; listings without one are skipped', () => {
+    const originals = new Map([['1', [{ id: 'o2', rank: 2 }, { id: 'o9', rank: 9 }]]]);
+    const p = planOperation(plan({ op: 'removeWatermark' }), sel.slice(0, 2), views([['1', v1], ['2', v1]]), originals);
+    expect(p.marks).toEqual([{ listingId: '1', rank: 2, refUrl: '/api/media/watermark-originals?id=o2', targetImageId: 101, restore: true }]);
+    expect(p.skipped.map((s) => [s.listingId, s.reason])).toEqual([['2', 'noWatermark']]);
+  });
+
   it('Alt text (typed) on every photo skips photos that already have it', () => {
     const v = buildListingPhotoView([img(1, 1, 'same'), img(2, 2, '')], null);
     const p = planOperation(plan({ op: 'alt', altMode: 'manual', altText: 'same', altAll: true }), sel.slice(0, 1), views([['1', v]]));

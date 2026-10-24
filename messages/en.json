@@ -15928,7 +15928,8 @@
       "copyFrom": "Copy photos from",
       "copyFromPlaceholder": "Choose a listing",
       "watermark": "Add watermark",
-      "wmAll": "All photos"
+      "wmAll": "All photos",
+      "removeWatermark": "Remove watermark"
     },
     "source": {
       "upload": "Upload",
@@ -15969,7 +15970,8 @@
       "hasVideo": "already has a video",
       "isSource": "it is the listing being copied",
       "nothingToCopy": "the source listing has no photos",
-      "noAltNeeded": "alt text is already the same"
+      "noAltNeeded": "alt text is already the same",
+      "noWatermark": "no watermarked photos"
     },
     "result": {
       "staged": "{count, plural, one {# change saved} other {# changes saved}} to your drafts · not sent yet",

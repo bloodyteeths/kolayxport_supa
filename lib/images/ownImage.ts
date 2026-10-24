@@ -41,6 +41,9 @@ export function ownPath(url: string): URL | null {
 async function readInside(root: string, file: string, mimeType?: string | null): Promise<OwnImage | null> {
   const abs = path.resolve(file);
   if (!abs.startsWith(root + path.sep)) return null;
+  // Symlinks must not lead out of the root either: compare real paths.
+  const [realRoot, realFile] = await Promise.all([fs.promises.realpath(root).catch(() => null), fs.promises.realpath(abs).catch(() => null)]);
+  if (!realRoot || !realFile || !realFile.startsWith(realRoot + path.sep)) return null;
   const stat = await fs.promises.stat(abs).catch(() => null);
   if (!stat?.isFile() || stat.size === 0 || stat.size > MAX_BYTES) return null;
   const type = mimeType && mimeType.startsWith('image/') ? mimeType : MIME[path.extname(abs).toLowerCase()];

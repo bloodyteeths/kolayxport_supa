@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { COMPANY, addressLine, whatsappUrl, whatsappDisplay } from '@/lib/site/company';
-import { CASES, localePath, type SiteLocale } from '@/lib/site/routes';
+import { CASES, casePath, localePath, type SiteLocale } from '@/lib/site/routes';
 import { openCookiePreferences } from './cookieConsent';
 import { usePlayClient } from '@/lib/billing/usePlayClient';
 import PlayBadge from './PlayBadge';
@@ -13,7 +13,7 @@ export default function SiteFooter({ locale }: { locale: SiteLocale }) {
   const social = Object.entries(COMPANY.social).filter(([, url]) => !!url) as [string, string][];
 
   const cols: { title: string; links: { href: string; label: string }[] }[] = [
-    { title: t('footer.solutions'), links: CASES.map((s) => ({ href: href(`/cozumler/${s}`), label: t(`cases.${s}.label`) })) },
+    { title: t('footer.solutions'), links: CASES.map((s) => ({ href: casePath(locale, s), label: t(`cases.${s}.label`) })) },
     {
       title: t('footer.product'),
       links: [

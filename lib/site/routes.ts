@@ -11,12 +11,21 @@ export function localePath(locale: SiteLocale, path: string): string {
 /** Use-case pages shown in the header/footer (labels: messages site.cases.<key>). Order = menu order. */
 export const CASES = [
   'etsy-satici',
+  'etsy-toplu-ilan-duzenleme',
   'ebay-satici',
   'trendyoldan-dunyaya',
   'ai-ilan-optimizasyonu',
   'urun-arastirma-arbitraj',
   'mikro-ihracat-kargo-etgb',
 ] as const;
+
+/** Case pages whose English slug differs from the Turkish key (content `twin:`). */
+const CASE_EN_SLUGS: Record<string, string> = { 'etsy-toplu-ilan-duzenleme': 'etsy-bulk-listing-editor' };
+
+/** Path of a use-case page in a locale: casePath('en', 'etsy-toplu-ilan-duzenleme') → '/en/cozumler/etsy-bulk-listing-editor'. */
+export function casePath(locale: SiteLocale, key: string): string {
+  return localePath(locale, `/cozumler/${locale === 'en' ? CASE_EN_SLUGS[key] || key : key}`);
+}
 
 export const LEGAL = [
   'kvkk-aydinlatma-metni',

@@ -16582,6 +16582,10 @@
         "label": "Etsy sellers",
         "desc": "Listing SEO, bulk editing, orders and shipping"
       },
+      "etsy-toplu-ilan-duzenleme": {
+        "label": "Bulk listing editor",
+        "desc": "Edit thousands of Etsy listings safely, as drafts"
+      },
       "ebay-satici": {
         "label": "eBay sellers",
         "desc": "Copy Etsy listings to eBay, bulk editing"

@@ -16582,6 +16582,10 @@
         "label": "Etsy satıcıları",
         "desc": "İlan SEO'su, toplu düzenleme, sipariş ve kargo"
       },
+      "etsy-toplu-ilan-duzenleme": {
+        "label": "Toplu ilan düzenleme",
+        "desc": "Binlerce Etsy ilanını taslakla, güvenle düzenleyin"
+      },
       "ebay-satici": {
         "label": "eBay satıcıları",
         "desc": "Etsy'den eBay'e ilan kopyalama, toplu düzenleme"

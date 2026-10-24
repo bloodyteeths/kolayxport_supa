@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { ChevronDown, Menu, X } from 'lucide-react';
-import { CASES, localePath, SIGNUP_HREF, type SiteLocale } from '@/lib/site/routes';
+import { CASES, casePath, localePath, SIGNUP_HREF, type SiteLocale } from '@/lib/site/routes';
 import { usePlayClient } from '@/lib/billing/usePlayClient';
 
 interface Props { locale: SiteLocale; path: string; hasTwin: boolean; tone: 'paper' | 'ink' }
@@ -66,7 +66,7 @@ export default function SiteHeader({ locale, path, hasTwin, tone }: Props) {
                 <ul className="grid grid-cols-2 gap-1">
                   {CASES.map((slug) => (
                     <li key={slug}>
-                      <Link prefetch={false} href={href(`/cozumler/${slug}`)} onClick={() => setSolutions(false)} className="block rounded-xl px-3 py-2.5 hover:bg-paper-2">
+                      <Link prefetch={false} href={casePath(locale, slug)} onClick={() => setSolutions(false)} className="block rounded-xl px-3 py-2.5 hover:bg-paper-2">
                         <span className="block font-semibold">{t(`cases.${slug}.label`)}</span>
                         <span className="block text-sm text-ink-mute">{t(`cases.${slug}.desc`)}</span>
                       </Link>
@@ -110,7 +110,7 @@ export default function SiteHeader({ locale, path, hasTwin, tone }: Props) {
           <ul className="mt-3 grid gap-1">
             {CASES.map((slug) => (
               <li key={slug}>
-                <Link prefetch={false} href={href(`/cozumler/${slug}`)} onClick={() => setOpen(false)} className="block rounded-xl px-2 py-3">
+                <Link prefetch={false} href={casePath(locale, slug)} onClick={() => setOpen(false)} className="block rounded-xl px-2 py-3">
                   <span className="block font-semibold">{t(`cases.${slug}.label`)}</span>
                   <span className="block text-sm text-ink-mute">{t(`cases.${slug}.desc`)}</span>
                 </Link>

@@ -14111,7 +14111,8 @@
       "matchSkipsPlain": "Varyasyonu olmayan {count} ilan değişmeyecek",
       "matchValue": "Değer",
       "matchValuePlaceholder": "Değer, ör. Büyük",
-      "matchOpen": "Yalnızca bazı varyasyonları değiştir"
+      "matchOpen": "Yalnızca bazı varyasyonları değiştir",
+      "listLabel": "{count} ilanın yeni fiyatı"
     },
     "stock": {
       "in": "Stokta var",

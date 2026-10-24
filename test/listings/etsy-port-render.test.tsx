@@ -285,6 +285,35 @@ describe('Change price on listings with variations (Etsy)', { timeout: 30_000 },
   });
 });
 
+describe('Change price: every listing old → new', { timeout: 30_000 }, () => {
+  it('lists each listing with its rounded new price before staging', async () => {
+    const { ChangePriceModal } = await import('@/components/domain/listings/bulk/ChangePriceModal');
+    const { useTranslations } = await import('next-intl');
+    const rows = [row({ id: '1', title: 'Wooden Keepsake Box', price: { amount: 29, currency: 'USD' } } as Partial<ListingRow>), row({ id: '2', title: 'Name Necklace Gold', price: { amount: 40, currency: 'USD' } } as Partial<ListingRow>)];
+    function Harness() {
+      const t = useTranslations() as unknown as (k: string, v?: Record<string, unknown>) => string;
+      return (
+        <ChangePriceModal open onClose={() => undefined} rows={rows} currency="USD" priceMin={0.2} currentPrice={(r) => r.price?.amount ?? null}
+          formatMoney={(n) => `$${n.toFixed(2)}`} onStage={vi.fn(async () => ({ ok: [], failed: [] }))} t={t as never} />
+      );
+    }
+    render(
+      <NextIntlClientProvider locale="en" messages={MESSAGES} timeZone="Europe/Istanbul" now={NOW} onError={() => {}}>
+        <ThemeProvider theme={theme}>
+          <Harness />
+        </ThemeProvider>
+      </NextIntlClientProvider>,
+    );
+    const dialog = await screen.findByTestId('listings-change-price');
+    fireEvent.change(within(dialog).getAllByRole('textbox')[0], { target: { value: '10' } });
+    const items = within(within(dialog).getByTestId('listings-change-price-list')).getAllByRole('listitem').map((li) => li.textContent);
+    expect(items).toHaveLength(2);
+    expect(items[0]).toContain('Wooden Keepsake Box');
+    expect(items[0]).toContain('$29.00 → $31.90');
+    expect(items[1]).toContain('$40.00 → $44.00');
+  });
+});
+
 describe('Profiles: delete', { timeout: 30_000 }, () => {
   it('deletes the chosen profile after confirming', async () => {
     const { ProfilesModal, PROFILE_STORAGE_KEY } = await import('@/components/domain/listing-editor/ProfilesModal');

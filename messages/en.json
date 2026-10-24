@@ -14111,7 +14111,8 @@
       "matchSkipsPlain": "{count, plural, one {# listing} other {# listings}} without variations won't change",
       "matchValue": "Value",
       "matchValuePlaceholder": "Value, e.g. Large",
-      "matchOpen": "Only change some variations"
+      "matchOpen": "Only change some variations",
+      "listLabel": "New price for {count} listings"
     },
     "stock": {
       "in": "In stock",

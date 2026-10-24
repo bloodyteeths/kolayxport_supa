@@ -148,6 +148,7 @@ export function ChangePriceModal({ open, onClose, rows, currency, priceMin, curr
     [rows, currentPrice, mode, value, round, priceMin, currentListPrice],
   );
   const example = plan.patches[0];
+  const titleById = React.useMemo(() => new Map(rows.map((r) => [r.id, r.title])), [rows]);
   const isMoney = mode === 'set' || mode === 'incAmt' || mode === 'decAmt';
   // Listings with variations (price per variation): staged as inventory when the marketplace supports it.
   const variationRows = React.useMemo(() => (onStageVariations ? rows.filter((r) => !r.editable.price) : []), [rows, onStageVariations]);
@@ -221,6 +222,27 @@ export function ChangePriceModal({ open, onClose, rows, currency, priceMin, curr
               })
             : t('listings.price.previewEmpty', { count: rows.length })}
         </Typography>
+        {plan.patches.length > 1 ? (
+          // Every listing's old → new price, not just one example (usability review): the seller sees each
+          // rounded result before staging.
+          <Box
+            component="ul"
+            aria-label={t('listings.price.listLabel', { count: plan.patches.length })}
+            data-testid="listings-change-price-list"
+            sx={{ m: 0, p: '6px 8px', listStyle: 'none', maxHeight: 180, overflowY: 'auto', border: `1px solid ${neutral[200]}`, borderRadius: '6px', display: 'flex', flexDirection: 'column', gap: '2px' }}
+          >
+            {plan.patches.map((item) => (
+              <Typography key={item.id} component="li" variant="caption" sx={{ display: 'flex', gap: '8px', color: neutral[700] }}>
+                <Box component="span" sx={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {titleById.get(item.id) ?? item.id}
+                </Box>
+                <Box component="span" sx={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+                  {formatMoney(item.from, currency)} → {formatMoney(item.to, currency)}
+                </Box>
+              </Typography>
+            ))}
+          </Box>
+        ) : null}
         {currentListPrice && example ? (
           <Box component="ul" sx={{ m: 0, p: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '2px' }} data-testid="listings-change-price-both">
             <Typography component="li" variant="caption" sx={{ color: neutral[600] }}>

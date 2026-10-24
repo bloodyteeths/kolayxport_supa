@@ -285,6 +285,22 @@ describe('Change price on listings with variations (Etsy)', { timeout: 30_000 },
   });
 });
 
+describe('Unsent count moves at once on an inline edit', { timeout: 30_000 }, () => {
+  it('counts the edit before the server refetch lands', async () => {
+    let release!: () => void;
+    const slow = new Promise<void>((r) => { release = r; });
+    await renderPage(makeAdapter({ stage: vi.fn(async () => { await slow; }) }));
+    expect(screen.queryByRole('button', { name: /Send 1 change/ })).toBeNull();
+    const cell = screen.getAllByTestId('listing-title').find((el) => el.textContent === 'Wooden Keepsake Box')!.closest('[data-row-id]') as HTMLElement;
+    fireEvent.click(within(cell).getByRole('button', { name: /Edit Stock|Edit Quantity|Edit Qty/i }));
+    const input = within(cell).getByRole('textbox');
+    fireEvent.change(input, { target: { value: '7' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(await screen.findByRole('button', { name: /Send 1 change/ })).toBeTruthy();
+    release();
+  });
+});
+
 describe('Change price: every listing old → new', { timeout: 30_000 }, () => {
   it('lists each listing with its rounded new price before staging', async () => {
     const { ChangePriceModal } = await import('@/components/domain/listings/bulk/ChangePriceModal');

@@ -333,7 +333,18 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
   const reconnectText = t('listings.banner.reconnect', { marketplace: mpName });
   const sendDisabledReason = needsReauth ? reconnectText : limitHit ? limitText : undefined;
 
-  const unsent = counts ? unsentCount(counts) : 0;
+  // Count a fresh edit at once (usability review: "3 → 4" took ~2 s): the server count only moves after the
+  // list refetch, while a staged overlay exists the moment the seller commits. Overlays on rows the server does not
+  // yet count as unsent are added; once the refetch counts them, they stop being added (no double count).
+  const localOnly = React.useMemo(() => {
+    let n = 0;
+    for (const id of staged.overlays.keys()) {
+      const r = rows.find((row) => row.id === id);
+      if (r && (!r.sync || r.sync.status === 'synced')) n += 1;
+    }
+    return n;
+  }, [staged.overlays, rows]);
+  const unsent = (counts ? unsentCount(counts) : 0) + localOnly;
   const send = useSendChanges({
     marketplace,
     unsent,

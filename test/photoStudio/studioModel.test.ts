@@ -162,11 +162,15 @@ describe('planOperation', () => {
     expect(planOperation(plan({ op: 'watermark', wmAll: true }), sel.slice(0, 1), views([['1', full]])).marks).toHaveLength(1);
   });
 
-  it('Remove watermark: stages each stored original back into its slot; listings without one are skipped', () => {
-    const originals = new Map([['1', [{ id: 'o2', rank: 2 }, { id: 'o9', rank: 9 }]]]);
-    const p = planOperation(plan({ op: 'removeWatermark' }), sel.slice(0, 2), views([['1', v1], ['2', v1]]), originals);
-    expect(p.marks).toEqual([{ listingId: '1', rank: 2, refUrl: '/api/media/watermark-originals?id=o2', targetImageId: 101, restore: true }]);
-    expect(p.skipped.map((s) => [s.listingId, s.reason])).toEqual([['2', 'noWatermark']]);
+  it('Remove watermark: replaces only the photo we placed (matched, even if moved); a changed photo is never overwritten', () => {
+    const originals = new Map([
+      ['1', [{ id: 'o2', rank: 2, match: { imageId: 102, rank: 3 } }, { id: 'o1', rank: 1, match: null }]],
+      ['2', [{ id: 'o5', rank: 1, match: null }]],
+    ]);
+    const three = [{ id: '1', title: 'A' }, { id: '2', title: 'B' }, { id: '3', title: 'C' }];
+    const p = planOperation(plan({ op: 'removeWatermark' }), three, views([['1', v1], ['2', v1], ['3', v1]]), originals);
+    expect(p.marks).toEqual([{ listingId: '1', rank: 3, refUrl: '/api/media/watermark-originals?id=o2', targetImageId: 102, restore: true }]);
+    expect(p.skipped.map((s) => [s.listingId, s.reason])).toEqual([['1', 'photoChanged'], ['2', 'photoChanged'], ['3', 'noWatermark']]);
   });
 
   it('Alt text (typed) on every photo skips photos that already have it', () => {

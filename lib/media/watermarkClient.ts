@@ -44,6 +44,17 @@ export async function listWatermarkOriginals(marketplace: WatermarkOriginRef['ma
   return ((await res.json()) as { originals?: { id: string; listingId: string; rank: number }[] }).originals ?? [];
 }
 
+/** Restore guard: matches each stored original to the photo we placed among the listings' current photos. */
+export async function matchWatermarkOriginals(
+  marketplace: WatermarkOriginRef['marketplace'],
+  listings: { listingId: string; photos: { imageId: number; rank: number; url: string }[] }[],
+): Promise<{ id: string; listingId: string; rank: number; match: { imageId: number; rank: number } | null }[]> {
+  if (!listings.length) return [];
+  const res = await fetch('/api/media/watermark-originals', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ marketplace, listings }) });
+  if (!res.ok) return [];
+  return ((await res.json()) as { matches?: [] }).matches ?? [];
+}
+
 export async function uploadWatermarkLogo(file: File): Promise<{ id: string }> {
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const r = new FileReader();

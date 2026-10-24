@@ -330,7 +330,7 @@ export interface StudioListingRef {
   syncing?: boolean;
 }
 
-export type SkipReason = 'notLoaded' | 'queuedDelete' | 'sending' | 'full' | 'noPhotoAtPosition' | 'lastPhoto' | 'pendingPhoto' | 'samePosition' | 'noVideo' | 'hasVideo' | 'isSource' | 'nothingToCopy' | 'noAltNeeded' | 'noWatermark';
+export type SkipReason = 'notLoaded' | 'queuedDelete' | 'sending' | 'full' | 'noPhotoAtPosition' | 'lastPhoto' | 'pendingPhoto' | 'samePosition' | 'noVideo' | 'hasVideo' | 'isSource' | 'nothingToCopy' | 'noAltNeeded' | 'noWatermark' | 'photoChanged';
 
 export interface PlannedUpload {
   listingId: string;
@@ -365,8 +365,12 @@ export interface PlannedMark {
   restore?: boolean;
 }
 
-/** Stored originals of watermarked photos per listing (GET /api/media/watermark-originals). */
-export type WatermarkOriginals = ReadonlyMap<string, ReadonlyArray<{ id: string; rank: number }>>;
+/**
+ * Stored originals of watermarked photos per listing, matched to the listing's CURRENT photos (POST
+ * /api/media/watermark-originals): `match` = the photo we placed (perceptual hash), wherever it is now; null = the
+ * seller changed or removed it, so it is never overwritten.
+ */
+export type WatermarkOriginals = ReadonlyMap<string, ReadonlyArray<{ id: string; rank: number; match?: { imageId: number; rank: number } | null }>>;
 
 export interface StudioPlan {
   /** Watermark jobs. */
@@ -603,14 +607,17 @@ export function planOperation(
       }
       case 'removeWatermark': {
         // Each watermarked slot gets its stored original back (upload at the slot + delete of the photo there).
+        // Only the photo we placed is replaced: matched by its fingerprint among the current photos (it may have moved).
         const rows = originals.get(id) ?? [];
+        if (rows.some((r) => !r.match)) skip(id, 'photoChanged');
         const jobs = rows.flatMap((r) => {
-          const tile = view.tiles[r.rank - 1];
-          return tile && !tile.pending && tile.staged !== 'delete' && tile.imageId != null
-            ? [{ listingId: id, rank: r.rank, refUrl: `/api/media/watermark-originals?id=${encodeURIComponent(r.id)}`, targetImageId: tile.imageId, restore: true }]
+          if (!r.match) return [];
+          const tile = view.tiles.find((t) => t.imageId === r.match!.imageId);
+          return tile && !tile.pending && tile.staged !== 'delete'
+            ? [{ listingId: id, rank: view.tiles.indexOf(tile) + 1, refUrl: `/api/media/watermark-originals?id=${encodeURIComponent(r.id)}`, targetImageId: r.match.imageId, restore: true }]
             : [];
         });
-        if (!jobs.length) { skip(id, 'noWatermark'); break; }
+        if (!jobs.length) { if (!rows.length) skip(id, 'noWatermark'); break; }
         if (view.room <= 0) { skip(id, 'full'); break; }
         marks.push(...jobs.slice(0, view.room));
         touched.add(id);

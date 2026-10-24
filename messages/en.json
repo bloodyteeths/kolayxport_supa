@@ -15971,7 +15971,8 @@
       "isSource": "it is the listing being copied",
       "nothingToCopy": "the source listing has no photos",
       "noAltNeeded": "alt text is already the same",
-      "noWatermark": "no watermarked photos"
+      "noWatermark": "no watermarked photos",
+      "photoChanged": "this photo has changed since the watermark, so it was not restored"
     },
     "result": {
       "staged": "{count, plural, one {# change saved} other {# changes saved}} to your drafts · not sent yet",

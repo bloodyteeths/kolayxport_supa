@@ -41,13 +41,18 @@ export async function readOriginalFile(userId: string, fileKey: string): Promise
 }
 
 /** Stores the original (once per content) and records the slot it belongs to. */
-export async function archiveOriginal(userId: string, origin: WatermarkOrigin, bytes: Buffer, mimeType: string, spec: WatermarkSpec) {
+export async function archiveOriginal(userId: string, origin: WatermarkOrigin, bytes: Buffer, mimeType: string, spec: WatermarkSpec, markHash: string) {
   const ext = EXT[mimeType] ?? 'jpg';
   const fileKey = `${crypto.createHash('sha256').update(bytes).digest('hex').slice(0, 32)}.${ext}`;
   await fs.promises.mkdir(dir(userId), { recursive: true });
   const abs = path.join(dir(userId), fileKey);
   if (!(await fs.promises.stat(abs).catch(() => null))) await fs.promises.writeFile(abs, bytes);
   return prisma.watermarkOriginal.create({
-    data: { userId, ...origin, fileKey, contentType: EXT[mimeType] ? mimeType : 'image/jpeg', spec: spec as unknown as Prisma.InputJsonValue },
+    data: { userId, ...origin, fileKey, contentType: EXT[mimeType] ? mimeType : 'image/jpeg', spec: spec as unknown as Prisma.InputJsonValue, markHash },
   });
+}
+
+/** Re-applied to a slot: the stored original stays; the mark we placed now is this one. */
+export async function updateMark(id: string, spec: WatermarkSpec, markHash: string) {
+  return prisma.watermarkOriginal.update({ where: { id }, data: { spec: spec as unknown as Prisma.InputJsonValue, markHash } });
 }

@@ -87,6 +87,7 @@ export const psEn = {
       nothingToCopy: 'the source listing has no photos',
       noAltNeeded: 'alt text is already the same',
       noWatermark: 'no watermarked photos',
+      photoChanged: 'this photo has changed since the watermark, so it was not restored',
     },
     result: {
       staged: '{count, plural, one {# change saved} other {# changes saved}} to your drafts · not sent yet',
@@ -224,6 +225,7 @@ export const psTr = {
       nothingToCopy: 'kaynak ilanda fotoğraf yok',
       noAltNeeded: 'alt metin zaten aynı',
       noWatermark: 'filigranlı fotoğraf yok',
+      photoChanged: 'bu fotoğraf değişmiş, geri yüklenmedi',
     },
     result: {
       staged: '{count} değişiklik taslaklarınıza kaydedildi · henüz gönderilmedi',

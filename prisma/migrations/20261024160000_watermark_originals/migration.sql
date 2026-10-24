@@ -8,7 +8,9 @@ CREATE TABLE "WatermarkOriginal" (
     "fileKey" TEXT NOT NULL,
     "contentType" TEXT NOT NULL,
     "spec" JSONB NOT NULL,
+    "markHash" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "WatermarkOriginal_pkey" PRIMARY KEY ("id")
 );

@@ -15971,7 +15971,8 @@
       "isSource": "kopyalanan ilanın kendisi",
       "nothingToCopy": "kaynak ilanda fotoğraf yok",
       "noAltNeeded": "alt metin zaten aynı",
-      "noWatermark": "filigranlı fotoğraf yok"
+      "noWatermark": "filigranlı fotoğraf yok",
+      "photoChanged": "bu fotoğraf değişmiş, geri yüklenmedi"
     },
     "result": {
       "staged": "{count} değişiklik taslaklarınıza kaydedildi · henüz gönderilmedi",

@@ -16,7 +16,7 @@
 // listings / BulkGrid "Send N changes" picks the drafts up.
 import { WatermarkDialog } from '@/components/domain/media/WatermarkDialog';
 import type { WatermarkSpec } from '@/lib/media/watermarkSpec';
-import { listWatermarkOriginals } from '@/lib/media/watermarkClient';
+import { listWatermarkOriginals, matchWatermarkOriginals } from '@/lib/media/watermarkClient';
 import { useAiCostsVisible } from '@/components/domain/credits/useCredits';
 import * as React from 'react';
 import Box from '@mui/material/Box';
@@ -175,15 +175,25 @@ function StudioBody({ studio, ids, tab, onTabChange, backHref, onHeader }: Studi
   React.useEffect(() => {
     if (input.op !== 'removeWatermark' && input.op !== 'watermark') return;
     let live = true;
-    void listWatermarkOriginals('etsy', selectedRefs.map((r) => r.id)).then((rows) => {
+    const put = (rows: { id: string; listingId: string; rank: number; match?: { imageId: number; rank: number } | null }[]) => {
       if (!live) return;
-      const m = new Map<string, { id: string; rank: number }[]>();
-      for (const r of rows) m.set(r.listingId, [...(m.get(r.listingId) ?? []), { id: r.id, rank: r.rank }]);
+      const m = new Map<string, { id: string; rank: number; match?: { imageId: number; rank: number } | null }[]>();
+      for (const r of rows) m.set(r.listingId, [...(m.get(r.listingId) ?? []), { id: r.id, rank: r.rank, match: r.match }]);
       setWmOriginals(m);
-    });
+    };
+    if (input.op === 'watermark') void listWatermarkOriginals('etsy', selectedRefs.map((r) => r.id)).then(put);
+    else {
+      // Restore guard: send the current Etsy photos so the server can find the photo we placed in each slot.
+      const listings = selectedRefs.map((r) => {
+        const v = photoViews.get(r.id);
+        const photos = (v?.tiles ?? []).flatMap((t, i) => (t.imageId != null && !t.pending && t.src ? [{ imageId: t.imageId, rank: i + 1, url: t.src }] : []));
+        return { listingId: r.id, photos };
+      }).filter((l) => l.photos.length);
+      void matchWatermarkOriginals('etsy', listings).then(put);
+    }
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input.op, selectedKey, studio.progress == null]);
+  }, [input.op, selectedKey, studio.progress == null, photoViews]);
   const plan = React.useMemo(() => planOperation(input, selectedRefs, photoViews, wmOriginals), [input, selectedRefs, photoViews, wmOriginals]);
   const videoPlan = React.useMemo(
     () => planVideo(videoOp, videoSource, videoUrl, Boolean(videoFile), selectedRefs, videoViews),

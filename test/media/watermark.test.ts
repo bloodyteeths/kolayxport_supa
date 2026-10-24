@@ -67,3 +67,28 @@ describe('applyWatermark', () => {
     expect(await changedIn(src, out.data, 400, 300, 800, 600)).toBeGreaterThan(5);
   }, 30_000);
 });
+
+describe('mark signature (restore guard)', () => {
+  it('matches the photo we placed after re-compression; not the unmarked original, not a similar other photo', async () => {
+    const fs = await import('fs');
+    const { markSignature, matchesSignature } = await import('@/lib/media/watermark');
+    for (const name of ['peshtemal-indigo', 'iznik-bowl-blue']) {
+      const src = fs.readFileSync(`public/demo/${name}.jpg`);
+      // A clearly visible mark: the unmarked original must not pass for it. (A faint mark only needs the same
+      // picture: restoring then cannot overwrite anything but a visually identical photo.)
+      const spec = normalizeWatermarkSpec({ kind: 'text', text: '© DemoAtolye', position: 'br', sizePct: 40, opacityPct: 95, marginPct: 3 })!;
+      const out = await applyWatermark(src, spec);
+      const placed = out.data;
+      const sig = await markSignature(src, placed, out.box);
+      const etsyCopy = await sharp(placed).resize(570).jpeg({ quality: 70 }).toBuffer();
+      const similar = await sharp(src).flop().modulate({ brightness: 1.06 }).jpeg().toBuffer();
+      const similarMarked = (await applyWatermark(similar, spec)).data;
+      const cropped = await sharp(src).extract({ left: 40, top: 40, width: 700, height: 700 }).resize(800, 800).jpeg().toBuffer();
+      expect((await matchesSignature(sig, etsyCopy)).ok, `${name}: Etsy copy`).toBe(true);
+      expect((await matchesSignature(sig, src)).ok, `${name}: unmarked original`).toBe(false);
+      expect((await matchesSignature(sig, similarMarked)).ok, `${name}: similar photo with the same mark`).toBe(false);
+      expect((await matchesSignature(sig, cropped)).ok, `${name}: a re-cropped photo`).toBe(false);
+    }
+    expect((await matchesSignature(null, Buffer.from('x'))).ok).toBe(false);
+  }, 60_000);
+});

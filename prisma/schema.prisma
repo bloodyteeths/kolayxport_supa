@@ -2938,7 +2938,11 @@ model WatermarkOriginal {
   fileKey     String // sha256 prefix + extension
   contentType String
   spec        Json
+  /// Signature of the watermarked photo we placed (whole + mark-region thumbnails, lib/media/watermark.ts):
+  /// restore only replaces a photo that matches it.
+  markHash    String?
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, marketplace, listingId])

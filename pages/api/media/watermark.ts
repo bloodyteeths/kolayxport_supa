@@ -5,10 +5,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import { loadImageForUser } from '@/lib/images/ownImage';
-import { applyWatermark } from '@/lib/media/watermark';
+import { applyWatermark, markSignature } from '@/lib/media/watermark';
 import { normalizeWatermarkSpec } from '@/lib/media/watermarkSpec';
 import { readWatermarkLogo } from '@/lib/media/watermarkLogos';
-import { archiveOriginal, findOriginal, normalizeOrigin, readOriginalFile } from '@/lib/media/watermarkOriginals';
+import { archiveOriginal, findOriginal, normalizeOrigin, readOriginalFile, updateMark } from '@/lib/media/watermarkOriginals';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return res.status(405).json({ error: 'Method not allowed' }); }
@@ -32,7 +32,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const source = Buffer.from(img.data, 'base64');
     const out = await applyWatermark(source, spec, logo);
     if (origin && !preview) {
-      const row = storedBytes && stored ? stored : await archiveOriginal(user.id, origin, source, img.mimeType, spec);
+      // Fingerprint of the photo we place: "Filigranı kaldır" later replaces only that photo.
+      const markHash = await markSignature(source, out.data, out.box);
+      const row = storedBytes && stored ? await updateMark(stored.id, spec, markHash) : await archiveOriginal(user.id, origin, source, img.mimeType, spec, markHash);
       res.setHeader('X-Watermark-Original', row.id);
     }
     res.setHeader('Content-Type', out.mimeType);

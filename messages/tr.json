@@ -16034,7 +16034,8 @@
       "nothing": "Geri alınacak bir şey yok: bu değişiklik zaten değiştirildi ya da taslağınızdan çıkarıldı",
       "done": "Değişiklik taslağınızdan çıkarıldı",
       "failed": "Değişiklik geri alınamadı. Tekrar deneyin."
-    }
+    },
+    "mobileWorks": "Telefonda bu {count} ilanın tüm fotoğraflarına filigran ekleyebilir ya da kaldırabilirsiniz."
   },
   "overview": {
     "toast": {
@@ -17959,6 +17960,7 @@
     "editorChanged": "{count} fotoğraf değişmiş, geri yüklenmedi.",
     "editorFailed": "{count} fotoğraf işlenemedi.",
     "retention": "Orijinaller {date} tarihine kadar saklanır · Depolama: {used} MB / {cap} GB (dolarsa en eskiler silinir)",
-    "diskFull": "Filigran şu an geçici olarak durduruldu (sunucu depolaması dolu). Diğer değişiklikleriniz ve gönderim etkilenmez."
+    "diskFull": "Filigran şu an geçici olarak durduruldu (sunucu depolaması dolu). Diğer değişiklikleriniz ve gönderim etkilenmez.",
+    "mobileApply": "Seçili {count} ilanın fotoğraflarına filigran ekle"
   }
 }

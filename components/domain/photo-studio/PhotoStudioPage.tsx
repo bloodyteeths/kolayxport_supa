@@ -14,12 +14,15 @@
 // Header: in the locked state only the title and meta stay (no primary). Trial: `PlanTag` after the title.
 // Below 900 px the studio is not offered (bulk-grid §3.4 message). PhotoStudio never sends: it stages, and the
 // listings / BulkGrid "Send N changes" picks the drafts up.
+import { etsyWatermarkPreviewUrl, runEtsyWatermark } from '@/components/domain/media/etsyWatermarkRun';
 import { WatermarkDialog } from '@/components/domain/media/WatermarkDialog';
 import type { WatermarkSpec } from '@/lib/media/watermarkSpec';
 import { listWatermarkOriginals, matchWatermarkOriginals } from '@/lib/media/watermarkClient';
 import { useAiCostsVisible } from '@/components/domain/credits/useCredits';
 import * as React from 'react';
 import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import { Button } from '@/components/ds/inputs/Button';
 import { useTranslations } from 'next-intl';
 import { Page } from '@/components/ds/page/Page';
 import { PageHeader } from '@/components/ds/page/PageHeader';
@@ -113,14 +116,7 @@ export function PhotoStudioPage({ shopId, ids, tab, onTabChange, backHref }: Pho
         mobilePrimary="none"
       />
       {mobile ? (
-        <EmptyState
-          kind="first-use"
-          icon={icons.photos}
-          title={t('mobileTitle')}
-          body={t('mobile')}
-          action={{ id: 'back', label: t('back'), href: backHref }}
-          data-testid="photo-studio-mobile"
-        />
+        <MobileStudio shopId={shopId} ids={ids} backHref={backHref} />
       ) : (
         <FeatureGate feature="bulkPhotoStudio" placement="page" data-testid="photo-studio-gate">
           <StudioBody studio={studio} ids={ids} tab={tab} onTabChange={onTabChange} backHref={backHref} onHeader={setHeader} />
@@ -552,3 +548,63 @@ function StudioBody({ studio, ids, tab, onTabChange, backHref, onHeader }: Studi
 }
 
 export default PhotoStudioPage;
+
+/**
+ * Phones: the drag grid needs a big screen, but no feature may dead-end here (founder hit this screen, 24 Oct).
+ * The watermark works on the selected listings right here (same plan + staging as the desktop studio).
+ */
+function MobileStudio({ shopId, ids, backHref }: { shopId: string | null; ids: string[]; backHref?: string }) {
+  const t = useTranslations('photoStudio');
+  const tWm = useTranslations('watermark');
+  const toast = useToast();
+  const [open, setOpen] = React.useState(false);
+  const [preview, setPreview] = React.useState<string | null>(null);
+  const [busy, setBusy] = React.useState(false);
+  const run = async (spec: WatermarkSpec | null) => {
+    if (!shopId || !ids.length) return;
+    setBusy(true);
+    try {
+      const r = await runEtsyWatermark(shopId, ids, spec);
+      if (r.staged) toast.success(tWm(spec ? 'editorStaged' : 'editorRestored', { count: r.staged }));
+      else if (!r.changed && !r.diskFull) toast.info(tWm(spec ? 'editorNothing' : 'editorNothingToRestore'));
+      if (r.changed) toast.info(tWm('editorChanged', { count: r.changed }));
+      if (r.failed) toast.error(tWm('editorFailed', { count: r.failed }));
+      if (r.diskFull) toast.error(tWm('diskFull'));
+    } catch {
+      toast.error(tWm('editorFailed', { count: 1 }));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: '12px', p: '8px 0' }} data-testid="photo-studio-mobile">
+      <Typography variant="body2" sx={{ color: neutral[700] }}>{t('mobileWorks', { count: ids.length })}</Typography>
+      <Button
+        variant="primary"
+        fullWidth
+        disabled={!shopId || !ids.length || busy}
+        onClick={() => {
+          setPreview(null);
+          setOpen(true);
+          if (shopId && ids[0]) void etsyWatermarkPreviewUrl(shopId, ids[0]).then(setPreview).catch(() => setPreview(null));
+        }}
+        data-testid="photo-studio-mobile-watermark"
+      >
+        {tWm('mobileApply', { count: ids.length })}
+      </Button>
+      <Button variant="secondary" fullWidth loading={busy} disabled={!shopId || !ids.length} onClick={() => void run(null)}>
+        {tWm('remove')}
+      </Button>
+      <Typography variant="caption" sx={{ color: neutral[600] }}>{t('mobile')}</Typography>
+      {backHref ? <Button variant="ghost" href={backHref}>{t('back')}</Button> : null}
+      <WatermarkDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        previewUrl={preview}
+        applyLabel={tWm('mobileApply', { count: ids.length })}
+        onApply={async (spec) => { await run(spec); setOpen(false); }}
+      />
+    </Box>
+  );
+}
+

@@ -16034,7 +16034,8 @@
       "nothing": "Nothing to undo: this change was already replaced or taken out of your draft",
       "done": "Change taken out of your draft",
       "failed": "Couldn't undo the change. Try again."
-    }
+    },
+    "mobileWorks": "On a phone you can add or remove a watermark on all photos of these {count} listings."
   },
   "overview": {
     "toast": {
@@ -17959,6 +17960,7 @@
     "editorChanged": "{count} photos have changed, so they were not restored.",
     "editorFailed": "{count} photos could not be processed.",
     "retention": "Originals are kept until {date} · Storage: {used} MB / {cap} GB (when full, the oldest are removed)",
-    "diskFull": "Watermarking is paused for now (server storage is full). Your other changes and sending are not affected."
+    "diskFull": "Watermarking is paused for now (server storage is full). Your other changes and sending are not affected.",
+    "mobileApply": "Watermark the photos of the {count} selected listings"
   }
 }

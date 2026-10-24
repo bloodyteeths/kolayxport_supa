@@ -10,7 +10,8 @@ import { WATERMARK_UPLOAD_ROOT } from '@/lib/media/watermarkLogos';
 
 export const ORIGINAL_RETENTION_DAYS = 180;
 export const ORIGINALS_CAP_BYTES = 1024 * 1024 * 1024;
-export const DISK_PAUSE_RATIO = 0.9;
+/** 0.9 unless WATERMARK_DISK_PAUSE_RATIO overrides it (0.5–0.99). */
+export const DISK_PAUSE_RATIO = (() => { const v = Number(process.env.WATERMARK_DISK_PAUSE_RATIO); return v >= 0.5 && v <= 0.99 ? v : 0.9; })();
 
 const DAY = 86_400_000;
 const userDir = (userId: string) => path.join(WATERMARK_UPLOAD_ROOT, userId.replace(/[^a-zA-Z0-9_-]/g, ''), 'originals');

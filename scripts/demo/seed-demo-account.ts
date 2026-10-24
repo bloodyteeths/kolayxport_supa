@@ -466,6 +466,37 @@ async function main() {
       data: { userId: uid, etsyShopId: ETSY_SHOP_ID, etsyListingId: ETSY_LISTING_BASE + BigInt(1234), status: 'draft', fieldPatch: { title: 'Handmade Iznik Ceramic Bowl, Cobalt Blue Tulip Bowl, Turkish Pottery Serving Bowl, Housewarming Gift' } as any },
     }).catch((e) => console.warn('[demo] draft skipped:', (e as Error).message));
 
+    // Two listings still in Turkish (a new seller's Trendyol copies), so the TR→EN "Çevir / AI açıklama" job has
+    // something to translate in the demo.
+    const TR_LISTINGS = [
+      { p: PRODUCTS[0], tags: ['iznik kase', 'el yapımı çini', 'kobalt mavi', 'türk seramik', 'servis kasesi', 'lale desenli', 'hediyelik kase', 'çini kase', 'mutfak dekoru', 'ev hediyesi'],
+        description: 'El yapımı İznik çini kase, kobalt mavisi lale deseniyle tek tek elde boyanır.\n\nÖzellikler\n- Çap: 20 cm\n- Malzeme: seramik, sır\n- İstanbul atölyemizde 1-3 iş gününde kargoya verilir\n\nHer parça el yapımı olduğu için küçük farklılıklar olabilir.' },
+      { p: PRODUCTS[11], tags: ['peştamal', 'plaj havlusu', 'pamuk havlu', 'hamam havlusu', 'indigo çizgili', 'türk havlusu', 'hafif havlu', 'banyo havlusu'],
+        description: 'Yüzde yüz pamuk indigo çizgili peştamal. Hafif, çabuk kurur, plajda ve banyoda kullanılır.\n\nÖlçü: 90 x 180 cm\nYıkama: 30 derecede makinede yıkanabilir\n\nİstanbul\'dan takipli kargo ile gönderilir.' },
+    ];
+    for (let k = 0; k < TR_LISTINGS.length; k++) {
+      const { p, tags, description } = TR_LISTINGS[k];
+      const listingId = ETSY_LISTING_BASE + BigInt(900001 + k);
+      await prisma.etsyListing.create({
+        data: {
+          etsyShopId: ETSY_SHOP_ID, etsyListingId: listingId, title: p.trTitle, description, tags, materials: MATERIALS[p.cat],
+          priceAmount: Math.round(p.price * 100), priceDivisor: 100, priceCurrencyCode: 'USD',
+          views: between(20, 120), numFavorers: between(0, 8), quantity: between(5, 20), state: 'active', url: `https://www.etsy.com/listing/${listingId}`,
+          shopSectionId: BigInt(SECTION[p.cat]), lastWebhookAt: new Date(NOW - between(9, 600) * 60_000),
+          taxonomyId: TAXONOMY[p.cat], whoMade: 'i_did', whenMade: 'made_to_order', isSupply: false, processingMin: 1, processingMax: 3,
+          isPersonalizable: false,
+          thumbnailUrl75x75: img(p.image), thumbnailUrl170x135: img(p.image), thumbnailUrl570xN: img(p.image),
+          imageCount: 5, hasVideo: false,
+          etsyCreatedTimestamp: nowSec - between(2, 10) * 86400, etsyUpdatedTimestamp: nowSec - between(0, 2) * 86400,
+          syncedAt: new Date(NOW - 4 * 60_000),
+          healthScore: 62, healthChecksUsed: 12, healthChecksTotal: 12, healthFails: ['tags_count', 'video', 'photos_alt'],
+        },
+      });
+      await prisma.etsyListingOffering.create({
+        data: { etsyShopId: ETSY_SHOP_ID, etsyListingId: listingId, variantKey: '', variantValueKey: '', sku: `${p.sku}-TR`, skuNormalized: `${p.sku}-tr`.toLowerCase(), quantity: 10, priceAmount: Math.round(p.price * 100), priceDivisor: 100 },
+      });
+    }
+
     // ---- 3. eBay listings + Trendyol products -----------------------------
     const ebayIdx = [0, 4, 6, 7, 8, 11, 12, 15, 16, 19, 20, 17];
     for (const [n, i] of ebayIdx.entries()) {
@@ -827,7 +858,7 @@ async function main() {
       ],
     });
 
-    console.log(`[demo] seeded user ${DEMO_EMAIL}: ${PRODUCTS.length} Etsy listings, ${ebayIdx.length} eBay listings, ${tyIdx.length} Trendyol products, ${plan.length} orders, ${tx.length} finance rows, ${stockIdx.length} stock items, ${threads.length} inbox threads`);
+    console.log(`[demo] seeded user ${DEMO_EMAIL}: ${PRODUCTS.length + 2} Etsy listings, ${ebayIdx.length} eBay listings, ${tyIdx.length} Trendyol products, ${plan.length} orders, ${tx.length} finance rows, ${stockIdx.length} stock items, ${threads.length} inbox threads`);
   } finally {
     await prisma.$disconnect();
   }

@@ -43,7 +43,7 @@ import {
   ORDERS_URL_SCHEMA,
   SORT_KEYS,
   VIEW_DEFAULTS,
-  applyViewPatch,
+  applyViewPatch, clearToView,
   baseViewOf,
   builtInViews,
   effectiveDateRange,
@@ -352,7 +352,7 @@ export function OrdersPage({ now }: OrdersPageProps = {}) {
   );
   const filterValues = React.useMemo(() => toFilterValues(url, now), [url, now]);
   const onFilters = (values: FilterValues) => setUrl(fromFilterValues(values, url, now));
-  const resetToView = () => setUrl(applyViewPatch(activeView, userViews.views));
+  const resetToView = () => setUrl(clearToView(activeView, userViews.views));
 
   const bulk = useOrdersBulkActions({
     selected: selectedRows,
@@ -548,7 +548,7 @@ export function OrdersPage({ now }: OrdersPageProps = {}) {
           },
           onDelete: (id) => {
             userViews.remove(id);
-            if (url.view === id) setUrl(applyViewPatch(baseView, []));
+            if (url.view === id) setUrl(clearToView(baseView, []));
           },
           label: t('views.label'),
         }}

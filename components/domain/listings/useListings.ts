@@ -232,7 +232,9 @@ export function viewPatch(
     }
     return out as Partial<ListingsUrlState>;
   }
-  return { ...cleared, view: viewId === config.defaultView ? undefined : viewId } as Partial<ListingsUrlState>;
+  // A built-in view changes only the view: the seller's search and filters stay and combine with it (the same rule
+  // as Orders; choosing a view never silently resets a filter). A saved view (above) is a full snapshot.
+  return { view: viewId === config.defaultView ? undefined : viewId } as Partial<ListingsUrlState>;
 }
 
 /** The query a "Save view…" stores (filters + search; the built-in base view as `base`). */

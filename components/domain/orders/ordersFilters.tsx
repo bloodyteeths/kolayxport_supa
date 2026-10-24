@@ -175,7 +175,19 @@ export function savedViewQuery(state: OrdersUrlState): Record<string, string | s
 }
 
 /** URL patch that applies a view: a built-in resets every filter; a user view restores its query. */
+/**
+ * State patch for choosing a view. A built-in view (To ship, Unshipped, Shipped…) changes ONLY the view: the
+ * seller's shop, status, date, search and sort filters stay and combine with it (Atilla, 24 Oct: choosing a shop
+ * then "unshipped" reset the shop). A saved view is a full snapshot and replaces the filters. "Clear all" resets
+ * to the view through `clearToView`.
+ */
 export function applyViewPatch(id: string, userViews: readonly SavedView[]): Partial<OrdersUrlState> {
+  if (isBuiltInView(id)) return { view: id, page: 1 };
+  return clearToView(id, userViews);
+}
+
+/** The view with every filter cleared ("Clear all", deleting a saved view). */
+export function clearToView(id: string, userViews: readonly SavedView[]): Partial<OrdersUrlState> {
   const cleared: Partial<OrdersUrlState> = {
     base: undefined,
     q: undefined,

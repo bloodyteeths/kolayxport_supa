@@ -8,6 +8,7 @@ import {
   ORDERS_URL_SCHEMA,
   VIEW_DEFAULTS,
   applyViewPatch,
+  clearToView,
   builtInViews,
   effectiveSort,
   fromFilterValues,
@@ -105,8 +106,11 @@ describe('views and the server query (orders §1.3)', () => {
     const patch = applyViewPatch('u_1', [{ id: 'u_1', label: 'Mine', query, builtIn: false }]);
     expect(patch).toMatchObject({ view: 'u_1', base: 'shipped', store: ['Etsy'], status: ['delivered'], q: 'mug', page: 1 });
   });
-  it('a built-in view resets every filter', () => {
-    expect(applyViewPatch('overdue', [])).toMatchObject({ view: 'overdue', store: [], status: [], q: undefined, preset: undefined });
+  it('a built-in view changes only the view (filters stay and combine; Atilla 24 Oct)', () => {
+    expect(applyViewPatch('overdue', [])).toEqual({ view: 'overdue', page: 1 });
+  });
+  it('"Clear all" still resets every filter to the view', () => {
+    expect(clearToView('overdue', [])).toMatchObject({ view: 'overdue', store: [], status: [], q: undefined, preset: undefined });
   });
   it('filter values round-trip and only explicit dates make a chip', () => {
     expect(toFilterValues(state({ view: 'all' }), NOW).date).toBeUndefined();

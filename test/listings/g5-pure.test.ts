@@ -87,10 +87,11 @@ describe('URL state → GET /api/listings query', () => {
     const patch = fromFilterValues({ ...v, price: undefined, hasVideo: true }, etsy.filters);
     expect(patch).toMatchObject({ status: ['active', 'sold_out'], 'f.hasVideo': '1', 'f.priceMin': undefined, 'f.photos': 'lt5' });
   });
-  it('a view switch clears filters; selecting the default view stores no ?view=', () => {
+  it('a built-in view switch keeps the filters (they combine); selecting the default view stores no ?view=', () => {
     const p = viewPatch('active', [], etsy);
     expect(p.view).toBeUndefined();
-    expect(p.status).toEqual([]);
+    expect(p).toEqual({ view: undefined });
+    expect('status' in p).toBe(false);
     expect(viewPatch('needs_work', [], etsy).view).toBe('needs_work');
     const user = viewPatch('u_1', [{ id: 'u_1', query: { status: ['sold_out'], q: 'gold', bogus: 'x' } }], etsy);
     expect(user).toMatchObject({ view: 'u_1', status: ['sold_out'], q: 'gold' });

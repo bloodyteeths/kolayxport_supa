@@ -50,14 +50,25 @@ async function viewCountsFingerprint(userId: string): Promise<string | null> {
   }
 }
 
-/** A1 `include=counts`: one FILTER query (lib/orders/views.ts VIEW_COUNTS_SQL), cached while nothing changed. */
-export async function loadViewCounts(userId: string, now: number = Date.now()): Promise<ViewCounts> {
+/**
+ * A1 `include=counts`: one FILTER query (lib/orders/views.ts VIEW_COUNTS_SQL), cached while nothing changed.
+ * With a store filter (`marketplaces`, the same values the list filters on) the counts are for those stores only,
+ * so a view's count always matches what the seller sees after choosing a shop (not cached).
+ */
+export async function loadViewCounts(userId: string, now: number = Date.now(), marketplaces: string[] = []): Promise<ViewCounts> {
+  const keys = ['to_ship', 'overdue', 'label_created', 'problems'] as const;
+  if (marketplaces.length) {
+    const scoped = await Promise.all(
+      keys.map((k) => prisma.$queryRawUnsafe(`${VIEW_COUNT_QUERIES[k]} AND o."marketplace" = ANY($2::text[])`, userId, marketplaces) as Promise<Array<Record<string, unknown>>>),
+    );
+    const m = (i: number) => toCount(scoped[i]?.[0]?.n);
+    return { to_ship: m(0), overdue: m(1), label_created: m(2), problems: m(3) };
+  }
   // No fingerprint (query failed) → no caching: stale counts are worse than one more query.
   const fp = await viewCountsFingerprint(userId);
   const hit = viewCountsCache.get(userId);
   if (fp !== null && hit && hit.fp === fp && now - hit.at < VIEW_COUNTS_TTL_MS) return hit.counts;
   // Four small parallel queries (VIEW_COUNT_QUERIES), not one FILTER query: ~0.7 s instead of ~5 s.
-  const keys = ['to_ship', 'overdue', 'label_created', 'problems'] as const;
   const results = await Promise.all(
     keys.map((k) => prisma.$queryRawUnsafe(VIEW_COUNT_QUERIES[k], userId) as Promise<Array<Record<string, unknown>>>),
   );
@@ -1148,7 +1159,7 @@ export default async function handler(
     const extras: Record<string, unknown> = {};
     if (newUi) {
       const [counts, lastPulledAt, etsyShopNames] = await Promise.all([
-        includeCounts ? loadViewCounts(user.id).catch((err) => { console.warn('[orders] view counts failed', err?.message); return undefined; }) : undefined,
+        includeCounts ? loadViewCounts(user.id, Date.now(), marketplaceValues).catch((err) => { console.warn('[orders] view counts failed', err?.message); return undefined; }) : undefined,
         // A4: newest of User.lastSyncedAt and the last completed order SyncOperation.
         Promise.resolve()
           .then(() => loadLastPulledAt(user.id))

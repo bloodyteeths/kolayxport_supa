@@ -366,11 +366,11 @@ describe('AiProposalCell', () => {
     );
     const on = screen.getByTestId('on');
     expect(on.querySelector('[data-ai-marker]')).not.toBeNull();
-    expect(on.textContent).toContain('AI suggestion · Revert to keep yours');
+    expect(on.textContent).toContain('Suggestion · Revert to keep yours');
     expect(screen.getByTestId('off-wrap').querySelector('[data-ai-proposal]')).toBeNull();
     cleanup();
     render(<Providers locale="tr"><AiProposalCell active data-testid="on">X</AiProposalCell></Providers>);
-    expect(screen.getByTestId('on').textContent).toContain('AI önerisi');
+    expect(screen.getByTestId('on').textContent).toContain('Öneri ·');
   });
 
   it('withAiMarker shows the marker inside BulkGrid for an overlay (draft) value, only while dirty', () => {
@@ -408,7 +408,7 @@ describe('AiProposalCell', () => {
     const markers = view.container.querySelectorAll('[data-ai-marker]');
     expect(markers).toHaveLength(1);
     expect(view.container.textContent).toContain(GOOD_TITLE);
-    expect(view.container.textContent).toContain('AI suggestion · Revert to keep yours');
+    expect(view.container.textContent).toContain('Suggestion · Revert to keep yours');
     expect(view.container.textContent).toContain('Live');
     // After send: same value, no longer dirty → no marker.
     view.rerender(grid(new Set()));

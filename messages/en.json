@@ -14061,7 +14061,7 @@
       "changePrice": "Change price",
       "changeStock": "Change stock",
       "addTags": "Add tags",
-      "improveAi": "Improve with AI",
+      "improveAi": "Auto-improve",
       "exportSelected": "Export selected",
       "selectAllInView": "Select all {count} in this view",
       "discardSelected": "Discard selected changes",
@@ -14074,7 +14074,7 @@
       "unarchiveSkipped": "{count, plural, one {# product} other {# products}} skipped: only archived products without other unsent changes can be unarchived",
       "editVariations": "Edit variations / SKU",
       "applyTemplate": "Apply template",
-      "aiText": "Translate / AI description",
+      "aiText": "Translate / write descriptions",
       "categoryAttrs": "Category attributes",
       "photos": "Photos"
     },
@@ -14583,7 +14583,7 @@
         "findReplace": "Find & replace",
         "schedule": "Scheduled sends",
         "csv": "CSV import/export",
-        "ai": "Bulk AI suggestions",
+        "ai": "Bulk suggestions (titles, tags, descriptions)",
         "templates": "Templates",
         "copyToShop": "Copy to another shop"
       },
@@ -14683,9 +14683,9 @@
       }
     },
     "aiText": {
-      "title": "AI description / translate on {count} listings",
+      "title": "Descriptions and translation for {count} listings",
       "description": "Review the results, then stage them as drafts; they go to Etsy when you send them.",
-      "mode": "What should AI do?",
+      "mode": "What should it do?",
       "modeTranslate": "Translate into English (for Turkish listings, e.g. copied from Trendyol)",
       "modeImprove": "Rewrite and improve the description in English",
       "fields": "Fields to translate",
@@ -14708,11 +14708,11 @@
       "more": "and {count} more",
       "loadFailed": "Couldn't read the listings' current content",
       "rateLimited": "Too many requests; try again in a minute.",
-      "failed": "The AI isn't responding right now; try again later.",
-      "staged": "AI suggestions staged on {count} listings",
+      "failed": "Suggestions aren't available right now; try again later.",
+      "staged": "Suggestions staged on {count} listings",
       "accept": "Apply to this listing",
       "alreadyEnglish": "{count} listings skipped because they are already in English.",
-      "cost": "This uses no AI credits; it's included in your plan.",
+      "cost": "This uses no credits; it's included in your plan.",
       "beta": "beta",
       "droppedTags": "Removed because the listing does not say so: {tags}",
       "droppedKind": {
@@ -15026,13 +15026,13 @@
       "basis": "Based on {count} {marketplace} listings for \"{query}\"",
       "fillFromPhotos": "Fill from photos",
       "fillFromPhotosHelp": "Reads your photos and writes the title, category, item specifics, price and description. You review every field",
-      "fillWithAi": "Fill with AI",
+      "fillWithAi": "Auto-fill",
       "fillFromTextHelp": "Writes the title, description and tags from your words. You review every field",
       "useAllCount": "Use all ({count})",
       "usedAll": "{count, plural, one {# field filled} other {# fields filled}}",
       "tagsAdded": "{count, plural, one {# tag added} other {# tags added}}",
       "cost": "{count, plural, =0 {No credits used} one {# credit} other {# credits}}",
-      "limitReached": "You've used all AI credits on your plan",
+      "limitReached": "You've used all content credits on your plan",
       "noMarketData": "Not enough similar {marketplace} listings to compare prices",
       "fillNeedsSeed": "Describe what you're selling in a few words first",
       "fillNeedsSeedOrPhoto": "Add a photo or describe what you're selling first",
@@ -15604,7 +15604,7 @@
       "noSiblings": "This product has no other colors or sizes",
       "inStockCount": "{count} in stock",
       "copyListing": "Copy an Etsy or eBay listing…",
-      "copyListingBody": "Brings photos, price and a Turkish draft of the title and description (AI). You review every field."
+      "copyListingBody": "Brings photos, price and a Turkish draft of the title and description (automatic). You review every field."
     },
     "shopify": {
       "notFound": "We couldn't find this product in your Shopify store",
@@ -15740,7 +15740,7 @@
     },
     "aiVideo": {
       "open": "Create video",
-      "title": "AI product video",
+      "title": "Product video",
       "subtitle": "A video from one photo in about a minute. Refine it until you like it.",
       "photo": "Photo",
       "photoHelp": "The photo the video starts from. Pick one where the product is clearly visible.",
@@ -15911,18 +15911,18 @@
       "title": "No listings to edit"
     },
     "ai": {
-      "suggestion": "AI suggestion · Revert to keep yours",
-      "action": "Improve with AI",
+      "suggestion": "Suggestion · Revert to keep yours",
+      "action": "Auto-improve",
       "progress": "Improving {done} / {total}…",
       "unusable": "{count, plural, one {# listing} other {# listings}} didn't get a usable suggestion",
       "cost": "{count, plural, =0 {No credits used} one {# credit} other {# credits}}",
       "cancel": "Stop",
       "cancelled": "Stopped · {count, plural, one {# listing} other {# listings}} improved",
       "done": "{count, plural, one {# listing} other {# listings}} improved · not sent yet",
-      "nothingNew": "AI had nothing new to suggest",
-      "failed": "AI couldn't improve these listings. Try again.",
+      "nothingNew": "Nothing new to suggest",
+      "failed": "These listings couldn't be improved. Try again.",
       "failedCount": "{count, plural, one {# listing} other {# listings}} couldn't be improved",
-      "limitReached": "You've used all AI credits on your plan"
+      "limitReached": "You've used all content credits on your plan"
     }
   },
   "photoStudio": {
@@ -15941,8 +15941,8 @@
     "summary": "{changes, plural, one {# change} other {# changes}} on {listings, plural, one {# listing} other {# listings}}",
     "credits": "{count, plural, one {# credit} other {# credits}}",
     "skipped": "{count, plural, one {# listing skipped} other {# listings skipped}}: {reason}",
-    "capped": "Only the first {cap} AI changes ran. Run it again for the rest.",
-    "aiCredits": "You're out of AI credits for this period. Changes without AI still work.",
+    "capped": "Only the first {cap} generated changes ran. Run it again for the rest.",
+    "aiCredits": "You're out of content credits for this period. Changes that need no credits still work.",
     "mobileTitle": "The photo studio works on a larger screen",
     "mobile": "Add photos one listing at a time in the editor",
     "noMatch": "No listings match this filter",
@@ -15968,7 +15968,7 @@
       "urlPlaceholder": "https://… image link",
       "prompt": "Describe the photo to generate",
       "promptTweak": "Extra instruction (optional)",
-      "altAi": "Write with AI",
+      "altAi": "Write automatically",
       "altManual": "Type it",
       "altAll": "All photos",
       "altPlaceholder": "Alt text for these photos",
@@ -15980,7 +15980,7 @@
     },
     "source": {
       "upload": "Upload",
-      "ai": "Generate with AI",
+      "ai": "Generate",
       "url": "Image link"
     },
     "position": {
@@ -16025,7 +16025,7 @@
       "staged": "{count, plural, one {# change saved} other {# changes saved}} to your drafts · not sent yet",
       "partial": "{staged} saved · {failed, plural, one {# listing} other {# listings}} failed",
       "none": "Nothing was changed",
-      "aiUnusable": "{count, plural, one {# AI result} other {# AI results}} weren't usable"
+      "aiUnusable": "{count, plural, one {# generated result} other {# generated results}} weren't usable"
     },
     "tile": {
       "staged": "Saved to your draft · not sent yet"
@@ -16045,7 +16045,7 @@
       "count": "{count} / {max}",
       "needAlt": "{count, plural, one {# needs alt text} other {# need alt text}}",
       "willRemove": "will remove {count}",
-      "ai": "{count} AI",
+      "ai": "{count} generated",
       "noPhotos": "No photos yet",
       "loadFailed": "Couldn't load photos",
       "queuedDelete": "Listing delete queued: photos stay as they are",

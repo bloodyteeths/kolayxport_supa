@@ -6,7 +6,7 @@ export const D_EN: Tree = {
   bulk: {
     ai: {
       action: 'Improve with AI',
-      suggestion: 'AI suggestion · Revert to keep yours',
+      suggestion: 'Suggestion · Revert to keep yours',
       progress: 'Improving {done} / {total}…',
       unusable: "{count, plural, one {# listing} other {# listings}} didn't get a usable suggestion",
       cost: '{count, plural, =0 {No credits used} one {# credit} other {# credits}}',
@@ -25,7 +25,7 @@ export const D_TR: Tree = {
   bulk: {
     ai: {
       action: 'AI ile iyileştir',
-      suggestion: 'AI önerisi · Sizinkini korumak için geri alın',
+      suggestion: 'Öneri · Sizinkini korumak için geri alın',
       progress: 'İyileştiriliyor {done} / {total}…',
       unusable: '{count} ilan için kullanılabilir öneri gelmedi',
       cost: '{count, plural, =0 {Kredi harcamaz} other {# kredi}}',

@@ -14061,7 +14061,7 @@
       "changePrice": "Fiyatı değiştir",
       "changeStock": "Stoğu değiştir",
       "addTags": "Etiket ekle",
-      "improveAi": "AI ile iyileştir",
+      "improveAi": "Otomatik iyileştir",
       "exportSelected": "Seçilenleri dışa aktar",
       "selectAllInView": "Bu görünümdeki {count} ilanın tümünü seç",
       "discardSelected": "Seçili değişiklikleri at",
@@ -14074,7 +14074,7 @@
       "unarchiveSkipped": "{count} ürün atlandı: yalnızca başka gönderilmemiş değişikliği olmayan arşivlenmiş ürünler arşivden çıkarılabilir",
       "editVariations": "Varyasyon / SKU düzenle",
       "applyTemplate": "Şablon uygula",
-      "aiText": "Çevir / AI açıklama",
+      "aiText": "Çevir / açıklama yaz",
       "categoryAttrs": "Kategori özellikleri",
       "photos": "Fotoğraflar"
     },
@@ -14583,7 +14583,7 @@
         "findReplace": "Bul ve değiştir",
         "schedule": "Zamanlanmış gönderim",
         "csv": "CSV içe/dışa aktarma",
-        "ai": "Toplu yapay zekâ önerileri",
+        "ai": "Toplu öneriler (başlık, etiket, açıklama)",
         "templates": "Şablonlar",
         "copyToShop": "Başka mağazaya kopyalama"
       },
@@ -14683,7 +14683,7 @@
       }
     },
     "aiText": {
-      "title": "{count} ilanda yapay zekâ ile açıklama / çeviri",
+      "title": "{count} ilanda açıklama ve çeviri",
       "description": "Sonuçları gözden geçirip taslak olarak hazırlarsınız; \"Değişiklikleri gönder\" deyince Etsy'ye gider.",
       "mode": "Ne yapılsın?",
       "modeTranslate": "İngilizceye çevir (Türkçe ilanlar için, ör. Trendyol'dan kopyalananlar)",
@@ -14708,11 +14708,11 @@
       "more": "ve {count} ilan daha",
       "loadFailed": "İlanların mevcut içeriği okunamadı",
       "rateLimited": "Çok fazla istek; bir dakika sonra tekrar deneyin.",
-      "failed": "Yapay zekâ şu an yanıt vermiyor; daha sonra tekrar deneyin.",
-      "staged": "Yapay zekâ önerileri {count} ilanda hazırlandı",
+      "failed": "Öneriler şu an alınamıyor; biraz sonra tekrar deneyin.",
+      "staged": "{count} ilanda öneriler hazırlandı",
       "accept": "Bu ilanda uygula",
       "alreadyEnglish": "{count} ilan zaten İngilizce olduğu için atlandı.",
-      "cost": "Bu işlem AI kredisi harcamaz; planınıza dahildir.",
+      "cost": "Bu işlem kredi harcamaz; planınıza dahildir.",
       "beta": "beta",
       "droppedTags": "İlanda geçmediği için çıkarıldı: {tags}",
       "droppedKind": {
@@ -15026,13 +15026,13 @@
       "basis": "\"{query}\" için {count} {marketplace} ilanına göre",
       "fillFromPhotos": "Fotoğraflardan doldur",
       "fillFromPhotosHelp": "Fotoğraflarınızı okur; başlık, kategori, ürün özellikleri, fiyat ve açıklama yazar. Her alanı siz onaylarsınız",
-      "fillWithAi": "AI ile doldur",
+      "fillWithAi": "Otomatik doldur",
       "fillFromTextHelp": "Yazdıklarınızdan başlık, açıklama ve etiketleri yazar. Her alanı siz onaylarsınız",
       "useAllCount": "Hepsini kullan ({count})",
       "usedAll": "{count} alan dolduruldu",
       "tagsAdded": "{count} etiket eklendi",
       "cost": "{count, plural, =0 {Kredi harcamaz} other {# kredi}}",
-      "limitReached": "Planınızdaki AI kredileri bitti",
+      "limitReached": "Planınızdaki içerik kredileri bitti",
       "noMarketData": "Fiyat karşılaştırmak için yeterli benzer {marketplace} ilanı yok",
       "fillNeedsSeed": "Önce ne sattığınızı birkaç kelimeyle yazın",
       "fillNeedsSeedOrPhoto": "Önce bir fotoğraf ekleyin veya ne sattığınızı yazın",
@@ -15604,7 +15604,7 @@
       "noSiblings": "Bu ürünün başka renk veya bedeni yok",
       "inStockCount": "Stokta {count}",
       "copyListing": "Bir Etsy veya eBay ilanını kopyala…",
-      "copyListingBody": "Fotoğrafları, fiyatı ve başlık ile açıklamanın Türkçe taslağını getirir (AI). Her alanı siz kontrol edersiniz."
+      "copyListingBody": "Fotoğrafları, fiyatı ve başlık ile açıklamanın Türkçe taslağını getirir (otomatik). Her alanı siz kontrol edersiniz."
     },
     "shopify": {
       "notFound": "Bu ürünü Shopify mağazanızda bulamadık",
@@ -15740,7 +15740,7 @@
     },
     "aiVideo": {
       "open": "Video oluştur",
-      "title": "Yapay zekâ ile ürün videosu",
+      "title": "Ürün videosu",
       "subtitle": "Bir fotoğraftan yaklaşık 1 dakikada video. Beğenene kadar düzeltebilirsiniz.",
       "photo": "Fotoğraf",
       "photoHelp": "Videonun başlayacağı fotoğraf. Ürünün net göründüğü bir fotoğraf seçin.",
@@ -15911,18 +15911,18 @@
       "title": "Düzenlenecek ilan yok"
     },
     "ai": {
-      "suggestion": "AI önerisi · Sizinkini korumak için geri alın",
-      "action": "AI ile iyileştir",
+      "suggestion": "Öneri · Sizinkini korumak için geri alın",
+      "action": "Otomatik iyileştir",
       "progress": "İyileştiriliyor {done} / {total}…",
       "unusable": "{count} ilan için kullanılabilir öneri gelmedi",
       "cost": "{count, plural, =0 {Kredi harcamaz} other {# kredi}}",
       "cancel": "Durdur",
       "cancelled": "Durduruldu · {count} ilan iyileştirildi",
       "done": "{count} ilan iyileştirildi · henüz gönderilmedi",
-      "nothingNew": "AI yeni bir öneri bulamadı",
-      "failed": "AI bu ilanları iyileştiremedi. Tekrar deneyin.",
+      "nothingNew": "Yeni bir öneri bulunamadı",
+      "failed": "Bu ilanlar iyileştirilemedi. Tekrar deneyin.",
       "failedCount": "{count} ilan iyileştirilemedi",
-      "limitReached": "Planınızdaki tüm AI kredilerini kullandınız"
+      "limitReached": "Planınızdaki tüm içerik kredilerini kullandınız"
     }
   },
   "photoStudio": {
@@ -15941,8 +15941,8 @@
     "summary": "{listings} ilanda {changes} değişiklik",
     "credits": "{count} kredi",
     "skipped": "{count} ilan atlandı: {reason}",
-    "capped": "Yalnızca ilk {cap} AI değişikliği çalıştı. Kalanlar için tekrar çalıştırın.",
-    "aiCredits": "Bu dönem için AI krediniz bitti. AI kullanmayan değişiklikler çalışmaya devam eder.",
+    "capped": "Yalnızca ilk {cap} otomatik değişiklik çalıştı. Kalanlar için tekrar çalıştırın.",
+    "aiCredits": "Bu dönem için içerik krediniz bitti. Kredi gerektirmeyen değişiklikler çalışmaya devam eder.",
     "mobileTitle": "Fotoğraf stüdyosu daha büyük bir ekranda çalışır",
     "mobile": "Fotoğrafları düzenleyicide ilan ilan ekleyin",
     "noMatch": "Bu filtreye uyan ilan yok",
@@ -15968,7 +15968,7 @@
       "urlPlaceholder": "https://… görsel linki",
       "prompt": "Oluşturulacak fotoğrafı tarif edin",
       "promptTweak": "Ek talimat (isteğe bağlı)",
-      "altAi": "AI ile yaz",
+      "altAi": "Otomatik yaz",
       "altManual": "Kendim yazayım",
       "altAll": "Tüm fotoğraflar",
       "altPlaceholder": "Bu fotoğraflar için alt metin",
@@ -15980,7 +15980,7 @@
     },
     "source": {
       "upload": "Yükle",
-      "ai": "AI ile oluştur",
+      "ai": "Görsel oluştur",
       "url": "Görsel linki"
     },
     "position": {
@@ -16025,7 +16025,7 @@
       "staged": "{count} değişiklik taslaklarınıza kaydedildi · henüz gönderilmedi",
       "partial": "{staged} kaydedildi · {failed} ilan başarısız",
       "none": "Hiçbir şey değişmedi",
-      "aiUnusable": "{count} AI sonucu kullanılamadı"
+      "aiUnusable": "{count} oluşturulan sonuç kullanılamadı"
     },
     "tile": {
       "staged": "Taslağınıza kaydedildi · henüz gönderilmedi"
@@ -16045,7 +16045,7 @@
       "count": "{count} / {max}",
       "needAlt": "{count} fotoğrafın alt metni eksik",
       "willRemove": "{count} kaldırılacak",
-      "ai": "{count} AI",
+      "ai": "{count} oluşturulan",
       "noPhotos": "Henüz fotoğraf yok",
       "loadFailed": "Fotoğraflar yüklenemedi",
       "queuedDelete": "İlan silme sırada: fotoğraflar olduğu gibi kalır",

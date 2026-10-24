@@ -81,7 +81,7 @@ export const C_EN: Tree = {
     },
     error: { load: "Couldn't load these listings" },
     empty: { title: 'No listings to edit' },
-    ai: { suggestion: 'AI suggestion · Revert to keep yours' },
+    ai: { suggestion: 'Suggestion · Revert to keep yours' },
   },
   // Stock-managed qty cell link (wiring-grid-stock; shared with the listings grid).
   listings: { cell: { stockManagedLink: 'Managed by stock sync · Open Stock Sync' } },
@@ -165,7 +165,7 @@ export const C_TR: Tree = {
     },
     error: { load: 'Bu ilanlar yüklenemedi' },
     empty: { title: 'Düzenlenecek ilan yok' },
-    ai: { suggestion: 'AI önerisi · Sizinkini korumak için geri alın' },
+    ai: { suggestion: 'Öneri · Sizinkini korumak için geri alın' },
   },
   listings: { cell: { stockManagedLink: 'Stok senkronu yönetiyor · Stok Senkronu’nu aç' } },
 };

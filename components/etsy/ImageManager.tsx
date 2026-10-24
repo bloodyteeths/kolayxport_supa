@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { useTranslations } from 'next-intl';
-import { AI_MAX_REFERENCE_IMAGES } from '@/lib/ai/referenceImages';
+import { AI_MAX_REFERENCE_IMAGES, AI_MAX_UPLOADED_REFERENCES, AI_REFERENCE_ROLES, type AiReferenceRole } from '@/lib/ai/referenceImages';
 import {
   Box,
   IconButton,
@@ -121,6 +121,28 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+/**
+ * An uploaded AI reference re-encoded to ≤1600px JPEG in the browser (the server shrinks to the same size before
+ * the model anyway), so 4 phone photos stay far below the route's 20 MB body limit. Falls back to the original.
+ */
+async function referenceToBase64(file: File): Promise<{ data: string; mime_type: string }> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('no 2d context');
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close?.();
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+    return { data: dataUrl.split(',')[1], mime_type: 'image/jpeg' };
+  } catch {
+    return { data: await fileToBase64(file), mime_type: file.type || 'image/jpeg' };
+  }
+}
+
 function sortImagesByRank(images: ImageInfo[]): ImageInfo[] {
   return [...(images || [])].sort((a, b) => a.rank - b.rank);
 }
@@ -181,7 +203,11 @@ const ImageManager = forwardRef<ImageManagerHandle, ImageManagerProps>(function 
   // AI Image generation state
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
-  const [aiRefFile, setAiRefFile] = useState<File | null>(null);
+  // Uploaded references (each with a role): kept in this browser only, sent inline with the generation request,
+  // never staged on the listing nor stored on the server, and cleared after every successful generation.
+  const [aiUploads, setAiUploads] = useState<Array<{ id: string; file: File; preview: string; role: AiReferenceRole }>>([]);
+  const aiUploadsRef = useRef(aiUploads);
+  aiUploadsRef.current = aiUploads;
   const [aiRefPreview, setAiRefPreview] = useState<string | null>(null);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiResult, setAiResult] = useState<{ base64: string; mimeType: string } | null>(null);
@@ -322,7 +348,7 @@ const ImageManager = forwardRef<ImageManagerHandle, ImageManagerProps>(function 
   useEffect(() => () => {
     pendingObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     uploadPreviews.forEach((url) => URL.revokeObjectURL(url));
-    if (aiRefPreview?.startsWith('blob:')) URL.revokeObjectURL(aiRefPreview);
+    aiUploadsRef.current.forEach((u) => URL.revokeObjectURL(u.preview));
   }, []);
 
   const appendPendingUploads = useCallback((files: File[], startRank: number, altText?: string, stagedMedia: any[] = []) => {
@@ -565,9 +591,15 @@ const ImageManager = forwardRef<ImageManagerHandle, ImageManagerProps>(function 
 
   // --- AI Image Generation ---
 
+  const clearAiUploads = () => {
+    aiUploadsRef.current.forEach((u) => URL.revokeObjectURL(u.preview));
+    setAiUploads([]);
+    if (aiRefInputRef.current) aiRefInputRef.current.value = '';
+  };
+
   const openAiDialog = () => {
     setAiPrompt('');
-    setAiRefFile(null);
+    clearAiUploads();
     setAiRefPreview(null);
     setAiRefUrl(null);
     setAiResult(null);
@@ -576,10 +608,17 @@ const ImageManager = forwardRef<ImageManagerHandle, ImageManagerProps>(function 
   };
 
   const handleAiRefSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setAiRefFile(file);
-    setAiRefPreview(URL.createObjectURL(file));
+    const files = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith('image/'));
+    if (aiRefInputRef.current) aiRefInputRef.current.value = '';
+    if (!files.length) return;
+    setAiUploads((cur) => {
+      const room = Math.max(0, AI_MAX_UPLOADED_REFERENCES - cur.length);
+      if (files.length > room) toast.error(t('referenceMax', { max: AI_MAX_UPLOADED_REFERENCES }));
+      return [
+        ...cur,
+        ...files.slice(0, room).map((file, i) => ({ id: `${Date.now()}-${i}-${file.name}`, file, preview: URL.createObjectURL(file), role: 'product' as AiReferenceRole })),
+      ];
+    });
   };
 
   /**
@@ -599,9 +638,9 @@ const ImageManager = forwardRef<ImageManagerHandle, ImageManagerProps>(function 
     setAiGenerating(true);
     setAiResult(null);
     try {
-      const referenceImages: Array<{ data: string; mime_type: string }> = [];
+      const referenceImages: Array<{ data: string; mime_type: string; role?: AiReferenceRole }> = [];
       if (previous) referenceImages.push({ data: previous.base64, mime_type: previous.mimeType });
-      if (aiRefFile) referenceImages.push({ data: await fileToBase64(aiRefFile), mime_type: aiRefFile.type });
+      for (const u of aiUploads) referenceImages.push({ ...(await referenceToBase64(u.file)), role: u.role });
 
       // Explicitly chosen listing photo first, then the listing's photos (cover first) — staged ones too: their
       // relative preview URLs are read from disk by the server for this seller (lib/images/ownImage). Before, they
@@ -628,9 +667,12 @@ const ImageManager = forwardRef<ImageManagerHandle, ImageManagerProps>(function 
       });
 
       const data = await res.json().catch(() => null);
+      if (res.status === 413) throw new AiRequestError('reference_too_large');
       if (!res.ok) throw new AiRequestError(aiErrorCode(data));
       if (typeof data?.image_base64 !== 'string' || !data.image_base64) throw new AiRequestError('ai_image_failed');
       setAiResult({ base64: data.image_base64, mimeType: data.mime_type || 'image/jpeg' });
+      // Uploaded references are single-use: gone once the photo is made (a follow-up refines the result itself).
+      clearAiUploads();
       toast.success(t('generateSuccess'));
     } catch (err: any) {
       if (previous) setAiResult(previous);
@@ -1137,6 +1179,7 @@ const ImageManager = forwardRef<ImageManagerHandle, ImageManagerProps>(function 
             ref={aiRefInputRef}
             type="file"
             accept="image/jpeg,image/png,image/gif,image/webp"
+            multiple
             style={{ display: 'none' }}
             onChange={handleAiRefSelect}
           />
@@ -1146,85 +1189,121 @@ const ImageManager = forwardRef<ImageManagerHandle, ImageManagerProps>(function 
               {t('referenceImage')}
             </Typography>
 
-            {/* Selected reference preview */}
+            {/* Chosen listing photo (a product reference) */}
             {aiRefPreview ? (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                 <img
                   src={aiRefPreview}
                   alt={t('referenceImage')}
-                  style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '2px solid #a855f7' }}
+                  style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8, border: '2px solid #a855f7' }}
                 />
                 <Box>
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                    {aiRefFile ? t('uploadedImage') : t('listingImage')}
+                    {t('listingImage')}
                   </Typography>
                   <Button
                     size="small"
                     color="error"
                     onClick={() => {
-                      setAiRefFile(null);
                       setAiRefPreview(null);
                       setAiRefUrl(null);
-                      if (aiRefInputRef.current) aiRefInputRef.current.value = '';
                     }}
                   >
                     {t('remove')}
                   </Button>
                 </Box>
               </Box>
-            ) : (
-              <>
-                {/* Existing listing images as selectable references */}
-                {sortedImages.length > 0 && (
-                  <Box sx={{ mb: 1 }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                      {t('selectFromExisting')}
-                    </Typography>
-                    <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                      {sortedImages.map((img) => (
-                        <Box
-                          key={img.listing_image_id}
-                          onClick={() => {
-                            if (aiGenerating) return;
-                            const fullUrl = img.url_fullxfull || img.url_570xN;
-                            setAiRefUrl(fullUrl);
-                            setAiRefPreview(img.url_570xN);
-                            setAiRefFile(null);
-                          }}
-                          sx={{
-                            width: 56,
-                            height: 56,
-                            borderRadius: 1,
-                            overflow: 'hidden',
-                            border: '2px solid #e5e7eb',
-                            cursor: aiGenerating ? 'not-allowed' : 'pointer',
-                            '&:hover': { borderColor: '#a855f7', transform: 'scale(1.05)' },
-                            transition: 'all 0.15s',
-                          }}
-                        >
-                          <img
-                            src={img.url_170x135 || img.url_75x75}
-                            alt={img.alt_text || t('imageRankAlt', { rank: img.rank })}
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          />
-                        </Box>
-                      ))}
+            ) : sortedImages.length > 0 ? (
+              <Box sx={{ mb: 1 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                  {t('selectFromExisting')}
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                  {sortedImages.map((img) => (
+                    <Box
+                      key={img.listing_image_id}
+                      onClick={() => {
+                        if (aiGenerating) return;
+                        const fullUrl = img.url_fullxfull || img.url_570xN;
+                        setAiRefUrl(fullUrl);
+                        setAiRefPreview(img.url_570xN);
+                      }}
+                      sx={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: 1,
+                        overflow: 'hidden',
+                        border: '2px solid #e5e7eb',
+                        cursor: aiGenerating ? 'not-allowed' : 'pointer',
+                        '&:hover': { borderColor: '#a855f7', transform: 'scale(1.05)' },
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      <img
+                        src={img.url_170x135 || img.url_75x75}
+                        alt={img.alt_text || t('imageRankAlt', { rank: img.rank })}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
                     </Box>
-                  </Box>
-                )}
+                  ))}
+                </Box>
+              </Box>
+            ) : null}
 
-                {/* Upload new reference image */}
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={() => aiRefInputRef.current?.click()}
-                  disabled={aiGenerating}
-                  startIcon={<AddPhotoAlternateIcon />}
-                >
-                  {t('uploadFromComputer')}
-                </Button>
-              </>
-            )}
+            {/* Uploaded references, each with a role */}
+            {aiUploads.length ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 1 }} data-testid="ai-ref-uploads">
+                {aiUploads.map((u) => (
+                  <Box key={u.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <img src={u.preview} alt={t('uploadedImage')} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb', flexShrink: 0 }} />
+                    <TextField
+                      select
+                      size="small"
+                      label={t('referenceRole')}
+                      value={u.role}
+                      onChange={(e) => setAiUploads((cur) => cur.map((x) => (x.id === u.id ? { ...x, role: e.target.value as AiReferenceRole } : x)))}
+                      SelectProps={{ native: true }}
+                      disabled={aiGenerating}
+                      sx={{ flex: 1, minWidth: 0 }}
+                      inputProps={{ 'data-testid': 'ai-ref-role' }}
+                    >
+                      {AI_REFERENCE_ROLES.map((r) => (
+                        <option key={r} value={r}>{t(`referenceRoles.${r}`)}</option>
+                      ))}
+                    </TextField>
+                    <IconButton
+                      size="small"
+                      aria-label={t('remove')}
+                      disabled={aiGenerating}
+                      onClick={() => {
+                        URL.revokeObjectURL(u.preview);
+                        setAiUploads((cur) => cur.filter((x) => x.id !== u.id));
+                      }}
+                    >
+                      <CloseIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                ))}
+                {aiUploads.some((u) => u.role === 'person') ? (
+                  <Typography variant="caption" color="text.secondary">{t('referencePersonNote')}</Typography>
+                ) : null}
+              </Box>
+            ) : null}
+
+            {aiUploads.length < AI_MAX_UPLOADED_REFERENCES ? (
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => aiRefInputRef.current?.click()}
+                disabled={aiGenerating}
+                startIcon={<AddPhotoAlternateIcon />}
+              >
+                {t('uploadFromComputer')}
+              </Button>
+            ) : null}
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+              {t('referencePrivacy')}
+            </Typography>
           </Box>
 
           <Divider sx={{ my: 2 }} />

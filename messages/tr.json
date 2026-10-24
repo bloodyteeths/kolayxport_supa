@@ -4357,7 +4357,7 @@
       "promptLabel": "Prompt",
       "promptPlaceholder": "örnek: Professional product photo of a handmade wooden phone stand on white background, studio lighting",
       "promptHelperText": "İngilizce prompt daha iyi sonuç verir",
-      "referenceImage": "Referans Görsel (opsiyonel)",
+      "referenceImage": "Referans görseller (isteğe bağlı)",
       "uploadedImage": "Yüklenen görsel",
       "listingImage": "Listing görseli",
       "remove": "Kaldır",
@@ -4390,7 +4390,17 @@
       "aiUploadNoDraftId": "AI görseli taslağa kaydedilemedi. Tekrar deneyin veya normal yükleme düğmesini kullanın.",
       "pendingAltBlocked": "Bekleyen yüklemelerin alt metni yükleme sırasında kaydedilir. Önce taslağı senkronize edin veya silin.",
       "altTextStaged": "Alt metin taslağa kaydedildi. Hazır olduğunuzda Etsy'ye senkronize edin.",
-      "aiWhiteBg": "Düz beyaz arka plan (ana ürün fotoğrafı)"
+      "aiWhiteBg": "Düz beyaz arka plan (ana ürün fotoğrafı)",
+      "referenceRole": "Bu görsel ne için?",
+      "referenceRoles": {
+        "product": "Ürün (aynen göster)",
+        "style": "Stil (ışık, renk, kompozisyon)",
+        "person": "Model / kişi (ürünü bu kişi kullansın)",
+        "scene": "Ortam / arka plan"
+      },
+      "referenceMax": "En fazla {max} referans görsel yükleyebilirsiniz",
+      "referencePersonNote": "Yalnızca fotoğrafını kullanma izniniz olan kişileri yükleyin.",
+      "referencePrivacy": "Yüklediğiniz referanslar ilana eklenmez ve sunucuda saklanmaz; görsel üretildikten sonra silinir."
     },
     "validation": {
       "titleRequired": "Başlık boş olamaz.",
@@ -4514,7 +4524,8 @@
       "ai_not_configured": "AI şu anda kullanılamıyor.",
       "ai_failed": "AI isteği başarısız oldu. Lütfen daha sonra tekrar deneyin.",
       "invalid_action": "Geçersiz AI isteği.",
-      "method_not_allowed": "Geçersiz AI isteği."
+      "method_not_allowed": "Geçersiz AI isteği.",
+      "reference_too_large": "Referans görseller çok büyük. Daha az veya daha küçük görsel yükleyip tekrar deneyin."
     },
     "processingProfile": {
       "title": "Hazırlık profili",

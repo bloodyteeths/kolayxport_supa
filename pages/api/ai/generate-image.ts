@@ -8,7 +8,7 @@ import crypto from 'crypto';
 import { imageCredits } from '@/lib/billing/aiCredits';
 import { isAiBudgetError, isNoCreditsError, refundCredits, spendCredits } from '@/lib/billing/aiCreditsServer';
 import { isReadablePhotoUrl, loadImageForUser } from '@/lib/images/ownImage';
-import { AI_MAX_REFERENCE_IMAGES } from '@/lib/ai/referenceImages';
+import { AI_MAX_REFERENCE_IMAGES, asReferenceRole, referenceInstruction, referenceLabel, usesReferenceRoles, type AiReferenceRole } from '@/lib/ai/referenceImages';
 
 export const config = {
   api: {
@@ -124,13 +124,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Reference images (up to MAX_REFERENCE_IMAGES): inline uploads first, then URLs
     // (e.g. the listing's existing photos, or the previous AI result for a follow-up).
     const parts: any[] = [];
-    const inlineRefs: RefPart[] = [];
+    // Uploads may carry a role (lib/ai/referenceImages: product / style / person / scene); they are only sent to
+    // the model with this request and never stored. The listing's photos (URLs) are always product references.
+    const inlineRefs: Array<RefPart & { role: AiReferenceRole }> = [];
     const legacyInline = inlineReference(reference_image, reference_mime_type);
-    if (legacyInline) inlineRefs.push(legacyInline);
+    if (legacyInline) inlineRefs.push({ ...legacyInline, role: 'product' });
     if (Array.isArray(reference_images)) {
       for (const r of reference_images) {
         const ref = r && typeof r === 'object' ? inlineReference(r.data, r.mime_type ?? r.mimeType) : null;
-        if (ref) inlineRefs.push(ref);
+        if (ref) inlineRefs.push({ ...ref, role: asReferenceRole(r.role) });
       }
     }
     const urls: string[] = [];
@@ -144,18 +146,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const img = await loadImageForUser(user.id, u);
       return img && img.data.length <= MAX_REFERENCE_BYTES * 1.4 ? { inlineData: { mimeType: img.mimeType, data: img.data } } : null;
     }))).filter((r): r is RefPart => !!r);
-    parts.push(...(await Promise.all([...inlineRefs.slice(0, MAX_REFERENCE_IMAGES), ...urlRefs].map(shrinkReference))));
+    const refs: Array<RefPart & { role: AiReferenceRole }> = [
+      ...inlineRefs.slice(0, MAX_REFERENCE_IMAGES),
+      ...urlRefs.map((r) => ({ ...r, role: 'product' as const })),
+    ];
+    const shrunk = await Promise.all(refs.map((r) => shrinkReference({ inlineData: r.inlineData })));
+    const roles = refs.map((r) => r.role);
+    const labelled = usesReferenceRoles(roles);
+    shrunk.forEach((part, i) => {
+      if (labelled) parts.push({ text: referenceLabel(roles[i], i + 1) });
+      parts.push(part);
+    });
 
-    const refCount = parts.length;
-    const style = whiteBackground
+    const refCount = refs.length;
+    // A scene / style / model reference decides the setting: never force a plain white background then.
+    const effectiveWhite = whiteBackground && !roles.some((r) => r === 'scene' || r === 'style' || r === 'person');
+    const style = effectiveWhite
       ? 'Clean pure white background, centered product, soft even studio lighting.'
       : 'Natural, styled setting that suits the product, soft realistic lighting.';
     const enhancedPrompt = [
-      refCount > 1
-        ? `Use the ${refCount} reference images above: keep the exact same product (shape, colours, materials, details, any printed text) and change only what the instructions ask.`
-        : refCount === 1
-          ? 'Use the reference image above: keep the exact same product (shape, colours, materials, details, any printed text) and change only what the instructions ask.'
-          : '',
+      referenceInstruction(roles),
       `Create a professional e-commerce product photo: ${prompt.trim().slice(0, 2000)}.`,
       style,
       `${aspectRatio} composition with the product fully in frame and a little margin on every side.`,

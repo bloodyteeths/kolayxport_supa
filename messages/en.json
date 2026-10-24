@@ -4357,7 +4357,7 @@
       "promptLabel": "Prompt",
       "promptPlaceholder": "example: Professional product photo of a handmade wooden phone stand on white background, studio lighting",
       "promptHelperText": "English prompts give better results",
-      "referenceImage": "Reference Image (optional)",
+      "referenceImage": "Reference images (optional)",
       "uploadedImage": "Uploaded image",
       "listingImage": "Listing image",
       "remove": "Remove",
@@ -4390,7 +4390,17 @@
       "aiUploadNoDraftId": "AI image could not be saved to the draft. Try again or use the regular upload button.",
       "pendingAltBlocked": "Alt text for pending uploads is saved during upload. Sync or discard the draft first.",
       "altTextStaged": "Alt text saved to draft. Sync to Etsy when ready.",
-      "aiWhiteBg": "Plain white background (main product shot)"
+      "aiWhiteBg": "Plain white background (main product shot)",
+      "referenceRole": "What is this image for?",
+      "referenceRoles": {
+        "product": "Product (show it exactly)",
+        "style": "Style (light, colour, composition)",
+        "person": "Model / person (show them using it)",
+        "scene": "Setting / background"
+      },
+      "referenceMax": "You can upload up to {max} reference images",
+      "referencePersonNote": "Only upload photos of people you have permission to use.",
+      "referencePrivacy": "Uploaded references are not added to the listing and not stored on our servers; they are deleted once the photo is made."
     },
     "validation": {
       "titleRequired": "Title can't be empty.",
@@ -4514,7 +4524,8 @@
       "ai_not_configured": "AI is not available right now.",
       "ai_failed": "AI request failed. Please try again later.",
       "invalid_action": "Invalid AI request.",
-      "method_not_allowed": "Invalid AI request."
+      "method_not_allowed": "Invalid AI request.",
+      "reference_too_large": "The reference images are too large. Upload fewer or smaller images and try again."
     },
     "processingProfile": {
       "title": "Processing profile",

@@ -428,6 +428,7 @@ export function computeSeoScore(input: SeoScoreInput): number {
 // ---------------------------------------------------------------------------
 
 export const AI_ERROR_CODES = [
+  'reference_too_large',
   'missing_title',
   'missing_query',
   'no_listings',

@@ -9329,7 +9329,10 @@
       "firstOrder": "First order",
       "plan": "Plan",
       "reminders": "Reminders",
-      "noStore": "Not connected"
+      "noStore": "Not connected",
+      "activity": "Activity",
+      "noActivity": "none recorded",
+      "lastSeen": "last"
     },
     "support": {
       "title": "Support tickets",

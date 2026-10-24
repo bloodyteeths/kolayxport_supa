@@ -5,6 +5,7 @@ import { getAuthUser } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 import { encryptIfNeeded } from '@/lib/crypto/credentials';
 import { verifyOAuthState } from '@/lib/auth/oauthState';
+import { recordActivation } from '@/lib/activation/events';
 
 /** Reject a signedInstance older than this (limits replay of a leaked redirect URL). */
 const SIGNED_INSTANCE_MAX_AGE_MS = 60 * 60 * 1000;
@@ -182,9 +183,11 @@ async function handleInstallRedirect(req: NextApiRequest, res: NextApiResponse) 
     });
 
     logger.info('Wix connection stored from install callback', { userId: user.id, siteId, siteName });
+    recordActivation(user.id, 'oauth_ok', 'wix');
     return res.redirect('/ayarlar?success=wix_connected');
   } catch (err) {
     logger.error('Wix install callback failed', err instanceof Error ? err : new Error(String(err)), { userId: user.id });
+    recordActivation(user.id, 'oauth_fail', 'wix');
     return res.redirect('/ayarlar?error=wix_callback_failed');
   }
 }

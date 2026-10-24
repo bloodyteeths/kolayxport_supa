@@ -9329,7 +9329,10 @@
       "firstOrder": "İlk sipariş",
       "plan": "Plan",
       "reminders": "Hatırlatmalar",
-      "noStore": "Bağlı değil"
+      "noStore": "Bağlı değil",
+      "activity": "Etkinlik",
+      "noActivity": "kayıt yok",
+      "lastSeen": "son"
     },
     "support": {
       "title": "Destek talepleri",

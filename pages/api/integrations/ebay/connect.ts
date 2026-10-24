@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { getAuthUser } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 import { signOAuthState } from '@/lib/auth/oauthState';
+import { recordActivation } from '@/lib/activation/events';
 
 // Force serverless runtime (not edge)
 export const config = {
@@ -74,6 +75,7 @@ export default async function handler(
     });
 
     // Redirect to eBay consent page
+  recordActivation(user.id, 'oauth_start', 'ebay');
     res.redirect(authUrl);
 
   } catch (error) {

@@ -15,7 +15,8 @@ export type LogCategory =
   | 'shipping'
   | 'etgb'
   | 'system'
-  | 'auth';
+  | 'auth'
+  | 'activation';
 
 export interface LogEntry {
   level: LogLevel;

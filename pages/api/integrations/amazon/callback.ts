@@ -4,6 +4,7 @@ import { exchangeAuthCode, regionForMarketplaceId } from '@/lib/integrations/ama
 import { logger } from '@/lib/logger';
 import { encryptIfNeeded } from '@/lib/crypto/credentials';
 import { clearConnectionAuthState } from '@/lib/integrations/authFailures';
+import { recordActivation } from '@/lib/activation/events';
 
 export const config = { runtime: 'nodejs' };
 
@@ -134,6 +135,7 @@ export default async function handler(
       expiresAt: tokenExpiresAt,
     });
 
+    recordActivation(userId, 'oauth_ok', 'amazon');
     res.redirect('/ayarlar?success=amazon_connected');
   } catch (error) {
     logger.error(
@@ -144,6 +146,7 @@ export default async function handler(
 
     const errorMsg = error instanceof Error ? error.message : String(error);
     const encoded = encodeURIComponent(errorMsg.substring(0, 100));
+    recordActivation(userId, 'oauth_fail', 'amazon');
     return res.redirect(`/ayarlar?error=amazon_callback_failed&details=${encoded}`);
   }
 }

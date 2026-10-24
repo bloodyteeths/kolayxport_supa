@@ -4,6 +4,7 @@ import { logger } from '@/lib/logger';
 import { encryptIfNeeded } from '@/lib/crypto/credentials';
 import { verifyOAuthState } from '@/lib/auth/oauthState';
 import { resolveNotification, notificationKeys } from '@/lib/notifications';
+import { recordActivation } from '@/lib/activation/events';
 
 /**
  * After a successful (re)connect: requeue webhook events parked while the shop
@@ -378,6 +379,7 @@ export default async function handler(
       shopId: shopData.shop_id,
       shopName: shopData.shop_name 
     });
+    recordActivation(userId, 'oauth_ok', 'etsy');
     res.redirect('/ayarlar?success=etsy_connected');
 
   } catch (error) {
@@ -391,6 +393,7 @@ export default async function handler(
 
     const errorMsg = error instanceof Error ? error.message : String(error);
     const encodedError = encodeURIComponent(errorMsg.substring(0, 100));
+    recordActivation(userId, 'oauth_fail', 'etsy');
     return res.redirect(`/ayarlar?error=etsy_callback_failed&details=${encodedError}`);
   }
 }

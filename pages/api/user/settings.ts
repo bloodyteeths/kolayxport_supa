@@ -8,6 +8,7 @@ import { loadAccountModules, NO_MODULES } from '@/lib/billing/modules';
 import { parsePreferencesPatch } from '@/lib/settings/accountTimezone';
 import { invalidateNotificationConfig } from '@/lib/notificationCenter/preferences';
 import { clearConnectionAuthState } from '@/lib/integrations/authFailures';
+import { recordActivation } from '@/lib/activation/events';
 
 export default async function handler(
   req: NextApiRequest,
@@ -246,6 +247,8 @@ export default async function handler(
           console.log('Integration settings saved successfully');
           if (trendyolResaved) await clearConnectionAuthState(authUser.id, 'trendyol');
           if (hepsiburadaResaved) await clearConnectionAuthState(authUser.id, 'hepsiburada');
+          if (trendyolResaved) recordActivation(authUser.id, 'credentials_saved', 'trendyol');
+          if (hepsiburadaResaved) recordActivation(authUser.id, 'credentials_saved', 'hepsiburada');
         } catch (error) {
           console.error('Error saving integration settings:', error);
           throw error;

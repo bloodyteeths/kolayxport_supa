@@ -10,6 +10,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '../../../../lib/auth';
 import { logger } from '../../../../lib/logger';
 import { SHOPIFY_SCOPES, createOAuthState, normalizeShopDomain } from '@/lib/integrations/shopify/oauth';
+import { recordActivation } from '@/lib/activation/events';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -48,5 +49,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   logger.info('Shopify OAuth connect initiated', { userId: user.id, shop });
 
+  recordActivation(user.id, 'oauth_start', 'shopify');
   return res.redirect(authUrl);
 }

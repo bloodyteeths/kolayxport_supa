@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { encryptIfNeeded } from '@/lib/crypto/credentials';
 import { verifyOAuthState } from '@/lib/auth/oauthState';
+import { recordActivation } from '@/lib/activation/events';
 
 // Force serverless runtime (not edge) — Prisma requires Node.js
 export const config = {
@@ -160,6 +161,7 @@ export default async function handler(
     });
 
     // Redirect back to settings with success message
+    recordActivation(userId, 'oauth_ok', 'ebay');
     res.redirect('/ayarlar?success=ebay_connected');
 
   } catch (error) {
@@ -171,6 +173,7 @@ export default async function handler(
 
     const errorMsg = error instanceof Error ? error.message : String(error);
     const encodedError = encodeURIComponent(errorMsg.substring(0, 100));
+    recordActivation(userId, 'oauth_fail', 'ebay');
     return res.redirect(`/ayarlar?error=ebay_callback_failed&details=${encodedError}`);
   }
 }

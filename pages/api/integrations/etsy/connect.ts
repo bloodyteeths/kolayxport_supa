@@ -3,6 +3,7 @@ import { getAuthUser } from '@/lib/auth';
 import crypto from 'crypto';
 import { logger } from '@/lib/logger';
 import { signOAuthState } from '@/lib/auth/oauthState';
+import { recordActivation } from '@/lib/activation/events';
 
 export default async function handler(
   req: NextApiRequest,
@@ -52,6 +53,7 @@ export default async function handler(
     });
 
     // Redirect to Etsy OAuth
+  recordActivation(user.id, 'oauth_start', 'etsy');
     res.redirect(authUrl);
 
   } catch (error) {

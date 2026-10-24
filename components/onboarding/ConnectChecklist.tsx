@@ -6,7 +6,7 @@
 //   2. sender profile   — the address on labels and customs forms
 //   3. first label      — Orders
 // Plus the WhatsApp line (components/support/WhatsAppHelp.tsx) and a link to support tickets.
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Box from '@mui/material/Box';
 import { useTranslations } from 'next-intl';
 import { LogoTile } from '@/components/ds/data/LogoTile';
@@ -14,6 +14,7 @@ import { Button } from '@/components/ds/inputs';
 import { neutral as n, accent } from '@/lib/ds/tokens';
 import { EBAY_CONNECT_HREF, ETSY_CONNECT_HREF } from '@/lib/settings/integrations';
 import WhatsAppHelp from '@/components/support/WhatsAppHelp';
+import { trackActivation } from '@/lib/activation/track';
 
 type Store = { id: 'etsy' | 'trendyol' | 'amazon' | 'ebay' | 'shopify' | 'wix'; name: string; href: string };
 
@@ -39,6 +40,7 @@ function StepNumber({ n: num, active }: { n: number; active: boolean }) {
 export default function ConnectChecklist({ 'data-testid': testId = 'connect-checklist' }: { 'data-testid'?: string }) {
   const t = useTranslations('onboarding.checklist');
   const [guide, setGuide] = useState(false);
+  useEffect(() => trackActivation('checklist_view', { once: true }), []);
 
   return (
     <Box data-testid={testId} sx={{ display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: 760, mx: 'auto', width: '100%' }}>
@@ -56,7 +58,7 @@ export default function ConnectChecklist({ 'data-testid': testId = 'connect-chec
             <Box sx={{ fontSize: 14, color: n[600], mt: '2px' }}>{t('step1.body')}</Box>
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(3, minmax(0, 1fr))' }, gap: '8px', mt: '12px' }}>
               {STORES.map((s) => (
-                <Box key={s.id} component="a" href={s.href} data-testid={`checklist-store-${s.id}`}
+                <Box key={s.id} component="a" href={s.href} data-testid={`checklist-store-${s.id}`} onClick={() => trackActivation('connect_click', { provider: s.id })}
                   sx={{ display: 'flex', alignItems: 'center', gap: '8px', minHeight: 48, px: '12px', borderRadius: '10px', border: `1px solid ${n[200]}`,
                     color: n[900], textDecoration: 'none', fontSize: 14, fontWeight: 600, bgcolor: '#fff',
                     '&:hover': { borderColor: accent[500] }, '&:focus-visible': { outline: `2px solid ${accent[500]}`, outlineOffset: 2 } }}>

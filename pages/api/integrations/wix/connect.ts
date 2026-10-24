@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import { signOAuthState } from '@/lib/auth/oauthState';
+import { recordActivation } from '@/lib/activation/events';
 
 /** How long an install link stays claimable after it was issued (checked in callback). */
 const STATE_TTL_MS = 60 * 60 * 1000;
@@ -41,5 +42,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const installUrl = `https://www.wix.com/app-installer?${params.toString()}`;
 
   // `since` is server time, so the poller isn't affected by client clock skew.
+  recordActivation(user.id, 'oauth_start', 'wix');
   return res.status(200).json({ installUrl, since: new Date(now).toISOString() });
 }

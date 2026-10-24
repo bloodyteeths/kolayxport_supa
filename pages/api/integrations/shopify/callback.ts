@@ -13,6 +13,7 @@ import {
   verifyOAuthState,
   verifyShopifyQueryHmac,
 } from '@/lib/integrations/shopify/oauth';
+import { recordActivation } from '@/lib/activation/events';
 
 const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 
@@ -292,13 +293,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       clearOAuthNonceCookie(res);
       const successKey = provisionedNow ? 'shopify_install_complete' : 'shopify_connected';
       logger.info('Shopify App Store install complete', { userId, shop, provisionedNow });
+      recordActivation(userId, 'oauth_ok', 'shopify');
       return res.redirect(`/ayarlar?success=${successKey}`);
     }
 
     logger.info('Shopify store connected successfully', { userId, shop, scopes: scope });
+    recordActivation(userId, 'oauth_ok', 'shopify');
     return res.redirect('/ayarlar?success=shopify_connected');
   } catch (error: any) {
     logger.error('Shopify callback error', error, { userId, shop });
+    recordActivation(userId, 'oauth_fail', 'shopify');
     return res.redirect('/ayarlar?error=shopify_connection_failed');
   }
 }

@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/lib/auth-context';
+import { trackActivation } from '@/lib/activation/track';
 
 /** Sign-in URL that returns to the current page. `/app` is no longer a login screen (it redirects to /app/analytics). */
 export function loginUrlFor(asPath: string) {
@@ -19,6 +20,11 @@ export default function withAuth<P extends object>(Component: React.ComponentTyp
     const { user, isLoading: authLoading } = useAuth();
     const router = useRouter();
     const t = useTranslations('auth');
+
+    // First-party activation event: an app page was opened (once per tab session; lib/activation/events.ts).
+    useEffect(() => {
+      if (!authLoading && user) trackActivation('app_visit', { once: true });
+    }, [authLoading, user]);
 
     useEffect(() => {
       // Not loading and no user: to the sign-in page, returning here afterwards. `replace` keeps Back usable.

@@ -8,7 +8,7 @@ import useSWR from 'swr';
 import { useTranslations } from 'next-intl';
 
 interface Funnel { signups: number; connected: number; withOrder: number; activated: number; connectRate: number; orderRate: number }
-interface Row { createdAt: string; name: string | null; email: string; source: string; via: string | null; stores: string[]; firstOrderAt: string | null; activated: boolean; plan: string | null; status: string | null; shopify: boolean; remindersSent: string[] }
+interface Row { createdAt: string; name: string | null; email: string; source: string; via: string | null; stores: string[]; firstOrderAt: string | null; activated: boolean; plan: string | null; status: string | null; shopify: boolean; remindersSent: string[]; activityLine?: string; activity?: { lastSeen: string | null } }
 interface Report { days: number; rows: Row[]; totals: Funnel; byDay: Array<{ day: string } & Funnel>; bySource: Array<{ source: string } & Funnel> }
 
 const fetcher = (url: string) => fetch(url).then((r) => {
@@ -106,7 +106,7 @@ export default function AdminSignupsPage() {
                 <thead><tr className="text-left text-gray-500">
                   <th className="py-1 pr-3">{t('signedUp')}</th><th className="pr-3">{t('name')}</th><th className="pr-3">{t('email')}</th>
                   <th className="pr-3">{t('source')}</th><th className="pr-3">{t('stores')}</th><th className="pr-3">{t('firstOrder')}</th>
-                  <th className="pr-3">{t('plan')}</th><th>{t('reminders')}</th>
+                  <th className="pr-3">{t('plan')}</th><th className="pr-3">{t('reminders')}</th><th>{t('activity')}</th>
                 </tr></thead>
                 <tbody>
                   {data.rows.map((r) => (
@@ -118,7 +118,8 @@ export default function AdminSignupsPage() {
                       <td className="pr-3">{r.stores.length ? r.stores.join(', ') : <span className="text-amber-700">{t('noStore')}</span>}</td>
                       <td className="pr-3 whitespace-nowrap">{r.firstOrderAt ? when(r.firstOrderAt) : '—'}</td>
                       <td className="pr-3">{r.plan || '—'}{r.status ? ` · ${r.status}` : ''}</td>
-                      <td>{r.remindersSent.length ? r.remindersSent.join(', ') : '—'}</td>
+                      <td className="pr-3">{r.remindersSent.length ? r.remindersSent.join(', ') : '—'}</td>
+                      <td className="text-xs">{r.activityLine || <span className="text-gray-400">{t('noActivity')}</span>}{r.activity?.lastSeen ? <span className="ml-1 text-gray-500">({t('lastSeen')} {when(r.activity.lastSeen)})</span> : null}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import { buildAuthUrl } from '@/lib/integrations/amazonClient';
 import { logger } from '@/lib/logger';
+import { recordActivation } from '@/lib/activation/events';
 
 export const config = { runtime: 'nodejs' };
 
@@ -34,6 +35,7 @@ export default async function handler(
 
     logger.info('Initiating Amazon OAuth flow', { userId: user.id });
 
+  recordActivation(user.id, 'oauth_start', 'amazon');
     res.redirect(authUrl);
   } catch (error) {
     logger.error(

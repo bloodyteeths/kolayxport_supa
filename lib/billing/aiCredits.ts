@@ -13,6 +13,8 @@ export type VideoResolution = '720p' | '1080p' | '4k';
 
 /** One generated image (2K, Nano Banana Pro). */
 export const IMAGE_CREDITS = 15;
+/** Text AI (titles, tags, descriptions, translations): plan-included, never metered. UI cost labels read this. */
+export const TEXT_AI_CREDITS = 0;
 
 /** Video credits per second of output, per generated variant. */
 export const VIDEO_CREDITS_PER_SEC: Readonly<Record<VideoQuality, Record<VideoResolution, number>>> = {

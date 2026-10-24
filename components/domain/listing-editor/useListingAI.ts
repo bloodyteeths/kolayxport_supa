@@ -21,6 +21,7 @@
 // lib/etsy/seoRules; HTML entities are decoded on the way in (decodeEntities) so "one&#39;s" never reaches a field
 // and is never sent back. Listing content stays English (P5); only the one-line rationale follows the UI locale
 // (the Etsy title API writes its explanation in Turkish, so it is shown only in TR).
+import { IMAGE_CREDITS, TEXT_AI_CREDITS } from '@/lib/billing/aiCredits';
 import { AI_MAX_REFERENCE_IMAGES } from '@/lib/ai/referenceImages';
 import { useAiCostsVisible } from '@/components/domain/credits/useCredits';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -340,7 +341,9 @@ export const TRENDYOL_AI_TITLE_MAX = CATALOG_TITLE_MAX.trendyol;
 export const ALT_TEXT_MAX = 250;
 export const DESCRIPTION_MIN = 80;
 /** AI credits per call (tiers.md AI_ACTION_COST: text 1, image 10). */
-export const AI_CREDITS = { text: 1, image: 10 } as const;
+// What is actually charged (lib/billing/aiCredits.ts): text AI is free (plan-included, rate-limited), one generated
+// image is IMAGE_CREDITS. Labels must never show a cost that is not spent.
+export const AI_CREDITS = { text: TEXT_AI_CREDITS, image: IMAGE_CREDITS } as const;
 
 /**
  * Billable AI calls in one Start faster run: Etsy = title, description, tags (research is a search, not AI);

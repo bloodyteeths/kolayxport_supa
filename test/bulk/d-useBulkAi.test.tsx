@@ -98,7 +98,7 @@ describe('pure helpers', () => {
   it('chunks to the API limit of 20 and charges 1 credit per listing', () => {
     expect(chunkRows(rows(45), 20).map((c) => c.length)).toEqual([20, 20, 5]);
     expect(chunkRows(rows(45), 50).map((c) => c.length)).toEqual([20, 20, 5]);
-    expect(bulkAiCredits(12)).toBe(12);
+    expect(bulkAiCredits(12)).toBe(0); // text AI is free
   });
 
   it('guards titles: entities decoded, garbled and > 140 chars dropped', () => {
@@ -190,8 +190,8 @@ describe('useBulkAi', () => {
     act(() => { p = hook.result.current.start(rows(12)); });
     expect(hook.result.current.running).toBe(true);
     expect(hook.result.current.metaLabel).toBe('Improving 0 / 12…');
-    expect(hook.result.current.costLabel(12)).toBe('12 credits');
-    expect(hook.result.current.costLabel(1)).toBe('1 credit');
+    expect(hook.result.current.costLabel(12)).toBe('No credits used');
+    expect(hook.result.current.costLabel(1)).toBe('No credits used');
     expect(hook.result.current.actionLabel).toBe('Improve with AI');
     // A second start while running does nothing.
     let second: unknown = 'x';
@@ -350,7 +350,7 @@ describe('useBulkAi', () => {
     const { hook } = setup({ fetcher }, 'tr');
     await act(async () => { await hook.result.current.start(rows(3)); });
     expect(hook.result.current.resultLabel).toBe('3 ilan iyileştirildi · henüz gönderilmedi');
-    expect(hook.result.current.costLabel(12)).toBe('12 kredi');
+    expect(hook.result.current.costLabel(12)).toBe('Kredi harcamaz');
   });
 });
 

@@ -24,6 +24,7 @@
 // eBay lane (legacy EbayListingsLegacy `handleAIBulkOptimize`): `/api/clawd/ebay-ai?action=bulk_optimize_titles`
 // (existing action, ≤ 10 listings per request, title only). Titles are guarded with `guardEbayTitle` (entity-decoded,
 // not garbled, ≤ 80 characters; Etsy's house style is NOT applied). Same staging path: suggestions are cell edits.
+import { TEXT_AI_CREDITS } from '@/lib/billing/aiCredits';
 import { useAiCostsVisible } from '@/components/domain/credits/useCredits';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
@@ -176,8 +177,9 @@ export interface UseBulkAi {
 // ── Pure helpers (exported for tests) ────────────────────────────────────────────────────────────
 
 /** 1 credit per listing (tiers.md `bulk_optimize`). */
+/** Credits a bulk text run spends: none. Text AI is plan-included (lib/billing/aiCredits.ts meters image/video only). */
 export function bulkAiCredits(listings: number): number {
-  return Math.max(0, Math.floor(listings));
+  return TEXT_AI_CREDITS * Math.max(0, Math.floor(listings));
 }
 
 export function chunkRows<T>(rows: readonly T[], size: number, max = 20): T[][] {

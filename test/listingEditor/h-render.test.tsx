@@ -124,7 +124,7 @@ describe.each<Locale>(['en', 'tr'])('useListingAI (%s)', (locale) => {
     neverSent();
   });
 
-  it('is single-flight per action and shows the credit cost', async () => {
+  it('is single-flight per action and shows no credit cost (text AI is free)', async () => {
     let resolve!: (v: unknown) => void;
     route = (c) => {
       if (c.url.includes('search_market')) return { json: SEARCH };
@@ -138,7 +138,7 @@ describe.each<Locale>(['en', 'tr'])('useListingAI (%s)', (locale) => {
       return { ok: true, status: 200, json: async () => ({ optimized_title: 'Personalized Baby Blanket, Newborn Gift' }) } as Response;
     });
     wrap(<AiHarness input={input} setField={vi.fn()} getField={() => ''} />, locale);
-    expect(screen.getByLabelText(locale === 'en' ? '1 credit' : '1 kredi')).toBeTruthy();
+    expect(screen.queryByLabelText(/\d+ (credit|kredi)/i)).toBeNull();
     fireEvent.click(screen.getByText('go'));
     fireEvent.click(screen.getByText('go'));
     await act(async () => { resolve(null); });
@@ -332,7 +332,7 @@ describe.each<Locale>(['en', 'tr'])('AiFillCard eBay (%s)', (locale) => {
     };
     const setField = vi.fn();
     wrap(<EbayFillHarness setField={setField} />, locale);
-    expect(screen.getByTestId('le-ai-fill-cost').textContent).toBe(locale === 'en' ? '4 credits' : '4 kredi');
+    expect(screen.getByTestId('le-ai-fill-cost').textContent).toBe(locale === 'en' ? 'No credits used' : 'Kredi harcamaz');
     fireEvent.change(within(screen.getByTestId('le-ai-fill-seed')).getByRole('textbox'), { target: { value: 'brass candle holder' } });
     fireEvent.click(screen.getByTestId('le-ai-fill-run'));
     await screen.findByTestId('le-ai-fill-use-all');

@@ -1,8 +1,9 @@
 // Group H pure logic: AI guards (entities decoded, garbled dropped, limits), research → band (median, never avg),
 // review rows / keep list (a queued delete always first), profile patch + legacy storage round trip, schedule block.
+import { IMAGE_CREDITS, TEXT_AI_CREDITS } from '@/lib/billing/aiCredits';
 import { describe, expect, it } from 'vitest';
 import {
-  FILL_LABEL_KEY, creditsFor, etsyMarketContext, fillCredits, fitWords, mergeAspects, ownImageUrls, priceBandFrom, researchFromEbayNiche, researchFromEtsySearch,
+  AI_CREDITS, FILL_LABEL_KEY, creditsFor, etsyMarketContext, fillCredits, fitWords, mergeAspects, ownImageUrls, priceBandFrom, researchFromEbayNiche, researchFromEtsySearch,
   researchQuery, sanitizeAltText, sanitizeAspects, sanitizeDescription, sanitizeTagIdeas, sanitizeTitle, toDecimalString,
   toMarketBand,
 } from '@/components/domain/listing-editor/useListingAI';
@@ -96,14 +97,16 @@ describe('AI guards', () => {
   });
 
   it('credits: text 1, image 10 (CRITIQUE X6)', () => {
-    expect(creditsFor('title')).toBe(1);
-    expect(creditsFor('photo')).toBe(10);
+    expect(creditsFor('title')).toBe(0); // text AI is free
+    expect(creditsFor('photo')).toBe(15); // = IMAGE_CREDITS, what generate-image charges
+    // Labels read the constants billing charges with (lib/billing/aiCredits.ts), so they cannot drift.
+    expect(AI_CREDITS).toEqual({ text: TEXT_AI_CREDITS, image: IMAGE_CREDITS });
     // One Start faster run is several billable calls, and the label says so (CRITIQUE X6).
-    expect(fillCredits('etsy')).toBe(3);
-    expect(fillCredits('ebay', true)).toBe(5);
-    expect(fillCredits('ebay', false)).toBe(4);
-    expect(creditsFor('fill', { marketplace: 'etsy' })).toBe(3);
-    expect(creditsFor('fill', { marketplace: 'ebay' })).toBe(5);
+    expect(fillCredits('etsy')).toBe(0);
+    expect(fillCredits('ebay', true)).toBe(0);
+    expect(fillCredits('ebay', false)).toBe(0);
+    expect(creditsFor('fill', { marketplace: 'etsy' })).toBe(0);
+    expect(creditsFor('fill', { marketplace: 'ebay' })).toBe(0);
   });
 
   it('identify_product gets only photos the server can read for the seller, at most 4', () => {
@@ -114,7 +117,7 @@ describe('AI guards', () => {
     expect(ownImageUrls(['/api/etsy-drafts/media-preview?id=abc', '/api/clawd/serve-image?path=u/1.jpg', 'https://i.etsystatic.com/1/r/il/x/1/il_fullxfull.1_a.jpg']))
       .toEqual(['/api/etsy-drafts/media-preview?id=abc', '/api/clawd/serve-image?path=u/1.jpg', 'https://i.etsystatic.com/1/r/il/x/1/il_fullxfull.1_a.jpg']);
     expect(ownImageUrls(['/api/orders/export', 'blob:https://kolayxport.com/x', 'https://evil.example/api/clawd/serve-image?path=a'])).toEqual([]);
-    expect(fillCredits('etsy', true)).toBe(4);
+    expect(fillCredits('etsy', true)).toBe(0); // text AI is free
   });
 });
 
@@ -319,7 +322,7 @@ describe('i18n fragment', () => {
     }
   });
   it('placeholders match between EN and TR', () => {
-    const vars = (s: string) => Array.from(new Set((s.match(/\{(\w+)/g) ?? []).map((m) => m.slice(1)).filter((v) => !['plural', 'one', 'other', 'select'].includes(v)))).sort();
+    const vars = (s: string) => Array.from(new Set((s.match(/\{(\w+)(?=[,}])/g) ?? []).map((m) => m.slice(1)).filter((v) => !['plural', 'one', 'other', 'select'].includes(v)))).sort();
     for (const r of rows) expect(vars(r.tr), r.key).toEqual(vars(r.en));
   });
 });

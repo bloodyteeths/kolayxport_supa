@@ -122,11 +122,11 @@ describe('Trendyol AI pure helpers', () => {
     expect(aiSupports('etsy', 'alt:123')).toBe(true);
     expect(AI_CAPABILITIES.wix).toEqual([]);
     expect(AI_CAPABILITIES.shopify).toEqual([]);
-    expect(fillCredits('trendyol')).toBe(2);
+    expect(fillCredits('trendyol')).toBe(0); // text AI is free
     expect(fillCredits('wix')).toBe(0);
-    expect(fillCredits('etsy')).toBe(3);
-    expect(fillCredits('ebay')).toBe(5);
-    expect(creditsFor('attributes')).toBe(1);
+    expect(fillCredits('etsy')).toBe(0);
+    expect(fillCredits('ebay')).toBe(0);
+    expect(creditsFor('attributes')).toBe(0);
   });
 
   it('sanitizeTitle(trendyol): decodes, strips quotes/markup, refuses raw JSON fallback, fits the limit at a word', () => {

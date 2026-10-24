@@ -328,7 +328,7 @@ export interface CopySourceData {
   item_dimensions_unit?: string;
   /** Public https image URLs, staged as draft media by URL (the server downloads them only on Send). */
   imageUrls?: string[];
-  source?: 'etsy' | 'ebay' | 'research';
+  source?: 'etsy' | 'ebay' | 'trendyol' | 'research';
 }
 
 /** How a create workspace starts (`new.tsx` query → `ListingEditor`). */

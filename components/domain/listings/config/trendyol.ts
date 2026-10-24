@@ -34,7 +34,7 @@ export const trendyolConfig: ListingsConfig = {
   rowInlineAction: 'edit',
   // A staged Archive is a queued removal (CatalogDraft `hasQueuedDelete`): it is excluded from every bulk send and
   // goes out only through "Send archive…" with type-to-confirm (`sendDeletion`, labelled by the page's removal kind).
-  rowActions: ['quickView', 'viewExternal', 'sendChange', 'scheduleSend', 'discardChanges', 'sendDeletion', 'archive', 'unarchive'],
+  rowActions: ['quickView', 'viewExternal', 'copyToEtsy', 'sendChange', 'scheduleSend', 'discardChanges', 'sendDeletion', 'archive', 'unarchive'],
   bulkPrimary: 'changePrice',
   // Unarchive is not a removal: it is a normal staged change ("Send N"), shown only for archived rows.
   bulkActions: ['changeStock', 'archive', 'unarchive'],

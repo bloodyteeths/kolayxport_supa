@@ -2,7 +2,8 @@
 // Bootstraps: blank · `?draft=<id>` (resume a staged new listing) · `?copy=<listingId>` (copy an Etsy listing,
 // photos staged by URL) · `?prefill=session` (research hand-off, `consumeListingPrefill`) · `?crosslist=ebay:<sku>`
 // (eBay "Copy to Etsy": the eBay listing is read before the workspace mounts; its price is kept only when the eBay
-// currency is the shop's). The first save creates the DB draft at a negative local listing id and the URL becomes
+// currency is the shop's) · `?crosslist=trendyol:<barcode>` (Trendyol "Copy to Etsy", same rules; TRY price kept only
+// for a TRY shop). The first save creates the DB draft at a negative local listing id and the URL becomes
 // `?draft=<id>` (shallow, so a reload resumes); the first successful send replaces it with
 // `/app/etsy-listings/<realId>`.
 import * as React from 'react';
@@ -18,6 +19,7 @@ import {
   loadEtsyShopCurrency,
   parseEtsyCreateQuery,
 } from '@/components/domain/listing-editor/crosslistEbayToEtsy';
+import { loadTrendyolCrosslistForEtsy } from '@/components/domain/listing-editor/crosslistTrendyolToEtsy';
 import { consumeListingPrefill } from '@/lib/listings/listingPrefill';
 import { editorHref, newListingHref } from '@/lib/listingEditor/editorNav';
 import type { CopySourceData } from '@/lib/listingEditor/types';
@@ -26,8 +28,8 @@ interface Bootstrap {
   draftId: string | null;
   copyFromId: string | null;
   copy: CopySourceData | null;
-  /** eBay SKU of a `crosslist=ebay:<sku>` hand-off (loaded per shop before the workspace mounts). */
-  crosslistEbaySku: string | null;
+  /** `crosslist=ebay:<sku>` / `crosslist=trendyol:<barcode>` hand-off (loaded per shop before the workspace mounts). */
+  crosslist: { from: 'ebay' | 'trendyol'; id: string } | null;
 }
 
 type ShopProps = { shop: { shopId: string; shopName: string | null }; boot: Bootstrap };
@@ -53,17 +55,18 @@ function EtsyCreateWorkspace({ shop, boot, copy }: ShopProps & { copy: CopySourc
   );
 }
 
-/** eBay → Etsy: load the eBay listing and the shop currency, then mount the workspace once (the engine reads `copy` once). */
-function EtsyCrosslistWorkspace({ shop, boot, sku }: ShopProps & { sku: string }) {
+/** eBay / Trendyol → Etsy: load the source and the shop currency, then mount the workspace once (the engine reads `copy` once). */
+function EtsyCrosslistWorkspace({ shop, boot, source }: ShopProps & { source: { from: 'ebay' | 'trendyol'; id: string } }) {
   const t = useTranslations('listingEditor');
   const toast = useToast();
   const [state, setState] = React.useState<{ done: boolean; copy: CopySourceData | null }>({ done: false, copy: null });
   React.useEffect(() => {
     let cancelled = false;
-    void Promise.all([loadEbayCrosslistForEtsy(sku).catch(() => null), loadEtsyShopCurrency(shop.shopId)]).then(([src, shopCurrency]) => {
+    const load = source.from === 'trendyol' ? loadTrendyolCrosslistForEtsy(source.id) : loadEbayCrosslistForEtsy(source.id);
+    void Promise.all([load.catch(() => null), loadEtsyShopCurrency(shop.shopId)]).then(([src, shopCurrency]) => {
       if (cancelled) return;
       if (!src) {
-        toast.error(t('state.crosslistEbayFailed'));
+        toast.error(t(source.from === 'trendyol' ? 'state.crosslistTrendyolFailed' : 'state.crosslistEbayFailed'));
         setState({ done: true, copy: null });
         return;
       }
@@ -74,7 +77,7 @@ function EtsyCrosslistWorkspace({ shop, boot, sku }: ShopProps & { sku: string }
     return () => {
       cancelled = true;
     };
-  }, [sku, shop.shopId, toast, t]);
+  }, [source.from, source.id, shop.shopId, toast, t]);
   if (!state.done) return null;
   return <EtsyCreateWorkspace shop={shop} boot={boot} copy={state.copy} />;
 }
@@ -91,14 +94,19 @@ function NewEtsyListingPage() {
       const prefill = consumeListingPrefill('etsy');
       copy = prefill ? copyFromPrefill(prefill) : null;
     }
-    boot.current = { draftId: parsed.draftId, copyFromId: parsed.copyFromId, crosslistEbaySku: parsed.crosslistEbaySku, copy };
+    const crosslist = parsed.crosslistEbaySku
+      ? { from: 'ebay' as const, id: parsed.crosslistEbaySku }
+      : parsed.crosslistTrendyolBarcode
+        ? { from: 'trendyol' as const, id: parsed.crosslistTrendyolBarcode }
+        : null;
+    boot.current = { draftId: parsed.draftId, copyFromId: parsed.copyFromId, crosslist, copy };
   }
   const b = boot.current;
-  const sku = b.crosslistEbaySku;
+  const source = b.crosslist;
   return (
-    // A cross-list from eBay does not know the Etsy shop: with several shops and no `?shop`, the first one is used.
-    <EtsyEditorGate firstShopFallback={Boolean(sku)}>
-      {(shop) => (sku ? <EtsyCrosslistWorkspace key={shop.shopId} shop={shop} boot={b} sku={sku} /> : <EtsyCreateWorkspace shop={shop} boot={b} copy={b.copy} />)}
+    // A cross-list does not know the Etsy shop: with several shops and no `?shop`, the first one is used.
+    <EtsyEditorGate firstShopFallback={Boolean(source)}>
+      {(shop) => (source ? <EtsyCrosslistWorkspace key={shop.shopId} shop={shop} boot={b} source={source} /> : <EtsyCreateWorkspace shop={shop} boot={b} copy={b.copy} />)}
     </EtsyEditorGate>
   );
 }

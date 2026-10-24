@@ -5,7 +5,7 @@
 // nothing reaches Etsy until the explicit send. Legacy equivalent: EtsyListingsLegacy `ebayItemToCopySource`.
 import type { CopySourceData } from '@/lib/listingEditor/types';
 import { decodeEntities } from '@/lib/text/decodeEntities';
-import { parseEbayCrosslist } from '@/lib/listings/legacyHandoff';
+import { parseEbayCrosslist, parseTrendyolCrosslist } from '@/lib/listings/legacyHandoff';
 import { decodeAspects, loadEbayCopySource, type EbayCopySourceData } from './adapters/ebay';
 import { ETSY_MAX_IMAGES } from './adapters/etsy';
 
@@ -114,6 +114,8 @@ export interface EtsyCreateQuery {
   copyFromId: string | null;
   /** eBay SKU of a `crosslist=ebay:<sku>` hand-off. */
   crosslistEbaySku: string | null;
+  /** Trendyol barcode of a `crosslist=trendyol:<barcode>` hand-off. */
+  crosslistTrendyolBarcode: string | null;
   prefill: boolean;
 }
 
@@ -124,5 +126,7 @@ export function parseEtsyCreateQuery(q: Record<string, string | string[] | undef
   const copy = one(q.copy);
   const copyFromId = !draftId && typeof copy === 'string' && /^\d{1,20}$/.test(copy) ? copy : null;
   const crosslistEbaySku = !draftId && !copyFromId ? parseEbayCrosslist(one(q.crosslist)) : null;
-  return { draftId, copyFromId, crosslistEbaySku, prefill: !draftId && !copyFromId && !crosslistEbaySku && one(q.prefill) === 'session' };
+  const crosslistTrendyolBarcode = !draftId && !copyFromId && !crosslistEbaySku ? parseTrendyolCrosslist(one(q.crosslist)) : null;
+  const crosslist = Boolean(crosslistEbaySku || crosslistTrendyolBarcode);
+  return { draftId, copyFromId, crosslistEbaySku, crosslistTrendyolBarcode, prefill: !draftId && !copyFromId && !crosslist && one(q.prefill) === 'session' };
 }

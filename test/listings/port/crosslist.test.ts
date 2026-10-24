@@ -45,7 +45,7 @@ describe('cross-list hrefs', () => {
 
 describe('Etsy create query', () => {
   it('reads crosslist=ebay:<sku> with draft › copy › crosslist › prefill precedence', () => {
-    expect(parseEtsyCreateQuery({ crosslist: 'ebay:SKU-9' })).toEqual({ draftId: null, copyFromId: null, crosslistEbaySku: 'SKU-9', prefill: false });
+    expect(parseEtsyCreateQuery({ crosslist: 'ebay:SKU-9' })).toEqual({ draftId: null, copyFromId: null, crosslistEbaySku: 'SKU-9', crosslistTrendyolBarcode: null, prefill: false });
     expect(parseEtsyCreateQuery({ crosslist: 'ebay:SKU-9', draft: 'abc' }).crosslistEbaySku).toBeNull();
     expect(parseEtsyCreateQuery({ crosslist: 'ebay:SKU-9', copy: '12' }).crosslistEbaySku).toBeNull();
     expect(parseEtsyCreateQuery({ crosslist: 'ebay:SKU-9', prefill: 'session' }).prefill).toBe(false);

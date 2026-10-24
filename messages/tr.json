@@ -14720,7 +14720,8 @@
       "crosslistEbayFailed": "Kopyalanacak eBay ilanı yüklenemedi",
       "ebayLegacyTitle": "Bu ilan doğrudan eBay'de oluşturulmuş",
       "ebayLegacyBody": "eBay, kendi sitesinde oluşturulan ilanların uygulamalardan düzenlenmesine henüz izin vermiyor. İlanı eBay'de düzenleyin; siparişleri ve stoğu burada görünmeye devam eder.",
-      "ebayLegacyAction": "eBay'de düzenle"
+      "ebayLegacyAction": "eBay'de düzenle",
+      "crosslistTrendyolFailed": "Kopyalanacak Trendyol ürünü yüklenemedi"
     },
     "createdOnSend": "Bu ilanı gönderdiğinizde Etsy'de oluşturulur",
     "stageFailed": "Kaydedilemedi. Tekrar deneyin",

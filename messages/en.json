@@ -14720,7 +14720,8 @@
       "crosslistEbayFailed": "Couldn't load the eBay listing to copy",
       "ebayLegacyTitle": "This listing was created directly on eBay",
       "ebayLegacyBody": "eBay doesn't let apps edit listings made on eBay's own site yet. Edit it on eBay; its orders and stock still show here.",
-      "ebayLegacyAction": "Edit on eBay"
+      "ebayLegacyAction": "Edit on eBay",
+      "crosslistTrendyolFailed": "Couldn't load the Trendyol product to copy"
     },
     "createdOnSend": "It's created on Etsy when you send this listing",
     "stageFailed": "Couldn't save this. Try again",

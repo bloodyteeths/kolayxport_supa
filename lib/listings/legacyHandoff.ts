@@ -15,6 +15,16 @@ export const ETSY_CROSSLIST_RE = /^etsy:(\d{1,20})$/;
 /** `ebay:<sku>`: up to 50 characters, no control characters (same rule as the catalog creator). */
 export const EBAY_CROSSLIST_RE = /^ebay:([^\u0000-\u001f]{1,50})$/;
 
+/** `trendyol:<barcode>`: the Trendyol editor's id rule (barcode, or stock code when the product has none). */
+export const TRENDYOL_CROSSLIST_RE = /^trendyol:([A-Za-z0-9._-]{1,64})$/;
+
+/** The Trendyol barcode of a `crosslist=trendyol:<barcode>` value, else null (pure). */
+export function parseTrendyolCrosslist(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const m = TRENDYOL_CROSSLIST_RE.exec(raw.trim());
+  return m ? m[1] : null;
+}
+
 /** The eBay SKU of a `crosslist=ebay:<sku>` value, else null (pure). */
 export function parseEbayCrosslist(raw: unknown): string | null {
   if (typeof raw !== 'string') return null;
@@ -42,6 +52,7 @@ export function editorHandoffHref(marketplace: 'etsy' | 'ebay', query: Query): s
   const cross = first(query.crosslist).trim();
   if (marketplace === 'ebay' && ETSY_CROSSLIST_RE.test(cross)) params.set('crosslist', cross);
   else if (marketplace === 'etsy' && parseEbayCrosslist(cross)) params.set('crosslist', `ebay:${parseEbayCrosslist(cross)}`);
+  else if (marketplace === 'etsy' && parseTrendyolCrosslist(cross)) params.set('crosslist', `trendyol:${parseTrendyolCrosslist(cross)}`);
   else if (cross) return null;
   else if (first(query.prefill) === 'session') params.set('prefill', 'session');
   else return null;
@@ -51,13 +62,17 @@ export function editorHandoffHref(marketplace: 'etsy' | 'ebay', query: Query): s
 /**
  * "Copy to eBay" / "Copy to Etsy" from a listings row (pure): the other marketplace's create route with the
  * `crosslist` hand-off. Etsy → eBay needs a numeric Etsy listing id (a staged new Etsy listing has a negative local
- * id and is not on Etsy yet); eBay → Etsy takes the SKU (≤ 50 characters, no control characters). Null = not offered.
+ * id and is not on Etsy yet); eBay → Etsy takes the SKU (≤ 50 characters, no control characters); Trendyol → Etsy the barcode. Null = not offered.
  */
 export function crosslistCreateHref(action: 'copyToEbay' | 'copyToEtsy', from: string, id: string): string | null {
   const v = String(id ?? '').trim();
   if (action === 'copyToEbay') {
     if (from !== 'etsy' || !/^\d{1,20}$/.test(v)) return null;
     return `/app/ebay-listings/new?${new URLSearchParams({ crosslist: `etsy:${v}` }).toString()}`;
+  }
+  if (from === 'trendyol') {
+    if (!parseTrendyolCrosslist(`trendyol:${v}`)) return null;
+    return `/app/etsy-listings/new?${new URLSearchParams({ crosslist: `trendyol:${v}` }).toString()}`;
   }
   if (from !== 'ebay' || !parseEbayCrosslist(`ebay:${v}`)) return null;
   return `/app/etsy-listings/new?${new URLSearchParams({ crosslist: `ebay:${v}` }).toString()}`;

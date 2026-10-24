@@ -10245,6 +10245,53 @@
         "plan": "{plan}: {monthTry}/month ({yearTry}/year) or {monthUsd}/month ({yearUsd}/year). {orders} orders, {labels} labels, {stores} connected stores and {ai} AI credits a month.",
         "enterprise": "Enterprise: custom quote with unlimited usage, through our contact form.",
         "footer": "Every plan starts with a 14-day free trial without a card. Every marketplace and carrier integration is included. No other fees."
+      },
+      "v2": {
+        "title": "Pricing",
+        "subtitle": "A flexible monthly plan or yearly packages. Yearly packages cost less per month.",
+        "trialLine": "14 days free, no card needed.",
+        "founding": "Founding offer: {percent}% off for life for the first {total} customers · {remaining} left",
+        "recommended": "Recommended",
+        "perMonth": "/ month",
+        "perYear": "/ year",
+        "monthlyEquivalent": "{price} a month equivalent, paid yearly",
+        "cancelAnytime": "Cancel anytime",
+        "stores": "{count} connected stores",
+        "ordersMonth": "{count} orders a month",
+        "ordersYear": "{count} orders a year",
+        "labelsMonth": "{count} labels a month",
+        "labelsYear": "{count} labels a year",
+        "cta": "Start 14 days free",
+        "kurumsalCta": "Contact us",
+        "taxLine": "Final prices; no VAT added (sold by Tamsar, Inc.). Yearly packages are paid in one payment.",
+        "modulesLine": "Optional modules: Finance, Arbitrage, Bulk Photo Studio, extra stores and extra order packs.",
+        "plans": {
+          "aylik": {
+            "name": "Monthly",
+            "tagline": "To start without commitment",
+            "editor": "Bulk editing: 100 listings per send"
+          },
+          "baslangic_yil": {
+            "name": "Starter (yearly)",
+            "tagline": "For sellers growing their first stores",
+            "editor": "Bulk editing: 100 listings per send"
+          },
+          "buyume_yil": {
+            "name": "Growth (yearly)",
+            "tagline": "For sellers on several marketplaces",
+            "editor": "Bulk editing: 500 listings, find & replace, scheduling, CSV"
+          },
+          "pro_yil": {
+            "name": "Pro (yearly)",
+            "tagline": "For multi-store teams",
+            "editor": "Bulk editing: unlimited, every tool"
+          },
+          "kurumsal": {
+            "name": "Enterprise",
+            "tagline": "For agencies and high volume, from {price} a year. Unlimited orders and labels, 10 client stores, dedicated support."
+          }
+        },
+        "buy": "Buy"
       }
     }
   },

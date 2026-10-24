@@ -10245,6 +10245,53 @@
         "plan": "{plan}: {monthTry}/month ({yearTry}/year) or {monthUsd}/month ({yearUsd}/year). {orders} orders, {labels} labels, {stores} connected stores and {ai} AI credits a month.",
         "enterprise": "Enterprise: custom quote with unlimited usage, through our contact form.",
         "footer": "Every plan starts with a 14-day free trial without a card. Every marketplace and carrier integration is included. No other fees."
+      },
+      "v2": {
+        "title": "Fiyatlandırma",
+        "subtitle": "Aylık esnek plan ya da yıllık paketler. Yıllık paketlerde ay başına daha az ödersiniz.",
+        "trialLine": "14 gün ücretsiz, kart gerekmez.",
+        "founding": "Kurucu üye fırsatı: ilk {total} müşteriye ömür boyu %{percent} indirim · {remaining} yer kaldı",
+        "recommended": "Önerilen",
+        "perMonth": "/ ay",
+        "perYear": "/ yıl",
+        "monthlyEquivalent": "aylık {price} karşılığı, yıllık peşin",
+        "cancelAnytime": "İstediğiniz zaman iptal",
+        "stores": "{count} bağlı mağaza",
+        "ordersMonth": "Ayda {count} sipariş",
+        "ordersYear": "Yılda {count} sipariş",
+        "labelsMonth": "Ayda {count} etiket",
+        "labelsYear": "Yılda {count} etiket",
+        "cta": "14 gün ücretsiz başla",
+        "kurumsalCta": "Bize ulaşın",
+        "taxLine": "Fiyatlar nihaidir; KDV eklenmez (satıcı Tamsar, Inc.). Yıllık paketler tek seferde ödenir.",
+        "modulesLine": "İsterseniz ek modüller: Finans, Arbitraj, Toplu Fotoğraf Stüdyosu, ek mağaza ve ek sipariş paketi.",
+        "plans": {
+          "aylik": {
+            "name": "Aylık",
+            "tagline": "Taahhütsüz başlamak için",
+            "editor": "Toplu düzenleme: gönderim başına 100 ilan"
+          },
+          "baslangic_yil": {
+            "name": "Başlangıç (yıllık)",
+            "tagline": "İlk mağazalarını büyütenler için",
+            "editor": "Toplu düzenleme: gönderim başına 100 ilan"
+          },
+          "buyume_yil": {
+            "name": "Büyüme (yıllık)",
+            "tagline": "Birden çok pazaryerinde satanlar için",
+            "editor": "Toplu düzenleme: 500 ilan, bul ve değiştir, zamanlama, CSV"
+          },
+          "pro_yil": {
+            "name": "Pro (yıllık)",
+            "tagline": "Çok mağazalı ekipler için",
+            "editor": "Toplu düzenleme: sınırsız, tüm araçlar"
+          },
+          "kurumsal": {
+            "name": "Kurumsal",
+            "tagline": "Ajanslar ve yüksek hacim için, yıllık {price} başlayan fiyatlarla. Sınırsız sipariş ve etiket, 10 müşteri mağazası, size özel destek."
+          }
+        },
+        "buy": "Satın al"
       }
     }
   },

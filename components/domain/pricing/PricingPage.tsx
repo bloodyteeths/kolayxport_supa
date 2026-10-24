@@ -43,6 +43,9 @@ import { PricingFaq } from './PricingFaq';
 import { ReviewerSummary } from './ReviewerSummary';
 import { FoundingFullModal } from './FoundingFullModal';
 import { useCheckout } from './useCheckout';
+import { PlanV2Cards, type V2Catalog } from './PlanV2Cards';
+import { V2_PLANS } from '@/lib/billing/pricingV2';
+import { DECIDED_PLAN_LIMITS } from '@/lib/billing/planLimits';
 import { MOBILE_ORDER, PRICING_PLANS, RECOMMENDED_PLAN, TAX_INCLUDED, defaultCurrency, fromPrice, pricingGate } from './pricingModel';
 
 export { pricingGate, type PricingGate } from './pricingModel';
@@ -53,8 +56,10 @@ export const PRICING_URL_SCHEMA = {
   plan: urlField.optionalEnum(['starter', 'growth', 'pro', 'enterprise'] as const),
 };
 
-export function PricingPage() {
+/** `v2`: PRICING_V2 is on (server props of /plan); the v2 packages replace the v1 cards. */
+export function PricingPage({ v2: v2On = false }: { v2?: boolean } = {}) {
   const t = useTranslations('marketing.pricingV2');
+  const tV2 = useTranslations('marketing.pricingV2.v2');
   const f = useFormatters();
   const locale = useLocale();
   const router = useRouter();
@@ -82,6 +87,10 @@ export function PricingPage() {
 
   const foundingPercent = founding.spots && FOUNDING_INTERVALS.includes(interval) ? founding.spots.percentOff : null;
   const checkout = useCheckout({ onFoundingFull: () => { void founding.mutate(); } });
+  // Pricing v2: the catalog endpoint answers only while PRICING_V2 is on; then the v2 packages replace the v1 cards.
+  // Same data the catalog endpoint serves, from the shared constants (no request: this page makes none before a click).
+  const v2: V2Catalog | null = v2On ? { plans: V2_PLANS.map((p) => ({ ...p, limits: DECIDED_PLAN_LIMITS[p.key].limits })) } : null;
+  const v2Founding = founding.spots && founding.spots.active && founding.spots.remaining > 0 ? founding.spots.percentOff : null;
 
   const [portalPending, setPortalPending] = useState<PricedPlanKey | 'payment' | null>(null);
   const openPortal = useCallback(
@@ -125,7 +134,9 @@ export function PricingPage() {
     ? t('seo.description', { price: f.money(fromPrice(currency), currency, { wholeIfIntegral: true }) })
     : t('seo.descriptionNeutral');
   const primaryPlan = pricingPrimaryPlan(viewer);
-  const pending: PricedPlanKey | null = checkout.pending ?? (portalPending && portalPending !== 'payment' ? portalPending : null);
+  // v1 cards only know v1 keys; a pending v2 checkout is shown on the v2 cards (checkout.pending).
+  const pendingV1 = checkout.pending && !/_yil$|^aylik$/.test(checkout.pending) ? (checkout.pending as PricedPlanKey) : null;
+  const pending: PricedPlanKey | null = pendingV1 ?? (portalPending && portalPending !== 'payment' ? portalPending : null);
   const ctaFor = (plan: PricedPlanKey): PricingCta | 'skeleton' => (showMoney ? pricingCta(viewer, plan) : 'skeleton');
   const pastDue = showMoney && entitlement?.state === 'past_due_grace';
 
@@ -141,7 +152,7 @@ export function PricingPage() {
 
           {/* Currency symbols are money too: the toggles join the gated region (no ₺/$ for shopify_free). */}
           {showMoney ? (
-            <IntervalCurrencyControls
+            v2 ? null : <IntervalCurrencyControls
               interval={interval}
               currency={currency}
               lockedCurrency={lockedCurrency}
@@ -191,6 +202,14 @@ export function PricingPage() {
                 </Box>
               ) : null}
 
+              {v2 ? (
+                <PlanV2Cards
+                  catalog={v2}
+                  foundingPercent={showMoney ? v2Founding : null}
+                  pending={checkout.pending}
+                  onBuy={(plan, iv) => { void checkout.start({ plan, interval: iv, currency: 'TRY', expectFounding: v2Founding !== null }); }}
+                />
+              ) : (
               <Box
                 sx={{
                   mt: '24px',
@@ -217,8 +236,11 @@ export function PricingPage() {
                   />
                 ))}
               </Box>
+              )}
 
-              {showMoney && TAX_INCLUDED !== null ? (
+              {v2 && showMoney ? (
+                <Typography variant="caption" component="p" sx={{ m: 0, mt: '12px', color: neutral[500] }} data-testid="pricing-v2-tax">{tV2('taxLine')}</Typography>
+              ) : showMoney && TAX_INCLUDED !== null ? (
                 <Typography variant="caption" component="p" sx={{ m: 0, mt: '12px', color: neutral[500] }} data-testid="pricing-tax">
                   {TAX_INCLUDED ? t('taxIncluded') : t('taxExcluded')}
                 </Typography>
@@ -227,6 +249,8 @@ export function PricingPage() {
             )}
           </Box>
 
+          {/* The v1 comparison describes Starter / Growth / Pro; with v2 on, the cards carry the limits. */}
+          {v2 ? null : (
           <Box component="section" aria-labelledby="pricing-compare-title" sx={{ mt: '48px' }}>
             <Typography id="pricing-compare-title" variant="titleLg" component="h2" sx={{ m: 0, mb: '16px', color: neutral[900] }}>
               {t('compare.title')}
@@ -234,6 +258,7 @@ export function PricingPage() {
             <CompareTable />
             <CompareMobile />
           </Box>
+          )}
 
           {showMoney ? (
             <>

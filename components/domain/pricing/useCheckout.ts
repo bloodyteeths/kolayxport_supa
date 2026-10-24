@@ -15,7 +15,8 @@ import { track } from '@/lib/tracking/events';
 export const CHECKOUT_ENDPOINT = '/api/stripe/create-checkout-session';
 
 export interface CheckoutRequest {
-  plan: PaidPlanKey;
+  /** A v1 plan, or a pricing v2 self-serve key (aylik / baslangic_yil / buyume_yil / pro_yil; the server fixes the interval). */
+  plan: PaidPlanKey | 'aylik' | 'baslangic_yil' | 'buyume_yil' | 'pro_yil';
   interval: Interval;
   currency: Currency;
   /** The page showed a founding price; the server answers 409 instead of silently charging full price. */
@@ -56,7 +57,7 @@ export function loginBackHref(req: Pick<CheckoutRequest, 'plan' | 'interval' | '
 export interface UseCheckout {
   start: (req: CheckoutRequest) => Promise<void>;
   /** Plan whose checkout is opening (its button shows "Opening checkout…"; the others are disabled). */
-  pending: PaidPlanKey | null;
+  pending: CheckoutRequest['plan'] | null;
   /** Set after a 409 `founding_full`: the request to continue at full price. */
   foundingFull: CheckoutRequest | null;
   dismissFoundingFull: () => void;
@@ -66,7 +67,7 @@ export function useCheckout(options: { onFoundingFull?: () => void } = {}): UseC
   const t = useTranslations('marketing.pricingV2');
   const toast = useToast();
   const router = useRouter();
-  const [pending, setPending] = useState<PaidPlanKey | null>(null);
+  const [pending, setPending] = useState<CheckoutRequest['plan'] | null>(null);
   const [foundingFull, setFoundingFull] = useState<CheckoutRequest | null>(null);
   const busy = useRef(false);
   const onFull = useRef(options.onFoundingFull);

@@ -9,6 +9,7 @@ import type { Currency, Interval } from '@/lib/billing/types';
 import { localePath, SIGNUP_HREF, type SiteLocale } from '@/lib/site/routes';
 import { faqPage, softwareApplication } from '@/lib/site/schema';
 import SiteLayout from './SiteLayout';
+import SitePricingV2 from './SitePricingV2';
 import { Section, CtaBand } from './Blocks';
 
 /**
@@ -16,21 +17,25 @@ import { Section, CtaBand } from './Blocks';
  * (components/domain/pricing/pricingModel.ts, lib/billing/price.ts). Signed-in visitors are forwarded to
  * /plan, which runs the real checkout / plan-change flows (PricingPage).
  */
-export default function SitePricing({ locale }: { locale: SiteLocale }) {
+export default function SitePricing({ locale, v2 = false }: { locale: SiteLocale; v2?: boolean }) {
   return (
     <SiteLayout
       locale={locale}
       seo={{
         title: locale === 'tr' ? 'Fiyatlandırma · KolayXport' : 'Pricing · KolayXport',
-        description: locale === 'tr'
-          ? 'Aylık ₺2.499 fiyatından başlayan planlar. 14 gün ücretsiz, kart gerekmez. Aylık ödeme, istediğiniz zaman iptal.'
-          : 'Plans from $59 a month. 14 days free, no card needed. Monthly billing, cancel anytime.',
+        description: v2
+          ? locale === 'tr'
+            ? 'Aylık ₺2.999 veya yıllık paketler ₺29.990\'dan. 14 gün ücretsiz, kart gerekmez. Fiyatlar nihaidir; KDV eklenmez.'
+            : 'From ₺2,999 a month, or yearly packages from ₺29,990. 14 days free, no card needed. Final prices, no VAT added.'
+          : locale === 'tr'
+            ? 'Aylık ₺2.499 fiyatından başlayan planlar. 14 gün ücretsiz, kart gerekmez. Aylık ödeme, istediğiniz zaman iptal.'
+            : 'Plans from $59 a month. 14 days free, no card needed. Monthly billing, cancel anytime.',
         path: '/fiyatlandirma',
         hasTwin: true,
       }}
       jsonLd={[softwareApplication(locale)]}
     >
-      <Body locale={locale} />
+      <Body locale={locale} v2={v2} />
     </SiteLayout>
   );
 }
@@ -39,7 +44,7 @@ function fmt(locale: SiteLocale, currency: Currency, n: number) {
   return currency === 'TRY' ? `₺${n.toLocaleString('tr-TR')}` : `$${n.toLocaleString('en-US')}`;
 }
 
-function Body({ locale }: { locale: SiteLocale }) {
+function Body({ locale, v2 }: { locale: SiteLocale; v2: boolean }) {
   const t = useTranslations('marketing.pricingV2');
   const c = useTranslations('site.common');
   const f = useTranslations('site.home.final');
@@ -58,6 +63,9 @@ function Body({ locale }: { locale: SiteLocale }) {
       .catch(() => {});
     return () => { alive = false; };
   }, [router]);
+
+  // Pricing v2 (PRICING_V2 on): the v2 packages; the signed-in redirect above still applies.
+  if (v2) return <SitePricingV2 locale={locale} />;
 
   const faqKeys = ['trial', 'limits', 'founding', 'change', 'currency', 'data'] as const;
   const faq = faqKeys.map((k) => ({

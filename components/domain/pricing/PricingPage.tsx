@@ -202,7 +202,9 @@ export function PricingPage({ v2: v2On = false }: { v2?: boolean } = {}) {
                 </Box>
               ) : null}
 
-              {v2 ? (
+              {/* Shopify-connected accounts and the Play app never see prices: v2 cards only when money may show (else the v1
+                  grid below renders its no-price skeleton while the page redirects to billing settings). */}
+              {v2 && showMoney ? (
                 <PlanV2Cards
                   catalog={v2}
                   foundingPercent={showMoney ? v2Founding : null}
@@ -238,7 +240,7 @@ export function PricingPage({ v2: v2On = false }: { v2?: boolean } = {}) {
               </Box>
               )}
 
-              {v2 && showMoney ? (
+              {v2 ? (
                 <Typography variant="caption" component="p" sx={{ m: 0, mt: '12px', color: neutral[500] }} data-testid="pricing-v2-tax">{tV2('taxLine')}</Typography>
               ) : showMoney && TAX_INCLUDED !== null ? (
                 <Typography variant="caption" component="p" sx={{ m: 0, mt: '12px', color: neutral[500] }} data-testid="pricing-tax">

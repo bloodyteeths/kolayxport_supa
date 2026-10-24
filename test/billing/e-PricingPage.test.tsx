@@ -61,11 +61,11 @@ const MESSAGES: Record<Locale, Tree> = {
   tr: merge(tr as unknown as Tree, E_TR as unknown as Tree),
 };
 
-function renderPage(locale: Locale) {
+function renderPage(locale: Locale, v2 = false) {
   return render(
     <NextIntlClientProvider locale={locale} messages={MESSAGES[locale] as never} timeZone="Europe/Istanbul" onError={(e) => { throw e; }}>
       <ThemeProvider theme={theme}>
-        <PricingPage />
+        <PricingPage v2={v2} />
       </ThemeProvider>
     </NextIntlClientProvider>,
   );
@@ -347,5 +347,43 @@ describe('PricingPage signed-in CTAs (§10.4)', () => {
     const ids = Array.from(plans().querySelectorAll('article')).map((a) => a.getAttribute('data-testid'));
     expect(ids[0]).toBe('plan-card-starter');
     expect(seoDescription()).toBe('From $59 a month. 14 days free, no card needed.');
+  });
+});
+
+// Pricing v2 ON (the /plan page's server prop): the Shopify / Play gate holds exactly as with v1 (-33, 24 Oct).
+describe.each(['en', 'tr'] as const)('PricingPage v2 ON keeps the Shopify gating (%s)', (locale) => {
+  const noMoney = () => {
+    const text = document.body.textContent ?? '';
+    expect(text).not.toMatch(/[₺$€]/);
+    expect(text).not.toMatch(/Stripe/);
+    expect(screen.queryByTestId('pricing-v2-app')).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  };
+  it('auth loading: no v2 prices', () => {
+    h.auth = { session: null, isLoading: true };
+    renderPage(locale, true);
+    noMoney();
+  });
+  it('entitlement pending: no v2 prices', () => {
+    signedIn(undefined, 'loading');
+    renderPage(locale, true);
+    noMoney();
+  });
+  it('shopify_free: redirect, no v2 prices', () => {
+    signedIn(ent({ plan: 'shopify_free', state: 'shopify_free', stripeUpsell: false }));
+    renderPage(locale, true);
+    expect(h.router.replace).toHaveBeenCalledWith('/ayarlar?tab=billing');
+    noMoney();
+  });
+  it('trial seller: the v2 packages, and Buy starts the v2 checkout', async () => {
+    signedIn(ent({}));
+    fetchSpy.mockResolvedValue(jsonRes(200, { url: 'https://checkout.stripe.com/c/1' }));
+    renderPage(locale, true);
+    expect(screen.getByTestId('pricing-v2-app')).toBeTruthy();
+    expect(document.body.textContent).toMatch(/₺/);
+    fireEvent.click(screen.getByTestId('pricing-v2-buy-buyume_yil'));
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalled());
+    const body = JSON.parse(String(fetchSpy.mock.calls[0][1].body));
+    expect(body).toMatchObject({ plan: 'buyume_yil', interval: 'year', currency: 'try' });
   });
 });

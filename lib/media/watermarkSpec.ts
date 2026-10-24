@@ -24,7 +24,17 @@ export interface WatermarkSpec {
 
 export const WATERMARK_TEXT_MAX = 60;
 export const WATERMARK_LIMITS = { size: [5, 60], opacity: [10, 100], margin: [0, 15] } as const;
-export const WATERMARK_DEFAULT: WatermarkSpec = { kind: 'text', text: '', color: '#ffffff', position: 'br', sizePct: 25, opacityPct: 60, marginPct: 4 };
+// Dark text by default (readable on the light backgrounds most product photos have); the outline is the opposite
+// tone (markOutline), so a mark stays legible on any photo. 3c, 24 Oct: white at 60 % vanished on a beige towel.
+export const WATERMARK_DEFAULT: WatermarkSpec = { kind: 'text', text: '', color: '#1f2937', position: 'br', sizePct: 25, opacityPct: 70, marginPct: 4 };
+
+/** Outline colour for a text mark: light around dark text, dark around light text. Pure. */
+export function markOutline(color: string | undefined): { rgb: string; alpha: number } {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(color ?? '');
+  const [r, g, b] = m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [255, 255, 255];
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  return luminance < 0.5 ? { rgb: '255,255,255', alpha: 0.55 } : { rgb: '0,0,0', alpha: 0.35 };
+}
 
 const clamp = (v: unknown, [lo, hi]: readonly [number, number], dflt: number) => {
   const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN;
@@ -48,7 +58,7 @@ export function normalizeWatermarkSpec(raw: unknown): WatermarkSpec | null {
   if (kind === 'text') {
     const text = typeof r.text === 'string' ? r.text.replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, WATERMARK_TEXT_MAX) : '';
     if (!text) return null;
-    const color = typeof r.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(r.color) ? r.color.toLowerCase() : '#ffffff';
+    const color = typeof r.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(r.color) ? r.color.toLowerCase() : WATERMARK_DEFAULT.color!;
     return { ...base, text, color };
   }
   const logoId = typeof r.logoId === 'string' && /^[a-f0-9]{16,64}$/.test(r.logoId) ? r.logoId : null;

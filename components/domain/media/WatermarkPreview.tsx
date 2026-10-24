@@ -5,7 +5,7 @@
 // copy is rendered by the server only when staging.
 import * as React from 'react';
 import Box from '@mui/material/Box';
-import { WATERMARK_DEFAULT, markOrigin, type WatermarkSpec } from '@/lib/media/watermarkSpec';
+import { WATERMARK_DEFAULT, markOrigin, markOutline, type WatermarkSpec } from '@/lib/media/watermarkSpec';
 import { watermarkLogoUrl } from '@/lib/media/watermarkClient';
 
 /** A ~800 px variant of a marketplace photo URL where the CDN offers one (Etsy il_fullxfull → il_794xN). Pure. */
@@ -41,6 +41,7 @@ export function WatermarkPreview({ src, spec, alt }: Props) {
   const textScale = natText && natText.w > 0 ? Math.min(markW / natText.w, maxH / Math.max(1, natText.h)) : 0;
   const fontSize = BASE * textScale;
   const margin = (Math.min(W, H) * spec.marginPct) / 100;
+  const outline = markOutline(spec.color);
 
   // Text: natural size at BASE px (then scaled). Logo: measured as rendered.
   const measureRef = React.useRef<HTMLDivElement | null>(null);
@@ -65,7 +66,7 @@ export function WatermarkPreview({ src, spec, alt }: Props) {
           position: 'absolute', whiteSpace: 'nowrap', lineHeight: 1, fontWeight: 700, pointerEvents: 'none',
           fontFamily: '"DejaVu Sans", "Liberation Sans", Arial, Helvetica, sans-serif', fontSize,
           color: spec.color ?? WATERMARK_DEFAULT.color, opacity: spec.opacityPct / 100,
-          WebkitTextStroke: `${Math.max(0.5, fontSize * 0.04)}px rgba(0,0,0,0.35)`, paintOrder: 'stroke',
+          WebkitTextStroke: `${Math.max(0.5, fontSize * 0.06)}px rgba(${outline.rgb},${outline.alpha})`, paintOrder: 'stroke',
         }}
         style={style}
       >

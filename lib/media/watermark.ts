@@ -2,7 +2,7 @@
 // Text is rendered as an SVG overlay (fontconfig fonts on the VPS: DejaVu / Liberation); a logo is resized to the
 // mark width and its alpha scaled by the opacity. The output keeps the input format (JPEG q92 / PNG / WebP) and size.
 import sharp from 'sharp';
-import { markOrigin, type WatermarkSpec } from '@/lib/media/watermarkSpec';
+import { WATERMARK_DEFAULT, markOrigin, markOutline, type WatermarkSpec } from '@/lib/media/watermarkSpec';
 
 export const WATERMARK_MAX_INPUT_BYTES = 25 * 1024 * 1024;
 const MAX_TILES = 240;
@@ -26,10 +26,11 @@ async function renderMark(spec: WatermarkSpec, width: number, maxHeight: number,
   // Rough width per character at font-size 1 (sans, mixed case); the SVG is then trimmed to the real text box.
   const fontSize = Math.max(8, Math.min(maxHeight * 0.8, width / Math.max(1, text.length * 0.56)));
   const h = Math.ceil(fontSize * 1.35);
+  const outline = markOutline(spec.color);
   const stroke = Math.max(1, fontSize * 0.04);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(width * 1.3)}" height="${h}">
 <text x="50%" y="${Math.round(fontSize * 1.02)}" text-anchor="middle" font-family="DejaVu Sans, Liberation Sans, Arial, Helvetica, sans-serif" font-weight="700" font-size="${fontSize.toFixed(1)}"
- fill="${spec.color ?? '#ffffff'}" fill-opacity="${alpha}" stroke="#000000" stroke-opacity="${(alpha * 0.35).toFixed(2)}" stroke-width="${stroke.toFixed(1)}" paint-order="stroke">${escapeXml(text)}</text></svg>`;
+ fill="${spec.color ?? WATERMARK_DEFAULT.color}" fill-opacity="${alpha}" stroke="rgb(${outline.rgb})" stroke-opacity="${(alpha * outline.alpha).toFixed(2)}" stroke-width="${(stroke * 1.5).toFixed(1)}" paint-order="stroke">${escapeXml(text)}</text></svg>`;
   const trimmed = await sharp(Buffer.from(svg)).png().trim({ threshold: 1 }).toBuffer();
   // Exactly `width` wide (capped by maxHeight): the mark's footprint must not depend on the font installed, and the
   // browser preview (components/domain/media/WatermarkPreview.tsx) scales its text the same way.

@@ -24,7 +24,7 @@ const changedIn = async (a: Buffer, b: Buffer, x0: number, y0: number, x1: numbe
 describe('watermark spec', () => {
   it('clamps and validates', () => {
     expect(normalizeWatermarkSpec({ kind: 'text', text: '  @belle  ', position: 'br', sizePct: 500, opacityPct: -3, marginPct: 4 }))
-      .toEqual({ kind: 'text', text: '@belle', color: '#ffffff', position: 'br', sizePct: 60, opacityPct: 10, marginPct: 4 });
+      .toEqual({ kind: 'text', text: '@belle', color: '#1f2937', position: 'br', sizePct: 60, opacityPct: 10, marginPct: 4 });
     expect(normalizeWatermarkSpec({ kind: 'text', text: '   ' })).toBeNull();
     expect(normalizeWatermarkSpec({ kind: 'logo', logoId: '../etc/passwd' })).toBeNull();
     expect(normalizeWatermarkSpec({ kind: 'logo', logoId: 'a'.repeat(32), position: 'nope' })?.position).toBe('br');

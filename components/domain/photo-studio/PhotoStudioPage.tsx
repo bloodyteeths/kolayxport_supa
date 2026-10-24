@@ -242,6 +242,12 @@ function StudioBody({ studio, ids, tab, onTabChange, backHref, onHeader }: Studi
   const tWm = useTranslations('watermark');
   const [wmOpen, setWmOpen] = React.useState(false);
   const wmSpecRef = React.useRef<WatermarkSpec | null>(null);
+  // Choosing "Filigran ekle" opens its settings right away (3c: sellers expect them after picking the op).
+  const prevOp = React.useRef(input.op);
+  React.useEffect(() => {
+    if (input.op === 'watermark' && prevOp.current !== 'watermark' && !running) setWmOpen(true);
+    prevOp.current = input.op;
+  }, [input.op, running]);
   const run = React.useCallback(async () => {
     if (running) return;
     if (tab === 'photos' && input.op === 'watermark' && !wmSpecRef.current) { setWmOpen(true); return; }

@@ -55,6 +55,12 @@ export async function matchWatermarkOriginals(
   return ((await res.json()) as { matches?: [] }).matches ?? [];
 }
 
+/** Originals storage of this account + until when an original stored now is kept (dialog footnote). */
+export async function watermarkStorage(): Promise<{ bytes: number; cap: number; keptUntil: string } | null> {
+  const res = await fetch('/api/media/watermark-originals?usage=1', { credentials: 'same-origin' }).catch(() => null);
+  return res && res.ok ? res.json() : null;
+}
+
 export async function uploadWatermarkLogo(file: File): Promise<{ id: string }> {
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const r = new FileReader();

@@ -17957,6 +17957,8 @@
     "editorNothing": "Filigran eklenecek fotoğraf yok.",
     "editorNothingToRestore": "Bu ilanda filigranlı fotoğraf yok.",
     "editorChanged": "{count} fotoğraf değişmiş, geri yüklenmedi.",
-    "editorFailed": "{count} fotoğraf işlenemedi."
+    "editorFailed": "{count} fotoğraf işlenemedi.",
+    "retention": "Orijinaller {date} tarihine kadar saklanır · Depolama: {used} MB / {cap} GB (dolarsa en eskiler silinir)",
+    "diskFull": "Filigran şu an geçici olarak durduruldu (sunucu depolaması dolu). Diğer değişiklikleriniz ve gönderim etkilenmez."
   }
 }

@@ -13,7 +13,7 @@ import { fetchListingImages, fetchShopDrafts, stageBatchMedia, stageFile } from 
 import { fetchWatermarkOriginal, listWatermarkOriginals, matchWatermarkOriginals, watermarkPhoto } from '@/lib/media/watermarkClient';
 import type { WatermarkSpec } from '@/lib/media/watermarkSpec';
 
-export type EtsyWatermarkResult = { staged: number; failed: number; changed: number; previewUrl: string | null };
+export type EtsyWatermarkResult = { staged: number; failed: number; changed: number; diskFull: boolean; previewUrl: string | null };
 
 async function loadViews(shopId: string, listingIds: string[]): Promise<Map<string, ListingPhotoView>> {
   const drafts = await fetchShopDrafts(shopId).catch(() => new Map());
@@ -50,6 +50,7 @@ export async function runEtsyWatermark(shopId: string, listingIds: string[], spe
   const plan = planOperation({ ...DEFAULT_PLAN_INPUT, op: spec ? 'watermark' : 'removeWatermark', wmAll: true }, refs, views, originals);
   let staged = 0;
   let failed = 0;
+  let diskFull = false;
   const deletes = new Map<string, number[]>();
   for (const job of plan.marks) {
     try {
@@ -60,14 +61,16 @@ export async function runEtsyWatermark(shopId: string, listingIds: string[], spe
       await stageFile({ shopId, listingId: job.listingId, file, kind: 'image', operation: 'upload', rank: job.rank });
       deletes.set(job.listingId, [...(deletes.get(job.listingId) ?? []), job.targetImageId]);
       staged += 1;
-    } catch {
+    } catch (err) {
+      // Disk guard on the server: new watermarks pause; stop instead of failing every photo.
+      if ((err as Error).message === 'disk_full') { diskFull = true; break; }
       failed += 1;
     }
   }
   const items = Array.from(deletes, ([listingId, ids]) => ({ listingId, media: ids.map((id) => ({ kind: 'image' as const, operation: 'delete' as const, etsyMediaId: id })) }));
   if (items.length) await stageBatchMedia(shopId, items, () => undefined);
   const changed = plan.skipped.filter((s) => s.reason === 'photoChanged').length;
-  return { staged, failed, changed, previewUrl: plan.marks[0]?.refUrl ?? null };
+  return { staged, failed, changed, diskFull, previewUrl: plan.marks[0]?.refUrl ?? null };
 }
 
 function groupRows(rows: { id: string; listingId: string; rank: number; match?: { imageId: number; rank: number } | null }[]): WatermarkOriginals {

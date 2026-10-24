@@ -17957,6 +17957,8 @@
     "editorNothing": "No photos to watermark.",
     "editorNothingToRestore": "This listing has no watermarked photos.",
     "editorChanged": "{count} photos have changed, so they were not restored.",
-    "editorFailed": "{count} photos could not be processed."
+    "editorFailed": "{count} photos could not be processed.",
+    "retention": "Originals are kept until {date} · Storage: {used} MB / {cap} GB (when full, the oldest are removed)",
+    "diskFull": "Watermarking is paused for now (server storage is full). Your other changes and sending are not affected."
   }
 }

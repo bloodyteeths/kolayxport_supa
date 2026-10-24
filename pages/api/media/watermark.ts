@@ -8,6 +8,8 @@ import { loadImageForUser } from '@/lib/images/ownImage';
 import { applyWatermark, markSignature } from '@/lib/media/watermark';
 import { normalizeWatermarkSpec } from '@/lib/media/watermarkSpec';
 import { readWatermarkLogo } from '@/lib/media/watermarkLogos';
+import { DISK_PAUSE_RATIO, uploadDiskUse } from '@/lib/media/watermarkRetention';
+import { logger } from '@/lib/logger';
 import { archiveOriginal, findOriginal, normalizeOrigin, readOriginalFile, updateMark } from '@/lib/media/watermarkOriginals';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -16,6 +18,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
   const body = (req.body && typeof req.body === 'object' ? req.body : {}) as Record<string, unknown>;
   const spec = normalizeWatermarkSpec(body.spec);
+  // Disk guard: above 90 % new watermark jobs pause (previews still render; sending is never affected).
+  if (body.preview !== true) {
+    const use = await uploadDiskUse();
+    if (use !== null && use > DISK_PAUSE_RATIO) {
+      logger.event('system', 'error', 'Disk above 90%: watermark jobs paused', { use }, { operation: 'watermark.disk_pause', userId: user.id });
+      return res.status(507).json({ error: 'Storage is full', code: 'disk_full' });
+    }
+  }
   if (!spec) return res.status(400).json({ error: 'Invalid watermark', code: 'invalid_spec' });
   const imageUrl = typeof body.imageUrl === 'string' ? body.imageUrl : '';
   // origin = the listing + photo slot. A slot watermarked before is re-watermarked from its stored original (never

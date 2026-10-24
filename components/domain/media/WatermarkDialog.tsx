@@ -2,7 +2,7 @@
 // Text or logo, size, nine positions or tiled, margin, opacity, a live preview rendered by the server on the
 // seller's own photo, and saved presets. It only returns the spec: the caller watermarks and stages its photos.
 import * as React from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import Box from '@mui/material/Box';
 import Slider from '@mui/material/Slider';
 import Typography from '@mui/material/Typography';
@@ -29,6 +29,7 @@ import {
   uploadWatermarkLogo,
   watermarkLogoUrl,
   watermarkPhoto,
+  watermarkStorage,
   type WatermarkOriginRef,
   type WatermarkPreset,
 } from '@/lib/media/watermarkClient';
@@ -52,6 +53,7 @@ const GRID: Exclude<WatermarkPosition, 'tile'>[] = ['tl', 'tc', 'tr', 'ml', 'c',
 
 export function WatermarkDialog({ open, onClose, previewUrl, previewOrigin, applyLabel, onApply, children }: WatermarkDialogProps) {
   const t = useTranslations('watermark');
+  const locale = useLocale();
   const [draft, setDraft] = React.useState<WatermarkSpec>({ ...WATERMARK_DEFAULT });
   const [presets, setPresets] = React.useState<WatermarkPreset[]>([]);
   const [presetName, setPresetName] = React.useState('');
@@ -62,8 +64,10 @@ export function WatermarkDialog({ open, onClose, previewUrl, previewOrigin, appl
   const fileRef = React.useRef<HTMLInputElement | null>(null);
   const spec = normalizeWatermarkSpec(draft);
 
+  const [storage, setStorage] = React.useState<{ bytes: number; cap: number; keptUntil: string } | null>(null);
   React.useEffect(() => {
     if (!open) return;
+    void watermarkStorage().then(setStorage);
     void listWatermarkPresets().then((p) => {
       setPresets(p);
       if (p[0]) setDraft(p[0].spec); // the last-used preset comes first
@@ -201,6 +205,16 @@ export function WatermarkDialog({ open, onClose, previewUrl, previewOrigin, appl
               : <Typography variant="caption" sx={{ color: neutral[600], p: '16px', textAlign: 'center' }}>{previewError ? t('previewError') : previewUrl ? t('previewLoading') : t('previewNone')}</Typography>}
           </Box>
           <Typography variant="caption" sx={{ color: neutral[600] }}>{t('stagedNote')}</Typography>
+          {storage ? (
+            // Retention (180 days after the last watermark on a photo; 1 GB per account, oldest first).
+            <Typography variant="caption" sx={{ color: neutral[600] }} data-testid="watermark-retention">
+              {t('retention', {
+                date: new Date(storage.keptUntil).toLocaleDateString(locale),
+                used: Math.max(1, Math.round(storage.bytes / 1048576)),
+                cap: Math.round(storage.cap / 1048576 / 1024),
+              })}
+            </Typography>
+          ) : null}
         </Box>
       </Box>
     </Modal>

@@ -11,12 +11,17 @@ import prisma from '@/lib/prisma';
 import { WATERMARK_MARKETPLACES, readOriginalFile } from '@/lib/media/watermarkOriginals';
 import { loadImageForUser } from '@/lib/images/ownImage';
 import { matchesSignature } from '@/lib/media/watermark';
+import { ORIGINALS_CAP_BYTES, originalKeptUntil, originalsUsage } from '@/lib/media/watermarkRetention';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET' && req.method !== 'POST') { res.setHeader('Allow', 'GET, POST'); return res.status(405).json({ error: 'Method not allowed' }); }
   const user = await getAuthUser(req, res);
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
   if (req.method === 'POST') return match(user.id, req, res);
+  if (req.query.usage === '1') {
+    // For the dialog: how much this account stores, the cap, and until when an original stored now is kept.
+    return res.status(200).json({ bytes: await originalsUsage(user.id), cap: ORIGINALS_CAP_BYTES, keptUntil: originalKeptUntil(new Date()).toISOString() });
+  }
   if (typeof req.query.id === 'string') {
     const row = await prisma.watermarkOriginal.findFirst({ where: { id: req.query.id, userId: user.id } });
     const bytes = row ? await readOriginalFile(user.id, row.fileKey) : null;

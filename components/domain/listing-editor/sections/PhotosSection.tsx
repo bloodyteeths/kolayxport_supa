@@ -164,6 +164,7 @@ function EtsyPhotos({ id = 'photos', writeAltText, removeStagedMedia, handleRef 
       else if (!r.changed) toast.info(tWm(spec ? 'editorNothing' : 'editorNothingToRestore'));
       if (r.changed) toast.info(tWm('editorChanged', { count: r.changed }));
       if (r.failed) toast.error(tWm('editorFailed', { count: r.failed }));
+      if (r.diskFull) toast.error(tWm('diskFull'));
       await reloadDraft();
     } catch {
       toast.error(tWm('editorFailed', { count: 1 }));

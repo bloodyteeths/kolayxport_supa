@@ -102,3 +102,33 @@ describe('live-source quantity marker and listings without variations', () => {
     expect(by).toEqual({ live: 5, drafted: undefined });
   });
 });
+
+import { optionValuesOf, propertyNamesOf } from '@/lib/bulk/variationOps';
+
+describe('price per option', () => {
+  const sized = () => ({
+    products: ['S', 'M', 'L'].flatMap((size) => ['Red', 'Blue'].map((color) => ({
+      sku: '', property_values: [{ property_id: 100, property_name: 'Size', values: [size] }, { property_id: 200, property_name: 'Color', values: [color] }],
+      offerings: [{ price: { amount: 2000, divisor: 100, currency_code: 'USD' }, quantity: 3, is_enabled: true }],
+    }))),
+    price_on_property: [], quantity_on_property: [], sku_on_property: [],
+  });
+  it('sets each size its own price; untouched sizes keep theirs; price_on_property covers the varying properties', () => {
+    const r = applyVariationEdits(sized(), { priceByOption: { property: 'size', prices: [{ value: 'm', price: 25 }, { value: 'L', price: 30 }] } });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const bySize = (r.inventory.products as any[]).map((p) => `${p.property_values[0].values[0]}=${p.offerings[0].price.amount}`);
+    expect(bySize).toEqual(['S=2000', 'S=2000', 'M=2500', 'M=2500', 'L=3000', 'L=3000']);
+    expect(r.changed).toBe(4);
+    expect(r.inventory.price_on_property).toEqual([100, 200]);
+    expect((r.inventory.products as any[])[2].offerings[0].quantity).toBe(3);
+  });
+  it('no matching option → noMatch; listing without variations → single', () => {
+    expect(applyVariationEdits(sized(), { priceByOption: { property: 'Size', prices: [{ value: 'XXL', price: 40 }] } })).toEqual({ ok: false, reason: 'noMatch' });
+    expect(applyVariationEdits({ products: [{ sku: '', property_values: [], offerings: [{ quantity: 1 }] }] }, { priceByOption: { property: 'Size', prices: [{ value: 'S', price: 5 }] } })).toEqual({ ok: false, reason: 'single' });
+  });
+  it('lists properties and option values from the selected inventories', () => {
+    expect(propertyNamesOf([sized()])).toEqual(['Size', 'Color']);
+    expect(optionValuesOf([sized(), sized()], 'size')).toEqual(['S', 'M', 'L']);
+  });
+});

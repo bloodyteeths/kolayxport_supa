@@ -14532,7 +14532,7 @@
     },
     "variations": {
       "title": "Edit variations and SKU on {count} listings",
-      "description": "Change stock or SKU per variation on listings with variations, and the SKU on listings without. For variation prices use \"Change price\".",
+      "description": "Stock, SKU or a price per option (e.g. Size L = 30) on listings with variations; SKU on listings without. For a % or amount change on all variations use \"Change price\".",
       "stage": "Stage changes on {count} listings",
       "field": "Field",
       "fieldQuantity": "Stock (per variation)",
@@ -14555,7 +14555,14 @@
       "skuMaxHelp": "Etsy SKUs can be at most 32 characters.",
       "note": "Changes are staged and go to Etsy when you send them. SKUs that would exceed 32 characters are skipped.",
       "staged": "Variation changes staged on {count} listings",
-      "skipped": "{count} listings skipped (stock on a listing without variations, no matching variation, SKU over 32 characters, or the listing could not be read)"
+      "skipped": "{count} listings skipped (stock on a listing without variations, no matching variation, SKU over 32 characters, or the listing could not be read)",
+      "fieldPriceByOption": "Price (per option)",
+      "priceByOptionHelp": "Give each option of a property its own price (e.g. Size: S 20, M 25, L 30). Options without a price stay as they are.",
+      "property": "Property",
+      "loadOptions": "Load options from listings",
+      "noOptions": "No \"{property}\" property found on the selected listings",
+      "optionValue": "Option, e.g. M",
+      "addOption": "Add option"
     },
     "templates": {
       "saveStep": "Save as template step",

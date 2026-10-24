@@ -37,8 +37,15 @@ export type SkuEdit =
   /** Tokens: {sku} current SKU, {n} 1-based variation number, {<Property name>} that variation's value (e.g. {Color}). */
   | { mode: 'template'; value: string };
 
+/** A price per option value of one property ("Size": S → 20, M → 25, L → 30). Other variations keep their price. */
+export interface PriceByOption {
+  property: string;
+  prices: Array<{ value: string; price: number }>;
+}
+
 export interface VariationEdits {
   price?: { ops: NumberOp[]; round?: PriceRounding };
+  priceByOption?: PriceByOption;
   quantity?: NumberOp[];
   sku?: SkuEdit;
 }
@@ -116,11 +123,19 @@ const varies = (vals: Array<string | number>) => new Set(vals.map(String)).size 
  * stage, or why nothing was produced. SKUs longer than Etsy's 32 characters fail the listing (no silent truncation).
  */
 export function applyVariationEdits(inventory: unknown, edits: VariationEdits, opts: VariationEditOptions = {}): VariationEditResult {
-  if (!edits.price?.ops.length && !edits.quantity?.length && !edits.sku) return { ok: false, reason: 'nothing' };
+  const byOption = edits.priceByOption && edits.priceByOption.property.trim() ? edits.priceByOption : null;
+  const optionPrices = new Map<string, number>();
+  for (const row of byOption?.prices ?? []) {
+    const k = row.value.trim().toLocaleLowerCase('tr');
+    if (k && Number.isFinite(row.price) && row.price > 0) optionPrices.set(k, row.price);
+  }
+  if (!edits.price?.ops.length && !edits.quantity?.length && !edits.sku && !optionPrices.size) return { ok: false, reason: 'nothing' };
   const source = rec(inventory);
   const products = liveProducts(source);
   // A listing without variations: only the SKU is edited here (its price and stock are plain fields elsewhere).
-  if (!isMultiVariation(inventory) && (products.length !== 1 || edits.price?.ops.length || edits.quantity?.length)) return { ok: false, reason: 'single' };
+  if (!isMultiVariation(inventory) && (products.length !== 1 || edits.price?.ops.length || edits.quantity?.length || optionPrices.size)) return { ok: false, reason: 'single' };
+  const optionPriceOf = (p: AnyRecord): number | undefined => (byOption ? optionPrices.get(valueOf(p, byOption.property).trim().toLocaleLowerCase('tr')) : undefined);
+  if (optionPrices.size && !products.some((p) => optionPriceOf(p) !== undefined)) return { ok: false, reason: 'noMatch' };
   const match = isMultiVariation(inventory) ? activeMatch(opts.match) : null;
   if (match && !products.some((p) => productMatches(p, match))) return { ok: false, reason: 'noMatch' };
   const minPrice = opts.minPrice ?? ETSY_MIN_PRICE;
@@ -134,6 +149,9 @@ export function applyVariationEdits(inventory: unknown, edits: VariationEdits, o
   };
   const next = products.map(stamp).map((p, i) => {
     if (match && !productMatches(p, match)) return p;
+    const optionPrice = optionPriceOf(p);
+    // Price by option only: variations without a price row stay as they are.
+    if (optionPrices.size && optionPrice === undefined && !edits.price?.ops.length && !edits.quantity?.length && !edits.sku) return p;
     changed += 1;
     const out: AnyRecord = { ...p };
     if (edits.sku) {
@@ -145,7 +163,12 @@ export function applyVariationEdits(inventory: unknown, edits: VariationEdits, o
       .filter((o) => !o.is_deleted)
       .map((o) => {
         const offering: AnyRecord = { ...o };
-        if (edits.price?.ops.length) {
+        if (optionPrice !== undefined) {
+          const price = typeof o.price === 'object' && o.price ? rec(o.price) : {};
+          const divisor = Number(price.divisor) || 100;
+          const value = Math.max(minPrice, Math.round(optionPrice * 100) / 100);
+          offering.price = { ...price, amount: Math.round(value * divisor), divisor };
+        } else if (edits.price?.ops.length) {
           const price = typeof o.price === 'object' && o.price ? rec(o.price) : {};
           const divisor = Number(price.divisor) || 100;
           const value = Math.max(minPrice, roundPrice(applyNumberOps(moneyOf(o), edits.price.ops), edits.price.round ?? 'none'));
@@ -214,4 +237,34 @@ export async function buildVariationEdits(
   };
   await Promise.all(Array.from({ length: Math.max(1, Math.min(concurrency, listingIds.length)) }, lane));
   return { patches, skipped };
+}
+
+/** Pure: the distinct values of one property across inventories, in first-seen order (the price-by-option table). */
+export function optionValuesOf(inventories: unknown[], property: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const inv of inventories) {
+    for (const p of liveProducts(inv)) {
+      const v = valueOf(p, property).trim();
+      const k = v.toLocaleLowerCase('tr');
+      if (v && !seen.has(k)) { seen.add(k); out.push(v); }
+    }
+  }
+  return out;
+}
+
+/** Pure: property names used by the variations of these inventories (suggestions for the property field). */
+export function propertyNamesOf(inventories: unknown[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const inv of inventories) {
+    for (const p of liveProducts(inv)) {
+      for (const pv of list(p.property_values)) {
+        const n = String(pv.property_name ?? '').trim();
+        const k = n.toLocaleLowerCase('tr');
+        if (n && !seen.has(k)) { seen.add(k); out.push(n); }
+      }
+    }
+  }
+  return out;
 }

@@ -1703,8 +1703,9 @@ export default async function handler(
             } else if (copyPayload.type === 'physical' || !sourceListing.is_digital) {
                 // Fetch shop's readiness states and use first one as fallback
                 try {
-                    const rsData = await callEtsyAPI(`/shops/${shopId}/readiness-states`, accessToken);
-                    const states = rsData.results || rsData.readiness_states || rsData;
+                    // v3 path is /readiness-state-definitions (there is no /readiness-states: that call 404'd).
+                    const rsData = await callEtsyAPI(`/shops/${shopId}/readiness-state-definitions`, accessToken);
+                    const states = rsData.results || rsData.readiness_state_definitions || rsData;
                     if (Array.isArray(states) && states.length > 0) {
                         copyPayload.readiness_state_id = states[0].readiness_state_id;
                     }

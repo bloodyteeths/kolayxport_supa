@@ -810,6 +810,20 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
     };
   }, [staged, storeId, config.validation.priceMin, toast, t, clearSelection]);
 
+  // Price per option table: the variation inventories of up to 20 selected listings (open draft first, else live).
+  const loadVariationInventories = React.useCallback(
+    async (targets: ListingRow[]) => {
+      if (!storeId) return [];
+      const { defaultVariationPriceDeps, pendingInventoryOf } = await import('@/lib/bulk/variationPriceOps');
+      const out = await Promise.all(targets.slice(0, 20).map(async (r) => {
+        const [drafts, live] = await Promise.all([defaultVariationPriceDeps.fetchDrafts(storeId, r.id).catch(() => []), defaultVariationPriceDeps.fetchInventory(storeId, r.id).catch(() => null)]);
+        return pendingInventoryOf(drafts) ?? live;
+      }));
+      return out.filter(Boolean) as unknown[];
+    },
+    [storeId],
+  );
+
   // "Edit variations" (Etsy): stock / SKU per variation, staged as each listing's whole inventory.
   const stageVariationEdits = React.useCallback(
     async (targets: ListingRow[], edits: VariationEdits, match: VariationMatch | null) => {
@@ -1647,7 +1661,7 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
         <TemplatesModal open={modal === 'templates'} onClose={() => setModal(null)} count={modalRows.length} onApply={(tpl) => applyTemplate(modalRows, tpl)} />
       ) : null}
       {staged.adapter.stagesEtsyExtras && storeId ? (
-        <VariationEditModal open={modal === 'variations'} onClose={() => setModal(null)} rows={modalRows} onStage={stageVariationEdits} t={t} />
+        <VariationEditModal open={modal === 'variations'} onClose={() => setModal(null)} rows={modalRows} onStage={stageVariationEdits} loadInventories={loadVariationInventories} currency={storeCurrency} t={t} />
       ) : null}
       <SetFieldModal
         templates={Boolean(staged.adapter.stagesEtsyExtras && storeId)}

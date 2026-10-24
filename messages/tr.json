@@ -14532,7 +14532,7 @@
     },
     "variations": {
       "title": "{count} ilanda varyasyon ve SKU düzenle",
-      "description": "Varyasyonlu ilanlarda stok veya SKU'yu, varyasyonsuz ilanlarda SKU'yu toplu değiştirin. Varyasyon fiyatları için \"Fiyatı değiştir\"i kullanın.",
+      "description": "Varyasyonlu ilanlarda stok, SKU veya seçeneğe göre fiyat (ör. Beden L = 30); varyasyonsuz ilanlarda SKU. Tüm varyasyonlara yüzde/tutar değişikliği için \"Fiyatı değiştir\"i kullanın.",
       "stage": "{count} ilanda değişikliği hazırla",
       "field": "Alan",
       "fieldQuantity": "Stok (varyasyon başına)",
@@ -14555,7 +14555,14 @@
       "skuMaxHelp": "Etsy SKU'ları en fazla 32 karakter olabilir.",
       "note": "Değişiklikler hazırlanır, \"Değişiklikleri gönder\" deyince Etsy'ye gider. 32 karakteri aşacak SKU'lar atlanır.",
       "staged": "{count} ilanda varyasyon değişikliği hazırlandı",
-      "skipped": "{count} ilan atlandı (varyasyonsuz ilanda stok, eşleşen varyasyon yok, SKU 32 karakteri aşıyor veya ilan okunamadı)"
+      "skipped": "{count} ilan atlandı (varyasyonsuz ilanda stok, eşleşen varyasyon yok, SKU 32 karakteri aşıyor veya ilan okunamadı)",
+      "fieldPriceByOption": "Fiyat (seçeneğe göre)",
+      "priceByOptionHelp": "Bir özelliğin her seçeneğine ayrı fiyat verin (ör. Beden: S 20, M 25, L 30). Fiyat girmediğiniz seçenekler aynı kalır.",
+      "property": "Özellik",
+      "loadOptions": "Seçenekleri ilanlardan getir",
+      "noOptions": "Seçili ilanlarda \"{property}\" özelliği bulunamadı",
+      "optionValue": "Seçenek, ör. M",
+      "addOption": "Seçenek ekle"
     },
     "templates": {
       "saveStep": "Şablona kaydet",

@@ -17949,6 +17949,14 @@
     "needText": "Bir yazı girin.",
     "needLogo": "Bir logo yükleyin.",
     "videoSoon": "Video için filigran yakında.",
-    "applyCount": "{count} fotoğrafa filigran ekle"
+    "applyCount": "{count} fotoğrafa filigran ekle",
+    "remove": "Filigranı kaldır",
+    "applyAll": "Tüm fotoğraflara filigran ekle",
+    "editorStaged": "{count} fotoğrafa filigran eklendi · henüz gönderilmedi",
+    "editorRestored": "{count} fotoğrafın orijinali geri yüklendi · henüz gönderilmedi",
+    "editorNothing": "Filigran eklenecek fotoğraf yok.",
+    "editorNothingToRestore": "Bu ilanda filigranlı fotoğraf yok.",
+    "editorChanged": "{count} fotoğraf değişmiş, geri yüklenmedi.",
+    "editorFailed": "{count} fotoğraf işlenemedi."
   }
 }

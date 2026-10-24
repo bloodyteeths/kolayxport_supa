@@ -17949,6 +17949,14 @@
     "needText": "Enter some text.",
     "needLogo": "Upload a logo.",
     "videoSoon": "Watermarks for video are coming soon.",
-    "applyCount": "Watermark {count} photos"
+    "applyCount": "Watermark {count} photos",
+    "remove": "Remove watermark",
+    "applyAll": "Watermark all photos",
+    "editorStaged": "Watermark added to {count} photos · not sent yet",
+    "editorRestored": "Original restored for {count} photos · not sent yet",
+    "editorNothing": "No photos to watermark.",
+    "editorNothingToRestore": "This listing has no watermarked photos.",
+    "editorChanged": "{count} photos have changed, so they were not restored.",
+    "editorFailed": "{count} photos could not be processed."
   }
 }

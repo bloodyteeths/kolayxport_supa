@@ -193,9 +193,10 @@ export function WatermarkDialog({ open, onClose, previewUrl, previewOrigin, appl
             </Box>
           ) : null}
         </Box>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {/* On a phone the preview comes first (it is what the seller watches while moving the sliders). */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px', order: { xs: -1, md: 0 } }}>
           {children}
-          <Box sx={{ aspectRatio: '1 / 1', bgcolor: neutral[100], borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }} data-testid="watermark-preview">
+          <Box sx={{ aspectRatio: '1 / 1', maxHeight: { xs: 220, md: 'none' }, bgcolor: neutral[100], borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }} data-testid="watermark-preview">
             {preview ? <Box component="img" src={preview} alt={t('previewAlt')} sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
               : <Typography variant="caption" sx={{ color: neutral[600], p: '16px', textAlign: 'center' }}>{previewError ? t('previewError') : previewUrl ? t('previewLoading') : t('previewNone')}</Typography>}
           </Box>

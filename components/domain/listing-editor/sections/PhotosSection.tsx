@@ -5,6 +5,9 @@
 // Etsy staging stays inside `components/etsy/{ImageManager,VideoUploader}` (embedded mode, same draft calls and
 // mediaSafety rules); eBay pictures stay the `images` field the eBay adapter stages. Nothing here sends anything:
 // photos reach the marketplace only with the footer's "Send changes".
+import { WatermarkDialog } from '@/components/domain/media/WatermarkDialog';
+import { etsyWatermarkPreviewUrl, runEtsyWatermark } from '@/components/domain/media/etsyWatermarkRun';
+import type { WatermarkSpec } from '@/lib/media/watermarkSpec';
 import { useRouter } from 'next/router';
 import { useToast } from '@/components/ds/feedback/toast';
 import * as React from 'react';
@@ -141,12 +144,31 @@ function EtsyPhotos({ id = 'photos', writeAltText, removeStagedMedia, handleRef 
     const q = new URLSearchParams({ mp: 'etsy', listing: String(listingId), store: String(shopId ?? ''), title: String(ed.view.fields.title ?? '').slice(0, 140) });
     void router.push(`/app/video-studio?${q}`);
   }, [router, listingId, shopId, ed.view.fields.title]);
-  // Watermark: Photo Studio for this listing with the watermark op preselected; back returns here.
+  // Watermark, right here (also on a phone, where Photo Studio is not available): every photo of this listing,
+  // staged like Photo Studio's watermark (originals kept; "Filigranı kaldır" restores them). Bulk stays in Photo Studio.
   const tWm = useTranslations('watermark');
+  const [wmOpen, setWmOpen] = React.useState(false);
+  const [wmPreview, setWmPreview] = React.useState<string | null>(null);
   const openWatermark = React.useCallback(() => {
-    const q = new URLSearchParams({ ids: String(listingId), shop: String(shopId ?? ''), op: 'watermark', back: router.asPath });
-    void router.push(`/app/etsy-listings/photos?${q}`);
-  }, [router, listingId, shopId]);
+    if (!shopId || !listingId) return;
+    setWmPreview(null);
+    setWmOpen(true);
+    void etsyWatermarkPreviewUrl(String(shopId), String(listingId)).then(setWmPreview).catch(() => setWmPreview(null));
+  }, [shopId, listingId]);
+  const runWatermark = React.useCallback(async (spec: WatermarkSpec | null) => {
+    if (!shopId || !listingId) return;
+    try {
+      await imagesRef.current?.stage(); // pending photo moves first: the run plans on the staged order
+      const r = await runEtsyWatermark(String(shopId), [String(listingId)], spec);
+      if (r.staged) toast.success(tWm(spec ? 'editorStaged' : 'editorRestored', { count: r.staged }));
+      else if (!r.changed) toast.info(tWm(spec ? 'editorNothing' : 'editorNothingToRestore'));
+      if (r.changed) toast.info(tWm('editorChanged', { count: r.changed }));
+      if (r.failed) toast.error(tWm('editorFailed', { count: r.failed }));
+      await reloadDraft();
+    } catch {
+      toast.error(tWm('editorFailed', { count: 1 }));
+    }
+  }, [shopId, listingId, toast, tWm, reloadDraft]);
   const [summary, setSummary] = React.useState<PhotosSummary | null>(null);
   const [videoTile, setVideoTile] = React.useState<StripVideo | null>(null);
   const [videoLoad, setVideoLoad] = React.useState<VideoLoad>({ status: 'idle', videos: [] });
@@ -345,16 +367,20 @@ function EtsyPhotos({ id = 'photos', writeAltText, removeStagedMedia, handleRef 
         {!readOnly ? (
           <PhotoActions
             primary={[
+              // The row never wraps (it scrolls sideways), so on a phone only two buttons stay in it and the rest go to
+              // the visible ⋯: "Filigran ekle" must never sit off-screen (founder looked for it on a phone, 24 Oct).
               ...(!full ? [{ id: 'choose', anchor: 'photos', label: t('photos.choose'), icon: icons.upload, onClick: () => imagesRef.current?.openUpload() }] : []),
-              ...(!full ? [{ id: 'generate', label: t('ai.generatePhoto'), icon: icons.ai, onClick: () => imagesRef.current?.openGenerate() }] : []),
-              ...(listingId ? [{ id: 'aiVideo', label: t('aiVideo.open'), icon: icons.video, onClick: openVideoStudio }] : []),
               ...(listingId ? [{ id: 'watermark', label: tWm('title'), icon: icons.photos, onClick: openWatermark }] : []),
+              ...(!full && !isMobile ? [{ id: 'generate', label: t('ai.generatePhoto'), icon: icons.ai, onClick: () => imagesRef.current?.openGenerate() }] : []),
+              ...(listingId && !isMobile ? [{ id: 'aiVideo', label: t('aiVideo.open'), icon: icons.video, onClick: openVideoStudio }] : []),
               // Desktop keeps the alt-text fix in the row; on a phone it joins ⋯ (the heading still says how many miss it).
               ...(altEnabled && missingAlt > 0 && !isMobile
                 ? [{ id: 'alt', label: t('ai.writeAlt', { count: missingAlt }), icon: icons.ai, onClick: () => imagesRef.current?.writeMissingAlt() }]
                 : []),
             ]}
             more={[
+              ...(!full && isMobile ? [{ id: 'generate', label: t('ai.generatePhoto'), icon: icons.ai, onClick: () => imagesRef.current?.openGenerate() }] : []),
+              ...(listingId && isMobile ? [{ id: 'aiVideo', label: t('aiVideo.open'), icon: icons.video, onClick: openVideoStudio }] : []),
               ...(altEnabled && missingAlt > 0 && isMobile
                 ? [{ id: 'alt', label: t('ai.writeAlt', { count: missingAlt }), icon: icons.ai, onClick: () => imagesRef.current?.writeMissingAlt() }]
                 : []),
@@ -362,10 +388,19 @@ function EtsyPhotos({ id = 'photos', writeAltText, removeStagedMedia, handleRef 
               ...(!hasVideo && videoLoad.status === 'ready'
                 ? [{ id: 'video', label: t('video.add'), icon: icons.video, onClick: () => videoRef.current?.pick() }]
                 : []),
+              ...(listingId ? [{ id: 'removeWatermark', label: tWm('remove'), onClick: () => void runWatermark(null) }] : []),
             ]}
             videoAnchor={!hasVideo && videoLoad.status === 'ready'}
           />
         ) : null}
+        <WatermarkDialog
+          open={wmOpen}
+          onClose={() => setWmOpen(false)}
+          previewUrl={wmPreview}
+          previewOrigin={null}
+          applyLabel={tWm('applyAll')}
+          onApply={async (spec) => { await runWatermark(spec); setWmOpen(false); }}
+        />
       </Box>
     </Section>
   );

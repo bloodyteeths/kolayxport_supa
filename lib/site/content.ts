@@ -123,7 +123,19 @@ export function contentSlugs(locale: SiteLocale, type: ContentType): string[] {
   return listContent(locale, type).map((d) => d.slug);
 }
 
+/** Frontmatter keys for our own bookkeeping (claims audit, legal review status): never sent to the browser. */
+const INTERNAL_META = ['inventoryRefs', 'lawyerReviewed', 'notLawyerReviewed'];
+
+/** Frontmatter safe to serialise into page props. A legal text marked `lawyerReviewed: false` keeps only the
+ *  public `legalDraft` flag, which shows the draft notice. */
+export function publicMeta(meta: Record<string, any>): Record<string, any> {
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(meta)) if (!INTERNAL_META.includes(k)) out[k] = v;
+  if (meta.lawyerReviewed === false) out.legalDraft = true;
+  return out;
+}
+
 /** Card data only (no html) for index pages. */
 export function contentCards(locale: SiteLocale, type: ContentType) {
-  return listContent(locale, type).map(({ slug, meta }) => ({ slug, meta }));
+  return listContent(locale, type).map(({ slug, meta }) => ({ slug, meta: publicMeta(meta) }));
 }

@@ -86,7 +86,7 @@ function Body({ locale, type, doc, heroPhoto, heroShot, heroShotMobile, related,
         <Breadcrumbs items={crumbItems} />
         <h1 className="display mt-6 max-w-3xl text-[36px] md:text-[52px]">{m.h1 || m.title}</h1>
         <p className="mt-4 text-sm text-ink-mute">{t('legal.effective')}: {m.effective || m.updated}</p>
-        {m.lawyerReviewed === false ? (
+        {m.legalDraft ? (
           <p className="mt-4 inline-flex rounded-xl border border-kx-cyan bg-kx-cyan-wash px-4 py-2 text-sm text-ink">{t('legal.draft')}</p>
         ) : null}
         <div className="mt-10"><Prose html={doc.html} /></div>

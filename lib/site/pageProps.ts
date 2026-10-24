@@ -1,5 +1,5 @@
 // getStaticPaths / getStaticProps builders for content-driven marketing pages (server-only).
-import { contentCards, contentSlugs, getContent, type ContentType } from './content';
+import { contentCards, contentSlugs, getContent, publicMeta, type ContentType } from './content';
 import { photo, screen, type Asset } from './media';
 import type { SiteLocale } from './routes';
 import { siteMessageProps } from '@/lib/i18n/pageMessages';
@@ -35,7 +35,7 @@ export async function docProps(locale: SiteLocale, type: ContentType, slug: stri
       ...siteMessageProps(locale),
       locale,
       type,
-      doc,
+      doc: { ...doc, meta: publicMeta(doc.meta) },
       path: `${BASE[type]}/${slug}`,
       heroPhoto: heroPhoto as Asset | null,
       heroShot: heroShot as Asset | null,

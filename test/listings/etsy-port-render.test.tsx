@@ -346,4 +346,16 @@ describe('Etsy grid: selection survives a trip to another screen', { timeout: 30
     await renderPage(makeAdapter());
     expect(await screen.findByRole('toolbar', { name: /selected/i })).toBeTruthy();
   });
+  it('forgets it once the seller deselects everything', async () => {
+    await renderPage(makeAdapter());
+    selectFirstRow();
+    await screen.findByRole('toolbar', { name: /selected/i });
+    selectFirstRow(); // toggles it off
+    await waitFor(() => expect(screen.queryByRole('toolbar', { name: /selected/i })).toBeNull());
+    cleanup();
+    __resetUrlStateForTests();
+    await renderPage(makeAdapter());
+    await screen.findAllByRole('row');
+    expect(screen.queryByRole('toolbar', { name: /selected/i })).toBeNull();
+  });
 });

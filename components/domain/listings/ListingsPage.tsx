@@ -447,7 +447,13 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
   // The selection survives a trip to the grid / Photo Studio and back (usability review): kept per tab in
   // sessionStorage for 30 min, restored only when the filters are the same; a filter change clears it as before.
   const selectionKey = `kx:sel:${marketplace}:${storeId ?? ''}`;
+  // Restore only once the URL and the store are known: before that the filters are still the defaults, which never
+  // match the saved ones, and the empty selection would overwrite what was saved.
+  const selectionReady = router.isReady && Boolean(data);
+  const selectionHydrated = React.useRef(false);
   React.useEffect(() => {
+    if (!selectionReady) return;
+    selectionHydrated.current = true;
     let restored: string[] = [];
     try {
       const saved = JSON.parse(sessionStorage.getItem(selectionKey) || 'null') as { ids?: unknown; filterKey?: string; at?: number } | null;
@@ -459,14 +465,19 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
     }
     setSelectedIds(restored);
     setSelectAllInView(false);
-  }, [filterKey, selectionKey]);
+  }, [filterKey, selectionKey, selectionReady]);
+  // Saved on every change; removed only when a selection is emptied (by the seller or a filter change), never on
+  // the render where a restore is still pending (selectedIds is the old [] there).
+  const hadSelection = React.useRef(false);
   React.useEffect(() => {
+    if (!selectionHydrated.current) return;
     try {
       if (selectedIds.length) sessionStorage.setItem(selectionKey, JSON.stringify({ ids: selectedIds, filterKey, at: Date.now() }));
-      else sessionStorage.removeItem(selectionKey);
+      else if (hadSelection.current) sessionStorage.removeItem(selectionKey);
     } catch {
       /* ignore */
     }
+    hadSelection.current = selectedIds.length > 0;
   }, [selectedIds, selectionKey, filterKey]);
   const clearSelection = React.useCallback(() => {
     setSelectedIds([]);

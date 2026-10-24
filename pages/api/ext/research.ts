@@ -7,6 +7,7 @@ import { buildFxTable } from '@/lib/research/stats';
 import { summarizeEtsySearch } from '@/lib/etsy/searchSummary';
 import { convertCurrency } from '@/lib/finance/fx';
 import { withResearchQuota, sendResearchOutcome, sharedCacheKey, RESEARCH_TTL, limitBody, istanbulDay } from '@/lib/ext/researchQuota';
+import { ETSY_OPENAPI_BASE } from '@/lib/etsy/apiBase';
 
 // Anonymous (signed-out) allowance per IP: only marketplace calls count; shared-cache hits are free.
 const anonLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -26,7 +27,7 @@ function checkAnonLimit(ip: string): boolean {
 }
 
 // Etsy public API helper
-const ETSY_BASE = 'https://openapi.etsy.com/v3/application';
+const ETSY_BASE = ETSY_OPENAPI_BASE;
 
 async function etsyGet(path: string) {
   // Through etsyFetch for the shared rate budget; no retries (unchanged behaviour).

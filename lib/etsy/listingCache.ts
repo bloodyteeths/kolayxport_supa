@@ -52,6 +52,7 @@ import {
 } from './listingAlerts';
 import { upsertSeoCohort } from './seoExperiments';
 import { queueHealthRefresh } from '@/lib/listings/healthQueue';
+import { ETSY_OPENAPI_BASE } from '@/lib/etsy/apiBase';
 
 export type RefreshListingSource = 'webhook' | 'reconcile' | 'draft_sync' | 'initial' | 'manual_refresh';
 
@@ -65,7 +66,7 @@ export type RefreshListingResult = {
   remoteUpdatedTs: number | null;
 };
 
-export const ETSY_API_BASE = 'https://openapi.etsy.com/v3/application';
+export const ETSY_API_BASE = ETSY_OPENAPI_BASE;
 /** Refreshes of one listing are at least this far apart (webhook path). */
 export const MIN_REFRESH_INTERVAL_MS = 30_000;
 

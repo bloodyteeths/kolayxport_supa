@@ -19,8 +19,9 @@ import prisma from '@/lib/prisma';
 import { etsyFetch } from './http';
 import { moneyToNumber } from './searchSummary';
 import { groupMedian } from '@/lib/research/stats';
+import { ETSY_OPENAPI_BASE } from '@/lib/etsy/apiBase';
 
-const ETSY_BASE = 'https://openapi.etsy.com/v3/application';
+const ETSY_BASE = ETSY_OPENAPI_BASE;
 const DAY_MS = 24 * 3600 * 1000;
 
 /** How recent reviews must be to count toward "recent" velocity/share. */

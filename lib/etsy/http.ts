@@ -34,8 +34,9 @@ import {
   recordEtsyResponse as recordBudgetResponse,
 } from './rateBudget';
 import { EtsyDeferError, EtsyRateLimitedError } from './webhooks/types';
+import { ETSY_OPENAPI_BASE } from '@/lib/etsy/apiBase';
 
-export const ETSY_API_BASE = 'https://openapi.etsy.com/v3/application';
+export const ETSY_API_BASE = ETSY_OPENAPI_BASE;
 export const ETSY_FETCH_TIMEOUT_MS = 30_000;
 export const ETSY_FETCH_MAX_RETRIES = 3;
 const DEFAULT_DEFER_MS = 60_000;

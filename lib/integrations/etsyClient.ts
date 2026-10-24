@@ -2,6 +2,7 @@ import { logger } from '../logger';
 import { etsyFetch, etsyAuthHeaders } from '../etsy/http';
 import { EtsyPriority } from '../etsy/rateBudget';
 import { getEtsyAccessToken, isInvalidTokenResponseBody, type GetEtsyAccessTokenOptions } from '../etsy/etsyToken';
+import { ETSY_OPENAPI_BASE } from '@/lib/etsy/apiBase';
 
 export { EtsyPriority };
 
@@ -56,7 +57,7 @@ export class EtsyClient {
   private shopId: string;
   private userId?: string;
   private priority: EtsyPriority;
-  private baseUrl = 'https://openapi.etsy.com/v3';
+  private baseUrl = ETSY_OPENAPI_BASE.replace(/\/application$/, '');
 
   constructor(credentials: EtsyCredentials, onTokenRefresh?: (newCredentials: EtsyCredentials) => Promise<void>) {
     void onTokenRefresh;

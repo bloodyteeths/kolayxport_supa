@@ -23,7 +23,7 @@ import {
   type FieldError,
 } from './validation';
 
-const ETSY_API_BASE = 'https://openapi.etsy.com/v3/application';
+const ETSY_API_BASE = ETSY_OPENAPI_BASE;
 const UPLOAD_ROOT = ETSY_DRAFT_UPLOAD_ROOT;
 const MAX_IMAGE_SOURCE_BYTES = 25 * 1024 * 1024;
 const MAX_VIDEO_SOURCE_BYTES = 130 * 1024 * 1024;
@@ -84,6 +84,7 @@ function mediaIdentity(media: any) {
 import { getEtsyAccessToken } from './etsyToken';
 export { getEtsyAccessToken };
 import { notify, resolveNotification, notificationKeys, NOTIFICATION_LINKS } from '@/lib/notifications';
+import { ETSY_OPENAPI_BASE } from '@/lib/etsy/apiBase';
 
 /** Human label for a draft in notifications: staged title > base title > listing id. */
 function draftNotificationTitle(draft: any): string {

@@ -8,6 +8,7 @@ import { createWixClient } from '../../../../lib/integrations/wixClient';
 import { getUserAccessToken } from '../../../../lib/integrations/ebayClient';
 import { getValidToken, submitAmazonTracking, regionForMarketplaceId } from '../../../../lib/integrations/amazonClient';
 import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
+import { ETSY_OPENAPI_BASE } from '@/lib/etsy/apiBase';
 
 interface VeeqoAllocation {
   id: number;
@@ -824,7 +825,7 @@ async function submitEtsyTracking(
     for (const shop of shopsToTest) {
       try {
         // Get shop details from Etsy API
-        const shopDetailsUrl = `https://openapi.etsy.com/v3/application/shops/${shop.shopId}`;
+        const shopDetailsUrl = `${ETSY_OPENAPI_BASE}/shops/${shop.shopId}`;
         const shopDetailsResponse = await fetch(shopDetailsUrl, {
           method: 'GET',
           headers: {
@@ -870,7 +871,7 @@ async function submitEtsyTracking(
         
         // Always test receipt access for each shop (regardless of shop details success)
         if (!targetShop) {
-          const testUrl = `https://openapi.etsy.com/v3/application/shops/${shop.shopId}/receipts/${etsyReceiptId}`;
+          const testUrl = `${ETSY_OPENAPI_BASE}/shops/${shop.shopId}/receipts/${etsyReceiptId}`;
           const testResponse = await fetch(testUrl, {
             method: 'GET',
             headers: {
@@ -1050,7 +1051,7 @@ async function submitEtsyTracking(
 
   // First, let's try to get the receipt details to debug access issues
   try {
-    const receiptUrl = `https://openapi.etsy.com/v3/application/shops/${targetShop.shopId}/receipts/${etsyReceiptId}`;
+    const receiptUrl = `${ETSY_OPENAPI_BASE}/shops/${targetShop.shopId}/receipts/${etsyReceiptId}`;
     const receiptCheckResponse = await fetch(receiptUrl, {
       method: 'GET',
       headers: {

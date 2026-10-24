@@ -4,8 +4,9 @@ import { logger } from '@/lib/logger';
 import { runCronGuard } from '@/lib/cron/idempotency';
 import { etsyFetch, etsyPublicHeaders } from '@/lib/etsy/http';
 import { EtsyPriority } from '@/lib/etsy/rateBudget';
+import { ETSY_OPENAPI_BASE } from '@/lib/etsy/apiBase';
 
-const ETSY_API_BASE = 'https://openapi.etsy.com/v3/application';
+const ETSY_API_BASE = ETSY_OPENAPI_BASE;
 const MAX_KEYWORDS_PER_RUN = 200; // Self-hosted: no timeout limit, process more per run
 const RATE_LIMIT_MS = 120;
 

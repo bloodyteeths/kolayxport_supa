@@ -9,6 +9,7 @@ import { etsyFetch, etsyAuthHeaders } from '@/lib/etsy/http';
 import { EtsyPriority } from '@/lib/etsy/rateBudget';
 import formidable from 'formidable';
 import fs from 'fs';
+import { ETSY_OPENAPI_BASE } from '@/lib/etsy/apiBase';
 
 type EtsyTokenContext = {
   shopId: string;
@@ -81,7 +82,7 @@ export const config = {
   },
 };
 
-const ETSY_API_BASE = 'https://openapi.etsy.com/v3/application';
+const ETSY_API_BASE = ETSY_OPENAPI_BASE;
 
 interface ParsedForm {
   fields: formidable.Fields;

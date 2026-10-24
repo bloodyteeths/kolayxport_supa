@@ -42,8 +42,9 @@ import {
   type StockAdapter,
   type StockLinkRow,
 } from './types';
+import { ETSY_OPENAPI_BASE } from '@/lib/etsy/apiBase';
 
-const ETSY_API = 'https://openapi.etsy.com/v3/application';
+const ETSY_API = ETSY_OPENAPI_BASE;
 
 class EtsyHttpError extends Error {
   constructor(public status: number, body: string) {

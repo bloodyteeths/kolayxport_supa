@@ -35,6 +35,7 @@ import {
     untrackKeywords,
     type RankPageGetter,
 } from '@/lib/research/rank';
+import { ETSY_OPENAPI_BASE } from '@/lib/etsy/apiBase';
 
 /**
  * Legacy research price summary in USD (RESEARCH_REDESIGN §6.3), through
@@ -99,7 +100,7 @@ export const config = {
 };
 
 // Etsy API base URL
-const ETSY_API_BASE = 'https://openapi.etsy.com/v3/application';
+const ETSY_API_BASE = ETSY_OPENAPI_BASE;
 
 interface EtsyReceipt {
     receipt_id: number;

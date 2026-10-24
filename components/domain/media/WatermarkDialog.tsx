@@ -13,6 +13,7 @@ import { SegmentedControl } from '@/components/ds/inputs/SegmentedControl';
 import { Select } from '@/components/ds/inputs/Select';
 import { Button } from '@/components/ds/inputs/Button';
 import { neutral, accent } from '@/lib/ds/tokens';
+import { WatermarkPreview, previewSizedUrl } from '@/components/domain/media/WatermarkPreview';
 import {
   WATERMARK_DEFAULT,
   WATERMARK_LIMITS,
@@ -57,8 +58,6 @@ export function WatermarkDialog({ open, onClose, previewUrl, previewOrigin, appl
   const [draft, setDraft] = React.useState<WatermarkSpec>({ ...WATERMARK_DEFAULT });
   const [presets, setPresets] = React.useState<WatermarkPreset[]>([]);
   const [presetName, setPresetName] = React.useState('');
-  const [preview, setPreview] = React.useState<string | null>(null);
-  const [previewError, setPreviewError] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [logoBusy, setLogoBusy] = React.useState(false);
   const fileRef = React.useRef<HTMLInputElement | null>(null);
@@ -74,18 +73,8 @@ export function WatermarkDialog({ open, onClose, previewUrl, previewOrigin, appl
     });
   }, [open]);
 
-  // Live preview, rendered by the server exactly as the result will be (debounced).
-  React.useEffect(() => {
-    if (!open || !previewUrl || !spec) { setPreview(null); return; }
-    const ctl = new AbortController();
-    const timer = setTimeout(() => {
-      watermarkPhoto(previewUrl, spec, 'preview', ctl.signal, { origin: previewOrigin ?? undefined, preview: true })
-        .then((file) => { setPreviewError(false); setPreview((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(file); }); })
-        .catch(() => { if (!ctl.signal.aborted) setPreviewError(true); });
-    }, 350);
-    return () => { clearTimeout(timer); ctl.abort(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, previewUrl, JSON.stringify(spec)]);
+  // Live preview drawn in the browser on a cached ~800 px copy (instant on every slider move); the server renders the
+  // full-resolution result only when staging.
 
   const set = <K extends keyof WatermarkSpec>(k: K, v: WatermarkSpec[K]) => setDraft((d) => ({ ...d, [k]: v }));
   const pickLogo = async (file: File | undefined) => {
@@ -94,7 +83,7 @@ export function WatermarkDialog({ open, onClose, previewUrl, previewOrigin, appl
     try {
       const { id } = await uploadWatermarkLogo(file);
       setDraft((d) => ({ ...d, kind: 'logo', logoId: id }));
-    } catch { setPreviewError(true); } finally { setLogoBusy(false); }
+    } catch { /* the logo stays as it was */ } finally { setLogoBusy(false); }
   };
   const slider = (key: 'sizePct' | 'opacityPct' | 'marginPct', limits: readonly [number, number], label: string) => (
     <FormField label={`${label}: ${draft[key]}%`}>
@@ -150,8 +139,8 @@ export function WatermarkDialog({ open, onClose, previewUrl, previewOrigin, appl
                   <TextField value={draft.text ?? ''} onChange={(v) => set('text', v)} maxLength={WATERMARK_TEXT_MAX} placeholder={t('textPlaceholder')} />
                 </FormField>
               </Box>
-              <Box component="input" type="color" aria-label={t('color')} value={draft.color ?? '#ffffff'} onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('color', e.target.value)}
-                sx={{ width: 40, height: 36, border: `1px solid ${neutral[300]}`, borderRadius: '6px', p: '2px', bgcolor: '#fff' }} />
+              <Box component="input" type="color" aria-label={t('color')} value={draft.color ?? WATERMARK_DEFAULT.color} onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('color', e.target.value)}
+                sx={{ width: 40, height: 36, border: `1px solid ${neutral[300]}`, borderRadius: '6px', p: '2px', bgcolor: neutral[0] }} />
             </Box>
           ) : (
             <Box sx={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -166,7 +155,7 @@ export function WatermarkDialog({ open, onClose, previewUrl, previewOrigin, appl
               <Box role="radiogroup" aria-label={t('position')} sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 28px)', gap: '4px' }}>
                 {GRID.map((p) => (
                   <Box key={p} component="button" type="button" role="radio" aria-checked={draft.position === p} aria-label={t(`pos.${p}`)} onClick={() => set('position', p)}
-                    sx={{ width: 28, height: 28, borderRadius: '6px', cursor: 'pointer', border: `1px solid ${draft.position === p ? accent[600] : neutral[300]}`, bgcolor: draft.position === p ? accent[600] : '#fff' }} />
+                    sx={{ width: 28, height: 28, borderRadius: '6px', cursor: 'pointer', border: `1px solid ${draft.position === p ? accent[600] : neutral[300]}`, bgcolor: draft.position === p ? accent[600] : neutral[0] }} />
                 ))}
               </Box>
               <Button variant={draft.position === 'tile' ? 'primary' : 'secondary'} size="sm" onClick={() => set('position', draft.position === 'tile' ? 'br' : 'tile')}>{t('pos.tile')}</Button>
@@ -201,8 +190,11 @@ export function WatermarkDialog({ open, onClose, previewUrl, previewOrigin, appl
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px', order: { xs: -1, md: 0 } }}>
           {children}
           <Box sx={{ aspectRatio: '1 / 1', maxHeight: { xs: 220, md: 'none' }, bgcolor: neutral[100], borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }} data-testid="watermark-preview">
-            {preview ? <Box component="img" src={preview} alt={t('previewAlt')} sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-              : <Typography variant="caption" sx={{ color: neutral[600], p: '16px', textAlign: 'center' }}>{previewError ? t('previewError') : previewUrl ? t('previewLoading') : t('previewNone')}</Typography>}
+            {previewUrl ? (
+              <WatermarkPreview src={previewSizedUrl(previewUrl)} spec={spec ?? { ...draft, kind: 'text', text: '' }} alt={t('previewAlt')} />
+            ) : (
+              <Typography variant="caption" sx={{ color: neutral[600], p: '16px', textAlign: 'center' }}>{t('previewNone')}</Typography>
+            )}
           </Box>
           <Typography variant="caption" sx={{ color: neutral[600] }}>{t('stagedNote')}</Typography>
           {storage ? (

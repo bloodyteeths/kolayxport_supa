@@ -149,11 +149,17 @@ function EtsyPhotos({ id = 'photos', writeAltText, removeStagedMedia, handleRef 
   const tWm = useTranslations('watermark');
   const [wmOpen, setWmOpen] = React.useState(false);
   const [wmPreview, setWmPreview] = React.useState<string | null>(null);
+  // The preview photo is looked up ahead of time (and again after staging), so the dialog opens with it at once.
+  const wmVersion = mediaVersion(ed.draft);
+  React.useEffect(() => {
+    if (!shopId || !listingId || readOnly) return;
+    let live = true;
+    void etsyWatermarkPreviewUrl(String(shopId), String(listingId)).then((u) => { if (live) setWmPreview(u); }).catch(() => undefined);
+    return () => { live = false; };
+  }, [shopId, listingId, readOnly, wmVersion]);
   const openWatermark = React.useCallback(() => {
     if (!shopId || !listingId) return;
-    setWmPreview(null);
     setWmOpen(true);
-    void etsyWatermarkPreviewUrl(String(shopId), String(listingId)).then(setWmPreview).catch(() => setWmPreview(null));
   }, [shopId, listingId]);
   const runWatermark = React.useCallback(async (spec: WatermarkSpec | null) => {
     if (!shopId || !listingId) return;

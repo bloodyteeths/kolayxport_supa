@@ -201,6 +201,7 @@ function Body({ locale, type, doc, heroPhoto, heroShot, heroShotMobile, related,
             </table>
           </div>
           <p className="mt-4 text-sm text-ink-mute">{t('compare.disclaimer', { date: String(m.lastVerified || m.updated) })}</p>
+          {m.demo ? <div className="mt-12"><DemoVideo demo={m.demo} title={c('demoTitle')} /></div> : null}
           <div className="mt-12 grid gap-12 lg:grid-cols-[1fr_300px]">
             <Prose html={doc.html} />
             {Array.isArray(m.sources) && m.sources.length ? (
@@ -274,6 +275,12 @@ function Body({ locale, type, doc, heroPhoto, heroShot, heroShotMobile, related,
         </Section>
       ) : null}
 
+      {m.demo ? (
+        <Section tone="white">
+          <DemoVideo demo={m.demo} title={c('demoTitle')} />
+        </Section>
+      ) : null}
+
       {features.length ? (
         <Section tone={caps.length ? 'paper' : 'white'}>
           <Heading title={c('featuresTitle')} />
@@ -314,5 +321,19 @@ function Body({ locale, type, doc, heroPhoto, heroShot, heroShotMobile, related,
 
       <CtaBand title={t('home.final.title')} text={t('home.final.text')} />
     </>
+  );
+}
+
+/** Product demo video from frontmatter `demo: { file, title }` → /media/demos/<file>.mp4 (+ .jpg poster). Muted, no audio track needed. */
+function DemoVideo({ demo, title }: { demo: any; title: string }) {
+  if (!demo?.file || !/^[a-z0-9-]+$/.test(String(demo.file))) return null;
+  const src = `/media/demos/${demo.file}`;
+  return (
+    <div id="demo" className="scroll-mt-24">
+      <h2 className="display text-[28px] md:text-[34px]">{title}</h2>
+      <video className="site-shot mt-6 aspect-video w-full" controls muted playsInline preload="none" poster={`${src}.jpg`} aria-label={demo.title || title}>
+        <source src={`${src}.mp4`} type="video/mp4" />
+      </video>
+    </div>
   );
 }

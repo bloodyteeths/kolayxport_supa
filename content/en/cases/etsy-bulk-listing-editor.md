@@ -10,6 +10,9 @@ draft: false
 eyebrow: "Etsy bulk listing editor"
 subtitle: "Prices, tags, titles, descriptions, variations, SKUs and photos, edited in bulk. Changes are staged first, so nothing reaches your shop until you send it."
 screenshot: bulk-editor
+demo:
+  file: etsy-editor-demo-en
+  title: "KolayXport Etsy bulk editor demo (demo data, simulated Etsy)"
 features:
   - title: "Nothing goes live by accident"
     text: "Every edit is a draft first. Review the exact changes, then send them to Etsy."

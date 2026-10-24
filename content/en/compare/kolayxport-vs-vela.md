@@ -9,6 +9,9 @@ inventoryRefs: [etsy-bulk-editor, staged-drafts-send, etsy-version-history, bulk
 draft: false
 competitor: "Vela"
 lastVerified: 2026-10-24
+demo:
+  file: etsy-editor-demo-en
+  title: "KolayXport Etsy bulk editor demo (demo data, simulated Etsy)"
 sources:
   - "https://help.getvela.com/en/articles/10625133-what-can-i-bulk-edit"
   - "https://help.getvela.com/en/articles/10625032-can-i-undo-my-edits-or-revert-my-listings-to-how-they-looked-before"

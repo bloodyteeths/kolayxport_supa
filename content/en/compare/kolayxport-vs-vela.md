@@ -49,7 +49,7 @@ rows:
   - feature: "Variations and SKUs in bulk"
     us: "yes"
     them: "yes"
-    note: "KolayXport supports SKU patterns and variation filters. Vela handles them through Profiles."
+    note: "KolayXport supports SKU patterns, variation filters and a different price per variation option (e.g. Size S 20 / M 25 / L 30). Vela handles them through Profiles."
   - feature: "Find & replace, scheduling, CSV, multi-shop"
     us: "yes"
     them: "yes"

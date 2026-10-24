@@ -53,7 +53,7 @@ cta: signup
 ## Toplu olarak neleri düzenleyebilirsiniz
 
 - **Başlık, etiket ve açıklama:** değiştirin, başına ya da sonuna ekleyin, bul ve değiştir.
-- **Fiyat ve stok:** varyasyon başına stok, `{sku}-{Renk}-{Beden}` gibi SKU şablonları ya da sadece filtrelediğiniz varyasyonlar (örneğin Renk = Kırmızı).
+- **Fiyat ve stok:** varyasyon seçeneğine göre farklı fiyat (Beden S 20 / M 25 / L 30), varyasyon başına stok, `{sku}-{Renk}-{Beden}` gibi SKU şablonları ya da sadece filtrelediğiniz varyasyonlar (örneğin Renk = Kırmızı).
 - **Fotoğraflar:** toplu sıralama ve alternatif metin. Yapay zekâ ile iyileştirme ve arka plan kaldırma Fotoğraf Stüdyosu'nda kullanılabilir (Pro ya da modül, yapay zekâ kredisi kullanır).
 - **Bölümler, materyaller, kargo, hazırlık ve iade profilleri, ağırlık ve ölçüler.**
 - **Şablonlar:** bir değişiklik setini kaydedin ve tek tıkla yüzlerce ilana uygulayın.

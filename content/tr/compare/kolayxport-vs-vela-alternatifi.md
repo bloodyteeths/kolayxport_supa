@@ -51,7 +51,7 @@ rows:
   - feature: "Toplu varyasyon ve SKU düzenleme"
     us: "yes"
     them: "yes"
-    note: "KolayXport SKU şablonlarını ve varyasyon filtrelerini destekler. Vela bunu Profiles ile yapar."
+    note: "KolayXport SKU şablonlarını, varyasyon filtrelerini ve varyasyon seçeneğine göre farklı fiyatı (ör. Beden S 20 / M 25 / L 30) destekler. Vela bunu Profiles ile yapar."
   - feature: "Bul ve değiştir, zamanlama, CSV, çoklu mağaza"
     us: "yes"
     them: "yes"

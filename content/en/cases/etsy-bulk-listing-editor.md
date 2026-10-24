@@ -53,7 +53,7 @@ cta: signup
 ## What you can edit in bulk
 
 - **Titles, tags and descriptions:** replace, add before or after, find & replace.
-- **Prices and quantities,** including stock per variation, SKU patterns like `{sku}-{Color}-{Size}`, or only the variations you filter (for example Color = Red).
+- **Prices and quantities,** including a different price per variation option (Size S 20 / M 25 / L 30), stock per variation, SKU patterns like `{sku}-{Color}-{Size}`, or only the variations you filter (for example Color = Red).
 - **Photos:** reorder and alt text in bulk. AI enhance and background removal are available in Photo Studio (Pro or module, uses AI credits).
 - **Sections, materials, shipping, processing and return profiles, weight and size.**
 - **Templates:** save a set of changes and apply it to hundreds of listings in one click.

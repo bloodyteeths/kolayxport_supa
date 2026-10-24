@@ -443,10 +443,30 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
     [selectedIds, rows],
   );
   const filterKey = JSON.stringify(query.status ?? []) + (query.q ?? '') + activeView + (query.health ?? '') + storeId;
+  // The selection survives a trip to the grid / Photo Studio and back (usability review): kept per tab in
+  // sessionStorage for 30 min, restored only when the filters are the same; a filter change clears it as before.
+  const selectionKey = `kx:sel:${marketplace}:${storeId ?? ''}`;
   React.useEffect(() => {
-    setSelectedIds([]);
+    let restored: string[] = [];
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(selectionKey) || 'null') as { ids?: unknown; filterKey?: string; at?: number } | null;
+      if (saved && saved.filterKey === filterKey && typeof saved.at === 'number' && Date.now() - saved.at < 30 * 60_000 && Array.isArray(saved.ids)) {
+        restored = saved.ids.filter((x): x is string => typeof x === 'string').slice(0, 5000);
+      }
+    } catch {
+      /* storage unavailable: start empty */
+    }
+    setSelectedIds(restored);
     setSelectAllInView(false);
-  }, [filterKey]);
+  }, [filterKey, selectionKey]);
+  React.useEffect(() => {
+    try {
+      if (selectedIds.length) sessionStorage.setItem(selectionKey, JSON.stringify({ ids: selectedIds, filterKey, at: Date.now() }));
+      else sessionStorage.removeItem(selectionKey);
+    } catch {
+      /* ignore */
+    }
+  }, [selectedIds, selectionKey, filterKey]);
   const clearSelection = React.useCallback(() => {
     setSelectedIds([]);
     setSelectAllInView(false);

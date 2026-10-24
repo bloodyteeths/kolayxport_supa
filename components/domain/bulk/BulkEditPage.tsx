@@ -47,11 +47,14 @@ import {
   storeOf,
   toListingsQuery,
 } from '@/components/domain/listings/useListings';
-import { planSend, useStagedChanges, type ListingsStagingAdapter } from '@/components/domain/listings/useStagedChanges';
+import { planSend, useStagedChanges, type ExtendedStagePatch, type ListingsStagingAdapter } from '@/components/domain/listings/useStagedChanges';
 import { excludedClauses, useSendChanges } from '@/components/domain/listings/SendChangesAction';
 import { useFetchedFilterOptions } from '@/components/domain/listings/ListingsToolbar';
 import { ChangePriceModal } from '@/components/domain/listings/bulk/ChangePriceModal';
 import { AddTagsModal } from '@/components/domain/listings/bulk/AddTagsModal';
+import { ChangeStockModal } from '@/components/domain/listings/bulk/ChangeStockModal';
+import { AiTextModal } from '@/components/domain/listings/bulk/AiTextModal';
+import type { AiTextField, AiTextInput, AiTextResult } from '@/lib/bulk/aiText';
 import { fetchToolText, hasFindReplaceField, type ListingsToolContext } from '@/components/domain/listings/tools/ToolsMenuItems';
 import { FindReplacePanel } from '@/components/domain/listings/tools/FindReplacePanel';
 import { exportUrl, filenameFromDisposition, selectedTooLong } from '@/components/domain/listings/tools/ExportCsvModal';
@@ -675,7 +678,7 @@ export function BulkEditPage({ marketplace, transport: injectedTransport, stagin
   );
 
   // ── bulk bar (§7) ──
-  const [modal, setModal] = React.useState<null | 'price' | 'tags' | 'section'>(null);
+  const [modal, setModal] = React.useState<null | 'price' | 'tags' | 'section' | 'stock' | 'aiText'>(null);
   const [sectionValue, setSectionValue] = React.useState<string | null>(null);
   const [modalRows, setModalRows] = React.useState<ListingRow[]>([]);
   const [tagLookup, setTagLookup] = React.useState<Map<string, string[] | null>>(new Map());
@@ -719,6 +722,18 @@ export function BulkEditPage({ marketplace, transport: injectedTransport, stagin
     if (ok) await stageActions(eligible, { type: 'delete' });
   }, [queue, selectedRows, toast, t, confirm, marketplace, stageActions]);
 
+  const loadDescriptions = React.useCallback(
+    async (targets: ListingRow[]) => {
+      const p = new URLSearchParams({ marketplace, includeDescription: '1' });
+      if (storeId) p.set('store', storeId);
+      p.set('ids', targets.map((r) => r.id).join(','));
+      const csv = readListingsCsv(await fetchToolText(`/api/listings/export?${p.toString()}`));
+      const map = new Map<string, string | null>();
+      for (const r of targets) map.set(r.id, csv.get(r.id)?.description ?? null);
+      return map;
+    },
+    [marketplace, storeId],
+  );
   const loadTags = React.useCallback(
     async (targets: ListingRow[]) => {
       const p = new URLSearchParams({ marketplace });
@@ -774,9 +789,26 @@ export function BulkEditPage({ marketplace, transport: injectedTransport, stagin
     if (ai.resultLabel && !ai.running) toast.info(ai.resultLabel);
   }, [ai.resultLabel, ai.running, toast]);
 
+  // ── header overflow (§2): Find & replace · Export these rows (CSV) · Keyboard shortcuts ──
+  // Find & replace stages through its own draft calls, so the grid queue is drained first (one writer per draft)
+  // and, after it staged, this session's staged title/tags values give way to the re-read server draft.
+  // With `?ids=` the list query has no filters, so its "view" scope would be the whole store: not offered there.
+  const findDisabledReason = ids
+    ? t('bulk.tools.findReplaceIds')
+    : !hasFindReplaceField(marketplace)
+      ? t('listings.tools.findReplaceUnavailable')
+      : undefined;
+  const openFind = React.useCallback(async () => {
+    if (findDisabledReason) return;
+    if (marketplace === 'etsy' && !editorTier.allows('findReplace')) { requestEditorUpgrade('findReplace'); return; }
+    await queue.whenIdle();
+    setUrl({ tool: 'findReplace' });
+  }, [findDisabledReason, queue, setUrl, marketplace, editorTier]);
+
   const bulkSelection: BulkActionBarProps | undefined = React.useMemo(() => {
     if (!selectedRows.length) return undefined;
     const actions: ActionSpec[] = [];
+    const overflowFirst: ActionSpec[] = [];
     if (config.listings.tags && config.fields.includes('tags')) {
       actions.push({
         id: 'addTags',
@@ -794,6 +826,24 @@ export function BulkEditPage({ marketplace, transport: injectedTransport, stagin
         },
       });
     }
+    // The six everyday jobs, in the listings page's order (usability review: identical on both screens).
+    actions.push({
+      id: 'findReplace',
+      label: t('listings.tools.findReplace'),
+      disabled: Boolean(findDisabledReason),
+      disabledReason: findDisabledReason,
+      onClick: () => void openFind(),
+    });
+    if (config.fields.includes('qty')) {
+      actions.push({
+        id: 'changeStock',
+        label: t('listings.bulk.changeStock'),
+        onClick: () => {
+          setModalRows(editableRows(selectedRows, 'qty'));
+          setModal('stock');
+        },
+      });
+    }
     if (config.fields.includes('section') && sectionOptions.length) {
       actions.push({
         id: 'setSection',
@@ -805,9 +855,22 @@ export function BulkEditPage({ marketplace, transport: injectedTransport, stagin
         },
       });
     }
+    if (marketplace === 'etsy' && config.fields.includes('title')) {
+      actions.push({
+        id: 'aiText',
+        label: t('listings.bulk.aiText'),
+        icon: icons.ai,
+        onClick: () => {
+          if (!editorTier.allows('ai')) { requestEditorUpgrade('ai'); return; }
+          setModalRows(editableRows(selectedRows, 'title'));
+          setModal('aiText');
+        },
+      });
+    }
     if (ai.supported && config.fields.includes('title')) {
       const n = selectedRows.length;
-      actions.push({
+      // The grid's quick "Improve with AI" (titles + tags) stays under ⋯; translate is on the bar.
+      overflowFirst.push({
         id: 'improveWithAi',
         label: [ai.actionLabel, ai.costLabel(n)].filter(Boolean).join(' · '),
         icon: icons.ai,
@@ -826,7 +889,7 @@ export function BulkEditPage({ marketplace, transport: injectedTransport, stagin
         ...(photo.onBlockedClick ? { onClick: photo.onBlockedClick } : { href }),
       });
     }
-    const overflow: ActionSpec[] = [];
+    const overflow: ActionSpec[] = [...overflowFirst];
     if (sendAction) overflow.push({ ...sendAction, shortcut: undefined });
     overflow.push({ id: 'revertRows', label: t('bulk.revert.selected'), icon: icons.revert, onClick: () => void revertCells(selectedRows.map((r) => ({ rowId: r.id }))) });
     for (const a of config.stateActions) {
@@ -854,23 +917,8 @@ export function BulkEditPage({ marketplace, transport: injectedTransport, stagin
       overflow,
       onClear: () => setSelectedIds([]),
     };
-  }, [selectedRows, config, t, editableRows, loadTags, toast, photo, storeId, sendAction, revertCells, stageActions, deleteSelected, ai, improveWithAi, sectionOptions, gridRouter.asPath]);
+  }, [selectedRows, config, t, editableRows, loadTags, toast, photo, storeId, sendAction, revertCells, stageActions, deleteSelected, ai, improveWithAi, sectionOptions, gridRouter.asPath, findDisabledReason, openFind, marketplace, editorTier]);
 
-  // ── header overflow (§2): Find & replace · Export these rows (CSV) · Keyboard shortcuts ──
-  // Find & replace stages through its own draft calls, so the grid queue is drained first (one writer per draft)
-  // and, after it staged, this session's staged title/tags values give way to the re-read server draft.
-  // With `?ids=` the list query has no filters, so its "view" scope would be the whole store: not offered there.
-  const findDisabledReason = ids
-    ? t('bulk.tools.findReplaceIds')
-    : !hasFindReplaceField(marketplace)
-      ? t('listings.tools.findReplaceUnavailable')
-      : undefined;
-  const openFind = React.useCallback(async () => {
-    if (findDisabledReason) return;
-    if (marketplace === 'etsy' && !editorTier.allows('findReplace')) { requestEditorUpgrade('findReplace'); return; }
-    await queue.whenIdle();
-    setUrl({ tool: 'findReplace' });
-  }, [findDisabledReason, queue, setUrl, marketplace, editorTier]);
   const closeTool = React.useCallback(() => setUrl({ tool: undefined }), [setUrl]);
   const toolCtx: ListingsToolContext = React.useMemo(
     () => ({
@@ -1098,6 +1146,60 @@ export function BulkEditPage({ marketplace, transport: injectedTransport, stagin
       )}
       {body}
 
+      <ChangeStockModal
+        open={modal === 'stock'}
+        onClose={() => setModal(null)}
+        rows={modalRows}
+        qtyMax={lc.validation.qtyMax ?? undefined}
+        currentQty={(r) => {
+          const v = values[r.id]?.qty;
+          return typeof v === 'number' ? v : r.qty ?? null;
+        }}
+        onStage={async (patches) => {
+          onCellsChange(patches.flatMap(({ id, patch }) => (patch.qty !== undefined ? [{ rowId: id, field: 'qty', value: patch.qty }] : [])), 'edit');
+          setSelectedIds([]);
+          return { ok: patches.map((p) => p.id), failed: [] };
+        }}
+        t={t}
+      />
+      {marketplace === 'etsy' ? (
+        <AiTextModal
+          open={modal === 'aiText'}
+          onClose={() => setModal(null)}
+          rows={modalRows}
+          loadInputs={async (targets): Promise<AiTextInput[]> => {
+            const [tags, descriptions] = await Promise.all([loadTags(targets), loadDescriptions(targets)]);
+            return targets.map((r) => {
+              const v = values[r.id] ?? {};
+              const changed = r.sync && r.sync.status !== 'synced' ? r.sync.changedFields : [];
+              return {
+                id: r.id,
+                title: typeof v.title === 'string' ? v.title : r.title,
+                description: descriptions.get(r.id) ?? '',
+                tags: Array.isArray(v.tags) ? (v.tags as string[]) : tags.get(r.id) ?? [],
+                unsent: (['title', 'description', 'tags'] as AiTextField[]).filter((f) => changed.includes(f)),
+              };
+            });
+          }}
+          onStage={async (results: AiTextResult[]) => {
+            // Title / tags are grid cells (the grid's queue stages them); the description has no column: staged
+            // directly once the queue is idle (one writer per draft).
+            onCellsChange(
+              results.flatMap((r) => [
+                ...(r.title ? [{ rowId: r.id, field: 'title', value: r.title }] : []),
+                ...(r.tags ? [{ rowId: r.id, field: 'tags', value: r.tags }] : []),
+              ]),
+              'edit',
+            );
+            const withDescription = results.filter((r) => r.description);
+            if (withDescription.length) {
+              await queue.whenIdle();
+              await staged.stageMany(withDescription.map((r) => ({ id: r.id, patch: { description: r.description } as ExtendedStagePatch })));
+            }
+            setSelectedIds([]);
+          }}
+        />
+      ) : null}
       <ChangePriceModal
         open={modal === 'price'}
         onClose={() => setModal(null)}

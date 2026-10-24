@@ -12528,7 +12528,8 @@
       "done": "Done",
       "selectRow": "Select row",
       "selectPage": "Select all on this page",
-      "moreActions": "More actions"
+      "moreActions": "More actions",
+      "clickToEdit": "Click to edit"
     },
     "kpi": {
       "deltaUp": "Up {value}",

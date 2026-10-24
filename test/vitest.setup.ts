@@ -9,3 +9,9 @@ if (!process.env.NEXTAUTH_SECRET) {
 if (!process.env.STRIPE_SECRET_KEY) {
   process.env.STRIPE_SECRET_KEY = 'sk_test_dummy_for_unit_tests';
 }
+
+// Pages remember per-tab state in sessionStorage (e.g. the listings selection); every test starts clean.
+import { beforeEach } from 'vitest';
+beforeEach(() => {
+  try { globalThis.sessionStorage?.clear(); } catch { /* no DOM / storage in this environment */ }
+});

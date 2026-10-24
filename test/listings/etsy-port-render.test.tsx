@@ -146,6 +146,8 @@ function selectFirstRow() {
 }
 
 beforeEach(() => {
+  // The listings page remembers the selection per tab (sessionStorage); every test starts with none.
+  try { sessionStorage.clear(); } catch { /* no storage */ }
   __resetShortcutsForTests();
   __resetUrlStateForTests();
   setViewport('desktop');
@@ -221,6 +223,7 @@ describe('Etsy grid: bulk Set field and Copy to another shop', { timeout: 30_000
     fireEvent.click(within(bar).getByRole('button', { name: 'More actions' }));
     expect(screen.queryByRole('menuitem', { name: 'Copy to another shop…' })).toBeNull();
     cleanup();
+    sessionStorage.clear(); // a fresh visit: the remembered selection of the first render must not come back
     __resetUrlStateForTests();
 
     response = makeResponse([
@@ -301,5 +304,17 @@ describe('Profiles: delete', { timeout: 30_000 }, () => {
     fireEvent.click(within(confirmDialog.closest('[role="dialog"]') as HTMLElement).getByRole('button', { name: 'Delete profile' }));
     await waitFor(() => expect(JSON.parse(m.get(PROFILE_STORAGE_KEY.etsy)!)).toEqual([]));
     expect(await screen.findByTestId('le-profile-empty')).toBeTruthy();
+  });
+});
+
+describe('Etsy grid: selection survives a trip to another screen', { timeout: 30_000 }, () => {
+  it('restores the selection on return with the same filters', async () => {
+    await renderPage(makeAdapter());
+    selectFirstRow();
+    expect(await screen.findByRole('toolbar', { name: /selected/i })).toBeTruthy();
+    cleanup(); // leave the page (e.g. to the grid or Photo Studio)
+    __resetUrlStateForTests();
+    await renderPage(makeAdapter());
+    expect(await screen.findByRole('toolbar', { name: /selected/i })).toBeTruthy();
   });
 });

@@ -350,7 +350,9 @@ export function EditCell<T>({
     return true;
   };
 
-  const tip = readOnlyReason || error || col.cellTooltip?.(row) || '';
+  // An editable number reads as editable (usability review): dashed underline, a pencil on hover, and a "click to
+  // edit" tooltip when nothing more specific applies.
+  const tip = readOnlyReason || error || col.cellTooltip?.(row) || (editable ? t('clickToEdit') : '');
 
   if (editing) {
     return (
@@ -411,7 +413,15 @@ export function EditCell<T>({
           textAlign: colAlign(col),
           cursor: editable ? 'text' : 'default',
           borderRadius: px(radius.xs),
-          ...(!editable ? {} : { '&:hover': { outline: `1px solid ${n[300]}`, outlineOffset: px(2) } }),
+          ...(!editable
+            ? {}
+            : {
+                textDecoration: 'underline dashed',
+                textDecorationColor: n[300],
+                textUnderlineOffset: px(3),
+                '&:hover': { outline: `1px solid ${n[300]}`, outlineOffset: px(2), textDecorationColor: accent[600] },
+                '&:hover::after': { content: '"✎"', ml: px(4), fontSize: px(11), color: accent[600] },
+              }),
           '&:focus-visible': { outline: `2px solid ${accent[600]}`, outlineOffset: px(2) },
         }}
       >

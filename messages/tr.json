@@ -12528,7 +12528,8 @@
       "done": "Bitti",
       "selectRow": "Satırı seç",
       "selectPage": "Bu sayfadakilerin hepsini seç",
-      "moreActions": "Diğer işlemler"
+      "moreActions": "Diğer işlemler",
+      "clickToEdit": "Düzenlemek için tıklayın"
     },
     "kpi": {
       "deltaUp": "{value} artış",

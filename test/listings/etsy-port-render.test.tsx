@@ -200,7 +200,9 @@ describe('Etsy grid: bulk Set field and Copy to another shop', { timeout: 30_000
     await renderPage(adapter);
     selectFirstRow();
     const bar = await screen.findByRole('toolbar', { name: /selected/i });
-    fireEvent.click(within(bar).getByRole('button', { name: 'Set field…' }));
+    // Set field moved under ⋯ (the bar shows the six everyday jobs).
+    fireEvent.click(within(bar).getByRole('button', { name: 'More actions' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Set field…' }));
     const dialog = await screen.findByTestId('listings-set-field');
     const select = within(dialog).getByTestId('set-field-shipping');
     await waitFor(() => expect(fetch).toHaveBeenCalledWith(expect.stringContaining('action=get_shipping_profiles')));

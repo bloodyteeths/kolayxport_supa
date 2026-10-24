@@ -207,7 +207,7 @@ describe('bulk modals (§6.3)', () => {
     expect(applyTags(['Gift', 'baby'], ['gift'], 'remove', 13).next).toEqual(['baby']);
     expect(applyTags(['x'], ['y'], 'replace', null).next).toEqual(['y']);
     const plan = planTagChanges([row({ id: 'a' }), row({ id: 'b' })], (r) => (r.id === 'a' ? ['x'] : null), ['y'], 'add', 13);
-    expect(plan).toEqual({ patches: [{ id: 'a', patch: { tags: ['x', 'y'] } }], overLimit: 0, unknown: 1, unsentTags: 0 });
+    expect(plan).toEqual({ patches: [{ id: 'a', patch: { tags: ['x', 'y'] } }], overLimit: 0, unknown: 1, unsentTags: 0, fullIds: [] });
   });
   it('tags: a listing whose draft already edits tags is skipped (live tags would overwrite the staged ones)', () => {
     const staged = row({ id: 'a', sync: { draftId: 'd', status: 'pending', changedFields: ['tags'], draft: {}, queuedDelete: false, scheduledSendAt: null, syncedAt: null } });
@@ -279,11 +279,11 @@ describe('filter options and legacy schedules', () => {
 });
 
 describe('configs (§3, §15)', () => {
-  it('every marketplace has the shared core columns, ≤ 4 bulk actions, ≤ 3 pinned filters and a column key', () => {
+  it('every marketplace has the shared core columns, ≤ 6 bulk actions (Etsy: the six everyday jobs), ≤ 3 pinned filters and a column key', () => {
     for (const [mp, c] of Object.entries(LISTINGS_CONFIGS)) {
       expect(c.marketplace).toBe(mp);
       for (const k of ['thumb', 'listing', 'price', 'qty', 'status', 'changes', 'health', 'updated'] as const) expect(c.columns).toContain(k);
-      expect(c.bulkActions.length).toBeLessThanOrEqual(4);
+      expect(c.bulkActions.length).toBeLessThanOrEqual(6);
       expect(c.filters.filter((f) => f.pinned).length).toBeLessThanOrEqual(3);
       expect(c.filters[0].key).toBe('status');
       expect(c.columnStateKey).toBe(`listings.${mp}.columns`);

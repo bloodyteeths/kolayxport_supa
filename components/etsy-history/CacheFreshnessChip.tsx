@@ -11,7 +11,11 @@ import { fetchJson, type CacheStatus } from './types';
  *   polling "Delayed · checked once a day · last check …"
  * Never says "webhook". Refreshes on live listing events and every minute.
  */
-export default function CacheFreshnessChip({ shopId, size = 'small' }: { shopId: string; size?: 'small' | 'medium' }) {
+/**
+ * `pendingCount`: staged changes not sent yet. When > 0 the chip says so (amber) instead of "no changes": the
+ * seller must never read "no changes" while their own edits are waiting (usability review 24 Oct).
+ */
+export default function CacheFreshnessChip({ shopId, size = 'small', pendingCount = 0 }: { shopId: string; size?: 'small' | 'medium'; pendingCount?: number }) {
   const t = useTranslations('listingHistory');
   const format = useFormatter();
   const [status, setStatus] = useState<CacheStatus | null>(null);
@@ -51,6 +55,9 @@ export default function CacheFreshnessChip({ shopId, size = 'small' }: { shopId:
   if (status.needsReauth) {
     label = t('freshness.needsReauth');
     color = '#DC2626';
+  } else if (pendingCount > 0) {
+    label = t('freshness.pending', { count: pendingCount });
+    color = '#D97706';
   } else if (status.live) {
     label = status.lastChangeAt
       ? t('freshness.live', { time: format.relativeTime(new Date(status.lastChangeAt), now) })

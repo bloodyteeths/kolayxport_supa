@@ -10470,12 +10470,13 @@
     },
     "freshness": {
       "live": "Etsy canlı bağlı · son değişiklik {time}",
-      "liveNoChange": "Etsy canlı bağlı · henüz değişiklik yok",
+      "liveNoChange": "Etsy canlı bağlı · Etsy'den yeni değişiklik yok",
       "delayed": "Gecikmeli · günde bir kontrol · son kontrol {time}",
       "delayedNever": "Gecikmeli · henüz kontrol edilmedi",
       "needsReauth": "İlanların güncel kalması için Etsy'yi yeniden bağlayın",
       "tooltipLive": "Etsy her değişikliği saniyeler içinde KolayXport'a bildiriyor.",
-      "tooltipDelayed": "Etsy son zamanlarda değişiklik bildirimi göndermedi; ilanlar her gece yeniden kontrol ediliyor. Hemen yenilemek için İlanları senkronize et'e basın."
+      "tooltipDelayed": "Etsy son zamanlarda değişiklik bildirimi göndermedi; ilanlar her gece yeniden kontrol ediliyor. Hemen yenilemek için İlanları senkronize et'e basın.",
+      "pending": "{count} değişiklik gönderilmeyi bekliyor"
     },
     "keys": {
       "created": "İlan oluşturuldu",
@@ -14025,8 +14026,9 @@
       "unarchiveSkipped": "{count} ürün atlandı: yalnızca başka gönderilmemiş değişikliği olmayan arşivlenmiş ürünler arşivden çıkarılabilir",
       "editVariations": "Varyasyon / SKU düzenle",
       "applyTemplate": "Şablon uygula",
-      "aiText": "Yapay zekâ ile açıklama / çeviri",
-      "categoryAttrs": "Kategori özellikleri"
+      "aiText": "Çevir / AI açıklama",
+      "categoryAttrs": "Kategori özellikleri",
+      "photos": "Fotoğraflar"
     },
     "tags": {
       "unsentSkipped": "{count} ilanda gönderilmemiş etiket düzenlemesi var: bunları düzenleyicide değiştirin",
@@ -14038,7 +14040,13 @@
       },
       "overLimit": "{count} ilan {max} etiket sınırını aşacağı için fazla etiketler eklenmez",
       "stage": "Etiket değişikliklerini hazırla",
-      "unknownSkipped": "{count} ilan atlandı: mevcut etiketler yüklenemedi"
+      "unknownSkipped": "{count} ilan atlandı: mevcut etiketler yüklenemedi",
+      "stageCount": "{count} ilanda etiketleri hazırla",
+      "fullTitle": "{count} ilanın etiketleri dolu ({max}/{max}); yeni etiketlerin hepsi eklenemiyor.",
+      "removeFirstCta": "Önce bazı etiketleri kaldır",
+      "switchReplaceCta": "Tüm etiketleri değiştir moduna geç",
+      "removeFirstLabel": "Önce kaldırılacak etiketler",
+      "removeFirstHelp": "Bu etiketler her ilandan silinir, sonra yeni etiketler eklenir. En sık kullanılanlara tıklayabilirsiniz."
     },
     "legacySchedule": {
       "kept": "{count} eski zamanlanmış güncelleme buraya taşınamadı ve saklandı",
@@ -14652,7 +14660,8 @@
       "failed": "Yapay zekâ şu an yanıt vermiyor; daha sonra tekrar deneyin.",
       "staged": "Yapay zekâ önerileri {count} ilanda hazırlandı",
       "accept": "Bu ilanda uygula",
-      "alreadyEnglish": "{count} ilan zaten İngilizce olduğu için atlandı."
+      "alreadyEnglish": "{count} ilan zaten İngilizce olduğu için atlandı.",
+      "cost": "Bu işlem AI kredisi harcamaz; planınıza dahildir."
     },
     "categoryAttrs": {
       "title": "{count} ilanda kategori özellikleri",
@@ -15886,7 +15895,7 @@
       "add": "Ekle",
       "replace": "Değiştir",
       "delete": "Sil",
-      "move": "Taşı",
+      "move": "Fotoğraf sırasını değiştir",
       "alt": "Alt metin",
       "enhance": "Kaliteyi iyileştir",
       "removeBg": "Arka planı kaldır",

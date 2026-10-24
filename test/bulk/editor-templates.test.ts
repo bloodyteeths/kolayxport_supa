@@ -90,3 +90,24 @@ describe('planTemplate tag limit', () => {
     expect(plan.tagsOverLimit).toBe(1);
   });
 });
+
+import { planTagChanges, commonTags } from '@/components/domain/listings/bulk/AddTagsModal';
+
+describe('full-13-tag listings are never a dead end', () => {
+  const full = Array.from({ length: 13 }, (_, i) => `t${i}`);
+  const rows = [row('a'), row('b')];
+  const cur = (r: { id: string }) => (r.id === 'a' ? full : ['x']);
+  it('reports which listings are full', () => {
+    const p = planTagChanges(rows as any, cur as any, ['christmas gift'], 'add', 13);
+    expect(p.fullIds).toEqual(['a']);
+    expect(p.patches.map((x) => x.id)).toEqual(['b']);
+  });
+  it('remove-first makes room, then adds', () => {
+    const p = planTagChanges(rows as any, cur as any, ['christmas gift'], 'add', 13, ['t0']);
+    expect(p.fullIds).toEqual([]);
+    expect(p.patches.find((x) => x.id === 'a')!.patch.tags).toEqual([...full.slice(1), 'christmas gift']);
+  });
+  it('suggests the most common tags', () => {
+    expect(commonTags([['a', 'b'], ['B', 'c'], null])[0]).toBe('b');
+  });
+});

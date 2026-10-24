@@ -41,8 +41,10 @@ export const etsyConfig: ListingsConfig = {
     'delete',
   ],
   bulkPrimary: 'editInGrid',
-  bulkActions: ['changePrice', 'addTags', 'setField', 'improveWithAi'],
-  bulkOverflow: ['categoryAttrs', 'aiText', 'applyTemplate', 'editVariations', 'sendSelected', 'discardSelected', 'scheduleSend', 'exportSelected', 'copyToShop', 'deactivate', 'activate', 'renew', 'delete'],
+  // The six everyday jobs, always visible (usability review 24 Oct): price, tags, find & replace, stock, photos,
+  // translate. Everything else is under ⋯.
+  bulkActions: ['changePrice', 'addTags', 'findReplace', 'changeStock', 'photos', 'aiText'],
+  bulkOverflow: ['setField', 'categoryAttrs', 'editVariations', 'applyTemplate', 'improveWithAi', 'sendSelected', 'discardSelected', 'scheduleSend', 'exportSelected', 'copyToShop', 'deactivate', 'activate', 'renew', 'delete'],
   tools: ['findReplace', 'duplicates', 'import', 'export', 'scheduled'],
   inlineEdit: { price: true, qty: true },
   validation: { priceMin: 0.2, qtyMax: 999 },

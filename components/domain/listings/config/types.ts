@@ -58,6 +58,10 @@ export type BulkActionKey =
   | 'aiText'
   /** Etsy: set category details (taxonomy properties) on the selected listings of one category. */
   | 'categoryAttrs'
+  /** Etsy: open Find & replace on the selection (one of the six everyday jobs on the bar). */
+  | 'findReplace'
+  /** Etsy: open Photo Studio with the selected listings. */
+  | 'photos'
   | 'sendSelected'
   | 'discardSelected'
   | 'scheduleSend'

@@ -10470,12 +10470,13 @@
     },
     "freshness": {
       "live": "Etsy live · last change {time}",
-      "liveNoChange": "Etsy live · no changes yet",
+      "liveNoChange": "Etsy live · no new changes from Etsy",
       "delayed": "Delayed · checked once a day · last check {time}",
       "delayedNever": "Delayed · not checked yet",
       "needsReauth": "Reconnect Etsy to keep listings up to date",
       "tooltipLive": "Etsy tells KolayXport about every change within seconds.",
-      "tooltipDelayed": "Etsy has not sent change notifications recently, so listings are re-checked every night. Use Sync listings to refresh now."
+      "tooltipDelayed": "Etsy has not sent change notifications recently, so listings are re-checked every night. Use Sync listings to refresh now.",
+      "pending": "{count, plural, one {# change} other {# changes}} waiting to be sent"
     },
     "keys": {
       "created": "Listing created",
@@ -14025,8 +14026,9 @@
       "unarchiveSkipped": "{count, plural, one {# product} other {# products}} skipped: only archived products without other unsent changes can be unarchived",
       "editVariations": "Edit variations / SKU",
       "applyTemplate": "Apply template",
-      "aiText": "AI description / translate",
-      "categoryAttrs": "Category attributes"
+      "aiText": "Translate / AI description",
+      "categoryAttrs": "Category attributes",
+      "photos": "Photos"
     },
     "tags": {
       "unsentSkipped": "{count, plural, one {# listing has} other {# listings have}} unsent tag edits: change them in the editor",
@@ -14038,7 +14040,13 @@
       },
       "overLimit": "{count} listings would go over {max} tags, so extra tags are not added",
       "stage": "Stage tag changes",
-      "unknownSkipped": "{count, plural, one {# listing} other {# listings}} skipped: current tags couldn't be loaded"
+      "unknownSkipped": "{count, plural, one {# listing} other {# listings}} skipped: current tags couldn't be loaded",
+      "stageCount": "Stage tags on {count} listings",
+      "fullTitle": "{count} listings already have {max}/{max} tags; not all new tags fit.",
+      "removeFirstCta": "Remove some tags first",
+      "switchReplaceCta": "Switch to replace all tags",
+      "removeFirstLabel": "Tags to remove first",
+      "removeFirstHelp": "These are removed from each listing, then the new tags are added. Click the most common ones to add them."
     },
     "legacySchedule": {
       "kept": "{count, plural, one {# old scheduled update could not be moved here and was kept} other {# old scheduled updates could not be moved here and were kept}}",
@@ -14652,7 +14660,8 @@
       "failed": "The AI isn't responding right now; try again later.",
       "staged": "AI suggestions staged on {count} listings",
       "accept": "Apply to this listing",
-      "alreadyEnglish": "{count} listings skipped because they are already in English."
+      "alreadyEnglish": "{count} listings skipped because they are already in English.",
+      "cost": "This uses no AI credits; it's included in your plan."
     },
     "categoryAttrs": {
       "title": "Category attributes on {count} listings",
@@ -15886,7 +15895,7 @@
       "add": "Add",
       "replace": "Replace",
       "delete": "Delete",
-      "move": "Move",
+      "move": "Change photo order",
       "alt": "Alt text",
       "enhance": "Improve quality",
       "removeBg": "Remove background",

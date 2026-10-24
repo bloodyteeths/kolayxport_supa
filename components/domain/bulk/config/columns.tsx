@@ -134,7 +134,8 @@ export function bulkColumns(t: ListingsT, ctx: BulkColumnsContext): GridColumn<L
             const byName = ctx.sectionOptions.find((o) => o.label.toLocaleLowerCase() === s.toLocaleLowerCase());
             return byName ? byName.value : s;
           },
-          format: (v) => (v === null || v === undefined ? '' : sectionLabel.get(String(v)) ?? String(v)),
+          // Never a bare Etsy id: '…' while the shop's section names are not loaded, '#id' only for a removed section.
+          format: (v) => (v === null || v === undefined ? '' : sectionLabel.get(String(v)) ?? (ctx.sectionOptions.length ? `#${String(v)}` : '…')),
           validate: validator('section', ctx),
         });
         break;

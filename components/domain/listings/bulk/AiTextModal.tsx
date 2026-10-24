@@ -16,6 +16,7 @@ import { neutral } from '@/lib/ds/tokens';
 import type { ListingRow } from '@/lib/listings/types';
 import { runAiText, type AiTextField, type AiTextInput, type AiTextMode, type AiTextRunSummary } from '@/lib/bulk/aiText';
 import { requestEditorUpgrade } from '../editor/EditorUpgrade';
+import { useAiCostsVisible } from '@/components/domain/credits/useCredits';
 
 export interface AiTextModalProps {
   open: boolean;
@@ -31,6 +32,7 @@ type Phase = { kind: 'setup' } | { kind: 'running'; done: number; total: number 
 
 export function AiTextModal({ open, onClose, rows, loadInputs, onStage }: AiTextModalProps) {
   const t = useTranslations('listings.aiText');
+  const showCosts = useAiCostsVisible();
   const [mode, setMode] = React.useState<AiTextMode>('translate');
   // Tags are only translated when the seller asks: translating replaces the listing's own tags.
   const [fields, setFields] = React.useState<AiTextField[]>(['title', 'description']);
@@ -140,6 +142,8 @@ export function AiTextModal({ open, onClose, rows, loadInputs, onStage }: AiText
               <TextArea value={instructions} onChange={setInstructions} minRows={2} />
             </FormField>
             <Typography variant="caption" sx={{ color: neutral[600] }}>{t('note')}</Typography>
+            {/* Credit wording only where costs may be shown (never for Shopify-installed accounts or the Play app). */}
+            {showCosts ? <Typography variant="caption" sx={{ color: neutral[600] }} data-testid="ai-text-cost">{t('cost')}</Typography> : null}
           </>
         ) : null}
         {running ? (

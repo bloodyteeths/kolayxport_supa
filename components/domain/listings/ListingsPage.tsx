@@ -1024,6 +1024,17 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
           setModal('setField');
           return;
         }
+        case 'findReplace':
+          if (etsyLocked('findReplace')) { requestEditorUpgrade('findReplace'); return; }
+          setExportScope(undefined);
+          setPanel({ tool: 'findReplace', open: undefined });
+          return;
+        case 'photos': {
+          const ids = targets.map((r) => r.id).join(',');
+          const qs = new URLSearchParams({ ids, ...(storeId ? { shop: storeId } : {}), back: router.asPath });
+          void router.push(`/app/etsy-listings/photos?${qs.toString()}`);
+          return;
+        }
         case 'categoryAttrs': {
           const rowsFor = editableTargets(targets);
           if (!rowsFor) return;
@@ -1148,6 +1159,10 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
         return staged.adapter.stagesEtsyExtras && storeId ? t('listings.bulk.aiText') : null;
       case 'categoryAttrs':
         return staged.adapter.stagesEtsyExtras && storeId ? t('listings.bulk.categoryAttrs') : null;
+      case 'findReplace':
+        return marketplace === 'etsy' ? t('listings.tools.findReplace') : null;
+      case 'photos':
+        return marketplace === 'etsy' && storeId && !mobile ? t('listings.bulk.photos') : null;
       case 'applyTemplate':
         return staged.adapter.stagesEtsyExtras && storeId ? t('listings.bulk.applyTemplate') : null;
       case 'copyToShop':
@@ -1198,7 +1213,7 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
   };
   const bulkPrimaryKey = bulkLabel(config.bulkPrimary, selectedIds.length) ? config.bulkPrimary : config.bulkActions.find((k) => bulkLabel(k, selectedIds.length));
   const bulkPrimary = bulkPrimaryKey ? bulkSpec(bulkPrimaryKey) : null;
-  const bulkActions = config.bulkActions.filter((k) => k !== bulkPrimaryKey).map(bulkSpec).filter((a): a is ActionSpec => Boolean(a)).slice(0, 4);
+  const bulkActions = config.bulkActions.filter((k) => k !== bulkPrimaryKey).map(bulkSpec).filter((a): a is ActionSpec => Boolean(a)).slice(0, 6);
   const bulkOverflow = config.bulkOverflow.map(bulkSpec).filter((a): a is ActionSpec => Boolean(a));
   const knownTotal = list.total;
   const selection: BulkActionBarProps | undefined =
@@ -1400,7 +1415,7 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
           data-testid="listings-sync-meta"
         />
         {/* Phones: one freshness line ("Refreshed … ago"), not two. */}
-        {FRESHNESS_CHIP[marketplace] && storeId && !mobile ? <CacheFreshnessChip shopId={storeId} /> : null}
+        {FRESHNESS_CHIP[marketplace] && storeId && !mobile ? <CacheFreshnessChip shopId={storeId} pendingCount={unsent} /> : null}
       </Box>
     );
 

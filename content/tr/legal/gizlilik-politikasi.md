@@ -3,9 +3,11 @@ title: "Gizlilik Politikası | KolayXport"
 description: "KolayXport hangi verileri işler, satıcıların alıcı verilerini nasıl korur, verileri ne kadar saklar ve kimlerle paylaşır? Tüm ayrıntılar bu sayfada."
 h1: "Gizlilik Politikası"
 keyword: "kolayxport gizlilik politikası"
-updated: 2026-10-18
+updated: 2026-10-24
 effective: 2026-10-17
 lawyerReviewed: true
+# Internal: lawyerReviewed covers the 2026-10-17 text. Added later and NOT lawyer-reviewed yet:
+notLawyerReviewed: ["Pinterest section (2026-10-24)"]
 inventoryRefs: []
 ---
 
@@ -26,7 +28,7 @@ Satıcı olarak alıcılarınızı aydınlatmak ve bu verileri işlemek için ge
 
 **Gönderici ve ihracat bilgileri:** gönderici profili (ad/ünvan, adres, telefon), ETGB ve ticari fatura için girdiğiniz vergi numarası, gümrük müşavirinizin e-posta adresi gibi bilgiler.
 
-**Bağladığınız hesaplar:** Etsy, eBay, Amazon (SP-API ve Veeqo), Shopify, Wix, Trendyol, Hepsiburada, N11, Çiçeksepeti, Shippo, FedEx, UPS, DHL eCommerce (MNG Kargo) ve Paraşüt hesaplarınızı bağladığınızda, verdiğiniz yetki kapsamında mağaza bilgileri, ilanlar ve görseller, stok, siparişler (alıcı bilgileri dahil), gönderiler, müşteri mesajları (desteklenen kanallarda) ve finans kayıtları (satış, ücretler, reklam harcaması, ödemeler). Bu hesaplara erişim için erişim anahtarlarını (token) veya API anahtarlarını saklarız.
+**Bağladığınız hesaplar:** Etsy, eBay, Amazon (SP-API ve Veeqo), Shopify, Wix, Trendyol, Hepsiburada, N11, Çiçeksepeti, Shippo, FedEx, UPS, DHL eCommerce (MNG Kargo), Paraşüt ve Pinterest hesaplarınızı bağladığınızda, verdiğiniz yetki kapsamında mağaza bilgileri, ilanlar ve görseller, stok, siparişler (alıcı bilgileri dahil), gönderiler, müşteri mesajları (desteklenen kanallarda) ve finans kayıtları (satış, ücretler, reklam harcaması, ödemeler). Bu hesaplara erişim için erişim anahtarlarını (token) veya API anahtarlarını saklarız.
 
 **Chrome uzantısı:** Uzantıyı kurarsanız:
 - kendi Etsy satıcı oturumunuzda açtığınız **kendi sipariş sayfalarınızdan**, Etsy API'sinin sağlamadığı alıcı adı, teslimat adresi ve e-posta bilgisini okuyarak yalnızca sizin KolayXport hesabınızdaki ilgili siparişe ekler,
@@ -111,6 +113,18 @@ Bir satıcının alıcısıysanız, verilerinizle ilgili talebinizi öncelikle o
 - KolayXport, Etsy API'sini kullanır. The term "Etsy" is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed or certified by Etsy, Inc. ("Etsy" terimi Etsy, Inc.'in markasıdır. Bu uygulama Etsy API'sini kullanır ancak Etsy, Inc. tarafından onaylanmamış veya sertifikalandırılmamıştır.)
 - Amazon'dan alınan veriler yalnızca ilgili satıcının siparişlerini yönetmek ve kargolamak için kullanılır, Amazon'un veri koruma kurallarına uygun olarak işlenir ve başka amaçla kullanılmaz.
 - Her pazaryerinin kendi gizlilik politikası ve API koşulları ayrıca geçerlidir.
+
+### Pinterest
+
+Pinterest hesabınızı yalnızca siz bağlamayı seçerseniz, Pinterest'in kendi izin (OAuth) ekranı üzerinden bağlanır.
+
+- **Eriştiğimiz veriler:** temel hesap bilgileriniz (kullanıcı adı ve hesap türü), panolarınız, KolayXport üzerinden oluşturduğunuz pinler ve bu pinlerin istatistikleri (gösterim, kaydetme, dış bağlantı tıklaması). İstediğimiz izinler: `user_accounts:read`, `boards:read`, `boards:write`, `pins:read`, `pins:write`.
+- **Neden:** yalnızca sizin seçtiğiniz ilanlar için, sizin Pinterest hesabınızda pin ve pano oluşturmak, pini seçtiğiniz saatte yayınlamak ve bu pinlerin performansını size göstermek için. Sizin seçiminiz olmadan hiçbir ilanı pinlemeyiz, mağazanızın tamamını otomatik olarak pinlemeyiz ve başka hesaplarda işlem yapmayız.
+- **Saklama:** Pinterest erişim ve yenileme anahtarları (token), diğer bağlantılarınız gibi veritabanına uygulama katmanında AES-256-GCM ile şifrelenerek yazılır. Pinterest'in organik istatistiklerini veritabanımızda saklamayız, siz görüntülediğinizde Pinterest'ten canlı olarak alırız. Saklamadığımız bu istatistikler dışında yalnızca oluşturduğumuz pinlerin ve panoların kimliklerini, hangi ilanın ne zaman pinlendiğini, pinleri size göstermek ve aynı ilanın tekrar pinlenmesini önlemek için tutarız.
+- **Paylaşım:** Pinterest'ten aldığımız verileri satmayız, reklam amacıyla kullanmayız ve üçüncü taraflarla paylaşmayız.
+- **Erişimi kaldırma:** KolayXport'ta **Ayarlar › Bağlantılar** bölümünden Pinterest bağlantısını kesebilir ya da Pinterest'te hesap ayarlarınızdaki bağlı uygulamalar bölümünden KolayXport'un erişimini kaldırabilirsiniz. Bağlantıyı kestiğinizde Pinterest anahtarlarınızı sileriz. Hesabınızı silerseniz Pinterest'e ait tüm kayıtlarınız da silinir.
+- **Sorular:** destek@kolayxport.com
+- "Pinterest", Pinterest, Inc.'in markasıdır. KolayXport, Pinterest tarafından onaylanmamış veya desteklenmemektedir.
 
 ## 10. Çocuklar
 

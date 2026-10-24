@@ -3,9 +3,11 @@ title: "Privacy Policy | KolayXport"
 description: "What data KolayXport processes, how it protects sellers' buyer data, how long it keeps data and who it shares it with. All the details are here."
 h1: "Privacy Policy"
 keyword: "kolayxport privacy policy"
-updated: 2026-10-18
+updated: 2026-10-24
 effective: 2026-10-17
 lawyerReviewed: true
+# Internal: lawyerReviewed covers the 2026-10-17 text. Added later and NOT lawyer-reviewed yet:
+notLawyerReviewed: ["Pinterest section (2026-10-24)"]
 inventoryRefs: []
 ---
 
@@ -26,7 +28,7 @@ As a seller, you are responsible for informing your buyers and for having a vali
 
 **Sender and export details:** your sender profile (name/company name, address, phone), the tax number you enter for ETGB and commercial invoices, your customs broker's e-mail address and similar details.
 
-**Connected accounts:** when you connect Etsy, eBay, Amazon (SP-API and Veeqo), Shopify, Wix, Trendyol, Hepsiburada, N11, Çiçeksepeti, Shippo, FedEx, UPS, DHL eCommerce (MNG Kargo) or Paraşüt, and within the permissions you grant: shop information, listings and images, stock, orders (including buyer details), shipments, customer messages (on supported channels) and finance records (sales, fees, ad spend, payouts). We store access tokens or API keys to reach these accounts.
+**Connected accounts:** when you connect Etsy, eBay, Amazon (SP-API and Veeqo), Shopify, Wix, Trendyol, Hepsiburada, N11, Çiçeksepeti, Shippo, FedEx, UPS, DHL eCommerce (MNG Kargo), Paraşüt or Pinterest, and within the permissions you grant: shop information, listings and images, stock, orders (including buyer details), shipments, customer messages (on supported channels) and finance records (sales, fees, ad spend, payouts). We store access tokens or API keys to reach these accounts.
 
 **Chrome extension:** if you install the extension, it:
 - reads the buyer name, shipping address and e-mail that the Etsy API does not provide from **your own order pages** in your own Etsy seller session, and adds them only to the matching order in your KolayXport account,
@@ -111,6 +113,18 @@ If you are a seller's buyer, please send requests about your data to that seller
 - KolayXport uses the Etsy API. The term "Etsy" is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed or certified by Etsy, Inc.
 - Data obtained from Amazon is used only to manage and ship the relevant seller's orders, is processed in line with Amazon's data protection rules, and is not used for any other purpose.
 - Each marketplace's own privacy policy and API terms also apply.
+
+### Pinterest
+
+Pinterest is connected only if you choose to connect it, through Pinterest's own permission (OAuth) screen.
+
+- **Data we access:** your basic account information (username and account type), your boards, the pins you create through KolayXport, and those pins' analytics (impressions, saves, outbound clicks). Permissions we request: `user_accounts:read`, `boards:read`, `boards:write`, `pins:read`, `pins:write`.
+- **Why:** only to create pins and boards on your own Pinterest account for the listings you choose, publish them at the time you pick, and show you how those pins perform. We never pin a listing without your choice, never auto-pin your whole shop, and never act on other accounts.
+- **Storage:** your Pinterest access and refresh tokens are encrypted at the application layer with AES-256-GCM before they are written to the database, like your other connections. We do not store Pinterest organic analytics in our database: we fetch them live from Pinterest when you view them. Apart from that, we keep only the IDs of the pins and boards we create and which listing was pinned when, to show you your pins and to avoid pinning the same listing twice.
+- **Sharing:** we do not sell data we receive from Pinterest, use it for advertising, or share it with third parties.
+- **Revoking access:** disconnect Pinterest in KolayXport under **Settings › Connections**, or remove KolayXport's access in the connected apps section of your Pinterest account settings. When you disconnect, we delete your Pinterest tokens. If you delete your account, all your Pinterest-related records are deleted too.
+- **Questions:** destek@kolayxport.com
+- "Pinterest" is a trademark of Pinterest, Inc. KolayXport is not endorsed by or affiliated with Pinterest.
 
 ## 10. Children
 

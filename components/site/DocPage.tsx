@@ -324,14 +324,14 @@ function Body({ locale, type, doc, heroPhoto, heroShot, heroShotMobile, related,
   );
 }
 
-/** Product demo video from frontmatter `demo: { file, title }` → /media/demos/<file>.mp4 (+ .jpg poster). Muted, no audio track needed. */
+/** Product demo video from frontmatter `demo: { file, title }` → /media/demos/<file>.mp4 (+ .jpg poster). Not autoplayed or muted: the demos carry a voice-over. */
 function DemoVideo({ demo, title }: { demo: any; title: string }) {
   if (!demo?.file || !/^[a-z0-9-]+$/.test(String(demo.file))) return null;
   const src = `/media/demos/${demo.file}`;
   return (
     <div id="demo" className="scroll-mt-24">
       <h2 className="display text-[28px] md:text-[34px]">{title}</h2>
-      <video className="site-shot mt-6 aspect-video w-full" controls muted playsInline preload="none" poster={`${src}.jpg`} aria-label={demo.title || title}>
+      <video className="site-shot mt-6 aspect-video w-full" controls playsInline preload="none" poster={`${src}.jpg`} aria-label={demo.title || title}>
         <source src={`${src}.mp4`} type="video/mp4" />
       </video>
     </div>

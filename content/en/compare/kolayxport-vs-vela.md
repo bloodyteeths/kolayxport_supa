@@ -10,7 +10,7 @@ draft: false
 competitor: "Vela"
 lastVerified: 2026-10-24
 demo:
-  file: etsy-editor-demo-en
+  file: etsy-editor-demo-en-voice
   title: "KolayXport Etsy bulk editor demo (demo data, simulated Etsy)"
 sources:
   - "https://help.getvela.com/en/articles/10625133-what-can-i-bulk-edit"

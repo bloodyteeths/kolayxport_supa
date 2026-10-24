@@ -10,7 +10,7 @@ draft: false
 competitor: "Vela"
 lastVerified: 2026-10-24
 demo:
-  file: etsy-toplu-duzenleme-demo-tr
+  file: etsy-toplu-duzenleme-demo-tr-sesli
   title: "KolayXport Etsy toplu düzenleme demosu (demo veriler, Etsy simüle edildi)"
 sources:
   - "https://help.getvela.com/en/articles/10625133-what-can-i-bulk-edit"

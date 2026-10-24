@@ -188,7 +188,9 @@ describe('ListingsPage (Etsy, desktop)', () => {
     const header = screen.getByTestId('listings-header');
     expect(within(header).getByText('Etsy listings')).toBeTruthy();
     expect(within(header).getByRole('button', { name: /Send 3 changes to Etsy/ })).toBeTruthy();
-    expect(screen.getByTestId('listings-failure-banner').textContent).toContain('Fix them and send again.');
+    // The fixture's only unsent problem is 1 conflict: worded as a choice, not as the seller's error (3c, 24 Oct).
+    expect(screen.getByTestId('listings-failure-banner').textContent).toContain('changed on Etsy after your edit. Choose which version to keep.');
+    expect(screen.getByTestId('listings-failure-banner').textContent).not.toContain('Fix them');
     expect(screen.getByTestId('listings-sync-meta')).toBeTruthy();
     expect(screen.getByTestId('freshness-chip')).toBeTruthy();
     // No "Sync" wording anywhere (listings-grid §15).
@@ -360,3 +362,4 @@ describe('ListingsPage wording', () => {
     router.pathname = '/app/etsy-listings';
   });
 });
+

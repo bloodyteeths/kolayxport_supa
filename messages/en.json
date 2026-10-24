@@ -14075,7 +14075,8 @@
       "reconnectCta": "Reconnect {marketplace}",
       "couldntCheck": "Couldn't check {marketplace}",
       "retry": "Retry",
-      "failedFix": "{count, plural, one {# listing wasn't} other {# listings weren't}} sent {to}. Fix them and send again."
+      "failedFix": "{count, plural, one {# listing wasn't} other {# listings weren't}} sent {to}. Fix them and send again.",
+      "conflictChoose": "{count, plural, one {# listing was} other {# listings were}} not sent because {count, plural, one {it} other {they}} changed on {on} after your edit. Choose which version to keep."
     },
     "meta": {
       "refreshed": "Refreshed from {from} {ago}",

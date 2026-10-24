@@ -14075,7 +14075,8 @@
       "reconnectCta": "{marketplace} hesabını yeniden bağla",
       "couldntCheck": "{marketplace} bağlantısı kontrol edilemedi",
       "retry": "Yeniden dene",
-      "failedFix": "{count} ilan {to} gönderilemedi. Düzeltip tekrar gönderin."
+      "failedFix": "{count} ilan {to} gönderilemedi. Düzeltip tekrar gönderin.",
+      "conflictChoose": "{count} ilan {on} sizden sonra değiştiği için gönderilmedi. Hangisi kalsın, seçin."
     },
     "meta": {
       "refreshed": "{from} {ago} yenilendi",

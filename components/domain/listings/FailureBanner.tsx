@@ -20,13 +20,16 @@ export function FailureBanner({ marketplace, sync, onShow, t, ...rest }: Failure
   const conflicts = sync?.conflict ?? 0;
   const count = failed + conflicts;
   if (count <= 0) return null;
-  // One line that says what to do ("5 listings weren't sent. Fix them and send again.") and one action that opens
-  // the filtered view. Conflicts are counted in: they are fixed in the same view ("Review differences").
-  const title = t('listings.banner.failedFix', { count, to: t('listings.mp.to', { marketplace }) });
+  // One line that says what to do and one action that opens the filtered view. A conflict is not the seller's
+  // error (the listing changed on the marketplace after their edit): it says so and asks which version to keep, in
+  // a warning tone; real failures keep "Fix them and send again". Both together: both sentences.
+  const to = t('listings.mp.to', { marketplace });
+  const conflictText = conflicts > 0 ? t('listings.banner.conflictChoose', { count: conflicts, on: t('listings.mp.on', { marketplace }) }) : '';
+  const title = failed > 0 ? [t('listings.banner.failedFix', { count: failed, to }), conflictText].filter(Boolean).join(' ') : conflictText;
   return (
     <Box sx={{ mb: '8px' }}>
       <Banner
-        tone="danger"
+        tone={failed > 0 ? 'danger' : 'warning'}
         title={title}
         action={onShow ? { id: 'showFailed', label: t('listings.banner.showThem'), onClick: onShow } : undefined}
         data-testid={rest['data-testid'] ?? 'listings-failure-banner'}

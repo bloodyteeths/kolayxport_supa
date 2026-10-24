@@ -7,6 +7,7 @@
 // drafts), "Send this change", "Send selected changes", and "Send deletion…" behind type-to-confirm. Nothing is
 // sent automatically. Pull ("Refresh from Etsy") uses the existing sync endpoints; the list itself reads only the
 // DB caches (`GET /api/listings`) and revalidates on live listing events (BUILD_PLAN §7 item 3).
+import { trackActivation } from '@/lib/activation/track';
 import * as React from 'react';
 import Box from '@mui/material/Box';
 import useSWR from 'swr';
@@ -1001,9 +1002,14 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
     [toast, t, removalKind],
   );
 
+  // Editor activation events (lib/activation/events.ts): opened, which job was chosen.
+  React.useEffect(() => {
+    if (marketplace === 'etsy') trackActivation('editor_open', { once: true });
+  }, [marketplace]);
   const runBulk = React.useCallback(
     (key: BulkActionKey) => {
       const targets = selectedRows;
+      if (marketplace === 'etsy') trackActivation('editor_job', { job: key, count: targets.length });
       switch (key) {
         case 'editInGrid':
           if (bulkHref) {
@@ -1155,7 +1161,7 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
           return;
       }
     },
-    [selectedRows, bulkHref, selectAllInView, activeView, router, loadTags, toast, t, sendRows, confirm, staged, openSchedule, setPanel, stageActionFor, confirmDelete, editableTargets],
+    [selectedRows, bulkHref, selectAllInView, activeView, router, loadTags, toast, t, sendRows, confirm, staged, openSchedule, setPanel, stageActionFor, confirmDelete, editableTargets, marketplace],
   );
 
   const bulkLabel = (key: BulkActionKey, count: number): string | null => {

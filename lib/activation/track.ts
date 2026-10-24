@@ -16,10 +16,10 @@ function sentOnce(id: string): boolean {
   return false;
 }
 
-export function trackActivation(event: ActivationEvent, opts: { provider?: ActivationProvider; once?: boolean } = {}): void {
+export function trackActivation(event: ActivationEvent, opts: { provider?: ActivationProvider; once?: boolean; job?: string; count?: number } = {}): void {
   if (typeof window === 'undefined') return;
   if (opts.once && sentOnce(`${event}:${opts.provider ?? ''}`)) return;
-  const body = JSON.stringify({ event, ...(opts.provider ? { provider: opts.provider } : {}) });
+  const body = JSON.stringify({ event, ...(opts.provider ? { provider: opts.provider } : {}), ...(opts.job ? { job: opts.job } : {}), ...(typeof opts.count === 'number' ? { count: opts.count } : {}) });
   try {
     if (navigator.sendBeacon && navigator.sendBeacon('/api/activation/event', new Blob([body], { type: 'application/json' }))) return;
   } catch {

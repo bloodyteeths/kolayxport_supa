@@ -8,6 +8,7 @@
 // - `sendAll` never sends a draft in `conflict`, a draft with a queued `delete`, a draft that creates a new
 //   listing, or a draft that is already `syncing`. Those are counted and returned so the page can say why.
 // - A conflict is never forced (`force` is never passed).
+import { trackActivation } from '@/lib/activation/track';
 import * as React from 'react';
 import { discardEtsyDraft, fetchEtsyDrafts, stageEtsyDraft, syncEtsyDraft, syncEtsyDrafts } from '@/lib/etsy/draftClient';
 import { discardEbayDraft, fetchEbayDrafts, stageEbayDraft, syncEbayDraft, syncEbayDrafts } from '@/lib/ebay/draftClient';
@@ -753,9 +754,10 @@ export function useStagedChanges({ config, storeId, rows, onChanged, adapter: in
         () => onProgress?.(++done, patches.length),
       );
       await refresh();
+      if (ok.length && config.marketplace === 'etsy') trackActivation('editor_staged', { count: ok.length });
       return { ok, failed };
     },
-    [adapter, refresh],
+    [adapter, refresh, config.marketplace],
   );
 
   const stageActions = React.useCallback(

@@ -4,6 +4,7 @@
 // draft of the store in chunks of ≤ 500 and EXCLUDES conflicts and queued deletes (and Etsy new-listing drafts,
 // which the editor sends). When something was excluded, a confirm says so first. A conflict is never forced; a
 // deletion is sent only from the row ⋯ "Send deletion…" with type-to-confirm. Nothing is ever sent automatically.
+import { trackActivation } from '@/lib/activation/track';
 import * as React from 'react';
 import { StickyActionBar } from '@/components/ds/page/StickyActionBar';
 import type { ActionSpec } from '@/components/ds/page';
@@ -66,6 +67,7 @@ export function useSendChanges({ marketplace, unsent, staged, t, disabledReason,
   const report = React.useCallback(
     (result: SendResult, retry: (ids: string[]) => void) => {
       const failedIds = [...result.failed.map((f) => f.id)];
+      if (result.sent.length && marketplace === 'etsy') trackActivation('editor_sent', { count: result.sent.length });
       const message = t('listings.send.toastResult', { sent: result.sent.length, failed: failedIds.length + result.conflicts.length, to });
       if (failedIds.length || result.conflicts.length) {
         toast.error(message, failedIds.length ? { action: { label: t('listings.send.retryFailed'), onClick: () => retry(failedIds) } } : undefined);

@@ -42,3 +42,31 @@ describe('POST /api/activation/event', () => {
     expect(recorded.map((a: any) => [a[2], a[4].userId])).toEqual([['activation:app_visit', 'u1'], ['activation:connect_click', 'u1'], ['activation:checklist_view', 'u1']]);
   });
 });
+
+describe('editor activation events', () => {
+  it('summarizes editor opens, chosen jobs, staged and sent counts', () => {
+    const at = (m: string, details: unknown = null) => ({ message: `activation:${m}`, details, timestamp: '2026-10-24T10:00:00Z' });
+    const s = summarizeActivation([
+      at('editor_open'), at('editor_job', { job: 'changePrice', count: 3 }), at('editor_job', { job: 'changePrice' }), at('editor_job', { job: 'addTags' }),
+      at('editor_staged', { count: 3 }), at('editor_staged', { count: 2 }), at('editor_sent', { count: 5 }),
+    ]);
+    expect(s.editor).toEqual({ opens: 1, jobs: { changePrice: 2, addTags: 1 }, staged: 5, sent: 5 });
+    expect(activationLine(s)).toBe('editor 1× (changePrice×2/addTags) staged 5 sent 5');
+  });
+  it('the API records only a safe job name and a bounded count', async () => {
+    vi.resetModules();
+    const recorded: any[] = [];
+    vi.doMock('@/lib/auth', () => ({ getAuthUser: async () => ({ id: 'u1' }) }));
+    vi.doMock('@/lib/logger', () => ({ logger: { event: (...a: unknown[]) => { recorded.push(a); } } }));
+    const { default: handler } = await import('@/pages/api/activation/event');
+    const res: any = { status: () => res, end: () => res };
+    await handler({ method: 'POST', body: { event: 'editor_job', job: 'changePrice', count: 4 } } as any, res);
+    await handler({ method: 'POST', body: { event: 'editor_job', job: '<script>x</script>', count: 1e9 } } as any, res);
+    await handler({ method: 'POST', body: { event: 'editor_sent', count: -2 } } as any, res);
+    expect(recorded.map((a) => [a[2], a[3]])).toEqual([
+      ['activation:editor_job', { job: 'changePrice', count: 4 }],
+      ['activation:editor_job', { count: 100000 }],
+      ['activation:editor_sent', undefined],
+    ]);
+  });
+});

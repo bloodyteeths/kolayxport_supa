@@ -18,6 +18,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!isActivationEvent(body.event) || !CLIENT_ACTIVATION_EVENTS.includes(body.event)) return res.status(400).end();
   const provider = isActivationProvider(body.provider) ? body.provider : null;
   if (body.event === 'connect_click' && !provider) return res.status(400).end();
-  recordActivation(user.id, body.event, provider);
+  const job = typeof body.job === 'string' ? body.job : null;
+  const count = typeof body.count === 'number' ? body.count : null;
+  recordActivation(user.id, body.event, provider, { job, count });
   return res.status(204).end();
 }

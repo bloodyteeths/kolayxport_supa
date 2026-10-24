@@ -14009,7 +14009,8 @@
         "listPrice": "Liste fiyatı {from} → {to}"
       },
       "unarchiveSkipped": "{count} ürün atlandı: yalnızca başka gönderilmemiş değişikliği olmayan arşivlenmiş ürünler arşivden çıkarılabilir",
-      "editVariations": "Varyasyon / SKU düzenle"
+      "editVariations": "Varyasyon / SKU düzenle",
+      "applyTemplate": "Şablon uygula"
     },
     "tags": {
       "unsentSkipped": "{count} ilanda gönderilmemiş etiket düzenlemesi var: bunları düzenleyicide değiştirin",
@@ -14540,6 +14541,64 @@
       "note": "Değişiklikler hazırlanır, \"Değişiklikleri gönder\" deyince Etsy'ye gider. 32 karakteri aşacak SKU'lar atlanır.",
       "staged": "{count} ilanda varyasyon değişikliği hazırlandı",
       "skipped": "{count} ilan atlandı (varyasyonsuz ilanda stok, eşleşen varyasyon yok, SKU 32 karakteri aşıyor veya ilan okunamadı)"
+    },
+    "templates": {
+      "saveStep": "Şablona kaydet",
+      "saveHelp": "Bu ayarı bir şablona adım olarak kaydedin. Aynı adla kaydederseniz mevcut şablona eklenir.",
+      "namePlaceholder": "Şablon adı, ör. Yılbaşı indirimi",
+      "save": "Kaydet",
+      "saved": "\"{name}\" şablonuna kaydedildi ({count} adım)",
+      "saveFailed": "Şablon kaydedilemedi",
+      "limit": "En fazla {max} şablon kaydedebilirsiniz",
+      "deleteFailed": "Silinemedi",
+      "title": "{count} ilana şablon uygula",
+      "description": "Kayıtlı şablonun adımları seçili ilanlarda değişiklik olarak hazırlanır; \"Değişiklikleri gönder\" deyince Etsy'ye gider.",
+      "close": "Kapat",
+      "loading": "Yükleniyor…",
+      "loadFailed": "Şablonlar yüklenemedi",
+      "empty": "Henüz şablonunuz yok. Fiyatı değiştir, Etiketler veya Alan ayarla pencerelerinde \"Şablona kaydet\" ile adım ekleyin.",
+      "delete": "Şablonu sil",
+      "removeStep": "Adımı kaldır",
+      "apply": "{count} ilana uygula",
+      "applied": "Şablon {count} ilanda hazırlandı",
+      "appliedSkipped": "{count} ilanda bazı adımlar uygulanamadı (mevcut değer okunamadı, gönderilmemiş değişiklik var veya sonuç geçersiz)",
+      "nothing": "Şablon bu ilanlarda bir şey değiştirmedi",
+      "step": {
+        "price": {
+          "set": "Fiyatı {value} yap",
+          "incPct": "Fiyatı %{value} artır",
+          "decPct": "Fiyatı %{value} azalt",
+          "incAmt": "Fiyatı {value} artır",
+          "decAmt": "Fiyatı {value} azalt"
+        },
+        "tags": {
+          "add": "Etiket ekle: {tags}",
+          "remove": "Etiket kaldır: {tags}",
+          "replace": "Etiketleri şunlarla değiştir: {tags}"
+        },
+        "mode": {
+          "replace": "şununla değiştir",
+          "add": "ekle",
+          "remove": "kaldır",
+          "prepend": "başına ekle",
+          "append": "sonuna ekle"
+        },
+        "on": "açık",
+        "off": "kapalı",
+        "fieldSet": "{field} ayarla"
+      },
+      "field": {
+        "shipping": "Kargo profili",
+        "returnPolicy": "İade politikası",
+        "processing": "Hazırlık süresi",
+        "category": "Kategori",
+        "itemDetails": "Ürün bilgileri",
+        "materials": "Materyaller",
+        "description": "Açıklama",
+        "personalization": "Kişiselleştirme",
+        "weight": "Ağırlık",
+        "dimensions": "Boyutlar"
+      }
     }
   },
   "listingEditor": {

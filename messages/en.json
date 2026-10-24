@@ -14009,7 +14009,8 @@
         "listPrice": "List price {from} → {to}"
       },
       "unarchiveSkipped": "{count, plural, one {# product} other {# products}} skipped: only archived products without other unsent changes can be unarchived",
-      "editVariations": "Edit variations / SKU"
+      "editVariations": "Edit variations / SKU",
+      "applyTemplate": "Apply template"
     },
     "tags": {
       "unsentSkipped": "{count, plural, one {# listing has} other {# listings have}} unsent tag edits: change them in the editor",
@@ -14540,6 +14541,64 @@
       "note": "Changes are staged and go to Etsy when you send them. SKUs that would exceed 32 characters are skipped.",
       "staged": "Variation changes staged on {count} listings",
       "skipped": "{count} listings skipped (stock on a listing without variations, no matching variation, SKU over 32 characters, or the listing could not be read)"
+    },
+    "templates": {
+      "saveStep": "Save as template step",
+      "saveHelp": "Save this setting as a step of a template. Saving under an existing name adds it to that template.",
+      "namePlaceholder": "Template name, e.g. Christmas sale",
+      "save": "Save",
+      "saved": "Saved to \"{name}\" ({count} steps)",
+      "saveFailed": "Couldn't save the template",
+      "limit": "You can save up to {max} templates",
+      "deleteFailed": "Couldn't delete",
+      "title": "Apply a template to {count} listings",
+      "description": "The template's steps are staged as changes on the selected listings; they go to Etsy when you send them.",
+      "close": "Close",
+      "loading": "Loading…",
+      "loadFailed": "Couldn't load templates",
+      "empty": "No templates yet. Add steps with \"Save as template step\" in the Change price, Tags or Set field dialogs.",
+      "delete": "Delete template",
+      "removeStep": "Remove step",
+      "apply": "Apply to {count}",
+      "applied": "Template staged on {count} listings",
+      "appliedSkipped": "Some steps could not apply on {count} listings (current value unreadable, an unsent change, or an invalid result)",
+      "nothing": "The template changed nothing on these listings",
+      "step": {
+        "price": {
+          "set": "Set price to {value}",
+          "incPct": "Raise price by {value}%",
+          "decPct": "Lower price by {value}%",
+          "incAmt": "Raise price by {value}",
+          "decAmt": "Lower price by {value}"
+        },
+        "tags": {
+          "add": "Add tags: {tags}",
+          "remove": "Remove tags: {tags}",
+          "replace": "Replace tags with: {tags}"
+        },
+        "mode": {
+          "replace": "replace with",
+          "add": "add",
+          "remove": "remove",
+          "prepend": "add before",
+          "append": "add after"
+        },
+        "on": "on",
+        "off": "off",
+        "fieldSet": "Set {field}"
+      },
+      "field": {
+        "shipping": "Shipping profile",
+        "returnPolicy": "Return policy",
+        "processing": "Processing time",
+        "category": "Category",
+        "itemDetails": "Item details",
+        "materials": "Materials",
+        "description": "Description",
+        "personalization": "Personalization",
+        "weight": "Weight",
+        "dimensions": "Dimensions"
+      }
     }
   },
   "listingEditor": {

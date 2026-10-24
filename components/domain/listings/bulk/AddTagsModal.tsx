@@ -15,6 +15,7 @@ import { TagInput } from '@/components/ds/inputs/TagInput';
 import { neutral } from '@/lib/ds/tokens';
 import type { ListingRow, StagePatch } from '@/lib/listings/types';
 import type { ListingsT } from '../columns';
+import { TemplateStepSaver } from './TemplateStepSaver';
 
 export type TagMode = 'add' | 'remove' | 'replace';
 
@@ -82,10 +83,12 @@ export type AddTagsModalProps = {
   limits: { max: number | null; maxLength: number | null };
   currentTags: (row: ListingRow) => string[] | null;
   onStage: (patches: Array<{ id: string; patch: StagePatch }>) => Promise<{ ok: string[]; failed: string[] }>;
+  /** Etsy: show "Save as template step" (saved bulk-edit templates). */
+  templates?: boolean;
   t: ListingsT;
 };
 
-export function AddTagsModal({ open, onClose, rows, limits, currentTags, onStage, t }: AddTagsModalProps) {
+export function AddTagsModal({ open, onClose, rows, limits, currentTags, onStage, templates, t }: AddTagsModalProps) {
   const [tags, setTags] = React.useState<string[]>([]);
   const [mode, setMode] = React.useState<TagMode>('add');
   const [busy, setBusy] = React.useState(false);
@@ -158,6 +161,7 @@ export function AddTagsModal({ open, onClose, rows, limits, currentTags, onStage
             {t('listings.tags.unsentSkipped', { count: plan.unsentTags })}
           </Typography>
         ) : null}
+        {templates ? <TemplateStepSaver step={tags.length ? { kind: 'tags', mode, tags } : null} /> : null}
       </Box>
     </Modal>
   );

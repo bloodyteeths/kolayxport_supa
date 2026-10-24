@@ -18,6 +18,7 @@ import { activeMatch, type VariationMatch } from '@/lib/bulk/variationPriceOps';
 import { neutral } from '@/lib/ds/tokens';
 import type { ListingRow, StagePatch } from '@/lib/listings/types';
 import type { ListingsT } from '../columns';
+import { TemplateStepSaver } from './TemplateStepSaver';
 
 export type PriceMode = 'set' | 'incPct' | 'decPct' | 'incAmt' | 'decAmt';
 export type PriceRound = '99' | '00' | 'none';
@@ -70,6 +71,8 @@ export type ChangePriceModalProps = {
    * staged as the listing's inventory (lib/bulk/variationPriceOps.ts). Omitted → they are skipped and counted.
    */
   onStageVariations?: (rows: ListingRow[], op: { mode: PriceMode; value: number; round: PriceRound; match?: VariationMatch | null }) => Promise<void>;
+  /** Etsy: show "Save as template step" (saved bulk-edit templates). */
+  templates?: boolean;
   t: ListingsT;
 };
 
@@ -120,7 +123,7 @@ export function planPriceChanges(
   return { patches, skippedVariations, skippedInvalid };
 }
 
-export function ChangePriceModal({ open, onClose, rows, currency, priceMin, currentPrice, currentListPrice, formatMoney, onStage, onStageVariations, t }: ChangePriceModalProps) {
+export function ChangePriceModal({ open, onClose, rows, currency, priceMin, currentPrice, currentListPrice, formatMoney, onStage, onStageVariations, templates, t }: ChangePriceModalProps) {
   const [mode, setMode] = React.useState<PriceMode>('incPct');
   const [value, setValue] = React.useState<number | null>(null);
   const [round, setRound] = React.useState<PriceRound>('none');
@@ -268,6 +271,7 @@ export function ChangePriceModal({ open, onClose, rows, currency, priceMin, curr
             {t('listings.price.skippedInvalid', { count: plan.skippedInvalid })}
           </Typography>
         ) : null}
+        {templates ? <TemplateStepSaver step={value !== null && value >= 0 ? { kind: 'price', mode, value, round } : null} /> : null}
       </Box>
     </Modal>
   );

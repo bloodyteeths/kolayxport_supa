@@ -52,6 +52,8 @@ export type BulkActionKey =
   | 'setField'
   /** Etsy: stock / SKU per variation on listings with variations (inventory drafts). */
   | 'editVariations'
+  /** Etsy: apply a saved bulk-edit template (price / tags / set field steps) as staged drafts. */
+  | 'applyTemplate'
   | 'sendSelected'
   | 'discardSelected'
   | 'scheduleSend'

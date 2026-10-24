@@ -29,6 +29,7 @@ import {
   type ShopMetaList,
 } from '@/components/domain/listing-editor/sections/etsyShared';
 import type { ExtendedStagePatch } from '../useStagedChanges';
+import { TemplateStepSaver } from './TemplateStepSaver';
 
 // ─── Pure model (unit-tested) ─────────────────────────────────────────────────────────────────────────────
 
@@ -195,6 +196,8 @@ export type SetFieldModalProps = {
   loadMaterials?: (rows: ListingRow[]) => Promise<Map<string, string[] | null>>;
   /** Live descriptions (the listings export), for "Add before" / "Add after". Without it only "Replace" is offered. */
   loadDescriptions?: (rows: ListingRow[]) => Promise<Map<string, string | null>>;
+  /** Etsy: show "Save as template step" (saved bulk-edit templates). */
+  templates?: boolean;
 };
 
 export function SetFieldModal(props: SetFieldModalProps) {
@@ -205,7 +208,7 @@ export function SetFieldModal(props: SetFieldModalProps) {
 
 const DEFAULT_VALUE: SetFieldValue = { weightUnit: 'g', dimensionsUnit: 'cm' };
 
-function SetFieldModalBody({ onClose, rows, shopId, onStage, loadMaterials, loadDescriptions }: SetFieldModalProps & { shopId: string }) {
+function SetFieldModalBody({ onClose, rows, shopId, onStage, loadMaterials, loadDescriptions, templates }: SetFieldModalProps & { shopId: string }) {
   const toast = useToast();
   const t = useTranslations('listings');
   const tl = useTranslations('listingEditor');
@@ -551,6 +554,11 @@ function SetFieldModalBody({ onClose, rows, shopId, onStage, loadMaterials, load
         {body}
         {skipped > 0 ? (
           <Box sx={{ fontSize: 12, lineHeight: '16px', color: neutral[600] }}>{t('bulk.skippedRemovals', { count: skipped, kind: 'delete' })}</Box>
+        ) : null}
+        {templates ? (
+          <TemplateStepSaver
+            step={patch ? { kind: 'field', key, value: { ...value, ...(key === 'materials' ? { materialsMode } : {}), ...(key === 'description' ? { descriptionMode } : {}) } as Record<string, unknown> } : null}
+          />
         ) : null}
       </Box>
     </Modal>

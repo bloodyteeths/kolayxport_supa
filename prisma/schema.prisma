@@ -78,6 +78,7 @@ model User {
   notifications           Notification[]
   inboxThreads            InboxThread[]
   savedReplies            SavedReply[]
+  editorTemplates         EditorTemplate[]
   researchWatches         ResearchWatch[]
   notificationPreferences NotificationPreference[]
   aiPreferences           AiPreference[]
@@ -2907,4 +2908,19 @@ model SupportMessage {
   createdAt DateTime      @default(now())
 
   @@index([ticketId, createdAt])
+}
+
+/// Saved bulk-edit templates (lib/bulk/editorTemplates.ts): a named list of bulk-dialog steps, replayed as staged drafts.
+model EditorTemplate {
+  id          String   @id @default(cuid())
+  userId      String
+  marketplace String // 'etsy'
+  name        String // <= 60
+  steps       Json     @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, marketplace, name])
+  @@index([userId, marketplace])
 }

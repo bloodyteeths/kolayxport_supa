@@ -89,6 +89,9 @@ import { QuickViewPanel } from './QuickViewPanel';
 import { useListingsShortcuts } from './useListingsShortcuts';
 import { ChangePriceModal } from './bulk/ChangePriceModal';
 import { VariationEditModal } from './bulk/VariationEditModal';
+import { TemplatesModal } from './bulk/TemplatesModal';
+import { planTemplate, templateNeeds } from './bulk/templatePlan';
+import type { EditorTemplate } from '@/lib/bulk/editorTemplates';
 import { buildVariationEdits, type VariationEdits } from '@/lib/bulk/variationOps';
 import { ChangeStockModal } from './bulk/ChangeStockModal';
 import { AddTagsModal } from './bulk/AddTagsModal';
@@ -446,7 +449,7 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
   }, []);
 
   // ── panels / modals ──────────────────────────────────────────────────────────────────────────────────
-  const [modal, setModal] = React.useState<null | 'price' | 'stock' | 'tags' | 'schedule' | 'copyShop' | 'setField' | 'variations'>(null);
+  const [modal, setModal] = React.useState<null | 'price' | 'stock' | 'tags' | 'schedule' | 'copyShop' | 'setField' | 'variations' | 'templates'>(null);
   const [modalRows, setModalRows] = React.useState<ListingRow[]>([]);
   // "Change stock" skips stock-managed rows (counted as skipped, like variation rows).
   const stockModalRows = React.useMemo(() => modalRows.map((r) => withStockManaged(r, stockManagedIds)), [modalRows, stockManagedIds]);
@@ -861,6 +864,43 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
     [marketplace, data?.store, storeId],
   );
 
+  // "Apply template" (Etsy): replays a saved template's steps (price / tags / set field) as staged drafts; reads the
+  // current tags / materials / descriptions first when a step needs them (templatePlan.ts).
+  const applyTemplate = React.useCallback(
+    async (targets: ListingRow[], template: EditorTemplate) => {
+      const needs = templateNeeds(template.steps);
+      let maps: { tags?: Map<string, string[] | null>; materials?: Map<string, string[] | null>; descriptions?: Map<string, string | null> };
+      try {
+        const [tags, materials, descriptions] = await Promise.all([
+          needs.tags ? loadTags(targets) : Promise.resolve(undefined),
+          needs.materials ? loadMaterials(targets) : Promise.resolve(undefined),
+          needs.descriptions ? loadDescriptions(targets) : Promise.resolve(undefined),
+        ]);
+        maps = { tags, materials, descriptions };
+      } catch {
+        toast.error(t('listings.tools.loadFailed'));
+        return;
+      }
+      const plan = planTemplate(targets, template.steps, {
+        currentPrice: (r) => displayPrice(r, staged.overlays),
+        priceMin: config.validation.priceMin,
+        tagMax: config.tags?.max ?? null,
+        ...maps,
+      });
+      const res = plan.patches.length ? await staged.stageMany(plan.patches) : { ok: [], failed: [] };
+      if (plan.priceStep && plan.variationPriceRows.length && stageVariationPrices) {
+        await stageVariationPrices(plan.variationPriceRows, { mode: plan.priceStep.mode, value: plan.priceStep.value, round: plan.priceStep.round });
+      }
+      if (res.failed.length) toast.error(t('listings.tools.stageFailed', { count: res.failed.length }));
+      else if (plan.skipped) toast.info(t('listings.templates.appliedSkipped', { count: plan.skipped }));
+      if (plan.tagsOverLimit && config.tags?.max) toast.info(t('listings.tags.overLimit', { count: plan.tagsOverLimit, max: config.tags.max }));
+      if (res.ok.length) toast.success(t('listings.templates.applied', { count: res.ok.length }));
+      else if (!res.failed.length && !plan.variationPriceRows.length) toast.info(t('listings.templates.nothing'));
+      if (!res.failed.length) clearSelection();
+    },
+    [loadTags, loadMaterials, loadDescriptions, staged, config.validation.priceMin, config.tags, stageVariationPrices, toast, t, clearSelection],
+  );
+
   // Bulk edits skip rows with a queued removal (the draft service rejects any other change next to it).
   const editableTargets = React.useCallback(
     (targets: ListingRow[]): ListingRow[] | null => {
@@ -913,6 +953,17 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
           if (!rowsFor) return;
           setModalRows(rowsFor);
           setModal('setField');
+          return;
+        }
+        case 'applyTemplate': {
+          if (etsyLocked('templates')) {
+            requestEditorUpgrade('templates');
+            return;
+          }
+          const rowsFor = editableTargets(targets);
+          if (!rowsFor) return;
+          setModalRows(rowsFor);
+          setModal('templates');
           return;
         }
         case 'editVariations': {
@@ -1006,6 +1057,8 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
         return staged.adapter.stagesEtsyExtras && storeId ? t('listings.action.setField') : null;
       case 'editVariations':
         return staged.adapter.stagesEtsyExtras && storeId ? t('listings.bulk.editVariations') : null;
+      case 'applyTemplate':
+        return staged.adapter.stagesEtsyExtras && storeId ? t('listings.bulk.applyTemplate') : null;
       case 'copyToShop':
         return staged.adapter.stagesCopyToShop && otherStores.length > 0 ? t('listings.action.copyToShop') : null;
       case 'sendSelected':
@@ -1490,6 +1543,7 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
       />
 
       <ChangePriceModal
+        templates={Boolean(staged.adapter.stagesEtsyExtras && storeId)}
         open={modal === 'price'}
         onClose={() => setModal(null)}
         rows={modalRows}
@@ -1524,6 +1578,7 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
       />
       {config.tags ? (
         <AddTagsModal
+          templates={Boolean(staged.adapter.stagesEtsyExtras && storeId)}
           open={modal === 'tags'}
           onClose={() => setModal(null)}
           rows={modalRows}
@@ -1539,9 +1594,13 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
         />
       ) : null}
       {staged.adapter.stagesEtsyExtras && storeId ? (
+        <TemplatesModal open={modal === 'templates'} onClose={() => setModal(null)} count={modalRows.length} onApply={(tpl) => applyTemplate(modalRows, tpl)} />
+      ) : null}
+      {staged.adapter.stagesEtsyExtras && storeId ? (
         <VariationEditModal open={modal === 'variations'} onClose={() => setModal(null)} rows={modalRows} onStage={stageVariationEdits} t={t} />
       ) : null}
       <SetFieldModal
+        templates={Boolean(staged.adapter.stagesEtsyExtras && storeId)}
         open={modal === 'setField'}
         onClose={() => setModal(null)}
         rows={modalRows}

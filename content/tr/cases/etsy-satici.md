@@ -28,7 +28,7 @@ features:
     text: "Başlık, fiyat, kategori özellikleri, varyasyonlar, kişiselleştirme, fotoğraf sırası, alt metin ve video aynı ekranda."
     ref: etsy-listing-editor
   - title: "Toplu düzenleme"
-    text: "Yüzlerce ilanın başlık, fiyat, adet, bölüm ve etiketini tablo üzerinde değiştirin; yenileme ve pasife alma da toplu yapılır."
+    text: "Yüzlerce ilanın başlık, fiyat, adet, bölüm ve etiketini tablo üzerinde değiştirin. Yenileme ve pasife alma da toplu yapılır."
     ref: etsy-bulk-editor
   - title: "Önce taslak, sonra Etsy"
     text: "Siz 'Gönder' demeden Etsy'ye hiçbir şey gitmez. İlan bu arada Etsy'de değiştiyse gönderim durur ve sizi uyarır."
@@ -64,7 +64,7 @@ KolayXport bu yüzden işe ilanlarınızdan başlar. **İlan doktoru** her ilana
 
 ## İlanlarınızı yeniden yazmak artık bir haftasonunuzu almaz
 
-Yapay zekâ ilanınız için İngilizce başlık, açıklama ve etiket önerir. Anahtar kelimeler İngilizce kalır, çünkü alıcınız İngilizce arıyor. Tek tek uğraşmak istemediğiniz durumlarda toplu düzenleyicide yüzlerce ilanın başlığını, fiyatını, adedini ve etiketlerini tablo üzerinde değiştirirsiniz.
+Yapay zekâ ilanınız için İngilizce başlık, açıklama ve etiket önerir. Anahtar kelimeler İngilizce kalır, çünkü alıcınız İngilizce arıyor. Tek tek uğraşmak istemediğiniz durumlarda toplu düzenleyicide yüzlerce ilanın başlığını, fiyatını, adedini ve etiketlerini tablo üzerinde değiştirirsiniz. Ayrıntılar için [Etsy toplu ilan düzenleme](/cozumler/etsy-toplu-ilan-duzenleme) sayfamıza bakın.
 
 Her değişiklik önce **taslak** olarak kalır. Siz "Gönder" demeden Etsy'ye hiçbir şey gitmez. İlan bu arada Etsy'de başka biri tarafından değiştirildiyse gönderim durur ve size haber verir. Yanlış bir düzenleme yaptıysanız ilanın önceki sürümüne dönebilirsiniz. Aynı ilanı eBay'e de açmak isterseniz tek tıkla eBay taslağına kopyalarsınız.
 

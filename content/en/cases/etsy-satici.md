@@ -64,7 +64,7 @@ That's why KolayXport starts with your listings. The **listing doctor** gives ea
 
 ## Rewriting your listings no longer eats your weekend
 
-AI suggests an English title, description and tags for each listing. Keywords stay in English because your buyers search in English. When you'd rather not go one by one, the bulk editor lets you change titles, prices, quantities and tags for hundreds of listings in a grid.
+AI suggests an English title, description and tags for each listing. Keywords stay in English because your buyers search in English. When you'd rather not go one by one, the bulk editor lets you change titles, prices, quantities and tags for hundreds of listings in a grid. See the [Etsy bulk listing editor](/en/cozumler/etsy-bulk-listing-editor) page for the details.
 
 Every change stays a **draft** first. Nothing reaches Etsy until you press Send. If someone changed the listing on Etsy in the meantime, the send stops and tells you. If you made a wrong edit, you can roll back to an earlier version. Want the same listing on eBay? Copy it to an eBay draft in one click.
 

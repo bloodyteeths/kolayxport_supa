@@ -13,6 +13,7 @@ import { stripe } from '@/lib/stripe';
 import { logger } from '@/lib/logger';
 import { ETSY_DRAFT_UPLOAD_ROOT } from '@/lib/etsy/mediaSafety';
 import { VIDEO_UPLOAD_ROOT } from '@/lib/ai/video';
+import { WATERMARK_UPLOAD_ROOT } from '@/lib/media/watermarkLogos';
 
 const EBAY_UPLOAD_ROOT = process.env.EBAY_IMAGE_UPLOAD_DIR || path.join(process.cwd(), 'uploads', 'ebay-images');
 
@@ -40,7 +41,7 @@ async function removeFolders(userId: string): Promise<number> {
   const safe = userId.replace(/[^a-zA-Z0-9_-]/g, '');
   if (!safe) return 0;
   let removed = 0;
-  for (const root of [ETSY_DRAFT_UPLOAD_ROOT, EBAY_UPLOAD_ROOT, VIDEO_UPLOAD_ROOT]) {
+  for (const root of [ETSY_DRAFT_UPLOAD_ROOT, EBAY_UPLOAD_ROOT, VIDEO_UPLOAD_ROOT, WATERMARK_UPLOAD_ROOT]) {
     const dir = path.join(root, safe);
     // Never leave the upload root (the id is sanitised, this is the belt to those braces).
     if (path.dirname(dir) !== path.resolve(root)) continue;

@@ -150,6 +150,18 @@ describe('planOperation', () => {
     expect(same.skipped[0].reason).toBe('samePosition');
   });
 
+  it('Watermark: every Etsy photo (or the one at the position), replace semantics, capped by room; no credits', () => {
+    const all = planOperation(plan({ op: 'watermark', wmAll: true }), sel.slice(0, 1), views([['1', v1]]));
+    expect(all.marks.map((m) => [m.rank, m.targetImageId])).toEqual([[1, 100], [2, 101], [3, 102]]);
+    expect(all.marks[0].refUrl).toBe('https://i.etsystatic.com/100_full.jpg');
+    expect(all.changes).toBe(3);
+    expect(all.credits).toBe(0);
+    const one = planOperation(plan({ op: 'watermark', wmAll: false, position: 2 }), sel.slice(0, 1), views([['1', v1]]));
+    expect(one.marks.map((m) => m.targetImageId)).toEqual([101]);
+    const full = buildListingPhotoView(imgs(19), null);
+    expect(planOperation(plan({ op: 'watermark', wmAll: true }), sel.slice(0, 1), views([['1', full]])).marks).toHaveLength(1);
+  });
+
   it('Alt text (typed) on every photo skips photos that already have it', () => {
     const v = buildListingPhotoView([img(1, 1, 'same'), img(2, 2, '')], null);
     const p = planOperation(plan({ op: 'alt', altMode: 'manual', altText: 'same', altAll: true }), sel.slice(0, 1), views([['1', v]]));

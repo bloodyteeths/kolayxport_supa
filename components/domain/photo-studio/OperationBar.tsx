@@ -41,10 +41,10 @@ export interface OperationBarProps {
 }
 
 const OP_KEY: Record<StudioOp, string> = {
-  add: 'op.add', replace: 'op.replace', delete: 'op.delete', move: 'op.move', alt: 'op.alt', enhance: 'op.enhance', removeBg: 'op.removeBg', copy: 'op.copy',
+  add: 'op.add', replace: 'op.replace', delete: 'op.delete', move: 'op.move', alt: 'op.alt', enhance: 'op.enhance', removeBg: 'op.removeBg', copy: 'op.copy', watermark: 'op.watermark',
 };
 const HAS_SOURCE: ReadonlySet<StudioOp> = new Set(['add', 'replace']);
-const HAS_POSITION: ReadonlySet<StudioOp> = new Set(['add', 'replace', 'delete', 'move', 'alt', 'enhance', 'removeBg']);
+const HAS_POSITION: ReadonlySet<StudioOp> = new Set(['add', 'replace', 'delete', 'move', 'alt', 'enhance', 'removeBg', 'watermark']);
 const AI_OPS: ReadonlySet<StudioOp> = new Set(['enhance', 'removeBg']);
 
 export function OperationBar({
@@ -94,7 +94,7 @@ export function OperationBar({
         <Box sx={{ width: 200 }}>
           <Select<StudioOp> value={input.op} onChange={changeOp} options={opOptions} size="sm" disabled={disabled} aria-label={t('op.label')} data-testid="photo-studio-op" />
         </Box>
-        {HAS_POSITION.has(input.op) && !(input.op === 'alt' && input.altAll) ? (
+        {HAS_POSITION.has(input.op) && !(input.op === 'alt' && input.altAll) && !(input.op === 'watermark' && input.wmAll) ? (
           <>
             {label(input.op === 'move' ? t('op.from') : t('op.position'))}
             <Box sx={{ width: 96 }}>
@@ -169,6 +169,10 @@ export function OperationBar({
               />
             </Box>
           </>
+        ) : null}
+        {input.op === 'watermark' ? (
+          // The watermark itself (text / logo, size, position, opacity) is set in the dialog the stage button opens.
+          <Checkbox checked={input.wmAll} onChange={(v) => set({ wmAll: v, position: input.position === 'end' ? 1 : input.position })} label={t('op.wmAll')} disabled={disabled} />
         ) : null}
         {input.op === 'alt' ? (
           <>

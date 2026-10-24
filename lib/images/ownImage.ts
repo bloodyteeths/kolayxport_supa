@@ -75,8 +75,12 @@ async function loadOwn(userId: string, u: URL, depth: number): Promise<OwnImage 
       const file = (await fs.promises.readdir(dir).catch(() => [] as string[])).find((f) => f.startsWith(`${id}.`));
       return file ? readInside(videoSourceRoot(), path.join(dir, file)) : null;
     }
-    default:
-      return null;
+    default: {
+      // Static images the app itself serves from public/ (demo photos, marketing assets): public anyway, read from disk.
+      if (!/\.(jpe?g|png|webp|gif)$/i.test(u.pathname)) return null;
+      const pub = path.resolve(process.cwd(), 'public');
+      return readInside(pub, path.resolve(pub, '.' + decodeURIComponent(u.pathname)));
+    }
   }
 }
 

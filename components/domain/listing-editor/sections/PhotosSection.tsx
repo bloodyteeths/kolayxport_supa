@@ -141,6 +141,12 @@ function EtsyPhotos({ id = 'photos', writeAltText, removeStagedMedia, handleRef 
     const q = new URLSearchParams({ mp: 'etsy', listing: String(listingId), store: String(shopId ?? ''), title: String(ed.view.fields.title ?? '').slice(0, 140) });
     void router.push(`/app/video-studio?${q}`);
   }, [router, listingId, shopId, ed.view.fields.title]);
+  // Watermark: Photo Studio for this listing with the watermark op preselected; back returns here.
+  const tWm = useTranslations('watermark');
+  const openWatermark = React.useCallback(() => {
+    const q = new URLSearchParams({ ids: String(listingId), shop: String(shopId ?? ''), op: 'watermark', back: router.asPath });
+    void router.push(`/app/etsy-listings/photos?${q}`);
+  }, [router, listingId, shopId]);
   const [summary, setSummary] = React.useState<PhotosSummary | null>(null);
   const [videoTile, setVideoTile] = React.useState<StripVideo | null>(null);
   const [videoLoad, setVideoLoad] = React.useState<VideoLoad>({ status: 'idle', videos: [] });
@@ -342,6 +348,7 @@ function EtsyPhotos({ id = 'photos', writeAltText, removeStagedMedia, handleRef 
               ...(!full ? [{ id: 'choose', anchor: 'photos', label: t('photos.choose'), icon: icons.upload, onClick: () => imagesRef.current?.openUpload() }] : []),
               ...(!full ? [{ id: 'generate', label: t('ai.generatePhoto'), icon: icons.ai, onClick: () => imagesRef.current?.openGenerate() }] : []),
               ...(listingId ? [{ id: 'aiVideo', label: t('aiVideo.open'), icon: icons.video, onClick: openVideoStudio }] : []),
+              ...(listingId ? [{ id: 'watermark', label: tWm('title'), icon: icons.photos, onClick: openWatermark }] : []),
               // Desktop keeps the alt-text fix in the row; on a phone it joins ⋯ (the heading still says how many miss it).
               ...(altEnabled && missingAlt > 0 && !isMobile
                 ? [{ id: 'alt', label: t('ai.writeAlt', { count: missingAlt }), icon: icons.ai, onClick: () => imagesRef.current?.writeMissingAlt() }]

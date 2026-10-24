@@ -2,6 +2,8 @@
 // Loads the selected listings (DB), their Etsy photos (one call per listing, concurrency 4, cached) and the shop's
 // staged drafts; runs operation-row plans and single-tile edits by STAGING them (batch-media / single-file
 // upload). It never sends: the listings / BulkGrid "Send N changes" picks the drafts up (one push place).
+import { watermarkPhoto } from '@/lib/media/watermarkClient';
+import type { WatermarkSpec } from '@/lib/media/watermarkSpec';
 import * as React from 'react';
 import { useFeatureLockStore } from '@/lib/http/limitInterceptor';
 import type { EtsyImageLike } from '@/components/domain/listing-editor/sections/photosModel';
@@ -98,6 +100,8 @@ export interface RunContext {
   /** AI prompt (Add / Replace with AI) or extra instruction (Improve, Remove background). */
   prompt: string;
   op: StudioOp;
+  /** Watermark op: the mark chosen in the dialog. */
+  watermark?: WatermarkSpec | null;
 }
 
 const EMPTY_RESULT: RunResult = { staged: 0, failed: 0, failures: [], aiUnusable: 0, stopped: null };
@@ -417,7 +421,7 @@ export function usePhotoStudio({ shopId, ids }: { shopId: string | null; ids: st
     if (!shop) return EMPTY_RESULT;
     const altJobs = plan.ai.filter((a) => a.kind === 'alt').length;
     // AI images tick twice (generate + stage), AI alt text once (generate; its staging is one batch).
-    const total = plan.items.length + plan.uploads.length + (plan.ai.length - altJobs) * 2 + altJobs;
+    const total = plan.items.length + plan.uploads.length + (plan.ai.length - altJobs) * 2 + altJobs + (plan.marks?.length ?? 0) * 2;
     let done = 0;
     const tick = () => { done += 1; setProgress({ done: Math.min(done, total), total }); };
     setProgress({ done: 0, total });
@@ -493,6 +497,28 @@ export function usePhotoStudio({ shopId, ids }: { shopId: string | null; ids: st
         });
         const pairs = ok.filter((i) => i.job.targetImageId != null).map((i) => ({ listingId: i.listingId, imageId: i.job.targetImageId as number }));
         if (!(await stageReplaceDeletes(pairs))) return locked();
+      }
+    }
+    // 4. Watermarks: rendered by the server (concurrency 3), then staged like a Replace (upload at the photo's rank +
+    // delete of the original in the same draft), so the original stays until Send.
+    if (plan.marks.length && ctx.watermark && !stopped) {
+      const spec = ctx.watermark;
+      const marked: { listingId: string; job: (typeof plan.marks)[number]; file: File }[] = [];
+      await runPool(plan.marks, AI_CONCURRENCY, async (job) => {
+        try {
+          marked.push({ listingId: job.listingId, job, file: await watermarkPhoto(job.refUrl, spec, `${job.listingId}-${job.rank}`) });
+        } catch (err) {
+          fail(clientFailure(job.listingId, err));
+        } finally {
+          tick();
+        }
+      }, cancel.current);
+      if (marked.length) {
+        const ok = await stageImageFiles(marked, (m) => m.file, (m) => m.job.rank, 'upload', (good, m, err) => {
+          if (good) staged += 1; else fail(clientFailure(m.listingId, err));
+          tick();
+        });
+        if (!(await stageReplaceDeletes(ok.map((m) => ({ listingId: m.listingId, imageId: m.job.targetImageId }))))) return locked();
       }
     }
     return finish({ staged, failed: failedListing.size, failures, aiUnusable, stopped });

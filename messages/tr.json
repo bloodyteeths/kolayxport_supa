@@ -15926,7 +15926,9 @@
       "altAll": "Tüm fotoğraflar",
       "altPlaceholder": "Bu fotoğraflar için alt metin",
       "copyFrom": "Fotoğrafları şuradan kopyala",
-      "copyFromPlaceholder": "Bir ilan seçin"
+      "copyFromPlaceholder": "Bir ilan seçin",
+      "watermark": "Filigran ekle",
+      "wmAll": "Tüm fotoğraflar"
     },
     "source": {
       "upload": "Yükle",
@@ -17898,5 +17900,52 @@
         "body": "Siparişleriniz geldiğinde Siparişler'de bir siparişe dokunup \"Etiket oluştur\" deyin; FedEx, UPS ve DHL eCommerce desteklenir."
       }
     }
+  },
+  "watermark": {
+    "title": "Filigran ekle",
+    "description": "Logonuzu ya da yazınızı fotoğraflara ekleyin. Orijinaller saklanır; göndermeden geri alabilir, sonra da kaldırabilirsiniz.",
+    "cancel": "Vazgeç",
+    "preset": "Kayıtlı filigran",
+    "presetPick": "Bir kayıtlı filigran seçin",
+    "kindLabel": "Filigran türü",
+    "kind": {
+      "text": "Yazı",
+      "logo": "Logo"
+    },
+    "text": "Yazı",
+    "textPlaceholder": "ör. © MağazaAdınız",
+    "color": "Renk",
+    "logoUpload": "Logo yükle",
+    "logoChange": "Logoyu değiştir",
+    "logoHelp": "Şeffaf arka planlı PNG en iyisidir.",
+    "position": "Konum",
+    "pos": {
+      "tl": "Sol üst",
+      "tc": "Üst orta",
+      "tr": "Sağ üst",
+      "ml": "Sol orta",
+      "c": "Orta",
+      "mr": "Sağ orta",
+      "bl": "Sol alt",
+      "bc": "Alt orta",
+      "br": "Sağ alt",
+      "tile": "Döşe (tekrarla)"
+    },
+    "size": "Boyut",
+    "opacity": "Opaklık",
+    "margin": "Kenar boşluğu",
+    "saveAs": "Kaydet olarak",
+    "saveAsPlaceholder": "ör. Mağaza logosu sağ alt",
+    "save": "Kaydet",
+    "deletePreset": "Sil: {name}",
+    "previewAlt": "Filigranlı önizleme",
+    "previewError": "Önizleme oluşturulamadı.",
+    "previewLoading": "Önizleme hazırlanıyor…",
+    "previewNone": "Önizleme için fotoğraf yok.",
+    "stagedNote": "Filigranlı kopyalar taslağa eklenir; \"Değişiklikleri gönder\" deyince pazaryerine gider.",
+    "needText": "Bir yazı girin.",
+    "needLogo": "Bir logo yükleyin.",
+    "videoSoon": "Video için filigran yakında.",
+    "applyCount": "{count} fotoğrafa filigran ekle"
   }
 }

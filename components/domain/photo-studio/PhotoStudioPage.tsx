@@ -14,6 +14,8 @@
 // Header: in the locked state only the title and meta stay (no primary). Trial: `PlanTag` after the title.
 // Below 900 px the studio is not offered (bulk-grid §3.4 message). PhotoStudio never sends: it stages, and the
 // listings / BulkGrid "Send N changes" picks the drafts up.
+import { WatermarkDialog } from '@/components/domain/media/WatermarkDialog';
+import type { WatermarkSpec } from '@/lib/media/watermarkSpec';
 import { useAiCostsVisible } from '@/components/domain/credits/useCredits';
 import * as React from 'react';
 import Box from '@mui/material/Box';
@@ -143,7 +145,11 @@ function StudioBody({ studio, ids, tab, onTabChange, backHref, onHeader }: Studi
   const tEditor = useTranslations('listingEditor');
   const toast = useToast();
   const confirm = useConfirm();
-  const [input, setInput] = React.useState<PlanInput>(DEFAULT_PLAN_INPUT);
+  // ?op=watermark (from a listing editor's "Filigran ekle") preselects that operation.
+  const [input, setInput] = React.useState<PlanInput>(() => {
+    const op = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('op') : null;
+    return op === 'watermark' ? { ...DEFAULT_PLAN_INPUT, op: 'watermark', position: 1 } : DEFAULT_PLAN_INPUT;
+  });
   const [files, setFiles] = React.useState<File[]>([]);
   const [prompt, setPrompt] = React.useState('');
   const [query, setQuery] = React.useState('');
@@ -208,8 +214,14 @@ function StudioBody({ studio, ids, tab, onTabChange, backHref, onHeader }: Studi
     if (res.aiUnusable) toast.info(t('result.aiUnusable', { count: res.aiUnusable }));
   }, [toast, t, failureText, runUndo]);
 
+  // Watermark: the stage button opens the shared dialog (preview on the first photo it will mark); applying runs
+  // the plan with the chosen mark.
+  const tWm = useTranslations('watermark');
+  const [wmOpen, setWmOpen] = React.useState(false);
+  const wmSpecRef = React.useRef<WatermarkSpec | null>(null);
   const run = React.useCallback(async () => {
     if (running) return;
+    if (tab === 'photos' && input.op === 'watermark' && !wmSpecRef.current) { setWmOpen(true); return; }
     if (tab === 'photos') {
       if (input.op === 'delete') {
         const ok = await confirm({
@@ -223,7 +235,8 @@ function StudioBody({ studio, ids, tab, onTabChange, backHref, onHeader }: Studi
       }
       setFailures([]);
       setCapped(plan.capped);
-      const res = await studio.runPlan(plan, { files, prompt, op: input.op });
+      const res = await studio.runPlan(plan, { files, prompt, op: input.op, watermark: wmSpecRef.current });
+      wmSpecRef.current = null;
       report(res);
       if (res.staged > 0 && (input.source === 'upload' || input.source === 'url')) {
         setFiles([]);
@@ -355,6 +368,18 @@ function StudioBody({ studio, ids, tab, onTabChange, backHref, onHeader }: Studi
         </Banner>
       ) : null}
       {capped > 0 ? <Banner tone="info" title={t('capped', { cap: AI_BATCH_CAP })} /> : null}
+      <WatermarkDialog
+        open={wmOpen}
+        onClose={() => setWmOpen(false)}
+        previewUrl={plan.marks[0]?.refUrl ?? null}
+        applyLabel={tWm('applyCount', { count: plan.marks.length })}
+        onApply={async (spec) => {
+          wmSpecRef.current = spec;
+          setWmOpen(false);
+          await runRef.current();
+        }}
+      />
+      {tab === 'video' ? <Banner tone="info" title={tWm('videoSoon')} data-testid="photo-studio-wm-video-soon" /> : null}
 
       {tab === 'photos' ? (
         <OperationBar

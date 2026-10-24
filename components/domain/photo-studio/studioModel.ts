@@ -49,7 +49,7 @@ export const IMAGE_FETCH_CONCURRENCY = 4;
 export const MAX_STUDIO_IDS = 250;
 
 export type StudioTab = 'photos' | 'video';
-export type StudioOp = 'add' | 'replace' | 'delete' | 'move' | 'alt' | 'enhance' | 'removeBg' | 'copy';
+export type StudioOp = 'add' | 'replace' | 'delete' | 'move' | 'alt' | 'enhance' | 'removeBg' | 'copy' | 'watermark';
 export type StudioSource = 'upload' | 'ai' | 'url';
 export type StudioPosition = number | 'end';
 export type StudioFilter = 'all' | 'noPhotos' | 'lt5' | 'missingAlt';
@@ -57,7 +57,7 @@ export type AltMode = 'manual' | 'ai';
 export type VideoOp = 'add' | 'remove';
 export type VideoSource = 'upload' | 'url';
 
-export const STUDIO_OPS: readonly StudioOp[] = ['add', 'replace', 'delete', 'move', 'alt', 'enhance', 'removeBg', 'copy'];
+export const STUDIO_OPS: readonly StudioOp[] = ['add', 'replace', 'delete', 'move', 'alt', 'enhance', 'removeBg', 'copy', 'watermark'];
 export const STUDIO_FILTERS: readonly StudioFilter[] = ['all', 'noPhotos', 'lt5', 'missingAlt'];
 /** Ops whose result is an AI image (always staged as `ai_upload`). */
 export const AI_IMAGE_OPS: ReadonlySet<StudioOp> = new Set(['enhance', 'removeBg']);
@@ -355,7 +355,17 @@ export interface PlannedAi {
   targetImageId?: number;
 }
 
+/** Watermark: one photo to watermark (server, lib/media/watermark) and stage in its place (Replace semantics). */
+export interface PlannedMark {
+  listingId: string;
+  rank: number;
+  refUrl: string;
+  targetImageId: number;
+}
+
 export interface StudioPlan {
+  /** Watermark jobs. */
+  marks: PlannedMark[];
   /** Media ops per listing (batch-media). */
   items: { listingId: string; media: MediaOp[] }[];
   uploads: PlannedUpload[];
@@ -388,10 +398,12 @@ export interface PlanInput {
   altAll: boolean;
   /** Copy: the listing to copy photos from. */
   copyFromId: string | null;
+  /** Watermark: every photo instead of the one at `position`. */
+  wmAll: boolean;
 }
 
 export const DEFAULT_PLAN_INPUT: PlanInput = {
-  op: 'add', source: 'upload', position: 'end', moveTo: 1, fileCount: 0, url: '', altMode: 'ai', altText: '', altAll: true, copyFromId: null,
+  op: 'add', source: 'upload', position: 'end', moveTo: 1, fileCount: 0, url: '', altMode: 'ai', altText: '', altAll: true, copyFromId: null, wmAll: true,
 };
 
 function bestSrc(img: EtsyImageLike): string {
@@ -452,6 +464,7 @@ export function planOperation(
   views: ReadonlyMap<string, ListingPhotoView>,
 ): StudioPlan {
   const items: StudioPlan['items'] = [];
+  const marks: PlannedMark[] = [];
   const uploads: PlannedUpload[] = [];
   let ai: PlannedAi[] = [];
   const skipped: StudioPlan['skipped'] = [];
@@ -567,6 +580,21 @@ export function planOperation(
         touched.add(id);
         break;
       }
+      case 'watermark': {
+        // Replace semantics: the watermarked copy is staged at the photo's rank and the original's delete is staged
+        // with it, so the original stays on the marketplace until Send. Staged removals keep their slot until then,
+        // so at most `room` photos per listing fit in one run.
+        const photos = etsyPhotos(view);
+        const chosen = input.wmAll ? photos : pos != null && targetIsEtsy ? photos.filter(({ tile }) => tile.id === target?.id) : [];
+        if (!chosen.length) { skip(id, !input.wmAll && target?.pending ? 'pendingPhoto' : 'noPhotoAtPosition'); break; }
+        if (view.room <= 0) { skip(id, 'full'); break; }
+        for (const { tile, img } of chosen.slice(0, view.room)) {
+          const src = bestSrc(img);
+          if (src) marks.push({ listingId: id, rank: view.tiles.indexOf(tile) + 1, refUrl: src, targetImageId: tile.imageId as number });
+        }
+        touched.add(id);
+        break;
+      }
       case 'copy': {
         if (id === input.copyFromId) { skip(id, 'isSource'); break; }
         if (!copySources.length) { skip(id, 'nothingToCopy'); break; }
@@ -599,9 +627,9 @@ export function planOperation(
   }
 
   const changes = items.reduce((n, i) => n + i.media.filter((m) => m.operation !== 'delete' || !isReplacePair(i.media, m)).length, 0)
-    + uploads.length + ai.length;
+    + uploads.length + ai.length + marks.length;
   const credits = ai.reduce((n, a) => n + (a.kind === 'alt' ? AI_CREDIT_COST.alt : AI_CREDIT_COST.image), 0);
-  return { items, uploads, ai, skipped, listings: touched.size, changes, credits, capped };
+  return { marks, items, uploads, ai, skipped, listings: touched.size, changes, credits, capped };
 }
 
 /** A Replace by URL is a delete + an upload; it counts as one photo change. */

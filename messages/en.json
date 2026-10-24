@@ -15926,7 +15926,9 @@
       "altAll": "All photos",
       "altPlaceholder": "Alt text for these photos",
       "copyFrom": "Copy photos from",
-      "copyFromPlaceholder": "Choose a listing"
+      "copyFromPlaceholder": "Choose a listing",
+      "watermark": "Add watermark",
+      "wmAll": "All photos"
     },
     "source": {
       "upload": "Upload",
@@ -17898,5 +17900,52 @@
         "body": "When orders arrive, tap one in Orders and choose \"Create label\"; FedEx, UPS and DHL eCommerce are supported."
       }
     }
+  },
+  "watermark": {
+    "title": "Add watermark",
+    "description": "Add your logo or text to photos. Originals are kept: undo before sending, or remove it later.",
+    "cancel": "Cancel",
+    "preset": "Saved watermark",
+    "presetPick": "Pick a saved watermark",
+    "kindLabel": "Watermark type",
+    "kind": {
+      "text": "Text",
+      "logo": "Logo"
+    },
+    "text": "Text",
+    "textPlaceholder": "e.g. © YourShopName",
+    "color": "Color",
+    "logoUpload": "Upload logo",
+    "logoChange": "Change logo",
+    "logoHelp": "A PNG with a transparent background works best.",
+    "position": "Position",
+    "pos": {
+      "tl": "Top left",
+      "tc": "Top center",
+      "tr": "Top right",
+      "ml": "Middle left",
+      "c": "Center",
+      "mr": "Middle right",
+      "bl": "Bottom left",
+      "bc": "Bottom center",
+      "br": "Bottom right",
+      "tile": "Tile (repeat)"
+    },
+    "size": "Size",
+    "opacity": "Opacity",
+    "margin": "Margin",
+    "saveAs": "Save as",
+    "saveAsPlaceholder": "e.g. Shop logo bottom right",
+    "save": "Save",
+    "deletePreset": "Delete: {name}",
+    "previewAlt": "Watermarked preview",
+    "previewError": "The preview could not be made.",
+    "previewLoading": "Preparing the preview…",
+    "previewNone": "No photo to preview on.",
+    "stagedNote": "The watermarked copies are added to the draft; they reach the marketplace when you press \"Send changes\".",
+    "needText": "Enter some text.",
+    "needLogo": "Upload a logo.",
+    "videoSoon": "Watermarks for video are coming soon.",
+    "applyCount": "Watermark {count} photos"
   }
 }

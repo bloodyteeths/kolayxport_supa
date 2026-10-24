@@ -10,6 +10,9 @@ draft: false
 eyebrow: "Etsy toplu ilan düzenleme"
 subtitle: "Fiyat, etiket, başlık, açıklama, varyasyon, SKU ve fotoğrafları toplu düzenleyin. Değişiklikler önce taslak olarak hazırlanır, siz göndermeden mağazanıza hiçbir şey gitmez."
 screenshot: bulk-editor
+demo:
+  file: etsy-toplu-duzenleme-demo-tr
+  title: "KolayXport Etsy toplu düzenleme demosu (demo veriler, Etsy simüle edildi)"
 features:
   - title: "Yanlışlıkla hiçbir şey yayına çıkmaz"
     text: "Her düzenleme önce taslaktır. Değişiklikleri tek tek görün, sonra Etsy'ye gönderin."

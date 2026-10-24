@@ -6,7 +6,7 @@
 // Answers pass the same guards as the grid AI (useBulkAi): coerceAiString / looksGarbled / normalizeTitle (≤140) /
 // normalizeTags (13 × 20, no title-word overlap). Listings with an unsent change to a field are not sent for that
 // field. Nothing is staged here: the caller stages the returned patches; nothing reaches Etsy before the send.
-import { mergeTranslatedTags, type DroppedFactTag } from '@/lib/etsy/tagFacts';
+import { mergeTranslatedTags, restorePercent, textFactViolations, type DroppedFactTag } from '@/lib/etsy/tagFacts';
 import { TITLE_MAX, coerceAiString, looksGarbled, normalizeTags, normalizeTitle } from '@/lib/etsy/seoRules';
 import { LIMIT_UI_HEADER } from '@/lib/http/limitInterceptor';
 
@@ -85,7 +85,7 @@ const sameTags = (a: string[], b: string[]) => a.length === b.length && a.every(
 /** One `optimized[]` item → a guarded result, or null when nothing usable changed (pure). */
 function isDroppedFactTag(v: unknown): v is DroppedFactTag {
   const d = v as DroppedFactTag;
-  return !!d && typeof d.tag === 'string' && typeof d.term === 'string' && ['material', 'origin', 'religion', 'style'].includes(d.kind);
+  return !!d && typeof d.tag === 'string' && typeof d.term === 'string' && ['material', 'origin', 'religion', 'style', 'product'].includes(d.kind);
 }
 
 export function guardAiTextItem(item: unknown, input: AiTextInput, fields: AiTextField[], mode: AiTextMode = 'improve'): AiTextResult | null {
@@ -93,15 +93,26 @@ export function guardAiTextItem(item: unknown, input: AiTextInput, fields: AiTex
   const it = item as Record<string, unknown>;
   const out: AiTextResult = { id: input.id };
   let title = input.title;
+  const factSource = { title: input.title, description: input.description, tags: input.tags };
+  const textDropped: DroppedFactTag[] = [];
   if (fields.includes('title')) {
-    const t = normalizeTitle(it.title);
+    let t = normalizeTitle(it.title);
+    if (mode === 'translate' && t) {
+      t = restorePercent(t, `${input.title} ${input.description}`);
+      const bad = textFactViolations(t, factSource);
+      if (bad.length) { textDropped.push(...bad.map((d) => ({ ...d, field: 'title' as const }))); t = ''; }
+    }
     if (t && t.length <= TITLE_MAX && !looksGarbled(t) && !TURKISH_ONLY.test(t) && t !== input.title) {
       out.title = t;
       title = t;
     }
   }
   if (fields.includes('description')) {
-    const d = coerceAiString(it.description).trim();
+    let d = coerceAiString(it.description).trim();
+    if (mode === 'translate' && d) {
+      const bad = textFactViolations(d, factSource);
+      if (bad.length) { textDropped.push(...bad.map((x) => ({ ...x, field: 'description' as const }))); d = ''; }
+    }
     if (d && !looksGarbled(d) && d !== input.description.trim()) out.description = d.slice(0, 102400);
   }
   if (fields.includes('tags')) {
@@ -115,10 +126,11 @@ export function guardAiTextItem(item: unknown, input: AiTextInput, fields: AiTex
       ? mergeTranslatedTags(all.filter((x) => ownSet.has(x.toLowerCase())), all.filter((x) => !ownSet.has(x.toLowerCase())), title, { title: input.title, description: input.description, tags: input.tags })
       : { tags: normalizeTags(all, { title, dropTitleOverlap: true }).tags, dropped: [] as DroppedFactTag[] };
     const fromServer = Array.isArray(it.droppedTags) ? (it.droppedTags as unknown[]).filter(isDroppedFactTag) : [];
-    const dropped = [...fromServer, ...guarded.dropped.filter((d) => !fromServer.some((x) => x.tag === d.tag))];
+    const dropped = [...fromServer, ...guarded.dropped.filter((d) => !fromServer.some((x) => x.tag === d.tag)), ...textDropped.filter((d) => !fromServer.some((x) => x.tag === d.tag))];
     if (guarded.tags.length && !sameTags(guarded.tags, input.tags)) out.tags = guarded.tags;
     if (translate && dropped.length) out.droppedTags = dropped;
   }
+  if (mode === 'translate' && !out.droppedTags && textDropped.length) out.droppedTags = textDropped;
   return out.title || out.description || out.tags ? out : null;
 }
 

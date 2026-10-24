@@ -9,7 +9,7 @@
 
 import { normalizeTags } from '@/lib/etsy/seoRules';
 
-export type TagFactKind = 'material' | 'origin' | 'religion' | 'style';
+export type TagFactKind = 'material' | 'origin' | 'religion' | 'style' | 'product';
 
 type FactTerm = { kind: TagFactKind; en: string[]; src: string[] };
 
@@ -59,6 +59,8 @@ const TERMS: FactTerm[] = [
   { kind: 'religion', en: ['buddha', 'buddhist', 'zen'], src: ['buddha', 'buddhist', 'buda', 'budist', 'zen'] },
   { kind: 'religion', en: ['hindu', 'hamsa'], src: ['hindu', 'hamsa', 'fatma ana eli'] },
   { kind: 'religion', en: ['spiritual', 'sacred', 'prayer'], src: ['spiritual', 'sacred', 'prayer', 'manevi', 'kutsal', 'dua'] },
+  // product type: "çini" is Iznik ceramic, not a tile; "tile" only when the product IS a tile (karo, pano, duvar çinisi)
+  { kind: 'product', en: ['tile', 'tiles'], src: ['tile', 'tiles', 'karo', 'pano', 'fayans', 'duvar cinisi', 'cini pano'] },
   // style claims
   { kind: 'style', en: ['vintage', 'antique', 'retro'], src: ['vintage', 'antique', 'retro', 'antika', 'eski', 'nostaljik'] },
   { kind: 'style', en: ['boho', 'bohemian'], src: ['boho', 'bohemian', 'bohem'] },
@@ -78,7 +80,7 @@ export function foldText(s: string): string {
 
 const hasWords = (hay: string, needle: string) => ` ${hay} `.includes(` ${needle} `);
 
-export type DroppedFactTag = { tag: string; kind: TagFactKind; term: string };
+export type DroppedFactTag = { tag: string; kind: TagFactKind; term: string; field?: 'title' | 'description' };
 
 /**
  * Keeps the tags whose guarded terms are justified by the source listing; returns the rest as `dropped`.
@@ -120,4 +122,27 @@ export function mergeTranslatedTags(
   const merged = normalizeTags([...ownTags, ...addedTags]).tags;
   const guarded = guardTagFacts(merged, source);
   return { tags: guarded.tags, own: ownTags.filter((t) => guarded.tags.includes(t)), dropped: guarded.dropped };
+}
+
+/** Guarded terms a translated title / description states that the source does not (same rules as tags). Pure. */
+export function textFactViolations(text: string, source: { title?: string; description?: string; tags?: readonly string[] }): DroppedFactTag[] {
+  if (!text) return [];
+  // Each sentence / comma phrase is checked like a tag, so the report names the phrase.
+  const parts = text.split(/[,.\n;!?]+/).map((p) => p.trim()).filter(Boolean);
+  return guardTagFacts(parts, source).dropped;
+}
+
+/**
+ * The AI sometimes drops "%" ("100 Cotton", "100 Percent Cotton") although Etsy titles allow one. When the source
+ * states the percentage (%100 / 100%), it is put back as "100%". Only when the title has no "%" yet. Pure.
+ */
+export function restorePercent(title: string, sourceText: string): string {
+  if (!title || title.includes('%')) return title;
+  const nums = new Set<string>();
+  for (const m of (sourceText || '').matchAll(/%\s?(\d{1,3})\b|\b(\d{1,3})\s?%/g)) nums.add(m[1] ?? m[2]);
+  for (const n of nums) {
+    const re = new RegExp(`\\b${n}(\\s+Percent)?\\b(?!\\s?(?:%|cm|mm|ml|kg|g|oz|inch|in|x)\\b)`, 'i');
+    if (re.test(title)) return title.replace(re, `${n}%`);
+  }
+  return title;
 }

@@ -14671,8 +14671,11 @@
         "material": "material",
         "origin": "origin",
         "religion": "religious/cultural term",
-        "style": "style"
-      }
+        "style": "style",
+        "product": "product type"
+      },
+      "droppedTitle": "Title suggestion withheld: the listing never says \"{term}\" ({kind}). The title stays as it is.",
+      "droppedDescription": "Description suggestion withheld: the listing never says \"{term}\" ({kind}). The description stays as it is."
     },
     "categoryAttrs": {
       "title": "Category attributes on {count} listings",

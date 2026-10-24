@@ -76,3 +76,26 @@ describe('hybrid rule (Orchestrator 24 Oct): own translated tags may repeat titl
     expect(r?.tags).toEqual(['peshtemal', 'turkish towel', 'pool sheet']);
   });
 });
+
+describe('3c re-check 2: çini is not "tile", % stays', () => {
+  it('drops "tile" unless the source says karo / pano', async () => {
+    const { guardTagFacts } = await import('@/lib/etsy/tagFacts');
+    expect(guardTagFacts(['handmade tile', 'ceramic tile bowl', 'iznik bowl'], BOWL).tags).toEqual(['iznik bowl']);
+    expect(guardTagFacts(['iznik tile'], { title: 'El Yapımı İznik Çini Pano, Duvar Karosu' }).tags).toEqual(['iznik tile']);
+  });
+  it('restores the % the AI dropped when the source has it', async () => {
+    const { restorePercent } = await import('@/lib/etsy/tagFacts');
+    expect(restorePercent('Turkish Peshtemal Towel, 100 Cotton Bath Sheet', PESTAMAL.title)).toBe('Turkish Peshtemal Towel, 100% Cotton Bath Sheet');
+    expect(restorePercent('Peshtemal, 100 Percent Cotton Beach Towel', PESTAMAL.title)).toBe('Peshtemal, 100% Cotton Beach Towel');
+    expect(restorePercent('Peshtemal, 100% Cotton', PESTAMAL.title)).toBe('Peshtemal, 100% Cotton');
+    expect(restorePercent('Bowl 20 cm', 'Kase %20 indirim')).toBe('Bowl 20 cm'); // a measurement is not a percentage
+  });
+  it('a translated title that calls the bowl a tile is withheld and explained (client)', async () => {
+    const { guardAiTextItem } = await import('@/lib/bulk/aiText');
+    const input = { id: 'b', title: BOWL.title, description: BOWL.description, tags: BOWL.tags, unsent: [] };
+    const r = guardAiTextItem({ title: 'Handmade Iznik Tile Bowl, Cobalt Blue Tulip Pottery', description: 'A hand painted Iznik ceramic bowl.' }, input, ['title', 'description'], 'translate');
+    expect(r?.title).toBeUndefined();
+    expect(r?.description).toBe('A hand painted Iznik ceramic bowl.');
+    expect(r?.droppedTags).toEqual([{ tag: 'Handmade Iznik Tile Bowl', kind: 'product', term: 'tile', field: 'title' }]);
+  });
+});

@@ -14671,8 +14671,11 @@
         "material": "malzeme",
         "origin": "köken",
         "religion": "dini/kültürel terim",
-        "style": "stil"
-      }
+        "style": "stil",
+        "product": "ürün türü"
+      },
+      "droppedTitle": "Başlık önerisi alınmadı: \"{term}\" ilanda geçmiyor ({kind}). Başlık değişmeden kalır.",
+      "droppedDescription": "Açıklama önerisi alınmadı: \"{term}\" ilanda geçmiyor ({kind}). Açıklama değişmeden kalır."
     },
     "categoryAttrs": {
       "title": "{count} ilanda kategori özellikleri",

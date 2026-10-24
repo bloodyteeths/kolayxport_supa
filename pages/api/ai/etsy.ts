@@ -2,7 +2,7 @@ import { editorAllows, editorLockedBody } from '@/lib/billing/editorTier';
 import { accountEditorTier } from '@/lib/billing/editorTierServer';
 import { AiNotConfiguredError, getAiModel, refineFromBody } from '@/lib/ai/gemini';
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { mergeTranslatedTags } from '@/lib/etsy/tagFacts';
+import { mergeTranslatedTags, restorePercent, textFactViolations, type DroppedFactTag } from '@/lib/etsy/tagFacts';
 import { getAuthUser } from '../../../lib/auth';
 import {
   normalizeTitle, checkTitle, normalizeTags, tagKey, coerceAiString, coerceAiStringArray, looksGarbled,
@@ -551,7 +551,8 @@ TRANSLATION RULES:
 - Translate faithfully from whatever language the listing is in (usually Turkish). Keep every fact: materials, sizes, measurements, quantities, colors, care and shipping notes. Never add claims, features or numbers that are not in the original.
 - Natural buyer-friendly English, not word-for-word. Keep the original structure and paragraph breaks (\\n\\n); keep bullet points as bullet points.
 - If a field is already in good English, return it unchanged.
-${wants('title') ? `- The title is the translated product name written to these rules:\n${TITLE_RULES}` : ''}
+${wants('title') ? `- The title is the translated product name written to these rules:\n${TITLE_RULES}\n- Keep percentages with the % sign ("100% Cotton"); Etsy allows one %.` : ''}
+- GLOSSARY (Turkish → English): çini = Iznik ceramic / Iznik pottery / hand painted ceramic (NOT tile; use "tile" only when the product is a tile: karo, pano, duvar çinisi); peştamal = peshtemal / turkish towel; cezve = turkish coffee pot; telkari = filigree; nazar boncuğu = evil eye bead.
 ${wants('tags') ? `TAG RULES (translation):
 - "translated_tags": translate EACH original tag, in order, into the English phrase a US buyer types for it (one per original tag). Keep established product names (peştamal → peshtemal or turkish towel, İznik → iznik, cezve → turkish coffee pot). These may repeat title words: they are the seller's own terms.
 - "added_tags": real buyer search terms for this exact product (use, recipient, occasion) so that translated_tags + added_tags is at most ${TAG_MAX_COUNT}. An added tag must NOT contain any word of ${tagsAgainst} (Etsy already indexes the title). Only phrases a US buyer actually types; FEWER accurate tags are better than filler. Never describe a weave, finish, technique, size or feature the listing does not state.
@@ -600,9 +601,16 @@ ${listingSummaries}`;
     const issues: string[] = [];
     let finalTitle = coerceAiString(input.title);
 
+    // Translate: the fact guard also covers the title and description (a "tile" bowl, an invented material): a
+    // suggestion that states a guarded fact the source does not is not offered, and the review says why.
+    const factSource = { title: coerceAiString(input.title), description: coerceAiString(input.description), tags: Array.isArray(input.tags) ? input.tags.map(coerceAiString) : [] };
+    const textDropped: DroppedFactTag[] = [];
     if (wants('title')) {
-      const t = fitTitleLength(normalizeTitle(item.title));
-      if (t && !looksGarbled(t)) {
+      let t = fitTitleLength(normalizeTitle(item.title));
+      if (translate && t) t = restorePercent(t, `${factSource.title} ${factSource.description}`);
+      const bad = translate && t ? textFactViolations(t, factSource) : [];
+      if (bad.length) textDropped.push(...bad.map((d) => ({ ...d, field: 'title' as const })));
+      else if (t && !looksGarbled(t)) {
         out.title = t;
         finalTitle = t;
         issues.push(...checkTitle(t).issues);
@@ -631,8 +639,11 @@ ${listingSummaries}`;
         : coerceAiString(raw);
       // A translation of a short description is short too; a rewrite must be substantial.
       const minLength = translate ? Math.min(80, Math.max(10, Math.floor(coerceAiString(input.description).length / 3))) : 80;
-      if (d && d.length >= minLength && !looksGarbled(d)) out.description = d.slice(0, 10000);
+      const bad = translate && d ? textFactViolations(d, factSource) : [];
+      if (bad.length) textDropped.push(...bad.map((x) => ({ ...x, field: 'description' as const })));
+      else if (d && d.length >= minLength && !looksGarbled(d)) out.description = d.slice(0, 10000);
     }
+    if (textDropped.length) out.droppedTags = [...(out.droppedTags ?? []), ...textDropped];
     if (issues.length) out.issues = Array.from(new Set(issues));
     if (Object.keys(out).some((k) => k === 'title' || k === 'tags' || k === 'description')) optimized.push(out);
   }

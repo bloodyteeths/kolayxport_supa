@@ -189,7 +189,12 @@ export function AiTextModal({ open, onClose, rows, loadInputs, onStage }: AiText
                     {r.droppedTags?.length ? (
                       // Tags the fact guard removed (lib/etsy/tagFacts): shown, never silently swallowed.
                       <Box sx={{ color: '#9A3412', fontSize: 12 }} data-testid="ai-text-dropped-tags">
-                        {t('droppedTags', { tags: r.droppedTags.map((d) => `${d.tag} (${t(`droppedKind.${d.kind}`)})`).join(', ') })}
+                        {r.droppedTags.filter((d) => d.field).map((d) => (
+                          <Box key={`${d.field}:${d.tag}`}>{t(d.field === 'title' ? 'droppedTitle' : 'droppedDescription', { term: d.term, kind: t(`droppedKind.${d.kind}`) })}</Box>
+                        ))}
+                        {r.droppedTags.some((d) => !d.field)
+                          ? t('droppedTags', { tags: r.droppedTags.filter((d) => !d.field).map((d) => `${d.tag} (${t(`droppedKind.${d.kind}`)})`).join(', ') })
+                          : null}
                       </Box>
                     ) : null}
                   </Box>

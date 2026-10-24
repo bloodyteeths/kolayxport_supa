@@ -30,6 +30,11 @@ export interface SelectProps<T extends string | number> extends DsBaseProps {
   disabled?: boolean;
   fullWidth?: boolean;
   'aria-label'?: string;
+  /**
+   * Focus moves elsewhere after a pick (e.g. into the next field): the menu does not pull focus back to the select,
+   * and this runs right after the pick so keystrokes typed while the menu fades out land in the next field.
+   */
+  onPicked?: () => void;
 }
 
 function Chevron(props: { className?: string }) {
@@ -42,7 +47,7 @@ function Chevron(props: { className?: string }) {
 
 export function Select<T extends string | number>({
   value, onChange, options, placeholder, size = 'md', id, invalid, disabled, fullWidth = true, className,
-  'data-testid': testId, 'aria-label': ariaLabel,
+  'data-testid': testId, 'aria-label': ariaLabel, onPicked,
 }: SelectProps<T>) {
   const field = useFieldContext();
   const isInvalid = Boolean(invalid ?? field?.invalid);
@@ -63,7 +68,10 @@ export function Select<T extends string | number>({
       value={value == null ? '' : String(value)}
       onChange={(e) => {
         const opt = byKey.get(String(e.target.value));
-        if (opt) onChange(opt.value);
+        if (opt) {
+          onChange(opt.value);
+          if (onPicked) setTimeout(onPicked, 0);
+        }
       }}
       displayEmpty
       disabled={disabled}
@@ -71,6 +79,7 @@ export function Select<T extends string | number>({
       className={className}
       data-testid={testId}
       IconComponent={Chevron}
+      MenuProps={onPicked ? { disableRestoreFocus: true } : undefined}
       input={<OutlinedInput notched={false} error={isInvalid} size="small" sx={{ ...outlinedInputSx(size), '& .MuiSelect-select': { pr: '36px !important', display: 'flex', alignItems: 'center' } }} />}
       SelectDisplayProps={{
         id: id ?? field?.id,

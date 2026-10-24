@@ -126,6 +126,7 @@ export function ChangePriceModal({ open, onClose, rows, currency, priceMin, curr
   const [mode, setMode] = React.useState<PriceMode>('incPct');
   const [value, setValue] = React.useState<number | null>(null);
   const [round, setRound] = React.useState<PriceRound>('none');
+  const valueInput = React.useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = React.useState(false);
   // "Only variations where <property> is <value>" (legacy Variation Price dialog): limits the change to matching
   // variations, and leaves listings without variations alone.
@@ -190,15 +191,21 @@ export function ChangePriceModal({ open, onClose, rows, currency, priceMin, curr
           <Select<PriceMode>
             value={mode}
             onChange={setMode}
+            // Typing right after picking a mode went to the closing menu (3c's re-test): the value field takes the
+            // focus at once, so the first keystroke lands there.
+            onPicked={() => {
+              valueInput.current?.focus();
+              valueInput.current?.select();
+            }}
             fullWidth
             options={(['set', 'incPct', 'decPct', 'incAmt', 'decAmt'] as const).map((m) => ({ value: m, label: t(`listings.price.mode.${m}`) }))}
           />
         </FormField>
         <FormField label={t('listings.price.valueLabel')}>
           {isMoney ? (
-            <MoneyField value={value} onChange={setValue} currency={currency} min={0} />
+            <MoneyField value={value} onChange={setValue} currency={currency} min={0} inputRef={valueInput} />
           ) : (
-            <NumberField value={value} onChange={setValue} min={0} max={1000} decimals={2} unit="%" />
+            <NumberField value={value} onChange={setValue} min={0} max={1000} decimals={2} unit="%" inputRef={valueInput} />
           )}
         </FormField>
         <FormField label={t('listings.price.round')}>

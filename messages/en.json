@@ -14047,7 +14047,8 @@
       "removeFirstCta": "Remove some tags first",
       "switchReplaceCta": "Switch to replace all tags",
       "removeFirstLabel": "Tags to remove first",
-      "removeFirstHelp": "These are removed from each listing, then the new tags are added. Click the most common ones to add them."
+      "removeFirstHelp": "These are removed from each listing, then the new tags are added. Click the most common ones to add them.",
+      "stillFull": "{count, plural, one {# listing is} other {# listings are}} still full: not all new tags fit. Remove one more tag, or it is skipped."
     },
     "legacySchedule": {
       "kept": "{count, plural, one {# old scheduled update could not be moved here and was kept} other {# old scheduled updates could not be moved here and were kept}}",

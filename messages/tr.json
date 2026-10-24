@@ -14047,7 +14047,8 @@
       "removeFirstCta": "Önce bazı etiketleri kaldır",
       "switchReplaceCta": "Tüm etiketleri değiştir moduna geç",
       "removeFirstLabel": "Önce kaldırılacak etiketler",
-      "removeFirstHelp": "Bu etiketler her ilandan silinir, sonra yeni etiketler eklenir. En sık kullanılanlara tıklayabilirsiniz."
+      "removeFirstHelp": "Bu etiketler her ilandan silinir, sonra yeni etiketler eklenir. En sık kullanılanlara tıklayabilirsiniz.",
+      "stillFull": "{count} ilan hâlâ dolu, yeni etiketlerin hepsi sığmıyor. Bir etiket daha kaldırın, yoksa atlanır."
     },
     "legacySchedule": {
       "kept": "{count} eski zamanlanmış güncelleme buraya taşınamadı ve saklandı",

@@ -175,7 +175,10 @@ export function AddTagsModal({ open, onClose, rows, limits, currentTags, onStage
         {plan.overLimit > 0 && limits.max !== null ? (
           <Box sx={{ p: '10px 12px', borderRadius: '8px', bgcolor: '#FFF7ED', border: '1px solid #FED7AA', display: 'flex', flexDirection: 'column', gap: '8px' }} data-testid="listings-tags-over-limit">
             <Typography variant="body2" sx={{ color: '#9A3412', fontWeight: 600 }}>
-              {t('listings.tags.fullTitle', { count: plan.overLimit, max: limits.max })}
+              {/* After removing some tags, say which listings are STILL full (why the stage count is lower). */}
+              {mode === 'add' && removeFirst.length > 0
+                ? t('listings.tags.stillFull', { count: plan.overLimit })
+                : t('listings.tags.fullTitle', { count: plan.overLimit, max: limits.max })}
             </Typography>
             <Typography variant="caption" sx={{ color: '#9A3412' }}>
               {fullRows.slice(0, 3).map((r) => r.title).join(' · ')}{fullRows.length > 3 ? ` · +${fullRows.length - 3}` : ''}

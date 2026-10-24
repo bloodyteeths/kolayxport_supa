@@ -14025,7 +14025,8 @@
       "unarchiveSkipped": "{count} ürün atlandı: yalnızca başka gönderilmemiş değişikliği olmayan arşivlenmiş ürünler arşivden çıkarılabilir",
       "editVariations": "Varyasyon / SKU düzenle",
       "applyTemplate": "Şablon uygula",
-      "aiText": "Yapay zekâ ile açıklama / çeviri"
+      "aiText": "Yapay zekâ ile açıklama / çeviri",
+      "categoryAttrs": "Kategori özellikleri"
     },
     "tags": {
       "unsentSkipped": "{count} ilanda gönderilmemiş etiket düzenlemesi var: bunları düzenleyicide değiştirin",
@@ -14649,6 +14650,20 @@
       "rateLimited": "Çok fazla istek; bir dakika sonra tekrar deneyin.",
       "failed": "Yapay zekâ şu an yanıt vermiyor; daha sonra tekrar deneyin.",
       "staged": "Yapay zekâ önerileri {count} ilanda hazırlandı"
+    },
+    "categoryAttrs": {
+      "title": "{count} ilanda kategori özellikleri",
+      "description": "Bir kategorinin özelliklerini (ana renk, malzeme, durum…) seçili ilanlara toplu verin. Boş bıraktıklarınız değişmez; değişiklikler \"Değişiklikleri gönder\" deyince Etsy'ye gider.",
+      "category": "Kategori",
+      "inCategory": "Bu kategoride {count} ilan var; {skipped} ilan başka kategoride olduğu için atlanır.",
+      "noCategory": "Bir kategori seçin.",
+      "loading": "Kategori özellikleri yükleniyor…",
+      "loadFailed": "Kategori özellikleri Etsy'den yüklenemedi",
+      "none": "Bu kategorinin ek özelliği yok.",
+      "emptyKeeps": "Yalnızca doldurduğunuz özellikler değişir.",
+      "stage": "{count} ilanda hazırla",
+      "staged": "Kategori özellikleri {count} ilanda hazırlandı",
+      "skipped": "{count} ilan başka kategoride olduğu için atlandı"
     }
   },
   "listingEditor": {

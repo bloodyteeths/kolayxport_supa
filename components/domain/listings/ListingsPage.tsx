@@ -89,6 +89,8 @@ import { QuickViewPanel } from './QuickViewPanel';
 import { useListingsShortcuts } from './useListingsShortcuts';
 import { ChangePriceModal } from './bulk/ChangePriceModal';
 import { VariationEditModal } from './bulk/VariationEditModal';
+import { CategoryAttributesModal, categoryRows } from './bulk/CategoryAttributesModal';
+import { pendingTaxonomyByListing, planCategoryAttributes } from '@/lib/bulk/categoryAttributes';
 import { TemplatesModal } from './bulk/TemplatesModal';
 import { AiTextModal } from './bulk/AiTextModal';
 import type { AiTextField, AiTextInput, AiTextResult } from '@/lib/bulk/aiText';
@@ -451,7 +453,7 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
   }, []);
 
   // ── panels / modals ──────────────────────────────────────────────────────────────────────────────────
-  const [modal, setModal] = React.useState<null | 'price' | 'stock' | 'tags' | 'schedule' | 'copyShop' | 'setField' | 'variations' | 'templates' | 'aiText'>(null);
+  const [modal, setModal] = React.useState<null | 'price' | 'stock' | 'tags' | 'schedule' | 'copyShop' | 'setField' | 'variations' | 'templates' | 'aiText' | 'categoryAttrs'>(null);
   const [modalRows, setModalRows] = React.useState<ListingRow[]>([]);
   // "Change stock" skips stock-managed rows (counted as skipped, like variation rows).
   const stockModalRows = React.useMemo(() => modalRows.map((r) => withStockManaged(r, stockManagedIds)), [modalRows, stockManagedIds]);
@@ -824,6 +826,25 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
     [storeId],
   );
 
+  // "Category attributes" (Etsy): the same category details on every selected listing of one category, merged with
+  // properties already staged on each listing (lib/bulk/categoryAttributes.ts).
+  const stageCategoryAttributes = React.useCallback(
+    async (targets: ListingRow[], taxonomyId: number, changed: Array<{ property_id: number; values: string[] }>) => {
+      if (!storeId) return;
+      const { fetchEtsyDrafts } = await import('@/lib/etsy/draftClient');
+      const pending = pendingTaxonomyByListing(await fetchEtsyDrafts(storeId).catch(() => []));
+      const plan = planCategoryAttributes(categoryRows(targets), taxonomyId, changed, pending);
+      const res = plan.patches.length
+        ? await staged.stageMany(plan.patches.map((p) => ({ id: p.id, patch: { etsy: { taxonomy: { properties: p.properties } } } as ExtendedStagePatch })))
+        : { ok: [], failed: [] };
+      if (res.failed.length) toast.error(t('listings.tools.stageFailed', { count: res.failed.length }));
+      if (res.ok.length) toast.success(t('listings.categoryAttrs.staged', { count: res.ok.length }));
+      if (plan.skipped) toast.info(t('listings.categoryAttrs.skipped', { count: plan.skipped }));
+      if (!res.failed.length && res.ok.length) clearSelection();
+    },
+    [staged, storeId, toast, t, clearSelection],
+  );
+
   // "Edit variations" (Etsy): stock / SKU per variation, staged as each listing's whole inventory.
   const stageVariationEdits = React.useCallback(
     async (targets: ListingRow[], edits: VariationEdits, match: VariationMatch | null) => {
@@ -1003,6 +1024,13 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
           setModal('setField');
           return;
         }
+        case 'categoryAttrs': {
+          const rowsFor = editableTargets(targets);
+          if (!rowsFor) return;
+          setModalRows(rowsFor);
+          setModal('categoryAttrs');
+          return;
+        }
         case 'aiText': {
           if (etsyLocked('ai')) {
             requestEditorUpgrade('ai');
@@ -1118,6 +1146,8 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
         return staged.adapter.stagesEtsyExtras && storeId ? t('listings.bulk.editVariations') : null;
       case 'aiText':
         return staged.adapter.stagesEtsyExtras && storeId ? t('listings.bulk.aiText') : null;
+      case 'categoryAttrs':
+        return staged.adapter.stagesEtsyExtras && storeId ? t('listings.bulk.categoryAttrs') : null;
       case 'applyTemplate':
         return staged.adapter.stagesEtsyExtras && storeId ? t('listings.bulk.applyTemplate') : null;
       case 'copyToShop':
@@ -1653,6 +1683,9 @@ export function ListingsPage({ marketplace, now, stagingAdapter }: ListingsPageP
           }}
           t={t}
         />
+      ) : null}
+      {staged.adapter.stagesEtsyExtras && storeId ? (
+        <CategoryAttributesModal open={modal === 'categoryAttrs'} onClose={() => setModal(null)} rows={modalRows} shopId={storeId} onStage={(tax, changed) => stageCategoryAttributes(modalRows, tax, changed)} />
       ) : null}
       {staged.adapter.stagesEtsyExtras && storeId ? (
         <AiTextModal open={modal === 'aiText'} onClose={() => setModal(null)} rows={modalRows} loadInputs={loadAiTextInputs} onStage={stageAiText} />

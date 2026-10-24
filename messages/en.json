@@ -14025,7 +14025,8 @@
       "unarchiveSkipped": "{count, plural, one {# product} other {# products}} skipped: only archived products without other unsent changes can be unarchived",
       "editVariations": "Edit variations / SKU",
       "applyTemplate": "Apply template",
-      "aiText": "AI description / translate"
+      "aiText": "AI description / translate",
+      "categoryAttrs": "Category attributes"
     },
     "tags": {
       "unsentSkipped": "{count, plural, one {# listing has} other {# listings have}} unsent tag edits: change them in the editor",
@@ -14649,6 +14650,20 @@
       "rateLimited": "Too many requests; try again in a minute.",
       "failed": "The AI isn't responding right now; try again later.",
       "staged": "AI suggestions staged on {count} listings"
+    },
+    "categoryAttrs": {
+      "title": "Category attributes on {count} listings",
+      "description": "Set a category's attributes (primary color, material, occasion…) on the selected listings. Empty fields stay as they are; changes go to Etsy when you send them.",
+      "category": "Category",
+      "inCategory": "{count} listings are in this category; {skipped} in another category are skipped.",
+      "noCategory": "Choose a category.",
+      "loading": "Loading category attributes…",
+      "loadFailed": "Couldn't load the category attributes from Etsy",
+      "none": "This category has no extra attributes.",
+      "emptyKeeps": "Only the attributes you fill in change.",
+      "stage": "Stage on {count} listings",
+      "staged": "Category attributes staged on {count} listings",
+      "skipped": "{count} listings skipped (another category)"
     }
   },
   "listingEditor": {

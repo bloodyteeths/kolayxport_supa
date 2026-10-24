@@ -56,6 +56,8 @@ export type BulkActionKey =
   | 'applyTemplate'
   /** Etsy: AI description rewrite / translation into English, staged as drafts. */
   | 'aiText'
+  /** Etsy: set category details (taxonomy properties) on the selected listings of one category. */
+  | 'categoryAttrs'
   | 'sendSelected'
   | 'discardSelected'
   | 'scheduleSend'

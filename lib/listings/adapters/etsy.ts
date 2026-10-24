@@ -183,6 +183,7 @@ export const etsyAdapter: ListingsAdapter = {
     state: true,
     url: true,
     shopSectionId: true,
+    taxonomyId: true,
     views: true,
     numFavorers: true,
     isPersonalizable: true,
@@ -218,6 +219,7 @@ export const etsyAdapter: ListingsAdapter = {
       createdAt: tsIso(r.etsyCreatedTimestamp),
       extra: {
         section: r.shopSectionId != null ? String(r.shopSectionId) : null,
+        taxonomyId: r.taxonomyId != null ? toNumber(r.taxonomyId) : null,
         views: toNumber(r.views),
         favorites: toNumber(r.numFavorers),
         photos: toNumber(r.imageCount),

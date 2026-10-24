@@ -16668,7 +16668,7 @@
       "updated": "Güncellendi",
       "lastVerified": "Son kontrol",
       "faqTitle": "Sık sorulan sorular",
-      "demoTitle": "60 saniyede görün",
+      "demoTitle": "Bir dakikada görün",
       "stepsTitle": "Nasıl çalışır?",
       "featuresTitle": "KolayXport ne yapar?",
       "painsTitle": "Tanıdık geliyor mu?",
@@ -16927,6 +16927,25 @@
       "readTime": "{count} dk okuma"
     },
     "help": {
+      "videos": {
+        "title": "Videolar",
+        "lead": "Her özelliği kısa bir videoda görün. Videolarda demo veriler kullanıldı.",
+        "related": "İlgili rehber",
+        "items": {
+          "editorSixJobs": {
+            "title": "Etsy toplu düzenleyici: altı iş, bir dakika",
+            "caption": "Fiyat değiştirme, etiket ekleme, bul ve değiştir, stok, fotoğraf sırası ve İngilizceye çeviri, hepsi göndermeden önce taslakta."
+          },
+          "trendyolEstimates": {
+            "title": "Trendyol'da kim ne kadar satıyor?",
+            "caption": "Bir kategorideki ilk ilanların tahmini günlük satışı ve cirosu. Değerlendirme artışından hesaplanır, gerçek satış sayacı değildir."
+          },
+          "etsyBulkShort": {
+            "title": "500 Etsy ilanını tek seferde düzenleyin",
+            "caption": "Her değişikliği göndermeden önce görün, Etsy'de yapılan düzenlemelerin üzerine yazılmaz."
+          }
+        }
+      },
       "title": "Nasıl kullanılır",
       "seoTitle": "Nasıl kullanılır: adım adım rehberler ve videolar — KolayXport",
       "seoDescription": "Mağaza bağlamaktan ilan optimizasyonuna, kargo etiketinden ETGB'ye KolayXport'un her adımı için kısa rehberler ve videolar.",

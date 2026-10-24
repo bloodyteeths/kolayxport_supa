@@ -6,6 +6,7 @@ import { ArrowRight } from 'lucide-react';
 import type { ContentType } from '@/lib/site/content';
 import { localePath, type SiteLocale } from '@/lib/site/routes';
 import { breadcrumbs } from '@/lib/site/schema';
+import { HOWTO_VIDEOS, type HowtoVideo } from '@/lib/site/howtoVideos';
 import SiteLayout from './SiteLayout';
 import { Section, Heading, CtaBand } from './Blocks';
 
@@ -55,6 +56,7 @@ function IndexBody({ locale, type, path, cards }: IndexPageProps) {
           </ul>
         )}
       </Section>
+      {type === 'guides' ? <HowtoVideos locale={locale} guideSlugs={cards.map((x) => x.slug)} /> : null}
       <CtaBand title={f('title')} text={f('text')} />
     </>
   );
@@ -95,5 +97,57 @@ function IndexSeo({ locale, path, title, description, crumb }: { locale: SiteLoc
       <NextSeo title={title} description={description} openGraph={{ title, description, url: `${SITE_URL}${localePath(locale, path)}` }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, '\\u003c') }} />
     </>
+  );
+}
+
+/** Product videos, each next to its related how-to guide (lib/site/howtoVideos.ts). */
+function HowtoVideos({ locale, guideSlugs }: { locale: SiteLocale; guideSlugs: string[] }) {
+  const t = useTranslations('site.help.videos');
+  const items = HOWTO_VIDEOS.filter((v) => v.youtube?.[locale] || v.file[locale]);
+  if (!items.length) return null;
+  return (
+    <Section tone="white">
+      <span id="videolar" className="block scroll-mt-24" />
+      <Heading title={t('title')} lead={t('lead')} />
+      <ul className="mt-10 grid gap-10 lg:grid-cols-2">
+        {items.map((v) => (
+          <li key={v.key} className={v.shape === 'wide' ? 'lg:col-span-2' : ''}>
+            <h3 className="display text-[24px] leading-tight">{t(`items.${v.key}.title` as any)}</h3>
+            <p className="mt-2 text-ink-soft">{t(`items.${v.key}.caption` as any)}</p>
+            <div className={`mt-5 ${v.shape === 'tall' ? 'mx-auto max-w-[340px]' : ''}`}><VideoPlayer v={v} locale={locale} label={t(`items.${v.key}.title` as any)} /></div>
+            {v.guide && guideSlugs.includes(v.guide) ? (
+              <Link prefetch={false} href={localePath(locale, `/nasil-kullanirim/${v.guide}`)} className="mt-4 inline-block text-sm font-semibold text-kx">
+                {t('related')} <ArrowRight size={14} className="inline" aria-hidden />
+              </Link>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </Section>
+  );
+}
+
+function VideoPlayer({ v, locale, label }: { v: HowtoVideo; locale: SiteLocale; label: string }) {
+  const aspect = v.shape === 'tall' ? 'aspect-[9/16]' : 'aspect-video';
+  const yt = v.youtube?.[locale];
+  if (yt) {
+    return (
+      <div className={`site-shot ${aspect} overflow-hidden`}>
+        <iframe
+          className="h-full w-full"
+          src={`https://www.youtube-nocookie.com/embed/${yt}?rel=0&cc_load_policy=1&cc_lang_pref=${locale}&hl=${locale}`}
+          title={label}
+          loading="lazy"
+          allow="accelerometer; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      </div>
+    );
+  }
+  const src = `/media/demos/${v.file[locale]}`;
+  return (
+    <video className={`site-shot ${aspect} w-full bg-ink`} controls playsInline preload="none" poster={`${src}.jpg`} aria-label={label}>
+      <source src={`${src}.mp4`} type="video/mp4" />
+    </video>
   );
 }

@@ -16668,7 +16668,7 @@
       "updated": "Updated",
       "lastVerified": "Last verified",
       "faqTitle": "Frequently asked questions",
-      "demoTitle": "See it in 60 seconds",
+      "demoTitle": "See it in a minute",
       "stepsTitle": "How it works",
       "featuresTitle": "What KolayXport does",
       "painsTitle": "Sound familiar?",
@@ -16927,6 +16927,25 @@
       "readTime": "{count} min read"
     },
     "help": {
+      "videos": {
+        "title": "Videos",
+        "lead": "See each feature in a short video. The videos use demo data.",
+        "related": "Related guide",
+        "items": {
+          "editorSixJobs": {
+            "title": "Etsy bulk editor: six jobs in a minute",
+            "caption": "Change prices, add tags, find and replace, stock, photo order and translation to English, all staged as drafts before you send."
+          },
+          "trendyolEstimates": {
+            "title": "Who sells how much on Trendyol?",
+            "caption": "Estimated daily sales and revenue for the top listings in a category, calculated from review growth, not a real sales counter."
+          },
+          "etsyBulkShort": {
+            "title": "Edit 500 Etsy listings at once",
+            "caption": "See every change before you send it, and edits made on Etsy are never overwritten."
+          }
+        }
+      },
       "title": "How-to guides",
       "seoTitle": "How-to guides and videos — KolayXport",
       "seoDescription": "Short guides and videos for every step in KolayXport, from connecting a shop to listing optimisation, labels and ETGB.",

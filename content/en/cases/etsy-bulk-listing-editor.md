@@ -5,7 +5,7 @@ h1: "Bulk edit thousands of Etsy listings, and see every change before it goes l
 keyword: "etsy bulk listing editor"
 twin: etsy-toplu-ilan-duzenleme
 updated: 2026-10-24
-inventoryRefs: [etsy-bulk-editor, staged-drafts-send, etsy-version-history, scheduled-send, bulk-photo-studio, ai-video-studio, ai-listing-copy, ai-bulk-optimize, etsy-copy-to-shop, order-sync-etsy, label-fedex, reports-profit]
+inventoryRefs: [ai-alt-text, stock-sync, etsy-bulk-editor, staged-drafts-send, etsy-version-history, scheduled-send, bulk-photo-studio, ai-video-studio, ai-listing-copy, ai-bulk-optimize, etsy-copy-to-shop, order-sync-etsy, label-fedex, reports-profit]
 draft: false
 eyebrow: "Etsy bulk listing editor"
 subtitle: "Prices, tags, titles, descriptions, variations, SKUs and photos, edited in bulk. Changes are staged first, so nothing reaches your shop until you send it."
@@ -67,6 +67,10 @@ Turn your existing product photos into short listing videos with AI, then add th
 ## More than an editor
 
 KolayXport also brings your Etsy, Amazon, eBay and Trendyol orders into one panel, with FedEx export labels and profit per order.
+
+## Already in KolayXport
+
+Six features waiting on Vela's public wishlist are already in KolayXport: bulk alt text (26 votes), auto-save (20), filters for listings missing photos, tags or video (18), cross-platform inventory sync (16), expired and sold-out listings (13), and inserting a photo at any position (8). Vote counts from [getvela.ai/help/wishlist](https://getvela.ai/help/wishlist), read 24 October 2026.
 
 ## What it doesn't do (yet)
 

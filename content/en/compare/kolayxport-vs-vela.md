@@ -5,7 +5,7 @@ h1: "Looking for a Vela alternative? Here's an honest comparison"
 keyword: "vela alternative"
 twin: kolayxport-vs-vela-alternatifi
 updated: 2026-10-24
-inventoryRefs: [etsy-bulk-editor, staged-drafts-send, etsy-version-history, bulk-photo-studio, ai-video-studio, ai-listing-copy, ai-bulk-optimize, scheduled-send, etsy-copy-to-shop, order-sync-etsy, label-fedex, reports-profit]
+inventoryRefs: [ai-alt-text, stock-sync, etsy-bulk-editor, staged-drafts-send, etsy-version-history, bulk-photo-studio, ai-video-studio, ai-listing-copy, ai-bulk-optimize, scheduled-send, etsy-copy-to-shop, order-sync-etsy, label-fedex, reports-profit]
 draft: false
 competitor: "Vela"
 lastVerified: 2026-10-24
@@ -73,6 +73,10 @@ rows:
 Vela is a popular, well-reviewed bulk editor for Etsy, Shopify, eBay and Faire. KolayXport focuses on safe bulk editing for Etsy, plus orders and shipping in one panel. Here's where we differ, and where we don't.
 
 The biggest difference is what happens before and after you press save. In KolayXport every edit is a draft until you send it, a listing that changed on Etsy in the meantime is flagged instead of overwritten, and you can restore a listing's earlier version after sending. Vela's own help centre says synced bulk edits are permanent and can't be undone.
+
+## Already in KolayXport
+
+Six features waiting on Vela's public wishlist are already in KolayXport: bulk alt text (26 votes), auto-save (20), filters for listings missing photos, tags or video (18), cross-platform inventory sync (16), expired and sold-out listings (13), and inserting a photo at any position (8). Vote counts from [getvela.ai/help/wishlist](https://getvela.ai/help/wishlist), read 24 October 2026.
 
 ## Who should pick which?
 

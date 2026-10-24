@@ -5,7 +5,7 @@ h1: "Vela alternatifi mi arıyorsunuz? İşte tarafsız bir karşılaştırma"
 keyword: "vela alternatifi"
 updated: 2026-10-24
 twin: kolayxport-vs-vela
-inventoryRefs: [etsy-bulk-editor, staged-drafts-send, etsy-version-history, bulk-photo-studio, ai-video-studio, ai-listing-copy, ai-bulk-optimize, scheduled-send, etsy-copy-to-shop, order-sync-etsy, label-fedex, reports-profit]
+inventoryRefs: [ai-alt-text, stock-sync, etsy-bulk-editor, staged-drafts-send, etsy-version-history, bulk-photo-studio, ai-video-studio, ai-listing-copy, ai-bulk-optimize, scheduled-send, etsy-copy-to-shop, order-sync-etsy, label-fedex, reports-profit]
 draft: false
 competitor: "Vela"
 lastVerified: 2026-10-24
@@ -78,6 +78,10 @@ rows:
 Vela, Etsy, Shopify, eBay ve Faire için popüler ve iyi değerlendirilen bir toplu düzenleme aracı. KolayXport ise Etsy'de güvenli toplu düzenlemeye, siparişler ve kargoyla birlikte tek panelde odaklanıyor. Nerede ayrıştığımızı ve nerede ayrışmadığımızı burada bulabilirsiniz.
 
 En büyük fark, kaydet tuşuna basmadan önce ve bastıktan sonra olanlar. KolayXport'ta her düzenleme siz gönderene kadar taslaktır, bu arada Etsy'de değişen bir ilanın üzerine yazılmaz, çakışma olarak gösterilir ve gönderdikten sonra bir ilanın önceki sürümünü geri yükleyebilirsiniz. Vela'nın kendi yardım merkezi, senkronize edilen toplu düzenlemelerin kalıcı olduğunu ve geri alınamadığını söylüyor.
+
+## KolayXport'ta zaten var
+
+Vela kullanıcılarının herkese açık istek listesinde bekleyen 6 özellik KolayXport'ta zaten var: toplu alternatif metin (26 oy), otomatik kaydetme (20), fotoğrafı, etiketi ya da videosu eksik ilan filtreleri (18), platformlar arası stok senkronu (16), süresi dolmuş ve tükenmiş ilanlar (13) ve fotoğrafı istediğiniz sıraya ekleme (8). Oy sayıları [getvela.ai/help/wishlist](https://getvela.ai/help/wishlist) sayfasından, 24 Ekim 2026'da okundu.
 
 ## Hangisini seçmeli?
 

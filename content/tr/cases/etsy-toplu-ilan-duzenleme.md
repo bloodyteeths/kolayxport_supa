@@ -5,7 +5,7 @@ h1: "Binlerce Etsy ilanını toplu düzenleyin, her değişikliği yayına almad
 keyword: "etsy toplu ilan düzenleme"
 updated: 2026-10-24
 twin: etsy-bulk-listing-editor
-inventoryRefs: [etsy-bulk-editor, staged-drafts-send, etsy-version-history, scheduled-send, bulk-photo-studio, ai-video-studio, ai-listing-copy, ai-bulk-optimize, etsy-copy-to-shop, order-sync-etsy, label-fedex, reports-profit]
+inventoryRefs: [ai-alt-text, stock-sync, etsy-bulk-editor, staged-drafts-send, etsy-version-history, scheduled-send, bulk-photo-studio, ai-video-studio, ai-listing-copy, ai-bulk-optimize, etsy-copy-to-shop, order-sync-etsy, label-fedex, reports-profit]
 draft: false
 eyebrow: "Etsy toplu ilan düzenleme"
 subtitle: "Fiyat, etiket, başlık, açıklama, varyasyon, SKU ve fotoğrafları toplu düzenleyin. Değişiklikler önce taslak olarak hazırlanır, siz göndermeden mağazanıza hiçbir şey gitmez."
@@ -67,6 +67,10 @@ Mevcut ürün fotoğraflarınızı yapay zekâ ile kısa ilan videolarına dön�
 ## Bir düzenleyiciden fazlası
 
 KolayXport, Etsy, Amazon, eBay ve Trendyol siparişlerinizi de FedEx ihracat etiketi ve sipariş başına kârla birlikte tek panelde toplar.
+
+## KolayXport'ta zaten var
+
+Vela kullanıcılarının herkese açık istek listesinde bekleyen 6 özellik KolayXport'ta zaten var: toplu alternatif metin (26 oy), otomatik kaydetme (20), fotoğrafı, etiketi ya da videosu eksik ilan filtreleri (18), platformlar arası stok senkronu (16), süresi dolmuş ve tükenmiş ilanlar (13) ve fotoğrafı istediğiniz sıraya ekleme (8). Oy sayıları [getvela.ai/help/wishlist](https://getvela.ai/help/wishlist) sayfasından, 24 Ekim 2026'da okundu.
 
 ## Henüz yapamadıkları
 

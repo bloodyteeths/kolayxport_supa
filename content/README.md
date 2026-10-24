@@ -16,7 +16,7 @@ content/
 ```
 
 The file name is the URL slug: lowercase, `a-z0-9-`, Turkish characters transliterated (ı→i, ş→s, ğ→g, ü→u, ö→o, ç→c).
-An English file uses the **same slug** as its Turkish twin.
+An English file uses the **same slug** as its Turkish twin. If the slugs must differ (an English URL for the EN page), add `twin: <other-locale slug>` to the frontmatter of **both** files; hreflang, the language switch and the sitemap then pair them.
 
 ## Frontmatter (the block between `---` lines at the top)
 

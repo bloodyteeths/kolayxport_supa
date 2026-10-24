@@ -18,6 +18,8 @@ export interface SiteSeo {
   path: string;
   /** Whether the page exists in the other locale (adds hreflang + the language switch target). */
   hasTwin?: boolean;
+  /** Turkish-form path of the twin when its slug differs (content `twin:`); defaults to `path`. */
+  twinPath?: string;
   /** Absolute path of the OG image under /public, e.g. /og/tr/cases/etsy-satici.png. */
   ogImage?: string | null;
   noindex?: boolean;
@@ -49,8 +51,10 @@ function SiteShell({ locale, seo, jsonLd = [], children, tone, keepInPlayApp }: 
   const t = useTranslations('site');
   const self = localePath(locale, seo.path);
   const canonical = `${SITE_URL}${self === '/' ? '' : self}` || SITE_URL;
-  const trUrl = `${SITE_URL}${localePath('tr', seo.path) === '/' ? '' : localePath('tr', seo.path)}`;
-  const enUrl = `${SITE_URL}${localePath('en', seo.path)}`;
+  const trPath = locale === 'tr' ? seo.path : seo.twinPath || seo.path;
+  const enPath = locale === 'en' ? seo.path : seo.twinPath || seo.path;
+  const trUrl = `${SITE_URL}${localePath('tr', trPath) === '/' ? '' : localePath('tr', trPath)}`;
+  const enUrl = `${SITE_URL}${localePath('en', enPath)}`;
   const og = `${SITE_URL}${seo.ogImage || (locale === 'en' ? '/og/default-en.png' : '/og/default.png')}`;
 
   useEffect(() => {
@@ -94,7 +98,7 @@ function SiteShell({ locale, seo, jsonLd = [], children, tone, keepInPlayApp }: 
         <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-ink focus:px-4 focus:py-2 focus:text-paper">
           {t('nav.skip')}
         </a>
-        <SiteHeader locale={locale} path={seo.path} hasTwin={!!seo.hasTwin} tone={tone || 'paper'} />
+        <SiteHeader locale={locale} path={seo.twinPath || seo.path} hasTwin={!!seo.hasTwin} tone={tone || 'paper'} />
         <main id="main" className="flex-1">{children}</main>
         <SiteFooter locale={locale} />
       </div>

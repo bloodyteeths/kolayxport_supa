@@ -58,7 +58,7 @@ export default function DocPage(props: DocPageProps) {
   return (
     <SiteLayout
       locale={locale}
-      seo={{ title: m.title, description: m.description, path, hasTwin: doc.hasTwin, ogImage: props.ogImage, type: type === 'blog' ? 'article' : 'website' }}
+      seo={{ title: m.title, description: m.description, path, hasTwin: doc.hasTwin, twinPath: doc.twinSlug && doc.twinSlug !== doc.slug ? path.replace(/[^/]+$/, doc.twinSlug) : undefined, ogImage: props.ogImage, type: type === 'blog' ? 'article' : 'website' }}
       jsonLd={schema}
       keepInPlayApp={type === 'legal'}
     >

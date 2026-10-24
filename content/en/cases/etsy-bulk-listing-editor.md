@@ -3,6 +3,7 @@ title: "Etsy Bulk Listing Editor: Edit Thousands of Listings Safely"
 description: "Bulk edit Etsy titles, tags, prices, variations and photos. See every change before it goes live, never overwrite Etsy edits, and restore earlier versions."
 h1: "Bulk edit thousands of Etsy listings, and see every change before it goes live"
 keyword: "etsy bulk listing editor"
+twin: etsy-toplu-ilan-duzenleme
 updated: 2026-10-24
 inventoryRefs: [etsy-bulk-editor, staged-drafts-send, etsy-version-history, scheduled-send, bulk-photo-studio, ai-video-studio, ai-listing-copy, ai-bulk-optimize, etsy-copy-to-shop, order-sync-etsy, label-fedex, reports-profit]
 draft: false

@@ -18,8 +18,10 @@ export interface ContentDoc {
   html: string;
   /** H2 headings for a table of contents. */
   toc: { id: string; text: string }[];
-  /** true when the other locale has a file with the same slug. */
+  /** true when the other locale has the twin file: the same slug, or the slug named in `twin:` frontmatter. */
   hasTwin: boolean;
+  /** Slug of the twin page in the other locale (null when there is none). Differs from `slug` only via `twin:`. */
+  twinSlug: string | null;
 }
 
 const ROOT = path.join(process.cwd(), 'content');
@@ -93,8 +95,10 @@ function load(locale: SiteLocale, type: ContentType, slug: string): ContentDoc |
   const { meta, body } = parse(fs.readFileSync(file, 'utf8'));
   const { html, toc } = render(body);
   const other: SiteLocale = locale === 'tr' ? 'en' : 'tr';
-  const hasTwin = fs.existsSync(path.join(dir(other, type), `${slug}.md`));
-  return { slug, locale, type, meta, html, toc, hasTwin };
+  // `twin: <slug>` pairs pages whose slugs differ per language (e.g. TR etsy-toplu-ilan-duzenleme ↔ EN etsy-bulk-listing-editor).
+  const twin = typeof meta.twin === 'string' && /^[a-z0-9-]+$/.test(meta.twin) ? meta.twin : slug;
+  const hasTwin = fs.existsSync(path.join(dir(other, type), `${twin}.md`));
+  return { slug, locale, type, meta, html, toc, hasTwin, twinSlug: hasTwin ? twin : null };
 }
 
 /** Published docs of a type (draft: true is skipped), newest first for blog, file order otherwise. */

@@ -6,7 +6,7 @@
 // Answers pass the same guards as the grid AI (useBulkAi): coerceAiString / looksGarbled / normalizeTitle (≤140) /
 // normalizeTags (13 × 20, no title-word overlap). Listings with an unsent change to a field are not sent for that
 // field. Nothing is staged here: the caller stages the returned patches; nothing reaches Etsy before the send.
-import { guardTagFacts, type DroppedFactTag } from '@/lib/etsy/tagFacts';
+import { mergeTranslatedTags, type DroppedFactTag } from '@/lib/etsy/tagFacts';
 import { TITLE_MAX, coerceAiString, looksGarbled, normalizeTags, normalizeTitle } from '@/lib/etsy/seoRules';
 import { LIMIT_UI_HEADER } from '@/lib/http/limitInterceptor';
 
@@ -105,12 +105,15 @@ export function guardAiTextItem(item: unknown, input: AiTextInput, fields: AiTex
     if (d && !looksGarbled(d) && d !== input.description.trim()) out.description = d.slice(0, 102400);
   }
   if (fields.includes('tags')) {
-    // No title-word overlap (founder rule). Translate re-applies the fact guard here too, so a tag that names a
+    // Improve: no title-word overlap (founder rule). Translate: the seller's own translated tags (`ownTags` from the
+    // server) may repeat title words, every other tag may not, and the fact guard runs again here, so a tag naming a
     // material / origin / religious term / style the listing does not state never reaches a draft.
     const translate = mode === 'translate';
-    const { tags: normalised } = normalizeTags(it.tags, { title, dropTitleOverlap: true });
-    const english = normalised.filter((x) => !TURKISH_ONLY.test(x));
-    const guarded = translate ? guardTagFacts(english, { title: input.title, description: input.description, tags: input.tags }) : { tags: english, dropped: [] as DroppedFactTag[] };
+    const all = (Array.isArray(it.tags) ? (it.tags as unknown[]) : []).filter((x): x is string => typeof x === 'string' && !TURKISH_ONLY.test(x));
+    const ownSet = new Set((Array.isArray(it.ownTags) ? (it.ownTags as unknown[]) : []).filter((x): x is string => typeof x === 'string').map((x) => x.toLowerCase()));
+    const guarded = translate
+      ? mergeTranslatedTags(all.filter((x) => ownSet.has(x.toLowerCase())), all.filter((x) => !ownSet.has(x.toLowerCase())), title, { title: input.title, description: input.description, tags: input.tags })
+      : { tags: normalizeTags(all, { title, dropTitleOverlap: true }).tags, dropped: [] as DroppedFactTag[] };
     const fromServer = Array.isArray(it.droppedTags) ? (it.droppedTags as unknown[]).filter(isDroppedFactTag) : [];
     const dropped = [...fromServer, ...guarded.dropped.filter((d) => !fromServer.some((x) => x.tag === d.tag))];
     if (guarded.tags.length && !sameTags(guarded.tags, input.tags)) out.tags = guarded.tags;

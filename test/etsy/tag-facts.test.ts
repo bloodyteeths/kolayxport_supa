@@ -59,3 +59,20 @@ describe('translate: no title-word overlap (founder rule) + fact guard (client)'
     expect(r?.droppedTags).toEqual([{ tag: 'natural fiber linen', kind: 'material', term: 'linen' }]);
   });
 });
+
+describe('hybrid rule (Orchestrator 24 Oct): own translated tags may repeat title words, AI-added may not', () => {
+  const TITLE = 'Indigo Striped Peshtemal, 100% Cotton Turkish Hammam Towel';
+  it('mergeTranslatedTags keeps own tags first, drops overlapping added tags, then the fact guard', async () => {
+    const { mergeTranslatedTags } = await import('@/lib/etsy/tagFacts');
+    const m = mergeTranslatedTags(['peshtemal', 'beach towel', 'cotton towel', 'hammam towel'], ['striped towel', 'pool sheet', 'gift for traveler', 'natural fiber linen'], TITLE, PESTAMAL);
+    expect(m.tags).toEqual(['peshtemal', 'beach towel', 'cotton towel', 'hammam towel', 'pool sheet', 'gift for traveler']);
+    expect(m.own).toEqual(['peshtemal', 'beach towel', 'cotton towel', 'hammam towel']);
+    expect(m.dropped.map((d) => d.tag)).toEqual(['natural fiber linen']);
+  });
+  it('client: tags the server marks as own survive the overlap filter; others do not', async () => {
+    const { guardAiTextItem } = await import('@/lib/bulk/aiText');
+    const input = { id: 'p', title: PESTAMAL.title, description: PESTAMAL.description, tags: PESTAMAL.tags, unsent: [] };
+    const r = guardAiTextItem({ title: TITLE, tags: ['peshtemal', 'turkish towel', 'striped towel', 'pool sheet'], ownTags: ['peshtemal', 'turkish towel'] }, input, ['title', 'tags'], 'translate');
+    expect(r?.tags).toEqual(['peshtemal', 'turkish towel', 'pool sheet']);
+  });
+});

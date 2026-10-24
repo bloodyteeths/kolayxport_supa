@@ -7,6 +7,8 @@
 // that names a guarded term with none of its justifications in the source title, description or tags is dropped and
 // reported, never silently kept.
 
+import { normalizeTags } from '@/lib/etsy/seoRules';
+
 export type TagFactKind = 'material' | 'origin' | 'religion' | 'style';
 
 type FactTerm = { kind: TagFactKind; en: string[]; src: string[] };
@@ -100,4 +102,22 @@ export function guardTagFacts(tags: readonly string[], source: { title?: string;
     else kept.push(tag);
   }
   return { tags: kept, dropped };
+}
+
+/**
+ * Translate mode (Orchestrator decision 24 Oct): the seller's OWN tags, translated, may repeat title words (they are
+ * the seller's chosen terms); every tag the AI ADDS follows the founder rule of no word shared with the title. Own
+ * tags come first, near-duplicates and the 13 limit are applied over the merged list, then the fact guard. Pure.
+ */
+export function mergeTranslatedTags(
+  own: unknown,
+  added: unknown,
+  title: string,
+  source: { title?: string; description?: string; tags?: readonly string[] },
+): { tags: string[]; own: string[]; dropped: DroppedFactTag[] } {
+  const ownTags = normalizeTags(own, { title, dropTitleOverlap: false }).tags;
+  const addedTags = normalizeTags(added, { title, dropTitleOverlap: true }).tags;
+  const merged = normalizeTags([...ownTags, ...addedTags]).tags;
+  const guarded = guardTagFacts(merged, source);
+  return { tags: guarded.tags, own: ownTags.filter((t) => guarded.tags.includes(t)), dropped: guarded.dropped };
 }

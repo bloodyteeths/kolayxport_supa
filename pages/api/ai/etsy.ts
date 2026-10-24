@@ -2,7 +2,7 @@ import { editorAllows, editorLockedBody } from '@/lib/billing/editorTier';
 import { accountEditorTier } from '@/lib/billing/editorTierServer';
 import { AiNotConfiguredError, getAiModel, refineFromBody } from '@/lib/ai/gemini';
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { guardTagFacts } from '@/lib/etsy/tagFacts';
+import { mergeTranslatedTags } from '@/lib/etsy/tagFacts';
 import { getAuthUser } from '../../../lib/auth';
 import {
   normalizeTitle, checkTitle, normalizeTags, tagKey, coerceAiString, coerceAiStringArray, looksGarbled,
@@ -541,7 +541,7 @@ async function handleBulkOptimize(body: any) {
   Category: ${coerceAiString(l.category) || 'N/A'}`;
   }).join('\n\n');
 
-  const outputShape = ['"listing_id": <same id>', ...Array.from(requested).map((f) => f === 'tags' ? '"tags": ["..."]' : `"${f}": "..."`)].join(', ');
+  const outputShape = ['"listing_id": <same id>', ...Array.from(requested).map((f) => f === 'tags' ? (translate ? '"translated_tags": ["..."], "added_tags": ["..."]' : '"tags": ["..."]') : `"${f}": "..."`)].join(', ');
   const tagsAgainst = wants('title') ? 'the NEW title you write' : 'the listing\'s CURRENT title (which is not being changed)';
 
   const prompt = translate
@@ -553,9 +553,8 @@ TRANSLATION RULES:
 - If a field is already in good English, return it unchanged.
 ${wants('title') ? `- The title is the translated product name written to these rules:\n${TITLE_RULES}` : ''}
 ${wants('tags') ? `TAG RULES (translation):
-- FIRST translate each original tag, in order, into the English phrase a US buyer types for it. Keep established product names (peştamal → peshtemal or turkish towel, İznik → iznik, cezve → turkish coffee pot).
-- A tag must NOT contain any word of ${tagsAgainst}: Etsy already indexes the title, so the product name and the words already in the title are covered there. When a translated original tag repeats a title word, use another true buyer search term instead.
-- THEN add real buyer search terms for this exact product (use, recipient, occasion), up to ${TAG_MAX_COUNT} tags in total. Only phrases a US buyer actually types; FEWER accurate tags are better than filler. Never describe a weave, finish, technique, size or feature the listing does not state.
+- "translated_tags": translate EACH original tag, in order, into the English phrase a US buyer types for it (one per original tag). Keep established product names (peştamal → peshtemal or turkish towel, İznik → iznik, cezve → turkish coffee pot). These may repeat title words: they are the seller's own terms.
+- "added_tags": real buyer search terms for this exact product (use, recipient, occasion) so that translated_tags + added_tags is at most ${TAG_MAX_COUNT}. An added tag must NOT contain any word of ${tagsAgainst} (Etsy already indexes the title). Only phrases a US buyer actually types; FEWER accurate tags are better than filler. Never describe a weave, finish, technique, size or feature the listing does not state.
 - Each tag MAXIMUM ${TAG_MAX_LEN} characters including spaces. Lowercase, letters/numbers/spaces only. No near-duplicates.
 - Never add a material, origin/country, religious or cultural term, or style (vintage, boho, …) that is not stated in the original title, description or tags. Never name items that are not included.` : ''}
 ${instructions ? `\nSELLER INSTRUCTIONS (follow them unless they conflict with the rules above): ${instructions}\n` : ''}
@@ -610,14 +609,20 @@ ${listingSummaries}`;
       }
     }
     if (wants('tags')) {
-      // No title-word overlap (founder rule: the title is indexed already). Translate also runs the fact guard: a tag
-      // naming a material / origin / religious term / style the source listing does not state is dropped (lib/etsy/tagFacts).
-      const { tags } = normalizeTags(item.tags, { title: finalTitle, dropTitleOverlap: true });
-      const guarded = translate
-        ? guardTagFacts(tags, { title: coerceAiString(input.title), description: coerceAiString(input.description), tags: Array.isArray(input.tags) ? input.tags.map(coerceAiString) : [] })
-        : { tags, dropped: [] };
-      if (guarded.tags.length > 0) out.tags = guarded.tags;
-      if (guarded.dropped.length) out.droppedTags = guarded.dropped;
+      // Improve: no title-word overlap (founder rule: the title is indexed already). Translate (Orchestrator, 24 Oct):
+      // the seller's own tags, translated, may repeat title words; AI-added tags may not; then the fact guard drops any
+      // tag naming a material / origin / religious term / style the source listing does not state (lib/etsy/tagFacts).
+      if (translate) {
+        const source = { title: coerceAiString(input.title), description: coerceAiString(input.description), tags: Array.isArray(input.tags) ? input.tags.map(coerceAiString) : [] };
+        const hasSplit = Array.isArray(item.translated_tags) || Array.isArray(item.added_tags);
+        const m = mergeTranslatedTags(hasSplit ? item.translated_tags : [], hasSplit ? item.added_tags : item.tags, finalTitle, source);
+        if (m.tags.length > 0) out.tags = m.tags;
+        if (m.own.length) out.ownTags = m.own;
+        if (m.dropped.length) out.droppedTags = m.dropped;
+      } else {
+        const { tags } = normalizeTags(item.tags, { title: finalTitle, dropTitleOverlap: true });
+        if (tags.length > 0) out.tags = tags;
+      }
     }
     if (wants('description')) {
       const raw = item.description;

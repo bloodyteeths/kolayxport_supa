@@ -230,6 +230,11 @@ function assertLocalDb(url: string) {
 
 export const DEMO_USER_ID = 'demo-user-kolayxport';
 export const DEMO_EMAIL = 'demo@kolayxport.test';
+// Hard guard: the permanent reviewer accounts (review@, play-review@, mcp-review@) are never seeded or wiped.
+if (/^(review|play-review|mcp-review)@/i.test(DEMO_EMAIL) || !DEMO_EMAIL.endsWith('.test')) {
+  console.error(`[demo] REFUSING to run: ${DEMO_EMAIL} is not a dedicated .test demo user.`);
+  process.exit(2);
+}
 export const DEMO_PASSWORD_DEFAULT = 'KolayDemo!2026';
 const ETSY_SHOP_ID = '48291736';
 const ETSY_SHOP_NAME = 'DemoAtolyeStudio';
